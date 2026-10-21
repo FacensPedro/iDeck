@@ -40,9 +40,14 @@ struct MainView: View {
                         .foregroundColor(.gray)
                     
                     if coordinator.prefixInstaller.isInstalling {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                            .padding(.top, 4)
+                        VStack {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            Text("Installing Madeira Environment...")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                        }
+                        .padding(.top, 4)
                     }
                 }
                 
@@ -73,7 +78,7 @@ struct MainView: View {
                     }) {
                         HStack {
                             Image(systemName: "window.casement")
-                            Text("Start Windows")
+                            Text("Start Windows Environment")
                                 .fontWeight(.semibold)
                         }
                         .frame(maxWidth: .infinity)
