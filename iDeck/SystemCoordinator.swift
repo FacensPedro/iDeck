@@ -91,4 +91,156 @@ class SystemCoordinator: ObservableObject {
     }
     
     private func startLiveContainer() {
-        currentStatus =
+        currentStatus = "Initializing LiveContainer..."
+        containerHost.setupContainer(bypassAMFI: isAMFIBypassEnabled, injectHooks: isGuestHooksEnabled) { [weak self] success in
+            DispatchQueue.main.async {
+                self?.isContainerReady = success
+                self?.currentStatus = success ? "LiveContainer Running" : "Container Error"
+            }
+        }
+    }
+    
+    private func startWindows() {
+        guard isJITEnabled else {
+            currentStatus = "Requires JIT"
+            return
+        }
+        
+        currentStatus = "Installing Windows Environment..."
+        containerHost.mountEnvironment { [weak self] mountPath in
+            guard let self = self else { return }
+            
+            self.prefixInstaller.installWinePrefix(to: mountPath) { success in
+                DispatchQueue.main.async {
+                    if success {
+                        self.isContainerReady = true
+                        self.windowsEnvironment.configureWine(prefix: mountPath)
+                        self.currentStatus = "Windows Ready"
+                    } else {
+                        self.currentStatus = "Failed to Install Windows Environment"
+                    }
+                }
+            }
+        }
+    }
+    
+    func activateJITManually(completion: ((Bool) -> Void)? = nil) {
+        let activateTask = {
+            let fileManager = FileManager.default
+            let documentDirectory = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first!
+            let pairingPath = documentDirectory.appendingPathComponent("pairing_file.mobiledevicepairing")
+            
+            let pairingURL = fileManager.fileExists(atPath: pairingPath.path) ? pairingPath : nil
+            
+            self.currentStatus = "Activating JIT..."
+            self.jitEnabler.activate(for: getpid(), useVPN: self.isVPNJITEnabled, pairingFileURL: pairingURL) { [weak self] success in
+                DispatchQueue.main.async {
+                    self?.isJITEnabled = success
+                    self?.currentStatus = success ? "JIT Activated" : "JIT Failed"
+                    completion?(success)
+                }
+            }
+        }
+        
+        if isVPNJITEnabled && !isLocalDevVPNActive() {
+            currentStatus = "Starting LocalDevVPN..."
+            VPNManager.shared.setupAndConnectLocalDevVPN { [weak self] success in
+                if success {
+                    activateTask()
+                } else {
+                    DispatchQueue.main.async {
+                        self?.currentStatus = "Failed to start VPN"
+                        completion?(false)
+                    }
+                }
+            }
+        } else {
+            activateTask()
+        }
+    }
+    
+    func importPairingFile(at url: URL) {
+        let fileManager = FileManager.default
+        let documentDirectory = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first!
+        let pairingPath = documentDirectory.appendingPathComponent("pairing_file.mobiledevicepairing")
+        
+        do {
+            if fileManager.fileExists(atPath: pairingPath.path) {
+                try fileManager.removeItem(at: pairingPath)
+            }
+            try fileManager.copyItem(at: url, to: pairingPath)
+            currentStatus = "Pairing file imported"
+        } catch {
+            currentStatus = "Pairing import failed"
+        }
+    }
+    
+    func mountDDI(urls: [URL]) {
+        currentStatus = "Mounting DDI..."
+        jitEnabler.mountDeveloperDiskImage(urls: urls) { [weak self] success in
+            DispatchQueue.main.async {
+                self?.currentStatus = success ? "DDI Mounted" : "DDI Mount Failed"
+            }
+        }
+    }
+    
+    private func applyMaxRefreshRate() {
+        if isMaxRefreshRateEnabled {
+            displayLink = CADisplayLink(target: self, selector: #selector(dummyDisplayLinkUpdate))
+            if #available(iOS 15.0, *) {
+                var maxFPS: Float = 60.0
+                let scenes = UIApplication.shared.connectedScenes
+                if let windowScene = scenes.first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene {
+                    maxFPS = Float(windowScene.screen.maximumFramesPerSecond)
+                }
+                displayLink?.preferredFrameRateRange = CAFrameRateRange(minimum: maxFPS, maximum: maxFPS, preferred: maxFPS)
+            }
+            displayLink?.add(to: .main, forMode: .common)
+        } else {
+            displayLink?.invalidate()
+            displayLink = nil
+        }
+    }
+    
+    @objc private func dummyDisplayLinkUpdate() {}
+    
+    func launchSteam() {
+        guard isJITEnabled && isContainerReady else { return }
+        
+        currentStatus = "Downloading Steam..."
+        containerHost.mountEnvironment { [weak self] mountPath in
+            guard let self = self else { return }
+            self.windowsEnvironment.configureWine(prefix: mountPath)
+            self.windowsEnvironment.installAndRunSteam(jitEnabler: self.jitEnabler) { result in
+                DispatchQueue.main.async {
+                    self.currentStatus = result ? "Steam Running" : "Steam Error"
+                }
+            }
+        }
+    }
+    
+    func launchWindowsExecutable(at url: URL) {
+        guard isJITEnabled && isContainerReady else { return }
+        
+        currentStatus = "Loading Executable..."
+        containerHost.mountEnvironment { [weak self] mountPath in
+            guard let self = self else { return }
+            self.windowsEnvironment.configureWine(prefix: mountPath)
+            self.windowsEnvironment.execute(binary: url, is32Bit: false, isSteam: false, jitEnabler: self.jitEnabler) { result in
+                DispatchQueue.main.async {
+                    self.currentStatus = result ? "Running" : "Execution Error"
+                }
+            }
+        }
+    }
+
+    func launchGuestApp(at url: URL) {
+        guard isJITEnabled && isContainerReady else {
+            currentStatus = "Requires JIT & LiveContainer"
+            return
+        }
+        
+        currentStatus = "Launching \(url.lastPathComponent)..."
+        setenv("GUEST_APP_PATH", url.path, 1)
+    }
+}
