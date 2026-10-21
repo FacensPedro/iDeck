@@ -19,6 +19,13 @@
 		111111111111111111111121 /* VPNManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222232 /* VPNManager.swift */; };
 		111111111111111111111122 /* PrefixInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222233 /* PrefixInstaller.swift */; };
 		111111111111111111111123 /* SteamManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222235 /* SteamManager.swift */; };
+		111111111111111111111124 /* AppManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222236 /* AppManager.swift */; };
+		111111111111111111111125 /* GameSessionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222237 /* GameSessionView.swift */; };
+		111111111111111111111126 /* GuestAppListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222238 /* GuestAppListView.swift */; };
+		111111111111111111111127 /* WindowsRendererView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222239 /* WindowsRendererView.swift */; };
+		111111111111111111111128 /* WineInputBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222240 /* WineInputBridge.swift */; };
+		111111111111111111111129 /* LiveContainerHook.m in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222241 /* LiveContainerHook.m */; };
+		111111111111111111111130 /* LiveContainerHook.c in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222242 /* LiveContainerHook.c */; };
 
 		222222222222222222222221 /* iDeckApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iDeckApp.swift; sourceTree = "<group>"; };
 		222222222222222222222222 /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
@@ -35,6 +42,15 @@
 		222222222222222222222233 /* PrefixInstaller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrefixInstaller.swift; sourceTree = "<group>"; };
 		222222222222222222222234 /* iDeck.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = iDeck.entitlements; sourceTree = "<group>"; };
 		222222222222222222222235 /* SteamManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamManager.swift; sourceTree = "<group>"; };
+		222222222222222222222236 /* AppManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppManager.swift"; sourceTree = "<group>"; };
+		222222222222222222222237 /* GameSessionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GameSessionView.swift"; sourceTree = "<group>"; };
+		222222222222222222222238 /* GuestAppListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GuestAppListView.swift"; sourceTree = "<group>"; };
+		222222222222222222222239 /* WindowsRendererView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WindowsRendererView.swift"; sourceTree = "<group>"; };
+		222222222222222222222240 /* WineInputBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WineInputBridge.swift"; sourceTree = "<group>"; };
+		222222222222222222222241 /* LiveContainerHook.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "LiveContainerHook.m"; sourceTree = "<group>"; };
+		222222222222222222222242 /* LiveContainerHook.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = "LiveContainerHook.c"; sourceTree = "<group>"; };
+		222222222222222222222243 /* LiveContainerHook.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "LiveContainerHook.h"; sourceTree = "<group>"; };
+		222222222222222222222244 /* iDeck-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "iDeck-Bridging-Header.h"; sourceTree = "<group>"; };
 
 		333333333333333333333331 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
@@ -60,6 +76,13 @@
 				111111111111111111111121 /* VPNManager.swift in Sources */,
 				111111111111111111111122 /* PrefixInstaller.swift in Sources */,
 				111111111111111111111123 /* SteamManager.swift in Sources */,
+				111111111111111111111124 /* AppManager.swift in Sources */,
+				111111111111111111111125 /* GameSessionView.swift in Sources */,
+				111111111111111111111126 /* GuestAppListView.swift in Sources */,
+				111111111111111111111127 /* WindowsRendererView.swift in Sources */,
+				111111111111111111111128 /* WineInputBridge.swift in Sources */,
+				111111111111111111111129 /* LiveContainerHook.m in Sources */,
+				111111111111111111111130 /* LiveContainerHook.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -88,6 +111,15 @@
 				222222222222222222222226 /* WindowsEnvironment.swift */,
 				222222222222222222222228 /* AudioManager.swift */,
 				222222222222222222222229 /* GraphicsConfig.swift */,
+				222222222222222222222236 /* AppManager.swift */,
+				222222222222222222222237 /* GameSessionView.swift */,
+				222222222222222222222238 /* GuestAppListView.swift */,
+				222222222222222222222239 /* WindowsRendererView.swift */,
+				222222222222222222222240 /* WineInputBridge.swift */,
+				222222222222222222222241 /* LiveContainerHook.m */,
+				222222222222222222222242 /* LiveContainerHook.c */,
+				222222222222222222222243 /* LiveContainerHook.h */,
+				222222222222222222222244 /* iDeck-Bridging-Header.h */,
 			);
 			path = iDeck;
 			sourceTree = "<group>";
@@ -164,6 +196,8 @@
 				CODE_SIGN_ENTITLEMENTS = iDeck/iDeck.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
+				INFOPLIST_FILE = iDeck/Info.plist;
+				SWIFT_OBJC_BRIDGING_HEADER = "iDeck/iDeck-Bridging-Header.h";
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_PREVIEWS = YES;
@@ -194,6 +228,8 @@
 				CODE_SIGN_ENTITLEMENTS = iDeck/iDeck.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
+				INFOPLIST_FILE = iDeck/Info.plist;
+				SWIFT_OBJC_BRIDGING_HEADER = "iDeck/iDeck-Bridging-Header.h";
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_PREVIEWS = YES;
