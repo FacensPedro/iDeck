@@ -5,6 +5,12 @@ class SystemCoordinator: ObservableObject {
     @Published var isJITEnabled: Bool = false
     @Published var isContainerReady: Bool = false
     @Published var currentStatus: String = "Idle"
+    @Published var isHUDEnabled: Bool = false {
+        didSet {
+            windowsEnvironment.graphicsConfig.isHUDEnabled = isHUDEnabled
+            windowsEnvironment.graphicsConfig.applyGraphicsEnvironment()
+        }
+    }
     
     private let jitEnabler = JITEnabler()
     private let containerHost = ContainerHost()
