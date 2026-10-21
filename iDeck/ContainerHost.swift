@@ -11,6 +11,7 @@ class ContainerHost {
         
         if dladdr(dyldPath, &info) != 0 {
             bypassSignatureChecks()
+            setupVirtualFileSystem()
             isMounted = true
             completion(true)
         } else {
@@ -25,11 +26,30 @@ class ContainerHost {
         let documentDirectory = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first!
         let virtualRoot = documentDirectory.appendingPathComponent("VirtualRoot")
         
-        if !fileManager.fileExists(atPath: virtualRoot.path) {
-            try? fileManager.createDirectory(at: virtualRoot, withIntermediateDirectories: true)
+        completion(virtualRoot.path)
+    }
+    
+    private func setupVirtualFileSystem() {
+        let fileManager = FileManager.default
+        guard let documentDirectory = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first else { return }
+        
+        let virtualRoot = documentDirectory.appendingPathComponent("VirtualRoot")
+        let directories = [
+            virtualRoot,
+            virtualRoot.appendingPathComponent("Library"),
+            virtualRoot.appendingPathComponent("Documents"),
+            virtualRoot.appendingPathComponent("SystemData"),
+            virtualRoot.appendingPathComponent("tmp")
+        ]
+        
+        for directory in directories {
+            if !fileManager.fileExists(atPath: directory.path) {
+                try? fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+            }
         }
         
-        completion(virtualRoot.path)
+        setenv("TMPDIR", virtualRoot.appendingPathComponent("tmp").path, 1)
+        setenv("HOME", virtualRoot.path, 1)
     }
     
     private func bypassSignatureChecks() {
