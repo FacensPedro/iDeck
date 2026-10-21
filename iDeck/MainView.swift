@@ -3,6 +3,7 @@ import UniformTypeIdentifiers
 
 struct MainView: View {
     @ObservedObject var coordinator: SystemCoordinator
+    @StateObject private var inputManager = InputManager()
     @State private var isDocumentPickerPresented = false
     
     var body: some View {
@@ -18,6 +19,7 @@ struct MainView: View {
                 HStack {
                     StatusIndicator(isActive: coordinator.isJITEnabled, label: "JIT Active")
                     StatusIndicator(isActive: coordinator.isContainerReady, label: "Container Ready")
+                    StatusIndicator(isActive: inputManager.isControllerConnected, label: "Controller")
                 }
                 
                 Text(coordinator.currentStatus)
@@ -34,6 +36,18 @@ struct MainView: View {
                         .cornerRadius(10)
                 }
                 .disabled(coordinator.isJITEnabled && coordinator.isContainerReady)
+                
+                Button(action: {
+                    coordinator.launchSteam()
+                }) {
+                    Text("Install & Run Steam")
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(coordinator.isJITEnabled && coordinator.isContainerReady ? Color.orange : Color.gray)
+                        .foregroundColor(.white)
+                        .cornerRadius(10)
+                }
+                .disabled(!coordinator.isJITEnabled || !coordinator.isContainerReady)
                 
                 Button(action: {
                     isDocumentPickerPresented = true
