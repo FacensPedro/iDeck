@@ -248,8 +248,7 @@ class SystemCoordinator: ObservableObject {
         }
     }
 
-    /// Selects the guest app the LiveContainer bundle hook should present as the main bundle.
-    /// Note: this only redirects `NSBundle.bundlePath`; it does not load or start the guest binary.
+    /// Loads and starts a guest .app inside this process (see LiveContainerHook).
     func launchGuestApp(at url: URL) {
         guard isJITEnabled && isContainerReady else {
             currentStatus = "Requires JIT & LiveContainer"
@@ -260,7 +259,12 @@ class SystemCoordinator: ObservableObject {
             return
         }
         
-        setenv("GUEST_APP_PATH", url.path, 1)
-        currentStatus = "Guest app selected: \(url.lastPathComponent)"
+        currentStatus = "Launching \(url.lastPathComponent)..."
+        var message: NSString?
+        if LiveContainerHook.launchGuestApp(atPath: url.path, errorMessage: &message) {
+            currentStatus = "Running \(url.lastPathComponent)"
+        } else {
+            currentStatus = "Guest launch failed: \(message ?? "unknown error")"
+        }
     }
 }
