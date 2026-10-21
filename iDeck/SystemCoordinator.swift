@@ -44,9 +44,10 @@ class SystemCoordinator: ObservableObject {
         }
     }
     
-    private let jitEnabler = JITEnabler()
-    private let containerHost = ContainerHost()
-    private let windowsEnvironment = WindowsEnvironment()
+    let jitEnabler = JITEnabler()
+    let containerHost = ContainerHost()
+    let windowsEnvironment = WindowsEnvironment()
+    let prefixInstaller = PrefixInstaller()
     private var displayLink: CADisplayLink?
     
     private func isLocalDevVPNActive() -> Bool {
@@ -65,7 +66,31 @@ class SystemCoordinator: ObservableObject {
         return false
     }
     
-    func startLiveContainer() {
+    func forceJITAndStartLiveContainer() {
+        if isJITEnabled {
+            startLiveContainer()
+        } else {
+            activateJITManually { success in
+                if success {
+                    self.startLiveContainer()
+                }
+            }
+        }
+    }
+    
+    func forceJITAndStartWindows() {
+        if isJITEnabled {
+            startWindows()
+        } else {
+            activateJITManually { success in
+                if success {
+                    self.startWindows()
+                }
+            }
+        }
+    }
+    
+    private func startLiveContainer() {
         currentStatus = "Initializing LiveContainer..."
         containerHost.setupContainer(bypassAMFI: isAMFIBypassEnabled, injectHooks: isGuestHooksEnabled) { [weak self] success in
             DispatchQueue.main.async {
@@ -75,21 +100,31 @@ class SystemCoordinator: ObservableObject {
         }
     }
     
-    func startWindows() {
-        guard isJITEnabled && isContainerReady else {
-            currentStatus = "Requires JIT & LiveContainer"
+    private func startWindows() {
+        guard isJITEnabled else {
+            currentStatus = "Requires JIT"
             return
         }
         
-        currentStatus = "Booting Windows Environment..."
+        currentStatus = "Installing Windows Environment..."
         containerHost.mountEnvironment { [weak self] mountPath in
             guard let self = self else { return }
-            self.windowsEnvironment.configureWine(prefix: mountPath)
-            self.currentStatus = "Windows Ready"
+            
+            self.prefixInstaller.installWinePrefix(to: mountPath) { success in
+                DispatchQueue.main.async {
+                    if success {
+                        self.isContainerReady = true
+                        self.windowsEnvironment.configureWine(prefix: mountPath)
+                        self.currentStatus = "Windows Ready"
+                    } else {
+                        self.currentStatus = "Failed to Install Windows Environment"
+                    }
+                }
+            }
         }
     }
     
-    func activateJITManually() {
+    func activateJITManually(completion: ((Bool) -> Void)? = nil) {
         let activateTask = {
             let fileManager = FileManager.default
             let documentDirectory = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first!
@@ -102,6 +137,7 @@ class SystemCoordinator: ObservableObject {
                 DispatchQueue.main.async {
                     self?.isJITEnabled = success
                     self?.currentStatus = success ? "JIT Activated" : "JIT Failed"
+                    completion?(success)
                 }
             }
         }
@@ -114,6 +150,7 @@ class SystemCoordinator: ObservableObject {
                 } else {
                     DispatchQueue.main.async {
                         self?.currentStatus = "Failed to start VPN"
+                        completion?(false)
                     }
                 }
             }
