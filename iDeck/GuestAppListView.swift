@@ -53,9 +53,7 @@ struct GuestAppListView: View {
             switch result {
             case .success(let urls):
                 if let url = urls.first {
-                    appManager.installIPA(from: url) { success in
-                        // Handle success/failure
-                    }
+                    appManager.installIPA(from: url) { _ in }
                 }
             case .failure:
                 break
