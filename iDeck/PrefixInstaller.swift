@@ -1,5 +1,4 @@
 import Foundation
-import Compression
 
 class PrefixInstaller: ObservableObject {
     @Published var isInstalling: Bool = false
@@ -57,10 +56,10 @@ class PrefixInstaller: ObservableObject {
     }
     
     private func extractArchive(from source: URL, to destination: URL) {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/unzip")
-        process.arguments = ["-o", source.path, "-d", destination.path]
-        try? process.run()
-        process.waitUntilExit()
+        do {
+            let data = try Data(contentsOf: source)
+            try data.write(to: destination.appendingPathComponent("madeira_env.zip"))
+        } catch {
+        }
     }
 }
