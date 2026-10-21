@@ -12,6 +12,7 @@ class ContainerHost {
         if dladdr(dyldPath, &info) != 0 {
             bypassSignatureChecks()
             setupVirtualFileSystem()
+            injectLiveContainerHooks()
             isMounted = true
             completion(true)
         } else {
@@ -59,6 +60,14 @@ class ContainerHost {
             typealias BypassFunction = @convention(c) () -> Void
             let function = unsafeBitCast(amfiSymbol, to: BypassFunction.self)
             function()
+        }
+    }
+    
+    private func injectLiveContainerHooks() {
+        let bundlePath = Bundle.main.bundlePath
+        let tweakPath = bundlePath.appending("/LiveContainerHook.dylib")
+        if FileManager.default.fileExists(atPath: tweakPath) {
+            setenv("DYLD_INSERT_LIBRARIES", tweakPath, 1)
         }
     }
 }
