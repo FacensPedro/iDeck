@@ -111,7 +111,11 @@ class SystemCoordinator: ObservableObject {
         if isMaxRefreshRateEnabled {
             displayLink = CADisplayLink(target: self, selector: #selector(dummyDisplayLinkUpdate))
             if #available(iOS 15.0, *) {
-                let maxFPS = Float(UIScreen.main.maximumFramesPerSecond)
+                var maxFPS: Float = 60.0
+                let scenes = UIApplication.shared.connectedScenes
+                if let windowScene = scenes.first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene {
+                    maxFPS = Float(windowScene.screen.maximumFramesPerSecond)
+                }
                 displayLink?.preferredFrameRateRange = CAFrameRateRange(minimum: maxFPS, maximum: maxFPS, preferred: maxFPS)
             }
             displayLink?.add(to: .main, forMode: .common)
