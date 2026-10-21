@@ -17,7 +17,7 @@ class WindowsEnvironment {
         graphicsConfig.applyGraphicsEnvironment()
     }
     
-    func installAndRunSteam(completion: @escaping (Bool) -> Void) {
+    func installAndRunSteam(jitEnabler: JITEnabler, completion: @escaping (Bool) -> Void) {
         let steamSetupURL = URL(string: "https://cdn.akamai.steamstatic.com/client/installer/SteamSetup.exe")!
         let fileManager = FileManager.default
         let downloadPath = fileManager.temporaryDirectory.appendingPathComponent("SteamSetup.exe")
@@ -34,7 +34,7 @@ class WindowsEnvironment {
             
             do {
                 try fileManager.moveItem(at: localURL, to: downloadPath)
-                self?.execute(binary: downloadPath, is32Bit: true) { success in
+                self?.execute(binary: downloadPath, is32Bit: true, jitEnabler: jitEnabler) { success in
                     completion(success)
                 }
             } catch {
@@ -44,7 +44,7 @@ class WindowsEnvironment {
         task.resume()
     }
     
-    func execute(binary: URL, is32Bit: Bool = false, completion: @escaping (Bool) -> Void) {
+    func execute(binary: URL, is32Bit: Bool = false, jitEnabler: JITEnabler, completion: @escaping (Bool) -> Void) {
         guard FileManager.default.fileExists(atPath: binary.path) else {
             completion(false)
             return
@@ -52,14 +52,14 @@ class WindowsEnvironment {
         
         let architectureTranslator = BoxTranslator()
         
-        architectureTranslator.translateAndRun(executablePath: binary.path, environment: winePrefixPath, is32Bit: is32Bit) { status in
+        architectureTranslator.translateAndRun(executablePath: binary.path, environment: winePrefixPath, is32Bit: is32Bit, jitEnabler: jitEnabler) { status in
             completion(status == 0)
         }
     }
 }
 
 private class BoxTranslator {
-    func translateAndRun(executablePath: String, environment: String, is32Bit: Bool, completion: @escaping (Int) -> Void) {
+    func translateAndRun(executablePath: String, environment: String, is32Bit: Bool, jitEnabler: JITEnabler, completion: @escaping (Int) -> Void) {
         let process = Process()
         let boxBinary = is32Bit ? "/usr/local/bin/box86" : "/usr/local/bin/box64"
         process.executableURL = URL(fileURLWithPath: boxBinary)
@@ -69,8 +69,17 @@ private class BoxTranslator {
         
         do {
             try process.run()
-            process.waitUntilExit()
-            completion(Int(process.terminationStatus))
+            
+            let pid = process.processIdentifier
+            jitEnabler.activate(for: pid) { jitSuccess in
+                if jitSuccess {
+                    process.waitUntilExit()
+                    completion(Int(process.terminationStatus))
+                } else {
+                    process.terminate()
+                    completion(-1)
+                }
+            }
         } catch {
             completion(-1)
         }
