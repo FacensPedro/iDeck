@@ -5,10 +5,26 @@ struct MainView: View {
     @ObservedObject var coordinator: SystemCoordinator
     @StateObject private var inputManager = InputManager()
     @State private var isDocumentPickerPresented = false
+    @State private var isSettingsPresented = false
     
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
+            
+            VStack {
+                HStack {
+                    Spacer()
+                    Button(action: {
+                        isSettingsPresented = true
+                    }) {
+                        Image(systemName: "gearshape.fill")
+                            .font(.title2)
+                            .foregroundColor(.white)
+                    }
+                    .padding()
+                }
+                Spacer()
+            }
             
             VStack(spacing: 24) {
                 Text("iDeck System")
@@ -69,6 +85,9 @@ struct MainView: View {
             }
             .padding()
         }
+        .sheet(isPresented: $isSettingsPresented) {
+            SettingsView(coordinator: coordinator)
+        }
         .fileImporter(
             isPresented: $isDocumentPickerPresented,
             allowedContentTypes: [UTType(filenameExtension: "exe")!],
@@ -83,5 +102,24 @@ struct MainView: View {
                 break
             }
         }
+    }
+}
+
+struct StatusIndicator: View {
+    let isActive: Bool
+    let label: String
+    
+    var body: some View {
+        HStack {
+            Circle()
+                .fill(isActive ? Color.green : Color.red)
+                .frame(width: 12, height: 12)
+            Text(label)
+                .font(.subheadline)
+                .foregroundColor(.white)
+        }
+        .padding(8)
+        .background(Color.gray.opacity(0.3))
+        .cornerRadius(8)
     }
 }
