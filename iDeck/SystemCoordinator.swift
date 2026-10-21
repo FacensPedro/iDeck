@@ -17,10 +17,10 @@ class SystemCoordinator: ObservableObject {
     private let windowsEnvironment = WindowsEnvironment()
     
     func initializeSystem() {
-        currentStatus = "Activating JIT..."
-        jitEnabler.activate { [weak self] success in
+        currentStatus = "Activating Host JIT..."
+        jitEnabler.activate(for: getpid()) { [weak self] success in
             guard let self = self, success else {
-                self?.currentStatus = "JIT Activation Failed"
+                self?.currentStatus = "Host JIT Activation Failed"
                 return
             }
             
@@ -44,9 +44,12 @@ class SystemCoordinator: ObservableObject {
         currentStatus = "Downloading Steam..."
         
         containerHost.mountEnvironment { [weak self] mountPath in
-            self?.windowsEnvironment.configureWine(prefix: mountPath)
-            self?.windowsEnvironment.installAndRunSteam { result in
-                self?.currentStatus = result ? "Running Steam" : "Steam Error"
+            guard let self = self else { return }
+            self.windowsEnvironment.configureWine(prefix: mountPath)
+            self.windowsEnvironment.installAndRunSteam(jitEnabler: self.jitEnabler) { result in
+                DispatchQueue.main.async {
+                    self.currentStatus = result ? "Running Steam" : "Steam Error"
+                }
             }
         }
     }
@@ -57,9 +60,12 @@ class SystemCoordinator: ObservableObject {
         currentStatus = "Loading Windows Environment..."
         
         containerHost.mountEnvironment { [weak self] mountPath in
-            self?.windowsEnvironment.configureWine(prefix: mountPath)
-            self?.windowsEnvironment.execute(binary: url) { result in
-                self?.currentStatus = result ? "Running" : "Execution Error"
+            guard let self = self else { return }
+            self.windowsEnvironment.configureWine(prefix: mountPath)
+            self.windowsEnvironment.execute(binary: url, jitEnabler: self.jitEnabler) { result in
+                DispatchQueue.main.async {
+                    self.currentStatus = result ? "Running" : "Execution Error"
+                }
             }
         }
     }
