@@ -226,7 +226,7 @@ class SystemCoordinator: ObservableObject {
         containerHost.mountEnvironment { [weak self] mountPath in
             guard let self = self else { return }
             self.windowsEnvironment.configureWine(prefix: mountPath)
-            self.windowsEnvironment.execute(binary: url, jitEnabler: self.jitEnabler) { result in
+            self.windowsEnvironment.execute(binary: url, is32Bit: false, isSteam: false, jitEnabler: self.jitEnabler) { result in
                 DispatchQueue.main.async {
                     self.currentStatus = result ? "Running" : "Execution Error"
                 }
