@@ -32,6 +32,19 @@ class SystemCoordinator: ObservableObject {
         }
     }
     
+    func launchSteam() {
+        guard isJITEnabled && isContainerReady else { return }
+        
+        currentStatus = "Downloading Steam..."
+        
+        containerHost.mountEnvironment { [weak self] mountPath in
+            self?.windowsEnvironment.configureWine(prefix: mountPath)
+            self?.windowsEnvironment.installAndRunSteam { result in
+                self?.currentStatus = result ? "Running Steam" : "Steam Error"
+            }
+        }
+    }
+    
     func launchWindowsExecutable(at url: URL) {
         guard isJITEnabled && isContainerReady else { return }
         
