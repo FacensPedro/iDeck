@@ -8,7 +8,9 @@ class WindowsEnvironment {
         setenv("WINEPREFIX", prefix, 1)
         setenv("WINEDEBUG", "-all", 1)
         setenv("STEAM_COMPAT_CLIENT_INSTALL_PATH", prefix + "/drive_c/Program Files (x86)/Steam", 1)
-        setenv("WINEDLLOVERRIDES", "dwrite=d;dxgi=n", 1)
+        setenv("WINEDLLOVERRIDES", "dwrite=d;dxgi=n;d3d11=n;d3d10=n", 1)
+        setenv("DXVK_HUD", "1", 1)
+        setenv("MVK_CONFIG_FULL_IMAGE_VIEW_SWIZZLE", "1", 1)
     }
     
     func installAndRunSteam(completion: @escaping (Bool) -> Void) {
@@ -28,7 +30,7 @@ class WindowsEnvironment {
             
             do {
                 try fileManager.moveItem(at: localURL, to: downloadPath)
-                self?.execute(binary: downloadPath) { success in
+                self?.execute(binary: downloadPath, is32Bit: true) { success in
                     completion(success)
                 }
             } catch {
@@ -38,30 +40,33 @@ class WindowsEnvironment {
         task.resume()
     }
     
-    func execute(binary: URL, completion: @escaping (Bool) -> Void) {
+    func execute(binary: URL, is32Bit: Bool = false, completion: @escaping (Bool) -> Void) {
         guard FileManager.default.fileExists(atPath: binary.path) else {
             completion(false)
             return
         }
         
-        let architectureTranslator = Box64Translator()
+        let architectureTranslator = BoxTranslator()
         
-        architectureTranslator.translateAndRun(executablePath: binary.path, environment: winePrefixPath) { status in
+        architectureTranslator.translateAndRun(executablePath: binary.path, environment: winePrefixPath, is32Bit: is32Bit) { status in
             completion(status == 0)
         }
     }
 }
 
-private class Box64Translator {
-    func translateAndRun(executablePath: String, environment: String, completion: @escaping (Int) -> Void) {
+private class BoxTranslator {
+    func translateAndRun(executablePath: String, environment: String, is32Bit: Bool, completion: @escaping (Int) -> Void) {
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/local/bin/box64")
+        let boxBinary = is32Bit ? "/usr/local/bin/box86" : "/usr/local/bin/box64"
+        process.executableURL = URL(fileURLWithPath: boxBinary)
         process.arguments = ["wine", executablePath]
         
         var environmentDict = ProcessInfo.processInfo.environment
         environmentDict["WINEPREFIX"] = environment
         environmentDict["STEAM_COMPAT_CLIENT_INSTALL_PATH"] = environment + "/drive_c/Program Files (x86)/Steam"
-        environmentDict["WINEDLLOVERRIDES"] = "dwrite=d;dxgi=n"
+        environmentDict["WINEDLLOVERRIDES"] = "dwrite=d;dxgi=n;d3d11=n;d3d10=n"
+        environmentDict["DXVK_HUD"] = "1"
+        environmentDict["MVK_CONFIG_FULL_IMAGE_VIEW_SWIZZLE"] = "1"
         
         process.environment = environmentDict
         
