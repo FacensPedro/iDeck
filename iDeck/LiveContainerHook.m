@@ -3,6 +3,7 @@
 #import <objc/runtime.h>
 #import <stdlib.h>
 #import <string.h>
+#import <limits.h>
 #import <dlfcn.h>
 #import <mach/mach.h>
 #import <mach-o/dyld.h>
@@ -242,7 +243,7 @@ static int LCGuestUIApplicationMain(int argc, char *_Nullable *_Nonnull argv, NS
         if (sceneClass) {
             gGuestSceneDelegate = [[sceneClass alloc] init];
             if ([gGuestSceneDelegate respondsToSelector:@selector(scene:willConnectToSession:options:)]) {
-                [gGuestSceneDelegate scene:hostScene willConnectToSession:hostScene.session connectionOptions:nil];
+                [gGuestSceneDelegate scene:hostScene willConnectToSession:hostScene.session options:nil];
             }
             if ([gGuestSceneDelegate respondsToSelector:@selector(window)]) window = [gGuestSceneDelegate window];
         }

@@ -278,7 +278,7 @@ enum TarGzExtractor {
         }
         defer { compression_stream_destroy(&stream) }
 
-        try input.withUnsafeBytes { (raw: UnsafeRawBufferPointer) in
+        try input.withUnsafeBytes { (raw: UnsafeRawBufferPointer) throws -> Void in
             guard let base = raw.bindMemory(to: UInt8.self).baseAddress else { throw ZipError.invalidArchive }
             stream.src_ptr = base
             stream.src_size = input.count
@@ -446,7 +446,7 @@ enum ZipExtractor {
         }
         defer { compression_stream_destroy(&stream) }
 
-        try input.withUnsafeBytes { (raw: UnsafeRawBufferPointer) in
+        try input.withUnsafeBytes { (raw: UnsafeRawBufferPointer) throws -> Void in
             guard let base = raw.bindMemory(to: UInt8.self).baseAddress else { throw ZipError.invalidArchive }
             stream.src_ptr = base
             stream.src_size = input.count

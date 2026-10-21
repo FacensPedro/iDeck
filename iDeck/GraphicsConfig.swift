@@ -1,5 +1,16 @@
 import Foundation
 
+/// Appends `value` to a ";"-separated environment variable, creating it if unset and
+/// skipping entries that are already present.
+func appendEnvironmentList(_ key: String, _ value: String) {
+    let current = getenv(key).map { String(cString: $0) } ?? ""
+    var entries = current.split(separator: ";").map(String.init)
+    for entry in value.split(separator: ";").map(String.init) where !entries.contains(entry) {
+        entries.append(entry)
+    }
+    setenv(key, entries.joined(separator: ";"), 1)
+}
+
 class GraphicsConfig {
     var isHUDEnabled: Bool = false
     var useD3DMetal: Bool = false
@@ -17,9 +28,9 @@ class GraphicsConfig {
         setenv("MVK_ALLOW_METAL_FENCES", "1", 1)
         
         if useD3DMetal {
-            setenv("WINEDLLOVERRIDES", String(cString: getenv("WINEDLLOVERRIDES")) + ";dxgi=n;d3d11=n;d3d10=n;d3d12=n", 1)
+            appendEnvironmentList("WINEDLLOVERRIDES", "dxgi=n;d3d11=n;d3d10=n;d3d12=n")
         } else {
-            setenv("WINEDLLOVERRIDES", String(cString: getenv("WINEDLLOVERRIDES")) + ";dxgi=n;d3d11=n;d3d10=n", 1)
+            appendEnvironmentList("WINEDLLOVERRIDES", "dxgi=n;d3d11=n;d3d10=n")
         }
     }
 }

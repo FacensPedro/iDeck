@@ -25,7 +25,7 @@
 		111111111111111111111127 /* WindowsRendererView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222239 /* WindowsRendererView.swift */; };
 		111111111111111111111128 /* WineInputBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222240 /* WineInputBridge.swift */; };
 		111111111111111111111129 /* LiveContainerHook.m in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222241 /* LiveContainerHook.m */; };
-		111111111111111111111130 /* LiveContainerHook.c in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222242 /* LiveContainerHook.c */; };
+		111111111111111111111130 /* LiveContainerInit.c in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222242 /* LiveContainerInit.c */; };
 
 		222222222222222222222221 /* iDeckApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iDeckApp.swift; sourceTree = "<group>"; };
 		222222222222222222222222 /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
@@ -48,7 +48,7 @@
 		222222222222222222222239 /* WindowsRendererView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WindowsRendererView.swift"; sourceTree = "<group>"; };
 		222222222222222222222240 /* WineInputBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WineInputBridge.swift"; sourceTree = "<group>"; };
 		222222222222222222222241 /* LiveContainerHook.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "LiveContainerHook.m"; sourceTree = "<group>"; };
-		222222222222222222222242 /* LiveContainerHook.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = "LiveContainerHook.c"; sourceTree = "<group>"; };
+		222222222222222222222242 /* LiveContainerInit.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = "LiveContainerInit.c"; sourceTree = "<group>"; };
 		222222222222222222222243 /* LiveContainerHook.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "LiveContainerHook.h"; sourceTree = "<group>"; };
 		222222222222222222222244 /* iDeck-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "iDeck-Bridging-Header.h"; sourceTree = "<group>"; };
 
@@ -82,7 +82,7 @@
 				111111111111111111111127 /* WindowsRendererView.swift in Sources */,
 				111111111111111111111128 /* WineInputBridge.swift in Sources */,
 				111111111111111111111129 /* LiveContainerHook.m in Sources */,
-				111111111111111111111130 /* LiveContainerHook.c in Sources */,
+				111111111111111111111130 /* LiveContainerInit.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -117,7 +117,7 @@
 				222222222222222222222239 /* WindowsRendererView.swift */,
 				222222222222222222222240 /* WineInputBridge.swift */,
 				222222222222222222222241 /* LiveContainerHook.m */,
-				222222222222222222222242 /* LiveContainerHook.c */,
+				222222222222222222222242 /* LiveContainerInit.c */,
 				222222222222222222222243 /* LiveContainerHook.h */,
 				222222222222222222222244 /* iDeck-Bridging-Header.h */,
 			);
