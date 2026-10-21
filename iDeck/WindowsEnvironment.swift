@@ -5,6 +5,7 @@ class WindowsEnvironment {
     private var winePrefixPath: String = ""
     let graphicsConfig = GraphicsConfig()
     let audioManager = AudioManager()
+    let steamManager = SteamManager()
     
     func configureWine(prefix: String) {
         self.winePrefixPath = prefix
@@ -12,10 +13,11 @@ class WindowsEnvironment {
         setenv("WINEDEBUG", "-all", 1)
         setenv("WINEARCH", "win64", 1)
         setenv("STEAM_COMPAT_CLIENT_INSTALL_PATH", prefix + "/drive_c/Program Files (x86)/Steam", 1)
-        setenv("WINEDLLOVERRIDES", "dwrite=d;winhttp=n,b;crypt32=n,b;secur32=n,b;nsi=n,b;rpcrt4=n,b", 1)
+        setenv("WINEDLLOVERRIDES", "dwrite=d;winhttp=n,b;crypt32=n,b;secur32=n,b;nsi=n,b;rpcrt4=n,b;wbemprox=n", 1)
         
         _ = audioManager.configureAudioSession()
         graphicsConfig.applyGraphicsEnvironment()
+        steamManager.applySteamRegistryFixes(prefixPath: prefix)
     }
     
     func installAndRunSteam(jitEnabler: JITEnabler, completion: @escaping (Bool) -> Void) {
@@ -35,7 +37,7 @@ class WindowsEnvironment {
             
             do {
                 try fileManager.moveItem(at: localURL, to: downloadPath)
-                self?.execute(binary: downloadPath, is32Bit: true, jitEnabler: jitEnabler) { success in
+                self?.execute(binary: downloadPath, is32Bit: true, isSteam: true, jitEnabler: jitEnabler) { success in
                     completion(success)
                 }
             } catch {
@@ -45,7 +47,7 @@ class WindowsEnvironment {
         task.resume()
     }
     
-    func execute(binary: URL, is32Bit: Bool = false, jitEnabler: JITEnabler, completion: @escaping (Bool) -> Void) {
+    func execute(binary: URL, is32Bit: Bool = false, isSteam: Bool = false, jitEnabler: JITEnabler, completion: @escaping (Bool) -> Void) {
         guard FileManager.default.fileExists(atPath: binary.path) else {
             completion(false)
             return
@@ -53,18 +55,24 @@ class WindowsEnvironment {
         
         let architectureTranslator = BoxTranslator()
         
-        architectureTranslator.translateAndRun(executablePath: binary.path, environment: winePrefixPath, is32Bit: is32Bit, jitEnabler: jitEnabler) { status in
+        architectureTranslator.translateAndRun(executablePath: binary.path.path, environment: winePrefixPath, is32Bit: is32Bit, isSteam: isSteam, jitEnabler: jitEnabler) { status in
             completion(status == 0)
         }
     }
 }
 
 private class BoxTranslator {
-    func translateAndRun(executablePath: String, environment: String, is32Bit: Bool, jitEnabler: JITEnabler, completion: @escaping (Int) -> Void) {
-        let boxBinary = is32Bit ? "/usr/local/bin/box86" : "/usr/local/bin/box64"
+    func translateAndRun(executablePath: String, environment: String, is32Bit: Bool, isSteam: Bool, jitEnabler: JITEnabler, completion: @escaping (Int) -> Void) {
+        let boxBinary = is32Bit ? "\(environment)/usr/bin/box86" : "\(environment)/usr/bin/box64"
+        let wineBinary = is32Bit ? "\(environment)/usr/bin/wine" : "\(environment)/usr/bin/wine64"
         var pid: pid_t = 0
         
-        let args = [boxBinary, "wine", executablePath]
+        var args = [boxBinary, wineBinary, executablePath]
+        
+        if isSteam {
+            args.append(contentsOf: ["-no-cef-sandbox", "-tcp", "-allopenal", "-login"])
+        }
+        
         var cArgs = args.map { strdup($0) }
         cArgs.append(nil)
         
