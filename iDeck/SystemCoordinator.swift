@@ -6,7 +6,7 @@ import QuartzCore
 class SystemCoordinator: ObservableObject {
     @Published var isJITEnabled: Bool = false
     @Published var isContainerReady: Bool = false
-    @Published var currentStatus: String = "Idle"
+    @Published var currentStatus: String = "Ready"
     
     @Published var isHUDEnabled: Bool = false {
         didSet {
@@ -25,7 +25,17 @@ class SystemCoordinator: ObservableObject {
         }
     }
     
+    @Published var isD3DMetalEnabled: Bool = false {
+        didSet {
+            windowsEnvironment.graphicsConfig.useD3DMetal = isD3DMetalEnabled
+            windowsEnvironment.graphicsConfig.applyGraphicsEnvironment()
+        }
+    }
+    
     @Published var isJITPoolEnabled: Bool = false
+    @Published var isVPNJITEnabled: Bool = false
+    @Published var isAMFIBypassEnabled: Bool = true
+    @Published var isGuestHooksEnabled: Bool = true
     
     @Published var isMaxRefreshRateEnabled: Bool = false {
         didSet {
@@ -36,34 +46,35 @@ class SystemCoordinator: ObservableObject {
     private let jitEnabler = JITEnabler()
     private let containerHost = ContainerHost()
     private let windowsEnvironment = WindowsEnvironment()
-    
     private var displayLink: CADisplayLink?
     
-    func initializeSystem() {
-        currentStatus = "Activating Host JIT..."
-        jitEnabler.activate(for: getpid()) { [weak self] success in
-            guard let self = self, success else {
-                self?.currentStatus = "Host JIT Activation Failed"
-                return
-            }
-            
-            self.isJITEnabled = true
-            self.currentStatus = "Initializing LiveContainer..."
-            
-            self.containerHost.setupContainer { containerSuccess in
-                if containerSuccess {
-                    self.isContainerReady = true
-                    self.currentStatus = "System Ready"
-                } else {
-                    self.currentStatus = "Container Setup Failed"
-                }
+    func startLiveContainer() {
+        currentStatus = "Initializing LiveContainer..."
+        containerHost.setupContainer(bypassAMFI: isAMFIBypassEnabled, injectHooks: isGuestHooksEnabled) { [weak self] success in
+            DispatchQueue.main.async {
+                self?.isContainerReady = success
+                self?.currentStatus = success ? "LiveContainer Running" : "Container Error"
             }
         }
     }
     
+    func startWindows() {
+        guard isJITEnabled && isContainerReady else {
+            currentStatus = "Requires JIT & LiveContainer"
+            return
+        }
+        
+        currentStatus = "Booting Windows Environment..."
+        containerHost.mountEnvironment { [weak self] mountPath in
+            guard let self = self else { return }
+            self.windowsEnvironment.configureWine(prefix: mountPath)
+            self.currentStatus = "Windows Ready"
+        }
+    }
+    
     func activateJITManually() {
-        currentStatus = "Activating JIT Manually..."
-        jitEnabler.activate(for: getpid()) { [weak self] success in
+        currentStatus = "Activating JIT..."
+        jitEnabler.activate(for: getpid(), useVPN: isVPNJITEnabled) { [weak self] success in
             DispatchQueue.main.async {
                 self?.isJITEnabled = success
                 self?.currentStatus = success ? "JIT Activated" : "JIT Failed"
@@ -81,9 +92,18 @@ class SystemCoordinator: ObservableObject {
                 try fileManager.removeItem(at: pairingPath)
             }
             try fileManager.copyItem(at: url, to: pairingPath)
-            currentStatus = "Pairing file imported successfully"
+            currentStatus = "Pairing file imported"
         } catch {
-            currentStatus = "Failed to import pairing file"
+            currentStatus = "Pairing import failed"
+        }
+    }
+    
+    func mountDDI(urls: [URL]) {
+        currentStatus = "Mounting DDI..."
+        jitEnabler.mountDeveloperDiskImage(urls: urls) { [weak self] success in
+            DispatchQueue.main.async {
+                self?.currentStatus = success ? "DDI Mounted" : "DDI Mount Failed"
+            }
         }
     }
     
@@ -101,21 +121,18 @@ class SystemCoordinator: ObservableObject {
         }
     }
     
-    @objc private func dummyDisplayLinkUpdate() {
-        // Keeps the display at maximum refresh rate
-    }
+    @objc private func dummyDisplayLinkUpdate() {}
     
     func launchSteam() {
         guard isJITEnabled && isContainerReady else { return }
         
         currentStatus = "Downloading Steam..."
-        
         containerHost.mountEnvironment { [weak self] mountPath in
             guard let self = self else { return }
             self.windowsEnvironment.configureWine(prefix: mountPath)
             self.windowsEnvironment.installAndRunSteam(jitEnabler: self.jitEnabler) { result in
                 DispatchQueue.main.async {
-                    self.currentStatus = result ? "Running Steam" : "Steam Error"
+                    self.currentStatus = result ? "Steam Running" : "Steam Error"
                 }
             }
         }
@@ -124,8 +141,7 @@ class SystemCoordinator: ObservableObject {
     func launchWindowsExecutable(at url: URL) {
         guard isJITEnabled && isContainerReady else { return }
         
-        currentStatus = "Loading Windows Environment..."
-        
+        currentStatus = "Loading Executable..."
         containerHost.mountEnvironment { [weak self] mountPath in
             guard let self = self else { return }
             self.windowsEnvironment.configureWine(prefix: mountPath)
