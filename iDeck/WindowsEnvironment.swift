@@ -55,7 +55,7 @@ class WindowsEnvironment {
         
         let architectureTranslator = BoxTranslator()
         
-        architectureTranslator.translateAndRun(executablePath: binary.path.path, environment: winePrefixPath, is32Bit: is32Bit, isSteam: isSteam, jitEnabler: jitEnabler) { status in
+        architectureTranslator.translateAndRun(executablePath: binary.path, environment: winePrefixPath, is32Bit: is32Bit, isSteam: isSteam, jitEnabler: jitEnabler) { status in
             completion(status == 0)
         }
     }
