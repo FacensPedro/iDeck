@@ -12,7 +12,7 @@ class WindowsEnvironment {
         setenv("WINEDEBUG", "-all", 1)
         setenv("WINEARCH", "win64", 1)
         setenv("STEAM_COMPAT_CLIENT_INSTALL_PATH", prefix + "/drive_c/Program Files (x86)/Steam", 1)
-        setenv("WINEDLLOVERRIDES", "dwrite=d", 1)
+        setenv("WINEDLLOVERRIDES", "dwrite=d;winhttp=n,b;crypt32=n,b;secur32=n,b;nsi=n,b;rpcrt4=n,b", 1)
         
         _ = audioManager.configureAudioSession()
         graphicsConfig.applyGraphicsEnvironment()
@@ -78,7 +78,7 @@ private class BoxTranslator {
         for e in cEnv { free(e) }
         
         if spawnStatus == 0 {
-            jitEnabler.activate(for: pid, useVPN: false) { jitSuccess in
+            jitEnabler.activate(for: pid, useVPN: false, pairingFileURL: nil) { jitSuccess in
                 if jitSuccess {
                     var status: Int32 = 0
                     waitpid(pid, &status, 0)
