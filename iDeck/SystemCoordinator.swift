@@ -1,10 +1,13 @@
 import Foundation
 import Combine
+import UIKit
+import QuartzCore
 
 class SystemCoordinator: ObservableObject {
     @Published var isJITEnabled: Bool = false
     @Published var isContainerReady: Bool = false
     @Published var currentStatus: String = "Idle"
+    
     @Published var isHUDEnabled: Bool = false {
         didSet {
             windowsEnvironment.graphicsConfig.isHUDEnabled = isHUDEnabled
@@ -12,9 +15,29 @@ class SystemCoordinator: ObservableObject {
         }
     }
     
+    @Published var isMetalFXEnabled: Bool = false {
+        didSet {
+            if isMetalFXEnabled {
+                setenv("MVK_CONFIG_USE_METALFX", "1", 1)
+            } else {
+                unsetenv("MVK_CONFIG_USE_METALFX")
+            }
+        }
+    }
+    
+    @Published var isJITPoolEnabled: Bool = false
+    
+    @Published var isMaxRefreshRateEnabled: Bool = false {
+        didSet {
+            applyMaxRefreshRate()
+        }
+    }
+    
     private let jitEnabler = JITEnabler()
     private let containerHost = ContainerHost()
     private let windowsEnvironment = WindowsEnvironment()
+    
+    private var displayLink: CADisplayLink?
     
     func initializeSystem() {
         currentStatus = "Activating Host JIT..."
@@ -36,6 +59,50 @@ class SystemCoordinator: ObservableObject {
                 }
             }
         }
+    }
+    
+    func activateJITManually() {
+        currentStatus = "Activating JIT Manually..."
+        jitEnabler.activate(for: getpid()) { [weak self] success in
+            DispatchQueue.main.async {
+                self?.isJITEnabled = success
+                self?.currentStatus = success ? "JIT Activated" : "JIT Failed"
+            }
+        }
+    }
+    
+    func importPairingFile(at url: URL) {
+        let fileManager = FileManager.default
+        let documentDirectory = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first!
+        let pairingPath = documentDirectory.appendingPathComponent("pairing_file.mobiledevicepairing")
+        
+        do {
+            if fileManager.fileExists(atPath: pairingPath.path) {
+                try fileManager.removeItem(at: pairingPath)
+            }
+            try fileManager.copyItem(at: url, to: pairingPath)
+            currentStatus = "Pairing file imported successfully"
+        } catch {
+            currentStatus = "Failed to import pairing file"
+        }
+    }
+    
+    private func applyMaxRefreshRate() {
+        if isMaxRefreshRateEnabled {
+            displayLink = CADisplayLink(target: self, selector: #selector(dummyDisplayLinkUpdate))
+            if #available(iOS 15.0, *) {
+                let maxFPS = Float(UIScreen.main.maximumFramesPerSecond)
+                displayLink?.preferredFrameRateRange = CAFrameRateRange(minimum: maxFPS, maximum: maxFPS, preferred: maxFPS)
+            }
+            displayLink?.add(to: .main, forMode: .common)
+        } else {
+            displayLink?.invalidate()
+            displayLink = nil
+        }
+    }
+    
+    @objc private func dummyDisplayLinkUpdate() {
+        // Keeps the display at maximum refresh rate
     }
     
     func launchSteam() {
