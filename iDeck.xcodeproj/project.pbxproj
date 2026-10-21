@@ -12,6 +12,8 @@
 		111111111111111111111114 /* JITEnabler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222224 /* JITEnabler.swift */; };
 		111111111111111111111115 /* ContainerHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222225 /* ContainerHost.swift */; };
 		111111111111111111111116 /* WindowsEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222226 /* WindowsEnvironment.swift */; };
+		111111111111111111111117 /* AudioManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222228 /* AudioManager.swift */; };
+		111111111111111111111118 /* GraphicsConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222229 /* GraphicsConfig.swift */; };
 
 		222222222222222222222221 /* iDeckApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iDeckApp.swift; sourceTree = "<group>"; };
 		222222222222222222222222 /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
@@ -20,6 +22,8 @@
 		222222222222222222222225 /* ContainerHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContainerHost.swift; sourceTree = "<group>"; };
 		222222222222222222222226 /* WindowsEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowsEnvironment.swift; sourceTree = "<group>"; };
 		222222222222222222222227 /* iDeck.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = iDeck.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		222222222222222222222228 /* AudioManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioManager.swift; sourceTree = "<group>"; };
+		222222222222222222222229 /* GraphicsConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GraphicsConfig.swift; sourceTree = "<group>"; };
 
 		333333333333333333333331 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
@@ -38,6 +42,8 @@
 				111111111111111111111114 /* JITEnabler.swift in Sources */,
 				111111111111111111111115 /* ContainerHost.swift in Sources */,
 				111111111111111111111116 /* WindowsEnvironment.swift in Sources */,
+				111111111111111111111117 /* AudioManager.swift in Sources */,
+				111111111111111111111118 /* GraphicsConfig.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -58,6 +64,8 @@
 				222222222222222222222224 /* JITEnabler.swift */,
 				222222222222222222222225 /* ContainerHost.swift */,
 				222222222222222222222226 /* WindowsEnvironment.swift */,
+				222222222222222222222228 /* AudioManager.swift */,
+				222222222222222222222229 /* GraphicsConfig.swift */,
 			);
 			path = iDeck;
 			sourceTree = "<group>";
