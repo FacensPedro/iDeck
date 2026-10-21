@@ -26,43 +26,41 @@ class AppManager: ObservableObject {
     }
     
     func installIPA(from url: URL, completion: @escaping (Bool) -> Void) {
-        guard url.startAccessingSecurityScopedResource() else {
-            completion(false)
-            return
-        }
-        defer { url.stopAccessingSecurityScopedResource() }
+        let hasScope = url.startAccessingSecurityScopedResource()
+        let fileManager = self.fileManager
+        let appsDirectory = self.appsDirectory
 
-        let tempZipPath = fileManager.temporaryDirectory.appendingPathComponent(url.lastPathComponent + ".zip")
-        let extractPath = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        
-        do {
-            if fileManager.fileExists(atPath: tempZipPath.path) {
-                try fileManager.removeItem(at: tempZipPath)
-            }
-            try fileManager.copyItem(at: url, to: tempZipPath)
-            
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: "/usr/bin/unzip")
-            process.arguments = ["-q", tempZipPath.path, "-d", extractPath.path]
-            try process.run()
-            process.waitUntilExit()
-            
-            let payloadPath = extractPath.appendingPathComponent("Payload")
-            if let appBundle = try? fileManager.contentsOfDirectory(at: payloadPath, includingPropertiesForKeys: nil).first(where: { $0.pathExtension == "app" }) {
-                let destination = appsDirectory.appendingPathComponent(appBundle.lastPathComponent)
-                
-                if fileManager.fileExists(atPath: destination.path) {
-                    try fileManager.removeItem(at: destination)
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            defer { if hasScope { url.stopAccessingSecurityScopedResource() } }
+
+            let extractPath = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+            defer { try? fileManager.removeItem(at: extractPath) }
+
+            var success = false
+            do {
+                // An .ipa is a ZIP archive; ZipExtractor rejects entries that escape extractPath.
+                try ZipExtractor.extract(archive: url, to: extractPath)
+
+                let payloadPath = extractPath.appendingPathComponent("Payload")
+                let appBundle = try fileManager.contentsOfDirectory(at: payloadPath, includingPropertiesForKeys: nil)
+                    .first(where: { $0.pathExtension == "app" })
+
+                if let appBundle = appBundle {
+                    let destination = appsDirectory.appendingPathComponent(appBundle.lastPathComponent)
+                    if fileManager.fileExists(atPath: destination.path) {
+                        try fileManager.removeItem(at: destination)
+                    }
+                    try fileManager.moveItem(at: appBundle, to: destination)
+                    success = true
                 }
-                
-                try fileManager.moveItem(at: appBundle, to: destination)
-                refreshInstalledApps()
-                completion(true)
-            } else {
-                completion(false)
+            } catch {
+                print("AppManager: IPA install failed: \(error)")
             }
-        } catch {
-            completion(false)
+
+            DispatchQueue.main.async {
+                if success { self?.refreshInstalledApps() }
+                completion(success)
+            }
         }
     }
 }

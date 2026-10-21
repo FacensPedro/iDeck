@@ -35,7 +35,6 @@ class SystemCoordinator: ObservableObject {
     
     @Published var isJITPoolEnabled: Bool = false
     @Published var isVPNJITEnabled: Bool = true
-    @Published var isAMFIBypassEnabled: Bool = true
     @Published var isGuestHooksEnabled: Bool = true
     
     @Published var isMaxRefreshRateEnabled: Bool = false {
@@ -58,7 +57,11 @@ class SystemCoordinator: ObservableObject {
         var current = interfaces
         while let interface = current {
             let name = String(cString: interface.pointee.ifa_name)
-            if name.hasPrefix("utun") || name.hasPrefix("tun") || name.hasPrefix("ipsec") {
+            let isTunnel = name.hasPrefix("utun") || name.hasPrefix("tun") || name.hasPrefix("ipsec")
+            // System utun interfaces only carry IPv6 link-local addresses; a VPN with an
+            // IPv4 address on a tunnel interface is what the JIT bridge needs.
+            if isTunnel, let addr = interface.pointee.ifa_addr, addr.pointee.sa_family == UInt8(AF_INET),
+               (interface.pointee.ifa_flags & UInt32(IFF_UP)) != 0 {
                 return true
             }
             current = interface.pointee.ifa_next
@@ -92,7 +95,7 @@ class SystemCoordinator: ObservableObject {
     
     private func startLiveContainer() {
         currentStatus = "Initializing LiveContainer..."
-        containerHost.setupContainer(bypassAMFI: isAMFIBypassEnabled, injectHooks: isGuestHooksEnabled) { [weak self] success in
+        containerHost.setupContainer(injectHooks: isGuestHooksEnabled) { [weak self] success in
             DispatchQueue.main.async {
                 self?.isContainerReady = success
                 self?.currentStatus = success ? "LiveContainer Running" : "Container Error"
@@ -109,6 +112,10 @@ class SystemCoordinator: ObservableObject {
         currentStatus = "Installing Windows Environment..."
         containerHost.mountEnvironment { [weak self] mountPath in
             guard let self = self else { return }
+            guard let mountPath = mountPath else {
+                self.currentStatus = "Container not initialized"
+                return
+            }
             
             self.prefixInstaller.installWinePrefix(to: mountPath) { success in
                 DispatchQueue.main.async {
@@ -132,7 +139,7 @@ class SystemCoordinator: ObservableObject {
             
             let pairingURL = fileManager.fileExists(atPath: pairingPath.path) ? pairingPath : nil
             
-            self.currentStatus = "Activating JIT..."
+            DispatchQueue.main.async { self.currentStatus = "Activating JIT..." }
             self.jitEnabler.activate(for: getpid(), useVPN: self.isVPNJITEnabled, pairingFileURL: pairingURL) { [weak self] success in
                 DispatchQueue.main.async {
                     self?.isJITEnabled = success
@@ -143,7 +150,7 @@ class SystemCoordinator: ObservableObject {
         }
         
         if isVPNJITEnabled && !isLocalDevVPNActive() {
-            currentStatus = "Starting LocalDevVPN..."
+            DispatchQueue.main.async { self.currentStatus = "Starting LocalDevVPN..." }
             VPNManager.shared.setupAndConnectLocalDevVPN { [weak self] success in
                 if success {
                     activateTask()
@@ -175,12 +182,11 @@ class SystemCoordinator: ObservableObject {
         }
     }
     
+    /// The JIT server mounts the Developer Disk Image itself; the picked files are not uploaded.
     func mountDDI(urls: [URL]) {
         currentStatus = "Mounting DDI..."
-        jitEnabler.mountDeveloperDiskImage(urls: urls) { [weak self] success in
-            DispatchQueue.main.async {
-                self?.currentStatus = success ? "DDI Mounted" : "DDI Mount Failed"
-            }
+        jitEnabler.mountDeveloperDiskImage { [weak self] success in
+            self?.currentStatus = success ? "DDI Mounted" : "DDI Mount Failed"
         }
     }
     
@@ -210,6 +216,10 @@ class SystemCoordinator: ObservableObject {
         currentStatus = "Downloading Steam..."
         containerHost.mountEnvironment { [weak self] mountPath in
             guard let self = self else { return }
+            guard let mountPath = mountPath else {
+                self.currentStatus = "Container not initialized"
+                return
+            }
             self.windowsEnvironment.configureWine(prefix: mountPath)
             self.windowsEnvironment.installAndRunSteam(jitEnabler: self.jitEnabler) { result in
                 DispatchQueue.main.async {
@@ -225,6 +235,10 @@ class SystemCoordinator: ObservableObject {
         currentStatus = "Loading Executable..."
         containerHost.mountEnvironment { [weak self] mountPath in
             guard let self = self else { return }
+            guard let mountPath = mountPath else {
+                self.currentStatus = "Container not initialized"
+                return
+            }
             self.windowsEnvironment.configureWine(prefix: mountPath)
             self.windowsEnvironment.execute(binary: url, is32Bit: false, isSteam: false, jitEnabler: self.jitEnabler) { result in
                 DispatchQueue.main.async {
@@ -234,13 +248,19 @@ class SystemCoordinator: ObservableObject {
         }
     }
 
+    /// Selects the guest app the LiveContainer bundle hook should present as the main bundle.
+    /// Note: this only redirects `NSBundle.bundlePath`; it does not load or start the guest binary.
     func launchGuestApp(at url: URL) {
         guard isJITEnabled && isContainerReady else {
             currentStatus = "Requires JIT & LiveContainer"
             return
         }
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            currentStatus = "Guest app not found"
+            return
+        }
         
-        currentStatus = "Launching \(url.lastPathComponent)..."
         setenv("GUEST_APP_PATH", url.path, 1)
+        currentStatus = "Guest app selected: \(url.lastPathComponent)"
     }
 }

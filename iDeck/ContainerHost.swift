@@ -5,38 +5,31 @@ class ContainerHost {
     private let containerIdentifier = "com.livecontainer.host"
     private var isMounted = false
     
-    func setupContainer(bypassAMFI: Bool, injectHooks: Bool, completion: @escaping (Bool) -> Void) {
-        let dyldPath = "/usr/lib/dyld"
-        var info = dl_info()
-        
-        if dladdr(dyldPath, &info) != 0 {
-            if bypassAMFI {
-                bypassSignatureChecks()
-            }
-            setupVirtualFileSystem()
-            if injectHooks {
-                injectLiveContainerHooks()
-            }
-            isMounted = true
-            completion(true)
-        } else {
+    func setupContainer(injectHooks: Bool, completion: @escaping (Bool) -> Void) {
+        guard setupVirtualFileSystem() else {
             completion(false)
+            return
         }
+        if injectHooks {
+            injectLiveContainerHooks()
+        }
+        isMounted = true
+        completion(true)
     }
-    
-    func mountEnvironment(completion: @escaping (String) -> Void) {
-        guard isMounted else { return }
-        
-        let fileManager = FileManager.default
-        let documentDirectory = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first!
-        let virtualRoot = documentDirectory.appendingPathComponent("VirtualRoot")
-        
-        completion(virtualRoot.path)
+
+    /// Calls `completion` with the virtual root path, or `nil` if the container was never set up.
+    func mountEnvironment(completion: @escaping (String?) -> Void) {
+        guard isMounted,
+              let documentDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            completion(nil)
+            return
+        }
+        completion(documentDirectory.appendingPathComponent("VirtualRoot").path)
     }
-    
-    private func setupVirtualFileSystem() {
+
+    private func setupVirtualFileSystem() -> Bool {
         let fileManager = FileManager.default
-        guard let documentDirectory = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first else { return }
+        guard let documentDirectory = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first else { return false }
         
         let virtualRoot = documentDirectory.appendingPathComponent("VirtualRoot")
         let directories = [
@@ -49,28 +42,24 @@ class ContainerHost {
         ]
         
         for directory in directories {
-            if !fileManager.fileExists(atPath: directory.path) {
-                try? fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+            do {
+                try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+            } catch {
+                print("ContainerHost: could not create \(directory.path): \(error)")
+                return false
             }
         }
         
         setenv("TMPDIR", virtualRoot.appendingPathComponent("tmp").path, 1)
         setenv("HOME", virtualRoot.path, 1)
-    }
-    
-    private func bypassSignatureChecks() {
-        let handle = dlopen(nil, RTLD_NOW)
-        let amfiSymbol = dlsym(handle, "AMFI_bypass")
-        if amfiSymbol != nil {
-            typealias BypassFunction = @convention(c) () -> Void
-            let function = unsafeBitCast(amfiSymbol, to: BypassFunction.self)
-            function()
-        }
+        return true
     }
     
     private func injectLiveContainerHooks() {
         let bundlePath = Bundle.main.bundlePath
         let tweakPath = bundlePath.appending("/LiveContainerHook.dylib")
+        // Setting this in the running process does not affect dyld for the current image;
+        // it is only inherited by child processes spawned from here.
         if FileManager.default.fileExists(atPath: tweakPath) {
             setenv("DYLD_INSERT_LIBRARIES", tweakPath, 1)
         }

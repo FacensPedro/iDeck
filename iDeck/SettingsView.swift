@@ -39,7 +39,6 @@ struct SettingsView: View {
                         }
                         
                         settingsSection(title: "LiveContainer") {
-                            toggleRow(title: "Bypass AMFI", isOn: $coordinator.isAMFIBypassEnabled)
                             toggleRow(title: "Inject Guest Hooks", isOn: $coordinator.isGuestHooksEnabled)
                         }
                     }

@@ -1,5 +1,6 @@
 #import "LiveContainerHook.h"
 #import <objc/runtime.h>
+#import <stdlib.h>
 
 @implementation LiveContainerHook
 
@@ -35,9 +36,9 @@
 }
 
 - (NSString *)lc_bundlePath {
-    NSString *guestAppPath = [[[NSProcessInfo processInfo] environment] objectForKey:@"GUEST_APP_PATH"];
-    if (guestAppPath && [self isEqual:[NSBundle mainBundle]]) {
-        return guestAppPath;
+    const char *guestAppPath = getenv("GUEST_APP_PATH");
+    if (guestAppPath != NULL && [self isEqual:[NSBundle mainBundle]]) {
+        return [NSString stringWithUTF8String:guestAppPath];
     }
     return [self lc_bundlePath];
 }
