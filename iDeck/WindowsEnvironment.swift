@@ -2,15 +2,19 @@ import Foundation
 
 class WindowsEnvironment {
     private var winePrefixPath: String = ""
+    let graphicsConfig = GraphicsConfig()
+    let audioManager = AudioManager()
     
     func configureWine(prefix: String) {
         self.winePrefixPath = prefix
         setenv("WINEPREFIX", prefix, 1)
         setenv("WINEDEBUG", "-all", 1)
+        setenv("WINEARCH", "win64", 1)
         setenv("STEAM_COMPAT_CLIENT_INSTALL_PATH", prefix + "/drive_c/Program Files (x86)/Steam", 1)
-        setenv("WINEDLLOVERRIDES", "dwrite=d;dxgi=n;d3d11=n;d3d10=n", 1)
-        setenv("DXVK_HUD", "1", 1)
-        setenv("MVK_CONFIG_FULL_IMAGE_VIEW_SWIZZLE", "1", 1)
+        setenv("WINEDLLOVERRIDES", "dwrite=d", 1)
+        
+        _ = audioManager.configureAudioSession()
+        graphicsConfig.applyGraphicsEnvironment()
     }
     
     func installAndRunSteam(completion: @escaping (Bool) -> Void) {
@@ -61,14 +65,7 @@ private class BoxTranslator {
         process.executableURL = URL(fileURLWithPath: boxBinary)
         process.arguments = ["wine", executablePath]
         
-        var environmentDict = ProcessInfo.processInfo.environment
-        environmentDict["WINEPREFIX"] = environment
-        environmentDict["STEAM_COMPAT_CLIENT_INSTALL_PATH"] = environment + "/drive_c/Program Files (x86)/Steam"
-        environmentDict["WINEDLLOVERRIDES"] = "dwrite=d;dxgi=n;d3d11=n;d3d10=n"
-        environmentDict["DXVK_HUD"] = "1"
-        environmentDict["MVK_CONFIG_FULL_IMAGE_VIEW_SWIZZLE"] = "1"
-        
-        process.environment = environmentDict
+        process.environment = ProcessInfo.processInfo.environment
         
         do {
             try process.run()
