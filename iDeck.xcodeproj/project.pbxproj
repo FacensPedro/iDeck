@@ -18,6 +18,7 @@
 		111111111111111111111120 /* InputManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222231 /* InputManager.swift */; };
 		111111111111111111111121 /* VPNManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222232 /* VPNManager.swift */; };
 		111111111111111111111122 /* PrefixInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222233 /* PrefixInstaller.swift */; };
+		111111111111111111111123 /* SteamManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222235 /* SteamManager.swift */; };
 
 		222222222222222222222221 /* iDeckApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iDeckApp.swift; sourceTree = "<group>"; };
 		222222222222222222222222 /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
@@ -33,6 +34,7 @@
 		222222222222222222222232 /* VPNManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VPNManager.swift; sourceTree = "<group>"; };
 		222222222222222222222233 /* PrefixInstaller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrefixInstaller.swift; sourceTree = "<group>"; };
 		222222222222222222222234 /* iDeck.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = iDeck.entitlements; sourceTree = "<group>"; };
+		222222222222222222222235 /* SteamManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamManager.swift; sourceTree = "<group>"; };
 
 		333333333333333333333331 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
@@ -57,6 +59,7 @@
 				111111111111111111111120 /* InputManager.swift in Sources */,
 				111111111111111111111121 /* VPNManager.swift in Sources */,
 				111111111111111111111122 /* PrefixInstaller.swift in Sources */,
+				111111111111111111111123 /* SteamManager.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -78,6 +81,7 @@
 				222222222222222222222231 /* InputManager.swift */,
 				222222222222222222222232 /* VPNManager.swift */,
 				222222222222222222222233 /* PrefixInstaller.swift */,
+				222222222222222222222235 /* SteamManager.swift */,
 				222222222222222222222223 /* SystemCoordinator.swift */,
 				222222222222222222222224 /* JITEnabler.swift */,
 				222222222222222222222225 /* ContainerHost.swift */,
