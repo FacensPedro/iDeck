@@ -2,6 +2,7 @@ import Foundation
 import Combine
 import UIKit
 import QuartzCore
+import Darwin
 
 class SystemCoordinator: ObservableObject {
     @Published var isJITEnabled: Bool = false
@@ -33,7 +34,7 @@ class SystemCoordinator: ObservableObject {
     }
     
     @Published var isJITPoolEnabled: Bool = false
-    @Published var isVPNJITEnabled: Bool = false
+    @Published var isVPNJITEnabled: Bool = true
     @Published var isAMFIBypassEnabled: Bool = true
     @Published var isGuestHooksEnabled: Bool = true
     
@@ -47,6 +48,22 @@ class SystemCoordinator: ObservableObject {
     private let containerHost = ContainerHost()
     private let windowsEnvironment = WindowsEnvironment()
     private var displayLink: CADisplayLink?
+    
+    private func isLocalDevVPNActive() -> Bool {
+        var interfaces: UnsafeMutablePointer<ifaddrs>?
+        guard getifaddrs(&interfaces) == 0 else { return false }
+        defer { freeifaddrs(interfaces) }
+        
+        var current = interfaces
+        while let interface = current {
+            let name = String(cString: interface.pointee.ifa_name)
+            if name.hasPrefix("utun") || name.hasPrefix("tun") || name.hasPrefix("ipsec") {
+                return true
+            }
+            current = interface.pointee.ifa_next
+        }
+        return false
+    }
     
     func startLiveContainer() {
         currentStatus = "Initializing LiveContainer..."
@@ -73,8 +90,15 @@ class SystemCoordinator: ObservableObject {
     }
     
     func activateJITManually() {
+        guard isLocalDevVPNActive() else {
+            DispatchQueue.main.async {
+                self.currentStatus = "LocalDevVPN Required"
+            }
+            return
+        }
+        
         currentStatus = "Activating JIT..."
-        jitEnabler.activate(for: getpid(), useVPN: isVPNJITEnabled) { [weak self] success in
+        jitEnabler.activate(for: getpid(), useVPN: true) { [weak self] success in
             DispatchQueue.main.async {
                 self?.isJITEnabled = success
                 self?.currentStatus = success ? "JIT Activated" : "JIT Failed"
