@@ -38,6 +38,12 @@ struct MainView: View {
                     Text(coordinator.currentStatus)
                         .font(.subheadline)
                         .foregroundColor(.gray)
+                    
+                    if coordinator.prefixInstaller.isInstalling {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            .padding(.top, 4)
+                    }
                 }
                 
                 HStack(spacing: 16) {
@@ -48,7 +54,7 @@ struct MainView: View {
                 
                 VStack(spacing: 16) {
                     Button(action: {
-                        coordinator.startLiveContainer()
+                        coordinator.forceJITAndStartLiveContainer()
                     }) {
                         HStack {
                             Image(systemName: "cube.box.fill")
@@ -63,7 +69,7 @@ struct MainView: View {
                     }
                     
                     Button(action: {
-                        coordinator.startWindows()
+                        coordinator.forceJITAndStartWindows()
                     }) {
                         HStack {
                             Image(systemName: "window.casement")
