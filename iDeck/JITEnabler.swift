@@ -3,8 +3,14 @@ import Foundation
 class JITEnabler {
     private let debugServerPort: UInt16 = 54321
     
-    func activate(completion: @escaping (Bool) -> Void) {
-        let task = URLSession.shared.dataTask(with: URL(string: "http://localhost:\(debugServerPort)/enable_jit")!) { data, response, error in
+    func activate(for pid: Int32, completion: @escaping (Bool) -> Void) {
+        let urlString = "http://localhost:\(debugServerPort)/enable_jit?pid=\(pid)"
+        guard let url = URL(string: urlString) else {
+            completion(false)
+            return
+        }
+        
+        let task = URLSession.shared.dataTask(with: url) { data, response, error in
             if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
                 DispatchQueue.main.async {
                     completion(true)
