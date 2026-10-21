@@ -25,6 +25,12 @@ struct MainView: View {
                 Text(coordinator.currentStatus)
                     .foregroundColor(.gray)
                 
+                Toggle("Performance HUD", isOn: $coordinator.isHUDEnabled)
+                    .padding()
+                    .background(Color.gray.opacity(0.2))
+                    .cornerRadius(10)
+                    .foregroundColor(.white)
+                
                 Button(action: {
                     coordinator.initializeSystem()
                 }) {
@@ -77,24 +83,5 @@ struct MainView: View {
                 break
             }
         }
-    }
-}
-
-struct StatusIndicator: View {
-    let isActive: Bool
-    let label: String
-    
-    var body: some View {
-        HStack {
-            Circle()
-                .fill(isActive ? Color.green : Color.red)
-                .frame(width: 12, height: 12)
-            Text(label)
-                .font(.subheadline)
-                .foregroundColor(.white)
-        }
-        .padding(8)
-        .background(Color.gray.opacity(0.3))
-        .cornerRadius(8)
     }
 }
