@@ -135,6 +135,12 @@ struct MainView: View {
                 break
             }
         }
+        .fullScreenCover(isPresented: Binding<Bool>(
+            get: { coordinator.currentStatus == "Steam Running" || coordinator.currentStatus == "Running" },
+            set: { _ in coordinator.currentStatus = "Windows Ready" }
+        )) {
+            GameSessionView(coordinator: coordinator)
+        }
     }
 }
 
