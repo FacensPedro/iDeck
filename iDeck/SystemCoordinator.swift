@@ -90,19 +90,35 @@ class SystemCoordinator: ObservableObject {
     }
     
     func activateJITManually() {
-        guard isLocalDevVPNActive() else {
-            DispatchQueue.main.async {
-                self.currentStatus = "LocalDevVPN Required"
+        let activateTask = {
+            let fileManager = FileManager.default
+            let documentDirectory = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first!
+            let pairingPath = documentDirectory.appendingPathComponent("pairing_file.mobiledevicepairing")
+            
+            let pairingURL = fileManager.fileExists(atPath: pairingPath.path) ? pairingPath : nil
+            
+            self.currentStatus = "Activating JIT..."
+            self.jitEnabler.activate(for: getpid(), useVPN: self.isVPNJITEnabled, pairingFileURL: pairingURL) { [weak self] success in
+                DispatchQueue.main.async {
+                    self?.isJITEnabled = success
+                    self?.currentStatus = success ? "JIT Activated" : "JIT Failed"
+                }
             }
-            return
         }
         
-        currentStatus = "Activating JIT..."
-        jitEnabler.activate(for: getpid(), useVPN: true) { [weak self] success in
-            DispatchQueue.main.async {
-                self?.isJITEnabled = success
-                self?.currentStatus = success ? "JIT Activated" : "JIT Failed"
+        if isVPNJITEnabled && !isLocalDevVPNActive() {
+            currentStatus = "Starting LocalDevVPN..."
+            VPNManager.shared.setupAndConnectLocalDevVPN { [weak self] success in
+                if success {
+                    activateTask()
+                } else {
+                    DispatchQueue.main.async {
+                        self?.currentStatus = "Failed to start VPN"
+                    }
+                }
             }
+        } else {
+            activateTask()
         }
     }
     
