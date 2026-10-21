@@ -26,6 +26,12 @@ class AppManager: ObservableObject {
     }
     
     func installIPA(from url: URL, completion: @escaping (Bool) -> Void) {
+        guard url.startAccessingSecurityScopedResource() else {
+            completion(false)
+            return
+        }
+        defer { url.stopAccessingSecurityScopedResource() }
+
         let tempZipPath = fileManager.temporaryDirectory.appendingPathComponent(url.lastPathComponent + ".zip")
         let extractPath = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         
@@ -35,13 +41,11 @@ class AppManager: ObservableObject {
             }
             try fileManager.copyItem(at: url, to: tempZipPath)
             
-            // Note: In a real implementation, you need a ZIP extraction library here (like ZIPFoundation or Minizip)
-            // This is a placeholder for the extraction process:
-            // let process = Process()
-            // process.executableURL = URL(fileURLWithPath: "/usr/bin/unzip")
-            // process.arguments = ["-q", tempZipPath.path, "-d", extractPath.path]
-            // try process.run()
-            // process.waitUntilExit()
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/unzip")
+            process.arguments = ["-q", tempZipPath.path, "-d", extractPath.path]
+            try process.run()
+            process.waitUntilExit()
             
             let payloadPath = extractPath.appendingPathComponent("Payload")
             if let appBundle = try? fileManager.contentsOfDirectory(at: payloadPath, includingPropertiesForKeys: nil).first(where: { $0.pathExtension == "app" }) {
