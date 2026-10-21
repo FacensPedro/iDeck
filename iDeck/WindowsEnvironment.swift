@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 
 class WindowsEnvironment {
     private var winePrefixPath: String = ""
@@ -60,27 +61,34 @@ class WindowsEnvironment {
 
 private class BoxTranslator {
     func translateAndRun(executablePath: String, environment: String, is32Bit: Bool, jitEnabler: JITEnabler, completion: @escaping (Int) -> Void) {
-        let process = Process()
         let boxBinary = is32Bit ? "/usr/local/bin/box86" : "/usr/local/bin/box64"
-        process.executableURL = URL(fileURLWithPath: boxBinary)
-        process.arguments = ["wine", executablePath]
+        var pid: pid_t = 0
         
-        process.environment = ProcessInfo.processInfo.environment
+        let args = [boxBinary, "wine", executablePath]
+        var cArgs = args.map { strdup($0) }
+        cArgs.append(nil)
         
-        do {
-            try process.run()
-            
-            let pid = process.processIdentifier
-            jitEnabler.activate(for: pid) { jitSuccess in
+        let env = ProcessInfo.processInfo.environment
+        var cEnv = env.map { strdup("\($0.key)=\($0.value)") }
+        cEnv.append(nil)
+        
+        let spawnStatus = posix_spawn(&pid, boxBinary, nil, nil, cArgs, cEnv)
+        
+        for arg in cArgs { free(arg) }
+        for e in cEnv { free(e) }
+        
+        if spawnStatus == 0 {
+            jitEnabler.activate(for: pid, useVPN: false) { jitSuccess in
                 if jitSuccess {
-                    process.waitUntilExit()
-                    completion(Int(process.terminationStatus))
+                    var status: Int32 = 0
+                    waitpid(pid, &status, 0)
+                    completion(Int(status))
                 } else {
-                    process.terminate()
+                    kill(pid, SIGKILL)
                     completion(-1)
                 }
             }
-        } catch {
+        } else {
             completion(-1)
         }
     }
