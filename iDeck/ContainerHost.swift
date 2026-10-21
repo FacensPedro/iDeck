@@ -5,14 +5,18 @@ class ContainerHost {
     private let containerIdentifier = "com.livecontainer.host"
     private var isMounted = false
     
-    func setupContainer(completion: @escaping (Bool) -> Void) {
+    func setupContainer(bypassAMFI: Bool, injectHooks: Bool, completion: @escaping (Bool) -> Void) {
         let dyldPath = "/usr/lib/dyld"
         var info = dl_info()
         
         if dladdr(dyldPath, &info) != 0 {
-            bypassSignatureChecks()
+            if bypassAMFI {
+                bypassSignatureChecks()
+            }
             setupVirtualFileSystem()
-            injectLiveContainerHooks()
+            if injectHooks {
+                injectLiveContainerHooks()
+            }
             isMounted = true
             completion(true)
         } else {
@@ -40,7 +44,8 @@ class ContainerHost {
             virtualRoot.appendingPathComponent("Library"),
             virtualRoot.appendingPathComponent("Documents"),
             virtualRoot.appendingPathComponent("SystemData"),
-            virtualRoot.appendingPathComponent("tmp")
+            virtualRoot.appendingPathComponent("tmp"),
+            virtualRoot.appendingPathComponent("GuestApps")
         ]
         
         for directory in directories {
