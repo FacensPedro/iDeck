@@ -20,70 +20,92 @@ struct MainView: View {
                         Image(systemName: "gearshape.fill")
                             .font(.title2)
                             .foregroundColor(.white)
+                            .padding()
+                            .background(Color(red: 0.15, green: 0.15, blue: 0.15))
+                            .clipShape(Circle())
                     }
                     .padding()
                 }
                 Spacer()
             }
             
-            VStack(spacing: 24) {
-                Text("iDeck System")
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
-                    .foregroundColor(.white)
-                
-                HStack {
-                    StatusIndicator(isActive: coordinator.isJITEnabled, label: "JIT Active")
-                    StatusIndicator(isActive: coordinator.isContainerReady, label: "Container Ready")
-                    StatusIndicator(isActive: inputManager.isControllerConnected, label: "Controller")
+            VStack(spacing: 32) {
+                VStack(spacing: 8) {
+                    Text("iDeck")
+                        .font(.system(size: 40, weight: .heavy, design: .rounded))
+                        .foregroundColor(.white)
+                    
+                    Text(coordinator.currentStatus)
+                        .font(.subheadline)
+                        .foregroundColor(.gray)
                 }
                 
-                Text(coordinator.currentStatus)
-                    .foregroundColor(.gray)
+                HStack(spacing: 16) {
+                    StatusPill(isActive: coordinator.isJITEnabled, label: "JIT")
+                    StatusPill(isActive: coordinator.isContainerReady, label: "Container")
+                    StatusPill(isActive: inputManager.isControllerConnected, label: "Gamepad")
+                }
                 
-                Toggle("Performance HUD", isOn: $coordinator.isHUDEnabled)
-                    .padding()
-                    .background(Color.gray.opacity(0.2))
-                    .cornerRadius(10)
-                    .foregroundColor(.white)
-                
-                Button(action: {
-                    coordinator.initializeSystem()
-                }) {
-                    Text("Initialize Core Systems")
+                VStack(spacing: 16) {
+                    Button(action: {
+                        coordinator.startLiveContainer()
+                    }) {
+                        HStack {
+                            Image(systemName: "cube.box.fill")
+                            Text("Start LiveContainer")
+                                .fontWeight(.semibold)
+                        }
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(Color.blue)
+                        .background(Color(red: 0.15, green: 0.15, blue: 0.15))
                         .foregroundColor(.white)
-                        .cornerRadius(10)
-                }
-                .disabled(coordinator.isJITEnabled && coordinator.isContainerReady)
-                
-                Button(action: {
-                    coordinator.launchSteam()
-                }) {
-                    Text("Install & Run Steam")
+                        .cornerRadius(12)
+                    }
+                    
+                    Button(action: {
+                        coordinator.startWindows()
+                    }) {
+                        HStack {
+                            Image(systemName: "window.casement")
+                            Text("Start Windows")
+                                .fontWeight(.semibold)
+                        }
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(coordinator.isJITEnabled && coordinator.isContainerReady ? Color.orange : Color.gray)
+                        .background(Color(red: 0.15, green: 0.15, blue: 0.15))
                         .foregroundColor(.white)
-                        .cornerRadius(10)
+                        .cornerRadius(12)
+                    }
                 }
-                .disabled(!coordinator.isJITEnabled || !coordinator.isContainerReady)
+                .padding(.horizontal, 32)
                 
-                Button(action: {
-                    isDocumentPickerPresented = true
-                }) {
-                    Text("Install and Run .exe")
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(coordinator.isJITEnabled && coordinator.isContainerReady ? Color.green : Color.gray)
-                        .foregroundColor(.white)
-                        .cornerRadius(10)
+                VStack(spacing: 16) {
+                    Button(action: {
+                        coordinator.launchSteam()
+                    }) {
+                        Text("Install & Run Steam")
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color(red: 0.15, green: 0.15, blue: 0.15))
+                            .foregroundColor(.white)
+                            .cornerRadius(12)
+                    }
+                    
+                    Button(action: {
+                        isDocumentPickerPresented = true
+                    }) {
+                        Text("Run Executable (.exe)")
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color(red: 0.15, green: 0.15, blue: 0.15))
+                            .foregroundColor(.white)
+                            .cornerRadius(12)
+                    }
                 }
+                .padding(.horizontal, 32)
+                .opacity((coordinator.isJITEnabled && coordinator.isContainerReady) ? 1.0 : 0.5)
                 .disabled(!coordinator.isJITEnabled || !coordinator.isContainerReady)
             }
-            .padding()
         }
         .sheet(isPresented: $isSettingsPresented) {
             SettingsView(coordinator: coordinator)
@@ -105,21 +127,23 @@ struct MainView: View {
     }
 }
 
-struct StatusIndicator: View {
+struct StatusPill: View {
     let isActive: Bool
     let label: String
     
     var body: some View {
-        HStack {
+        HStack(spacing: 6) {
             Circle()
                 .fill(isActive ? Color.green : Color.red)
-                .frame(width: 12, height: 12)
+                .frame(width: 8, height: 8)
             Text(label)
-                .font(.subheadline)
+                .font(.caption)
+                .fontWeight(.bold)
                 .foregroundColor(.white)
         }
-        .padding(8)
-        .background(Color.gray.opacity(0.3))
-        .cornerRadius(8)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(Color(red: 0.15, green: 0.15, blue: 0.15))
+        .cornerRadius(16)
     }
 }
