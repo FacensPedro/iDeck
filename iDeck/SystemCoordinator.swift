@@ -10,6 +10,7 @@ class SystemCoordinator: ObservableObject {
     @Published var currentStatus: String = "Ready"
     @Published var windowsStatus: String = "Ready"
     @Published var liveContainerStatus: String = "Ready"
+    @Published var isSteamConnected: Bool = false
     
     @Published var isHUDEnabled: Bool = false {
         didSet {
@@ -125,11 +126,11 @@ class SystemCoordinator: ObservableObject {
     }
     
     private func startLiveContainer() {
-        currentStatus = "Initializing LiveContainer..."
+        setLiveContainerStatus("Initializing LiveContainer...")
         containerHost.setupContainer(injectHooks: isGuestHooksEnabled) { [weak self] success in
             DispatchQueue.main.async {
                 self?.isContainerReady = success
-                self?.currentStatus = success ? "LiveContainer Running" : "Container Error"
+                self?.setLiveContainerStatus(success ? "LiveContainer Running" : "Container Error")
             }
         }
     }
@@ -148,9 +149,9 @@ class SystemCoordinator: ObservableObject {
                     if success {
                         self.isContainerReady = true
                         self.windowsEnvironment.configureWine(prefix: mountPath)
-                        self.currentStatus = "Windows Ready"
+                        self.setWindowsStatus("Windows Ready")
                     } else {
-                        self.currentStatus = "Failed to Install Windows Environment"
+                        self.setWindowsStatus("Failed to Install Windows Environment")
                     }
                 }
             }
@@ -159,6 +160,11 @@ class SystemCoordinator: ObservableObject {
     
     func confirmJITActivatedByStikDebug() {
         refreshJITStatus()
+    }
+
+    func disconnectSteamAccount() {
+        isSteamConnected = false
+        currentStatus = "Steam disconnected"
     }
 
     private var pairingFileURL: URL {
@@ -303,20 +309,20 @@ class SystemCoordinator: ObservableObject {
     /// Loads and starts a guest .app inside this process (see LiveContainerHook).
     func launchGuestApp(at url: URL) {
         guard isJITEnabled && isContainerReady else {
-            currentStatus = "Requires JIT & LiveContainer"
+            setLiveContainerStatus("Requires JIT & LiveContainer")
             return
         }
         guard FileManager.default.fileExists(atPath: url.path) else {
-            currentStatus = "Guest app not found"
+            setLiveContainerStatus("Guest app not found")
             return
         }
         
-        currentStatus = "Launching: \(url.lastPathComponent)"
+        setLiveContainerStatus("Launching: \(url.lastPathComponent)")
         var message: NSString?
         if LiveContainerHook.launchGuestApp(atPath: url.path, errorMessage: &message) {
-            currentStatus = "Guest app running: \(url.lastPathComponent)"
+            setLiveContainerStatus("Guest app running: \(url.lastPathComponent)")
         } else {
-            currentStatus = "Guest launch failed: \(message ?? "unknown error")"
+            setLiveContainerStatus("Guest launch failed: \(message ?? "unknown error")")
         }
     }
 }
