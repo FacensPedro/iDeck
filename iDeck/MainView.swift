@@ -56,6 +56,7 @@ struct MainView: View {
     @State private var mode: AppMode = .windows
     @State private var isDocumentPickerPresented = false
     @State private var isSettingsPresented = false
+    @State private var isWindowsWorkspacePresented = false
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @AppStorage(AppLanguage.storageKey) private var appLanguage = AppLanguage.system.rawValue // re-renders on change
 
@@ -87,6 +88,7 @@ struct MainView: View {
                 }
             }
         }
+        .onAppear { coordinator.refreshJITStatus() }
         .sheet(isPresented: $isSettingsPresented) {
             SettingsView(coordinator: coordinator)
         }
@@ -98,6 +100,17 @@ struct MainView: View {
             if case .success(let urls) = result, let url = urls.first {
                 coordinator.launchWindowsExecutable(at: url)
             }
+        }
+        .onChange(of: coordinator.currentStatus) { status in
+            if status == "Windows Ready" { isWindowsWorkspacePresented = true }
+        }
+        .fullScreenCover(isPresented: $isWindowsWorkspacePresented) {
+            WindowsWorkspaceView(
+                coordinator: coordinator,
+                onBack: { isWindowsWorkspacePresented = false },
+                onSettings: { isSettingsPresented = true },
+                onAddExecutable: { isDocumentPickerPresented = true }
+            )
         }
         .fullScreenCover(isPresented: Binding<Bool>(
             get: { coordinator.currentStatus == "Steam Running" || coordinator.currentStatus == "Running" },
@@ -260,9 +273,6 @@ struct MainView: View {
             actionButton(tr("Install & Run Steam"), symbol: "gamecontroller.fill", enabled: actionsEnabled) {
                 coordinator.launchSteam()
             }
-            actionButton(tr("Run Executable (.exe)"), symbol: "doc.badge.gearshape", enabled: actionsEnabled) {
-                isDocumentPickerPresented = true
-            }
         }
     }
 
@@ -297,5 +307,101 @@ struct StatusPill: View {
         .padding(.vertical, 6)
         .background(Color(red: 0.15, green: 0.15, blue: 0.15))
         .cornerRadius(16)
+    }
+}
+
+struct WindowsWorkspaceView: View {
+    @ObservedObject var coordinator: SystemCoordinator
+    let onBack: () -> Void
+    let onSettings: () -> Void
+    let onAddExecutable: () -> Void
+
+    private let panelColor = Color(red: 0.12, green: 0.12, blue: 0.12)
+
+    var body: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+            VStack(spacing: 0) {
+                HStack(spacing: 12) {
+                    Button(action: onBack) {
+                        Label(tr("Back"), systemImage: "chevron.left")
+                            .foregroundColor(.white)
+                    }
+                    Spacer()
+                    Text(tr("Windows"))
+                        .font(.headline)
+                        .foregroundColor(.white)
+                    Spacer()
+                    Button(action: onSettings) {
+                        Image(systemName: "gearshape.fill")
+                            .font(.title3)
+                            .foregroundColor(.white)
+                            .frame(width: 42, height: 42)
+                    }
+                    Button(action: onAddExecutable) {
+                        Image(systemName: "plus")
+                            .font(.title3.bold())
+                            .foregroundColor(.white)
+                            .frame(width: 42, height: 42)
+                            .background(panelColor)
+                            .clipShape(Circle())
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(tr("Game Library"))
+                            .font(.title2.bold())
+                            .foregroundColor(.white)
+                        Text(tr("Steam games and imported Windows installers"))
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                    }
+                    Spacer()
+                    Button {
+                        if let url = URL(string: "https://store.steampowered.com/login/") {
+                            UIApplication.shared.open(url)
+                        }
+                    } label: {
+                        Label(tr("Connect Steam"), systemImage: "link")
+                            .font(.subheadline.bold())
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 10)
+                            .background(Color.blue)
+                            .cornerRadius(10)
+                    }
+                }
+                .padding(16)
+
+                VStack(spacing: 12) {
+                    Image(systemName: "gamecontroller")
+                        .font(.system(size: 42))
+                        .foregroundColor(.gray)
+                    Text(tr("Steam library integration is not configured"))
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .multilineTextAlignment(.center)
+                    Text(tr("This iDeck build does not include Madeira's FEX, Wine ARM64EC, DXMT and Steam Dock runtime. Opening Steam's website does not connect an account or load games."))
+                        .font(.subheadline)
+                        .foregroundColor(.gray)
+                        .multilineTextAlignment(.center)
+                    Button(action: onAddExecutable) {
+                        Label(tr("Install a Windows .exe"), systemImage: "plus.circle.fill")
+                            .foregroundColor(.white)
+                            .padding()
+                            .frame(maxWidth: .infinity)
+                            .background(panelColor)
+                            .cornerRadius(12)
+                    }
+                }
+                .padding(24)
+                .frame(maxWidth: 560)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+        .preferredColorScheme(.dark)
     }
 }
