@@ -110,10 +110,11 @@ struct MainView: View {
 
     private var sidebar: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Text("iDeck")
-                .font(.system(size: 34, weight: .heavy, design: .rounded))
-                .foregroundColor(.white)
-                .padding(.top, 24)
+            Image("IDeckLogo")
+                .resizable()
+                .scaledToFit()
+                .frame(maxWidth: .infinity)
+                .padding(.top, 16)
 
             VStack(spacing: 8) {
                 ForEach(AppMode.allCases) { item in
@@ -151,9 +152,10 @@ struct MainView: View {
 
     private var topBar: some View {
         HStack {
-            Text("iDeck")
-                .font(.system(size: 28, weight: .heavy, design: .rounded))
-                .foregroundColor(.white)
+            Image("IDeckLogo")
+                .resizable()
+                .scaledToFit()
+                .frame(height: 44)
             Spacer()
             Button(action: { isSettingsPresented = true }) {
                 Image(systemName: "gearshape.fill")
