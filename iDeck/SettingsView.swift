@@ -8,6 +8,7 @@ struct SettingsView: View {
     @AppStorage("controllerRightSensitivity") private var controllerRightSensitivity = 1.0
     @AppStorage("controllerDeadzone") private var controllerDeadzone = 0.10
     @StateObject private var updater = UpdateChecker()
+    @State private var isSteamSignInPresented = false
     @AppStorage(AppLanguage.storageKey) private var appLanguage = AppLanguage.system.rawValue
     
     var body: some View {
@@ -34,19 +35,31 @@ struct SettingsView: View {
                         }
                         
                         settingsSection(title: tr("Steam")) {
-                            HStack {
+                            HStack(alignment: .top) {
                                 Text(tr("Steam account"))
                                     .foregroundColor(.white)
                                 Spacer()
-                                Text(coordinator.isSteamConnected ? tr("Connected") : tr("Not connected"))
-                                    .font(.caption)
-                                    .foregroundColor(coordinator.isSteamConnected ? .green : .gray)
+                                VStack(alignment: .trailing, spacing: 4) {
+                                    Text(coordinator.isSteamConnected ? tr("Connected") : tr("Not connected"))
+                                        .font(.caption)
+                                        .foregroundColor(coordinator.isSteamConnected ? .green : .gray)
+                                    if coordinator.isSteamConnected, let account = SteamSignIn.accountName {
+                                        Text(account)
+                                            .font(.caption)
+                                            .foregroundColor(.white)
+                                    }
+                                }
                             }
                             .padding()
-                            actionButton(title: tr("Disconnect Steam"), icon: "rectangle.portrait.and.arrow.right") {
-                                coordinator.disconnectSteamAccount()
+                            if coordinator.isSteamConnected {
+                                actionButton(title: tr("Disconnect Steam"), icon: "rectangle.portrait.and.arrow.right") {
+                                    coordinator.disconnectSteamAccount()
+                                }
+                            } else {
+                                actionButton(title: tr("Connect Steam"), icon: "link") {
+                                    isSteamSignInPresented = true
+                                }
                             }
-                            .disabled(!coordinator.isSteamConnected)
                         }
 
                         settingsSection(title: tr("Controller")) {
@@ -95,6 +108,9 @@ struct SettingsView: View {
             }
         }
         .navigationViewStyle(.stack)
+        .sheet(isPresented: $isSteamSignInPresented) {
+            SteamSignInView()
+        }
         .task { await updater.check() }
         .preferredColorScheme(.dark)
     }
