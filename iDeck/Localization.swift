@@ -118,7 +118,6 @@ enum Translations {
         "Could not connect to the server": ["pt": "Não foi possível conectar ao servidor", "es": "No se pudo conectar con el servidor"],
         "Could not copy the app bundle": ["pt": "Não foi possível copiar o pacote do app", "es": "No se pudo copiar el paquete de la app"],
         "JIT helper server": ["pt": "Servidor auxiliar de JIT", "es": "Servidor auxiliar de JIT"],
-        "Not connected": ["pt": "Não conectado", "es": "No conectado"],
 
         // Updates
         "Check for Updates": ["pt": "Verificar atualizações", "es": "Buscar actualizaciones"],
