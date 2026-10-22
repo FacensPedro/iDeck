@@ -184,5 +184,7 @@ enum Translations {
         "Executable import failed": ["pt": "Falha ao importar o executável", "es": "Error al importar el ejecutable"],
         "Container initialization failed": ["pt": "Falha ao inicializar o contêiner", "es": "Error al inicializar el contenedor"],
         "dlopen failed": ["pt": "Falha no dlopen", "es": "Falló dlopen"],
+        "Home": ["pt": "Início", "es": "Inicio"],
+        "Choose a mode to continue": ["pt": "Escolha um modo para continuar", "es": "Elige un modo para continuar"],
     ]
 }
