@@ -187,8 +187,13 @@ class SystemCoordinator: ObservableObject {
         let fileManager = FileManager.default
         do {
             let data = try Data(contentsOf: url)
-            guard let plist = try PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any],
-                  plist["HostID"] != nil || plist["DeviceCertificate"] != nil || plist["private_key"] != nil else {
+            // Pairing files exported by other tools (StikDebug, JitterBug, ...) are accepted as well:
+            // a property list or JSON object that carries the usual pairing record keys.
+            let knownKeys: Set<String> = ["HostID", "SystemBUID", "UDID", "DeviceCertificate", "HostCertificate",
+                                          "HostPrivateKey", "RootCertificate", "RootPrivateKey", "private_key"]
+            let object = (try? PropertyListSerialization.propertyList(from: data, format: nil))
+                ?? (try? JSONSerialization.jsonObject(with: data))
+            guard let record = object as? [String: Any], !knownKeys.isDisjoint(with: record.keys) else {
                 currentStatus = "Not a valid pairing file"
                 return
             }
@@ -280,10 +285,10 @@ class SystemCoordinator: ObservableObject {
             return
         }
         
-        currentStatus = "Launching \(url.lastPathComponent)..."
+        currentStatus = "Launching: \(url.lastPathComponent)"
         var message: NSString?
         if LiveContainerHook.launchGuestApp(atPath: url.path, errorMessage: &message) {
-            currentStatus = "Running \(url.lastPathComponent)"
+            currentStatus = "Guest app running: \(url.lastPathComponent)"
         } else {
             currentStatus = "Guest launch failed: \(message ?? "unknown error")"
         }

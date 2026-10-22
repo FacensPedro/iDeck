@@ -7,6 +7,7 @@ struct SettingsView: View {
     @State private var isImportingPairingFile = false
     @State private var isImportingDDI = false
     @StateObject private var updater = UpdateChecker()
+    @AppStorage(AppLanguage.storageKey) private var appLanguage = AppLanguage.system.rawValue
     @AppStorage("jitServerURL") private var jitServerURL = ""
     @AppStorage("jitServerToken") private var jitServerToken = ""
     
@@ -17,50 +18,54 @@ struct SettingsView: View {
                 
                 ScrollView {
                     VStack(spacing: 24) {
-                        settingsSection(title: "JIT & Debugging") {
+                        settingsSection(title: tr("Language")) {
+                            languagePicker
+                        }
+                        
+                        settingsSection(title: tr("JIT & Debugging")) {
                             statusRow
                             
-                            actionButton(title: "Activate JIT", icon: "bolt.fill") {
+                            actionButton(title: tr("Activate JIT"), icon: "bolt.fill") {
                                 coordinator.activateJITManually()
                             }
                             
-                            actionButton(title: "Import Pairing File", icon: "lock.shield.fill") {
+                            actionButton(title: tr("Import Pairing File"), icon: "lock.shield.fill") {
                                 isImportingPairingFile = true
                             }
                             
-                            actionButton(title: "Mount Developer Disk Image", icon: "externaldrive.fill") {
+                            actionButton(title: tr("Mount Developer Disk Image"), icon: "externaldrive.fill") {
                                 isImportingDDI = true
                             }
                             
                             jitServerFields
                             
-                            toggleRow(title: "JIT Pool", isOn: $coordinator.isJITPoolEnabled)
-                            toggleRow(title: "VPN JIT Trigger", isOn: $coordinator.isVPNJITEnabled)
+                            toggleRow(title: tr("JIT Pool"), isOn: $coordinator.isJITPoolEnabled)
+                            toggleRow(title: tr("VPN JIT Trigger"), isOn: $coordinator.isVPNJITEnabled)
                         }
                         
-                        settingsSection(title: "Graphics & Performance") {
-                            toggleRow(title: "MetalFX Upscaling", isOn: $coordinator.isMetalFXEnabled)
-                            toggleRow(title: "Hold Display at Maximum Rate", isOn: $coordinator.isMaxRefreshRateEnabled)
-                            toggleRow(title: "DXVK HUD", isOn: $coordinator.isHUDEnabled)
-                            toggleRow(title: "D3DMetal Rendering", isOn: $coordinator.isD3DMetalEnabled)
+                        settingsSection(title: tr("Graphics & Performance")) {
+                            toggleRow(title: tr("MetalFX Upscaling"), isOn: $coordinator.isMetalFXEnabled)
+                            toggleRow(title: tr("Hold Display at Maximum Rate"), isOn: $coordinator.isMaxRefreshRateEnabled)
+                            toggleRow(title: tr("DXVK HUD"), isOn: $coordinator.isHUDEnabled)
+                            toggleRow(title: tr("D3DMetal Rendering"), isOn: $coordinator.isD3DMetalEnabled)
                         }
                         
-                        settingsSection(title: "Updates") {
+                        settingsSection(title: tr("Updates")) {
                             updatesContent
                         }
                         
-                        settingsSection(title: "LiveContainer") {
-                            toggleRow(title: "Inject Guest Hooks", isOn: $coordinator.isGuestHooksEnabled)
+                        settingsSection(title: tr("LiveContainer")) {
+                            toggleRow(title: tr("Inject Guest Hooks"), isOn: $coordinator.isGuestHooksEnabled)
                         }
                     }
                     .padding()
                 }
             }
-            .navigationTitle("Settings")
+            .navigationTitle(tr("Settings"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
+                    Button(tr("Done")) {
                         presentationMode.wrappedValue.dismiss()
                     }
                     .foregroundColor(.white)
@@ -68,7 +73,7 @@ struct SettingsView: View {
             }
             .fileImporter(
                 isPresented: $isImportingPairingFile,
-                allowedContentTypes: [.data],
+                allowedContentTypes: [.item],
                 allowsMultipleSelection: false
             ) { result in
                 if case .success(let urls) = result, let url = urls.first {
@@ -87,15 +92,16 @@ struct SettingsView: View {
         }
         .navigationViewStyle(.stack)
         .onAppear { coordinator.refreshPairingFileState() }
+        .task { await updater.check() }
         .preferredColorScheme(.dark)
     }
     
     private var statusRow: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(coordinator.currentStatus)
+            Text(trStatus(coordinator.currentStatus))
                 .font(.footnote)
                 .foregroundColor(.white)
-            Text(coordinator.hasPairingFile ? "Pairing file: imported" : "Pairing file: none")
+            Text(coordinator.hasPairingFile ? tr("Pairing file: imported") : tr("Pairing file: none"))
                 .font(.caption)
                 .foregroundColor(coordinator.hasPairingFile ? .green : .gray)
         }
@@ -107,7 +113,7 @@ struct SettingsView: View {
     
     private var jitServerFields: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("JIT helper server")
+            Text(tr("JIT helper server"))
                 .font(.caption).fontWeight(.bold).foregroundColor(.gray)
             TextField("http://192.168.1.10:54321", text: $jitServerURL)
                 .textInputAutocapitalization(.never)
@@ -116,17 +122,35 @@ struct SettingsView: View {
                 .padding(10)
                 .background(Color.black.opacity(0.4))
                 .cornerRadius(8)
-            SecureField("Token (JIT_SERVER_TOKEN)", text: $jitServerToken)
+            SecureField(tr("Token (JIT_SERVER_TOKEN)"), text: $jitServerToken)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
                 .padding(10)
                 .background(Color.black.opacity(0.4))
                 .cornerRadius(8)
-            Text("Run server_jit/server.py on a computer connected to this device, then enter its address here. The pairing file stays on the device and is not sent to the server.")
+            Text(tr("Run server_jit/server.py on a computer connected to this device, then enter its address here. The pairing file stays on the device and is not sent to the server."))
                 .font(.caption2)
                 .foregroundColor(.gray)
         }
         .foregroundColor(.white)
+        .padding()
+        .background(Color(red: 0.15, green: 0.15, blue: 0.15))
+        .padding(.bottom, 2)
+    }
+    
+    private var languagePicker: some View {
+        HStack {
+            Text(tr("Language"))
+                .foregroundColor(.white)
+            Spacer()
+            Picker(tr("Language"), selection: $appLanguage) {
+                ForEach(AppLanguage.allCases) { language in
+                    Text(language.displayName).tag(language.rawValue)
+                }
+            }
+            .pickerStyle(.menu)
+            .tint(.blue)
+        }
         .padding()
         .background(Color(red: 0.15, green: 0.15, blue: 0.15))
         .padding(.bottom, 2)
@@ -142,39 +166,35 @@ struct SettingsView: View {
                     Spacer()
                     Text(versionText(for: status))
                         .font(.caption)
-                        .foregroundColor(status.upstreamChanged ? .orange : .gray)
+                        .foregroundColor(.gray)
                 }
-            }
-            if let message = updater.message {
-                Text(message).font(.caption).foregroundColor(.gray)
             }
         }
         .padding()
         .background(Color(red: 0.15, green: 0.15, blue: 0.15))
         .padding(.bottom, 2)
         
-        actionButton(title: updater.isChecking ? "Checking..." : "Check for Updates", icon: "arrow.triangle.2.circlepath") {
+        actionButton(title: updater.isChecking ? tr("Checking...") : tr("Check for Updates"), icon: "arrow.triangle.2.circlepath") {
             Task { await updater.check() }
         }
         .disabled(updater.isChecking)
         
         if let update = updater.availableIDeckUpdate {
-            actionButton(title: "Install iDeck \(update.latest ?? "")", icon: "arrow.down.circle.fill") {
+            actionButton(title: tr("Install iDeck %@", update.latest ?? ""), icon: "arrow.down.circle.fill") {
                 updater.installIDeckUpdate()
             }
         }
     }
     
+    /// iDeck shows the installed version; the other projects show the newest release that has an IPA.
     private func versionText(for status: ProjectStatus) -> String {
         if status.project.id == UpdateChecker.ideck.id {
-            let latest = status.latest ?? "no release yet"
-            return "v\(updater.currentVersion) · latest \(latest)"
+            return "v\(updater.currentVersion)"
         }
-        guard let latest = status.latest else { return status.error == nil ? "-" : "unavailable" }
-        if let pinned = status.project.pinnedVersion {
-            return status.upstreamChanged ? "\(pinned) → \(latest)" : "\(latest)"
-        }
-        return "latest \(latest)"
+        if !updater.hasChecked { return "-" }
+        if status.failed { return tr("unavailable") }
+        guard let latest = status.latest else { return tr("no IPA release") }
+        return latest
     }
     
     private func settingsSection<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {

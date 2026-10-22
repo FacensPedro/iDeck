@@ -25,8 +25,8 @@ enum AppMode: String, CaseIterable, Identifiable {
 
     var subtitle: String {
         switch self {
-        case .windows: return "Run Windows apps and Steam through Wine"
-        case .liveContainer: return "Run iOS apps inside iDeck"
+        case .windows: return tr("Run Windows apps and Steam through Wine")
+        case .liveContainer: return tr("Run iOS apps inside iDeck")
         }
     }
 }
@@ -57,6 +57,7 @@ struct MainView: View {
     @State private var isDocumentPickerPresented = false
     @State private var isSettingsPresented = false
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @AppStorage(AppLanguage.storageKey) private var appLanguage = AppLanguage.system.rawValue // re-renders on change
 
     private let cardColor = Color(red: 0.15, green: 0.15, blue: 0.15)
 
@@ -77,7 +78,7 @@ struct MainView: View {
             } else {
                 VStack(spacing: 0) {
                     topBar
-                    Picker("Mode", selection: $mode) {
+                    Picker(tr("Mode"), selection: $mode) {
                         ForEach(AppMode.allCases) { Text($0.rawValue).tag($0) }
                     }
                     .pickerStyle(.segmented)
@@ -137,7 +138,7 @@ struct MainView: View {
             Spacer()
             statusPills(vertical: true)
             Button(action: { isSettingsPresented = true }) {
-                Label("Settings", systemImage: "gearshape.fill")
+                Label(tr("Settings"), systemImage: "gearshape.fill")
                     .frame(maxWidth: .infinity)
                     .padding()
                     .background(cardColor)
@@ -173,8 +174,8 @@ struct MainView: View {
     private func statusPills(vertical: Bool) -> some View {
         let pills = Group {
             StatusPill(isActive: coordinator.isJITEnabled, label: "JIT")
-            StatusPill(isActive: coordinator.isContainerReady, label: "Container")
-            StatusPill(isActive: inputManager.isControllerConnected, label: "Gamepad")
+            StatusPill(isActive: coordinator.isContainerReady, label: tr("Container"))
+            StatusPill(isActive: inputManager.isControllerConnected, label: tr("Gamepad"))
         }
         return Group {
             if vertical {
@@ -214,7 +215,7 @@ struct MainView: View {
                 .font(.subheadline)
                 .foregroundColor(.gray)
                 .multilineTextAlignment(.center)
-            Text(coordinator.currentStatus)
+            Text(trStatus(coordinator.currentStatus))
                 .font(.footnote)
                 .foregroundColor(.gray)
                 .multilineTextAlignment(.center)
@@ -224,7 +225,7 @@ struct MainView: View {
                     ProgressView(value: Double(coordinator.prefixInstaller.progress))
                         .tint(.white)
                         .frame(maxWidth: 240)
-                    Text("Installing Windows environment...")
+                    Text(tr("Installing Windows environment..."))
                         .font(.caption)
                         .foregroundColor(.gray)
                 }
@@ -254,13 +255,13 @@ struct MainView: View {
 
     private var windowsActions: some View {
         LazyVGrid(columns: columns, spacing: 16) {
-            actionButton("Start Windows Environment", symbol: "power") {
+            actionButton(tr("Start Windows Environment"), symbol: "power") {
                 coordinator.forceJITAndStartWindows()
             }
-            actionButton("Install & Run Steam", symbol: "gamecontroller.fill", enabled: actionsEnabled) {
+            actionButton(tr("Install & Run Steam"), symbol: "gamecontroller.fill", enabled: actionsEnabled) {
                 coordinator.launchSteam()
             }
-            actionButton("Run Executable (.exe)", symbol: "doc.badge.gearshape", enabled: actionsEnabled) {
+            actionButton(tr("Run Executable (.exe)"), symbol: "doc.badge.gearshape", enabled: actionsEnabled) {
                 isDocumentPickerPresented = true
             }
         }
@@ -268,7 +269,7 @@ struct MainView: View {
 
     private var liveContainerActions: some View {
         VStack(spacing: 16) {
-            actionButton("Start LiveContainer", symbol: "power") {
+            actionButton(tr("Start LiveContainer"), symbol: "power") {
                 coordinator.forceJITAndStartLiveContainer()
             }
             GuestAppListView(coordinator: coordinator)

@@ -7,43 +7,37 @@ struct TrackedProject: Identifiable {
     let name: String
     let owner: String
     let repo: String
-    /// Release tag or short commit iDeck was built against; nil when not tracked yet.
-    let pinnedVersion: String?
 }
 
 struct ProjectStatus: Identifiable {
     let project: TrackedProject
+    /// Tag of the newest release that has an .ipa attached.
     var latest: String?
-    var error: String?
+    var failed = false
     var ipaURL: URL?
     var pageURL: URL?
     var id: String { project.id }
-
-    /// True when upstream moved past the version iDeck is based on.
-    var upstreamChanged: Bool {
-        guard let latest = latest, let pinned = project.pinnedVersion else { return false }
-        return latest != pinned
-    }
 }
 
-/// Checks GitHub for newer releases. Native code cannot be swapped inside an installed app, so
-/// "installing" an update means installing a newer iDeck IPA (built by CI with the newer upstream
-/// code) over the current one through a sideloading app, which keeps the app's data.
+/// Reads the newest GitHub release that ships an IPA for each tracked project. Native code cannot be
+/// swapped inside an installed app, so "installing" an update means installing a newer iDeck IPA over
+/// the current one through a sideloading app, which keeps the app's data.
 @MainActor
 final class UpdateChecker: ObservableObject {
-    static let ideck = TrackedProject(id: "ideck", name: "iDeck", owner: "FacensPedro", repo: "iDeck", pinnedVersion: nil)
+    static let ideck = TrackedProject(id: "ideck", name: "iDeck", owner: "FacensPedro", repo: "iDeck")
 
     static let projects: [TrackedProject] = [
         ideck,
-        TrackedProject(id: "stikdebug", name: "StikDebug", owner: "StikDebug", repo: "StikDebug", pinnedVersion: nil),
-        TrackedProject(id: "livecontainer", name: "LiveContainer", owner: "LiveContainer", repo: "LiveContainer", pinnedVersion: nil),
-        TrackedProject(id: "madeira", name: "Madeira", owner: "willfaust", repo: "madeira", pinnedVersion: "279fd0f")
+        TrackedProject(id: "stikdebug", name: "StikDebug", owner: "StikDebug", repo: "StikDebug"),
+        TrackedProject(id: "livecontainer", name: "LiveContainer", owner: "LiveContainer", repo: "LiveContainer"),
+        TrackedProject(id: "madeira", name: "Madeira", owner: "willfaust", repo: "madeira")
     ]
 
     @Published var statuses: [ProjectStatus] = UpdateChecker.projects.map { ProjectStatus(project: $0) }
     @Published var isChecking = false
-    @Published var message: String?
+    @Published var hasChecked = false
 
+    /// Version of the installed iDeck.
     var currentVersion: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
     }
@@ -58,19 +52,16 @@ final class UpdateChecker: ObservableObject {
 
     func check() async {
         isChecking = true
-        message = nil
         var result: [ProjectStatus] = []
         for project in Self.projects {
             result.append(await fetch(project))
         }
         statuses = result
         isChecking = false
-        if availableIDeckUpdate == nil && !result.contains(where: { $0.upstreamChanged }) {
-            message = "Everything is up to date."
-        }
+        hasChecked = true
     }
 
-    /// Hands the new IPA to AltStore or SideStore (installs over the current app, data is kept).
+    /// Hands the new IPA to SideStore or AltStore (installs over the current app, data is kept).
     /// Falls back to the release page when neither app is installed.
     func installIDeckUpdate() {
         guard let status = availableIDeckUpdate, let ipa = status.ipaURL else { return }
@@ -93,46 +84,38 @@ final class UpdateChecker: ObservableObject {
 
     private func fetch(_ project: TrackedProject) async -> ProjectStatus {
         var status = ProjectStatus(project: project)
-        let base = "https://api.github.com/repos/\(project.owner)/\(project.repo)"
-
-        do {
-            if let release: Release = try await get("\(base)/releases/latest", allowNotFound: true) {
-                status.latest = release.tag_name
-                status.pageURL = URL(string: release.html_url)
-                status.ipaURL = release.assets.first(where: { $0.name.lowercased().hasSuffix(".ipa") })
-                    .flatMap { URL(string: $0.browser_download_url) }
-            } else if let commits: [Commit] = try await get("\(base)/commits?per_page=1", allowNotFound: false),
-                      let first = commits.first {
-                status.latest = String(first.sha.prefix(7))
-                status.pageURL = URL(string: first.html_url)
-            }
-        } catch {
-            status.error = error.localizedDescription
+        guard let url = URL(string: "https://api.github.com/repos/\(project.owner)/\(project.repo)/releases?per_page=30") else {
+            status.failed = true
+            return status
         }
-        return status
-    }
-
-    private func get<T: Decodable>(_ urlString: String, allowNotFound: Bool) async throws -> T? {
-        guard let url = URL(string: urlString) else { return nil }
         var request = URLRequest(url: url, timeoutInterval: 20)
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-        let (data, response) = try await URLSession.shared.data(for: request)
-        let code = (response as? HTTPURLResponse)?.statusCode ?? 0
-        if code == 404 && allowNotFound { return nil }
-        guard code == 200 else { throw URLError(.badServerResponse) }
-        return try JSONDecoder().decode(T.self, from: data)
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
+            let releases = try JSONDecoder().decode([Release].self, from: data)
+            // GitHub lists releases newest first; take the first published one that carries an IPA.
+            for release in releases where !release.draft {
+                if let asset = release.assets.first(where: { $0.name.lowercased().hasSuffix(".ipa") }) {
+                    status.latest = release.tag_name
+                    status.ipaURL = URL(string: asset.browser_download_url)
+                    status.pageURL = URL(string: release.html_url)
+                    break
+                }
+            }
+        } catch {
+            status.failed = true
+        }
+        return status
     }
 
     private struct Release: Decodable {
         struct Asset: Decodable { let name: String; let browser_download_url: String }
         let tag_name: String
         let html_url: String
+        let draft: Bool
         let assets: [Asset]
-    }
-
-    private struct Commit: Decodable {
-        let sha: String
-        let html_url: String
     }
 
     /// Compares dotted numeric versions ("v1.2.10" > "1.2.9"); non-numeric parts are ignored.

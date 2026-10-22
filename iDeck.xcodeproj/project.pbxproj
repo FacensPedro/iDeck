@@ -20,6 +20,7 @@
 		111111111111111111111122 /* PrefixInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222233 /* PrefixInstaller.swift */; };
 		111111111111111111111123 /* SteamManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222235 /* SteamManager.swift */; };
 		999999999999999999999914 /* UpdateChecker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 999999999999999999999906 /* UpdateChecker.swift */; };
+		999999999999999999999915 /* Localization.swift in Sources */ = {isa = PBXBuildFile; fileRef = 999999999999999999999907 /* Localization.swift */; };
 		999999999999999999999911 /* PacketTunnelProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 999999999999999999999901 /* PacketTunnelProvider.swift */; };
 		999999999999999999999912 /* VPNExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 999999999999999999999902 /* VPNExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		999999999999999999999913 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 999999999999999999999905 /* Assets.xcassets */; };
@@ -47,6 +48,7 @@
 		222222222222222222222234 /* iDeck.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = iDeck.entitlements; sourceTree = "<group>"; };
 		222222222222222222222235 /* SteamManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamManager.swift; sourceTree = "<group>"; };
 		999999999999999999999906 /* UpdateChecker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateChecker.swift; sourceTree = "<group>"; };
+		999999999999999999999907 /* Localization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Localization.swift; sourceTree = "<group>"; };
 		999999999999999999999901 /* PacketTunnelProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PacketTunnelProvider.swift; sourceTree = "<group>"; };
 		999999999999999999999902 /* VPNExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = VPNExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		999999999999999999999903 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -87,6 +89,7 @@
 				111111111111111111111122 /* PrefixInstaller.swift in Sources */,
 				111111111111111111111123 /* SteamManager.swift in Sources */,
 				999999999999999999999914 /* UpdateChecker.swift in Sources */,
+				999999999999999999999915 /* Localization.swift in Sources */,
 				111111111111111111111124 /* AppManager.swift in Sources */,
 				111111111111111111111125 /* GameSessionView.swift in Sources */,
 				111111111111111111111126 /* GuestAppListView.swift in Sources */,
@@ -125,6 +128,7 @@
 				222222222222222222222228 /* AudioManager.swift */,
 				222222222222222222222229 /* GraphicsConfig.swift */,
 				999999999999999999999906 /* UpdateChecker.swift */,
+				999999999999999999999907 /* Localization.swift */,
 				222222222222222222222236 /* AppManager.swift */,
 				222222222222222222222237 /* GameSessionView.swift */,
 				222222222222222222222238 /* GuestAppListView.swift */,
