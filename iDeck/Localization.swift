@@ -244,5 +244,6 @@ enum Translations {
         "Sign in to load the Steam game library. Launching Windows games still requires the Madeira native runtime.": ["pt": "Entre na conta Steam para carregar a biblioteca. A execução de jogos do Windows ainda exige o runtime nativo do Madeira.", "es": "Inicia sesión en Steam para cargar la biblioteca. Ejecutar juegos de Windows todavía requiere el entorno nativo de Madeira."],
         "Steam did not provide required shared content metadata. Refresh and retry the download.": ["pt": "O Steam não forneceu os metadados necessários de conteúdo compartilhado. Atualize e tente o download novamente.", "es": "Steam no proporcionó los metadatos necesarios del contenido compartido. Actualiza e inténtalo de nuevo."],
         "Steam library connection failed": ["pt": "Falha na conexão com a biblioteca Steam", "es": "Falló la conexión con la biblioteca de Steam"],
+        "Refresh JIT status": ["pt": "Atualizar status do JIT", "es": "Actualizar estado de JIT"],
     ]
 }
