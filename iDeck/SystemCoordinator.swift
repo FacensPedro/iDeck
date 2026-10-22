@@ -8,6 +8,8 @@ class SystemCoordinator: ObservableObject {
     @Published var isJITEnabled: Bool = false
     @Published var isContainerReady: Bool = false
     @Published var currentStatus: String = "Ready"
+    @Published var windowsStatus: String = "Ready"
+    @Published var liveContainerStatus: String = "Ready"
     
     @Published var isHUDEnabled: Bool = false {
         didSet {
@@ -73,6 +75,22 @@ class SystemCoordinator: ObservableObject {
         return false
     }
     
+    func setWindowsStatus(_ status: String) {
+        let update = {
+            self.windowsStatus = status
+            self.currentStatus = status
+        }
+        if Thread.isMainThread { update() } else { DispatchQueue.main.async(execute: update) }
+    }
+
+    func setLiveContainerStatus(_ status: String) {
+        let update = {
+            self.liveContainerStatus = status
+            self.currentStatus = status
+        }
+        if Thread.isMainThread { update() } else { DispatchQueue.main.async(execute: update) }
+    }
+
     func refreshJITStatus() {
         var info = kinfo_proc()
         var size = MemoryLayout<kinfo_proc>.stride
@@ -95,7 +113,7 @@ class SystemCoordinator: ObservableObject {
     func forceJITAndStartLiveContainer() {
         refreshJITStatus()
         guard isJITEnabled else {
-            currentStatus = "Activate JIT with StikDebug, then confirm it in iDeck Settings."
+            setLiveContainerStatus("Activate JIT with StikDebug, then confirm it in iDeck Settings.")
             return
         }
         startLiveContainer()
@@ -117,11 +135,11 @@ class SystemCoordinator: ObservableObject {
     }
     
     private func startWindows() {
-        currentStatus = "Preparing Windows Environment..."
+        setWindowsStatus("Preparing Windows Environment...")
         containerHost.mountEnvironment { [weak self] mountPath in
             guard let self = self else { return }
             guard let mountPath = mountPath else {
-                self.currentStatus = "Container not initialized"
+                self.setWindowsStatus("Container not initialized")
                 return
             }
             
@@ -213,23 +231,23 @@ class SystemCoordinator: ObservableObject {
     func launchSteam() {
         guard isJITEnabled && isContainerReady else { return }
         
-        currentStatus = "Downloading Steam..."
+        setWindowsStatus("Downloading Steam...")
         containerHost.mountEnvironment { [weak self] mountPath in
             guard let self = self else { return }
             guard let mountPath = mountPath else {
-                self.currentStatus = "Container not initialized"
+                self.setWindowsStatus("Container not initialized")
                 return
             }
             guard self.windowsEnvironment.hasRuntime(in: mountPath) else {
                 DispatchQueue.main.async {
-                    self.currentStatus = "Madeira runtime missing: FEX/box64 and Wine ARM64EC are not installed."
+                    self.setWindowsStatus("Madeira runtime missing: FEX/box64 and Wine ARM64EC are not installed.")
                 }
                 return
             }
             self.windowsEnvironment.configureWine(prefix: mountPath)
             self.windowsEnvironment.installAndRunSteam(jitEnabler: self.jitEnabler) { result in
                 DispatchQueue.main.async {
-                    self.currentStatus = result ? "Steam Running" : "Steam Error"
+                    self.setWindowsStatus(result ? "Steam Running" : "Steam Error")
                 }
             }
         }
@@ -239,13 +257,13 @@ class SystemCoordinator: ObservableObject {
         guard isContainerReady else { return }
         
         refreshJITStatus()
-        currentStatus = "Importing Executable..."
+        setWindowsStatus("Importing Executable...")
         let hasScope = url.startAccessingSecurityScopedResource()
         defer { if hasScope { url.stopAccessingSecurityScopedResource() } }
         containerHost.mountEnvironment { [weak self] mountPath in
             guard let self = self else { return }
             guard let mountPath = mountPath else {
-                self.currentStatus = "Container initialization failed"
+                self.setWindowsStatus("Container initialization failed")
                 return
             }
             do {
@@ -258,7 +276,7 @@ class SystemCoordinator: ObservableObject {
                 try FileManager.default.copyItem(at: url, to: destination)
                 guard self.isJITEnabled else {
                     DispatchQueue.main.async {
-                        self.currentStatus = "Executable imported. Enable JIT for iDeck in StikDebug before running it."
+                        self.setWindowsStatus("Executable imported. Enable JIT for iDeck in StikDebug before running it.")
                     }
                     return
                 }
