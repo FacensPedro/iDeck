@@ -7,7 +7,13 @@ class WindowsEnvironment {
     let audioManager = AudioManager()
     let steamManager = SteamManager()
     
-    func hasRuntime(in prefix: String) -> Bool {\n        let root = URL(fileURLWithPath: prefix)\n        let required = ["usr/bin/box64", "usr/bin/wine64"]\n        return required.allSatisfy { FileManager.default.isExecutableFile(atPath: root.appendingPathComponent($0).path) }\n    }\n\n    func configureWine(prefix: String) {
+    func hasRuntime(in prefix: String) -> Bool {
+        let root = URL(fileURLWithPath: prefix)
+        let required = ["usr/bin/box64", "usr/bin/wine64"]
+        return required.allSatisfy { FileManager.default.isExecutableFile(atPath: root.appendingPathComponent($0).path) }
+    }
+
+    func configureWine(prefix: String) {
         self.winePrefixPath = prefix
         setenv("WINEPREFIX", prefix, 1)
         setenv("WINEDEBUG", "-all", 1)
