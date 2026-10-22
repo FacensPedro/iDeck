@@ -220,5 +220,17 @@ enum Translations {
         "Sign in directly with Steam. iDeck does not store your password; the sign-in token is saved in this device's Keychain.": ["pt": "Entre diretamente com o Steam. O iDeck não armazena sua senha; o token da sessão é salvo no Chaves deste dispositivo.", "es": "Inicia sesión directamente con Steam. iDeck no guarda tu contraseña; el token de sesión se almacena en el llavero de este dispositivo."],
         "iDeck can use this secure Steam sign-in to access your Steam account.": ["pt": "O iDeck usa esta autenticação segura do Steam para acessar sua conta.", "es": "iDeck usa este inicio de sesión seguro de Steam para acceder a tu cuenta."],
         "iDeck signs in with Steam directly. Your password is sent only to Steam and is never stored. A sign-in token is kept in this device's Keychain until you sign out.": ["pt": "O iDeck entra diretamente no Steam. Sua senha é enviada apenas ao Steam e nunca é armazenada. O token da sessão fica no Chaves deste dispositivo até você sair da conta.", "es": "iDeck inicia sesión directamente en Steam. Tu contraseña solo se envía a Steam y nunca se guarda. El token de sesión permanece en el llavero de este dispositivo hasta que cierres sesión."],
+        "Preparing Windows Environment...": ["pt": "Preparando o ambiente Windows...", "es": "Preparando el entorno de Windows..."],
+        "Madeira runtime missing: FEX/box64 and Wine ARM64EC are not installed.": ["pt": "Runtime do Madeira ausente: FEX/box64 e Wine ARM64EC não estão instalados.", "es": "Falta el runtime de Madeira: FEX/box64 y Wine ARM64EC no están instalados."],
+        "Execution Error: Madeira Wine/FEX runtime is missing or failed to start": ["pt": "Erro de execução: o runtime Wine/FEX do Madeira está ausente ou não iniciou.", "es": "Error de ejecución: falta el runtime Wine/FEX de Madeira o no pudo iniciarse."],
+        "The account name or password is incorrect.": ["pt": "O nome da conta ou a senha está incorreto.", "es": "El nombre de cuenta o la contraseña no son correctos."],
+        "Too many attempts. Please try again later.": ["pt": "Muitas tentativas. Tente novamente mais tarde.", "es": "Demasiados intentos. Vuelve a intentarlo más tarde."],
+        "This Steam account has been disabled": ["pt": "Esta conta Steam foi desativada.", "es": "Esta cuenta de Steam ha sido desactivada."],
+        "Failed to fetch RSA public key for password encryption": ["pt": "Não foi possível obter a chave pública RSA para criptografar a senha.", "es": "No se pudo obtener la clave pública RSA para cifrar la contraseña."],
+        "QR code has expired. Please try again.": ["pt": "O código QR expirou. Tente novamente.", "es": "El código QR ha caducado. Vuelve a intentarlo."],
+        "The sign-in request expired. Start again.": ["pt": "A solicitação de login expirou. Comece novamente.", "es": "La solicitud de inicio de sesión ha caducado. Vuelve a empezar."],
+        "Steam did not respond. Check your internet connection.": ["pt": "O Steam não respondeu. Verifique sua conexão com a internet.", "es": "Steam no respondió. Comprueba tu conexión a Internet."],
+        "Steam sign-in is unavailable right now (HTTP %d).": ["pt": "O login do Steam está indisponível no momento (HTTP %d).", "es": "El inicio de sesión de Steam no está disponible ahora (HTTP %d)."],
+        "Steam refused the sign-in (code %u).": ["pt": "O Steam recusou o login (código %u).", "es": "Steam rechazó el inicio de sesión (código %u)."],
     ]
 }
