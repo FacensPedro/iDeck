@@ -1,10 +1,15 @@
 name: iOS Build
 
 on:
+  workflow_dispatch:
   push:
     branches: [ "main" ]
+    tags: [ "v*" ]
   pull_request:
     branches: [ "main" ]
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -31,12 +36,19 @@ jobs:
 
       - name: Package IPA
         run: |
+          test -d build/Build/Products/Release-iphoneos/iDeck.app/PlugIns/VPNExtension.appex
           mkdir -p Payload
-          mv build/Build/Products/Release-iphoneos/iDeck.app Payload/
-          zip -r iDeck.ipa Payload
+          cp -R build/Build/Products/Release-iphoneos/iDeck.app Payload/
+          zip -qry iDeck.ipa Payload
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: iDeck
           path: iDeck.ipa
+
+      - name: Publish release (tags only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release create "${{ github.ref_name }}" iDeck.ipa --title "iDeck ${{ github.ref_name }}" --generate-notes

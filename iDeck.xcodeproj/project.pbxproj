@@ -19,6 +19,9 @@
 		111111111111111111111121 /* VPNManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222232 /* VPNManager.swift */; };
 		111111111111111111111122 /* PrefixInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222233 /* PrefixInstaller.swift */; };
 		111111111111111111111123 /* SteamManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222235 /* SteamManager.swift */; };
+		999999999999999999999911 /* PacketTunnelProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 999999999999999999999901 /* PacketTunnelProvider.swift */; };
+		999999999999999999999912 /* VPNExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 999999999999999999999902 /* VPNExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		999999999999999999999913 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 999999999999999999999905 /* Assets.xcassets */; };
 		111111111111111111111124 /* AppManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222236 /* AppManager.swift */; };
 		111111111111111111111125 /* GameSessionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222237 /* GameSessionView.swift */; };
 		111111111111111111111126 /* GuestAppListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222238 /* GuestAppListView.swift */; };
@@ -42,6 +45,11 @@
 		222222222222222222222233 /* PrefixInstaller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrefixInstaller.swift; sourceTree = "<group>"; };
 		222222222222222222222234 /* iDeck.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = iDeck.entitlements; sourceTree = "<group>"; };
 		222222222222222222222235 /* SteamManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamManager.swift; sourceTree = "<group>"; };
+		999999999999999999999901 /* PacketTunnelProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PacketTunnelProvider.swift; sourceTree = "<group>"; };
+		999999999999999999999902 /* VPNExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = VPNExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		999999999999999999999903 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		999999999999999999999904 /* VPNExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = VPNExtension.entitlements; sourceTree = "<group>"; };
+		999999999999999999999905 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		222222222222222222222236 /* AppManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppManager.swift"; sourceTree = "<group>"; };
 		222222222222222222222237 /* GameSessionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GameSessionView.swift"; sourceTree = "<group>"; };
 		222222222222222222222238 /* GuestAppListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GuestAppListView.swift"; sourceTree = "<group>"; };
@@ -90,6 +98,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				999999999999999999999913 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -98,6 +107,7 @@
 			isa = PBXGroup;
 			children = (
 				222222222222222222222234 /* iDeck.entitlements */,
+				999999999999999999999905 /* Assets.xcassets */,
 				222222222222222222222221 /* iDeckApp.swift */,
 				222222222222222222222222 /* MainView.swift */,
 				222222222222222222222230 /* SettingsView.swift */,
@@ -128,6 +138,7 @@
 			isa = PBXGroup;
 			children = (
 				222222222222222222222227 /* iDeck.app */,
+				999999999999999999999902 /* VPNExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -136,6 +147,7 @@
 			isa = PBXGroup;
 			children = (
 				444444444444444444444441 /* iDeck */,
+				999999999999999999999981 /* VPNExtension */,
 				444444444444444444444442 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -148,15 +160,148 @@
 				333333333333333333333332 /* Sources */,
 				333333333333333333333331 /* Frameworks */,
 				333333333333333333333333 /* Resources */,
+				999999999999999999999924 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				999999999999999999999941 /* PBXTargetDependency */,
 			);
 			name = iDeck;
 			productName = iDeck;
 			productReference = 222222222222222222222227 /* iDeck.app */;
 			productType = "com.apple.product-type.application";
+		};
+
+
+		999999999999999999999921 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				999999999999999999999911 /* PacketTunnelProvider.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		999999999999999999999922 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		999999999999999999999923 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		999999999999999999999924 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				999999999999999999999912 /* VPNExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		999999999999999999999951 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 777777777777777777777771 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 999999999999999999999931;
+			remoteInfo = VPNExtension;
+		};
+		999999999999999999999941 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 999999999999999999999931 /* VPNExtension */;
+			targetProxy = 999999999999999999999951 /* PBXContainerItemProxy */;
+		};
+		999999999999999999999981 /* VPNExtension */ = {
+			isa = PBXGroup;
+			children = (
+				999999999999999999999901 /* PacketTunnelProvider.swift */,
+				999999999999999999999903 /* Info.plist */,
+				999999999999999999999904 /* VPNExtension.entitlements */,
+			);
+			path = VPNExtension;
+			sourceTree = "<group>";
+		};
+		999999999999999999999931 /* VPNExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 999999999999999999999961 /* Build configuration list for PBXNativeTarget "VPNExtension" */;
+			buildPhases = (
+				999999999999999999999921 /* Sources */,
+				999999999999999999999922 /* Frameworks */,
+				999999999999999999999923 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = VPNExtension;
+			productName = VPNExtension;
+			productReference = 999999999999999999999902 /* VPNExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		999999999999999999999971 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = VPNExtension/VPNExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = VPNExtension/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.iDeck.VPNExtension;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		999999999999999999999972 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = VPNExtension/VPNExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = VPNExtension/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.iDeck.VPNExtension;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		999999999999999999999961 /* Build configuration list for PBXNativeTarget "VPNExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				999999999999999999999971 /* Debug */,
+				999999999999999999999972 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 
 		777777777777777777777771 /* Project object */ = {
@@ -185,6 +330,7 @@
 			projectRoot = "";
 			targets = (
 				555555555555555555555551 /* iDeck */,
+				999999999999999999999931 /* VPNExtension */,
 			);
 		};
 
