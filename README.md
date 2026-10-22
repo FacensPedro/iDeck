@@ -33,3 +33,8 @@ The mode screens show the mark of the engine behind each mode when an image set 
 
 Add the official files from those projects yourself (check their brand/licence terms). The app icon is
 `iDeck/Assets.xcassets/AppIcon.appiconset/AppIcon.png` (1024x1024, opaque PNG); replace it with your own artwork.
+
+
+## Third-party components
+
+The Steam authentication code in `iDeck/SteamManager.swift` includes adapted source from [Madeira](https://github.com/willfaust/Madeira), including the SwiftSteam sign-in flow. The upstream source headers and copyright notices are retained in the file. Consult [LICENSES/Madeira-COPYING](LICENSES/Madeira-COPYING) and [LICENSES/Madeira-LICENSE-EXCEPTION.md](LICENSES/Madeira-LICENSE-EXCEPTION.md) for the upstream terms. This iDeck change integrates sign-in only; the Madeira FEX/Wine/DXMT runtime and owned-game library/launch pipeline are not yet integrated.
