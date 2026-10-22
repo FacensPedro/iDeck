@@ -373,13 +373,32 @@ enum ZipExtractor {
                                    unixMode: Int, lexicalRoot: String, resolvedRoot: String, destination: URL) throws {
         let fm = FileManager.default
 
-        // Reject absolute paths, backslashes and ".." components.
-        let components = name.split(separator: "/", omittingEmptySubsequences: true)
-        if name.hasPrefix("/") || name.contains("\\") || components.contains("..") { throw ZipError.unsafePath }
-        if components.isEmpty { return }
+        // Normalize harmless dot segments while rejecting absolute paths and paths
+        // that would escape the extraction root. Some valid IPA framework bundles
+        // contain relative entries such as Payload/App.app/Frameworks/../Framework.
+        let normalizedName = name.replacingOccurrences(of: "\\", with: "/")
+        if normalizedName.hasPrefix("/") || normalizedName.unicodeScalars.contains(where: { $0.value == 0 }) {
+            throw ZipError.unsafePath
+        }
+        var safeComponents: [String] = []
+        for part in normalizedName.split(separator: "/", omittingEmptySubsequences: true) {
+            if part == "." { continue }
+            if part == ".." {
+                guard !safeComponents.isEmpty else { throw ZipError.unsafePath }
+                safeComponents.removeLast()
+                continue
+            }
+            guard !part.contains(":"),
+                  !part.unicodeScalars.contains(where: { $0.value < 0x20 || $0.value == 0x7F }) else {
+                throw ZipError.unsafePath
+            }
+            safeComponents.append(String(part))
+        }
+        guard !safeComponents.isEmpty else { return }
 
-        let target = components.reduce(destination) { $0.appendingPathComponent(String($1)) }
-        guard target.standardizedFileURL.path.hasPrefix(lexicalRoot + "/") else { throw ZipError.unsafePath }
+        let target = safeComponents.reduce(destination) { $0.appendingPathComponent($1) }
+        let standardizedTarget = target.standardizedFileURL.path
+        guard standardizedTarget.hasPrefix(lexicalRoot + "/") else { throw ZipError.unsafePath }
 
         if name.hasSuffix("/") {
             try fm.createDirectory(at: target, withIntermediateDirectories: true)

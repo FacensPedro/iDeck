@@ -44,12 +44,16 @@ class AppManager: ObservableObject {
         let appsDirectory = self.appsDirectory
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             defer { if hasScope { url.stopAccessingSecurityScopedResource() } }
-            let extractPath = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
-            defer { try? fileManager.removeItem(at: extractPath) }
+            let workDirectory = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+            let extractPath = workDirectory.appendingPathComponent("Extracted", isDirectory: true)
+            let stagedArchive = workDirectory.appendingPathComponent("Source.ipa")
+            defer { try? fileManager.removeItem(at: workDirectory) }
             let result: Result<URL, IPAInstallError>
             do {
                 guard fileManager.fileExists(atPath: url.path), url.pathExtension.lowercased() == "ipa" else { throw IPAInstallError.invalidArchive }
-                try ZipExtractor.extract(archive: url, to: extractPath)
+                try fileManager.createDirectory(at: workDirectory, withIntermediateDirectories: true)
+                try fileManager.copyItem(at: url, to: stagedArchive)
+                try ZipExtractor.extract(archive: stagedArchive, to: extractPath)
                 let payloadPath = extractPath.appendingPathComponent("Payload", isDirectory: true)
                 var isDirectory: ObjCBool = false
                 guard fileManager.fileExists(atPath: payloadPath.path, isDirectory: &isDirectory), isDirectory.boolValue else { throw IPAInstallError.missingPayload }

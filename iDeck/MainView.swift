@@ -372,6 +372,67 @@ struct MainView: View {
     }
 }
 
+
+struct SteamGameArtworkView: View {
+    let game: SteamAppInfo
+    @State private var candidateIndex = 0
+
+    private var candidates: [URL] {
+        var urls: [URL] = []
+        func append(_ url: URL?) {
+            if let url, !urls.contains(url) { urls.append(url) }
+        }
+        if let asset = game.libraryCapsule,
+           asset.utf8.count <= 256,
+           !asset.isEmpty,
+           !asset.hasPrefix("/"),
+           !asset.contains(".."),
+           asset.unicodeScalars.allSatisfy({ $0.isASCII && (CharacterSet.alphanumerics.contains($0) || "._-/".unicodeScalars.contains($0)) }) {
+            append(URL(string: "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/\\(game.appID)/\\(asset)"))
+        }
+        append(URL(string: "https://cdn.cloudflare.steamstatic.com/steam/apps/\\(game.appID)/library_600x900.jpg"))
+        if let parentID = game.parentID {
+            append(URL(string: "https://cdn.cloudflare.steamstatic.com/steam/apps/\\(parentID)/library_600x900.jpg"))
+        }
+        if let header = game.headerImage,
+           header.utf8.count <= 256,
+           !header.isEmpty,
+           !header.hasPrefix("/"),
+           !header.contains(".."),
+           header.unicodeScalars.allSatisfy({ $0.isASCII && (CharacterSet.alphanumerics.contains($0) || "._-/".unicodeScalars.contains($0)) }) {
+            append(URL(string: "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/\\(game.appID)/\\(header)"))
+        }
+        return urls
+    }
+
+    var body: some View {
+        AsyncImage(url: candidateIndex < candidates.count ? candidates[candidateIndex] : nil) { phase in
+            if let image = phase.image {
+                image.resizable().scaledToFill()
+            } else if phase.error != nil {
+                Image(systemName: "gamecontroller.fill")
+                    .resizable()
+                    .scaledToFit()
+                    .padding(14)
+                    .foregroundColor(.gray)
+                    .onAppear {
+                        if candidateIndex + 1 < candidates.count { candidateIndex += 1 }
+                    }
+            } else {
+                ZStack {
+                    Color.white.opacity(0.06)
+                    ProgressView().tint(.gray)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.white.opacity(0.06))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .task(id: game.appID) { candidateIndex = 0 }
+        .accessibilityLabel(game.name)
+    }
+}
+
 struct StatusPill: View {
     let isActive: Bool
     let label: String
@@ -400,8 +461,18 @@ struct WindowsWorkspaceView: View {
 
     @State private var isSettingsPresented = false
     @State private var isSteamSignInPresented = false
+    @State private var searchText = ""
     @StateObject private var steamLibrary = SteamOwnedGamesModel()
+    @Environment(\.openURL) private var openURL
     private let panelColor = Color(red: 0.12, green: 0.12, blue: 0.12)
+
+    private var filteredSteamGames: [SteamAppInfo] {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return steamLibrary.games }
+        return steamLibrary.games.filter {
+            $0.name.localizedCaseInsensitiveContains(query) || String($0.appID).contains(query)
+        }
+    }
 
     var body: some View {
         ZStack {
@@ -533,52 +604,91 @@ struct WindowsWorkspaceView: View {
             }
             .padding(.vertical, 6)
         } else if !steamLibrary.games.isEmpty {
-            HStack {
-                Text(tr("Owned games: %d", steamLibrary.games.count))
-                    .font(.subheadline.bold())
-                    .foregroundColor(.white)
-                Spacer()
-                Button {
-                    Task { await steamLibrary.refresh() }
-                } label: {
-                    Image(systemName: "arrow.clockwise")
+            VStack(spacing: 12) {
+                HStack {
+                    Text(tr("Owned games: %d", steamLibrary.games.count))
+                        .font(.subheadline.bold())
                         .foregroundColor(.white)
-                        .padding(8)
-                        .background(panelColor)
-                        .clipShape(Circle())
-                }
-                .accessibilityLabel(tr("Refresh library"))
-            }
-            ScrollView {
-                LazyVStack(spacing: 8) {
-                    ForEach(steamLibrary.games, id: \.appID) { game in
-                        HStack(spacing: 12) {
-                            Image(systemName: "gamecontroller.fill")
-                                .foregroundColor(.gray)
-                                .frame(width: 32, height: 32)
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(game.name.isEmpty ? tr("Untitled Steam app") : game.name)
-                                    .font(.subheadline.weight(.semibold))
-                                    .foregroundColor(.white)
-                                    .lineLimit(2)
-                                Text(tr("App ID: %u", game.appID))
-                                    .font(.caption)
-                                    .foregroundColor(.gray)
-                            }
-                            Spacer(minLength: 0)
-                            Text(game.oslist.localizedCaseInsensitiveContains("windows") ? tr("Windows") : tr("Windows support not listed"))
-                                .font(.caption2)
-                                .foregroundColor(.gray)
-                        }
-                        .padding(10)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(panelColor)
-                        .cornerRadius(10)
+                    Spacer()
+                    Button {
+                        Task { await steamLibrary.refresh() }
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
+                            .foregroundColor(.white)
+                            .padding(8)
+                            .background(panelColor)
+                            .clipShape(Circle())
                     }
+                    .accessibilityLabel(tr("Refresh library"))
                 }
+
+                HStack(spacing: 10) {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundColor(.gray)
+                    TextField(tr("Search your games"), text: $searchText)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .foregroundColor(.white)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(panelColor)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+
+                if filteredSteamGames.isEmpty {
+                    Text(tr("No games match this search"))
+                        .font(.subheadline)
+                        .foregroundColor(.gray)
+                        .padding(.vertical, 20)
+                } else {
+                    ScrollView {
+                        LazyVStack(spacing: 8) {
+                            ForEach(filteredSteamGames, id: \.appID) { game in
+                                HStack(spacing: 12) {
+                                    SteamGameArtworkView(game: game)
+                                        .frame(width: 64, height: 88)
+                                    VStack(alignment: .leading, spacing: 5) {
+                                        Text(game.name.isEmpty ? tr("Untitled Steam app") : game.name)
+                                            .font(.subheadline.weight(.semibold))
+                                            .foregroundColor(.white)
+                                            .lineLimit(2)
+                                        Text(tr("App ID: %u", game.appID))
+                                            .font(.caption)
+                                            .foregroundColor(.gray)
+                                        Text(game.oslist.localizedCaseInsensitiveContains("windows") ? tr("Windows") : tr("Windows support not listed"))
+                                            .font(.caption2)
+                                            .foregroundColor(.gray)
+                                    }
+                                    Spacer(minLength: 4)
+                                    Button {
+                                        if let url = URL(string: "https://store.steampowered.com/app/\\(game.appID)/") {
+                                            openURL(url)
+                                        }
+                                    } label: {
+                                        Image(systemName: "arrow.up.right.square")
+                                            .font(.title3)
+                                            .foregroundColor(.white)
+                                            .frame(width: 38, height: 38)
+                                            .background(Color.blue.opacity(0.8))
+                                            .clipShape(RoundedRectangle(cornerRadius: 9))
+                                    }
+                                    .accessibilityLabel(tr("Open Steam Store"))
+                                }
+                                .padding(10)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(panelColor)
+                                .cornerRadius(10)
+                            }
+                        }
+                    }
+                    .frame(maxHeight: 420)
+                }
+                Text(tr("Direct Steam game downloads need the Madeira downloader and Windows runtime, which are not integrated yet."))
+                    .font(.caption)
+                    .foregroundColor(.gray)
+                    .multilineTextAlignment(.center)
             }
-            .frame(maxHeight: 360)
-        } else {
+        }        } else {
             Text(tr("No owned games found yet."))
                 .font(.subheadline)
                 .foregroundColor(.gray)
