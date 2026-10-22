@@ -70,69 +70,39 @@ struct MainView: View {
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
-
-            if isWide {
-                HStack(spacing: 0) {
-                    sidebar
-                        .frame(width: 280)
-                    Divider().background(Color.white.opacity(0.1))
-                    if isHome {
-                        homeScreen
-                    } else {
-                        detail
+            VStack(spacing: 0) {
+                topBar
+                if isHome {
+                    homeScreen
+                } else {
+                    Picker(tr("Mode"), selection: $mode) {
+                        ForEach(AppMode.allCases) { Text(tr($0.rawValue)).tag($0) }
                     }
-                }
-            } else {
-                VStack(spacing: 0) {
-                    topBar
-                    if isHome {
-                        homeScreen
-                    } else {
-                        Picker(tr("Mode"), selection: $mode) {
-                            ForEach(AppMode.allCases) { Text(tr($0.rawValue)).tag($0) }
-                        }
-                        .pickerStyle(.segmented)
-                        .padding(.horizontal)
-                        .onChange(of: mode) { selectedMode in selectMode(selectedMode) }
-                        detail
-                    }
+                    .pickerStyle(.segmented)
+                    .padding(.horizontal)
+                    .onChange(of: mode) { selectedMode in selectMode(selectedMode) }
+                    detail
                 }
             }
         }
-        .onAppear {
-            coordinator.refreshJITStatus()
-        }
+        .onAppear { coordinator.refreshJITStatus() }
         .onChange(of: scenePhase) { phase in
             if phase == .active { coordinator.refreshJITStatus() }
         }
-        .sheet(isPresented: $isSettingsPresented) {
-            SettingsView(coordinator: coordinator)
-        }
-        .fileImporter(
-            isPresented: $isDocumentPickerPresented,
-            allowedContentTypes: [UTType(filenameExtension: "exe") ?? .data],
-            allowsMultipleSelection: false
-        ) { result in
-            if case .success(let urls) = result, let url = urls.first {
-                coordinator.launchWindowsExecutable(at: url)
-            }
+        .sheet(isPresented: $isSettingsPresented) { SettingsView(coordinator: coordinator) }
+        .fileImporter(isPresented: $isDocumentPickerPresented, allowedContentTypes: [.data], allowsMultipleSelection: false) { result in
+            if case .success(let urls) = result, let url = urls.first { coordinator.launchWindowsExecutable(at: url) }
         }
         .onChange(of: coordinator.windowsStatus) { status in
             if status == "Windows Ready" && mode == .windows && !isHome { isWindowsWorkspacePresented = true }
         }
         .fullScreenCover(isPresented: $isWindowsWorkspacePresented) {
-            WindowsWorkspaceView(
-                coordinator: coordinator,
-                onBack: { isWindowsWorkspacePresented = false; isHome = true },
-                onAddExecutable: { isDocumentPickerPresented = true }
-            )
+            WindowsWorkspaceView(coordinator: coordinator, onBack: { isWindowsWorkspacePresented = false; isHome = true }, onAddExecutable: { isDocumentPickerPresented = true })
         }
         .fullScreenCover(isPresented: Binding<Bool>(
             get: { !isHome && mode == .windows && (coordinator.windowsStatus == "Steam Running" || coordinator.windowsStatus == "Running") },
             set: { _ in coordinator.setWindowsStatus("Windows Ready") }
-        )) {
-            GameSessionView(coordinator: coordinator)
-        }
+        )) { GameSessionView(coordinator: coordinator) }
     }
 
     private func selectMode(_ selectedMode: AppMode) {
@@ -147,58 +117,6 @@ struct MainView: View {
     }
 
     // MARK: Layout pieces
-
-    private var sidebar: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            Image("IDeckLogo")
-                .resizable()
-                .scaledToFit()
-                .frame(maxWidth: .infinity)
-                .padding(.top, 16)
-
-            Button(action: { isHome = true }) {
-                Label(tr("Home"), systemImage: "house.fill")
-                    .fontWeight(.semibold)
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(12)
-                    .background(isHome ? Color.blue.opacity(0.35) : cardColor)
-                    .cornerRadius(12)
-            }
-
-            VStack(spacing: 8) {
-                ForEach(AppMode.allCases) { item in
-                    Button(action: { selectMode(item) }) {
-                        HStack(spacing: 12) {
-                            BrandMark(assetName: item.brandAsset, fallbackSymbol: item.fallbackSymbol)
-                                .frame(width: 28, height: 28)
-                            Text(tr(item.rawValue))
-                                .fontWeight(.semibold)
-                                .foregroundColor(.white)
-                            Spacer()
-                        }
-                        .padding(12)
-                        .background(mode == item ? Color.blue.opacity(0.35) : cardColor)
-                        .cornerRadius(12)
-                    }
-                }
-            }
-
-            Spacer()
-            statusPills(vertical: true)
-            Button(action: { isSettingsPresented = true }) {
-                Label(tr("Settings"), systemImage: "gearshape.fill")
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(cardColor)
-                    .foregroundColor(.white)
-                    .cornerRadius(12)
-            }
-            .padding(.bottom, 16)
-        }
-        .padding(.horizontal, 16)
-        .background(Color(red: 0.07, green: 0.07, blue: 0.07).ignoresSafeArea())
-    }
 
     private var topBar: some View {
         HStack {
@@ -218,20 +136,6 @@ struct MainView: View {
         }
         .padding(.horizontal)
         .padding(.vertical, 8)
-    }
-
-    private func statusPills(vertical: Bool) -> some View {
-        let pills = Group {
-            StatusPill(isActive: coordinator.isJITEnabled, label: "JIT")
-            StatusPill(isActive: coordinator.isContainerReady, label: tr("Container"))
-        }
-        return Group {
-            if vertical {
-                VStack(alignment: .leading, spacing: 8) { pills }
-            } else {
-                HStack(spacing: 12) { pills }
-            }
-        }
     }
 
     private var homeScreen: some View {
@@ -288,8 +192,6 @@ struct MainView: View {
         ScrollView {
             VStack(spacing: 24) {
                 header
-                if !isWide { statusPills(vertical: false) }
-
                 switch mode {
                 case .windows: windowsActions
                 case .liveContainer: liveContainerActions
@@ -503,7 +405,7 @@ struct WindowsWorkspaceView: View {
                         Text(tr("Game Library"))
                             .font(.title2.bold())
                             .foregroundColor(.white)
-                        Text(tr("Steam games and imported Windows installers"))
+                        Text(tr("Your Steam library and Windows apps"))
                             .font(.caption)
                             .foregroundColor(.gray)
                     }
@@ -523,20 +425,13 @@ struct WindowsWorkspaceView: View {
                 .padding(16)
 
                 VStack(spacing: 12) {
-                    Image(systemName: coordinator.isSteamConnected ? "checkmark.circle.fill" : "gamecontroller")
-                        .font(.system(size: 42))
-                        .foregroundColor(coordinator.isSteamConnected ? .green : .gray)
-                    Text(tr(coordinator.isSteamConnected ? "Connected to Steam" : "Connect Steam to continue"))
-                        .font(.headline)
-                        .foregroundColor(.white)
-                        .multilineTextAlignment(.center)
                     if coordinator.isSteamConnected {
                         Text(tr("Signed in as %@",
                                 SteamSignIn.accountName ?? tr("Connected")))
                             .font(.subheadline)
                             .foregroundColor(.gray)
                             .multilineTextAlignment(.center)
-                        Text(tr("The owned-games list is fetched from Steam. Launching Windows games still requires the Madeira native runtime."))
+                        Text(tr("Steam game launching requires the Madeira runtime."))
                             .font(.subheadline)
                             .foregroundColor(.gray)
                             .multilineTextAlignment(.center)
@@ -546,13 +441,13 @@ struct WindowsWorkspaceView: View {
                             .font(.subheadline)
                             .foregroundColor(.gray)
                             .multilineTextAlignment(.center)
-                        Text(tr("Sign in to load the Steam game library. Launching Windows games still requires the Madeira native runtime."))
+                        Text(tr("Sign in to load your library."))
                             .font(.subheadline)
                             .foregroundColor(.gray)
                             .multilineTextAlignment(.center)
                     }
                     Button(action: onAddExecutable) {
-                        Label(tr("Install a Windows .exe"), systemImage: "square.and.arrow.down")
+                        Label(tr("Install .exe"), systemImage: "square.and.arrow.down")
                             .foregroundColor(.white)
                             .padding()
                             .frame(maxWidth: .infinity)
