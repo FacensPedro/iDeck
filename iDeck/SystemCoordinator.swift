@@ -229,6 +229,12 @@ class SystemCoordinator: ObservableObject {
                 self.currentStatus = "Container not initialized"
                 return
             }
+            guard self.windowsEnvironment.hasRuntime(in: mountPath) else {
+                DispatchQueue.main.async {
+                    self.currentStatus = "Madeira runtime missing: FEX/box64 and Wine ARM64EC are not installed."
+                }
+                return
+            }
             self.windowsEnvironment.configureWine(prefix: mountPath)
             self.windowsEnvironment.installAndRunSteam(jitEnabler: self.jitEnabler) { result in
                 DispatchQueue.main.async {
@@ -263,6 +269,12 @@ class SystemCoordinator: ObservableObject {
                     try FileManager.default.removeItem(at: destination)
                 }
                 try FileManager.default.copyItem(at: url, to: destination)
+                guard self.windowsEnvironment.hasRuntime(in: mountPath) else {
+                    DispatchQueue.main.async {
+                        self.currentStatus = "Madeira runtime missing: FEX/box64 and Wine ARM64EC are not installed."
+                    }
+                    return
+                }
                 self.windowsEnvironment.configureWine(prefix: mountPath)
                 self.windowsEnvironment.execute(binary: destination, is32Bit: false, isSteam: false, jitEnabler: self.jitEnabler) { result in
                     DispatchQueue.main.async {
