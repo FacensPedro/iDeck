@@ -389,7 +389,7 @@ struct WindowsWorkspaceView: View {
     let onAddExecutable: () -> Void
 
     @State private var isSettingsPresented = false
-    @State private var showSteamIntegrationAlert = false
+    @State private var isSteamSignInPresented = false
     private let panelColor = Color(red: 0.12, green: 0.12, blue: 0.12)
 
     var body: some View {
@@ -427,9 +427,9 @@ struct WindowsWorkspaceView: View {
                     }
                     Spacer()
                     Button {
-                        showSteamIntegrationAlert = true
+                        isSteamSignInPresented = true
                     } label: {
-                        Label(tr("Connect Steam"), systemImage: "link")
+                        Label(tr(coordinator.isSteamConnected ? "Steam connected" : "Connect Steam"), systemImage: coordinator.isSteamConnected ? "checkmark.circle.fill" : "link")
                             .font(.subheadline.bold())
                             .foregroundColor(.white)
                             .padding(.horizontal, 14)
@@ -441,17 +441,29 @@ struct WindowsWorkspaceView: View {
                 .padding(16)
 
                 VStack(spacing: 12) {
-                    Image(systemName: "gamecontroller")
+                    Image(systemName: coordinator.isSteamConnected ? "checkmark.circle.fill" : "gamecontroller")
                         .font(.system(size: 42))
-                        .foregroundColor(.gray)
-                    Text(tr("Steam library integration is not configured"))
+                        .foregroundColor(coordinator.isSteamConnected ? .green : .gray)
+                    Text(tr(coordinator.isSteamConnected ? "Connected to Steam" : "Connect Steam to continue"))
                         .font(.headline)
                         .foregroundColor(.white)
                         .multilineTextAlignment(.center)
-                    Text(tr("This iDeck build does not include Madeira's FEX, Wine ARM64EC, DXMT and Steam Dock runtime. Opening Steam's website does not connect an account or load games."))
-                        .font(.subheadline)
-                        .foregroundColor(.gray)
-                        .multilineTextAlignment(.center)
+                    if coordinator.isSteamConnected {
+                        Text(tr("Signed in as %@",
+                                SteamSignIn.accountName ?? tr("Connected")))
+                            .font(.subheadline)
+                            .foregroundColor(.gray)
+                            .multilineTextAlignment(.center)
+                        Text(tr("Steam sign-in is connected. Loading the owned-games library and launching games requires the Madeira native runtime."))
+                            .font(.subheadline)
+                            .foregroundColor(.gray)
+                            .multilineTextAlignment(.center)
+                    } else {
+                        Text(tr("Sign in directly with Steam. iDeck does not store your password; the sign-in token is saved in this device's Keychain."))
+                            .font(.subheadline)
+                            .foregroundColor(.gray)
+                            .multilineTextAlignment(.center)
+                    }
                     Button(action: onAddExecutable) {
                         Label(tr("Install a Windows .exe"), systemImage: "square.and.arrow.down")
                             .foregroundColor(.white)
@@ -469,10 +481,8 @@ struct WindowsWorkspaceView: View {
         .sheet(isPresented: $isSettingsPresented) {
             SettingsView(coordinator: coordinator)
         }
-        .alert(tr("Steam integration unavailable"), isPresented: $showSteamIntegrationAlert) {
-            Button(tr("OK"), role: .cancel) { }
-        } message: {
-            Text(tr("Steam account sign-in and library loading require Madeira's runtime integration, which is not included in this build yet."))
+        .sheet(isPresented: $isSteamSignInPresented) {
+            SteamSignInView()
         }
         .preferredColorScheme(.dark)
     }
