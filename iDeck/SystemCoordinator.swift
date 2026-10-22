@@ -288,19 +288,19 @@ class SystemCoordinator: ObservableObject {
                 }
                 guard self.windowsEnvironment.hasRuntime(in: mountPath) else {
                     DispatchQueue.main.async {
-                        self.currentStatus = "Madeira runtime missing: FEX/box64 and Wine ARM64EC are not installed."
+                        self.setWindowsStatus("Madeira runtime missing: FEX/box64 and Wine ARM64EC are not installed.")
                     }
                     return
                 }
                 self.windowsEnvironment.configureWine(prefix: mountPath)
                 self.windowsEnvironment.execute(binary: destination, is32Bit: false, isSteam: false, jitEnabler: self.jitEnabler) { result in
                     DispatchQueue.main.async {
-                        self.currentStatus = result ? "Running" : "Execution Error: Madeira Wine/FEX runtime is missing or failed to start"
+                        self.setWindowsStatus(result ? "Running" : "Execution Error: Madeira Wine/FEX runtime is missing or failed to start")
                     }
                 }
             } catch {
                 DispatchQueue.main.async {
-                    self.currentStatus = "Executable import failed: \(error.localizedDescription)"
+                    self.setWindowsStatus("Executable import failed: \(error.localizedDescription)")
                 }
             }
         }
