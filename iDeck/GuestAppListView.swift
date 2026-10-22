@@ -5,6 +5,8 @@ struct GuestAppListView: View {
     @ObservedObject var coordinator: SystemCoordinator
     @StateObject private var appManager = AppManager()
     @State private var isPickerPresented = false
+    @State private var installMessage: String?
+    @State private var isShowingInstallResult = false
     @AppStorage(AppLanguage.storageKey) private var appLanguage = AppLanguage.system.rawValue // re-renders on change
     
     var body: some View {
@@ -46,6 +48,12 @@ struct GuestAppListView: View {
                 .scrollContentBackground(.hidden)
             }
         }
+        .alert(tr("IPA installation"), isPresented: $isShowingInstallResult) {
+            Button(tr("OK"), role: .cancel) { }
+        } message: {
+            Text(installMessage ?? tr("Unknown installation result"))
+        }
+        .onAppear { appManager.refreshInstalledApps() }
         .fileImporter(
             isPresented: $isPickerPresented,
             allowedContentTypes: [UTType(filenameExtension: "ipa")!],
@@ -54,10 +62,14 @@ struct GuestAppListView: View {
             switch result {
             case .success(let urls):
                 if let url = urls.first {
-                    appManager.installIPA(from: url) { _ in }
+                    appManager.installIPA(from: url) { success in
+                        installMessage = success ? tr("IPA installed. Select the app to launch it.") : tr("Installation failed. Verify that the IPA contains Payload/*.app and is a valid ZIP archive.")
+                        isShowingInstallResult = true
+                    }
                 }
-            case .failure:
-                break
+            case .failure(let error):
+                installMessage = error.localizedDescription
+                isShowingInstallResult = true
             }
         }
     }

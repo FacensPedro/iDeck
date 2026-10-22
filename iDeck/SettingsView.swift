@@ -6,6 +6,10 @@ struct SettingsView: View {
     @Environment(\.presentationMode) var presentationMode
     @State private var isImportingPairingFile = false
     @State private var isImportingDDI = false
+    @StateObject private var inputManager = InputManager.shared
+    @AppStorage("controllerLeftSensitivity") private var controllerLeftSensitivity = 1.0
+    @AppStorage("controllerRightSensitivity") private var controllerRightSensitivity = 1.0
+    @AppStorage("controllerDeadzone") private var controllerDeadzone = 0.10
     @StateObject private var updater = UpdateChecker()
     @AppStorage(AppLanguage.storageKey) private var appLanguage = AppLanguage.system.rawValue
     @AppStorage("jitServerURL") private var jitServerURL = ""
@@ -40,9 +44,24 @@ struct SettingsView: View {
                             jitServerFields
                             
                             toggleRow(title: tr("JIT Pool"), isOn: $coordinator.isJITPoolEnabled)
-                            toggleRow(title: tr("VPN JIT Trigger"), isOn: $coordinator.isVPNJITEnabled)
                         }
                         
+                        settingsSection(title: tr("Controller")) {
+                            HStack {
+                                Text(tr("Connected controller")).foregroundColor(.white)
+                                Spacer()
+                                Text(inputManager.isControllerConnected ? inputManager.controllerName : tr("Not connected"))
+                                    .font(.caption).foregroundColor(inputManager.isControllerConnected ? .green : .gray)
+                                    .multilineTextAlignment(.trailing)
+                            }.padding()
+                            sensitivityRow(title: tr("Left stick sensitivity"), value: $controllerLeftSensitivity)
+                            sensitivityRow(title: tr("Right stick sensitivity"), value: $controllerRightSensitivity)
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack { Text(tr("Stick dead zone")).foregroundColor(.white); Spacer(); Text(String(format: "%.2f", controllerDeadzone)).foregroundColor(.gray) }
+                                Slider(value: $controllerDeadzone, in: 0...0.35, step: 0.01).tint(.blue)
+                            }.padding()
+                        }
+
                         settingsSection(title: tr("Graphics & Performance")) {
                             toggleRow(title: tr("MetalFX Upscaling"), isOn: $coordinator.isMetalFXEnabled)
                             toggleRow(title: tr("Hold Display at Maximum Rate"), isOn: $coordinator.isMaxRefreshRateEnabled)
@@ -231,6 +250,16 @@ struct SettingsView: View {
         .padding(.bottom, 2)
     }
     
+    private func sensitivityRow(title: String, value: Binding<Double>) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack { Text(title).foregroundColor(.white); Spacer(); Text(String(format: "%.2fx", value.wrappedValue)).foregroundColor(.gray) }
+            Slider(value: value, in: 0.25...2.0, step: 0.05).tint(.blue)
+        }
+        .padding()
+        .background(Color(red: 0.15, green: 0.15, blue: 0.15))
+        .padding(.bottom, 2)
+    }
+
     private func toggleRow(title: String, isOn: Binding<Bool>) -> some View {
         Toggle(title, isOn: isOn)
             .padding()
