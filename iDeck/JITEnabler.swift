@@ -43,7 +43,7 @@ class JITEnabler {
         let task = URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
             var failure: String?
             if let error = error {
-                failure = "JIT server unreachable at \(request.url?.host ?? "?") (\(error.localizedDescription))"
+                failure = "JIT server unreachable: \(error.localizedDescription)"
             } else if let http = response as? HTTPURLResponse, http.statusCode != 200 {
                 let body = data.flatMap { String(data: $0, encoding: .utf8) } ?? ""
                 failure = http.statusCode == 401 ? "JIT server rejected the token" : (body.isEmpty ? "HTTP \(http.statusCode)" : body)
