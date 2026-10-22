@@ -73,7 +73,22 @@ class SystemCoordinator: ObservableObject {
         return false
     }
     
+    func refreshJITStatus() {
+        var info = kinfo_proc()
+        var size = MemoryLayout<kinfo_proc>.stride
+        var mib: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_PID, getpid()]
+        let result = sysctl(&mib, u_int(mib.count), &info, &size, nil, 0)
+        let debuggerAttached = result == 0 && (info.kp_proc.p_flag & P_TRACED) != 0
+        DispatchQueue.main.async {
+            self.isJITEnabled = debuggerAttached
+            if !debuggerAttached && (self.currentStatus == "JIT confirmed via StikDebug" || self.currentStatus == "Ready") {
+                self.currentStatus = "JIT not detected. Enable it in StikDebug and return to iDeck."
+            }
+        }
+    }
+
     func forceJITAndStartLiveContainer() {
+        refreshJITStatus()
         guard isJITEnabled else {
             currentStatus = "Activate JIT with StikDebug, then confirm it in iDeck Settings."
             return
@@ -82,6 +97,7 @@ class SystemCoordinator: ObservableObject {
     }
 
     func forceJITAndStartWindows() {
+        refreshJITStatus()
         guard isJITEnabled else {
             currentStatus = "Activate JIT with StikDebug, then confirm it in iDeck Settings."
             return
@@ -105,7 +121,7 @@ class SystemCoordinator: ObservableObject {
             return
         }
         
-        currentStatus = "Installing Windows Environment..."
+        currentStatus = "Preparing Windows Environment..."
         containerHost.mountEnvironment { [weak self] mountPath in
             guard let self = self else { return }
             guard let mountPath = mountPath else {
@@ -128,8 +144,7 @@ class SystemCoordinator: ObservableObject {
     }
     
     func confirmJITActivatedByStikDebug() {
-        isJITEnabled = true
-        currentStatus = "JIT confirmed via StikDebug"
+        refreshJITStatus()
     }
 
     private var pairingFileURL: URL {
