@@ -79,11 +79,16 @@ class SystemCoordinator: ObservableObject {
         var mib: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_PID, getpid()]
         let result = sysctl(&mib, u_int(mib.count), &info, &size, nil, 0)
         let debuggerAttached = result == 0 && (info.kp_proc.p_flag & P_TRACED) != 0
-        DispatchQueue.main.async {
+        let update = {
             self.isJITEnabled = debuggerAttached
             if !debuggerAttached && (self.currentStatus == "JIT confirmed via StikDebug" || self.currentStatus == "Ready") {
                 self.currentStatus = "JIT not detected. Enable it in StikDebug and return to iDeck."
             }
+        }
+        if Thread.isMainThread {
+            update()
+        } else {
+            DispatchQueue.main.async(execute: update)
         }
     }
 
@@ -236,17 +241,37 @@ class SystemCoordinator: ObservableObject {
     func launchWindowsExecutable(at url: URL) {
         guard isJITEnabled && isContainerReady else { return }
         
+        refreshJITStatus()
+        guard isJITEnabled else {
+            currentStatus = "JIT not detected. Enable JIT for iDeck in StikDebug and return."
+            return
+        }
         currentStatus = "Loading Executable..."
+        let hasScope = url.startAccessingSecurityScopedResource()
+        defer { if hasScope { url.stopAccessingSecurityScopedResource() } }
         containerHost.mountEnvironment { [weak self] mountPath in
             guard let self = self else { return }
             guard let mountPath = mountPath else {
-                self.currentStatus = "Container not initialized"
+                self.currentStatus = "Container initialization failed"
                 return
             }
-            self.windowsEnvironment.configureWine(prefix: mountPath)
-            self.windowsEnvironment.execute(binary: url, is32Bit: false, isSteam: false, jitEnabler: self.jitEnabler) { result in
+            do {
+                let downloads = URL(fileURLWithPath: mountPath).appendingPathComponent("WindowsDownloads", isDirectory: true)
+                try FileManager.default.createDirectory(at: downloads, withIntermediateDirectories: true)
+                let destination = downloads.appendingPathComponent(url.lastPathComponent)
+                if FileManager.default.fileExists(atPath: destination.path) {
+                    try FileManager.default.removeItem(at: destination)
+                }
+                try FileManager.default.copyItem(at: url, to: destination)
+                self.windowsEnvironment.configureWine(prefix: mountPath)
+                self.windowsEnvironment.execute(binary: destination, is32Bit: false, isSteam: false, jitEnabler: self.jitEnabler) { result in
+                    DispatchQueue.main.async {
+                        self.currentStatus = result ? "Running" : "Execution Error: Madeira Wine/FEX runtime is missing or failed to start"
+                    }
+                }
+            } catch {
                 DispatchQueue.main.async {
-                    self.currentStatus = result ? "Running" : "Execution Error"
+                    self.currentStatus = "Executable import failed: \(error.localizedDescription)"
                 }
             }
         }
