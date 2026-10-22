@@ -276,9 +276,6 @@ struct MainView: View {
             actionButton(tr("Start Windows Environment"), symbol: "power") {
                 coordinator.forceJITAndStartWindows()
             }
-            actionButton(tr("Install & Run Steam"), symbol: "gamecontroller.fill", enabled: actionsEnabled) {
-                coordinator.launchSteam()
-            }
         }
     }
 
