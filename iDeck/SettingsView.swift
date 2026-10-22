@@ -1,19 +1,14 @@
 import SwiftUI
-import UniformTypeIdentifiers
 
 struct SettingsView: View {
     @ObservedObject var coordinator: SystemCoordinator
     @Environment(\.presentationMode) var presentationMode
-    @State private var isImportingPairingFile = false
-    @State private var isImportingDDI = false
     @StateObject private var inputManager = InputManager.shared
     @AppStorage("controllerLeftSensitivity") private var controllerLeftSensitivity = 1.0
     @AppStorage("controllerRightSensitivity") private var controllerRightSensitivity = 1.0
     @AppStorage("controllerDeadzone") private var controllerDeadzone = 0.10
     @StateObject private var updater = UpdateChecker()
     @AppStorage(AppLanguage.storageKey) private var appLanguage = AppLanguage.system.rawValue
-    @AppStorage("jitServerURL") private var jitServerURL = ""
-    @AppStorage("jitServerToken") private var jitServerToken = ""
     
     var body: some View {
         NavigationView {
@@ -29,21 +24,13 @@ struct SettingsView: View {
                         settingsSection(title: tr("JIT & Debugging")) {
                             statusRow
                             
-                            actionButton(title: tr("Activate JIT"), icon: "bolt.fill") {
-                                coordinator.activateJITManually()
+                            Text(tr("Activate JIT in StikDebug first, then return here and confirm. iDeck does not activate JIT itself."))
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                                .padding()
+                            actionButton(title: tr("Confirm JIT activated in StikDebug"), icon: "checkmark.shield.fill") {
+                                coordinator.confirmJITActivatedByStikDebug()
                             }
-                            
-                            actionButton(title: tr("Import Pairing File"), icon: "lock.shield.fill") {
-                                isImportingPairingFile = true
-                            }
-                            
-                            actionButton(title: tr("Mount Developer Disk Image"), icon: "externaldrive.fill") {
-                                isImportingDDI = true
-                            }
-                            
-                            jitServerFields
-                            
-                            toggleRow(title: tr("JIT Pool"), isOn: $coordinator.isJITPoolEnabled)
                         }
                         
                         settingsSection(title: tr("Controller")) {
@@ -90,24 +77,6 @@ struct SettingsView: View {
                     .foregroundColor(.white)
                 }
             }
-            .fileImporter(
-                isPresented: $isImportingPairingFile,
-                allowedContentTypes: [.item],
-                allowsMultipleSelection: false
-            ) { result in
-                if case .success(let urls) = result, let url = urls.first {
-                    coordinator.importPairingFile(at: url)
-                }
-            }
-            .fileImporter(
-                isPresented: $isImportingDDI,
-                allowedContentTypes: [.data],
-                allowsMultipleSelection: true
-            ) { result in
-                if case .success(let urls) = result {
-                    coordinator.mountDDI(urls: urls)
-                }
-            }
         }
         .navigationViewStyle(.stack)
         .onAppear { coordinator.refreshPairingFileState() }
@@ -125,33 +94,6 @@ struct SettingsView: View {
                 .foregroundColor(coordinator.hasPairingFile ? .green : .gray)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(Color(red: 0.15, green: 0.15, blue: 0.15))
-        .padding(.bottom, 2)
-    }
-    
-    private var jitServerFields: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(tr("JIT helper server"))
-                .font(.caption).fontWeight(.bold).foregroundColor(.gray)
-            TextField("http://192.168.1.10:54321", text: $jitServerURL)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .keyboardType(.URL)
-                .padding(10)
-                .background(Color.black.opacity(0.4))
-                .cornerRadius(8)
-            SecureField(tr("Token (JIT_SERVER_TOKEN)"), text: $jitServerToken)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .padding(10)
-                .background(Color.black.opacity(0.4))
-                .cornerRadius(8)
-            Text(tr("Run server_jit/server.py on a computer connected to this device, then enter its address here. The pairing file stays on the device and is not sent to the server."))
-                .font(.caption2)
-                .foregroundColor(.gray)
-        }
-        .foregroundColor(.white)
         .padding()
         .background(Color(red: 0.15, green: 0.15, blue: 0.15))
         .padding(.bottom, 2)
