@@ -74,27 +74,19 @@ class SystemCoordinator: ObservableObject {
     }
     
     func forceJITAndStartLiveContainer() {
-        if isJITEnabled {
-            startLiveContainer()
-        } else {
-            activateJITManually { success in
-                if success {
-                    self.startLiveContainer()
-                }
-            }
+        guard isJITEnabled else {
+            currentStatus = "Activate JIT with StikDebug, then confirm it in iDeck Settings."
+            return
         }
+        startLiveContainer()
     }
-    
+
     func forceJITAndStartWindows() {
-        if isJITEnabled {
-            startWindows()
-        } else {
-            activateJITManually { success in
-                if success {
-                    self.startWindows()
-                }
-            }
+        guard isJITEnabled else {
+            currentStatus = "Activate JIT with StikDebug, then confirm it in iDeck Settings."
+            return
         }
+        startWindows()
     }
     
     private func startLiveContainer() {
@@ -135,40 +127,11 @@ class SystemCoordinator: ObservableObject {
         }
     }
     
-    func activateJITManually(completion: ((Bool) -> Void)? = nil) {
-        let activateTask = {
-            DispatchQueue.main.async { self.currentStatus = "Activating JIT..." }
-            self.jitEnabler.activate(for: getpid(), useVPN: self.isVPNJITEnabled) { [weak self] success in
-                DispatchQueue.main.async {
-                    guard let self = self else { return }
-                    self.isJITEnabled = success
-                    if success {
-                        self.currentStatus = "JIT Activated"
-                    } else {
-                        self.currentStatus = "JIT Failed: \(self.jitEnabler.lastError ?? "unknown error")"
-                    }
-                    completion?(success)
-                }
-            }
-        }
-        
-        if isVPNJITEnabled && !isLocalDevVPNActive() {
-            DispatchQueue.main.async { self.currentStatus = "Starting LocalDevVPN..." }
-            VPNManager.shared.setupAndConnectLocalDevVPN { [weak self] success in
-                if success {
-                    activateTask()
-                } else {
-                    DispatchQueue.main.async {
-                        self?.currentStatus = "Failed to start VPN"
-                        completion?(false)
-                    }
-                }
-            }
-        } else {
-            activateTask()
-        }
+    func confirmJITActivatedByStikDebug() {
+        isJITEnabled = true
+        currentStatus = "JIT confirmed via StikDebug"
     }
-    
+
     private var pairingFileURL: URL {
         FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
             .appendingPathComponent("pairing_file.mobiledevicepairing")
