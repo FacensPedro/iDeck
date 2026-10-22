@@ -232,5 +232,6 @@ enum Translations {
         "Steam did not respond. Check your internet connection.": ["pt": "O Steam não respondeu. Verifique sua conexão com a internet.", "es": "Steam no respondió. Comprueba tu conexión a Internet."],
         "Steam sign-in is unavailable right now (HTTP %d).": ["pt": "O login do Steam está indisponível no momento (HTTP %d).", "es": "El inicio de sesión de Steam no está disponible ahora (HTTP %d)."],
         "Steam refused the sign-in (code %u).": ["pt": "O Steam recusou o login (código %u).", "es": "Steam rechazó el inicio de sesión (código %u)."],
+        "The Steam-owned game library and Windows game launching require the Madeira native runtime, which is not bundled in this build.": ["pt": "A biblioteca de jogos da conta Steam e a execução de jogos do Windows exigem o runtime nativo do Madeira, que não está incluído nesta versão.", "es": "La biblioteca de juegos de Steam y la ejecución de juegos de Windows requieren el entorno nativo de Madeira, que no está incluido en esta versión."],
     ]
 }
