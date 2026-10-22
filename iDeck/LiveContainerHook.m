@@ -88,7 +88,11 @@ static void LCPatchExecutablePathsInLoadCommands(struct mach_header_64 *mh) {
                 char *path = (char *)rpath + rpath->path.offset;
                 LCPatchExecutablePath(path, lc->cmdsize - rpath->path.offset);
             }
-        } else if (lc->cmd == LC_LOAD_DYLIB || lc->cmd == LC_LOAD_WEAK_DYLIB) {
+        } else if (lc->cmd == LC_LOAD_DYLIB ||
+                   lc->cmd == LC_LOAD_WEAK_DYLIB ||
+                   lc->cmd == LC_REEXPORT_DYLIB ||
+                   lc->cmd == LC_LOAD_UPWARD_DYLIB ||
+                   lc->cmd == LC_LAZY_LOAD_DYLIB) {
             struct dylib_command *dylib = (struct dylib_command *)lc;
             if (dylib->dylib.name.offset < lc->cmdsize) {
                 char *path = (char *)dylib + dylib->dylib.name.offset;
