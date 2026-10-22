@@ -91,7 +91,7 @@ struct MainView: View {
         }
         .onAppear {
             coordinator.refreshJITStatus()
-            if mode == .windows && coordinator.isJITEnabled { coordinator.forceJITAndStartWindows() }
+            if mode == .windows { coordinator.forceJITAndStartWindows() }
         }
         .onChange(of: scenePhase) { phase in
             if phase == .active { coordinator.refreshJITStatus() }
