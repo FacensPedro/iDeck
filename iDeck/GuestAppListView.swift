@@ -62,8 +62,13 @@ struct GuestAppListView: View {
             switch result {
             case .success(let urls):
                 if let url = urls.first {
-                    appManager.installIPA(from: url) { success in
-                        installMessage = success ? tr("IPA installed. Select the app to launch it.") : tr("Installation failed. Verify that the IPA contains Payload/*.app and is a valid ZIP archive.")
+                    appManager.installIPA(from: url) { result in
+                        switch result {
+                        case .success:
+                            installMessage = tr("IPA installed. Select the app to launch it.")
+                        case .failure(let error):
+                            installMessage = tr(error.localizedDescription)
+                        }
                         isShowingInstallResult = true
                     }
                 }
