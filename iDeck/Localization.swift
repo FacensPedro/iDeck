@@ -48,7 +48,7 @@ func trStatus(_ status: String) -> String {
     if Translations.table[status] != nil { return tr(status) }
     if let range = status.range(of: ": ") {
         let head = String(status[status.startIndex..<range.lowerBound])
-        return tr(head) + ": " + status[range.upperBound...]
+        return tr(head) + ": " + trStatus(String(status[range.upperBound...]))
     }
     return status
 }
@@ -95,6 +95,29 @@ enum Translations {
         "Run server_jit/server.py on a computer connected to this device, then enter its address here. The pairing file stays on the device and is not sent to the server.":
             ["pt": "Execute server_jit/server.py num computador conectado a este aparelho e digite o endereço dele aqui. O arquivo de pareamento fica no aparelho e não é enviado ao servidor.",
              "es": "Ejecuta server_jit/server.py en un ordenador conectado a este dispositivo e introduce su dirección aquí. El archivo de emparejamiento se queda en el dispositivo y no se envía al servidor."],
+
+        "Controller": ["pt": "Controle", "es": "Mando"],
+        "Connected controller": ["pt": "Controle conectado", "es": "Mando conectado"],
+        "Not connected": ["pt": "Não conectado", "es": "No conectado"],
+        "Left stick sensitivity": ["pt": "Sensibilidade do analógico esquerdo", "es": "Sensibilidad del stick izquierdo"],
+        "Right stick sensitivity": ["pt": "Sensibilidade do analógico direito", "es": "Sensibilidad del stick derecho"],
+        "Stick dead zone": ["pt": "Zona morta dos analógicos", "es": "Zona muerta de los sticks"],
+        "IPA installation": ["pt": "Instalação de IPA", "es": "Instalación de IPA"],
+        "OK": ["pt": "OK", "es": "Aceptar"],
+        "Unknown installation result": ["pt": "Resultado de instalação desconhecido", "es": "Resultado de instalación desconocido"],
+        "IPA installed. Select the app to launch it.": ["pt": "IPA instalado. Selecione o app para iniciá-lo.", "es": "IPA instalado. Selecciona la app para iniciarla."],
+        "The selected file is not a readable IPA/ZIP archive.": ["pt": "O arquivo selecionado não é um arquivo IPA/ZIP válido ou legível.", "es": "El archivo seleccionado no es un archivo IPA/ZIP válido o legible."],
+        "This IPA uses a ZIP feature that the current extractor does not support (for example ZIP64 or encryption).": ["pt": "Este IPA usa um recurso ZIP não compatível com o extrator atual, como ZIP64 ou criptografia.", "es": "Este IPA utiliza una función ZIP no compatible con el extractor actual, como ZIP64 o cifrado."],
+        "The IPA contains an unsafe file path and was rejected.": ["pt": "O IPA contém um caminho de arquivo inseguro e foi rejeitado.", "es": "El IPA contiene una ruta de archivo no segura y se rechazó."],
+        "The archive does not contain a top-level Payload directory.": ["pt": "O arquivo não contém uma pasta Payload na raiz.", "es": "El archivo no contiene una carpeta Payload en la raíz."],
+        "The Payload directory does not contain a valid .app bundle with Info.plist.": ["pt": "A pasta Payload não contém um pacote .app válido com Info.plist.", "es": "La carpeta Payload no contiene un paquete .app válido con Info.plist."],
+        "JIT server address is not configured. Enter the reachable computer/server address in Settings.": ["pt": "O endereço do servidor JIT não está configurado. Informe em Ajustes o endereço acessível do computador/servidor.", "es": "La dirección del servidor JIT no está configurada. Introduce en Ajustes la dirección accesible del ordenador/servidor."],
+        "Invalid JIT server URL. Enter a valid http:// or https:// address.": ["pt": "URL do servidor JIT inválida. Informe um endereço http:// ou https:// válido.", "es": "La URL del servidor JIT no es válida. Introduce una dirección http:// o https:// válida."],
+        "JIT server unreachable": ["pt": "Servidor JIT inacessível", "es": "Servidor JIT inaccesible"],
+        "JIT server rejected the token": ["pt": "O servidor JIT rejeitou o token", "es": "El servidor JIT rechazó el token"],
+        "Could not connect to the server": ["pt": "Não foi possível conectar ao servidor", "es": "No se pudo conectar con el servidor"],
+        "Could not copy the app bundle": ["pt": "Não foi possível copiar o pacote do app", "es": "No se pudo copiar el paquete de la app"],
+        "JIT helper server": ["pt": "Servidor auxiliar de JIT", "es": "Servidor auxiliar de JIT"],
 
         // Updates
         "Check for Updates": ["pt": "Verificar atualizações", "es": "Buscar actualizaciones"],

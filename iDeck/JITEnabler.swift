@@ -1,7 +1,7 @@
 import Foundation
 
 class JITEnabler {
-    private let defaultServerURL = "http://127.0.0.1:54321"
+    private let defaultServerURL = ""
     private let requestTimeout: TimeInterval = 120
 
     /// Base URL of the JIT server. Configurable via UserDefaults ("jitServerURL");
@@ -9,7 +9,7 @@ class JITEnabler {
     /// server running on a computer must be addressed explicitly.
     private var baseURL: String {
         let stored = UserDefaults.standard.string(forKey: "jitServerURL") ?? ""
-        return stored.isEmpty ? defaultServerURL : stored
+        return stored.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? defaultServerURL : stored.trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
     }
 
     private var serverToken: String? {
@@ -18,7 +18,16 @@ class JITEnabler {
     }
 
     private func makeRequest(endpoint: String) -> URLRequest? {
-        guard let url = URL(string: "\(baseURL)/\(endpoint)") else { return nil }
+        guard !baseURL.isEmpty else {
+            lastError = "JIT server address is not configured. Enter the reachable computer/server address in Settings."
+            return nil
+        }
+        guard let url = URL(string: "\(baseURL)/\(endpoint)"),
+              let scheme = url.scheme?.lowercased(), ["http", "https"].contains(scheme),
+              url.host != nil else {
+            lastError = "Invalid JIT server URL. Enter a valid http:// or https:// address."
+            return nil
+        }
         var request = URLRequest(url: url, timeoutInterval: requestTimeout)
         request.httpMethod = "POST"
         if let token = serverToken {
@@ -34,7 +43,7 @@ class JITEnabler {
         let task = URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
             var failure: String?
             if let error = error {
-                failure = "JIT server unreachable at \(request.url?.host ?? "?") (\(error.localizedDescription))"
+                failure = "JIT server unreachable: \(error.localizedDescription)"
             } else if let http = response as? HTTPURLResponse, http.statusCode != 200 {
                 let body = data.flatMap { String(data: $0, encoding: .utf8) } ?? ""
                 failure = http.statusCode == 401 ? "JIT server rejected the token" : (body.isEmpty ? "HTTP \(http.statusCode)" : body)

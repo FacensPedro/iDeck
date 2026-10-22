@@ -1,65 +1,74 @@
 import Foundation
 import UniformTypeIdentifiers
 
+enum IPAInstallError: LocalizedError {
+    case invalidArchive
+    case unsupportedArchive
+    case unsafeArchivePath
+    case missingPayload
+    case missingAppBundle
+    case copyFailed(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidArchive: return "The selected file is not a readable IPA/ZIP archive."
+        case .unsupportedArchive: return "This IPA uses a ZIP feature that the current extractor does not support (for example ZIP64 or encryption)."
+        case .unsafeArchivePath: return "The IPA contains an unsafe file path and was rejected."
+        case .missingPayload: return "The archive does not contain a top-level Payload directory."
+        case .missingAppBundle: return "The Payload directory does not contain a valid .app bundle with Info.plist."
+        case .copyFailed(let reason): return "Could not copy the app bundle: \(reason)"
+        }
+    }
+}
+
 class AppManager: ObservableObject {
     @Published var installedApps: [URL] = []
-    
     private let fileManager = FileManager.default
-    private var appsDirectory: URL {
-        fileManager.urls(for: .documentDirectory, in: .userDomainMask).first!.appendingPathComponent("GuestApps")
-    }
-    
+    private var appsDirectory: URL { fileManager.urls(for: .documentDirectory, in: .userDomainMask).first!.appendingPathComponent("GuestApps", isDirectory: true) }
+
     init() {
-        if !fileManager.fileExists(atPath: appsDirectory.path) {
-            try? fileManager.createDirectory(at: appsDirectory, withIntermediateDirectories: true)
-        }
+        try? fileManager.createDirectory(at: appsDirectory, withIntermediateDirectories: true)
         refreshInstalledApps()
     }
-    
+
     func refreshInstalledApps() {
         do {
-            let contents = try fileManager.contentsOfDirectory(at: appsDirectory, includingPropertiesForKeys: nil)
-            installedApps = contents.filter { $0.hasDirectoryPath }
-        } catch {
-            installedApps = []
-        }
+            let contents = try fileManager.contentsOfDirectory(at: appsDirectory, includingPropertiesForKeys: [.isDirectoryKey])
+            installedApps = contents.filter { url in (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true && url.pathExtension == "app" }.sorted { $0.lastPathComponent.localizedCaseInsensitiveCompare($1.lastPathComponent) == .orderedAscending }
+        } catch { installedApps = [] }
     }
-    
-    func installIPA(from url: URL, completion: @escaping (Bool) -> Void) {
+
+    func installIPA(from url: URL, completion: @escaping (Result<URL, IPAInstallError>) -> Void) {
         let hasScope = url.startAccessingSecurityScopedResource()
         let fileManager = self.fileManager
         let appsDirectory = self.appsDirectory
-
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             defer { if hasScope { url.stopAccessingSecurityScopedResource() } }
-
-            let extractPath = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+            let extractPath = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
             defer { try? fileManager.removeItem(at: extractPath) }
-
-            var success = false
+            let result: Result<URL, IPAInstallError>
             do {
-                // An .ipa is a ZIP archive; ZipExtractor rejects entries that escape extractPath.
+                guard fileManager.fileExists(atPath: url.path), url.pathExtension.lowercased() == "ipa" else { throw IPAInstallError.invalidArchive }
                 try ZipExtractor.extract(archive: url, to: extractPath)
-
-                let payloadPath = extractPath.appendingPathComponent("Payload")
-                let appBundle = try fileManager.contentsOfDirectory(at: payloadPath, includingPropertiesForKeys: nil)
-                    .first(where: { $0.pathExtension == "app" })
-
-                if let appBundle = appBundle {
-                    let destination = appsDirectory.appendingPathComponent(appBundle.lastPathComponent)
-                    if fileManager.fileExists(atPath: destination.path) {
-                        try fileManager.removeItem(at: destination)
-                    }
+                let payloadPath = extractPath.appendingPathComponent("Payload", isDirectory: true)
+                var isDirectory: ObjCBool = false
+                guard fileManager.fileExists(atPath: payloadPath.path, isDirectory: &isDirectory), isDirectory.boolValue else { throw IPAInstallError.missingPayload }
+                let contents = try fileManager.contentsOfDirectory(at: payloadPath, includingPropertiesForKeys: [.isDirectoryKey])
+                guard let appBundle = contents.first(where: { $0.pathExtension == "app" && (try? $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true }), fileManager.fileExists(atPath: appBundle.appendingPathComponent("Info.plist").path) else { throw IPAInstallError.missingAppBundle }
+                let destination = appsDirectory.appendingPathComponent(appBundle.lastPathComponent, isDirectory: true)
+                do {
+                    if fileManager.fileExists(atPath: destination.path) { try fileManager.removeItem(at: destination) }
                     try fileManager.moveItem(at: appBundle, to: destination)
-                    success = true
-                }
-            } catch {
-                print("AppManager: IPA install failed: \(error)")
-            }
-
+                } catch { throw IPAInstallError.copyFailed(error.localizedDescription) }
+                result = .success(destination)
+            } catch let error as IPAInstallError { result = .failure(error) }
+            catch ZipError.unsupported { result = .failure(.unsupportedArchive) }
+            catch ZipError.unsafePath { result = .failure(.unsafeArchivePath) }
+            catch ZipError.invalidArchive { result = .failure(.invalidArchive) }
+            catch { result = .failure(.copyFailed(error.localizedDescription)) }
             DispatchQueue.main.async {
-                if success { self?.refreshInstalledApps() }
-                completion(success)
+                if case .success = result { self?.refreshInstalledApps() }
+                completion(result)
             }
         }
     }
