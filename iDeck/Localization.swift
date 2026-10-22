@@ -117,7 +117,6 @@ enum Translations {
         "JIT server rejected the token": ["pt": "O servidor JIT rejeitou o token", "es": "El servidor JIT rechazó el token"],
         "Could not connect to the server": ["pt": "Não foi possível conectar ao servidor", "es": "No se pudo conectar con el servidor"],
         "Could not copy the app bundle": ["pt": "Não foi possível copiar o pacote do app", "es": "No se pudo copiar el paquete de la app"],
-        "JIT helper server": ["pt": "Servidor auxiliar de JIT", "es": "Servidor auxiliar de JIT"],
 
         // Updates
         "Check for Updates": ["pt": "Verificar atualizações", "es": "Buscar actualizaciones"],
