@@ -53,7 +53,7 @@ struct BrandMark: View {
 struct MainView: View {
     @ObservedObject var coordinator: SystemCoordinator
     @StateObject private var inputManager = InputManager.shared
-    @State private var mode: AppMode = .windows
+    @State private var mode: AppMode = .liveContainer
     @State private var isDocumentPickerPresented = false
     @State private var isSettingsPresented = false
     @State private var isWindowsWorkspacePresented = false
@@ -81,7 +81,7 @@ struct MainView: View {
                 VStack(spacing: 0) {
                     topBar
                     Picker(tr("Mode"), selection: $mode) {
-                        ForEach(AppMode.allCases) { Text($0.rawValue).tag($0) }
+                        ForEach(AppMode.allCases) { Text(tr($0.rawValue)).tag($0) }
                     }
                     .pickerStyle(.segmented)
                     .padding(.horizontal)
@@ -91,7 +91,6 @@ struct MainView: View {
         }
         .onAppear {
             coordinator.refreshJITStatus()
-            if mode == .windows { coordinator.forceJITAndStartWindows() }
         }
         .onChange(of: scenePhase) { phase in
             if phase == .active { coordinator.refreshJITStatus() }
@@ -108,7 +107,7 @@ struct MainView: View {
                 coordinator.launchWindowsExecutable(at: url)
             }
         }
-        .onChange(of: coordinator.currentStatus) { status in
+        .onChange(of: coordinator.windowsStatus) { status in
             if status == "Windows Ready" { isWindowsWorkspacePresented = true }
         }
         .fullScreenCover(isPresented: $isWindowsWorkspacePresented) {
@@ -119,8 +118,8 @@ struct MainView: View {
             )
         }
         .fullScreenCover(isPresented: Binding<Bool>(
-            get: { coordinator.currentStatus == "Steam Running" || coordinator.currentStatus == "Running" },
-            set: { _ in coordinator.currentStatus = "Windows Ready" }
+            get: { coordinator.windowsStatus == "Steam Running" || coordinator.windowsStatus == "Running" },
+            set: { _ in coordinator.setWindowsStatus("Windows Ready") }
         )) {
             GameSessionView(coordinator: coordinator)
         }
@@ -142,7 +141,7 @@ struct MainView: View {
                         HStack(spacing: 12) {
                             BrandMark(assetName: item.brandAsset, fallbackSymbol: item.fallbackSymbol)
                                 .frame(width: 28, height: 28)
-                            Text(item.rawValue)
+                            Text(tr(item.rawValue))
                                 .fontWeight(.semibold)
                                 .foregroundColor(.white)
                             Spacer()
@@ -226,14 +225,14 @@ struct MainView: View {
         VStack(spacing: 12) {
             BrandMark(assetName: mode.brandAsset, fallbackSymbol: mode.fallbackSymbol)
                 .frame(width: isWide ? 120 : 88, height: isWide ? 120 : 88)
-            Text(mode.rawValue)
+            Text(tr(mode.rawValue))
                 .font(.system(size: isWide ? 34 : 28, weight: .heavy, design: .rounded))
                 .foregroundColor(.white)
             Text(mode.subtitle)
                 .font(.subheadline)
                 .foregroundColor(.gray)
                 .multilineTextAlignment(.center)
-            Text(trStatus(coordinator.currentStatus))
+            Text(trStatus(mode == .windows ? coordinator.windowsStatus : coordinator.liveContainerStatus))
                 .font(.footnote)
                 .foregroundColor(.gray)
                 .multilineTextAlignment(.center)
@@ -341,14 +340,6 @@ struct WindowsWorkspaceView: View {
                             .font(.title3)
                             .foregroundColor(.white)
                             .frame(width: 42, height: 42)
-                    }
-                    Button(action: onAddExecutable) {
-                        Image(systemName: "plus")
-                            .font(.title3.bold())
-                            .foregroundColor(.white)
-                            .frame(width: 42, height: 42)
-                            .background(panelColor)
-                            .clipShape(Circle())
                     }
                 }
                 .padding(.horizontal, 16)
