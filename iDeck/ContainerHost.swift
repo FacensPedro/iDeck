@@ -2,66 +2,69 @@ import Foundation
 import Darwin
 
 class ContainerHost {
-    private let containerIdentifier = "com.livecontainer.host"
     private var isMounted = false
-    
+
     func setupContainer(injectHooks: Bool, completion: @escaping (Bool) -> Void) {
         guard setupVirtualFileSystem() else {
+            isMounted = false
             completion(false)
             return
         }
+
         if injectHooks {
-            injectLiveContainerHooks()
+            LiveContainerHook.installHooks()
         }
+
         isMounted = true
         completion(true)
     }
 
-    /// Calls `completion` with the virtual root path, or `nil` if the container was never set up.
     func mountEnvironment(completion: @escaping (String?) -> Void) {
         guard isMounted,
               let documentDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
             completion(nil)
             return
         }
-        completion(documentDirectory.appendingPathComponent("VirtualRoot").path)
+
+        let virtualRoot = documentDirectory.appendingPathComponent("VirtualRoot", isDirectory: true)
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: virtualRoot.path, isDirectory: &isDirectory),
+              isDirectory.boolValue else {
+            isMounted = false
+            completion(nil)
+            return
+        }
+
+        completion(virtualRoot.path)
     }
 
     private func setupVirtualFileSystem() -> Bool {
         let fileManager = FileManager.default
-        guard let documentDirectory = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first else { return false }
-        
-        let virtualRoot = documentDirectory.appendingPathComponent("VirtualRoot")
+        guard let documentDirectory = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            return false
+        }
+
+        let virtualRoot = documentDirectory.appendingPathComponent("VirtualRoot", isDirectory: true)
         let directories = [
             virtualRoot,
-            virtualRoot.appendingPathComponent("Library"),
-            virtualRoot.appendingPathComponent("Documents"),
-            virtualRoot.appendingPathComponent("SystemData"),
-            virtualRoot.appendingPathComponent("tmp"),
-            virtualRoot.appendingPathComponent("GuestApps")
+            virtualRoot.appendingPathComponent("Library", isDirectory: true),
+            virtualRoot.appendingPathComponent("Documents", isDirectory: true),
+            virtualRoot.appendingPathComponent("SystemData", isDirectory: true),
+            virtualRoot.appendingPathComponent("tmp", isDirectory: true),
+            virtualRoot.appendingPathComponent("GuestApps", isDirectory: true)
         ]
-        
+
         for directory in directories {
             do {
                 try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
             } catch {
-                print("ContainerHost: could not create \(directory.path): \(error)")
+                print("ContainerHost: could not create \(directory.path): \(error.localizedDescription)")
                 return false
             }
         }
-        
+
         setenv("TMPDIR", virtualRoot.appendingPathComponent("tmp").path, 1)
         setenv("HOME", virtualRoot.path, 1)
         return true
-    }
-    
-    private func injectLiveContainerHooks() {
-        let bundlePath = Bundle.main.bundlePath
-        let tweakPath = bundlePath.appending("/LiveContainerHook.dylib")
-        // Setting this in the running process does not affect dyld for the current image;
-        // it is only inherited by child processes spawned from here.
-        if FileManager.default.fileExists(atPath: tweakPath) {
-            setenv("DYLD_INSERT_LIBRARIES", tweakPath, 1)
-        }
     }
 }
