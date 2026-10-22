@@ -400,6 +400,7 @@ struct WindowsWorkspaceView: View {
 
     @State private var isSettingsPresented = false
     @State private var isSteamSignInPresented = false
+    @StateObject private var steamLibrary = SteamOwnedGamesModel()
     private let panelColor = Color(red: 0.12, green: 0.12, blue: 0.12)
 
     var body: some View {
@@ -464,10 +465,11 @@ struct WindowsWorkspaceView: View {
                             .font(.subheadline)
                             .foregroundColor(.gray)
                             .multilineTextAlignment(.center)
-                        Text(tr("Steam sign-in is connected. Loading the owned-games library and launching games requires the Madeira native runtime."))
+                        Text(tr("The owned-games list is fetched from Steam. Launching Windows games still requires the Madeira native runtime."))
                             .font(.subheadline)
                             .foregroundColor(.gray)
                             .multilineTextAlignment(.center)
+                        libraryContent
                     } else {
                         Text(tr("Sign in directly with Steam. iDeck does not store your password; the sign-in token is saved in this device's Keychain."))
                             .font(.subheadline)
@@ -498,6 +500,95 @@ struct WindowsWorkspaceView: View {
         .sheet(isPresented: $isSteamSignInPresented) {
             SteamSignInView()
         }
+        .task(id: coordinator.isSteamConnected) {
+            if coordinator.isSteamConnected {
+                await steamLibrary.refresh()
+            } else {
+                steamLibrary.disconnect()
+            }
+        }
         .preferredColorScheme(.dark)
+    }
+
+    
+    @ViewBuilder
+    private var libraryContent: some View {
+        if steamLibrary.isLoading {
+            HStack(spacing: 10) {
+                ProgressView()
+                Text(tr("Loading Steam library..."))
+                    .foregroundColor(.gray)
+            }
+            .padding(.vertical, 8)
+        } else if let error = steamLibrary.errorMessage {
+            Text(tr(error))
+                .font(.footnote)
+                .foregroundColor(.red)
+                .multilineTextAlignment(.center)
+            Button {
+                Task { await steamLibrary.refresh() }
+            } label: {
+                Label(tr("Refresh library"), systemImage: "arrow.clockwise")
+                    .foregroundColor(.white)
+            }
+            .padding(.vertical, 6)
+        } else if !steamLibrary.games.isEmpty {
+            HStack {
+                Text(tr("Owned games: %d", steamLibrary.games.count))
+                    .font(.subheadline.bold())
+                    .foregroundColor(.white)
+                Spacer()
+                Button {
+                    Task { await steamLibrary.refresh() }
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                        .foregroundColor(.white)
+                        .padding(8)
+                        .background(panelColor)
+                        .clipShape(Circle())
+                }
+                .accessibilityLabel(tr("Refresh library"))
+            }
+            ScrollView {
+                LazyVStack(spacing: 8) {
+                    ForEach(steamLibrary.games, id: \.appID) { game in
+                        HStack(spacing: 12) {
+                            Image(systemName: "gamecontroller.fill")
+                                .foregroundColor(.gray)
+                                .frame(width: 32, height: 32)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(game.name.isEmpty ? tr("Untitled Steam app") : game.name)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundColor(.white)
+                                    .lineLimit(2)
+                                Text(tr("App ID: %u", game.appID))
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                            }
+                            Spacer(minLength: 0)
+                            Text(game.oslist.localizedCaseInsensitiveContains("windows") ? tr("Windows") : tr("Windows support not listed"))
+                                .font(.caption2)
+                                .foregroundColor(.gray)
+                        }
+                        .padding(10)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(panelColor)
+                        .cornerRadius(10)
+                    }
+                }
+            }
+            .frame(maxHeight: 360)
+        } else {
+            Text(tr("No owned games found yet."))
+                .font(.subheadline)
+                .foregroundColor(.gray)
+            Button {
+                Task { await steamLibrary.refresh() }
+            } label: {
+                Label(tr("Refresh library"), systemImage: "arrow.clockwise")
+                    .foregroundColor(.white)
+            }
+            .padding(.vertical, 6)
+        }
     }
 }
