@@ -1,14 +1,13 @@
-import base64
-import binascii
 import hmac
 import http.server
 import ipaddress
 import json
 import os
+import socket
 import socketserver
 import subprocess
 import sys
-import tempfile
+import time
 import urllib.parse
 
 PORT = int(os.environ.get("JIT_SERVER_PORT", "54321"))
@@ -16,6 +15,90 @@ HOST = os.environ.get("JIT_SERVER_HOST", "127.0.0.1")
 TOKEN = os.environ.get("JIT_SERVER_TOKEN", "")
 MAX_BODY = 1024 * 1024  # 1 MiB
 TIMEOUT = 120
+UDID = os.environ.get("JIT_SERVER_UDID", "")      # optional: target device (default: first USB device)
+TUNNEL = os.environ.get("JIT_SERVER_TUNNEL", "")  # optional (iOS 17+): tunneld UDID to use
+ATTACH_TIMEOUT = 30
+
+
+class JITError(Exception):
+    pass
+
+
+def gdb_packet(payload: bytes) -> bytes:
+    """Frames a GDB remote-protocol packet: $<payload>#<checksum>."""
+    return b"$" + payload + b"#" + b"%02x" % (sum(payload) % 256)
+
+
+def gdb_read_packet(sock: socket.socket) -> bytes:
+    """Reads one packet, acknowledging it with '+'. Leading ack characters are skipped."""
+    buf = b""
+    while True:
+        chunk = sock.recv(4096)
+        if not chunk:
+            raise JITError("debugserver closed the connection")
+        buf += chunk
+        start = buf.find(b"$")
+        if start != -1:
+            end = buf.find(b"#", start)
+            if end != -1 and len(buf) >= end + 3:
+                payload = buf[start + 1:end]
+                if int(buf[end + 1:end + 3], 16) != sum(payload) % 256:
+                    sock.sendall(b"-")
+                    raise JITError("bad checksum from debugserver")
+                sock.sendall(b"+")
+                return payload
+
+
+def gdb_attach_and_detach(sock: socket.socket, pid: int) -> None:
+    """vAttach makes the debugger the process' tracer (this is what grants JIT), then detach."""
+    sock.sendall(gdb_packet(b"vAttach;%x" % pid))
+    reply = gdb_read_packet(sock)
+    if reply.startswith(b"E"):
+        raise JITError("debugserver refused to attach: " + reply.decode(errors="replace"))
+    sock.sendall(gdb_packet(b"D"))
+    try:
+        gdb_read_packet(sock)
+    except (JITError, OSError):
+        pass  # the connection may close right after detaching
+
+
+def _wait_for_endpoint(proc: subprocess.Popen, local_port: int):
+    """Returns (host, port) of the debugserver once pymobiledevice3 exposes it."""
+    deadline = time.time() + ATTACH_TIMEOUT
+    while time.time() < deadline:
+        if proc.poll() is not None:
+            raise JITError("pymobiledevice3 exited early (is the device connected and paired?)")
+        try:
+            with socket.create_connection(("127.0.0.1", local_port), timeout=1):
+                return "127.0.0.1", local_port
+        except OSError:
+            time.sleep(0.3)
+    raise JITError("timed out waiting for debugserver")
+
+
+def enable_jit(pid: int) -> None:
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        local_port = probe.getsockname()[1]
+
+    cmd = ["pymobiledevice3", "developer", "debugserver", "start-server", "--local-port", str(local_port)]
+    if UDID:
+        cmd += ["--udid", UDID]
+    if TUNNEL:
+        cmd += ["--tunnel", TUNNEL]
+
+    proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    try:
+        host, port = _wait_for_endpoint(proc, local_port)
+        with socket.create_connection((host, port), timeout=ATTACH_TIMEOUT) as sock:
+            sock.settimeout(ATTACH_TIMEOUT)
+            gdb_attach_and_detach(sock, pid)
+    finally:
+        proc.terminate()
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
 
 
 def _is_loopback(host):
@@ -60,7 +143,7 @@ class JITHandler(http.server.BaseHTTPRequestHandler):
             return
         raw = self.rfile.read(length)
 
-        if path in ("/enable_jit", "/enable_jit_vpn"):
+        if path in ("/enable_jit", "/enable_jit_vpn"):  # both do the same; the VPN variant is kept for compatibility
             self._enable_jit(path, raw)
         elif path == "/mount_ddi":
             try:
@@ -84,35 +167,13 @@ class JITHandler(http.server.BaseHTTPRequestHandler):
             self._reply(400, "Invalid PID")
             return
 
-        pairing_file_path = None
         try:
-            pairing_data = body.get("pairing_data")
-            if pairing_data is not None:
-                if not isinstance(pairing_data, str):
-                    self._reply(400, "Invalid pairing data")
-                    return
-                try:
-                    decoded = base64.b64decode(pairing_data, validate=True)
-                except (binascii.Error, ValueError):
-                    self._reply(400, "Invalid pairing data")
-                    return
-                fd, pairing_file_path = tempfile.mkstemp(suffix=".mobiledevicepairing")
-                with os.fdopen(fd, "wb") as f:
-                    f.write(decoded)
-
-            args = ["pymobiledevice3", "developer", "debugserver", "attach", "--pid", str(pid)]
-            if path == "/enable_jit_vpn":
-                args.append("--network-vpn")
-            if pairing_file_path:
-                args += ["--pairing-record", pairing_file_path]
-
-            self._run(args)
+            enable_jit(pid)
             self._reply(200, "JIT Activated")
-        except (subprocess.SubprocessError, OSError):
-            self._reply(500, "JIT Failed")
-        finally:
-            if pairing_file_path and os.path.exists(pairing_file_path):
-                os.remove(pairing_file_path)
+        except JITError as error:
+            self._reply(500, "JIT Failed: " + str(error))
+        except (subprocess.SubprocessError, OSError) as error:
+            self._reply(500, "JIT Failed: " + str(error))
 
     def do_GET(self):
         self._reply(405, "Method Not Allowed")

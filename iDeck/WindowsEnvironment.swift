@@ -86,7 +86,7 @@ private class BoxTranslator {
         for e in cEnv { free(e) }
         
         if spawnStatus == 0 {
-            jitEnabler.activate(for: pid, useVPN: false, pairingFileURL: nil) { jitSuccess in
+            jitEnabler.activate(for: pid, useVPN: false) { jitSuccess in
                 if jitSuccess {
                     var status: Int32 = 0
                     waitpid(pid, &status, 0)

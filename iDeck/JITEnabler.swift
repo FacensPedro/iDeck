@@ -27,15 +27,27 @@ class JITEnabler {
         return request
     }
 
+    /// Human-readable reason of the last failed request (nil after a success).
+    private(set) var lastError: String?
+
     private func send(_ request: URLRequest, completion: @escaping (Bool) -> Void) {
-        let task = URLSession.shared.dataTask(with: request) { _, response, _ in
-            let ok = (response as? HTTPURLResponse)?.statusCode == 200
-            DispatchQueue.main.async { completion(ok) }
+        let task = URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+            var failure: String?
+            if let error = error {
+                failure = "JIT server unreachable at \(request.url?.host ?? "?") (\(error.localizedDescription))"
+            } else if let http = response as? HTTPURLResponse, http.statusCode != 200 {
+                let body = data.flatMap { String(data: $0, encoding: .utf8) } ?? ""
+                failure = http.statusCode == 401 ? "JIT server rejected the token" : (body.isEmpty ? "HTTP \(http.statusCode)" : body)
+            }
+            DispatchQueue.main.async {
+                self?.lastError = failure
+                completion(failure == nil)
+            }
         }
         task.resume()
     }
 
-    func activate(for pid: Int32, useVPN: Bool = false, pairingFileURL: URL?, completion: @escaping (Bool) -> Void) {
+    func activate(for pid: Int32, useVPN: Bool = false, completion: @escaping (Bool) -> Void) {
         let endpoint = useVPN ? "enable_jit_vpn" : "enable_jit"
         guard var request = makeRequest(endpoint: endpoint) else {
             DispatchQueue.main.async { completion(false) }
@@ -43,12 +55,8 @@ class JITEnabler {
         }
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
-        var body: [String: Any] = ["pid": Int(pid)]
-        if let pairingURL = pairingFileURL, let pairingData = try? Data(contentsOf: pairingURL) {
-            body["pairing_data"] = pairingData.base64EncodedString()
-        }
-
-        guard let payload = try? JSONSerialization.data(withJSONObject: body) else {
+        // The pairing file (it contains a private key) is deliberately never sent over the network.
+        guard let payload = try? JSONSerialization.data(withJSONObject: ["pid": Int(pid)]) else {
             DispatchQueue.main.async { completion(false) }
             return
         }

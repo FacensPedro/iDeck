@@ -7,6 +7,8 @@ struct SettingsView: View {
     @State private var isImportingPairingFile = false
     @State private var isImportingDDI = false
     @StateObject private var updater = UpdateChecker()
+    @AppStorage("jitServerURL") private var jitServerURL = ""
+    @AppStorage("jitServerToken") private var jitServerToken = ""
     
     var body: some View {
         NavigationView {
@@ -16,6 +18,8 @@ struct SettingsView: View {
                 ScrollView {
                     VStack(spacing: 24) {
                         settingsSection(title: "JIT & Debugging") {
+                            statusRow
+                            
                             actionButton(title: "Activate JIT", icon: "bolt.fill") {
                                 coordinator.activateJITManually()
                             }
@@ -27,6 +31,8 @@ struct SettingsView: View {
                             actionButton(title: "Mount Developer Disk Image", icon: "externaldrive.fill") {
                                 isImportingDDI = true
                             }
+                            
+                            jitServerFields
                             
                             toggleRow(title: "JIT Pool", isOn: $coordinator.isJITPoolEnabled)
                             toggleRow(title: "VPN JIT Trigger", isOn: $coordinator.isVPNJITEnabled)
@@ -80,7 +86,50 @@ struct SettingsView: View {
             }
         }
         .navigationViewStyle(.stack)
+        .onAppear { coordinator.refreshPairingFileState() }
         .preferredColorScheme(.dark)
+    }
+    
+    private var statusRow: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(coordinator.currentStatus)
+                .font(.footnote)
+                .foregroundColor(.white)
+            Text(coordinator.hasPairingFile ? "Pairing file: imported" : "Pairing file: none")
+                .font(.caption)
+                .foregroundColor(coordinator.hasPairingFile ? .green : .gray)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
+        .background(Color(red: 0.15, green: 0.15, blue: 0.15))
+        .padding(.bottom, 2)
+    }
+    
+    private var jitServerFields: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("JIT helper server")
+                .font(.caption).fontWeight(.bold).foregroundColor(.gray)
+            TextField("http://192.168.1.10:54321", text: $jitServerURL)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .keyboardType(.URL)
+                .padding(10)
+                .background(Color.black.opacity(0.4))
+                .cornerRadius(8)
+            SecureField("Token (JIT_SERVER_TOKEN)", text: $jitServerToken)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .padding(10)
+                .background(Color.black.opacity(0.4))
+                .cornerRadius(8)
+            Text("Run server_jit/server.py on a computer connected to this device, then enter its address here. The pairing file stays on the device and is not sent to the server.")
+                .font(.caption2)
+                .foregroundColor(.gray)
+        }
+        .foregroundColor(.white)
+        .padding()
+        .background(Color(red: 0.15, green: 0.15, blue: 0.15))
+        .padding(.bottom, 2)
     }
     
     @ViewBuilder

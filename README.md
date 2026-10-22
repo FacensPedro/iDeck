@@ -20,13 +20,19 @@ identifiers (`com.example.iDeck`, `com.example.iDeck.VPNExtension`) and app grou
 should be changed to your own.
 
 ## JIT helper server
+JIT is enabled by a helper that runs on a computer connected to the device (USB or Wi-Fi sync, already paired):
 ```bash
 cd server_jit
 ./setup.sh            # installs pymobiledevice3 and starts server.py on 127.0.0.1:54321
 ```
+It starts `pymobiledevice3 developer debugserver start-server`, attaches to the app's PID over the GDB remote
+protocol (`vAttach`) and detaches again, which leaves the process debugged and therefore JIT-capable.
 Environment variables: `JIT_SERVER_HOST`, `JIT_SERVER_PORT`, `JIT_SERVER_TOKEN` (required when the host is not
-loopback). `jit_server.js` is an equivalent Node implementation. The app reads `jitServerURL` and `jitServerToken`
-from `UserDefaults`.
+loopback), `JIT_SERVER_UDID`, `JIT_SERVER_TUNNEL` (iOS 17+, a running tunneld).
+In the app: Settings -> JIT & Debugging -> enter the server address (and token), then **Activate JIT**.
+
+The imported pairing file is stored on the device only (it contains a private key and is never sent to the
+server); an on-device StikDebug-style flow that consumes it is not implemented yet.
 
 ## Branding assets
 The mode screens show the mark of the engine behind each mode when an image set with this name exists in

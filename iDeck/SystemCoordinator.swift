@@ -34,7 +34,11 @@ class SystemCoordinator: ObservableObject {
     }
     
     @Published var isJITPoolEnabled: Bool = false
-    @Published var isVPNJITEnabled: Bool = true
+    /// Starts the LocalDevVPN extension before activating JIT. Off by default: the extension needs
+    /// a provisioning profile with the Network Extensions capability, and the helper-server
+    /// flow does not need it.
+    @Published var isVPNJITEnabled: Bool = false
+    @Published var hasPairingFile: Bool = false
     @Published var isGuestHooksEnabled: Bool = true
     
     @Published var isMaxRefreshRateEnabled: Bool = false {
@@ -133,17 +137,16 @@ class SystemCoordinator: ObservableObject {
     
     func activateJITManually(completion: ((Bool) -> Void)? = nil) {
         let activateTask = {
-            let fileManager = FileManager.default
-            let documentDirectory = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first!
-            let pairingPath = documentDirectory.appendingPathComponent("pairing_file.mobiledevicepairing")
-            
-            let pairingURL = fileManager.fileExists(atPath: pairingPath.path) ? pairingPath : nil
-            
             DispatchQueue.main.async { self.currentStatus = "Activating JIT..." }
-            self.jitEnabler.activate(for: getpid(), useVPN: self.isVPNJITEnabled, pairingFileURL: pairingURL) { [weak self] success in
+            self.jitEnabler.activate(for: getpid(), useVPN: self.isVPNJITEnabled) { [weak self] success in
                 DispatchQueue.main.async {
-                    self?.isJITEnabled = success
-                    self?.currentStatus = success ? "JIT Activated" : "JIT Failed"
+                    guard let self = self else { return }
+                    self.isJITEnabled = success
+                    if success {
+                        self.currentStatus = "JIT Activated"
+                    } else {
+                        self.currentStatus = "JIT Failed: \(self.jitEnabler.lastError ?? "unknown error")"
+                    }
                     completion?(success)
                 }
             }
@@ -166,19 +169,37 @@ class SystemCoordinator: ObservableObject {
         }
     }
     
+    private var pairingFileURL: URL {
+        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+            .appendingPathComponent("pairing_file.mobiledevicepairing")
+    }
+    
+    func refreshPairingFileState() {
+        hasPairingFile = FileManager.default.fileExists(atPath: pairingFileURL.path)
+    }
+    
+    /// Imports a pairing file picked with the document picker. Files from the Files app are
+    /// security-scoped: without startAccessingSecurityScopedResource the copy silently fails.
     func importPairingFile(at url: URL) {
-        let fileManager = FileManager.default
-        let documentDirectory = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first!
-        let pairingPath = documentDirectory.appendingPathComponent("pairing_file.mobiledevicepairing")
+        let hasScope = url.startAccessingSecurityScopedResource()
+        defer { if hasScope { url.stopAccessingSecurityScopedResource() } }
         
+        let fileManager = FileManager.default
         do {
-            if fileManager.fileExists(atPath: pairingPath.path) {
-                try fileManager.removeItem(at: pairingPath)
+            let data = try Data(contentsOf: url)
+            guard let plist = try PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any],
+                  plist["HostID"] != nil || plist["DeviceCertificate"] != nil || plist["private_key"] != nil else {
+                currentStatus = "Not a valid pairing file"
+                return
             }
-            try fileManager.copyItem(at: url, to: pairingPath)
+            if fileManager.fileExists(atPath: pairingFileURL.path) {
+                try fileManager.removeItem(at: pairingFileURL)
+            }
+            try data.write(to: pairingFileURL, options: [.atomic, .completeFileProtection])
+            hasPairingFile = true
             currentStatus = "Pairing file imported"
         } catch {
-            currentStatus = "Pairing import failed"
+            currentStatus = "Pairing import failed: \(error.localizedDescription)"
         }
     }
     
