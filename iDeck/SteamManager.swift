@@ -1694,7 +1694,7 @@ enum SteamSignIn {
 
     /// `env.NAME` from madeira.cfg, then the process environment. "0" is off.
     static func flag(_ name: String, default fallback: Bool) -> Bool {
-        guard let value = nil ?? ProcessInfo.processInfo.environment[name] else {
+        guard let value = ProcessInfo.processInfo.environment[name] else {
             return fallback
         }
         return value.trimmingCharacters(in: .whitespaces) != "0"
@@ -1911,6 +1911,7 @@ import UIKit
 /// account and Sign out.
 struct SteamSignInView: View {
     @ObservedObject private var steam = SteamSignInModel.shared
+    @AppStorage(AppLanguage.storageKey) private var appLanguage = AppLanguage.system.rawValue
     @Environment(\.dismiss) private var dismiss
     @State private var method: SteamSignInModel.SignInMethod = UIDevice.current.userInterfaceIdiom == .pad ? .qr : .password
     @State private var account = ""
@@ -1924,8 +1925,8 @@ struct SteamSignInView: View {
             Form {
                 Section {
                     VStack(alignment: .leading, spacing: 8) {
-                        Label("Sign in to Steam", systemImage: "person.crop.circle.fill").font(.title2.bold())
-                        Text("Madeira keeps a Steam sign-in so it can start your Steam games with your own account.")
+                        Label(tr("Sign in to Steam"), systemImage: "person.crop.circle.fill").font(.title2.bold())
+                        Text(tr("Madeira keeps a Steam sign-in so it can start your Steam games with your own account."))
                             .foregroundStyle(.secondary)
                     }.padding(.vertical, 4)
                 }
@@ -1935,9 +1936,9 @@ struct SteamSignInView: View {
                     guardSection(prompt)
                 } else {
                     Section {
-                        Picker("Sign-in method", selection: $method) {
-                            Text("Password").tag(SteamSignInModel.SignInMethod.password)
-                            Text("QR code").tag(SteamSignInModel.SignInMethod.qr)
+                        Picker(tr("Sign-in method"), selection: $method) {
+                            Text(tr("Password")).tag(SteamSignInModel.SignInMethod.password)
+                            Text(tr("QR code")).tag(SteamSignInModel.SignInMethod.qr)
                         }.pickerStyle(.segmented)
                     }
                     if method == .password { passwordSection } else { qrSection }
@@ -1946,14 +1947,14 @@ struct SteamSignInView: View {
                     Section { Label(error, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.red) }
                 }
                 Section {
-                    Text("Madeira signs in with Steam directly. Your password is sent only to Steam and is never stored. A sign-in token is kept in this device's Keychain until you sign out.")
+                    Text(tr("Madeira signs in with Steam directly. Your password is sent only to Steam and is never stored. A sign-in token is kept in this device's Keychain until you sign out."))
                         .font(.footnote).foregroundStyle(.secondary)
                 }
             }
             .navigationTitle("Steam").navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button(steam.signedIn ? "Done" : "Cancel") { steam.cancelSignIn(); dismiss() }
+                    Button(steam.signedIn ? tr("Done") : tr("Cancel")) { steam.cancelSignIn(); dismiss() }
                 }
             }
             .onAppear {
@@ -1975,15 +1976,15 @@ struct SteamSignInView: View {
     private func signedInSection(_ name: String) -> some View {
         Section {
             LabeledContent("Account", value: name)
-            Button("Sign out", role: .destructive) { steam.signOut() }
+            Button(tr("Sign out"), role: .destructive) { steam.signOut() }
         } footer: {
-            Text("Signing out removes the token from this device's Keychain.")
+            Text(tr("Signing out removes the token from this device's Keychain."))
         }
     }
 
     private var passwordSection: some View {
         Section {
-            TextField("Steam account name", text: $account)
+            TextField(tr("Steam account name"), text: $account)
                 .textContentType(.username).textInputAutocapitalization(.never).autocorrectionDisabled()
                 .focused($focus, equals: .account).submitLabel(.next).onSubmit { focus = .password }
             SecureField("Password", text: $password)
@@ -1991,12 +1992,12 @@ struct SteamSignInView: View {
                 .submitLabel(.go).onSubmit(submit)
             Button(action: submit) {
                 HStack {
-                    Text("Sign in").fontWeight(.semibold)
+                    Text(tr("Sign in")).fontWeight(.semibold)
                     if steam.signInBusy { Spacer(); ProgressView() }
                 }
             }.disabled(account.trimmingCharacters(in: .whitespaces).isEmpty || password.isEmpty || steam.signInBusy)
         } footer: {
-            Text("Use your Steam account name, which can differ from your email address.")
+            Text(tr("Use your Steam account name, which can differ from your email address."))
         }
     }
 
@@ -2012,14 +2013,14 @@ struct SteamSignInView: View {
                 Text(type == .device
                      ? "Enter the Steam Guard code shown in the Steam app on your phone."
                      : "Enter the code Steam sent to your email" + (prompt.hint.isEmpty ? "." : " (\(prompt.hint))."))
-                TextField("Code", text: $code)
+                TextField(tr("Code"), text: $code)
                     .textContentType(.oneTimeCode).textInputAutocapitalization(.characters).autocorrectionDisabled()
                     .font(.title3.monospaced()).focused($focus, equals: .code)
                     .submitLabel(.go).onSubmit { steam.submitGuardCode(code) }
                 Button {
                     steam.submitGuardCode(code)
                 } label: {
-                    HStack { Text("Continue").fontWeight(.semibold); if steam.signInBusy { Spacer(); ProgressView() } }
+                    HStack { Text(tr("Continue")).fontWeight(.semibold); if steam.signInBusy { Spacer(); ProgressView() } }
                 }.disabled(code.trimmingCharacters(in: .whitespaces).count < 5 || steam.signInBusy)
             }
             if prompt.canApprove {
@@ -2031,8 +2032,8 @@ struct SteamSignInView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            Button("Start over", role: .cancel) { code = ""; steam.cancelSignIn() }
-        } header: { Text("Steam Guard") }
+            Button(tr("Start over"), role: .cancel) { code = ""; steam.cancelSignIn() }
+        } header: { Text(tr("Steam Guard")) }
     }
 
     private var qrSection: some View {
@@ -2042,18 +2043,18 @@ struct SteamSignInView: View {
                     .frame(maxWidth: 240).padding(12)
                     .background(Color.white, in: RoundedRectangle(cornerRadius: 14))
                     .frame(maxWidth: .infinity)
-                    .accessibilityLabel("Steam sign-in QR code")
-                Text("On another device, open the Steam app, go to Steam Guard, and scan this code.")
+                    .accessibilityLabel(tr("Steam sign-in QR code"))
+                Text(tr("On another device, open the Steam app, go to Steam Guard, and scan this code."))
                 if let link = steam.qrLink {
                     Button { UIApplication.shared.open(link) } label: {
-                        Label("Open in the Steam app on this device", systemImage: "arrow.up.forward.app")
+                        Label(tr("Open in the Steam app on this device"), systemImage: "arrow.up.forward.app")
                     }
                 }
-                HStack(spacing: 12) { ProgressView(); Text("Waiting for approval…").foregroundStyle(.secondary) }
+                HStack(spacing: 12) { ProgressView(); Text(tr("Waiting for approval…")).foregroundStyle(.secondary) }
             } else if steam.signInBusy {
-                HStack(spacing: 12) { ProgressView(); Text("Getting a sign-in code…").foregroundStyle(.secondary) }
+                HStack(spacing: 12) { ProgressView(); Text(tr("Getting a sign-in code…")).foregroundStyle(.secondary) }
             } else {
-                Button("Get a new code") { steam.beginQR() }
+                Button(tr("Get a new code")) { steam.beginQR() }
             }
         }
     }
