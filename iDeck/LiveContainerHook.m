@@ -63,6 +63,42 @@ static BOOL LCFail(NSString **out, NSString *message) {
     return NO;
 }
 
+static void LCPatchExecutablePath(char *path, size_t capacity) {
+    const char *oldPrefix = "@executable_path";
+    const char *newPrefix = "@loader_path";
+    size_t oldPrefixLength = strlen(oldPrefix);
+    size_t newPrefixLength = strlen(newPrefix);
+    size_t pathLength = strnlen(path, capacity);
+    if (pathLength >= capacity || strncmp(path, oldPrefix, oldPrefixLength) != 0) return;
+    size_t suffixLength = pathLength - oldPrefixLength;
+    size_t newLength = newPrefixLength + suffixLength;
+    if (newLength + 1 > capacity) return;
+    memmove(path + newPrefixLength, path + oldPrefixLength, suffixLength + 1);
+    memcpy(path, newPrefix, newPrefixLength);
+    memset(path + newLength + 1, 0, capacity - newLength - 1);
+}
+
+static void LCPatchExecutablePathsInLoadCommands(struct mach_header_64 *mh) {
+    struct load_command *lc = (struct load_command *)(mh + 1);
+    for (uint32_t i = 0; i < mh->ncmds; i++) {
+        if (lc->cmdsize < sizeof(struct load_command)) return;
+        if (lc->cmd == LC_RPATH) {
+            struct rpath_command *rpath = (struct rpath_command *)lc;
+            if (rpath->path.offset < lc->cmdsize) {
+                char *path = (char *)rpath + rpath->path.offset;
+                LCPatchExecutablePath(path, lc->cmdsize - rpath->path.offset);
+            }
+        } else if (lc->cmd == LC_LOAD_DYLIB || lc->cmd == LC_LOAD_WEAK_DYLIB) {
+            struct dylib_command *dylib = (struct dylib_command *)lc;
+            if (dylib->dylib.name.offset < lc->cmdsize) {
+                char *path = (char *)dylib + dylib->dylib.name.offset;
+                LCPatchExecutablePath(path, lc->cmdsize - dylib->dylib.name.offset);
+            }
+        }
+        lc = (struct load_command *)((uint8_t *)lc + lc->cmdsize);
+    }
+}
+
 /// Copies the arm64 slice of the guest executable and turns it into an MH_BUNDLE.
 static NSString *LCPreparePatchedBinary(NSString *appPath, NSDictionary *info, NSString **error) {
     NSString *execName = info[@"CFBundleExecutable"];
@@ -111,6 +147,7 @@ static NSString *LCPreparePatchedBinary(NSString *appPath, NSDictionary *info, N
         if (error) *error = @"Guest executable has an unexpected Mach-O type";
         return nil;
     }
+    LCPatchExecutablePathsInLoadCommands(mh);
     mh->filetype = MH_BUNDLE;
 
     NSString *out = [appPath stringByAppendingPathComponent:[execName stringByAppendingString:@".iDeck.bundle"]];
