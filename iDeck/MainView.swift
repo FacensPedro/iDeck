@@ -37,36 +37,6 @@ struct BrandMark: View {
     let fallbackSymbol: String
 
     var body: some View {
-        if UIImage(named: assetName) != nil {
-            Image(assetName)
-                .resizable()
-                .scaledToFit()
-        } else {
-            Image(systemName: fallbackSymbol)
-                .resizable()
-                .scaledToFit()
-                .foregroundColor(.white)
-        }
-    }
-}
-
-struct MainView: View {
-    @ObservedObject var coordinator: SystemCoordinator
-    @StateObject private var inputManager = InputManager.shared
-    @State private var mode: AppMode = .liveContainer
-    @State private var isDocumentPickerPresented = false
-    @State private var isSettingsPresented = false
-    @State private var isWindowsWorkspacePresented = false
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    @Environment(\.scenePhase) private var scenePhase
-    @AppStorage(AppLanguage.storageKey) private var appLanguage = AppLanguage.system.rawValue // re-renders on change
-
-    private let cardColor = Color(red: 0.15, green: 0.15, blue: 0.15)
-
-    private var isWide: Bool { horizontalSizeClass == .regular }
-    private var actionsEnabled: Bool { coordinator.isJITEnabled && coordinator.isContainerReady }
-
-    var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
 
@@ -75,17 +45,26 @@ struct MainView: View {
                     sidebar
                         .frame(width: 280)
                     Divider().background(Color.white.opacity(0.1))
-                    detail
+                    if isHome {
+                        homeScreen
+                    } else {
+                        detail
+                    }
                 }
             } else {
                 VStack(spacing: 0) {
                     topBar
-                    Picker(tr("Mode"), selection: $mode) {
-                        ForEach(AppMode.allCases) { Text(tr($0.rawValue)).tag($0) }
+                    if isHome {
+                        homeScreen
+                    } else {
+                        Picker(tr("Mode"), selection: $mode) {
+                            ForEach(AppMode.allCases) { Text(tr($0.rawValue)).tag($0) }
+                        }
+                        .pickerStyle(.segmented)
+                        .padding(.horizontal)
+                        .onChange(of: mode) { _ in isHome = false }
+                        detail
                     }
-                    .pickerStyle(.segmented)
-                    .padding(.horizontal)
-                    detail
                 }
             }
         }
@@ -135,9 +114,19 @@ struct MainView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.top, 16)
 
+            Button(action: { isHome = true }) {
+                Label(tr("Home"), systemImage: "house.fill")
+                    .fontWeight(.semibold)
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(12)
+                    .background(isHome ? Color.blue.opacity(0.35) : cardColor)
+                    .cornerRadius(12)
+            }
+
             VStack(spacing: 8) {
                 ForEach(AppMode.allCases) { item in
-                    Button(action: { mode = item }) {
+                    Button(action: { mode = item; isHome = false }) {
                         HStack(spacing: 12) {
                             BrandMark(assetName: item.brandAsset, fallbackSymbol: item.fallbackSymbol)
                                 .frame(width: 28, height: 28)
@@ -200,6 +189,57 @@ struct MainView: View {
             } else {
                 HStack(spacing: 12) { pills }
             }
+        }
+    }
+ 
+    private var homeScreen: some View {
+        ScrollView {
+            VStack(spacing: 22) {
+                Image("IDeckLogo")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxWidth: isWide ? 240 : 190)
+                    .padding(.bottom, 6)
+                Text(tr("Home"))
+                    .font(.system(size: isWide ? 34 : 28, weight: .heavy, design: .rounded))
+                    .foregroundColor(.white)
+                Text(tr("Choose a mode to continue"))
+                    .font(.subheadline)
+                    .foregroundColor(.gray)
+                    .multilineTextAlignment(.center)
+                ForEach(AppMode.allCases) { item in
+                    Button {
+                        mode = item
+                        isHome = false
+                    } label: {
+                        HStack(spacing: 16) {
+                            BrandMark(assetName: item.brandAsset, fallbackSymbol: item.fallbackSymbol)
+                                .frame(width: 54, height: 54)
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(tr(item.rawValue))
+                                    .font(.headline)
+                                    .foregroundColor(.white)
+                                Text(item.subtitle)
+                                    .font(.subheadline)
+                                    .foregroundColor(.gray)
+                                    .multilineTextAlignment(.leading)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .foregroundColor(.gray)
+                        }
+                        .padding(18)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(cardColor)
+                        .cornerRadius(14)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .frame(maxWidth: 620)
+            .padding(.horizontal, isWide ? 32 : 20)
+            .padding(.vertical, 28)
+            .frame(maxWidth: .infinity)
         }
     }
 
