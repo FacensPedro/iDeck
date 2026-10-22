@@ -56,23 +56,6 @@ class JITEnabler {
         task.resume()
     }
 
-    func activate(for pid: Int32, useVPN: Bool = false, completion: @escaping (Bool) -> Void) {
-        let endpoint = useVPN ? "enable_jit_vpn" : "enable_jit"
-        guard var request = makeRequest(endpoint: endpoint) else {
-            DispatchQueue.main.async { completion(false) }
-            return
-        }
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
-        // The pairing file (it contains a private key) is deliberately never sent over the network.
-        guard let payload = try? JSONSerialization.data(withJSONObject: ["pid": Int(pid)]) else {
-            DispatchQueue.main.async { completion(false) }
-            return
-        }
-        request.httpBody = payload
-        send(request, completion: completion)
-    }
-
     /// The server mounts the Developer Disk Image itself (`pymobiledevice3 mounter auto-mount`),
     /// so no local files need to be sent.
     func mountDeveloperDiskImage(completion: @escaping (Bool) -> Void) {
