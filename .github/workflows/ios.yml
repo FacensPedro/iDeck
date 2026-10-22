@@ -2,9 +2,14 @@ name: iOS Build
 
 on:
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Publish a GitHub release for this tag (e.g. 0.1.0); empty = build only"
+        required: false
+        default: ""
   push:
     branches: [ "main" ]
-    tags: [ "v*" ]
+    tags: [ "v*", "[0-9]*" ]
   pull_request:
     branches: [ "main" ]
 
@@ -47,8 +52,14 @@ jobs:
           name: iDeck
           path: iDeck.ipa
 
-      - name: Publish release (tags only)
-        if: startsWith(github.ref, 'refs/tags/v')
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/') || inputs.release_tag != ''
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release create "${{ github.ref_name }}" iDeck.ipa --title "iDeck ${{ github.ref_name }}" --generate-notes
+          TAG: ${{ inputs.release_tag || github.ref_name }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" iDeck.ipa --clobber
+          else
+            gh release create "$TAG" iDeck.ipa --target "${{ github.sha }}" --title "iDeck $TAG" --generate-notes
+          fi
