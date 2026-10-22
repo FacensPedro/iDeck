@@ -24,7 +24,7 @@ struct SettingsView: View {
                         settingsSection(title: tr("JIT & Debugging")) {
                             statusRow
                             
-                            Text(tr("JIT is detected automatically. If it is not detected, enable JIT for iDeck in StikDebug, then return here."))
+                            Text(tr("JIT is detected automatically. To activate it, enable JIT for iDeck in StikDebug, then return here."))
                                 .font(.caption)
                                 .foregroundColor(.gray)
                                 .padding()
@@ -33,6 +33,22 @@ struct SettingsView: View {
                             }
                         }
                         
+                        settingsSection(title: tr("Steam")) {
+                            HStack {
+                                Text(tr("Steam account"))
+                                    .foregroundColor(.white)
+                                Spacer()
+                                Text(coordinator.isSteamConnected ? tr("Connected") : tr("Not connected"))
+                                    .font(.caption)
+                                    .foregroundColor(coordinator.isSteamConnected ? .green : .gray)
+                            }
+                            .padding()
+                            actionButton(title: tr("Disconnect Steam"), icon: "rectangle.portrait.and.arrow.right") {
+                                coordinator.disconnectSteamAccount()
+                            }
+                            .disabled(!coordinator.isSteamConnected)
+                        }
+
                         settingsSection(title: tr("Controller")) {
                             HStack {
                                 Text(tr("Connected controller")).foregroundColor(.white)
@@ -79,19 +95,15 @@ struct SettingsView: View {
             }
         }
         .navigationViewStyle(.stack)
-        .onAppear { coordinator.refreshPairingFileState() }
         .task { await updater.check() }
         .preferredColorScheme(.dark)
     }
     
     private var statusRow: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(trStatus(coordinator.currentStatus))
+            Text(coordinator.isJITEnabled ? tr("JIT detected") : tr("JIT not detected"))
                 .font(.footnote)
-                .foregroundColor(.white)
-            Text(coordinator.hasPairingFile ? tr("Pairing file: imported") : tr("Pairing file: none"))
-                .font(.caption)
-                .foregroundColor(coordinator.hasPairingFile ? .green : .gray)
+                .foregroundColor(coordinator.isJITEnabled ? .green : .white)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
