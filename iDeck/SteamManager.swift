@@ -4560,6 +4560,15 @@ enum VDFParser {
 
 
 #if os(iOS)
+enum SteamFileError: LocalizedError {
+    case invalid(String)
+
+    var errorDescription: String? {
+        if case .invalid(let reason) = self { return reason }
+        return nil
+    }
+}
+
 @MainActor
 final class SteamOwnedGamesModel: ObservableObject {
     @Published private(set) var games: [SteamAppInfo] = []
