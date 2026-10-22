@@ -1944,7 +1944,7 @@ struct SteamSignInView: View {
                     if method == .password { passwordSection } else { qrSection }
                 }
                 if let error = steam.signInError {
-                    Section { Label(error, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.red) }
+                    Section { Label(tr(error), systemImage: "exclamationmark.triangle.fill").foregroundStyle(.red) }
                 }
                 Section {
                     Text(tr("iDeck signs in with Steam directly. Your password is sent only to Steam and is never stored. A sign-in token is kept in this device's Keychain until you sign out."))
