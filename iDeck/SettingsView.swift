@@ -6,6 +6,7 @@ struct SettingsView: View {
     @Environment(\.presentationMode) var presentationMode
     @State private var isImportingPairingFile = false
     @State private var isImportingDDI = false
+    @StateObject private var updater = UpdateChecker()
     
     var body: some View {
         NavigationView {
@@ -36,6 +37,10 @@ struct SettingsView: View {
                             toggleRow(title: "Hold Display at Maximum Rate", isOn: $coordinator.isMaxRefreshRateEnabled)
                             toggleRow(title: "DXVK HUD", isOn: $coordinator.isHUDEnabled)
                             toggleRow(title: "D3DMetal Rendering", isOn: $coordinator.isD3DMetalEnabled)
+                        }
+                        
+                        settingsSection(title: "Updates") {
+                            updatesContent
                         }
                         
                         settingsSection(title: "LiveContainer") {
@@ -76,6 +81,51 @@ struct SettingsView: View {
         }
         .navigationViewStyle(.stack)
         .preferredColorScheme(.dark)
+    }
+    
+    @ViewBuilder
+    private var updatesContent: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            ForEach(updater.statuses) { status in
+                HStack {
+                    Text(status.project.name)
+                        .foregroundColor(.white)
+                    Spacer()
+                    Text(versionText(for: status))
+                        .font(.caption)
+                        .foregroundColor(status.upstreamChanged ? .orange : .gray)
+                }
+            }
+            if let message = updater.message {
+                Text(message).font(.caption).foregroundColor(.gray)
+            }
+        }
+        .padding()
+        .background(Color(red: 0.15, green: 0.15, blue: 0.15))
+        .padding(.bottom, 2)
+        
+        actionButton(title: updater.isChecking ? "Checking..." : "Check for Updates", icon: "arrow.triangle.2.circlepath") {
+            Task { await updater.check() }
+        }
+        .disabled(updater.isChecking)
+        
+        if let update = updater.availableIDeckUpdate {
+            actionButton(title: "Install iDeck \(update.latest ?? "")", icon: "arrow.down.circle.fill") {
+                updater.installIDeckUpdate()
+            }
+        }
+    }
+    
+    private func versionText(for status: ProjectStatus) -> String {
+        if status.project.id == UpdateChecker.ideck.id {
+            let latest = status.latest ?? "no release yet"
+            return "v\(updater.currentVersion) · latest \(latest)"
+        }
+        guard let latest = status.latest else { return status.error == nil ? "-" : "unavailable" }
+        if let pinned = status.project.pinnedVersion {
+            return status.upstreamChanged ? "\(pinned) → \(latest)" : "\(latest)"
+        }
+        return "latest \(latest)"
     }
     
     private func settingsSection<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
