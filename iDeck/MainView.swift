@@ -1,121 +1,89 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
+enum AppMode: String, CaseIterable, Identifiable {
+    case windows = "Windows"
+    case liveContainer = "LiveContainer"
+
+    var id: String { rawValue }
+
+    /// Name of an optional image set in Assets.xcassets holding the official mark of the engine
+    /// behind this mode (drop the files in as "MadeiraLogo" / "LiveContainerSymbol").
+    var brandAsset: String {
+        switch self {
+        case .windows: return "MadeiraLogo"
+        case .liveContainer: return "LiveContainerSymbol"
+        }
+    }
+
+    var fallbackSymbol: String {
+        switch self {
+        case .windows: return "window.casement"
+        case .liveContainer: return "cube.box.fill"
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .windows: return "Run Windows apps and Steam through Wine"
+        case .liveContainer: return "Run iOS apps inside iDeck"
+        }
+    }
+}
+
+/// Shows the image set `assetName` when it exists in the asset catalog, an SF Symbol otherwise.
+struct BrandMark: View {
+    let assetName: String
+    let fallbackSymbol: String
+
+    var body: some View {
+        if UIImage(named: assetName) != nil {
+            Image(assetName)
+                .resizable()
+                .scaledToFit()
+        } else {
+            Image(systemName: fallbackSymbol)
+                .resizable()
+                .scaledToFit()
+                .foregroundColor(.white)
+        }
+    }
+}
+
 struct MainView: View {
     @ObservedObject var coordinator: SystemCoordinator
     @StateObject private var inputManager = InputManager()
+    @State private var mode: AppMode = .windows
     @State private var isDocumentPickerPresented = false
     @State private var isSettingsPresented = false
-    
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
+    private let cardColor = Color(red: 0.15, green: 0.15, blue: 0.15)
+
+    private var isWide: Bool { horizontalSizeClass == .regular }
+    private var actionsEnabled: Bool { coordinator.isJITEnabled && coordinator.isContainerReady }
+
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
-            
-            VStack {
-                HStack {
-                    Spacer()
-                    Button(action: {
-                        isSettingsPresented = true
-                    }) {
-                        Image(systemName: "gearshape.fill")
-                            .font(.title2)
-                            .foregroundColor(.white)
-                            .padding()
-                            .background(Color(red: 0.15, green: 0.15, blue: 0.15))
-                            .clipShape(Circle())
-                    }
-                    .padding()
+
+            if isWide {
+                HStack(spacing: 0) {
+                    sidebar
+                        .frame(width: 280)
+                    Divider().background(Color.white.opacity(0.1))
+                    detail
                 }
-                Spacer()
-            }
-            
-            VStack(spacing: 32) {
-                VStack(spacing: 8) {
-                    Text("iDeck")
-                        .font(.system(size: 40, weight: .heavy, design: .rounded))
-                        .foregroundColor(.white)
-                    
-                    Text(coordinator.currentStatus)
-                        .font(.subheadline)
-                        .foregroundColor(.gray)
-                    
-                    if coordinator.prefixInstaller.isInstalling {
-                        VStack {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                            Text("Installing Madeira Environment...")
-                                .font(.caption)
-                                .foregroundColor(.gray)
-                        }
-                        .padding(.top, 4)
+            } else {
+                VStack(spacing: 0) {
+                    topBar
+                    Picker("Mode", selection: $mode) {
+                        ForEach(AppMode.allCases) { Text($0.rawValue).tag($0) }
                     }
+                    .pickerStyle(.segmented)
+                    .padding(.horizontal)
+                    detail
                 }
-                
-                HStack(spacing: 16) {
-                    StatusPill(isActive: coordinator.isJITEnabled, label: "JIT")
-                    StatusPill(isActive: coordinator.isContainerReady, label: "Container")
-                    StatusPill(isActive: inputManager.isControllerConnected, label: "Gamepad")
-                }
-                
-                VStack(spacing: 16) {
-                    Button(action: {
-                        coordinator.forceJITAndStartLiveContainer()
-                    }) {
-                        HStack {
-                            Image(systemName: "cube.box.fill")
-                            Text("Start LiveContainer")
-                                .fontWeight(.semibold)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color(red: 0.15, green: 0.15, blue: 0.15))
-                        .foregroundColor(.white)
-                        .cornerRadius(12)
-                    }
-                    
-                    Button(action: {
-                        coordinator.forceJITAndStartWindows()
-                    }) {
-                        HStack {
-                            Image(systemName: "window.casement")
-                            Text("Start Windows Environment")
-                                .fontWeight(.semibold)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color(red: 0.15, green: 0.15, blue: 0.15))
-                        .foregroundColor(.white)
-                        .cornerRadius(12)
-                    }
-                }
-                .padding(.horizontal, 32)
-                
-                VStack(spacing: 16) {
-                    Button(action: {
-                        coordinator.launchSteam()
-                    }) {
-                        Text("Install & Run Steam")
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(Color(red: 0.15, green: 0.15, blue: 0.15))
-                            .foregroundColor(.white)
-                            .cornerRadius(12)
-                    }
-                    
-                    Button(action: {
-                        isDocumentPickerPresented = true
-                    }) {
-                        Text("Run Executable (.exe)")
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(Color(red: 0.15, green: 0.15, blue: 0.15))
-                            .foregroundColor(.white)
-                            .cornerRadius(12)
-                    }
-                }
-                .padding(.horizontal, 32)
-                .opacity((coordinator.isJITEnabled && coordinator.isContainerReady) ? 1.0 : 0.5)
-                .disabled(!coordinator.isJITEnabled || !coordinator.isContainerReady)
             }
         }
         .sheet(isPresented: $isSettingsPresented) {
@@ -123,16 +91,11 @@ struct MainView: View {
         }
         .fileImporter(
             isPresented: $isDocumentPickerPresented,
-            allowedContentTypes: [UTType(filenameExtension: "exe")!],
+            allowedContentTypes: [UTType(filenameExtension: "exe") ?? .data],
             allowsMultipleSelection: false
         ) { result in
-            switch result {
-            case .success(let urls):
-                if let url = urls.first {
-                    coordinator.launchWindowsExecutable(at: url)
-                }
-            case .failure:
-                break
+            if case .success(let urls) = result, let url = urls.first {
+                coordinator.launchWindowsExecutable(at: url)
             }
         }
         .fullScreenCover(isPresented: Binding<Bool>(
@@ -140,6 +103,176 @@ struct MainView: View {
             set: { _ in coordinator.currentStatus = "Windows Ready" }
         )) {
             GameSessionView(coordinator: coordinator)
+        }
+    }
+
+    // MARK: Layout pieces
+
+    private var sidebar: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            Text("iDeck")
+                .font(.system(size: 34, weight: .heavy, design: .rounded))
+                .foregroundColor(.white)
+                .padding(.top, 24)
+
+            VStack(spacing: 8) {
+                ForEach(AppMode.allCases) { item in
+                    Button(action: { mode = item }) {
+                        HStack(spacing: 12) {
+                            BrandMark(assetName: item.brandAsset, fallbackSymbol: item.fallbackSymbol)
+                                .frame(width: 28, height: 28)
+                            Text(item.rawValue)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.white)
+                            Spacer()
+                        }
+                        .padding(12)
+                        .background(mode == item ? Color.blue.opacity(0.35) : cardColor)
+                        .cornerRadius(12)
+                    }
+                }
+            }
+
+            Spacer()
+            statusPills(vertical: true)
+            Button(action: { isSettingsPresented = true }) {
+                Label("Settings", systemImage: "gearshape.fill")
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(cardColor)
+                    .foregroundColor(.white)
+                    .cornerRadius(12)
+            }
+            .padding(.bottom, 16)
+        }
+        .padding(.horizontal, 16)
+        .background(Color(red: 0.07, green: 0.07, blue: 0.07).ignoresSafeArea())
+    }
+
+    private var topBar: some View {
+        HStack {
+            Text("iDeck")
+                .font(.system(size: 28, weight: .heavy, design: .rounded))
+                .foregroundColor(.white)
+            Spacer()
+            Button(action: { isSettingsPresented = true }) {
+                Image(systemName: "gearshape.fill")
+                    .font(.title3)
+                    .foregroundColor(.white)
+                    .padding(10)
+                    .background(cardColor)
+                    .clipShape(Circle())
+            }
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 8)
+    }
+
+    private func statusPills(vertical: Bool) -> some View {
+        let pills = Group {
+            StatusPill(isActive: coordinator.isJITEnabled, label: "JIT")
+            StatusPill(isActive: coordinator.isContainerReady, label: "Container")
+            StatusPill(isActive: inputManager.isControllerConnected, label: "Gamepad")
+        }
+        return Group {
+            if vertical {
+                VStack(alignment: .leading, spacing: 8) { pills }
+            } else {
+                HStack(spacing: 12) { pills }
+            }
+        }
+    }
+
+    private var detail: some View {
+        ScrollView {
+            VStack(spacing: 24) {
+                header
+                if !isWide { statusPills(vertical: false) }
+
+                switch mode {
+                case .windows: windowsActions
+                case .liveContainer: liveContainerActions
+                }
+            }
+            .frame(maxWidth: 720)
+            .padding(.horizontal, isWide ? 32 : 16)
+            .padding(.vertical, 24)
+            .frame(maxWidth: .infinity)
+        }
+    }
+
+    private var header: some View {
+        VStack(spacing: 12) {
+            BrandMark(assetName: mode.brandAsset, fallbackSymbol: mode.fallbackSymbol)
+                .frame(width: isWide ? 120 : 88, height: isWide ? 120 : 88)
+            Text(mode.rawValue)
+                .font(.system(size: isWide ? 34 : 28, weight: .heavy, design: .rounded))
+                .foregroundColor(.white)
+            Text(mode.subtitle)
+                .font(.subheadline)
+                .foregroundColor(.gray)
+                .multilineTextAlignment(.center)
+            Text(coordinator.currentStatus)
+                .font(.footnote)
+                .foregroundColor(.gray)
+                .multilineTextAlignment(.center)
+
+            if coordinator.prefixInstaller.isInstalling {
+                VStack(spacing: 6) {
+                    ProgressView(value: Double(coordinator.prefixInstaller.progress))
+                        .tint(.white)
+                        .frame(maxWidth: 240)
+                    Text("Installing Windows environment...")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                }
+            }
+        }
+    }
+
+    private var columns: [GridItem] {
+        [GridItem(.adaptive(minimum: 260), spacing: 16)]
+    }
+
+    private func actionButton(_ title: String, symbol: String, enabled: Bool = true, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack {
+                Image(systemName: symbol)
+                Text(title).fontWeight(.semibold)
+            }
+            .frame(maxWidth: .infinity)
+            .padding()
+            .background(cardColor)
+            .foregroundColor(.white)
+            .cornerRadius(12)
+        }
+        .disabled(!enabled)
+        .opacity(enabled ? 1.0 : 0.5)
+    }
+
+    private var windowsActions: some View {
+        LazyVGrid(columns: columns, spacing: 16) {
+            actionButton("Start Windows Environment", symbol: "power") {
+                coordinator.forceJITAndStartWindows()
+            }
+            actionButton("Install & Run Steam", symbol: "gamecontroller.fill", enabled: actionsEnabled) {
+                coordinator.launchSteam()
+            }
+            actionButton("Run Executable (.exe)", symbol: "doc.badge.gearshape", enabled: actionsEnabled) {
+                isDocumentPickerPresented = true
+            }
+        }
+    }
+
+    private var liveContainerActions: some View {
+        VStack(spacing: 16) {
+            actionButton("Start LiveContainer", symbol: "power") {
+                coordinator.forceJITAndStartLiveContainer()
+            }
+            GuestAppListView(coordinator: coordinator)
+                .frame(height: 340)
+                .background(Color(red: 0.1, green: 0.1, blue: 0.1))
+                .cornerRadius(12)
         }
     }
 }

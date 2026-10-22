@@ -27,3 +27,15 @@ cd server_jit
 Environment variables: `JIT_SERVER_HOST`, `JIT_SERVER_PORT`, `JIT_SERVER_TOKEN` (required when the host is not
 loopback). `jit_server.js` is an equivalent Node implementation. The app reads `jitServerURL` and `jitServerToken`
 from `UserDefaults`.
+
+## Branding assets
+The mode screens show the mark of the engine behind each mode when an image set with this name exists in
+`iDeck/Assets.xcassets`; otherwise an SF Symbol is used:
+
+| Image set name        | Used for                      |
+|-----------------------|-------------------------------|
+| `MadeiraLogo`         | Windows mode                  |
+| `LiveContainerSymbol` | LiveContainer mode            |
+
+Add the official files from those projects yourself (check their brand/licence terms). The app icon is
+`iDeck/Assets.xcassets/AppIcon.appiconset/AppIcon.png` (1024x1024, opaque PNG); replace it with your own artwork.
