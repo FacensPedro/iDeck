@@ -24,12 +24,12 @@ struct SettingsView: View {
                         settingsSection(title: tr("JIT & Debugging")) {
                             statusRow
                             
-                            Text(tr("Activate JIT in StikDebug first, then return here and confirm. iDeck does not activate JIT itself."))
+                            Text(tr("JIT is detected automatically. If it is not detected, enable JIT for iDeck in StikDebug, then return here."))
                                 .font(.caption)
                                 .foregroundColor(.gray)
                                 .padding()
-                            actionButton(title: tr("Confirm JIT activated in StikDebug"), icon: "checkmark.shield.fill") {
-                                coordinator.confirmJITActivatedByStikDebug()
+                            actionButton(title: tr("Refresh JIT status"), icon: "arrow.clockwise") {
+                                coordinator.refreshJITStatus()
                             }
                         }
                         
