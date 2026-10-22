@@ -58,6 +58,7 @@ struct MainView: View {
     @State private var isSettingsPresented = false
     @State private var isWindowsWorkspacePresented = false
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.scenePhase) private var scenePhase
     @AppStorage(AppLanguage.storageKey) private var appLanguage = AppLanguage.system.rawValue // re-renders on change
 
     private let cardColor = Color(red: 0.15, green: 0.15, blue: 0.15)
@@ -88,7 +89,13 @@ struct MainView: View {
                 }
             }
         }
-        .onAppear { coordinator.refreshJITStatus() }
+        .onAppear {
+            coordinator.refreshJITStatus()
+            if mode == .windows && coordinator.isJITEnabled { coordinator.forceJITAndStartWindows() }
+        }
+        .onChange(of: scenePhase) { phase in
+            if phase == .active { coordinator.refreshJITStatus() }
+        }
         .sheet(isPresented: $isSettingsPresented) {
             SettingsView(coordinator: coordinator)
         }
@@ -108,7 +115,6 @@ struct MainView: View {
             WindowsWorkspaceView(
                 coordinator: coordinator,
                 onBack: { isWindowsWorkspacePresented = false },
-                onSettings: { isSettingsPresented = true },
                 onAddExecutable: { isDocumentPickerPresented = true }
             )
         }
@@ -313,9 +319,9 @@ struct StatusPill: View {
 struct WindowsWorkspaceView: View {
     @ObservedObject var coordinator: SystemCoordinator
     let onBack: () -> Void
-    let onSettings: () -> Void
     let onAddExecutable: () -> Void
 
+    @State private var isSettingsPresented = false
     private let panelColor = Color(red: 0.12, green: 0.12, blue: 0.12)
 
     var body: some View {
@@ -332,7 +338,7 @@ struct WindowsWorkspaceView: View {
                         .font(.headline)
                         .foregroundColor(.white)
                     Spacer()
-                    Button(action: onSettings) {
+                    Button { isSettingsPresented = true } label: {
                         Image(systemName: "gearshape.fill")
                             .font(.title3)
                             .foregroundColor(.white)
@@ -401,6 +407,9 @@ struct WindowsWorkspaceView: View {
                 .frame(maxWidth: 560)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
+        }
+        .sheet(isPresented: $isSettingsPresented) {
+            SettingsView(coordinator: coordinator)
         }
         .preferredColorScheme(.dark)
     }
