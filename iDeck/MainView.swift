@@ -388,11 +388,11 @@ struct SteamGameArtworkView: View {
            !asset.hasPrefix("/"),
            !asset.contains(".."),
            asset.unicodeScalars.allSatisfy({ $0.isASCII && (CharacterSet.alphanumerics.contains($0) || "._-/".unicodeScalars.contains($0)) }) {
-            append(URL(string: "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/\\(game.appID)/\\(asset)"))
+            append(URL(string: "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/\(game.appID)/\(asset)"))
         }
-        append(URL(string: "https://cdn.cloudflare.steamstatic.com/steam/apps/\\(game.appID)/library_600x900.jpg"))
+        append(URL(string: "https://cdn.cloudflare.steamstatic.com/steam/apps/\(game.appID)/library_600x900.jpg"))
         if let parentID = game.parentID {
-            append(URL(string: "https://cdn.cloudflare.steamstatic.com/steam/apps/\\(parentID)/library_600x900.jpg"))
+            append(URL(string: "https://cdn.cloudflare.steamstatic.com/steam/apps/\(parentID)/library_600x900.jpg"))
         }
         if let header = game.headerImage,
            header.utf8.count <= 256,
@@ -400,7 +400,7 @@ struct SteamGameArtworkView: View {
            !header.hasPrefix("/"),
            !header.contains(".."),
            header.unicodeScalars.allSatisfy({ $0.isASCII && (CharacterSet.alphanumerics.contains($0) || "._-/".unicodeScalars.contains($0)) }) {
-            append(URL(string: "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/\\(game.appID)/\\(header)"))
+            append(URL(string: "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/\(game.appID)/\(header)"))
         }
         return urls
     }
@@ -661,14 +661,15 @@ struct WindowsWorkspaceView: View {
                                     }
                                     Spacer(minLength: 4)
                                     Button {
-                                        if let url = URL(string: "https://store.steampowered.com/app/\\(game.appID)/") {
+                                        if let url = URL(string: "https://store.steampowered.com/app/\(game.appID)/") {
                                             openURL(url)
                                         }
                                     } label: {
-                                        Image(systemName: "arrow.up.right.square")
-                                            .font(.title3)
+                                        Label(tr("Open Steam Store"), systemImage: "arrow.up.right.square")
+                                            .font(.caption2.weight(.semibold))
                                             .foregroundColor(.white)
-                                            .frame(width: 38, height: 38)
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 9)
                                             .background(Color.blue.opacity(0.8))
                                             .clipShape(RoundedRectangle(cornerRadius: 9))
                                     }
@@ -688,7 +689,7 @@ struct WindowsWorkspaceView: View {
                     .foregroundColor(.gray)
                     .multilineTextAlignment(.center)
             }
-        }        } else {
+        } else {
             Text(tr("No owned games found yet."))
                 .font(.subheadline)
                 .foregroundColor(.gray)
