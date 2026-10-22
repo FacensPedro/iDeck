@@ -48,7 +48,7 @@ func trStatus(_ status: String) -> String {
     if Translations.table[status] != nil { return tr(status) }
     if let range = status.range(of: ": ") {
         let head = String(status[status.startIndex..<range.lowerBound])
-        return tr(head) + ": " + status[range.upperBound...]
+        return tr(head) + ": " + tr(String(status[range.upperBound...]))
     }
     return status
 }
