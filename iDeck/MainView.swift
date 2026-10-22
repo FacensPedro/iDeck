@@ -93,7 +93,7 @@ struct MainView: View {
                         }
                         .pickerStyle(.segmented)
                         .padding(.horizontal)
-                        .onChange(of: mode) { _ in isHome = false }
+                        .onChange(of: mode) { selectedMode in selectMode(selectedMode) }
                         detail
                     }
                 }
@@ -118,7 +118,7 @@ struct MainView: View {
             }
         }
         .onChange(of: coordinator.windowsStatus) { status in
-            if status == "Windows Ready" { isWindowsWorkspacePresented = true }
+            if status == "Windows Ready" && mode == .windows && !isHome { isWindowsWorkspacePresented = true }
         }
         .fullScreenCover(isPresented: $isWindowsWorkspacePresented) {
             WindowsWorkspaceView(
@@ -128,10 +128,21 @@ struct MainView: View {
             )
         }
         .fullScreenCover(isPresented: Binding<Bool>(
-            get: { coordinator.windowsStatus == "Steam Running" || coordinator.windowsStatus == "Running" },
+            get: { !isHome && mode == .windows && (coordinator.windowsStatus == "Steam Running" || coordinator.windowsStatus == "Running") },
             set: { _ in coordinator.setWindowsStatus("Windows Ready") }
         )) {
             GameSessionView(coordinator: coordinator)
+        }
+    }
+
+    private func selectMode(_ selectedMode: AppMode) {
+        mode = selectedMode
+        isHome = false
+        guard selectedMode == .windows else { return }
+        if coordinator.windowsStatus == "Windows Ready" {
+            isWindowsWorkspacePresented = true
+        } else {
+            coordinator.forceJITAndStartWindows()
         }
     }
 
@@ -157,7 +168,7 @@ struct MainView: View {
 
             VStack(spacing: 8) {
                 ForEach(AppMode.allCases) { item in
-                    Button(action: { mode = item; isHome = false }) {
+                    Button(action: { selectMode(item) }) {
                         HStack(spacing: 12) {
                             BrandMark(assetName: item.brandAsset, fallbackSymbol: item.fallbackSymbol)
                                 .frame(width: 28, height: 28)
@@ -240,8 +251,7 @@ struct MainView: View {
                     .multilineTextAlignment(.center)
                 ForEach(AppMode.allCases) { item in
                     Button {
-                        mode = item
-                        isHome = false
+                        selectMode(item)
                     } label: {
                         HStack(spacing: 16) {
                             BrandMark(assetName: item.brandAsset, fallbackSymbol: item.fallbackSymbol)
