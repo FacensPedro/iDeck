@@ -1,8 +1,7 @@
 # iDeck
 
 iOS app (SwiftUI) that experiments with running Windows apps on iPhone/iPad: a Wine prefix (from the
-[Madeira](https://github.com/willfaust/madeira) template), JIT activation through a small helper server and
-a LocalDevVPN packet-tunnel extension.
+[Madeira](https://github.com/willfaust/madeira) template). JIT activation is handled externally by StikDebug; iDeck does not activate JIT itself.
 
 ## Build the IPA
 
@@ -19,20 +18,9 @@ Extension (`VPNExtension`) needs a provisioning profile with the *Network Extens
 identifiers (`com.example.iDeck`, `com.example.iDeck.VPNExtension`) and app group (`group.com.example.iDeck`)
 should be changed to your own.
 
-## JIT helper server
-JIT is enabled by a helper that runs on a computer connected to the device (USB or Wi-Fi sync, already paired):
-```bash
-cd server_jit
-./setup.sh            # installs pymobiledevice3 and starts server.py on 127.0.0.1:54321
-```
-It starts `pymobiledevice3 developer debugserver start-server`, attaches to the app's PID over the GDB remote
-protocol (`vAttach`) and detaches again, which leaves the process debugged and therefore JIT-capable.
-Environment variables: `JIT_SERVER_HOST`, `JIT_SERVER_PORT`, `JIT_SERVER_TOKEN` (required when the host is not
-loopback), `JIT_SERVER_UDID`, `JIT_SERVER_TUNNEL` (iOS 17+, a running tunneld).
-In the app: Settings -> JIT & Debugging -> enter the server address (and token), then **Activate JIT**.
+## JIT via StikDebug
 
-The imported pairing file is stored on the device only (it contains a private key and is never sent to the
-server); an on-device StikDebug-style flow that consumes it is not implemented yet.
+Activate JIT for iDeck using StikDebug. Return to iDeck Settings and choose **Confirm JIT activated in StikDebug**. This confirmation only updates iDeck’s UI state; it does not activate JIT or independently verify that JIT is enabled. If iDeck is relaunched, repeat the confirmation after activating JIT in StikDebug.
 
 ## Branding assets
 The mode screens show the mark of the engine behind each mode when an image set with this name exists in
