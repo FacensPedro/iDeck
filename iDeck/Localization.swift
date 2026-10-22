@@ -233,5 +233,13 @@ enum Translations {
         "Steam sign-in is unavailable right now (HTTP %d).": ["pt": "O login do Steam está indisponível no momento (HTTP %d).", "es": "El inicio de sesión de Steam no está disponible ahora (HTTP %d)."],
         "Steam refused the sign-in (code %u).": ["pt": "O Steam recusou o login (código %u).", "es": "Steam rechazó el inicio de sesión (código %u)."],
         "The Steam-owned game library and Windows game launching require the Madeira native runtime, which is not bundled in this build.": ["pt": "A biblioteca de jogos da conta Steam e a execução de jogos do Windows exigem o runtime nativo do Madeira, que não está incluído nesta versão.", "es": "La biblioteca de juegos de Steam y la ejecución de juegos de Windows requieren el entorno nativo de Madeira, que no está incluido en esta versión."],
+        "Loading Steam library...": ["pt": "Carregando a biblioteca do Steam...", "es": "Cargando la biblioteca de Steam..."],
+        "Refresh library": ["pt": "Atualizar biblioteca", "es": "Actualizar biblioteca"],
+        "Owned games: %d": ["pt": "Jogos na conta: %d", "es": "Juegos en la cuenta: %d"],
+        "App ID: %u": ["pt": "ID do aplicativo: %u", "es": "ID de la aplicación: %u"],
+        "Untitled Steam app": ["pt": "Aplicativo Steam sem nome", "es": "Aplicación de Steam sin nombre"],
+        "Windows support not listed": ["pt": "Suporte para Windows não informado", "es": "Compatibilidad con Windows no indicada"],
+        "No owned games found yet.": ["pt": "Nenhum jogo da conta foi encontrado.", "es": "Todavía no se encontraron juegos de la cuenta."],
+        "The owned-games list is fetched from Steam. Launching Windows games still requires the Madeira native runtime.": ["pt": "A lista de jogos da conta é obtida do Steam. Executar jogos do Windows ainda exige o runtime nativo do Madeira.", "es": "La lista de juegos de la cuenta se obtiene de Steam. Ejecutar juegos de Windows todavía requiere el entorno nativo de Madeira."],
     ]
 }
