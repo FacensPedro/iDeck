@@ -473,6 +473,10 @@ struct WindowsWorkspaceView: View {
                             .font(.subheadline)
                             .foregroundColor(.gray)
                             .multilineTextAlignment(.center)
+                        Text(tr("The Steam-owned game library and Windows game launching require the Madeira native runtime, which is not bundled in this build."))
+                            .font(.subheadline)
+                            .foregroundColor(.gray)
+                            .multilineTextAlignment(.center)
                     }
                     Button(action: onAddExecutable) {
                         Label(tr("Install a Windows .exe"), systemImage: "square.and.arrow.down")
