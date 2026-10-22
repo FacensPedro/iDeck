@@ -103,10 +103,6 @@ class SystemCoordinator: ObservableObject {
 
     func forceJITAndStartWindows() {
         refreshJITStatus()
-        guard isJITEnabled else {
-            currentStatus = "Activate JIT with StikDebug, then confirm it in iDeck Settings."
-            return
-        }
         startWindows()
     }
     
@@ -121,11 +117,6 @@ class SystemCoordinator: ObservableObject {
     }
     
     private func startWindows() {
-        guard isJITEnabled else {
-            currentStatus = "Requires JIT"
-            return
-        }
-        
         currentStatus = "Preparing Windows Environment..."
         containerHost.mountEnvironment { [weak self] mountPath in
             guard let self = self else { return }
@@ -245,14 +236,10 @@ class SystemCoordinator: ObservableObject {
     }
     
     func launchWindowsExecutable(at url: URL) {
-        guard isJITEnabled && isContainerReady else { return }
+        guard isContainerReady else { return }
         
         refreshJITStatus()
-        guard isJITEnabled else {
-            currentStatus = "JIT not detected. Enable JIT for iDeck in StikDebug and return."
-            return
-        }
-        currentStatus = "Loading Executable..."
+        currentStatus = "Importing Executable..."
         let hasScope = url.startAccessingSecurityScopedResource()
         defer { if hasScope { url.stopAccessingSecurityScopedResource() } }
         containerHost.mountEnvironment { [weak self] mountPath in
@@ -269,6 +256,12 @@ class SystemCoordinator: ObservableObject {
                     try FileManager.default.removeItem(at: destination)
                 }
                 try FileManager.default.copyItem(at: url, to: destination)
+                guard self.isJITEnabled else {
+                    DispatchQueue.main.async {
+                        self.currentStatus = "Executable imported. Enable JIT for iDeck in StikDebug before running it."
+                    }
+                    return
+                }
                 guard self.windowsEnvironment.hasRuntime(in: mountPath) else {
                     DispatchQueue.main.async {
                         self.currentStatus = "Madeira runtime missing: FEX/box64 and Wine ARM64EC are not installed."
