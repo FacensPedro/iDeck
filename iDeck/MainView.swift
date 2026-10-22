@@ -52,7 +52,7 @@ struct BrandMark: View {
 
 struct MainView: View {
     @ObservedObject var coordinator: SystemCoordinator
-    @StateObject private var inputManager = InputManager()
+    @StateObject private var inputManager = InputManager.shared
     @State private var mode: AppMode = .windows
     @State private var isDocumentPickerPresented = false
     @State private var isSettingsPresented = false
@@ -175,7 +175,6 @@ struct MainView: View {
         let pills = Group {
             StatusPill(isActive: coordinator.isJITEnabled, label: "JIT")
             StatusPill(isActive: coordinator.isContainerReady, label: tr("Container"))
-            StatusPill(isActive: inputManager.isControllerConnected, label: tr("Gamepad"))
         }
         return Group {
             if vertical {
