@@ -382,7 +382,7 @@ struct WindowsWorkspaceView: View {
                         .foregroundColor(.gray)
                         .multilineTextAlignment(.center)
                     Button(action: onAddExecutable) {
-                        Label(tr("Install a Windows .exe"), systemImage: "plus.circle.fill")
+                        Label(tr("Install a Windows .exe"), systemImage: "square.and.arrow.down")
                             .foregroundColor(.white)
                             .padding()
                             .frame(maxWidth: .infinity)
