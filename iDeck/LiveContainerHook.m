@@ -113,9 +113,7 @@ static NSString *LCPreparePatchedBinary(NSString *appPath, NSDictionary *info, N
     }
     mh->filetype = MH_BUNDLE;
 
-    NSString *dir = [NSTemporaryDirectory() stringByAppendingPathComponent:@"GuestBinaries"];
-    [[NSFileManager defaultManager] createDirectoryAtPath:dir withIntermediateDirectories:YES attributes:nil error:nil];
-    NSString *out = [dir stringByAppendingPathComponent:[execName stringByAppendingString:@".bundle"]];
+    NSString *out = [appPath stringByAppendingPathComponent:[execName stringByAppendingString:@".iDeck.bundle"]];
     NSData *slice = [NSData dataWithBytes:bytes + sliceOffset length:sliceLength];
     if (![slice writeToFile:out options:NSDataWritingAtomic error:nil]) {
         if (error) *error = @"Could not write the patched guest binary";
@@ -289,6 +287,7 @@ static int LCGuestUIApplicationMain(int argc, char *_Nullable *_Nonnull argv, NS
     NSString *patched = LCPreparePatchedBinary(appPath, info, &prepError);
     if (!patched) return LCFail(errorMessage, prepError);
 
+    dlerror();
     void *handle = dlopen(patched.fileSystemRepresentation, RTLD_LAZY | RTLD_GLOBAL);
     if (!handle) {
         const char *dlerr = dlerror();
