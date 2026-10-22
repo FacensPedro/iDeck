@@ -37,6 +37,37 @@ struct BrandMark: View {
     let fallbackSymbol: String
 
     var body: some View {
+        if UIImage(named: assetName) != nil {
+            Image(assetName)
+                .resizable()
+                .scaledToFit()
+        } else {
+            Image(systemName: fallbackSymbol)
+                .resizable()
+                .scaledToFit()
+                .foregroundColor(.white)
+        }
+    }
+}
+
+struct MainView: View {
+    @ObservedObject var coordinator: SystemCoordinator
+    @StateObject private var inputManager = InputManager.shared
+    @State private var mode: AppMode = .windows
+    @State private var isHome = true
+    @State private var isDocumentPickerPresented = false
+    @State private var isSettingsPresented = false
+    @State private var isWindowsWorkspacePresented = false
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.scenePhase) private var scenePhase
+    @AppStorage(AppLanguage.storageKey) private var appLanguage = AppLanguage.system.rawValue // re-renders on change
+
+    private let cardColor = Color(red: 0.15, green: 0.15, blue: 0.15)
+
+    private var isWide: Bool { horizontalSizeClass == .regular }
+    private var actionsEnabled: Bool { coordinator.isJITEnabled && coordinator.isContainerReady }
+
+    var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
 
@@ -191,7 +222,7 @@ struct BrandMark: View {
             }
         }
     }
- 
+
     private var homeScreen: some View {
         ScrollView {
             VStack(spacing: 22) {
