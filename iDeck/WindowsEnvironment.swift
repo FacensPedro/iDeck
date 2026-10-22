@@ -86,16 +86,9 @@ private class BoxTranslator {
         for e in cEnv { free(e) }
         
         if spawnStatus == 0 {
-            jitEnabler.activate(for: pid, useVPN: false) { jitSuccess in
-                if jitSuccess {
-                    var status: Int32 = 0
-                    waitpid(pid, &status, 0)
-                    completion(Int(status))
-                } else {
-                    kill(pid, SIGKILL)
-                    completion(-1)
-                }
-            }
+            var status: Int32 = 0
+            waitpid(pid, &status, 0)
+            completion(Int(status))
         } else {
             completion(-1)
         }
