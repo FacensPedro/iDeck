@@ -66,6 +66,12 @@ enum Translations {
         "Installing Windows environment...": ["pt": "Instalando ambiente Windows...", "es": "Instalando entorno de Windows..."],
         "Start Windows Environment": ["pt": "Iniciar ambiente Windows", "es": "Iniciar entorno de Windows"],
         "Install & Run Steam": ["pt": "Instalar e abrir o Steam", "es": "Instalar y abrir Steam"],
+        "Install .exe": ["pt": "Instalar .exe", "es": "Instalar .exe"],
+        "Your Steam library and Windows apps": ["pt": "Sua biblioteca Steam e apps do Windows", "es": "Tu biblioteca de Steam y apps de Windows"],
+        "Sign in to load your library.": ["pt": "Entre para carregar sua biblioteca.", "es": "Inicia sesión para cargar tu biblioteca."],
+        "Invalid executable file": ["pt": "Arquivo executável inválido", "es": "Archivo ejecutable no válido"],
+        "Steam game launching requires the Madeira runtime.": ["pt": "Executar jogos Steam exige o ambiente Madeira.", "es": "Ejecutar juegos de Steam requiere el entorno Madeira."],
+        "Steam did not respond in time. Check your internet connection and try again.": ["pt": "O Steam não respondeu a tempo. Verifique a conexão com a internet e tente novamente.", "es": "Steam no respondió a tiempo. Comprueba tu conexión a Internet e inténtalo de nuevo."]
         "Run Executable (.exe)": ["pt": "Executar programa (.exe)", "es": "Ejecutar programa (.exe)"],
         "Start LiveContainer": ["pt": "Iniciar LiveContainer", "es": "Iniciar LiveContainer"],
         "LiveContainer Apps": ["pt": "Apps do LiveContainer", "es": "Apps de LiveContainer"],

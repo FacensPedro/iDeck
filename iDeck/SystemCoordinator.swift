@@ -278,8 +278,22 @@ class SystemCoordinator: ObservableObject {
         refreshJITStatus()
         setWindowsStatus("Importing Executable...")
         let hasScope = url.startAccessingSecurityScopedResource()
-        defer { if hasScope { url.stopAccessingSecurityScopedResource() } }
+        let stagedExecutable = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathExtension("exe")
+        do {
+            guard url.pathExtension.lowercased() == "exe" else {
+                if hasScope { url.stopAccessingSecurityScopedResource() }
+                setWindowsStatus("Invalid executable file")
+                return
+            }
+            try FileManager.default.copyItem(at: url, to: stagedExecutable)
+        } catch {
+            if hasScope { url.stopAccessingSecurityScopedResource() }
+            setWindowsStatus("Executable import failed: \(error.localizedDescription)")
+            return
+        }
+        if hasScope { url.stopAccessingSecurityScopedResource() }
         containerHost.mountEnvironment { [weak self] mountPath in
+            defer { try? FileManager.default.removeItem(at: stagedExecutable) }
             guard let self = self else { return }
             guard let mountPath = mountPath else {
                 self.setWindowsStatus("Container initialization failed")
@@ -288,7 +302,7 @@ class SystemCoordinator: ObservableObject {
             do {
                 let downloads = URL(fileURLWithPath: mountPath).appendingPathComponent("WindowsDownloads", isDirectory: true)
                 try FileManager.default.createDirectory(at: downloads, withIntermediateDirectories: true)
-                let destination = downloads.appendingPathComponent(url.lastPathComponent)
+                let destination = downloads.appendingPathComponent(stagedExecutable.lastPathComponent)
                 if FileManager.default.fileExists(atPath: destination.path) {
                     try FileManager.default.removeItem(at: destination)
                 }

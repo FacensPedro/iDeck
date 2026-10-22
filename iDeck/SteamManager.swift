@@ -1712,7 +1712,8 @@ enum SteamSignIn {
     /// none. Valve still decides whether the token is accepted.
     static func credentialsForDock() -> (accountName: String, refreshToken: String)? {
         guard let tokens = SteamTokenStore().loadTokens() else { return nil }
-        return usable(accountName: tokens.accountName, refreshToken: tokens.refreshToken, now: Date())
+        guard let valid = usable(accountName: tokens.accountName, refreshToken: tokens.accessToken, now: Date()) else { return nil }
+        return valid
     }
 
     static func signOut() {
@@ -2471,41 +2472,45 @@ actor SteamConnection {
     // MARK: - Connect
 
     func connect() async throws {
-        let server = try await serverList.getServer()
-        currentEndpoint = server.endpoint
-        SteamLog.trace("Connecting to CM: \(server.url)")
-
-        // Build a custom URLSession with our delegate so we can observe the WS handshake.
-        // The delegate tells us what protocol the server actually negotiated.
-        let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 20
-        // Delegate queue nil → URLSession creates an internal serial queue (correct for our actor model)
-        let session = URLSession(configuration: config, delegate: wsDelegate, delegateQueue: nil)
-        urlSession = session
-
-        // IMPORTANT: Sec-WebSocket-Protocol is a CONTROLLED HEADER in URLSessionWebSocketTask.
-        // Setting it via request.setValue is silently ignored by URLSession.
-        // The only supported way is the `protocols` parameter below.
-        // Without "steamdataport", Steam CM servers accept the WebSocket but do not
-        // initialize a Steam session handler, so they silently ignore all messages.
-        let task = session.webSocketTask(with: server.url, protocols: ["steamdataport"])
-        webSocketTask = task
-        task.resume()
-
-        // Verify the connection completed (WebSocket handshake + ping round-trip)
-        try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
-            task.sendPing { error in
-                if let error {
-                    cont.resume(throwing: SteamError.connectionFailed(error.localizedDescription))
-                } else {
-                    cont.resume()
+        var lastError: Error = SteamError.connectionTimeout
+        for attempt in 1...3 {
+            let server = try await serverList.getServer()
+            currentEndpoint = server.endpoint
+            SteamLog.trace("Connecting to CM (attempt \(attempt)/3): \(server.url)")
+            let config = URLSessionConfiguration.default
+            config.timeoutIntervalForRequest = 20
+            let session = URLSession(configuration: config, delegate: wsDelegate, delegateQueue: nil)
+            urlSession = session
+            let task = session.webSocketTask(with: server.url, protocols: ["steamdataport"])
+            webSocketTask = task
+            task.resume()
+            do {
+                let guardOnce = LogonResumeGuard()
+                try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                    task.sendPing { error in
+                        guard guardOnce.claim() else { return }
+                        if let error { continuation.resume(throwing: SteamError.connectionFailed(error.localizedDescription)) }
+                        else { continuation.resume() }
+                    }
+                    Task {
+                        try? await Task.sleep(nanoseconds: 12_000_000_000)
+                        guard guardOnce.claim() else { return }
+                        continuation.resume(throwing: SteamError.connectionTimeout)
+                    }
                 }
+                await serverList.markSuccess(endpoint: server.endpoint)
+                scheduleReceive(task)
+                SteamLog.trace("WebSocket connected — ready for protocol messages")
+                return
+            } catch {
+                lastError = error
+                SteamLog.trace("CM connection attempt \(attempt) failed: \(error.localizedDescription)")
+                await serverList.markFailed(endpoint: server.endpoint)
+                disconnect()
+                if attempt < 3 { try? await Task.sleep(nanoseconds: 350_000_000) }
             }
         }
-
-        await serverList.markSuccess(endpoint: server.endpoint)
-        scheduleReceive(task)
-        SteamLog.trace("WebSocket connected — ready for protocol messages")
+        throw lastError
     }
 
     // MARK: - Receive
