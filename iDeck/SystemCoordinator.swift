@@ -55,6 +55,18 @@ class SystemCoordinator: ObservableObject {
     let windowsEnvironment = WindowsEnvironment()
     let prefixInstaller = PrefixInstaller()
     private var displayLink: CADisplayLink?
+    private var steamSignInObserver: NSObjectProtocol?
+
+    init() {
+        isSteamConnected = SteamSignIn.isSignedIn
+        steamSignInObserver = NotificationCenter.default.addObserver(
+            forName: SteamSignIn.didChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.isSteamConnected = SteamSignIn.isSignedIn
+        }
+    }
     
     private func isLocalDevVPNActive() -> Bool {
         var interfaces: UnsafeMutablePointer<ifaddrs>?
@@ -163,6 +175,7 @@ class SystemCoordinator: ObservableObject {
     }
 
     func disconnectSteamAccount() {
+        SteamSignIn.signOut()
         isSteamConnected = false
         currentStatus = "Steam disconnected"
     }
