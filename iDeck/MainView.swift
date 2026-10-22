@@ -319,6 +319,7 @@ struct WindowsWorkspaceView: View {
     let onAddExecutable: () -> Void
 
     @State private var isSettingsPresented = false
+    @State private var showSteamIntegrationAlert = false
     private let panelColor = Color(red: 0.12, green: 0.12, blue: 0.12)
 
     var body: some View {
@@ -364,9 +365,7 @@ struct WindowsWorkspaceView: View {
                     }
                     Spacer()
                     Button {
-                        if let url = URL(string: "https://store.steampowered.com/login/") {
-                            UIApplication.shared.open(url)
-                        }
+                        showSteamIntegrationAlert = true
                     } label: {
                         Label(tr("Connect Steam"), systemImage: "link")
                             .font(.subheadline.bold())
@@ -407,6 +406,11 @@ struct WindowsWorkspaceView: View {
         }
         .sheet(isPresented: $isSettingsPresented) {
             SettingsView(coordinator: coordinator)
+        }
+        .alert(tr("Steam integration unavailable"), isPresented: $showSteamIntegrationAlert) {
+            Button(tr("OK"), role: .cancel) { }
+        } message: {
+            Text(tr("Steam account sign-in and library loading require Madeira's runtime integration, which is not included in this build yet."))
         }
         .preferredColorScheme(.dark)
     }
