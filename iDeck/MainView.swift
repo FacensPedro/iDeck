@@ -353,6 +353,11 @@ struct WindowsWorkspaceView: View {
         }
     }
 
+    private var installedSteamGames: [SteamAppInfo] {
+        guard let prefixPath else { return [] }
+        return steamLibrary.games.filter { steamLibrary.isInstalled(appID: $0.appID, prefixPath: prefixPath) }
+    }
+
     private var columns: [GridItem] {
         [GridItem(.adaptive(minimum: 158), spacing: 14)]
     }
@@ -772,12 +777,12 @@ struct WindowsWorkspaceView: View {
                     .font(.headline)
                     .foregroundColor(.white)
                 Spacer()
-                Text(tr("%d installed", appManager.installedApps.count + windowsLibrary.executableURLs.count))
+                Text(tr("%d installed", appManager.installedApps.count + windowsLibrary.executableURLs.count + installedSteamGames.count))
                     .font(.caption)
                     .foregroundColor(.gray)
             }
 
-            if appManager.installedApps.isEmpty && windowsLibrary.executableURLs.isEmpty {
+            if appManager.installedApps.isEmpty && windowsLibrary.executableURLs.isEmpty && installedSteamGames.isEmpty {
                 HStack(spacing: 12) {
                     Image(systemName: "square.grid.2x2")
                         .font(.title2)
@@ -812,6 +817,31 @@ struct WindowsWorkspaceView: View {
                                     .lineLimit(2)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                 Text(tr("iOS app · LiveContainer"))
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                            }
+                            .padding(10)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(panelColor)
+                            .clipShape(RoundedRectangle(cornerRadius: 13))
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    ForEach(installedSteamGames, id: \.appID) { game in
+                        Button {
+                            selectedSteamGame = SelectedSteamGame(game: game)
+                        } label: {
+                            VStack(alignment: .leading, spacing: 9) {
+                                SteamGameArtworkView(game: game)
+                                    .frame(height: 152)
+                                    .clipShape(RoundedRectangle(cornerRadius: 9))
+                                Text(game.name.isEmpty ? tr("Untitled Steam app") : game.name)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundColor(.white)
+                                    .lineLimit(2)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                Text(tr("Steam · Windows game"))
                                     .font(.caption)
                                     .foregroundColor(.gray)
                             }
