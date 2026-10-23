@@ -1047,7 +1047,7 @@ private struct WindowsExecutableDetailsView: View {
                     WindowsGameProfileForm(profile: $profile)
                     Button {
                         library.save(profile)
-                        coordinator.launchWindowsExecutable(at: executableURL)
+                        coordinator.launchWindowsExecutable(at: executableURL, profile: profile)
                         dismiss()
                     } label: {
                         Label(tr("Launch"), systemImage: "play.fill")
