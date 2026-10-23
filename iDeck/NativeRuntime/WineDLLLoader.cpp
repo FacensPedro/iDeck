@@ -1,5 +1,6 @@
 #include "RuntimeSupport.h"
 #include <cstring>
+#include <initializer_list>
 #include <string>
 #include <sys/stat.h>
 extern "C" bool ideck_wine_dll_exists(const char *root, const char *name) {
