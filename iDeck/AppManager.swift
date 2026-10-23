@@ -147,7 +147,10 @@ class AppManager: ObservableObject {
             defer { try? fileManager.removeItem(at: workDirectory) }
             let result: Result<URL, IPAInstallError>
             do {
-                guard fileManager.fileExists(atPath: url.path), url.pathExtension.lowercased() == "ipa" else { throw IPAInstallError.invalidArchive }
+                guard fileManager.fileExists(atPath: url.path),
+                      ["ipa", "zip"].contains(url.pathExtension.lowercased()) else {
+                    throw IPAInstallError.invalidArchive
+                }
                 try fileManager.createDirectory(at: workDirectory, withIntermediateDirectories: true)
                 try fileManager.copyItem(at: url, to: stagedArchive)
                 try ZipExtractor.extract(archive: stagedArchive, to: extractPath)

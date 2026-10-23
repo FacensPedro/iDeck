@@ -357,6 +357,65 @@ class SystemCoordinator: ObservableObject {
         }
     }
 
+    /// Launches a Steam game in its original installation directory, preserving
+    /// relative DLL and asset paths instead of copying the executable elsewhere.
+    func launchSteamGame(game: SteamAppInfo, profile: WindowsGameProfile, prefixPath: URL) {
+        refreshJITStatus()
+        guard isJITEnabled else {
+            setWindowsStatus("Cannot launch: activate JIT in StikDebug first.")
+            return
+        }
+
+        let steamApps = SteamInstallPaths.steamApps(
+            drive: prefixPath.appendingPathComponent("drive_c", isDirectory: true))
+        guard SteamInstallFiles.buildID(appID: Int(game.appID), steamApps: steamApps) != nil else {
+            setWindowsStatus("Cannot launch: this Steam game is not installed.")
+            return
+        }
+
+        guard let entry = game.launches.first(where: { option in
+            (option.oslist.isEmpty || option.oslist.lowercased().contains("windows")) &&
+            option.requiredDLC == nil && option.executable.lowercased().hasSuffix(".exe")
+        }) else {
+            setWindowsStatus("Cannot launch: Steam did not provide a Windows executable for this game.")
+            return
+        }
+
+        var folded: [String: String] = [:]
+        guard let relativePath = SteamInstallFiles.safeRelativePath(entry.executable, folded: &folded),
+              relativePath.lowercased().hasSuffix(".exe") else {
+            setWindowsStatus("Cannot launch: invalid Steam executable path.")
+            return
+        }
+
+        let directory = SteamInstallPaths.common(
+            drive: prefixPath.appendingPathComponent("drive_c", isDirectory: true))
+            .appendingPathComponent(SteamInstallFiles.safeFolderName(game.installDir), isDirectory: true)
+        let executableURL = directory.appendingPathComponent(relativePath).standardizedFileURL
+        let resolvedRoot = directory.resolvingSymlinksInPath().standardizedFileURL
+        let resolvedExecutable = executableURL.resolvingSymlinksInPath().standardizedFileURL
+        guard resolvedExecutable.path.hasPrefix(resolvedRoot.path + "/"),
+              FileManager.default.fileExists(atPath: resolvedExecutable.path) else {
+            setWindowsStatus("Cannot launch: the Windows executable is missing.")
+            return
+        }
+        guard windowsEnvironment.hasRuntime(in: prefixPath.path) else {
+            setWindowsStatus("Madeira runtime missing: FEX/Wine/DXMT must be installed and linked.")
+            return
+        }
+
+        windowsEnvironment.configureWine(prefix: prefixPath.path)
+        windowsEnvironment.applyGameProfile(profile)
+        setWindowsStatus("Launching Steam game...")
+        windowsEnvironment.execute(binary: executableURL,
+                                   arguments: profile.arguments.isEmpty ? entry.arguments : profile.arguments,
+                                   jitEnabler: jitEnabler) { [weak self] success in
+            DispatchQueue.main.async {
+                self?.setWindowsStatus(success ? "Running" : "Execution Error: Windows game launch failed")
+            }
+        }
+    }
+
     /// Loads and starts a guest .app inside this process (see LiveContainerHook).
     func launchGuestApp(at url: URL) {
         guard isJITEnabled && isContainerReady else {

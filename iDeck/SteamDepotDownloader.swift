@@ -49,7 +49,7 @@ final class DepotDownloader {
     private let session: SteamCMSession
     private var depotKeys: [UInt32: Data] = [:]
     private var cdnAuthTokens: [String: String] = [:]  // "depot|host" -> "?auth=…" fragment
-    private let maxConcurrentChunks = 8
+    private let maxConcurrentChunks = 12
     private let attemptsPerChunk = 5
     private let hostPoolSize = 6
 
@@ -59,7 +59,7 @@ final class DepotDownloader {
         config.requestCachePolicy = .reloadIgnoringLocalCacheData
         config.timeoutIntervalForRequest = 30
         config.timeoutIntervalForResource = 300
-        config.httpMaximumConnectionsPerHost = 8
+        config.httpMaximumConnectionsPerHost = 12
         return URLSession(configuration: config)
     }()
 
@@ -78,8 +78,9 @@ final class DepotDownloader {
     /// the calling task is cancelled; completed chunks stay journaled.
     func install(_ app: SteamAppInfo, steamApps: URL,
                  ownedDepots: @escaping () async -> Set<UInt32>? = { nil },
+                 includedDLC: Set<UInt32> = [],
                  progress report: @escaping (SteamDownloadProgress) -> Void) async throws -> URL {
-        let depots = app.installDepots()
+        let depots = app.installDepots(includingDLC: includedDLC)
         guard !depots.isEmpty else { throw SteamError.depotNotFound(app.appID) }
         // Before the key requests, so a refused depot still has its selection logged.
         SteamLog.event("[steam-depot] selection app=\(app.appID) build=\(app.buildID) \(app.depotSelectionSummary())")
@@ -130,8 +131,16 @@ final class DepotDownloader {
             let manifest = try await fetchManifest(depotID: depot.depotID, appID: contentAppID,
                                                    manifestGID: gid, key: key, hosts: hosts)
             var auth: [String: String] = [:]
-            for host in pool {
-                auth[host] = await cdnAuthFragment(depotID: depot.depotID, appID: contentAppID, host: host)
+            await withTaskGroup(of: (String, String).self) { group in
+                for host in pool {
+                    group.addTask {
+                        (host, await self.cdnAuthFragment(depotID: depot.depotID,
+                                                          appID: contentAppID, host: host))
+                    }
+                }
+                for await (host, fragment) in group {
+                    auth[host] = fragment
+                }
             }
             plans.append(DepotPlan(depotID: depot.depotID, manifestGID: gid, key: key, manifest: manifest,
                                    hosts: pool, auth: auth,
