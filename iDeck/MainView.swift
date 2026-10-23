@@ -902,3 +902,351 @@ struct WindowsWorkspaceView: View {
         }
     }
 }
+
+
+private struct AppBundleArtworkView: View {
+    let appURL: URL
+    @ObservedObject var appManager: AppManager
+
+    var body: some View {
+        Group {
+            if let iconURL = appManager.iconURL(for: appURL),
+               let icon = UIImage(contentsOfFile: iconURL.path) {
+                Image(uiImage: icon)
+                    .resizable()
+                    .scaledToFit()
+                    .padding(12)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color.white.opacity(0.05))
+            } else {
+                ZStack {
+                    Color.white.opacity(0.06)
+                    Image(systemName: "app.fill")
+                        .font(.system(size: 44))
+                        .foregroundColor(.gray)
+                }
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 9))
+        .accessibilityLabel(appManager.displayName(for: appURL))
+    }
+}
+
+private struct GuestProgramDetailsView: View {
+    let appURL: URL
+    @ObservedObject var appManager: AppManager
+    @ObservedObject var coordinator: SystemCoordinator
+    @Environment(\.dismiss) private var dismiss
+    @State private var errorMessage: String?
+    @State private var showError = false
+
+    private var displayName: String { appManager.displayName(for: appURL) }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 18) {
+                    AppBundleArtworkView(appURL: appURL, appManager: appManager)
+                        .frame(width: 160, height: 160)
+                    Text(displayName)
+                        .font(.title2.bold())
+                        .foregroundColor(.white)
+                    Text(appManager.bundleIdentifier(for: appURL) ?? appURL.lastPathComponent)
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                        .textSelection(.enabled)
+                    Text(tr("This app is stored in iDeck's shared library. Opening it uses the current in-process guest-app loader."))
+                        .font(.subheadline)
+                        .foregroundColor(.gray)
+                        .multilineTextAlignment(.center)
+                    Button {
+                        coordinator.launchGuestApp(at: appURL)
+                        dismiss()
+                    } label: {
+                        Label(tr("Open app"), systemImage: "play.fill")
+                            .font(.headline)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    Button(role: .destructive) {
+                        do {
+                            try appManager.uninstallApp(at: appURL)
+                            dismiss()
+                        } catch {
+                            errorMessage = error.localizedDescription
+                            showError = true
+                        }
+                    } label: {
+                        Label(tr("Uninstall"), systemImage: "trash")
+                            .font(.headline)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                    }
+                    .buttonStyle(.bordered)
+                }
+                .padding(24)
+            }
+            .background(Color.black.ignoresSafeArea())
+            .navigationTitle(tr("App details"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(tr("Done")) { dismiss() }
+                }
+            }
+            .alert(tr("Uninstall failed"), isPresented: $showError) {
+                Button(tr("OK"), role: .cancel) { }
+            } message: {
+                Text(errorMessage ?? tr("Unknown error"))
+            }
+        }
+        .preferredColorScheme(.dark)
+    }
+}
+
+private struct WindowsExecutableDetailsView: View {
+    let executableURL: URL
+    let prefixPath: URL?
+    @ObservedObject var library: WindowsLibraryStore
+    @ObservedObject var coordinator: SystemCoordinator
+    @Environment(\.dismiss) private var dismiss
+    @State private var profile: WindowsGameProfile
+    @State private var errorMessage: String?
+    @State private var showError = false
+
+    init(executableURL: URL, prefixPath: URL?, library: WindowsLibraryStore, coordinator: SystemCoordinator) {
+        self.executableURL = executableURL
+        self.prefixPath = prefixPath
+        self.library = library
+        self.coordinator = coordinator
+        let profileID = library.profileID(for: executableURL)
+        _profile = State(initialValue: library.profile(for: profileID, title: executableURL.deletingPathExtension().lastPathComponent))
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    VStack(spacing: 10) {
+                        Image(systemName: "app.dashed")
+                            .font(.system(size: 52))
+                            .foregroundColor(.white)
+                            .frame(width: 150, height: 150)
+                            .background(Color.white.opacity(0.07))
+                            .clipShape(RoundedRectangle(cornerRadius: 22))
+                        Text(executableURL.deletingPathExtension().lastPathComponent)
+                            .font(.title2.bold())
+                            .foregroundColor(.white)
+                        Text(executableURL.lastPathComponent)
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                            .textSelection(.enabled)
+                    }
+                    .frame(maxWidth: .infinity)
+                    WindowsGameProfileForm(profile: $profile)
+                    Button {
+                        library.save(profile)
+                        coordinator.launchWindowsExecutable(at: executableURL)
+                        dismiss()
+                    } label: {
+                        Label(tr("Launch"), systemImage: "play.fill")
+                            .font(.headline)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    Button(role: .destructive) {
+                        guard let prefixPath else {
+                            errorMessage = tr("Windows environment is not ready.")
+                            showError = true
+                            return
+                        }
+                        do {
+                            try library.uninstallExecutable(at: executableURL, prefixPath: prefixPath)
+                            dismiss()
+                        } catch {
+                            errorMessage = error.localizedDescription
+                            showError = true
+                        }
+                    } label: {
+                        Label(tr("Uninstall"), systemImage: "trash")
+                            .font(.headline)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                    }
+                    .buttonStyle(.bordered)
+                }
+                .padding(22)
+            }
+            .background(Color.black.ignoresSafeArea())
+            .navigationTitle(tr("Game details"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(tr("Cancel")) { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(tr("Save")) {
+                        library.save(profile)
+                        dismiss()
+                    }
+                }
+            }
+            .alert(tr("Operation failed"), isPresented: $showError) {
+                Button(tr("OK"), role: .cancel) { }
+            } message: {
+                Text(errorMessage ?? tr("Unknown error"))
+            }
+        }
+        .preferredColorScheme(.dark)
+    }
+}
+
+private struct SteamProgramDetailsView: View {
+    let game: SteamAppInfo
+    let prefixPath: URL?
+    @ObservedObject var library: WindowsLibraryStore
+    @ObservedObject var steamLibrary: SteamOwnedGamesModel
+    @ObservedObject var coordinator: SystemCoordinator
+    @Environment(\.dismiss) private var dismiss
+    @State private var profile: WindowsGameProfile
+    @State private var errorMessage: String?
+    @State private var showError = false
+
+    init(game: SteamAppInfo, prefixPath: URL?, library: WindowsLibraryStore, steamLibrary: SteamOwnedGamesModel, coordinator: SystemCoordinator) {
+        self.game = game
+        self.prefixPath = prefixPath
+        self.library = library
+        self.steamLibrary = steamLibrary
+        self.coordinator = coordinator
+        _profile = State(initialValue: library.profile(for: "steam:\(game.appID)", title: game.name))
+    }
+
+    private var installed: Bool {
+        guard let prefixPath else { return false }
+        return steamLibrary.isInstalled(appID: game.appID, prefixPath: prefixPath)
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    SteamGameArtworkView(game: game)
+                        .frame(height: 250)
+                    Text(game.name)
+                        .font(.title2.bold())
+                        .foregroundColor(.white)
+                    Text(tr("Steam app ID: %u", game.appID))
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                    Label(installed ? tr("Installed") : tr("Not installed"), systemImage: installed ? "checkmark.circle.fill" : "arrow.down.circle")
+                        .foregroundColor(installed ? .green : .gray)
+                    WindowsGameProfileForm(profile: $profile)
+                    if installed {
+                        Button(role: .destructive) {
+                            guard let prefixPath else { return }
+                            if steamLibrary.uninstall(appID: game.appID, prefixPath: prefixPath) {
+                                library.removeProfile(for: "steam:\(game.appID)")
+                                dismiss()
+                            } else {
+                                errorMessage = tr("Steam could not safely remove this game's files. Refresh the library and try again.")
+                                showError = true
+                            }
+                        } label: {
+                            Label(tr("Uninstall"), systemImage: "trash")
+                                .font(.headline)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                        }
+                        .buttonStyle(.bordered)
+                    } else {
+                        Button {
+                            guard let prefixPath else {
+                                errorMessage = tr("Windows environment is not ready.")
+                                showError = true
+                                return
+                            }
+                            Task { await steamLibrary.install(appID: game.appID, prefixPath: prefixPath) }
+                        } label: {
+                            Label(tr("Install"), systemImage: "arrow.down.circle.fill")
+                                .font(.headline)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 14)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(prefixPath == nil || steamLibrary.installingApps.contains(game.appID))
+                    }
+                }
+                .padding(22)
+            }
+            .background(Color.black.ignoresSafeArea())
+            .navigationTitle(tr("Game details"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(tr("Cancel")) { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(tr("Save")) {
+                        library.save(profile)
+                        dismiss()
+                    }
+                }
+            }
+            .alert(tr("Operation failed"), isPresented: $showError) {
+                Button(tr("OK"), role: .cancel) { }
+            } message: {
+                Text(errorMessage ?? tr("Unknown error"))
+            }
+        }
+        .preferredColorScheme(.dark)
+    }
+}
+
+private struct WindowsGameProfileForm: View {
+    @Binding var profile: WindowsGameProfile
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text(tr("Game configuration"))
+                .font(.headline)
+                .foregroundColor(.white)
+            VStack(alignment: .leading, spacing: 6) {
+                Text(tr("Launch arguments"))
+                    .font(.subheadline)
+                    .foregroundColor(.gray)
+                TextField(tr("Example: -windowed"), text: $profile.arguments)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .textFieldStyle(.roundedBorder)
+            }
+            profilePicker(title: tr("Resolution"), selection: $profile.resolution, choices: ["Device native", "960x540", "1280x720", "1600x900", "1920x1080"])
+            profilePicker(title: tr("Graphics API"), selection: $profile.graphicsAPI, choices: ["Automatic", "Direct3D 9", "Direct3D 10", "Direct3D 11", "Direct3D 12"])
+            profilePicker(title: tr("Frame rate limit"), selection: $profile.fpsLimit, choices: ["30", "40", "60", "Uncapped"])
+            Toggle(tr("MetalFX upscaling"), isOn: $profile.metalFXEnabled)
+                .tint(.blue)
+            Toggle(tr("Enable AVX/AVX2 translation"), isOn: $profile.avxEnabled)
+                .tint(.blue)
+        }
+        .padding(16)
+        .background(Color.white.opacity(0.055))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+    }
+
+    private func profilePicker(title: String, selection: Binding<String>, choices: [String]) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.subheadline)
+                .foregroundColor(.gray)
+            Picker(title, selection: selection) {
+                ForEach(choices, id: \.self) { choice in
+                    Text(choice).tag(choice)
+                }
+            }
+            .pickerStyle(.menu)
+            .tint(.white)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
