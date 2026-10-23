@@ -38,6 +38,53 @@ class AppManager: ObservableObject {
         } catch { installedApps = [] }
     }
 
+    func displayName(for appURL: URL) -> String {
+        guard let info = NSDictionary(contentsOf: appURL.appendingPathComponent("Info.plist")) as? [String: Any] else {
+            return appURL.deletingPathExtension().lastPathComponent
+        }
+        return (info["CFBundleDisplayName"] as? String)
+            ?? (info["CFBundleName"] as? String)
+            ?? appURL.deletingPathExtension().lastPathComponent
+    }
+
+    func bundleIdentifier(for appURL: URL) -> String? {
+        guard let info = NSDictionary(contentsOf: appURL.appendingPathComponent("Info.plist")) as? [String: Any] else {
+            return nil
+        }
+        return info["CFBundleIdentifier"] as? String
+    }
+
+    func iconURL(for appURL: URL) -> URL? {
+        guard let info = NSDictionary(contentsOf: appURL.appendingPathComponent("Info.plist")) as? [String: Any] else {
+            return nil
+        }
+        let bundleIcons = info["CFBundleIcons"] as? [String: Any]
+        let primaryIcon = bundleIcons?["CFBundlePrimaryIcon"] as? [String: Any]
+        let iconNames = primaryIcon?["CFBundleIconFiles"] as? [String] ?? []
+        for name in iconNames.reversed() {
+            let candidates = [
+                appURL.appendingPathComponent(name + ".png"),
+                appURL.appendingPathComponent(name)
+            ]
+            if let found = candidates.first(where: { fileManager.fileExists(atPath: $0.path) }) {
+                return found
+            }
+        }
+        return nil
+    }
+
+    func uninstallApp(at url: URL) throws {
+        let appsRoot = appsDirectory.standardizedFileURL.resolvingSymlinksInPath()
+        let target = url.standardizedFileURL
+        guard target.pathExtension == "app",
+              target.deletingLastPathComponent().resolvingSymlinksInPath() == appsRoot,
+              target.resolvingSymlinksInPath().deletingLastPathComponent() == appsRoot else {
+            throw IPAInstallError.copyFailed("Refused to remove an app outside iDeck's app library.")
+        }
+        try fileManager.removeItem(at: target)
+        refreshInstalledApps()
+    }
+
     func installIPA(from url: URL, completion: @escaping (Result<URL, IPAInstallError>) -> Void) {
         let hasScope = url.startAccessingSecurityScopedResource()
         let fileManager = self.fileManager
