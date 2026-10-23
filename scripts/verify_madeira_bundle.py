@@ -33,7 +33,7 @@ def inspect(app: Path) -> list[str]:
             ["xcrun", "nm", "-arch", "arm64", "-gU", str(executable)],
             check=True, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
         )
-        exported = set(re.findall(r"(?m)^.*\\s_([A-Za-z][A-Za-z0-9_]*)\\s*$", result.stdout))
+        exported = set(re.findall(r"(?m)^.*\s_([A-Za-z][A-Za-z0-9_]*)\s*$", result.stdout))
         errors.extend(f"native symbol not linked/exported: {name}"
                       for name in SYMBOLS if name not in exported)
     except (OSError, subprocess.CalledProcessError) as exc:
