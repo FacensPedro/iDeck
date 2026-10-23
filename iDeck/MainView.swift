@@ -54,12 +54,6 @@ struct MainView: View {
                 if isHome {
                     homeScreen
                 } else {
-                    Picker(tr("Mode"), selection: $mode) {
-                        ForEach(AppMode.allCases) { Text(tr($0.rawValue)).tag($0) }
-                    }
-                    .pickerStyle(.segmented)
-                    .padding(.horizontal)
-                    .onChange(of: mode) { selectedMode in selectMode(selectedMode) }
                     detail
                 }
             }
@@ -73,13 +67,13 @@ struct MainView: View {
             if case .success(let urls) = result, let url = urls.first { coordinator.launchWindowsExecutable(at: url) }
         }
         .onChange(of: coordinator.windowsStatus) { status in
-            if status == "Windows Ready" && mode == .windows && !isHome { isWindowsWorkspacePresented = true }
+            if status == "Windows Ready" && !isHome { isWindowsWorkspacePresented = true }
         }
         .fullScreenCover(isPresented: $isWindowsWorkspacePresented) {
             WindowsWorkspaceView(coordinator: coordinator, onBack: { isWindowsWorkspacePresented = false; isHome = true }, onAddExecutable: { isDocumentPickerPresented = true })
         }
         .fullScreenCover(isPresented: Binding<Bool>(
-            get: { !isHome && mode == .windows && (coordinator.windowsStatus == "Steam Running" || coordinator.windowsStatus == "Running") },
+            get: { !isHome && (coordinator.windowsStatus == "Steam Running" || coordinator.windowsStatus == "Running") },
             set: { _ in coordinator.setWindowsStatus("Windows Ready") }
         )) { GameSessionView(coordinator: coordinator) }
     }
