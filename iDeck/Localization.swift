@@ -308,5 +308,7 @@ enum Translations {
         "Library": ["pt": "Biblioteca", "es": "Biblioteca"],
         "Operation completed.": ["pt": "Operação concluída.", "es": "Operación completada."],
         "Add a Windows app": ["pt": "Adicionar um app do Windows", "es": "Añadir una app de Windows"],
+        "Change cover": ["pt": "Trocar capa", "es": "Cambiar portada"],
+        "Choose a PNG, JPG, JPEG or HEIC image for the cover.": ["pt": "Escolha uma imagem PNG, JPG, JPEG ou HEIC para a capa.", "es": "Elige una imagen PNG, JPG, JPEG o HEIC para la portada."],
     ]
 }
