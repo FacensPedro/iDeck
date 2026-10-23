@@ -381,32 +381,23 @@ class SystemCoordinator: ObservableObject {
             return
         }
 
-        guard let entry = game.launches.first(where: { option in
-            (option.oslist.isEmpty || option.oslist.lowercased().contains("windows")) &&
-            option.requiredDLC == nil && option.executable.lowercased().hasSuffix(".exe")
-        }) else {
-            setWindowsStatus("Cannot launch: Steam did not provide a Windows executable for this game.")
-            return
-        }
-
-        var folded: [String: String] = [:]
-        guard let relativePath = SteamInstallFiles.safeRelativePath(entry.executable, folded: &folded),
-              relativePath.lowercased().hasSuffix(".exe") else {
-            setWindowsStatus("Cannot launch: invalid Steam executable path.")
-            return
-        }
-
+        let folderName = SteamInstallFiles.installDirectoryName(
+            appID: Int(game.appID), steamApps: steamApps) ??
+            SteamInstallFiles.safeFolderName(
+                game.installDir.isEmpty ? "app_\(game.appID)" : game.installDir)
         let directory = SteamInstallPaths.common(
             drive: prefixPath.appendingPathComponent("drive_c", isDirectory: true))
-            .appendingPathComponent(SteamInstallFiles.safeFolderName(game.installDir), isDirectory: true)
-        let executableURL = directory.appendingPathComponent(relativePath).standardizedFileURL
-        let resolvedRoot = directory.resolvingSymlinksInPath().standardizedFileURL
-        let resolvedExecutable = executableURL.resolvingSymlinksInPath().standardizedFileURL
-        guard resolvedExecutable.path.hasPrefix(resolvedRoot.path + "/"),
-              FileManager.default.fileExists(atPath: resolvedExecutable.path) else {
-            setWindowsStatus("Cannot launch: the Windows executable is missing.")
+            .appendingPathComponent(folderName, isDirectory: true)
+        guard FileManager.default.fileExists(atPath: directory.path) else {
+            setWindowsStatus("Cannot launch: the installed game folder is missing.")
             return
         }
+        guard let selected = steamExecutable(game: game, directory: directory) else {
+            setWindowsStatus("Cannot launch: no Windows .exe was found in this game's installed files.")
+            return
+        }
+        let executableURL = selected.url
+        let entryArguments = selected.arguments
         guard windowsEnvironment.hasRuntime(in: prefixPath.path) else {
             setWindowsStatus("Madeira runtime missing: FEX/Wine/DXMT must be installed and linked.")
             return
@@ -418,12 +409,81 @@ class SystemCoordinator: ObservableObject {
         windowsEnvironment.applyGameProfile(effectiveProfile)
         setWindowsStatus("Launching Steam game...")
         windowsEnvironment.execute(binary: executableURL,
-                                   arguments: profile.arguments.isEmpty ? entry.arguments : profile.arguments,
+                                   arguments: profile.arguments.isEmpty ? entryArguments : profile.arguments,
                                    jitEnabler: jitEnabler) { [weak self] success in
             DispatchQueue.main.async {
                 self?.setWindowsStatus(success ? "Running" : "Execution Error: Windows game launch failed")
             }
         }
+    }
+
+    private func steamExecutable(game: SteamAppInfo, directory: URL) -> (url: URL, arguments: String)? {
+        let fm = FileManager.default
+        let root = directory.resolvingSymlinksInPath().standardizedFileURL
+
+        func verified(_ relative: String) -> URL? {
+            var folded: [String: String] = [:]
+            guard let path = SteamInstallFiles.safeRelativePath(relative, folded: &folded),
+                  path.lowercased().hasSuffix(".exe") else { return nil }
+            let file = root.appendingPathComponent(path)
+                .resolvingSymlinksInPath().standardizedFileURL
+            guard file.path.hasPrefix(root.path + "/"),
+                  (try? file.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true
+            else { return nil }
+            return file
+        }
+
+        for option in game.launches where
+            (option.oslist.isEmpty || option.oslist.lowercased().contains("windows")) &&
+            (option.requiredDLC?.isEmpty != false) {
+            if let executable = verified(option.executable) {
+                return (executable, option.arguments)
+            }
+        }
+
+        let blockedNames = Set([
+            "unins000.exe", "uninstall.exe", "setup.exe", "install.exe",
+            "crashreporter.exe", "unitycrashhandler64.exe",
+            "unitycrashhandler32.exe", "dxsetup.exe", "vcredist.exe",
+            "steamsetup.exe", "vc_redist.x64.exe", "vc_redist.x86.exe"
+        ])
+        guard let enumerator = fm.enumerator(
+            at: root, includingPropertiesForKeys: [.isRegularFileKey],
+            options: [.skipsHiddenFiles, .skipsPackageDescendants]) else { return nil }
+        var candidates: [(url: URL, score: Int)] = []
+        var visited = 0
+        let expectedNames = [game.installDir, game.name]
+            .map { $0.lowercased().filter { $0.isLetter || $0.isNumber } }
+            .filter { !$0.isEmpty }
+        for case let entry as URL in enumerator {
+            visited += 1
+            if visited > 20_000 || candidates.count >= 256 { break }
+            guard entry.pathExtension.lowercased() == "exe",
+                  !blockedNames.contains(entry.lastPathComponent.lowercased()),
+                  (try? entry.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true
+            else { continue }
+            let resolved = entry.resolvingSymlinksInPath().standardizedFileURL
+            guard resolved.path.hasPrefix(root.path + "/") else { continue }
+            let relative = String(resolved.path.dropFirst(root.path.count + 1))
+            guard relative.split(separator: "/").count <= 6 else { continue }
+            let basename = entry.deletingPathExtension().lastPathComponent
+                .lowercased().filter { $0.isLetter || $0.isNumber }
+            let depth = relative.split(separator: "/").count
+            let isLikelyGame = expectedNames.contains(basename)
+            let isTool = relative.lowercased().contains("redist") ||
+                         relative.lowercased().contains("prereq") ||
+                         relative.lowercased().contains("engine/binaries") ||
+                         basename.contains("crash") || basename.contains("uninstall")
+            let score = (isLikelyGame ? 100 : 0) + (isTool ? -100 : 0) -
+                        depth * 10
+            candidates.append((resolved, score))
+        }
+        guard let best = candidates.sorted(by: {
+            $0.score == $1.score
+                ? $0.url.path.localizedCaseInsensitiveCompare($1.url.path) == .orderedAscending
+                : $0.score > $1.score
+        }).first, best.score > -100 else { return nil }
+        return (best.url, "")
     }
 
     /// Loads and starts a guest .app inside this process (see LiveContainerHook).

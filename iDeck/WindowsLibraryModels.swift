@@ -1,5 +1,7 @@
 import Foundation
 import Combine
+import UIKit
+import ImageIO
 
 struct WindowsGameProfile: Codable, Equatable, Identifiable {
     var id: String
@@ -134,6 +136,30 @@ final class WindowsLibraryStore: ObservableObject {
         }
     }
 
+    func importEmbeddedIcon(for executable: URL) async {
+        let profileID = profileID(for: executable)
+        let current = profile(for: profileID, title: executable.deletingPathExtension().lastPathComponent)
+        guard artworkURL(for: current) == nil else { return }
+        let data = await Task.detached(priority: .utility) {
+            WindowsPEIcon.pngData(from: executable)
+        }.value
+        guard let data, !data.isEmpty, data.count <= 16 * 1024 * 1024 else { return }
+        do {
+            try fileManager.createDirectory(at: artworkDirectory, withIntermediateDirectories: true)
+            let safeID = Data(profileID.utf8).base64EncodedString()
+                .replacingOccurrences(of: "/", with: "_")
+                .replacingOccurrences(of: "+", with: "-")
+                .replacingOccurrences(of: "=", with: "")
+            let name = String(safeID.prefix(80)) + "-extracted.png"
+            try data.write(to: artworkDirectory.appendingPathComponent(name), options: .atomic)
+            var profile = current
+            profile.artworkFilename = name
+            save(profile)
+        } catch {
+            NSLog("iDeck: unable to extract icon: %@", error.localizedDescription)
+        }
+    }
+
     func importExecutable(from source: URL, prefixPath: URL) throws -> URL {
         let hasScope = source.startAccessingSecurityScopedResource()
         defer { if hasScope { source.stopAccessingSecurityScopedResource() } }
@@ -231,4 +257,151 @@ struct SelectedLibraryURL: Identifiable {
 struct SelectedSteamGame: Identifiable {
     let game: SteamAppInfo
     var id: UInt32 { game.appID }
+}
+
+enum WindowsPEIcon {
+    static func pngData(from url: URL) -> Data? {
+        guard let size = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize,
+              size > 128, size <= 1024 * 1024 * 1024,
+              let bytes = try? Data(contentsOf: url, options: .mappedIfSafe) else { return nil }
+
+        func word(_ offset: Int) -> Int? {
+            guard offset >= 0, offset <= bytes.count - 2 else { return nil }
+            return Int(bytes[offset]) | Int(bytes[offset + 1]) << 8
+        }
+        func dword(_ offset: Int) -> Int? {
+            guard offset >= 0, offset <= bytes.count - 4 else { return nil }
+            return Int(bytes[offset]) | Int(bytes[offset + 1]) << 8 |
+                   Int(bytes[offset + 2]) << 16 | Int(bytes[offset + 3]) << 24
+        }
+        guard word(0) == 0x5A4D, let peOffset = dword(0x3C),
+              peOffset >= 64, peOffset <= bytes.count - 256,
+              dword(peOffset) == 0x00004550,
+              let sectionCount = word(peOffset + 6), sectionCount > 0, sectionCount <= 96,
+              let optionalSize = word(peOffset + 20),
+              let optionalMagic = word(peOffset + 24),
+              optionalMagic == 0x10B || optionalMagic == 0x20B else { return nil }
+
+        let optional = peOffset + 24
+        let dataDirectories = optional + (optionalMagic == 0x20B ? 112 : 96)
+        guard optionalSize >= (optionalMagic == 0x20B ? 128 : 112),
+              let resourceRVA = dword(dataDirectories + 16),
+              resourceRVA > 0 else { return nil }
+
+        struct Section {
+            var rva: Int
+            var rawSize: Int
+            var rawOffset: Int
+        }
+        let sectionHeaders = optional + optionalSize
+        var sections: [Section] = []
+        for index in 0..<sectionCount {
+            let offset = sectionHeaders + index * 40
+            guard let rva = dword(offset + 12),
+                  let rawSize = dword(offset + 16),
+                  let rawOffset = dword(offset + 20),
+                  rawOffset <= bytes.count,
+                  rawSize <= bytes.count - rawOffset else { return nil }
+            sections.append(Section(rva: rva, rawSize: rawSize, rawOffset: rawOffset))
+        }
+        func fileOffset(_ rva: Int, length: Int = 1) -> Int? {
+            guard rva >= 0, length >= 0 else { return nil }
+            for section in sections {
+                guard rva >= section.rva else { continue }
+                let relative = rva - section.rva
+                guard relative <= section.rawSize, length <= section.rawSize - relative else { continue }
+                return section.rawOffset + relative
+            }
+            return nil
+        }
+        guard let rootOffset = fileOffset(resourceRVA, length: 16) else { return nil }
+        func relativeOffset(_ value: Int, length: Int = 1) -> Int? {
+            guard value >= 0, value <= 32 * 1024 * 1024 else { return nil }
+            return fileOffset(resourceRVA + value, length: length)
+        }
+        func directoryEntry(_ relative: Int, id: Int?) -> Int? {
+            guard let base = relativeOffset(relative, length: 16),
+                  let named = word(base + 12), let numbered = word(base + 14),
+                  named + numbered <= 2048,
+                  let entries = relativeOffset(relative + 16, length: (named + numbered) * 8)
+            else { return nil }
+            for index in 0..<(named + numbered) {
+                let offset = entries + index * 8
+                guard let name = dword(offset), let value = dword(offset + 4) else { continue }
+                if id == nil || (name & 0x8000_0000 == 0 && name == id) {
+                    return value
+                }
+            }
+            return nil
+        }
+        func child(_ value: Int) -> Int? {
+            guard value & 0x8000_0000 != 0 else { return nil }
+            return value & 0x7FFF_FFFF
+        }
+        func resource(type: Int, id: Int?) -> Data? {
+            guard let typeEntry = directoryEntry(0, id: type),
+                  let typeDirectory = child(typeEntry),
+                  let itemEntry = directoryEntry(typeDirectory, id: id),
+                  let itemDirectory = child(itemEntry),
+                  let languageEntry = directoryEntry(itemDirectory, id: nil),
+                  languageEntry & 0x8000_0000 == 0,
+                  let metadata = relativeOffset(languageEntry, length: 16),
+                  let dataRVA = dword(metadata),
+                  let size = dword(metadata + 4), size > 0, size <= 16 * 1024 * 1024,
+                  let offset = fileOffset(dataRVA, length: size)
+            else { return nil }
+            return bytes.subdata(in: offset..<(offset + size))
+        }
+
+        guard let group = resource(type: 14, id: nil), group.count >= 20 else { return nil }
+        func groupWord(_ offset: Int) -> Int {
+            Int(group[offset]) | Int(group[offset + 1]) << 8
+        }
+        func groupDword(_ offset: Int) -> Int {
+            Int(group[offset]) | Int(group[offset + 1]) << 8 |
+            Int(group[offset + 2]) << 16 | Int(group[offset + 3]) << 24
+        }
+        let count = groupWord(4)
+        guard groupWord(2) == 1, count > 0, count <= 128,
+              count <= (group.count - 6) / 14 else { return nil }
+        let sorted = (0..<count).sorted { first, second in
+            let a = 6 + first * 14, b = 6 + second * 14
+            let dimensionA = (group[a] == 0 ? 256 : Int(group[a])) *
+                             (group[a + 1] == 0 ? 256 : Int(group[a + 1]))
+            let dimensionB = (group[b] == 0 ? 256 : Int(group[b])) *
+                             (group[b + 1] == 0 ? 256 : Int(group[b + 1]))
+            return dimensionA > dimensionB
+        }
+
+        func little16(_ value: Int) -> [UInt8] {
+            [UInt8(value & 0xFF), UInt8((value >> 8) & 0xFF)]
+        }
+        func little32(_ value: Int) -> [UInt8] {
+            [UInt8(value & 0xFF), UInt8((value >> 8) & 0xFF),
+             UInt8((value >> 16) & 0xFF), UInt8((value >> 24) & 0xFF)]
+        }
+
+        for index in sorted {
+            let offset = 6 + index * 14
+            let iconID = groupWord(offset + 12)
+            guard let image = resource(type: 3, id: iconID), image.count <= 8 * 1024 * 1024 else { continue }
+            let pngSignature: [UInt8] = [137, 80, 78, 71, 13, 10, 26, 10]
+            if image.starts(with: pngSignature), let decoded = UIImage(data: image),
+               let output = decoded.pngData() { return output }
+
+            var ico = Data([0, 0, 1, 0, 1, 0])
+            ico.append(contentsOf: [group[offset], group[offset + 1],
+                                     group[offset + 2], group[offset + 3]])
+            ico.append(contentsOf: little16(groupWord(offset + 4)))
+            ico.append(contentsOf: little16(groupWord(offset + 6)))
+            ico.append(contentsOf: little32(image.count))
+            ico.append(contentsOf: little32(22))
+            ico.append(image)
+            if let source = CGImageSourceCreateWithData(ico as CFData, nil),
+               let graphic = CGImageSourceCreateImageAtIndex(source, 0, nil) {
+                return UIImage(cgImage: graphic).pngData()
+            }
+        }
+        return nil
+    }
 }

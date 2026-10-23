@@ -16,14 +16,25 @@ struct MainView: View {
             if let selectedWorkspace {
                 WindowsWorkspaceView(coordinator: coordinator, onBack: {
                     self.selectedWorkspace = nil
-                }, mode: selectedWorkspace)
+                }, mode: selectedWorkspace, steamLibrary: steamLibrary)
             } else {
                 homeView
             }
         }
-        .onAppear { coordinator.refreshJITStatus() }
+        .onAppear {
+            coordinator.refreshJITStatus()
+            UIApplication.shared.isIdleTimerDisabled = true
+        }
         .onChange(of: scenePhase) { phase in
+            UIApplication.shared.isIdleTimerDisabled = phase == .active
             if phase == .active { coordinator.refreshJITStatus() }
+        }
+        .task(id: coordinator.isSteamConnected) {
+            if coordinator.isSteamConnected {
+                await steamLibrary.refresh()
+            } else {
+                steamLibrary.disconnect()
+            }
         }
         .fullScreenCover(isPresented: Binding<Bool>(
             get: {
@@ -224,9 +235,9 @@ struct WindowsWorkspaceView: View {
     @ObservedObject var coordinator: SystemCoordinator
     let onBack: (() -> Void)?
     let mode: IDeckWorkspace
+    @ObservedObject var steamLibrary: SteamOwnedGamesModel
 
     @State private var isSettingsPresented = false
-    @State private var isSteamSignInPresented = false
     @State private var searchText = ""
     @State private var prefixPath: URL?
     @StateObject private var steamLibrary = SteamOwnedGamesModel()
@@ -312,8 +323,9 @@ struct WindowsWorkspaceView: View {
                                 Button {
                                     Task { await steamLibrary.refresh(force: true) }
                                 } label: {
-                                    Label(tr("Refresh library"), systemImage: "arrow.clockwise")
-                                        .font(.caption)
+                                    Image(systemName: "arrow.clockwise")
+                                        .font(.headline)
+                                        .frame(width: 32, height: 32)
                                 }
                                 .buttonStyle(.bordered)
                             }
@@ -351,9 +363,6 @@ struct WindowsWorkspaceView: View {
         .sheet(isPresented: $isSettingsPresented) {
             SettingsView(coordinator: coordinator)
         }
-        .sheet(isPresented: $isSteamSignInPresented) {
-            SteamSignInView()
-        }
         .sheet(item: $selectedGuestApp) { selection in
             GuestProgramDetailsView(appURL: selection.url, appManager: appManager, coordinator: coordinator)
         }
@@ -370,7 +379,10 @@ struct WindowsWorkspaceView: View {
         ) { result in
             guard case .success(let urls) = result, let url = urls.first, let prefixPath else { return }
             do {
-                _ = try windowsLibrary.importExecutable(from: url, prefixPath: prefixPath)
+                let executable = try windowsLibrary.importExecutable(from: url, prefixPath: prefixPath)
+                Task {
+                    await windowsLibrary.importEmbeddedIcon(for: executable)
+                }
             } catch {
                 installMessage = error.localizedDescription
                 isShowingInstallResult = true
@@ -402,14 +414,6 @@ struct WindowsWorkspaceView: View {
             Button(tr("OK"), role: .cancel) { }
         } message: {
             Text(installMessage ?? tr("Operation completed."))
-        }
-        .task(id: coordinator.isSteamConnected) {
-            if coordinator.isSteamConnected {
-                await steamLibrary.refresh()
-                if let prefixPath { steamLibrary.refreshInstalledApps(prefixPath: prefixPath) }
-            } else {
-                steamLibrary.disconnect()
-            }
         }
         .onAppear {
             resolvePrefixPath()
@@ -499,19 +503,6 @@ struct WindowsWorkspaceView: View {
     private var steamConnectButton: some View {
         HStack(spacing: 10) {
             Button {
-                isSteamSignInPresented = true
-            } label: {
-                Label(tr(coordinator.isSteamConnected ? "Steam connected" : "Connect Steam"),
-                      systemImage: coordinator.isSteamConnected ? "checkmark.circle.fill" : "person.crop.circle")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 13)
-                    .padding(.vertical, 11)
-                    .frame(minHeight: 44)
-                    .background(Color(red: 0.12, green: 0.35, blue: 0.65))
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-            }
-            Button {
                 isExecutableMenuPresented = true
             } label: {
                 Image(systemName: "plus")
@@ -579,7 +570,7 @@ struct WindowsWorkspaceView: View {
                 Button {
                     Task { await steamLibrary.refresh() }
                 } label: {
-                    Label(tr("Refresh library"), systemImage: "arrow.clockwise")
+                    Image(systemName: "arrow.clockwise")
                         .foregroundColor(.white)
                         .padding(.horizontal, 16)
                         .padding(.vertical, 10)
@@ -606,7 +597,7 @@ struct WindowsWorkspaceView: View {
                 Button {
                     Task { await steamLibrary.refresh() }
                 } label: {
-                    Label(tr("Refresh library"), systemImage: "arrow.clockwise")
+                    Image(systemName: "arrow.clockwise")
                         .foregroundColor(.white)
                         .padding(.horizontal, 16)
                         .padding(.vertical, 10)
@@ -674,7 +665,18 @@ struct WindowsWorkspaceView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            let downloadBytes = game.downloadSize(for: "windows")
+            let knownDownloadBytes = game.downloadSize(for: "windows")
+            let installedBytes: UInt64
+            if knownDownloadBytes == 0,
+               let prefixPath {
+                let steamApps = SteamInstallPaths.steamApps(
+                    drive: prefixPath.appendingPathComponent("drive_c", isDirectory: true))
+                installedBytes = UInt64(max(0,
+                    SteamInstallFiles.sizeOnDisk(appID: Int(game.appID), steamApps: steamApps) ?? 0))
+            } else {
+                installedBytes = 0
+            }
+            let downloadBytes = knownDownloadBytes > 0 ? knownDownloadBytes : installedBytes
             if downloadBytes > 0 {
                 Text("(\(ByteCountFormatter.string(fromByteCount: Int64(clamping: downloadBytes), countStyle: .file)))")
                     .font(.caption)
@@ -767,6 +769,12 @@ struct WindowsWorkspaceView: View {
             Task { @MainActor in
                 prefixPath = root
                 windowsLibrary.refresh(prefixPath: root)
+                let unindexedIcons = Array(windowsLibrary.executableURLs.prefix(40))
+                Task(priority: .utility) {
+                    for executable in unindexedIcons {
+                        await windowsLibrary.importEmbeddedIcon(for: executable)
+                    }
+                }
                 steamLibrary.refreshInstalledApps(prefixPath: root)
                 appManager.refreshInstalledApps()
             }
