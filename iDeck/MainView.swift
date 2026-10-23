@@ -841,7 +841,7 @@ struct WindowsWorkspaceView: View {
                         Button {
                             selectedGuestApp = SelectedLibraryURL(url: appURL)
                         } label: {
-                            VStack(alignment: .leading, spacing: 9) {
+                            VStack(alignment: .center, spacing: 9) {
                                 AppBundleArtworkView(appURL: appURL, appManager: appManager)
                                     .frame(width: artworkWidth, height: artworkHeight)
                                 cardTitle(appManager.displayName(for: appURL))
@@ -850,7 +850,7 @@ struct WindowsWorkspaceView: View {
                                     .foregroundColor(.gray)
                             }
                             .padding(10)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .frame(maxWidth: .infinity, alignment: .center)
                             .background(panelColor)
                             .clipShape(RoundedRectangle(cornerRadius: 13))
                         }
@@ -862,7 +862,7 @@ struct WindowsWorkspaceView: View {
                         Button {
                             selectedSteamGame = SelectedSteamGame(game: game)
                         } label: {
-                            VStack(alignment: .leading, spacing: 9) {
+                            VStack(alignment: .center, spacing: 9) {
                                 SteamGameArtworkView(game: game)
                                     .frame(width: artworkWidth, height: artworkHeight)
                                 cardTitle(game.name.isEmpty ? tr("Untitled Steam app") : game.name)
@@ -871,7 +871,7 @@ struct WindowsWorkspaceView: View {
                                     .foregroundColor(.gray)
                             }
                             .padding(10)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .frame(maxWidth: .infinity, alignment: .center)
                             .background(panelColor)
                             .clipShape(RoundedRectangle(cornerRadius: 13))
                         }
@@ -889,7 +889,7 @@ struct WindowsWorkspaceView: View {
                         Button {
                             selectedExecutable = SelectedLibraryURL(url: executableURL)
                         } label: {
-                            VStack(alignment: .leading, spacing: 9) {
+                            VStack(alignment: .center, spacing: 9) {
                                 WindowsExecutableArtworkView(executableURL: executableURL, library: windowsLibrary, fallbackColor: panelColor)
                                     .frame(width: artworkWidth, height: artworkHeight)
                                 cardTitle(executableURL.deletingPathExtension().lastPathComponent)
@@ -898,7 +898,7 @@ struct WindowsWorkspaceView: View {
                                     .foregroundColor(.gray)
                             }
                             .padding(10)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .frame(maxWidth: .infinity, alignment: .center)
                             .background(panelColor)
                             .clipShape(RoundedRectangle(cornerRadius: 13))
                         }
