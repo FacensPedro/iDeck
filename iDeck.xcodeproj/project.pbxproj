@@ -8,8 +8,8 @@
 
 		E10000000000000000000001 /* SteamKeyValues.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000001 /* SteamKeyValues.swift */; };
 		E10000000000000000000002 /* SteamChunkCodecs.c in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000002 /* SteamChunkCodecs.c */; };
+		E10000000000000000000005 /* LzmaDec.c in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000004 /* LzmaDec.c */; };
 		E10000000000000000000003 /* libzstd in Frameworks */ = {isa = PBXBuildFile; productRef = E40000000000000000000001 /* libzstd */; };
-		E10000000000000000000004 /* PLzmaSDK-Static in Frameworks */ = {isa = PBXBuildFile; productRef = E40000000000000000000002 /* PLzmaSDK-Static */; };
 		D10000000000000000000001 /* RuntimeLifecycle.mm in Sources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000001 /* RuntimeLifecycle.mm */; };
 		D10000000000000000000002 /* FEXMemoryManager.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000002 /* FEXMemoryManager.cpp */; };
 		D10000000000000000000003 /* WineEnvironmentManager.c in Sources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000003 /* WineEnvironmentManager.c */; };
@@ -124,6 +124,11 @@
 		E20000000000000000000001 /* SteamKeyValues.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamKeyValues.swift; sourceTree = "<group>"; };
 		E20000000000000000000002 /* SteamChunkCodecs.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = SteamChunkCodecs.c; sourceTree = "<group>"; };
 		E20000000000000000000003 /* SteamChunkCodecs.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SteamChunkCodecs.h; sourceTree = "<group>"; };
+		E20000000000000000000004 /* LzmaDec.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = SteamLZMA/LzmaDec.c; sourceTree = "<group>"; };
+		E20000000000000000000005 /* LzmaDec.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SteamLZMA/LzmaDec.h; sourceTree = "<group>"; };
+		E20000000000000000000006 /* 7zTypes.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SteamLZMA/7zTypes.h; sourceTree = "<group>"; };
+		E20000000000000000000007 /* Precomp.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SteamLZMA/Precomp.h; sourceTree = "<group>"; };
+		E20000000000000000000008 /* Compiler.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SteamLZMA/Compiler.h; sourceTree = "<group>"; };
 		A20000000000000000000006 /* WindowsLibraryModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowsLibraryModels.swift; sourceTree = "<group>"; };
 
 		333333333333333333333331 /* Frameworks */ = {
@@ -131,7 +136,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				E10000000000000000000003 /* libzstd in Frameworks */,
-				E10000000000000000000004 /* PLzmaSDK-Static in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -188,6 +192,7 @@
 				A10000000000000000000005 /* SteamInstall.swift in Sources */,
 				E10000000000000000000001 /* SteamKeyValues.swift in Sources */,
 				E10000000000000000000002 /* SteamChunkCodecs.c in Sources */,
+				E10000000000000000000005 /* LzmaDec.c in Sources */,
 				A10000000000000000000006 /* WindowsLibraryModels.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -261,6 +266,11 @@
 				E20000000000000000000001 /* SteamKeyValues.swift */,
 				E20000000000000000000002 /* SteamChunkCodecs.c */,
 				E20000000000000000000003 /* SteamChunkCodecs.h */,
+				E20000000000000000000004 /* LzmaDec.c */,
+				E20000000000000000000005 /* LzmaDec.h */,
+				E20000000000000000000006 /* 7zTypes.h */,
+				E20000000000000000000007 /* Precomp.h */,
+				E20000000000000000000008 /* Compiler.h */,
 				A20000000000000000000006 /* WindowsLibraryModels.swift */,
 			);
 			path = iDeck;
@@ -302,7 +312,6 @@
 			name = iDeck;
 			packageProductDependencies = (
 				E40000000000000000000001 /* libzstd */,
-				E40000000000000000000002 /* PLzmaSDK-Static */,
 			);
 			productName = iDeck;
 			productReference = 222222222222222222222227 /* iDeck.app */;
@@ -463,7 +472,6 @@
 			mainGroup = 444444444444444444444443;
 			packageReferences = (
 				E30000000000000000000001 /* XCRemoteSwiftPackageReference "zstd" */,
-				E30000000000000000000002 /* XCRemoteSwiftPackageReference "PLzmaSDK" */,
 			);
 			productRefGroup = 444444444444444444444442 /* Products */;
 			projectDirPath = "";
@@ -621,20 +629,10 @@
 			repositoryURL = "https://github.com/facebook/zstd";
 			requirement = {kind = exactVersion; version = 1.5.7; };
 		};
-		E30000000000000000000002 /* XCRemoteSwiftPackageReference "PLzmaSDK" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/OlehKulykov/PLzmaSDK";
-			requirement = {kind = exactVersion; version = 1.6.2; };
-		};
 		E40000000000000000000001 /* libzstd */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = E30000000000000000000001 /* XCRemoteSwiftPackageReference "zstd" */;
 			productName = libzstd;
-		};
-		E40000000000000000000002 /* PLzmaSDK-Static */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = E30000000000000000000002 /* XCRemoteSwiftPackageReference "PLzmaSDK" */;
-			productName = PLzmaSDK-Static;
 		};
 	};
 	rootObject = 777777777777777777777771 /* Project object */;

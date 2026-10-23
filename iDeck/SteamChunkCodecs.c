@@ -1,4 +1,5 @@
 #include "SteamChunkCodecs.h"
+#include "SteamLZMA/LzmaDec.h"
 
 #include <limits.h>
 #include <stdlib.h>
@@ -10,32 +11,7 @@
 #define ZIP_CENTRAL_SIGNATURE UINT32_C(0x02014b50)
 #define ZIP_END_SIGNATURE UINT32_C(0x06054b50)
 
-/* Public APIs provided by the pinned PLzmaSDK and libzstd Swift packages. */
-typedef struct ISzAlloc ISzAlloc;
-typedef const ISzAlloc *ISzAllocPtr;
-struct ISzAlloc {
-    void *(*Alloc)(ISzAllocPtr allocator, size_t size);
-    void (*Free)(ISzAllocPtr allocator, void *address);
-};
-
-typedef enum {
-    LZMA_FINISH_ANY = 0,
-    LZMA_FINISH_END = 1
-} ELzmaFinishMode;
-
-typedef enum {
-    LZMA_STATUS_NOT_SPECIFIED = 0,
-    LZMA_STATUS_FINISHED_WITH_MARK = 1,
-    LZMA_STATUS_NOT_FINISHED = 2,
-    LZMA_STATUS_NEEDS_MORE_INPUT = 3,
-    LZMA_STATUS_MAYBE_FINISHED_WITHOUT_MARK = 4
-} ELzmaStatus;
-
-extern int LzmaDecode(uint8_t *destination, size_t *destination_length,
-                      const uint8_t *source, size_t *source_length,
-                      const uint8_t *properties, unsigned properties_length,
-                      ELzmaFinishMode finish_mode, ELzmaStatus *status,
-                      ISzAllocPtr allocator);
+/* LZMA is built directly into iDeck from the public-domain 7-Zip SDK. */
 extern size_t ZSTD_decompress(void *destination, size_t destination_capacity,
                               const void *source, size_t source_length);
 extern unsigned ZSTD_isError(size_t result);
