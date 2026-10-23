@@ -502,7 +502,7 @@ class SystemCoordinator: ObservableObject {
         if LiveContainerHook.launchGuestApp(atPath: url.path, errorMessage: &message) {
             setLiveContainerStatus("Guest app running: \(url.lastPathComponent)")
         } else {
-            setLiveContainerStatus("Guest launch failed: \(message ?? "unknown error")")
+            setLiveContainerStatus("Guest launch failed: \(message ?? "O carregador não conseguiu abrir este aplicativo.")")
         }
     }
 }
