@@ -149,27 +149,35 @@ class SystemCoordinator: ObservableObject {
     
     private func startWindows() {
         setWindowsStatus("Preparing Windows Environment...")
-        containerHost.mountEnvironment { [weak self] mountPath in
-            guard let self = self else { return }
-            guard let mountPath = mountPath else {
-                self.setWindowsStatus("Container not initialized")
+        containerHost.setupContainer(injectHooks: isGuestHooksEnabled) { [weak self] setupSuccess in
+            guard let self else { return }
+            guard setupSuccess else {
+                self.setWindowsStatus("Container initialization failed")
                 return
             }
-            
-            self.prefixInstaller.installWinePrefix(to: mountPath) { success in
-                DispatchQueue.main.async {
-                    if success {
-                        self.isContainerReady = true
-                        self.windowsEnvironment.configureWine(prefix: mountPath)
-                        self.setWindowsStatus("Windows Ready")
-                    } else {
-                        self.setWindowsStatus("Failed to Install Windows Environment")
+
+            self.containerHost.mountEnvironment { [weak self] mountPath in
+                guard let self else { return }
+                guard let mountPath else {
+                    self.setWindowsStatus("Container not initialized")
+                    return
+                }
+
+                self.prefixInstaller.installWinePrefix(to: mountPath) { success in
+                    DispatchQueue.main.async {
+                        if success {
+                            self.isContainerReady = true
+                            self.windowsEnvironment.configureWine(prefix: mountPath)
+                            self.setWindowsStatus("Windows Ready")
+                        } else {
+                            self.setWindowsStatus("Failed to Install Windows Environment")
+                        }
                     }
                 }
             }
         }
     }
-    
+
     func confirmJITActivatedByStikDebug() {
         refreshJITStatus()
     }
