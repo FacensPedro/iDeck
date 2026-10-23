@@ -23,6 +23,7 @@ enum IPAInstallError: LocalizedError {
 
 class AppManager: ObservableObject {
     @Published var installedApps: [URL] = []
+    @Published private(set) var artworkRevision = 0
     private let fileManager = FileManager.default
     private var appsDirectory: URL { fileManager.urls(for: .documentDirectory, in: .userDomainMask).first!.appendingPathComponent("GuestApps", isDirectory: true) }
 
@@ -55,6 +56,9 @@ class AppManager: ObservableObject {
     }
 
     func iconURL(for appURL: URL) -> URL? {
+        if let custom = customArtworkURL(for: appURL) {
+            return custom
+        }
         guard let info = NSDictionary(contentsOf: appURL.appendingPathComponent("Info.plist")) as? [String: Any] else {
             return nil
         }
@@ -71,6 +75,42 @@ class AppManager: ObservableObject {
             }
         }
         return nil
+    }
+
+    func customArtworkURL(for appURL: URL) -> URL? {
+        let filename = artworkFilename(for: appURL)
+        let url = artworkDirectory.appendingPathComponent(filename)
+        return fileManager.fileExists(atPath: url.path) ? url : nil
+    }
+
+    func setArtwork(from source: URL, for appURL: URL) throws {
+        let hasScope = source.startAccessingSecurityScopedResource()
+        defer { if hasScope { source.stopAccessingSecurityScopedResource() } }
+        let ext = source.pathExtension.lowercased()
+        guard ["png", "jpg", "jpeg", "heic"].contains(ext) else {
+            throw IPAInstallError.copyFailed("Choose a PNG, JPG, JPEG or HEIC image.")
+        }
+        try fileManager.createDirectory(at: artworkDirectory, withIntermediateDirectories: true)
+        let destination = artworkDirectory.appendingPathComponent(artworkFilename(for: appURL))
+        let temporary = artworkDirectory.appendingPathComponent(UUID().uuidString + "." + ext)
+        try fileManager.copyItem(at: source, to: temporary)
+        if fileManager.fileExists(atPath: destination.path) { try fileManager.removeItem(at: destination) }
+        try fileManager.moveItem(at: temporary, to: destination)
+        artworkRevision &+= 1
+    }
+
+    private func artworkFilename(for appURL: URL) -> String {
+        let key = bundleIdentifier(for: appURL) ?? appURL.lastPathComponent
+        let encoded = Data(key.utf8).base64EncodedString()
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "=", with: "")
+        return String(encoded.prefix(96)) + ".art"
+    }
+
+    private var artworkDirectory: URL {
+        fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("iDeck/GuestAppsArtwork", isDirectory: true)
     }
 
     func uninstallApp(at url: URL) throws {
