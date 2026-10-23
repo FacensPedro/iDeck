@@ -1087,6 +1087,16 @@ private struct WindowsExecutableDetailsView: View {
                     .frame(maxWidth: .infinity)
                     WindowsGameProfileForm(profile: $profile)
                     Button {
+                        guard coordinator.isJITEnabled else {
+                            errorMessage = tr("Activate JIT with StikDebug, then confirm it in Settings.")
+                            showError = true
+                            return
+                        }
+                        guard let prefixPath, coordinator.windowsEnvironment.hasRuntime(in: prefixPath.path) else {
+                            errorMessage = tr("The native Madeira runtime is not linked into this build yet.")
+                            showError = true
+                            return
+                        }
                         library.save(profile)
                         coordinator.launchWindowsExecutable(at: executableURL, profile: profile)
                         dismiss()
