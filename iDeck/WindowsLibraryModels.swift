@@ -42,7 +42,7 @@ final class WindowsLibraryStore: ObservableObject {
                 at: directory,
                 includingPropertiesForKeys: [.isRegularFileKey]
             )
-            .filter { ["exe", "bat", "cmd"].contains($0.pathExtension.lowercased()) }
+            .filter { $0.pathExtension.lowercased() == "exe" }
             .filter { (try? $0.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true }
             .sorted { $0.lastPathComponent.localizedCaseInsensitiveCompare($1.lastPathComponent) == .orderedAscending }
         } catch {
@@ -75,7 +75,7 @@ final class WindowsLibraryStore: ObservableObject {
         defer { if hasScope { source.stopAccessingSecurityScopedResource() } }
 
         let fileExtension = source.pathExtension.lowercased()
-        guard ["exe", "bat", "cmd"].contains(fileExtension) else {
+        guard fileExtension == "exe" else {
             throw WindowsLibraryError.unsupportedExecutable
         }
 
@@ -101,7 +101,7 @@ final class WindowsLibraryStore: ObservableObject {
         let directory = prefixPath.appendingPathComponent("WindowsDownloads", isDirectory: true).standardizedFileURL
         let target = url.standardizedFileURL
         guard target.deletingLastPathComponent() == directory,
-              target.pathExtension.lowercased() == "exe" || target.pathExtension.lowercased() == "bat" || target.pathExtension.lowercased() == "cmd",
+              target.pathExtension.lowercased() == "exe",
               target.resolvingSymlinksInPath().deletingLastPathComponent() == directory.resolvingSymlinksInPath() else {
             throw WindowsLibraryError.unsafePath
         }
@@ -142,7 +142,7 @@ enum WindowsLibraryError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .unsupportedExecutable:
-            return "Choose a Windows .exe, .bat or .cmd file."
+            return "Choose a Windows .exe file."
         case .unsafePath:
             return "iDeck refused to remove a file outside its Windows library."
         }
