@@ -6,6 +6,7 @@
 	objectVersion = 56;
 	objects = {
 
+		B10000000000000000000001 /* NativeRuntimeDiagnostics.mm in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000001 /* NativeRuntimeDiagnostics.mm */; };
 		111111111111111111111111 /* iDeckApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222221 /* iDeckApp.swift */; };
 		111111111111111111111112 /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222222 /* MainView.swift */; };
 		111111111111111111111113 /* SystemCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222223 /* SystemCoordinator.swift */; };
@@ -38,6 +39,8 @@
 		A10000000000000000000005 /* SteamInstall.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000005 /* SteamInstall.swift */; };
 		A10000000000000000000006 /* WindowsLibraryModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000006 /* WindowsLibraryModels.swift */; };
 
+		B20000000000000000000001 /* NativeRuntimeDiagnostics.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = NativeRuntimeDiagnostics.mm; sourceTree = "<group>"; };
+		B20000000000000000000002 /* NativeRuntimeDiagnostics.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = NativeRuntimeDiagnostics.h; sourceTree = "<group>"; };
 		222222222222222222222221 /* iDeckApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iDeckApp.swift; sourceTree = "<group>"; };
 		222222222222222222222222 /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
 		222222222222222222222223 /* SystemCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemCoordinator.swift; sourceTree = "<group>"; };
@@ -93,6 +96,7 @@
 				111111111111111111111114 /* JITEnabler.swift in Sources */,
 				111111111111111111111115 /* ContainerHost.swift in Sources */,
 				111111111111111111111116 /* WindowsEnvironment.swift in Sources */,
+				B10000000000000000000001 /* NativeRuntimeDiagnostics.mm in Sources */,
 				111111111111111111111117 /* AudioManager.swift in Sources */,
 				111111111111111111111118 /* GraphicsConfig.swift in Sources */,
 				111111111111111111111119 /* SettingsView.swift in Sources */,
@@ -143,6 +147,8 @@
 				222222222222222222222224 /* JITEnabler.swift */,
 				222222222222222222222225 /* ContainerHost.swift */,
 				222222222222222222222226 /* WindowsEnvironment.swift */,
+				B20000000000000000000001 /* NativeRuntimeDiagnostics.mm */,
+				B20000000000000000000002 /* NativeRuntimeDiagnostics.h */,
 				222222222222222222222228 /* AudioManager.swift */,
 				222222222222222222222229 /* GraphicsConfig.swift */,
 				999999999999999999999906 /* UpdateChecker.swift */,
