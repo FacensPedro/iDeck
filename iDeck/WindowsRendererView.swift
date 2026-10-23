@@ -12,11 +12,10 @@ struct WindowsRendererView: UIViewRepresentable {
         mtkView.clearColor = MTLClearColorMake(0.0, 0.0, 0.0, 1.0)
         mtkView.isOpaque = true
         mtkView.enableSetNeedsDisplay = false
-        mtkView.isPaused = true
+        mtkView.isPaused = false
         mtkView.autoResizeDrawable = true
         mtkView.framebufferOnly = false
         mtkView.contentMode = .scaleAspectFit
-        mtkView.drawableSize = CGSize(width: 1, height: 1)
         
         setenv("MVK_CONFIG_IOS_SURFACE", "1", 1)
         
