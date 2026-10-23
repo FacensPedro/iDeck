@@ -28,6 +28,11 @@ class WindowsEnvironment {
             "madeira_d3d12_canary_run",
             "ideck_madeira_launch_v1"
         ]
+        let native = ideck_native_capabilities()
+        guard native.metal_available, native.fex_linked, native.wine_linked,
+              native.dxmt_linked, native.d3d12_linked, native.launcher_linked else {
+            return false
+        }
         return requiredSymbols.allSatisfy { name in
             name.withCString { dlsym(RTLD_DEFAULT, $0) != nil }
         }
@@ -75,6 +80,7 @@ class WindowsEnvironment {
     
     func execute(binary: URL, arguments: String = "", is32Bit: Bool = false, isSteam: Bool = false, jitEnabler: JITEnabler, completion: @escaping (Bool) -> Void) {
         guard FileManager.default.fileExists(atPath: binary.path),
+              binary.path.withCString({ ideck_native_validate_pe($0) }),
               let parsedArguments = BoxTranslator.parseArguments(arguments) else {
             completion(false)
             return
