@@ -53,44 +53,121 @@ class WindowsEnvironment {
         task.resume()
     }
     
-    func execute(binary: URL, is32Bit: Bool = false, isSteam: Bool = false, jitEnabler: JITEnabler, completion: @escaping (Bool) -> Void) {
-        guard FileManager.default.fileExists(atPath: binary.path) else {
+    func execute(binary: URL, arguments: String = "", is32Bit: Bool = false, isSteam: Bool = false, jitEnabler: JITEnabler, completion: @escaping (Bool) -> Void) {
+        guard FileManager.default.fileExists(atPath: binary.path),
+              let parsedArguments = BoxTranslator.parseArguments(arguments) else {
             completion(false)
             return
         }
-        
+
         let architectureTranslator = BoxTranslator()
-        
-        architectureTranslator.translateAndRun(executablePath: binary.path, environment: winePrefixPath, is32Bit: is32Bit, isSteam: isSteam, jitEnabler: jitEnabler) { status in
+        architectureTranslator.translateAndRun(
+            executablePath: binary.path,
+            arguments: parsedArguments,
+            environment: winePrefixPath,
+            is32Bit: is32Bit,
+            isSteam: isSteam,
+            jitEnabler: jitEnabler
+        ) { status in
             completion(status == 0)
         }
+    }
+
+    func applyGameProfile(_ profile: WindowsGameProfile) {
+        if profile.resolution == "Device native" {
+            unsetenv("MADEIRA_SCREEN_W")
+            unsetenv("MADEIRA_SCREEN_H")
+        } else {
+            let parts = profile.resolution.split(separator: "x")
+            if parts.count == 2, let width = Int(parts[0]), let height = Int(parts[1]),
+               (320...7680).contains(width), (240...4320).contains(height) {
+                setenv("MADEIRA_SCREEN_W", String(width), 1)
+                setenv("MADEIRA_SCREEN_H", String(height), 1)
+                setenv("MADEIRA_SCREEN_SRC", "knob", 1)
+            }
+        }
+
+        if profile.avxEnabled {
+            setenv("MADEIRA_FEX_AVX", "1", 1)
+        } else {
+            unsetenv("MADEIRA_FEX_AVX")
+        }
+
+        if profile.metalFXEnabled {
+            setenv("MVK_CONFIG_USE_METALFX", "1", 1)
+        } else {
+            unsetenv("MVK_CONFIG_USE_METALFX")
+        }
+
+        setenv("IDECK_PREFERRED_GRAPHICS_API", profile.graphicsAPI, 1)
+        setenv("IDECK_FPS_LIMIT", profile.fpsLimit, 1)
     }
 }
 
 private class BoxTranslator {
-    func translateAndRun(executablePath: String, environment: String, is32Bit: Bool, isSteam: Bool, jitEnabler: JITEnabler, completion: @escaping (Int) -> Void) {
+    static func parseArguments(_ command: String) -> [String]? {
+        guard command.utf8.count <= 4096 else { return nil }
+        var result: [String] = []
+        var current = ""
+        var inQuotes = false
+        var escaping = false
+        var hasToken = false
+
+        for character in command {
+            if escaping {
+                current.append(character)
+                escaping = false
+                hasToken = true
+            } else if character == "\\" {
+                escaping = true
+                hasToken = true
+            } else if character == "\"" {
+                inQuotes.toggle()
+                hasToken = true
+            } else if character.isWhitespace && !inQuotes {
+                if hasToken {
+                    result.append(current)
+                    current = ""
+                    hasToken = false
+                    if result.count > 64 { return nil }
+                }
+            } else {
+                current.append(character)
+                hasToken = true
+            }
+        }
+
+        if escaping { current.append("\\") }
+        guard !inQuotes else { return nil }
+        if hasToken { result.append(current) }
+        guard result.count <= 64 else { return nil }
+        return result
+    }
+
+    func translateAndRun(executablePath: String, arguments: [String], environment: String, is32Bit: Bool, isSteam: Bool, jitEnabler: JITEnabler, completion: @escaping (Int) -> Void) {
         let boxBinary = is32Bit ? "\(environment)/usr/bin/box86" : "\(environment)/usr/bin/box64"
         let wineBinary = is32Bit ? "\(environment)/usr/bin/wine" : "\(environment)/usr/bin/wine64"
         var pid: pid_t = 0
-        
+
         var args = [boxBinary, wineBinary, executablePath]
-        
+        args.append(contentsOf: arguments)
+
         if isSteam {
             args.append(contentsOf: ["-no-cef-sandbox", "-tcp", "-allopenal", "-login"])
         }
-        
+
         var cArgs = args.map { strdup($0) }
         cArgs.append(nil)
-        
+
         let env = ProcessInfo.processInfo.environment
         var cEnv = env.map { strdup("\($0.key)=\($0.value)") }
         cEnv.append(nil)
-        
+
         let spawnStatus = posix_spawn(&pid, boxBinary, nil, nil, cArgs, cEnv)
-        
+
         for arg in cArgs { free(arg) }
         for e in cEnv { free(e) }
-        
+
         if spawnStatus == 0 {
             var status: Int32 = 0
             waitpid(pid, &status, 0)
