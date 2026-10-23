@@ -25,14 +25,6 @@ struct SettingsView: View {
                         
                         settingsSection(title: tr("JIT & Debugging")) {
                             statusRow
-                            
-                            Text(tr("JIT is detected automatically. To activate it, enable JIT for iDeck in StikDebug, then return here."))
-                                .font(.caption)
-                                .foregroundColor(.gray)
-                                .padding()
-                            actionButton(title: tr("Refresh JIT status"), icon: "arrow.clockwise") {
-                                coordinator.refreshJITStatus()
-                            }
                         }
                         
                         settingsSection(title: tr("Steam")) {
@@ -114,7 +106,10 @@ struct SettingsView: View {
         .sheet(isPresented: $isSteamSignInPresented) {
             SteamSignInView()
         }
-        .task { await updater.check() }
+        .task {
+            coordinator.refreshJITStatus()
+            await updater.check()
+        }
         .preferredColorScheme(.dark)
     }
     

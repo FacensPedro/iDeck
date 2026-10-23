@@ -56,6 +56,21 @@ func trStatus(_ status: String) -> String {
 enum Translations {
     static let table: [String: [String: String]] = [
         // Modes
+        "Madeira": ["pt": "Madeira", "es": "Madeira"],
+        "Installed games": ["pt": "Jogos instalados", "es": "Juegos instalados"],
+        "Your installed games will appear here": ["pt": "Seus jogos instalados aparecerão aqui", "es": "Tus juegos instalados aparecerán aquí"],
+        "Stop download": ["pt": "Parar download", "es": "Detener descarga"],
+        "Stopping...": ["pt": "Parando...", "es": "Deteniendo..."],
+        "Preparing download...": ["pt": "Preparando download...", "es": "Preparando descarga..."],
+        "Finishing installation...": ["pt": "Finalizando instalação...", "es": "Finalizando instalación..."],
+        "App size: %@": ["pt": "Tamanho do app: %@", "es": "Tamaño de la aplicación: %@"],
+        "View Steam Cloud saves": ["pt": "Ver saves do Steam Cloud", "es": "Ver partidas guardadas de Steam Cloud"],
+        "Steam Cloud files open on Steam; in-app synchronization is not available yet.": ["pt": "Os saves do Steam Cloud abrem na Steam; a sincronização dentro do iDeck ainda não está disponível.", "es": "Los archivos de Steam Cloud se abren en Steam; la sincronización dentro de iDeck aún no está disponible."],
+        "DLC for this game": ["pt": "DLCs deste jogo", "es": "DLC de este juego"],
+        "No DLC found for this game": ["pt": "Nenhuma DLC encontrada para este jogo", "es": "No se encontraron DLC para este juego"],
+        "Could not uninstall DLC safely.": ["pt": "Não foi possível desinstalar a DLC com segurança.", "es": "No se pudo desinstalar el DLC de forma segura."],
+        "JIT is not available. Activate it for iDeck in StikDebug.": ["pt": "O JIT não está disponível. Ative-o para o iDeck no StikDebug.", "es": "JIT no está disponible. Actívalo para iDeck en StikDebug."],
+        "Install this game before installing its DLC.": ["pt": "Instale este jogo antes de instalar suas DLCs.", "es": "Instala este juego antes de instalar su DLC."],
         "Choose a mode": ["pt": "Escolha um modo", "es": "Elige un modo"],
         "PC Gaming": ["pt": "Jogos de PC", "es": "Juegos de PC"],
         "Steam games and Windows apps": ["pt": "Jogos Steam e aplicativos de PC", "es": "Juegos de Steam y aplicaciones de PC"],

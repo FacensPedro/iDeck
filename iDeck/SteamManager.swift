@@ -4597,18 +4597,29 @@ final class SteamOwnedGamesModel: ObservableObject {
     @Published private(set) var downloadErrors: [UInt32: String] = [:]
     @Published private(set) var installedApps: Set<UInt32> = []
     @Published private(set) var availableDLC: [UInt32: [UInt32]] = [:]
+    @Published private(set) var dlcMetadata: [UInt32: SteamAppInfo] = [:]
+    @Published private(set) var installedDLC: [UInt32: Set<UInt32>] = [:]
+    @Published private(set) var cancellingApps: Set<UInt32> = []
 
+    private var installTasks: [UInt32: Task<Void, Never>] = [:]
+    private var lastRefresh: Date?
+    private var lastAccountName: String?
     private let session = SteamSession()
     private lazy var fetcher = SteamLibraryFetcher(session: session)
     private lazy var downloader = DepotDownloader(session: session)
 
-    func refresh() async {
+    func refresh(force: Bool = false) async {
         guard SteamSignIn.isSignedIn else {
             games = []
             errorMessage = nil
             return
         }
         guard !isLoading else { return }
+        let account = SteamSignIn.accountName
+        if !force, !games.isEmpty, lastAccountName == account,
+           let lastRefresh, Date().timeIntervalSince(lastRefresh) < 120 {
+            return
+        }
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
@@ -4616,15 +4627,22 @@ final class SteamOwnedGamesModel: ObservableObject {
             games = try await fetcher.fetchOwnedApps().sorted {
                 $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
             }
+            lastRefresh = Date()
+            lastAccountName = account
         } catch {
             errorMessage = SteamSignIn.message(error)
-            games = []
         }
     }
 
     func loadDLC(appID: UInt32) async {
         do {
-            guard let info = try await fetcher.fetchInstallInfo(appID: appID) else {
+            let info: SteamAppInfo?
+            if let cached = games.first(where: { $0.appID == appID }) {
+                info = cached
+            } else {
+                info = try await fetcher.fetchInstallInfo(appID: appID)
+            }
+            guard let info else {
                 availableDLC[appID] = []
                 return
             }
@@ -4632,16 +4650,61 @@ final class SteamOwnedGamesModel: ObservableObject {
                 availableDLC[appID] = []
                 return
             }
-            availableDLC[appID] = Array(Set(info.depots.compactMap { depot -> UInt32? in
+            let ids = Array(Set(info.depots.compactMap { depot -> UInt32? in
                 guard depot.publicManifestID != nil,
                       depot.supports(os: "windows"),
                       let dlc = depot.dlcAppID,
                       dlc != appID else { return nil }
                 return dlc
             })).sorted()
+            availableDLC[appID] = ids
+            for id in ids.prefix(32) where dlcMetadata[id] == nil {
+                if let details = try? await fetcher.fetchAppInfo(appID: id), details.appID == id {
+                    dlcMetadata[id] = details
+                }
+            }
         } catch {
             availableDLC[appID] = []
         }
+    }
+
+    func startInstall(appID: UInt32, prefixPath: URL) {
+        guard installTasks[appID] == nil else { return }
+        installTasks[appID] = Task { @MainActor in
+            await self.install(appID: appID, prefixPath: prefixPath)
+            self.installTasks.removeValue(forKey: appID)
+            self.cancellingApps.remove(appID)
+        }
+    }
+
+    func canCancelInstall(appID: UInt32) -> Bool {
+        installTasks[appID] != nil
+    }
+
+    func cancelInstall(appID: UInt32) {
+        guard let task = installTasks[appID] else { return }
+        cancellingApps.insert(appID)
+        task.cancel()
+    }
+
+    func refreshInstalledDLC(appID: UInt32, prefixPath: URL) {
+        let steamApps = SteamInstallPaths.steamApps(
+            drive: prefixPath.appendingPathComponent("drive_c", isDirectory: true))
+        let ids = availableDLC[appID] ?? []
+        installedDLC[appID] = Set(ids.filter {
+            SteamDLCRecords.isInstalled(parentID: appID, dlcID: $0, steamApps: steamApps)
+        })
+    }
+
+    func uninstallDLC(appID: UInt32, dlcAppID: UInt32, prefixPath: URL) -> Bool {
+        guard availableDLC[appID]?.contains(dlcAppID) == true,
+              !installingApps.contains(appID) else { return false }
+        let steamApps = SteamInstallPaths.steamApps(
+            drive: prefixPath.appendingPathComponent("drive_c", isDirectory: true))
+        let removed = SteamDLCRecords.uninstall(parentID: appID, dlcID: dlcAppID,
+                                                 steamApps: steamApps)
+        refreshInstalledDLC(appID: appID, prefixPath: prefixPath)
+        return removed
     }
 
     func isInstalled(appID: UInt32, prefixPath: URL) -> Bool {
@@ -4676,15 +4739,20 @@ final class SteamOwnedGamesModel: ObservableObject {
         downloadErrors[appID] = nil
         downloadProgress[appID] = SteamDownloadProgress()
         defer { installingApps.remove(appID) }
+        var installFolder: String?
+        let drive = prefixPath.appendingPathComponent("drive_c", isDirectory: true)
+        let steamApps = SteamInstallPaths.steamApps(drive: drive)
+        let wasInstalled = isInstalled(appID: appID, prefixPath: prefixPath)
         do {
+            try Task.checkCancellation()
             guard let app = try await fetcher.fetchInstallInfo(appID: appID) else {
                 throw SteamError.depotNotFound(appID)
             }
+            installFolder = SteamInstallFiles.safeFolderName(
+                app.installDir.isEmpty ? "app_\(app.appID)" : app.installDir)
             guard app.installableOnWindows else {
                 throw SteamError.depotNotFound(appID)
             }
-            let drive = prefixPath.appendingPathComponent("drive_c", isDirectory: true)
-            let steamApps = SteamInstallPaths.steamApps(drive: drive)
             try FileManager.default.createDirectory(at: steamApps, withIntermediateDirectories: true)
             _ = try await downloader.install(
                 app,
@@ -4694,10 +4762,17 @@ final class SteamOwnedGamesModel: ObservableObject {
                     self?.downloadProgress[appID] = progress
                 }
             )
+            try Task.checkCancellation()
             installedApps.insert(appID)
             downloadErrors[appID] = nil
         } catch {
-            downloadErrors[appID] = SteamSignIn.message(error)
+            let cancelled = Task.isCancelled || error is CancellationError
+            if cancelled, !wasInstalled, let installFolder {
+                SteamInstallFiles.delete(appID: Int(appID), folderName: installFolder,
+                                         steamApps: steamApps)
+            }
+            downloadProgress.removeValue(forKey: appID)
+            downloadErrors[appID] = cancelled ? nil : SteamSignIn.message(error)
         }
     }
 
@@ -4736,12 +4811,20 @@ final class SteamOwnedGamesModel: ObservableObject {
                 dlcOnly: true,
                 progress: { [weak self] progress in self?.downloadProgress[appID] = progress })
             installedApps.insert(appID)
+            refreshInstalledDLC(appID: appID, prefixPath: prefixPath)
         } catch {
             downloadErrors[appID] = SteamSignIn.message(error)
         }
     }
 
     func disconnect() {
+        for task in installTasks.values { task.cancel() }
+        installTasks.removeAll()
+        lastRefresh = nil
+        lastAccountName = nil
+        availableDLC.removeAll()
+        installedDLC.removeAll()
+        dlcMetadata.removeAll()
         games = []
         errorMessage = nil
         downloadErrors = [:]
