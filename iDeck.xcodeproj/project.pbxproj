@@ -6,6 +6,10 @@
 	objectVersion = 56;
 	objects = {
 
+		E10000000000000000000001 /* SteamKeyValues.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000001 /* SteamKeyValues.swift */; };
+		E10000000000000000000002 /* SteamChunkCodecs.c in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000002 /* SteamChunkCodecs.c */; };
+		E10000000000000000000003 /* libzstd in Frameworks */ = {isa = PBXBuildFile; productRef = E40000000000000000000001 /* libzstd */; };
+		E10000000000000000000004 /* PLzmaSDK-Static in Frameworks */ = {isa = PBXBuildFile; productRef = E40000000000000000000002 /* PLzmaSDK-Static */; };
 		D10000000000000000000001 /* RuntimeLifecycle.mm in Sources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000001 /* RuntimeLifecycle.mm */; };
 		D10000000000000000000002 /* FEXMemoryManager.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000002 /* FEXMemoryManager.cpp */; };
 		D10000000000000000000003 /* WineEnvironmentManager.c in Sources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000003 /* WineEnvironmentManager.c */; };
@@ -117,12 +121,17 @@
 		A20000000000000000000003 /* SteamDepotManifest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamDepotManifest.swift; sourceTree = "<group>"; };
 		A20000000000000000000004 /* SteamAppManifestWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamAppManifestWriter.swift; sourceTree = "<group>"; };
 		A20000000000000000000005 /* SteamInstall.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamInstall.swift; sourceTree = "<group>"; };
+		E20000000000000000000001 /* SteamKeyValues.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamKeyValues.swift; sourceTree = "<group>"; };
+		E20000000000000000000002 /* SteamChunkCodecs.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = SteamChunkCodecs.c; sourceTree = "<group>"; };
+		E20000000000000000000003 /* SteamChunkCodecs.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SteamChunkCodecs.h; sourceTree = "<group>"; }
 		A20000000000000000000006 /* WindowsLibraryModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowsLibraryModels.swift; sourceTree = "<group>"; };
 
 		333333333333333333333331 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E10000000000000000000003 /* libzstd in Frameworks */,
+				E10000000000000000000004 /* PLzmaSDK-Static in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -177,6 +186,8 @@
 				A10000000000000000000003 /* SteamDepotManifest.swift in Sources */,
 				A10000000000000000000004 /* SteamAppManifestWriter.swift in Sources */,
 				A10000000000000000000005 /* SteamInstall.swift in Sources */,
+				E10000000000000000000001 /* SteamKeyValues.swift in Sources */,
+				E10000000000000000000002 /* SteamChunkCodecs.c in Sources */,
 				A10000000000000000000006 /* WindowsLibraryModels.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -247,6 +258,9 @@
 				A20000000000000000000003 /* SteamDepotManifest.swift */,
 				A20000000000000000000004 /* SteamAppManifestWriter.swift */,
 				A20000000000000000000005 /* SteamInstall.swift */,
+				E20000000000000000000001 /* SteamKeyValues.swift */,
+				E20000000000000000000002 /* SteamChunkCodecs.c */,
+				E20000000000000000000003 /* SteamChunkCodecs.h */,
 				A20000000000000000000006 /* WindowsLibraryModels.swift */,
 			);
 			path = iDeck;
@@ -286,6 +300,10 @@
 				999999999999999999999941 /* PBXTargetDependency */,
 			);
 			name = iDeck;
+			packageProductDependencies = (
+				E40000000000000000000001 /* libzstd */,
+				E40000000000000000000002 /* PLzmaSDK-Static */,
+			);
 			productName = iDeck;
 			productReference = 222222222222222222222227 /* iDeck.app */;
 			productType = "com.apple.product-type.application";
@@ -443,6 +461,10 @@
 				Base,
 			);
 			mainGroup = 444444444444444444444443;
+			packageReferences = (
+				E30000000000000000000001 /* XCRemoteSwiftPackageReference "zstd" */,
+				E30000000000000000000002 /* XCRemoteSwiftPackageReference "PLzmaSDK" */,
+			);
 			productRefGroup = 444444444444444444444442 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -462,6 +484,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				INFOPLIST_FILE = iDeck/Info.plist;
 				SWIFT_OBJC_BRIDGING_HEADER = "iDeck/iDeck-Bridging-Header.h";
+				OTHER_LDFLAGS = ("$(inherited)", "-lz");
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_PREVIEWS = YES;
@@ -494,6 +517,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				INFOPLIST_FILE = iDeck/Info.plist;
 				SWIFT_OBJC_BRIDGING_HEADER = "iDeck/iDeck-Bridging-Header.h";
+				OTHER_LDFLAGS = ("$(inherited)", "-lz");
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_PREVIEWS = YES;
@@ -590,6 +614,27 @@
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
+		};
+
+		E30000000000000000000001 /* XCRemoteSwiftPackageReference "zstd" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/facebook/zstd";
+			requirement = {kind = exactVersion; version = 1.5.7; };
+		};
+		E30000000000000000000002 /* XCRemoteSwiftPackageReference "PLzmaSDK" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/OlehKulykov/PLzmaSDK";
+			requirement = {kind = exactVersion; version = 1.6.2; };
+		};
+		E40000000000000000000001 /* libzstd */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E30000000000000000000001 /* XCRemoteSwiftPackageReference "zstd" */;
+			productName = libzstd;
+		};
+		E40000000000000000000002 /* PLzmaSDK-Static */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E30000000000000000000002 /* XCRemoteSwiftPackageReference "PLzmaSDK" */;
+			productName = PLzmaSDK-Static;
 		};
 	};
 	rootObject = 777777777777777777777771 /* Project object */;

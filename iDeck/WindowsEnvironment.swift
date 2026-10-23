@@ -34,7 +34,7 @@ class WindowsEnvironment {
             return false
         }
         return requiredSymbols.allSatisfy { name in
-            name.withCString { dlsym(RTLD_DEFAULT, $0) != nil }
+            name.withCString { dlsym(UnsafeMutableRawPointer(bitPattern: -2), $0) != nil }
         }
     }
 
@@ -177,7 +177,7 @@ private class BoxTranslator {
             UnsafePointer<CChar>?
         ) -> Int32
 
-        guard let symbol = "ideck_madeira_launch_v1".withCString({ dlsym(RTLD_DEFAULT, $0) }),
+        guard let symbol = "ideck_madeira_launch_v1".withCString({ dlsym(UnsafeMutableRawPointer(bitPattern: -2), $0) }),
               !environment.isEmpty,
               FileManager.default.fileExists(atPath: executablePath),
               let payload = try? JSONSerialization.data(withJSONObject: [

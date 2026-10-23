@@ -2451,6 +2451,19 @@ private final class SteamWebSocketDelegate: NSObject, URLSessionWebSocketDelegat
     }
 }
 
+private final class SteamPingResumeGuard: @unchecked Sendable {
+    private let lock = NSLock()
+    private var completed = false
+
+    func claim() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        if completed { return false }
+        completed = true
+        return true
+    }
+}
+
 // MARK: - SteamConnection
 
 /// WebSocket transport to a Steam CM server (wss://).
@@ -2485,7 +2498,7 @@ actor SteamConnection {
             webSocketTask = task
             task.resume()
             do {
-                let guardOnce = LogonResumeGuard()
+                let guardOnce = SteamPingResumeGuard()
                 try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
                     task.sendPing { error in
                         guard guardOnce.claim() else { return }
@@ -3656,7 +3669,7 @@ class SteamSession: SteamCMSession {
 
 }
 
-extension SteamSession: SteamCMSession {}
+
 
 // MARK: - Data Extensions
 

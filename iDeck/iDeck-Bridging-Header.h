@@ -4,4 +4,6 @@
 #import "LiveContainerHook.h"
 #import "NativeRuntimeDiagnostics.h"
 
+#import "SteamChunkCodecs.h"
+
 #endif /* iDeck_Bridging_Header_h */
