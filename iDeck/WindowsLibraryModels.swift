@@ -314,7 +314,7 @@ enum WindowsPEIcon {
             }
             return nil
         }
-        guard let rootOffset = fileOffset(resourceRVA, length: 16) else { return nil }
+        guard fileOffset(resourceRVA, length: 16) != nil else { return nil }
         func relativeOffset(_ value: Int, length: Int = 1) -> Int? {
             guard value >= 0, value <= 32 * 1024 * 1024 else { return nil }
             return fileOffset(resourceRVA + value, length: length)

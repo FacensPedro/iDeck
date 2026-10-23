@@ -10,6 +10,7 @@ struct MainView: View {
     @ObservedObject var coordinator: SystemCoordinator
     @Environment(\.scenePhase) private var scenePhase
     @State private var selectedWorkspace: IDeckWorkspace?
+    @StateObject private var steamLibrary = SteamOwnedGamesModel()
 
     var body: some View {
         Group {
@@ -240,7 +241,6 @@ struct WindowsWorkspaceView: View {
     @State private var isSettingsPresented = false
     @State private var searchText = ""
     @State private var prefixPath: URL?
-    @StateObject private var steamLibrary = SteamOwnedGamesModel()
     @StateObject private var appManager = AppManager()
     @StateObject private var windowsLibrary = WindowsLibraryStore()
     @State private var isExecutablePickerPresented = false
@@ -648,6 +648,15 @@ struct WindowsWorkspaceView: View {
         }
     }
 
+    private func displayedSize(for game: SteamAppInfo) -> UInt64 {
+        let known = game.downloadSize(for: "windows")
+        guard known == 0, let prefixPath else { return known }
+        let steamApps = SteamInstallPaths.steamApps(
+            drive: prefixPath.appendingPathComponent("drive_c", isDirectory: true))
+        return UInt64(max(0, SteamInstallFiles.sizeOnDisk(
+            appID: Int(game.appID), steamApps: steamApps) ?? 0))
+    }
+
     private func gameCard(_ game: SteamAppInfo) -> some View {
         let progress = steamLibrary.downloadProgress[game.appID]
         let percent = Int(((progress?.fraction ?? 0) * 100).rounded())
@@ -665,18 +674,7 @@ struct WindowsWorkspaceView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            let knownDownloadBytes = game.downloadSize(for: "windows")
-            let installedBytes: UInt64
-            if knownDownloadBytes == 0,
-               let prefixPath {
-                let steamApps = SteamInstallPaths.steamApps(
-                    drive: prefixPath.appendingPathComponent("drive_c", isDirectory: true))
-                installedBytes = UInt64(max(0,
-                    SteamInstallFiles.sizeOnDisk(appID: Int(game.appID), steamApps: steamApps) ?? 0))
-            } else {
-                installedBytes = 0
-            }
-            let downloadBytes = knownDownloadBytes > 0 ? knownDownloadBytes : installedBytes
+            let downloadBytes = displayedSize(for: game)
             if downloadBytes > 0 {
                 Text("(\(ByteCountFormatter.string(fromByteCount: Int64(clamping: downloadBytes), countStyle: .file)))")
                     .font(.caption)

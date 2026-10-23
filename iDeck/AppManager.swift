@@ -177,9 +177,9 @@ class AppManager: ObservableObject {
 
     func installIPA(from url: URL, completion: @escaping (Result<URL, IPAInstallError>) -> Void) {
         let hasScope = url.startAccessingSecurityScopedResource()
-        let fileManager = self.fileManager
         let appsDirectory = self.appsDirectory
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            let fileManager = FileManager.default
             defer { if hasScope { url.stopAccessingSecurityScopedResource() } }
             let workDirectory = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
             let extractPath = workDirectory.appendingPathComponent("Extracted", isDirectory: true)
