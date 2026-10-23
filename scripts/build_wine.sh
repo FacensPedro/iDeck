@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -euo pipefail
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SOURCE="$ROOT/vendor/Madeira/build/ntdll-unix/build.sh"
+[[ "$(uname -s)" == "Darwin" ]] || { echo "Requires macOS/Xcode" >&2; exit 2; }
+[[ -f "$SOURCE" ]] || { echo "Missing Madeira Wine/ntdll build script. Run scripts/fetch_madeira_sources.sh" >&2; exit 2; }
+command -v xcrun >/dev/null || { echo "Missing Xcode command line tools" >&2; exit 2; }
+cd "$(dirname "$SOURCE")"
+bash "$SOURCE" "$@"
+echo "Note: ntdll build alone does not complete the Wine ARM64EC runtime."
