@@ -203,7 +203,6 @@ enum Translations {
         "JIT is detected automatically. To activate it, enable JIT for iDeck in StikDebug, then return here.": ["pt": "O JIT é detectado automaticamente. Para ativá-lo, ative o JIT do iDeck no StikDebug e volte para cá.", "es": "El JIT se detecta automáticamente. Para activarlo, activa el JIT de iDeck en StikDebug y vuelve aquí."],
         "Steam disconnected": ["pt": "Steam desconectado", "es": "Steam desconectado"],
         "Madeira runtime missing": ["pt": "Runtime do Madeira ausente", "es": "Falta el runtime de Madeira"],
-        "Executable imported. Enable JIT for iDeck in StikDebug before running it.": ["pt": "Executável importado. Ative o JIT do iDeck no StikDebug antes de executá-lo.", "es": "Ejecutable importado. Activa el JIT de iDeck en StikDebug antes de ejecutarlo."],
         "Executable import failed": ["pt": "Falha ao importar o executável", "es": "Error al importar el ejecutable"],
         "Container initialization failed": ["pt": "Falha ao inicializar o contêiner", "es": "Error al inicializar el contenedor"],
         "dlopen failed": ["pt": "Falha no dlopen", "es": "Falló dlopen"],
