@@ -162,15 +162,18 @@ struct WindowsWorkspaceView: View {
                 topBar
                 ScrollView {
                     VStack(alignment: .leading, spacing: 22) {
-                        ViewThatFits(in: .horizontal) {
+                        Group {
+                            if !isCompact && !dynamicTypeSize.isAccessibilitySize {
                             HStack(alignment: .center, spacing: 14) {
                                 libraryHeading
                                 Spacer(minLength: 8)
                                 steamConnectButton
                             }
+                            } else {
                             VStack(alignment: .leading, spacing: 14) {
                                 libraryHeading
                                 steamConnectButton
+                            }
                             }
                         }
 
@@ -219,8 +222,9 @@ struct WindowsWorkspaceView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 14))
                         }
 
-                        ViewThatFits(in: .horizontal) {
-                            HStack(spacing: 12) {
+                        Group {
+                            if !isCompact && !dynamicTypeSize.isAccessibilitySize {
+                                HStack(spacing: 12) {
                             Button {
                                 isExecutablePickerPresented = true
                             } label: {
@@ -244,7 +248,8 @@ struct WindowsWorkspaceView: View {
                                     .clipShape(RoundedRectangle(cornerRadius: 12))
                             }
                             }
-                            VStack(spacing: 12) {
+                            } else {
+                                VStack(spacing: 12) {
                             Button {
                                 isExecutablePickerPresented = true
                             } label: {
@@ -266,6 +271,7 @@ struct WindowsWorkspaceView: View {
                                     .frame(maxWidth: .infinity)
                                     .background(Color(red: 0.12, green: 0.35, blue: 0.65))
                                     .clipShape(RoundedRectangle(cornerRadius: 12))
+                            }
                             }
                             }
                         }
