@@ -2,6 +2,7 @@
 #import <Foundation/Foundation.h>
 #import <QuartzCore/CAMetalLayer.h>
 #import <Metal/Metal.h>
+#include <new>
 struct IDeckMetalSwapchain { CAMetalLayer *layer; };
 extern "C" void *ideck_metal_swapchain_create(void *metal_layer) {
     if (!metal_layer) return nullptr;
@@ -12,7 +13,7 @@ extern "C" void *ideck_metal_swapchain_create(void *metal_layer) {
     if (!layer.device) return nullptr;
     layer.pixelFormat = MTLPixelFormatBGRA8Unorm;
     layer.framebufferOnly = NO;
-    return new IDeckMetalSwapchain{layer};
+    return new (std::nothrow) IDeckMetalSwapchain{layer};
 }
 extern "C" void ideck_metal_swapchain_destroy(void *swapchain) {
     delete static_cast<IDeckMetalSwapchain *>(swapchain);
