@@ -8,7 +8,8 @@ class WindowsEnvironment {
     let steamManager = SteamManager()
     
     func hasRuntime(in prefix: String) -> Bool {
-        guard let manifestURL = Bundle.main.url(forResource: "MadeiraRuntimeManifest", withExtension: "plist"),
+        guard FileManager.default.fileExists(atPath: prefix),
+              let manifestURL = Bundle.main.url(forResource: "MadeiraRuntimeManifest", withExtension: "plist"),
               let data = try? Data(contentsOf: manifestURL),
               let rawManifest = try? PropertyListSerialization.propertyList(from: data, options: [], format: nil),
               let manifest = rawManifest as? [String: Any],
@@ -23,8 +24,9 @@ class WindowsEnvironment {
             "fex_initialize",
             "wineserver_start",
             "wine_process_start",
-            "madeira_dxmt_runtime_ready",
-            "madeira_d3d12_runtime_ready"
+            "madeira_get_present_count",
+            "madeira_d3d12_canary_run",
+            "ideck_madeira_launch_v1"
         ]
         return requiredSymbols.allSatisfy { name in
             name.withCString { dlsym(RTLD_DEFAULT, $0) != nil }
@@ -163,35 +165,38 @@ private class BoxTranslator {
     }
 
     func translateAndRun(executablePath: String, arguments: [String], environment: String, is32Bit: Bool, isSteam: Bool, jitEnabler: JITEnabler, completion: @escaping (Int) -> Void) {
-        let boxBinary = is32Bit ? "\(environment)/usr/bin/box86" : "\(environment)/usr/bin/box64"
-        let wineBinary = is32Bit ? "\(environment)/usr/bin/wine" : "\(environment)/usr/bin/wine64"
-        var pid: pid_t = 0
+        typealias NativeLaunch = @convention(c) (
+            UnsafePointer<CChar>?,
+            UnsafePointer<CChar>?,
+            UnsafePointer<CChar>?
+        ) -> Int32
 
-        var args = [boxBinary, wineBinary, executablePath]
-        args.append(contentsOf: arguments)
-
-        if isSteam {
-            args.append(contentsOf: ["-no-cef-sandbox", "-tcp", "-allopenal", "-login"])
+        guard let symbol = "ideck_madeira_launch_v1".withCString({ dlsym(RTLD_DEFAULT, $0) }),
+              !environment.isEmpty,
+              FileManager.default.fileExists(atPath: executablePath),
+              let payload = try? JSONSerialization.data(withJSONObject: [
+                "version": 1,
+                "arguments": arguments,
+                "is32Bit": is32Bit,
+                "isSteam": isSteam
+              ]),
+              let request = String(data: payload, encoding: .utf8) else {
+            completion(-1)
+            return
         }
 
-        var cArgs = args.map { strdup($0) }
-        cArgs.append(nil)
-
-        let env = ProcessInfo.processInfo.environment
-        var cEnv = env.map { strdup("\($0.key)=\($0.value)") }
-        cEnv.append(nil)
-
-        let spawnStatus = posix_spawn(&pid, boxBinary, nil, nil, cArgs, cEnv)
-
-        for arg in cArgs { free(arg) }
-        for e in cEnv { free(e) }
-
-        if spawnStatus == 0 {
-            var status: Int32 = 0
-            waitpid(pid, &status, 0)
-            completion(Int(status))
-        } else {
-            completion(-1)
+        let launch = unsafeBitCast(symbol, to: NativeLaunch.self)
+        DispatchQueue.global(qos: .userInitiated).async {
+            let status = executablePath.withCString { executable in
+                environment.withCString { prefix in
+                    request.withCString { json in
+                        launch(executable, prefix, json)
+                    }
+                }
+            }
+            DispatchQueue.main.async {
+                completion(Int(status))
+            }
         }
     }
 }

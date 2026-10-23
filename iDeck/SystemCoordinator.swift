@@ -168,7 +168,7 @@ class SystemCoordinator: ObservableObject {
                         if success {
                             self.isContainerReady = true
                             self.windowsEnvironment.configureWine(prefix: mountPath)
-                            self.setWindowsStatus("Windows Ready")
+                            self.setWindowsStatus(self.windowsEnvironment.hasRuntime(in: mountPath) ? "Windows Runtime Ready" : "Library Ready — Madeira native runtime is not bundled")
                         } else {
                             self.setWindowsStatus("Failed to Install Windows Environment")
                         }
@@ -267,7 +267,7 @@ class SystemCoordinator: ObservableObject {
             }
             guard self.windowsEnvironment.hasRuntime(in: mountPath) else {
                 DispatchQueue.main.async {
-                    self.setWindowsStatus("Madeira runtime missing: FEX/box64 and Wine ARM64EC are not installed.")
+                    self.setWindowsStatus("Madeira runtime missing: in-process FEX, Wine ARM64EC, DXMT, D3D12 and native launch bridge are not linked.")
                 }
                 return
             }

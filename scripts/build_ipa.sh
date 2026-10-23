@@ -20,6 +20,12 @@ APP="$BUILD_DIR/Build/Products/Release-iphoneos/iDeck.app"
 [ -d "$APP" ] || { echo "error: $APP not found" >&2; exit 1; }
 [ -d "$APP/PlugIns/VPNExtension.appex" ] || { echo "error: VPNExtension.appex was not embedded" >&2; exit 1; }
 
+if [ "${IDECK_REQUIRE_MADEIRA:-0}" = "1" ]; then
+  python3 scripts/verify_madeira_bundle.py --app "$APP" --require
+else
+  python3 scripts/verify_madeira_bundle.py --app "$APP"
+fi
+
 mkdir -p Payload
 cp -R "$APP" Payload/
 zip -qry iDeck.ipa Payload
