@@ -49,7 +49,7 @@ final class DepotDownloader {
     private let session: SteamCMSession
     private var depotKeys: [UInt32: Data] = [:]
     private var cdnAuthTokens: [String: String] = [:]  // "depot|host" -> "?auth=…" fragment
-    private let maxConcurrentChunks = 12
+    private let maxConcurrentChunks = 6
     private let attemptsPerChunk = 5
     private let hostPoolSize = 6
 
@@ -59,7 +59,7 @@ final class DepotDownloader {
         config.requestCachePolicy = .reloadIgnoringLocalCacheData
         config.timeoutIntervalForRequest = 30
         config.timeoutIntervalForResource = 300
-        config.httpMaximumConnectionsPerHost = 12
+        config.httpMaximumConnectionsPerHost = 6
         return URLSession(configuration: config)
     }()
 
@@ -79,8 +79,12 @@ final class DepotDownloader {
     func install(_ app: SteamAppInfo, steamApps: URL,
                  ownedDepots: @escaping () async -> Set<UInt32>? = { nil },
                  includedDLC: Set<UInt32> = [],
+                 dlcOnly: Bool = false,
                  progress report: @escaping (SteamDownloadProgress) -> Void) async throws -> URL {
-        let depots = app.installDepots(includingDLC: includedDLC)
+        let selected = app.installDepots(includingDLC: includedDLC)
+        let depots = dlcOnly
+            ? selected.filter { $0.dlcAppID.map { includedDLC.contains($0) } == true }
+            : selected
         guard !depots.isEmpty else { throw SteamError.depotNotFound(app.appID) }
         // Before the key requests, so a refused depot still has its selection logged.
         SteamLog.event("[steam-depot] selection app=\(app.appID) build=\(app.buildID) \(app.depotSelectionSummary())")
@@ -233,13 +237,15 @@ final class DepotDownloader {
                 .map { $0.filename.replacingOccurrences(of: "/", with: "\\") }
         }
         if !custom.isEmpty { SteamLog.event("[steam-record] custom-executables app=\(app.appID) custom=\(custom.count)") }
-        try AppManifestWriter.writeManifest(
-            appID: app.appID, name: app.name, installDir: folderName, buildID: app.buildID,
-            steamID: accountID, sizeOnDisk: prepared.totalUncompressed,
-            steamAppsPath: steamApps.path, installedDepots: own,
-            sharedDepots: shared.map { ($0.depotID, Int(owners[UInt32($0.depotID)]!)) },
-            customExecutables: custom)
-        if !shared.isEmpty {
+        if !dlcOnly {
+            try AppManifestWriter.writeManifest(
+                appID: app.appID, name: app.name, installDir: folderName, buildID: app.buildID,
+                steamID: accountID, sizeOnDisk: prepared.totalUncompressed,
+                steamAppsPath: steamApps.path, installedDepots: own,
+                sharedDepots: shared.map { ($0.depotID, Int(owners[UInt32($0.depotID)]!)) },
+                customExecutables: custom)
+        }
+        if !shared.isEmpty && !dlcOnly {
             var written = 0, skipped = 0
             for ownerID in Set(owners.values).sorted() {
                 let depots = shared.filter { owners[UInt32($0.depotID)] == ownerID }

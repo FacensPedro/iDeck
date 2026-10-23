@@ -1378,7 +1378,8 @@ private struct SteamProgramDetailsView: View {
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.bordered)
-                    .disabled((steamLibrary.availableDLC[game.appID] ?? []).isEmpty ||
+                    .disabled(!installed ||
+                              (steamLibrary.availableDLC[game.appID] ?? []).isEmpty ||
                               steamLibrary.installingApps.contains(game.appID))
                     if let error = steamLibrary.downloadErrors[game.appID] {
                         Text(error).foregroundColor(.red).font(.caption)
