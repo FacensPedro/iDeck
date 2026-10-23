@@ -49,9 +49,11 @@ final class DepotDownloader {
     private let session: SteamCMSession
     private var depotKeys: [UInt32: Data] = [:]
     private var cdnAuthTokens: [String: String] = [:]  // "depot|host" -> "?auth=…" fragment
-    private let maxConcurrentChunks = 6
+    private let maxConcurrentChunks = 8
     private let attemptsPerChunk = 5
-    private let hostPoolSize = 6
+    private let hostPoolSize = 8
+    private var cachedContentServers: [String] = []
+    private var cachedContentServersAt = Date.distantPast
 
     private nonisolated static let http: URLSession = {
         let config = URLSessionConfiguration.ephemeral
@@ -59,7 +61,7 @@ final class DepotDownloader {
         config.requestCachePolicy = .reloadIgnoringLocalCacheData
         config.timeoutIntervalForRequest = 30
         config.timeoutIntervalForResource = 300
-        config.httpMaximumConnectionsPerHost = 6
+        config.httpMaximumConnectionsPerHost = 8
         return URLSession(configuration: config)
     }()
 
@@ -665,6 +667,10 @@ final class DepotDownloader {
     }
 
     private func contentServers(appID: UInt32) async throws -> [String] {
+        if !cachedContentServers.isEmpty,
+           Date().timeIntervalSince(cachedContentServersAt) < 10 * 60 {
+            return cachedContentServers
+        }
         var hosts: [String] = []
         do {
             guard let url = URL(string: "https://api.steampowered.com/IContentServerDirectoryService/GetServersForSteamPipe/v1/?cell_id=\(session.cellID)&max_servers=20") else {
@@ -703,6 +709,8 @@ final class DepotDownloader {
         }
         let fallback = "https://steampipe.akamaized.net"
         if !hosts.contains(fallback) { hosts.append(fallback) }
+        cachedContentServers = hosts
+        cachedContentServersAt = Date()
         return hosts
     }
 

@@ -3947,14 +3947,27 @@ struct SteamAppInfo {
     /// `maxsize`. DLC depots and `sharedinstall` redistributables are not part
     /// of the base install and are left out. Treat the figure as "about".
     func downloadSize(for os: String) -> UInt64 {
-        installDepots(os: os).reduce(0) { total, d in
-            let bytes = d.publicDownloadBytes > 0 ? d.publicDownloadBytes : d.maxSize
-            guard bytes > 0 else { return total }
-            // Sizes are parsed from untrusted PICS VDF strings with no bound:
-            // saturate instead of trapping if a malformed depot overflows the sum.
-            let (sum, overflow) = total.addingReportingOverflow(bytes)
-            return overflow ? UInt64.max : sum
+        let selected = installDepots(os: os)
+        let candidates: [DepotInfo]
+        if !selected.isEmpty {
+            candidates = selected
+        } else {
+            let relevant = depots.filter {
+                $0.supports(os: os) && $0.dlcAppID == nil && !$0.isSharedInstall &&
+                !$0.lowViolence && ($0.language.isEmpty ||
+                 $0.language.caseInsensitiveCompare("english") == .orderedSame)
+            }
+            let architecture = relevant.contains(where: { $0.osarch == "64" }) ? "64" : "32"
+            candidates = relevant.filter { $0.osarch.isEmpty || $0.osarch == architecture }
         }
+        var result: UInt64 = 0
+        for depot in candidates {
+            let size = depot.publicDownloadBytes > 0 ? depot.publicDownloadBytes :
+                (depot.maxSize > 0 ? depot.maxSize : depot.publicSizeBytes)
+            let (sum, overflow) = result.addingReportingOverflow(size)
+            result = overflow ? UInt64.max : sum
+        }
+        return result
     }
 
     // MARK: - Parsing
@@ -4148,7 +4161,7 @@ struct SteamLaunchOption: Codable, Hashable, Sendable {
             guard let arguments = text(entry["arguments"], limit: 2048), let workingDir = text(entry["workingdir"], limit: 512),
                   let type = text(entry["type"]), let oslist = text(config["oslist"]), let osarch = text(config["osarch"]),
                   let betaKey = text(config["betakey"]), let requiredDLC = text(config["ownsdlc"]) else { continue }
-            options.append(SteamLaunchOption(executable: executable, index: index, requiredDLC: requiredDLC,
+            options.append(SteamLaunchOption(executable: executable, index: index, requiredDLC: requiredDLC.isEmpty ? nil : requiredDLC,
                                              arguments: arguments, workingDir: workingDir,
                                              type: type, oslist: oslist, osarch: osarch, betaKey: betaKey))
         }
@@ -4253,9 +4266,15 @@ class SteamLibraryFetcher {
     /// The app's metadata for an install, with the content metadata of the
     /// apps it shares depots with resolved. This never supplies depot keys or
     /// grants access: every later content request still goes to Valve.
-    func fetchInstallInfo(appID: UInt32) async throws -> SteamAppInfo? {
+    func fetchInstallInfo(appID: UInt32, cached: SteamAppInfo? = nil) async throws -> SteamAppInfo? {
         try Task.checkCancellation()
-        guard var app = try await fetchAppInfo(appID: appID) else { return nil }
+        let metadata: SteamAppInfo?
+        if let cached, cached.appID == appID, !cached.depots.isEmpty {
+            metadata = cached
+        } else {
+            metadata = try await fetchAppInfo(appID: appID)
+        }
+        guard var app = metadata else { return nil }
         try Task.checkCancellation()
         var owners: [UInt32: SteamAppInfo] = [appID: app]
         var visited: Set<UInt32> = [appID], references = Set<String>()
@@ -4756,7 +4775,8 @@ final class SteamOwnedGamesModel: ObservableObject {
         let wasInstalled = isInstalled(appID: appID, prefixPath: prefixPath)
         do {
             try Task.checkCancellation()
-            guard let app = try await fetcher.fetchInstallInfo(appID: appID) else {
+            guard let app = try await fetcher.fetchInstallInfo(
+                appID: appID, cached: games.first(where: { $0.appID == appID })) else {
                 throw SteamError.depotNotFound(appID)
             }
             installFolder = SteamInstallFiles.safeFolderName(
@@ -4812,7 +4832,8 @@ final class SteamOwnedGamesModel: ObservableObject {
         downloadProgress[appID] = SteamDownloadProgress()
         defer { installingApps.remove(appID) }
         do {
-            guard let app = try await fetcher.fetchInstallInfo(appID: appID),
+            guard let app = try await fetcher.fetchInstallInfo(
+                appID: appID, cached: games.first(where: { $0.appID == appID })),
                   app.appID == appID,
                   app.installableOnWindows,
                   availableDLC[appID]?.contains(dlcAppID) == true,
