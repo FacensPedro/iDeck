@@ -314,5 +314,7 @@ enum Translations {
         "Steam · Windows game": ["pt": "Steam · jogo para Windows", "es": "Steam · juego de Windows"],
         "Choose a PNG, JPG, JPEG or HEIC image.": ["pt": "Escolha uma imagem PNG, JPG, JPEG ou HEIC.", "es": "Elige una imagen PNG, JPG, JPEG o HEIC."],
         "This app is stored in iDeck's shared library. Opening it uses the current in-process guest-app loader.": ["pt": "Este app está na biblioteca compartilhada do iDeck. Abrir usa o carregador atual de apps convidados em processo.", "es": "Esta app está en la biblioteca compartida de iDeck. Al abrirla se usa el cargador actual de apps invitados en proceso."],
+        "Activate JIT with StikDebug, then confirm it in Settings.": ["pt": "Ative o JIT com o StikDebug e confirme nas Configurações.", "es": "Activa JIT con StikDebug y confírmalo en Ajustes."],
+        "The native Madeira runtime is not linked into this build yet.": ["pt": "O runtime nativo do Madeira ainda não foi vinculado a esta compilação.", "es": "El runtime nativo de Madeira todavía no está enlazado en esta compilación."],
     ]
 }
