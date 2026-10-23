@@ -366,6 +366,15 @@ struct WindowsWorkspaceView: View {
     @State private var searchText = ""
     @State private var prefixPath: URL?
     @StateObject private var steamLibrary = SteamOwnedGamesModel()
+    @StateObject private var appManager = AppManager()
+    @StateObject private var windowsLibrary = WindowsLibraryStore()
+    @State private var isExecutablePickerPresented = false
+    @State private var isIPAPickerPresented = false
+    @State private var selectedGuestApp: SelectedLibraryURL?
+    @State private var selectedExecutable: SelectedLibraryURL?
+    @State private var selectedSteamGame: SelectedSteamGame?
+    @State private var installMessage: String?
+    @State private var isShowingInstallResult = false
     @Environment(\.openURL) private var openURL
 
     private let panelColor = Color(red: 0.105, green: 0.105, blue: 0.115)
@@ -414,6 +423,8 @@ struct WindowsWorkspaceView: View {
                             }
                         }
 
+                        installedProgramsContent
+
                         if coordinator.isSteamConnected {
                             HStack(spacing: 8) {
                                 Image(systemName: "person.crop.circle.fill")
@@ -457,14 +468,29 @@ struct WindowsWorkspaceView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 14))
                         }
 
-                        Button(action: onAddExecutable) {
-                            Label(tr("Install .exe"), systemImage: "square.and.arrow.down")
-                                .font(.headline)
-                                .foregroundColor(.white)
-                                .padding(.vertical, 15)
-                                .frame(maxWidth: .infinity)
-                                .background(secondaryColor)
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                        HStack(spacing: 12) {
+                            Button {
+                                isExecutablePickerPresented = true
+                            } label: {
+                                Label(tr("Add Windows app"), systemImage: "square.and.arrow.down")
+                                    .font(.headline)
+                                    .foregroundColor(.white)
+                                    .padding(.vertical, 15)
+                                    .frame(maxWidth: .infinity)
+                                    .background(secondaryColor)
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                            }
+                            Button {
+                                isIPAPickerPresented = true
+                            } label: {
+                                Label(tr("Install IPA"), systemImage: "app.badge.plus")
+                                    .font(.headline)
+                                    .foregroundColor(.white)
+                                    .padding(.vertical, 15)
+                                    .frame(maxWidth: .infinity)
+                                    .background(Color(red: 0.12, green: 0.35, blue: 0.65))
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                            }
                         }
                     }
                     .frame(maxWidth: 1000)
@@ -481,6 +507,55 @@ struct WindowsWorkspaceView: View {
         .sheet(isPresented: $isSteamSignInPresented) {
             SteamSignInView()
         }
+        .sheet(item: $selectedGuestApp) { selection in
+            GuestProgramDetailsView(appURL: selection.url, appManager: appManager, coordinator: coordinator)
+        }
+        .sheet(item: $selectedExecutable) { selection in
+            WindowsExecutableDetailsView(executableURL: selection.url, prefixPath: prefixPath, library: windowsLibrary, coordinator: coordinator)
+        }
+        .sheet(item: $selectedSteamGame) { selection in
+            SteamProgramDetailsView(game: selection.game, prefixPath: prefixPath, library: windowsLibrary, steamLibrary: steamLibrary, coordinator: coordinator)
+        }
+        .fileImporter(
+            isPresented: $isExecutablePickerPresented,
+            allowedContentTypes: [.data],
+            allowsMultipleSelection: false
+        ) { result in
+            guard case .success(let urls) = result, let url = urls.first, let prefixPath else { return }
+            do {
+                _ = try windowsLibrary.importExecutable(from: url, prefixPath: prefixPath)
+            } catch {
+                installMessage = error.localizedDescription
+                isShowingInstallResult = true
+            }
+        }
+        .fileImporter(
+            isPresented: $isIPAPickerPresented,
+            allowedContentTypes: [UTType(filenameExtension: "ipa") ?? .data],
+            allowsMultipleSelection: false
+        ) { result in
+            switch result {
+            case .success(let urls):
+                guard let url = urls.first else { return }
+                appManager.installIPA(from: url) { result in
+                    switch result {
+                    case .success(let appURL):
+                        installMessage = "\(appManager.displayName(for: appURL)) installed in the shared library."
+                    case .failure(let error):
+                        installMessage = error.localizedDescription
+                    }
+                    isShowingInstallResult = true
+                }
+            case .failure(let error):
+                installMessage = error.localizedDescription
+                isShowingInstallResult = true
+            }
+        }
+        .alert(tr("Library"), isPresented: $isShowingInstallResult) {
+            Button(tr("OK"), role: .cancel) { }
+        } message: {
+            Text(installMessage ?? tr("Operation completed."))
+        }
         .task(id: coordinator.isSteamConnected) {
             if coordinator.isSteamConnected {
                 await steamLibrary.refresh()
@@ -488,7 +563,10 @@ struct WindowsWorkspaceView: View {
                 steamLibrary.disconnect()
             }
         }
-        .onAppear(perform: resolvePrefixPath)
+        .onAppear {
+            resolvePrefixPath()
+            appManager.refreshInstalledApps()
+        }
         .preferredColorScheme(.dark)
     }
 
@@ -700,13 +778,113 @@ struct WindowsWorkspaceView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(panelColor)
         .clipShape(RoundedRectangle(cornerRadius: 13))
+        .contentShape(RoundedRectangle(cornerRadius: 13))
+        .onTapGesture {
+            selectedSteamGame = SelectedSteamGame(game: game)
+        }
     }
 
     private func resolvePrefixPath() {
         coordinator.containerHost.mountEnvironment { mountedPath in
             guard let mountedPath else { return }
             let root = URL(fileURLWithPath: mountedPath, isDirectory: true)
-            Task { @MainActor in prefixPath = root }
+            Task { @MainActor in
+                prefixPath = root
+                windowsLibrary.refresh(prefixPath: root)
+                appManager.refreshInstalledApps()
+            }
+        }
+    }
+
+    private var installedProgramsContent: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Text(tr("Installed apps and games"))
+                    .font(.headline)
+                    .foregroundColor(.white)
+                Spacer()
+                Text(tr("%d installed", appManager.installedApps.count + windowsLibrary.executableURLs.count))
+                    .font(.caption)
+                    .foregroundColor(.gray)
+            }
+
+            if appManager.installedApps.isEmpty && windowsLibrary.executableURLs.isEmpty {
+                HStack(spacing: 12) {
+                    Image(systemName: "square.grid.2x2")
+                        .font(.title2)
+                        .foregroundColor(.gray)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(tr("Your installed apps will appear here"))
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundColor(.white)
+                        Text(tr("Install an IPA or add a Windows executable. Both appear in this library."))
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                    }
+                    Spacer(minLength: 0)
+                }
+                .padding(16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(panelColor)
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+            } else {
+                LazyVGrid(columns: columns, spacing: 14) {
+                    ForEach(appManager.installedApps, id: \.path) { appURL in
+                        Button {
+                            selectedGuestApp = SelectedLibraryURL(url: appURL)
+                        } label: {
+                            VStack(alignment: .leading, spacing: 9) {
+                                AppBundleArtworkView(appURL: appURL, appManager: appManager)
+                                    .frame(height: 152)
+                                    .clipShape(RoundedRectangle(cornerRadius: 9))
+                                Text(appManager.displayName(for: appURL))
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundColor(.white)
+                                    .lineLimit(2)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                Text(tr("iOS app · LiveContainer"))
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                            }
+                            .padding(10)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(panelColor)
+                            .clipShape(RoundedRectangle(cornerRadius: 13))
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    ForEach(windowsLibrary.executableURLs, id: \.path) { executableURL in
+                        Button {
+                            selectedExecutable = SelectedLibraryURL(url: executableURL)
+                        } label: {
+                            VStack(alignment: .leading, spacing: 9) {
+                                ZStack {
+                                    LinearGradient(colors: [Color(red: 0.13, green: 0.18, blue: 0.24), panelColor], startPoint: .topLeading, endPoint: .bottomTrailing)
+                                    Image(systemName: "app.dashed")
+                                        .font(.system(size: 42, weight: .medium))
+                                        .foregroundColor(.white.opacity(0.82))
+                                }
+                                .frame(height: 152)
+                                .clipShape(RoundedRectangle(cornerRadius: 9))
+                                Text(executableURL.deletingPathExtension().lastPathComponent)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundColor(.white)
+                                    .lineLimit(2)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                Text(tr("Windows app"))
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                            }
+                            .padding(10)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(panelColor)
+                            .clipShape(RoundedRectangle(cornerRadius: 13))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
         }
     }
 
