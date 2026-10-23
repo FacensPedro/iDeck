@@ -310,5 +310,7 @@ enum Translations {
         "Add a Windows app": ["pt": "Adicionar um app do Windows", "es": "Añadir una app de Windows"],
         "Change cover": ["pt": "Trocar capa", "es": "Cambiar portada"],
         "Choose a PNG, JPG, JPEG or HEIC image for the cover.": ["pt": "Escolha uma imagem PNG, JPG, JPEG ou HEIC para a capa.", "es": "Elige una imagen PNG, JPG, JPEG o HEIC para la portada."],
+        "Windows, Steam and iOS apps in one library": ["pt": "Apps do Windows, Steam e iOS em uma biblioteca", "es": "Apps de Windows, Steam e iOS en una sola biblioteca"],
+        "Steam · Windows game": ["pt": "Steam · jogo para Windows", "es": "Steam · juego de Windows"],
     ]
 }
