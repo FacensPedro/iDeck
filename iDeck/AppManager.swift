@@ -78,9 +78,12 @@ class AppManager: ObservableObject {
     }
 
     func customArtworkURL(for appURL: URL) -> URL? {
-        let filename = artworkFilename(for: appURL)
-        let url = artworkDirectory.appendingPathComponent(filename)
-        return fileManager.fileExists(atPath: url.path) ? url : nil
+        let basename = artworkBasename(for: appURL)
+        for ext in ["png", "jpg", "jpeg", "heic"] {
+            let url = artworkDirectory.appendingPathComponent(basename + "." + ext)
+            if fileManager.fileExists(atPath: url.path) { return url }
+        }
+        return nil
     }
 
     func setArtwork(from source: URL, for appURL: URL) throws {
@@ -91,21 +94,25 @@ class AppManager: ObservableObject {
             throw IPAInstallError.copyFailed("Choose a PNG, JPG, JPEG or HEIC image.")
         }
         try fileManager.createDirectory(at: artworkDirectory, withIntermediateDirectories: true)
-        let destination = artworkDirectory.appendingPathComponent(artworkFilename(for: appURL))
+        let basename = artworkBasename(for: appURL)
+        for existingExt in ["png", "jpg", "jpeg", "heic"] {
+            let old = artworkDirectory.appendingPathComponent(basename + "." + existingExt)
+            if fileManager.fileExists(atPath: old.path) { try fileManager.removeItem(at: old) }
+        }
+        let destination = artworkDirectory.appendingPathComponent(basename + "." + ext)
         let temporary = artworkDirectory.appendingPathComponent(UUID().uuidString + "." + ext)
         try fileManager.copyItem(at: source, to: temporary)
-        if fileManager.fileExists(atPath: destination.path) { try fileManager.removeItem(at: destination) }
         try fileManager.moveItem(at: temporary, to: destination)
         artworkRevision &+= 1
     }
 
-    private func artworkFilename(for appURL: URL) -> String {
+    private func artworkBasename(for appURL: URL) -> String {
         let key = bundleIdentifier(for: appURL) ?? appURL.lastPathComponent
         let encoded = Data(key.utf8).base64EncodedString()
             .replacingOccurrences(of: "/", with: "_")
             .replacingOccurrences(of: "+", with: "-")
             .replacingOccurrences(of: "=", with: "")
-        return String(encoded.prefix(96)) + ".art"
+        return String(encoded.prefix(96))
     }
 
     private var artworkDirectory: URL {
@@ -121,7 +128,10 @@ class AppManager: ObservableObject {
               target.resolvingSymlinksInPath().deletingLastPathComponent() == appsRoot else {
             throw IPAInstallError.copyFailed("Refused to remove an app outside iDeck's app library.")
         }
+        let artwork = customArtworkURL(for: target)
         try fileManager.removeItem(at: target)
+        if let artwork { try? fileManager.removeItem(at: artwork) }
+        artworkRevision &+= 1
         refreshInstalledApps()
     }
 
