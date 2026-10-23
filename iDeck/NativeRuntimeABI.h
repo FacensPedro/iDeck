@@ -10,7 +10,7 @@ extern "C" {
 /*
  * ABI 1: implemented by a real, statically linked Madeira-derived native
  * runtime, not by the Swift UI. Must execute the guest inside the iDeck
- * process and block until the launched Windows process exits.
+ * process and return once the guest session is initialized.
  *
  * executable_path: absolute path to a Windows PE executable within the app
  *                   sandbox (or a previously security-scoped copy).
@@ -19,7 +19,7 @@ extern "C" {
  *                   {"version":1,"arguments":[...],
  *                    "is32Bit":false,"isSteam":false}
  *
- * Returns 0 on successful guest exit, nonzero on runtime/guest failure.
+ * Returns 0 once the guest session starts, nonzero on startup failure.\n * Process exit and rendering updates must be delivered through the\n * separately integrated Wine runtime/session callbacks.
  * Implementation must initialize FEX, wineserver and Wine in the correct
  * upstream order and install the DXMT/Direct3D 12 components. It must not
  * use posix_spawn/exec to launch unsigned native binaries on iOS.
