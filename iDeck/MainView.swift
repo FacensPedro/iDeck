@@ -960,6 +960,7 @@ private struct GuestProgramDetailsView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var errorMessage: String?
     @State private var showError = false
+    @State private var isArtworkPickerPresented = false
 
     private var displayName: String { appManager.displayName(for: appURL) }
 
@@ -969,6 +970,12 @@ private struct GuestProgramDetailsView: View {
                 VStack(spacing: 18) {
                     AppBundleArtworkView(appURL: appURL, appManager: appManager)
                         .frame(width: 160, height: 160)
+                    Button {
+                        isArtworkPickerPresented = true
+                    } label: {
+                        Label(tr("Change cover"), systemImage: "photo")
+                    }
+                    .buttonStyle(.bordered)
                     Text(displayName)
                         .font(.title2.bold())
                         .foregroundColor(.white)
@@ -1011,6 +1018,21 @@ private struct GuestProgramDetailsView: View {
             .background(Color.black.ignoresSafeArea())
             .navigationTitle(tr("App details"))
             .navigationBarTitleDisplayMode(.inline)
+            .fileImporter(isPresented: $isArtworkPickerPresented, allowedContentTypes: [.image], allowsMultipleSelection: false) { result in
+                switch result {
+                case .success(let urls):
+                    guard let url = urls.first else { return }
+                    do {
+                        try appManager.setArtwork(from: url, for: appURL)
+                    } catch {
+                        errorMessage = error.localizedDescription
+                        showError = true
+                    }
+                case .failure(let error):
+                    errorMessage = error.localizedDescription
+                    showError = true
+                }
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(tr("Done")) { dismiss() }
