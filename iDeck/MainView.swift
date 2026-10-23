@@ -56,7 +56,7 @@ struct MainView: View {
                             coordinator.forceJITAndStartWindows()
                         }
                     } label: {
-                        modeTile(title: tr("PC Gaming"), subtitle: tr("Steam games and Windows apps"), symbol: "gamecontroller.fill")
+                        modeTile(title: tr("Madeira"), subtitle: tr("Steam games and Windows apps"), symbol: "gamecontroller.fill")
                     }
                     .buttonStyle(.plain)
                     Button {
@@ -74,20 +74,21 @@ struct MainView: View {
     }
 
     private func modeTile(title: String, subtitle: String, symbol: String) -> some View {
-        HStack(spacing: 18) {
+        VStack(spacing: 12) {
             Image(systemName: symbol)
-                .font(.system(size: 30))
-                .frame(width: 52)
+                .font(.system(size: 32))
                 .foregroundColor(.white)
-            VStack(alignment: .leading, spacing: 6) {
-                Text(title).font(.title3.bold()).foregroundColor(.white)
-                Text(subtitle).font(.subheadline).foregroundColor(.gray)
-            }
-            Spacer()
-            Image(systemName: "chevron.right").foregroundColor(.gray)
+            Text(title)
+                .font(.title3.bold())
+                .foregroundColor(.white)
+                .multilineTextAlignment(.center)
+            Text(subtitle)
+                .font(.subheadline)
+                .foregroundColor(.gray)
+                .multilineTextAlignment(.center)
         }
-        .padding(22)
         .frame(maxWidth: .infinity)
+        .padding(24)
         .background(Color.white.opacity(0.09))
         .clipShape(RoundedRectangle(cornerRadius: 16))
     }
@@ -232,6 +233,7 @@ struct WindowsWorkspaceView: View {
     @StateObject private var appManager = AppManager()
     @StateObject private var windowsLibrary = WindowsLibraryStore()
     @State private var isExecutablePickerPresented = false
+    @State private var isExecutableMenuPresented = false
     @State private var isIPAPickerPresented = false
     @State private var selectedGuestApp: SelectedLibraryURL?
     @State private var selectedExecutable: SelectedLibraryURL?
@@ -254,8 +256,10 @@ struct WindowsWorkspaceView: View {
     }
 
     private var installedSteamGames: [SteamAppInfo] {
-        guard let prefixPath else { return [] }
-        return steamLibrary.games.filter { steamLibrary.isInstalled(appID: $0.appID, prefixPath: prefixPath) }
+        steamLibrary.games.filter { game in
+            steamLibrary.installingApps.contains(game.appID) ||
+            steamLibrary.installedApps.contains(game.appID)
+        }
     }
 
     private var isCompact: Bool { horizontalSizeClass == .compact }
@@ -265,7 +269,7 @@ struct WindowsWorkspaceView: View {
     }
 
     private var artworkWidth: CGFloat { isCompact ? 112 : 148 }
-    private var artworkHeight: CGFloat { isCompact ? 160 : 204 }
+    private var artworkHeight: CGFloat { isCompact ? 168 : 222 }
 
     private func cardTitle(_ title: String) -> some View {
         Text(title)
@@ -303,31 +307,18 @@ struct WindowsWorkspaceView: View {
                         installedProgramsContent
 
                         if coordinator.isSteamConnected {
-                            HStack(spacing: 8) {
-                                Image(systemName: "person.crop.circle.fill")
-                                    .foregroundColor(.gray)
-                                Text(tr("Signed in as %@",
-                                        SteamSignIn.accountName ?? tr("Connected")))
-                                    .font(.subheadline)
-                                    .foregroundColor(.gray)
+                            HStack {
                                 Spacer()
                                 Button {
-                                    Task { await steamLibrary.refresh() }
+                                    Task { await steamLibrary.refresh(force: true) }
                                 } label: {
-                                    Image(systemName: "arrow.clockwise")
-                                        .foregroundColor(.white)
-                                        .padding(10)
-                                        .background(secondaryColor)
-                                        .clipShape(Circle())
+                                    Label(tr("Refresh library"), systemImage: "arrow.clockwise")
+                                        .font(.caption)
                                 }
-                                .accessibilityLabel(tr("Refresh library"))
+                                .buttonStyle(.bordered)
                             }
                             libraryContent
-                            Text(tr("Steam game installation is available. Launching requires the Madeira runtime."))
-                                .font(.caption)
-                                .foregroundColor(.gray)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        } else {
+                         } else {
                             VStack(alignment: .leading, spacing: 10) {
                                 Label(tr("Connect Steam to continue"), systemImage: "steam")
                                     .font(.headline)
@@ -345,59 +336,6 @@ struct WindowsWorkspaceView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 14))
                         }
 
-                        Group {
-                            if !isCompact && !dynamicTypeSize.isAccessibilitySize {
-                                HStack(spacing: 12) {
-                            Button {
-                                isExecutablePickerPresented = true
-                            } label: {
-                                Label(tr("Add Windows app"), systemImage: "square.and.arrow.down")
-                                    .font(.headline)
-                                    .foregroundColor(.white)
-                                    .padding(.vertical, 15)
-                                    .frame(maxWidth: .infinity)
-                                    .background(secondaryColor)
-                                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                            }
-                            Button {
-                                isIPAPickerPresented = true
-                            } label: {
-                                Label(tr("Install IPA"), systemImage: "app.badge.plus")
-                                    .font(.headline)
-                                    .foregroundColor(.white)
-                                    .padding(.vertical, 15)
-                                    .frame(maxWidth: .infinity)
-                                    .background(Color(red: 0.12, green: 0.35, blue: 0.65))
-                                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                            }
-                            }
-                            } else {
-                                VStack(spacing: 12) {
-                            Button {
-                                isExecutablePickerPresented = true
-                            } label: {
-                                Label(tr("Add Windows app"), systemImage: "square.and.arrow.down")
-                                    .font(.headline)
-                                    .foregroundColor(.white)
-                                    .padding(.vertical, 15)
-                                    .frame(maxWidth: .infinity)
-                                    .background(secondaryColor)
-                                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                            }
-                            Button {
-                                isIPAPickerPresented = true
-                            } label: {
-                                Label(tr("Install IPA"), systemImage: "app.badge.plus")
-                                    .font(.headline)
-                                    .foregroundColor(.white)
-                                    .padding(.vertical, 15)
-                                    .frame(maxWidth: .infinity)
-                                    .background(Color(red: 0.12, green: 0.35, blue: 0.65))
-                                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                            }
-                            }
-                            }
-                        }
                         } else {
                             liveContainerContent
                         }
@@ -427,7 +365,7 @@ struct WindowsWorkspaceView: View {
         }
         .fileImporter(
             isPresented: $isExecutablePickerPresented,
-            allowedContentTypes: [.data],
+            allowedContentTypes: [UTType(filenameExtension: "exe") ?? .data, .data],
             allowsMultipleSelection: false
         ) { result in
             guard case .success(let urls) = result, let url = urls.first, let prefixPath else { return }
@@ -449,11 +387,11 @@ struct WindowsWorkspaceView: View {
                 appManager.installIPA(from: url) { result in
                     switch result {
                     case .success(let appURL):
-                        installMessage = "\(appManager.displayName(for: appURL)) installed in the shared library."
+                        selectedGuestApp = SelectedLibraryURL(url: appURL)
                     case .failure(let error):
                         installMessage = error.localizedDescription
+                        isShowingInstallResult = true
                     }
-                    isShowingInstallResult = true
                 }
             case .failure(let error):
                 installMessage = error.localizedDescription
@@ -468,6 +406,7 @@ struct WindowsWorkspaceView: View {
         .task(id: coordinator.isSteamConnected) {
             if coordinator.isSteamConnected {
                 await steamLibrary.refresh()
+                if let prefixPath { steamLibrary.refreshInstalledApps(prefixPath: prefixPath) }
             } else {
                 steamLibrary.disconnect()
             }
@@ -558,20 +497,35 @@ struct WindowsWorkspaceView: View {
     }
 
     private var steamConnectButton: some View {
-        Button {
-            isSteamSignInPresented = true
-        } label: {
-            Label(tr(coordinator.isSteamConnected ? "Steam connected" : "Connect Steam"),
-                  systemImage: coordinator.isSteamConnected ? "checkmark.circle.fill" : "person.crop.circle")
-                .font(.subheadline.weight(.semibold))
-                .foregroundColor(.white)
-                .padding(.horizontal, 13)
-                .padding(.vertical, 11)
-                .frame(minHeight: 44)
-                .background(Color(red: 0.12, green: 0.35, blue: 0.65))
-                .clipShape(RoundedRectangle(cornerRadius: 10))
+        HStack(spacing: 10) {
+            Button {
+                isSteamSignInPresented = true
+            } label: {
+                Label(tr(coordinator.isSteamConnected ? "Steam connected" : "Connect Steam"),
+                      systemImage: coordinator.isSteamConnected ? "checkmark.circle.fill" : "person.crop.circle")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 13)
+                    .padding(.vertical, 11)
+                    .frame(minHeight: 44)
+                    .background(Color(red: 0.12, green: 0.35, blue: 0.65))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+            }
+            Button {
+                isExecutableMenuPresented = true
+            } label: {
+                Image(systemName: "plus")
+                    .font(.headline)
+                    .foregroundColor(.white)
+                    .frame(width: 44, height: 44)
+                    .background(secondaryColor)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+            }
+            .accessibilityLabel(tr("Install .exe"))
+            .confirmationDialog(tr("Add Windows app"), isPresented: $isExecutableMenuPresented) {
+                Button(tr("Install .exe")) { isExecutablePickerPresented = true }
+            }
         }
-        .accessibilityLabel(tr(coordinator.isSteamConnected ? "Steam connected" : "Connect Steam"))
     }
 
     private var topBar: some View {
@@ -583,7 +537,7 @@ struct WindowsWorkspaceView: View {
                 }
             }
             Spacer()
-            Text(mode == .pc ? tr("PC Gaming") : tr("LiveContainer"))
+            Text(mode == .pc ? tr("Madeira") : tr("LiveContainer"))
                 .font(.headline)
                 .foregroundColor(.white)
             Spacer()
@@ -671,9 +625,6 @@ struct WindowsWorkspaceView: View {
                         .font(.subheadline.weight(.semibold))
                         .foregroundColor(.white)
                     Spacer()
-                    Text(tr("Windows games"))
-                        .font(.caption)
-                        .foregroundColor(.gray)
                 }
 
                 HStack(spacing: 10) {
@@ -709,13 +660,7 @@ struct WindowsWorkspaceView: View {
     private func gameCard(_ game: SteamAppInfo) -> some View {
         let progress = steamLibrary.downloadProgress[game.appID]
         let percent = Int(((progress?.fraction ?? 0) * 100).rounded())
-        let installedOnDisk: Bool
-        if let prefixPath {
-            installedOnDisk = steamLibrary.isInstalled(appID: game.appID, prefixPath: prefixPath)
-        } else {
-            installedOnDisk = false
-        }
-        let installed = steamLibrary.installedApps.contains(game.appID) || installedOnDisk
+        let installed = steamLibrary.installedApps.contains(game.appID)
 
         return VStack(alignment: .center, spacing: 10) {
             Button {
@@ -752,14 +697,7 @@ struct WindowsWorkspaceView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 9))
                 }
             } else if steamLibrary.installingApps.contains(game.appID) {
-                VStack(alignment: .leading, spacing: 6) {
-                    ProgressView(value: progress?.fraction ?? 0)
-                        .tint(.white)
-                    Text(tr("Downloading %d%%", percent))
-                        .font(.caption.weight(.medium))
-                        .foregroundColor(.white)
-                }
-                .padding(.vertical, 4)
+                downloadControls(for: game)
             } else {
                 if let error = steamLibrary.downloadErrors[game.appID] {
                     Text(tr(error))
@@ -792,6 +730,36 @@ struct WindowsWorkspaceView: View {
         .clipShape(RoundedRectangle(cornerRadius: 13))
     }
 
+    private func downloadControls(for game: SteamAppInfo) -> some View {
+        let progress = steamLibrary.downloadProgress[game.appID]
+        let stopping = steamLibrary.cancellingApps.contains(game.appID)
+        return VStack(spacing: 8) {
+            ProgressView(value: progress?.fraction ?? 0)
+                .tint(.white)
+            Text(progress?.phase == .preparing
+                 ? tr("Preparing download...")
+                 : progress?.phase == .finishing
+                   ? tr("Finishing installation...")
+                   : tr("Downloading %d%%", Int(((progress?.fraction ?? 0) * 100).rounded())))
+                .font(.caption)
+                .foregroundColor(.white)
+                .lineLimit(1)
+            if steamLibrary.canCancelInstall(appID: game.appID) {
+                Button(role: .destructive) {
+                    steamLibrary.cancelInstall(appID: game.appID)
+                } label: {
+                    Label(stopping ? tr("Stopping...") : tr("Stop download"),
+                          systemImage: "stop.fill")
+                        .font(.caption.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .disabled(stopping)
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
     private func resolvePrefixPath() {
         coordinator.containerHost.mountEnvironment { mountedPath in
             guard let mountedPath else { return }
@@ -799,6 +767,7 @@ struct WindowsWorkspaceView: View {
             Task { @MainActor in
                 prefixPath = root
                 windowsLibrary.refresh(prefixPath: root)
+                steamLibrary.refreshInstalledApps(prefixPath: root)
                 appManager.refreshInstalledApps()
             }
         }
@@ -807,28 +776,25 @@ struct WindowsWorkspaceView: View {
     private var installedProgramsContent: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
-                Text(tr("Installed apps and games"))
+                Text(tr("Installed games"))
                     .font(.headline)
                     .foregroundColor(.white)
                 Spacer()
-                Text(tr("%d installed", appManager.installedApps.count + windowsLibrary.executableURLs.count + installedSteamGames.count))
+                Text(tr("%d installed", windowsLibrary.executableURLs.count + installedSteamGames.count))
                     .font(.caption)
                     .foregroundColor(.gray)
             }
 
-            if appManager.installedApps.isEmpty && windowsLibrary.executableURLs.isEmpty && installedSteamGames.isEmpty {
+            if windowsLibrary.executableURLs.isEmpty && installedSteamGames.isEmpty {
                 HStack(spacing: 12) {
                     Image(systemName: "square.grid.2x2")
                         .font(.title2)
                         .foregroundColor(.gray)
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(tr("Your installed apps will appear here"))
+                        Text(tr("Your installed games will appear here"))
                             .font(.subheadline.weight(.semibold))
                             .foregroundColor(.white)
-                        Text(tr("Install an IPA or add a Windows executable. Both appear in this library."))
-                            .font(.caption)
-                            .foregroundColor(.gray)
-                    }
+}
                     Spacer(minLength: 0)
                 }
                 .padding(16)
@@ -837,26 +803,6 @@ struct WindowsWorkspaceView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 14))
             } else {
                 LazyVGrid(columns: columns, spacing: 14) {
-                    ForEach(appManager.installedApps, id: \.path) { appURL in
-                        Button {
-                            selectedGuestApp = SelectedLibraryURL(url: appURL)
-                        } label: {
-                            VStack(alignment: .center, spacing: 9) {
-                                AppBundleArtworkView(appURL: appURL, appManager: appManager)
-                                    .frame(width: artworkWidth, height: artworkHeight)
-                                cardTitle(appManager.displayName(for: appURL))
-                                Text(tr("iOS app · LiveContainer"))
-                                    .font(.caption)
-                                    .foregroundColor(.gray)
-                            }
-                            .padding(10)
-                            .frame(maxWidth: .infinity, alignment: .center)
-                            .background(panelColor)
-                            .clipShape(RoundedRectangle(cornerRadius: 13))
-                        }
-                        .buttonStyle(.plain)
-                    }
-
                     ForEach(installedSteamGames, id: \.appID) { game in
                         VStack(spacing: 8) {
                         Button {
@@ -876,11 +822,15 @@ struct WindowsWorkspaceView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 13))
                         }
                         .buttonStyle(.plain)
-                        Button { launchSteamGame(game) } label: {
-                            Label(tr("Launch"), systemImage: "play.fill")
-                                .frame(maxWidth: .infinity)
+                        if steamLibrary.installingApps.contains(game.appID) {
+                            downloadControls(for: game)
+                        } else {
+                            Button { launchSteamGame(game) } label: {
+                                Label(tr("Launch"), systemImage: "play.fill")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.borderedProminent)
                         }
-                        .buttonStyle(.borderedProminent)
                         }
                     }
 
@@ -955,7 +905,7 @@ struct WindowsWorkspaceView: View {
             let root = URL(fileURLWithPath: mountedPath, isDirectory: true)
             Task { @MainActor in
                 prefixPath = root
-                await steamLibrary.install(appID: game.appID, prefixPath: root)
+                steamLibrary.startInstall(appID: game.appID, prefixPath: root)
             }
         }
     }
@@ -995,8 +945,7 @@ private struct AppBundleArtworkView: View {
 
     var body: some View {
         Group {
-            if let iconURL = appManager.iconURL(for: appURL),
-               let icon = UIImage(contentsOfFile: iconURL.path) {
+            if let icon = appManager.iconImage(for: appURL) {
                 Image(uiImage: icon)
                     .resizable()
                     .scaledToFit()
@@ -1027,6 +976,7 @@ private struct GuestProgramDetailsView: View {
     @State private var isArtworkPickerPresented = false
 
     private var displayName: String { appManager.displayName(for: appURL) }
+    @State private var appSize: Int64 = 0
 
     var body: some View {
         NavigationStack {
@@ -1047,10 +997,10 @@ private struct GuestProgramDetailsView: View {
                         .font(.caption)
                         .foregroundColor(.gray)
                         .textSelection(.enabled)
-                    Text(tr("This app is stored in iDeck's shared library. Opening it uses the current in-process guest-app loader."))
+                    Text(tr("App size: %@", ByteCountFormatter.string(
+                        fromByteCount: appSize, countStyle: .file)))
                         .font(.subheadline)
                         .foregroundColor(.gray)
-                        .multilineTextAlignment(.center)
                     Button {
                         coordinator.refreshJITStatus()
                         guard coordinator.isJITEnabled else {
@@ -1094,6 +1044,12 @@ private struct GuestProgramDetailsView: View {
             .background(Color.black.ignoresSafeArea())
             .navigationTitle(tr("App details"))
             .navigationBarTitleDisplayMode(.inline)
+            .task(id: appURL) {
+                let url = appURL
+                appSize = await Task.detached(priority: .utility) {
+                    AppManager.sizeOfInstalledApp(at: url)
+                }.value
+            }
             .fileImporter(isPresented: $isArtworkPickerPresented, allowedContentTypes: [.image], allowsMultipleSelection: false) { result in
                 switch result {
                 case .success(let urls):
@@ -1167,7 +1123,8 @@ private struct WindowsExecutableDetailsView: View {
                             .textSelection(.enabled)
                     }
                     .frame(maxWidth: .infinity)
-                    WindowsGameProfileForm(profile: $profile)
+                    WindowsGameProfileForm(profile: $profile,
+                                           globalMetalFXEnabled: $coordinator.isMetalFXEnabled)
                     Button {
                         guard coordinator.isJITEnabled else {
                             errorMessage = tr("Activate JIT with StikDebug, then confirm it in Settings.")
@@ -1263,13 +1220,16 @@ private struct SteamProgramDetailsView: View {
     @State private var errorMessage: String?
     @State private var showError = false
 
-    init(game: SteamAppInfo, prefixPath: URL?, library: WindowsLibraryStore, steamLibrary: SteamOwnedGamesModel, coordinator: SystemCoordinator) {
+    init(game: SteamAppInfo, prefixPath: URL?, library: WindowsLibraryStore,
+         steamLibrary: SteamOwnedGamesModel, coordinator: SystemCoordinator) {
         self.game = game
         self.prefixPath = prefixPath
         self.library = library
         self.steamLibrary = steamLibrary
         self.coordinator = coordinator
-        _profile = State(initialValue: library.profile(for: "steam:\(game.appID)", title: game.name))
+        var initial = library.profile(for: "steam:\(game.appID)", title: game.name)
+        if coordinator.isMetalFXEnabled { initial.metalFXEnabled = true }
+        _profile = State(initialValue: initial)
     }
 
     private var installed: Bool {
@@ -1277,42 +1237,70 @@ private struct SteamProgramDetailsView: View {
         return steamLibrary.isInstalled(appID: game.appID, prefixPath: prefixPath)
     }
 
+    private var installing: Bool {
+        steamLibrary.installingApps.contains(game.appID)
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    SteamGameBannerView(game: game)
-                    SteamGameArtworkView(game: game)
-                        .frame(width: 170, height: 220)
-                        .frame(maxWidth: .infinity)
+                VStack(alignment: .center, spacing: 18) {
+                    ZStack {
+                        SteamGameBannerView(game: game)
+                            .frame(height: 250)
+                        SteamGameArtworkView(game: game)
+                            .frame(width: 160, height: 220)
+                            .background(Color.black.opacity(0.65))
+                            .clipShape(RoundedRectangle(cornerRadius: 11))
+                            .shadow(color: .black.opacity(0.4), radius: 12)
+                    }
+                    .frame(maxWidth: .infinity)
                     Text(game.name)
                         .font(.title2.bold())
                         .foregroundColor(.white)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: .infinity)
                     Text(tr("Steam app ID: %u", game.appID))
                         .font(.caption)
                         .foregroundColor(.gray)
-                    Label(installed ? tr("Installed") : tr("Not installed"), systemImage: installed ? "checkmark.circle.fill" : "arrow.down.circle")
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: .infinity)
+                    Label(installed ? tr("Installed") : tr("Not installed"),
+                          systemImage: installed ? "checkmark.circle.fill" : "arrow.down.circle")
                         .foregroundColor(installed ? .green : .gray)
-                    WindowsGameProfileForm(profile: $profile)
-                    if installed {
+                    WindowsGameProfileForm(profile: $profile,
+                                           globalMetalFXEnabled: $coordinator.isMetalFXEnabled)
+                    if let saveURL = URL(string: "https://store.steampowered.com/account/remotestorageapp/?appid=\(game.appID)") {
+                        Link(destination: saveURL) {
+                            Label(tr("View Steam Cloud saves"), systemImage: "icloud")
+                                .frame(maxWidth: .infinity)
+                                .padding(12)
+                        }
+                        .buttonStyle(.bordered)
+                        Text(tr("Steam Cloud files open on Steam; in-app synchronization is not available yet."))
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                            .multilineTextAlignment(.center)
+                    }
+                    if installing {
+                        downloadStatus
+                    } else if installed {
                         Button {
                             coordinator.refreshJITStatus()
                             guard coordinator.isJITEnabled else {
-                                errorMessage = tr("Activate JIT with StikDebug, then confirm it in Settings.")
-                                showError = true
+                                presentError(tr("JIT is not available. Activate it for iDeck in StikDebug."))
                                 return
                             }
                             guard let prefixPath else {
-                                errorMessage = tr("Windows environment is not ready.")
-                                showError = true
+                                presentError(tr("Windows environment is not ready."))
                                 return
                             }
+                            profile.metalFXEnabled = coordinator.isMetalFXEnabled || profile.metalFXEnabled
                             library.save(profile)
                             coordinator.launchSteamGame(game: game, profile: profile, prefixPath: prefixPath)
                             if coordinator.windowsStatus.hasPrefix("Cannot launch") ||
                                coordinator.windowsStatus.hasPrefix("Madeira runtime missing") {
-                                errorMessage = coordinator.windowsStatus
-                                showError = true
+                                presentError(coordinator.windowsStatus)
                             } else {
                                 dismiss()
                             }
@@ -1329,12 +1317,10 @@ private struct SteamProgramDetailsView: View {
                                 library.removeProfile(for: "steam:\(game.appID)")
                                 dismiss()
                             } else {
-                                errorMessage = tr("Steam could not safely remove this game's files. Refresh the library and try again.")
-                                showError = true
+                                presentError(tr("Steam could not safely remove this game's files. Refresh the library and try again."))
                             }
                         } label: {
                             Label(tr("Uninstall"), systemImage: "trash")
-                                .font(.headline)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 12)
                         }
@@ -1342,64 +1328,46 @@ private struct SteamProgramDetailsView: View {
                     } else {
                         Button {
                             guard let prefixPath else {
-                                errorMessage = tr("Windows environment is not ready.")
-                                showError = true
+                                presentError(tr("Windows environment is not ready."))
                                 return
                             }
-                            Task { await steamLibrary.install(appID: game.appID, prefixPath: prefixPath) }
+                            steamLibrary.startInstall(appID: game.appID, prefixPath: prefixPath)
                         } label: {
                             Label(tr("Install"), systemImage: "arrow.down.circle.fill")
-                                .font(.headline)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 14)
                         }
                         .buttonStyle(.borderedProminent)
-                        .disabled(prefixPath == nil || steamLibrary.installingApps.contains(game.appID))
+                        .disabled(prefixPath == nil || !game.installableOnWindows)
                     }
-                    Menu {
-                        ForEach(steamLibrary.availableDLC[game.appID] ?? [], id: \.self) { dlcID in
-                            Button {
-                                guard let prefixPath else {
-                                    errorMessage = tr("Windows environment is not ready.")
-                                    showError = true
-                                    return
-                                }
-                                Task {
-                                    await steamLibrary.installDLC(appID: game.appID,
-                                                                  dlcAppID: dlcID, prefixPath: prefixPath)
-                                }
-                            } label: {
-                                Text(steamLibrary.games.first(where: { $0.appID == dlcID })?.name ?? "DLC \(dlcID)")
-                            }
-                        }
-                    } label: {
-                        Label(tr("Install DLC"), systemImage: "square.stack.3d.up")
-                            .font(.headline)
-                            .frame(maxWidth: .infinity)
+
+                    if installed {
+                        dlcList
                     }
-                    .buttonStyle(.bordered)
-                    .disabled(!installed ||
-                              (steamLibrary.availableDLC[game.appID] ?? []).isEmpty ||
-                              steamLibrary.installingApps.contains(game.appID))
                     if let error = steamLibrary.downloadErrors[game.appID] {
-                        Text(error).foregroundColor(.red).font(.caption)
-                    }
-                    if steamLibrary.installingApps.contains(game.appID) {
-                        ProgressView(value: steamLibrary.downloadProgress[game.appID]?.fraction ?? 0)
+                        Text(error)
+                            .foregroundColor(.red)
+                            .font(.caption)
                     }
                 }
                 .padding(22)
             }
-            .task(id: game.appID) { await steamLibrary.loadDLC(appID: game.appID) }
             .background(Color.black.ignoresSafeArea())
             .navigationTitle(tr("Game details"))
             .navigationBarTitleDisplayMode(.inline)
+            .task(id: game.appID) {
+                await steamLibrary.loadDLC(appID: game.appID)
+                if let prefixPath {
+                    steamLibrary.refreshInstalledDLC(appID: game.appID, prefixPath: prefixPath)
+                }
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button(tr("Cancel")) { dismiss() }
+                    Button(tr("Done")) { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(tr("Save")) {
+                        profile.metalFXEnabled = coordinator.isMetalFXEnabled || profile.metalFXEnabled
                         library.save(profile)
                         dismiss()
                     }
@@ -1413,10 +1381,97 @@ private struct SteamProgramDetailsView: View {
         }
         .preferredColorScheme(.dark)
     }
+
+    private var downloadStatus: some View {
+        let progress = steamLibrary.downloadProgress[game.appID]
+        let stopping = steamLibrary.cancellingApps.contains(game.appID)
+        return VStack(spacing: 10) {
+            ProgressView(value: progress?.fraction ?? 0)
+            Text(progress?.phase == .preparing ? tr("Preparing download...") :
+                 progress?.phase == .finishing ? tr("Finishing installation...") :
+                 tr("Downloading %d%%", Int(((progress?.fraction ?? 0) * 100).rounded())))
+                .font(.caption)
+                .foregroundColor(.white)
+            if steamLibrary.canCancelInstall(appID: game.appID) {
+                Button(role: .destructive) {
+                    steamLibrary.cancelInstall(appID: game.appID)
+                } label: {
+                    Label(stopping ? tr("Stopping...") : tr("Stop download"), systemImage: "stop.fill")
+                        .frame(maxWidth: .infinity)
+                }
+                .disabled(stopping)
+                .buttonStyle(.bordered)
+            }
+        }
+    }
+
+    private var dlcList: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(tr("DLC for this game"))
+                .font(.headline)
+                .foregroundColor(.white)
+            let ids = steamLibrary.availableDLC[game.appID] ?? []
+            if ids.isEmpty {
+                Text(tr("No DLC found for this game"))
+                    .font(.caption)
+                    .foregroundColor(.gray)
+            }
+            ForEach(ids, id: \.self) { id in
+                HStack(spacing: 12) {
+                    SteamGameArtworkView(game: steamLibrary.dlcMetadata[id] ?? SteamAppInfo(appID: id))
+                        .frame(width: 58, height: 78)
+                    Text(steamLibrary.dlcMetadata[id]?.name ?? "DLC \(id)")
+                        .font(.subheadline)
+                        .foregroundColor(.white)
+                        .lineLimit(2)
+                    Spacer(minLength: 6)
+                    if steamLibrary.installedDLC[game.appID]?.contains(id) == true {
+                        Button(role: .destructive) {
+                            guard let prefixPath,
+                                  steamLibrary.uninstallDLC(appID: game.appID,
+                                                            dlcAppID: id, prefixPath: prefixPath) else {
+                                presentError(tr("Could not uninstall DLC safely."))
+                                return
+                            }
+                        } label: {
+                            Label(tr("Uninstall"), systemImage: "trash")
+                                .font(.caption.weight(.semibold))
+                        }
+                        .buttonStyle(.bordered)
+                    } else {
+                        Button {
+                            guard let prefixPath else {
+                                presentError(tr("Windows environment is not ready."))
+                                return
+                            }
+                            Task {
+                                await steamLibrary.installDLC(appID: game.appID,
+                                                               dlcAppID: id, prefixPath: prefixPath)
+                            }
+                        } label: {
+                            Text(tr("Install"))
+                                .font(.caption.weight(.semibold))
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
+                }
+                .padding(10)
+                .background(Color.white.opacity(0.06))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func presentError(_ message: String) {
+        errorMessage = message
+        showError = true
+    }
 }
 
 private struct WindowsGameProfileForm: View {
     @Binding var profile: WindowsGameProfile
+    @Binding var globalMetalFXEnabled: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -1435,7 +1490,7 @@ private struct WindowsGameProfileForm: View {
             profilePicker(title: tr("Resolution"), selection: $profile.resolution, choices: ["Device native", "960x540", "1280x720", "1600x900", "1920x1080"])
             profilePicker(title: tr("Graphics API"), selection: $profile.graphicsAPI, choices: ["Automatic", "Direct3D 9", "Direct3D 10", "Direct3D 11", "Direct3D 12"])
             profilePicker(title: tr("Frame rate limit"), selection: $profile.fpsLimit, choices: ["30", "40", "60", "Uncapped"])
-            Toggle(tr("MetalFX upscaling"), isOn: $profile.metalFXEnabled)
+            Toggle(tr("MetalFX upscaling"), isOn: $globalMetalFXEnabled)
                 .tint(.blue)
             Toggle(tr("Enable AVX/AVX2 translation"), isOn: $profile.avxEnabled)
                 .tint(.blue)

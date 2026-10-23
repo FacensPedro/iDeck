@@ -1,5 +1,6 @@
 import Foundation
 import UniformTypeIdentifiers
+import UIKit
 
 enum IPAInstallError: LocalizedError {
     case invalidArchive
@@ -53,6 +54,45 @@ class AppManager: ObservableObject {
             return nil
         }
         return info["CFBundleIdentifier"] as? String
+    }
+
+    func iconImage(for appURL: URL) -> UIImage? {
+        if let iconURL = iconURL(for: appURL),
+           let image = UIImage(contentsOfFile: iconURL.path) {
+            return image
+        }
+        guard let info = NSDictionary(contentsOf: appURL.appendingPathComponent("Info.plist")) as? [String: Any],
+              let bundle = Bundle(url: appURL) else { return nil }
+        for iconKey in ["CFBundleIcons~ipad", "CFBundleIcons"] {
+            guard let icons = info[iconKey] as? [String: Any],
+                  let primary = icons["CFBundlePrimaryIcon"] as? [String: Any] else { continue }
+            let names = ([primary["CFBundleIconName"] as? String].compactMap { $0 }) +
+                (primary["CFBundleIconFiles"] as? [String] ?? [])
+            for name in names.reversed() {
+                if let image = UIImage(named: name, in: bundle, compatibleWith: nil) {
+                    return image
+                }
+            }
+        }
+        for name in ["AppIcon", "AppIcon60x60", "AppIcon76x76", "Icon"] {
+            if let image = UIImage(named: name, in: bundle, compatibleWith: nil) {
+                return image
+            }
+        }
+        return nil
+    }
+
+    static func sizeOfInstalledApp(at appURL: URL) -> Int64 {
+        guard let enumerator = FileManager.default.enumerator(at: appURL,
+            includingPropertiesForKeys: [.isRegularFileKey, .fileSizeKey],
+            options: []) else { return 0 }
+        var total: Int64 = 0
+        for case let file as URL in enumerator {
+            guard let properties = try? file.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey]),
+                  properties.isRegularFile == true else { continue }
+            total += Int64(properties.fileSize ?? 0)
+        }
+        return total
     }
 
     func iconURL(for appURL: URL) -> URL? {
@@ -143,7 +183,6 @@ class AppManager: ObservableObject {
             defer { if hasScope { url.stopAccessingSecurityScopedResource() } }
             let workDirectory = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
             let extractPath = workDirectory.appendingPathComponent("Extracted", isDirectory: true)
-            let stagedArchive = workDirectory.appendingPathComponent("Source.ipa")
             defer { try? fileManager.removeItem(at: workDirectory) }
             let result: Result<URL, IPAInstallError>
             do {
@@ -152,17 +191,25 @@ class AppManager: ObservableObject {
                     throw IPAInstallError.invalidArchive
                 }
                 try fileManager.createDirectory(at: workDirectory, withIntermediateDirectories: true)
-                try fileManager.copyItem(at: url, to: stagedArchive)
-                try ZipExtractor.extract(archive: stagedArchive, to: extractPath)
+                try ZipExtractor.extract(archive: url, to: extractPath)
                 let payloadPath = extractPath.appendingPathComponent("Payload", isDirectory: true)
                 var isDirectory: ObjCBool = false
                 guard fileManager.fileExists(atPath: payloadPath.path, isDirectory: &isDirectory), isDirectory.boolValue else { throw IPAInstallError.missingPayload }
                 let contents = try fileManager.contentsOfDirectory(at: payloadPath, includingPropertiesForKeys: [.isDirectoryKey])
                 guard let appBundle = contents.first(where: { $0.pathExtension == "app" && (try? $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true }), fileManager.fileExists(atPath: appBundle.appendingPathComponent("Info.plist").path) else { throw IPAInstallError.missingAppBundle }
-                let destination = appsDirectory.appendingPathComponent(appBundle.lastPathComponent, isDirectory: true)
+                let safeName = appBundle.lastPathComponent
+                guard safeName != "." && safeName != ".." &&
+                    !safeName.contains("/") && !safeName.contains("\\") else {
+                    throw IPAInstallError.unsafeArchivePath
+                }
+                let destination = appsDirectory.appendingPathComponent(safeName, isDirectory: true)
                 do {
-                    if fileManager.fileExists(atPath: destination.path) { try fileManager.removeItem(at: destination) }
-                    try fileManager.moveItem(at: appBundle, to: destination)
+                    let replacement = appsDirectory.appendingPathComponent(UUID().uuidString + ".app", isDirectory: true)
+                    try fileManager.moveItem(at: appBundle, to: replacement)
+                    if fileManager.fileExists(atPath: destination.path) {
+                        try fileManager.removeItem(at: destination)
+                    }
+                    try fileManager.moveItem(at: replacement, to: destination)
                 } catch { throw IPAInstallError.copyFailed(error.localizedDescription) }
                 result = .success(destination)
             } catch let error as IPAInstallError { result = .failure(error) }

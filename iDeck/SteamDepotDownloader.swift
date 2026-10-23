@@ -267,6 +267,24 @@ final class DepotDownloader {
             }
             SteamLog.event("[steam-shared-record] app=\(app.appID) shared=\(shared.count) owners-written=\(written) owners-skipped=\(skipped)")
         }
+        if dlcOnly {
+            let common = steamApps.appendingPathComponent("common", isDirectory: true)
+                .standardizedFileURL.path
+            var newlyInstalledFiles: [String] = []
+            for (index, _) in plans.enumerated() {
+                for fileIndex in prepared.paths[index].indices {
+                    let path = prepared.paths[index][fileIndex]
+                    guard !path.isEmpty,
+                          !prepared.existing[index][fileIndex],
+                          path.hasPrefix(common + "/") else { continue }
+                    newlyInstalledFiles.append(String(path.dropFirst(common.count + 1)))
+                }
+            }
+            for dlcID in includedDLC {
+                try SteamDLCRecords.markInstalled(parentID: app.appID, dlcID: dlcID,
+                                                  files: newlyInstalledFiles, steamApps: steamApps)
+            }
+        }
         try? FileManager.default.removeItem(at: journalDir)
         SteamLog.event("[steam-depot] install complete app=\(app.appID) bytes=\(prepared.totalUncompressed) seconds=\(Int(Date().timeIntervalSince(started)))")
         return installURL

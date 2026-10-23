@@ -74,6 +74,7 @@ enum SteamInstallFiles {
         }
         try? fm.removeItem(at: recordURL)
         try? fm.removeItem(at: steamApps.appendingPathComponent("downloading/\(appID)", isDirectory: true))
+        try? fm.removeItem(at: steamApps.appendingPathComponent(".ideck-dlc/\(appID)", isDirectory: true))
     }
 
     /// Validates a manifest path and folds directory spelling to the first
@@ -114,5 +115,87 @@ enum SteamInstallFiles {
               var parser = try? SteamKeyValues(data), let root = try? parser.read(),
               let state = root["AppState"], state["appid"]?.string == String(appID) else { return nil }
         return state
+    }
+}
+
+
+enum SteamDLCRecords {
+    private struct Record: Codable {
+        let parentID: UInt32
+        let dlcID: UInt32
+        let files: [String]
+    }
+
+    private static func directory(parentID: UInt32, steamApps: URL) -> URL {
+        steamApps.appendingPathComponent(".ideck-dlc", isDirectory: true)
+            .appendingPathComponent(String(parentID), isDirectory: true)
+    }
+
+    private static func url(parentID: UInt32, dlcID: UInt32, steamApps: URL) -> URL {
+        directory(parentID: parentID, steamApps: steamApps)
+            .appendingPathComponent("\(dlcID).json")
+    }
+
+    static func isInstalled(parentID: UInt32, dlcID: UInt32, steamApps: URL) -> Bool {
+        load(parentID: parentID, dlcID: dlcID, steamApps: steamApps) != nil
+    }
+
+    private static func load(parentID: UInt32, dlcID: UInt32, steamApps: URL) -> Record? {
+        let file = url(parentID: parentID, dlcID: dlcID, steamApps: steamApps)
+        guard let data = try? Data(contentsOf: file), data.count <= 4 * 1024 * 1024,
+              let record = try? JSONDecoder().decode(Record.self, from: data),
+              record.parentID == parentID, record.dlcID == dlcID,
+              record.files.count <= 100_000 else { return nil }
+        return record
+    }
+
+    static func markInstalled(parentID: UInt32, dlcID: UInt32, files: [String], steamApps: URL) throws {
+        let directory = directory(parentID: parentID, steamApps: steamApps)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let previous = load(parentID: parentID, dlcID: dlcID, steamApps: steamApps)?.files ?? []
+        let normalized = Array(Set(previous + files)).sorted()
+        guard normalized.count <= 100_000 else { throw CocoaError(.fileWriteOutOfSpace) }
+        let record = Record(parentID: parentID, dlcID: dlcID, files: normalized)
+        let data = try JSONEncoder().encode(record)
+        try data.write(to: url(parentID: parentID, dlcID: dlcID, steamApps: steamApps),
+                       options: .atomic)
+    }
+
+    static func uninstall(parentID: UInt32, dlcID: UInt32, steamApps: URL) -> Bool {
+        guard let record = load(parentID: parentID, dlcID: dlcID, steamApps: steamApps) else {
+            return false
+        }
+        let folder = directory(parentID: parentID, steamApps: steamApps)
+        let otherIDs = ((try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? [])
+            .compactMap { name -> UInt32? in
+                guard name.hasSuffix(".json") else { return nil }
+                return UInt32(String(name.dropLast(5)))
+            }
+            .filter { $0 != dlcID }
+        var shared = Set<String>()
+        for id in otherIDs {
+            if let other = load(parentID: parentID, dlcID: id, steamApps: steamApps) {
+                shared.formUnion(other.files)
+            }
+        }
+
+        let common = steamApps.appendingPathComponent("common", isDirectory: true)
+            .resolvingSymlinksInPath().standardizedFileURL
+        for entry in record.files where !shared.contains(entry) {
+            var folded: [String: String] = [:]
+            guard let relative = SteamInstallFiles.safeRelativePath(entry, folded: &folded),
+                  !relative.isEmpty, relative == entry else { continue }
+            let target = common.appendingPathComponent(relative).standardizedFileURL
+            let resolved = target.resolvingSymlinksInPath().standardizedFileURL
+            guard resolved.path.hasPrefix(common.path + "/"),
+                  target.path.hasPrefix(common.path + "/") else { continue }
+            try? FileManager.default.removeItem(at: target)
+        }
+        do {
+            try FileManager.default.removeItem(at: url(parentID: parentID, dlcID: dlcID, steamApps: steamApps))
+            return true
+        } catch {
+            return false
+        }
     }
 }

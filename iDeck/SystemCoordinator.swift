@@ -19,8 +19,9 @@ class SystemCoordinator: ObservableObject {
         }
     }
     
-    @Published var isMetalFXEnabled: Bool = false {
+    @Published var isMetalFXEnabled: Bool = UserDefaults.standard.bool(forKey: "metalFXEnabled") {
         didSet {
+            UserDefaults.standard.set(isMetalFXEnabled, forKey: "metalFXEnabled")
             if isMetalFXEnabled {
                 setenv("MVK_CONFIG_USE_METALFX", "1", 1)
             } else {
@@ -58,6 +59,8 @@ class SystemCoordinator: ObservableObject {
     private var steamSignInObserver: NSObjectProtocol?
 
     init() {
+        if isMetalFXEnabled { setenv("MVK_CONFIG_USE_METALFX", "1", 1) }
+        refreshJITStatus()
         isSteamConnected = SteamSignIn.isSignedIn
         steamSignInObserver = NotificationCenter.default.addObserver(
             forName: SteamSignIn.didChange,
@@ -110,9 +113,18 @@ class SystemCoordinator: ObservableObject {
         var mib: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_PID, getpid()]
         let result = sysctl(&mib, u_int(mib.count), &info, &size, nil, 0)
         let debuggerAttached = result == 0 && (info.kp_proc.p_flag & P_TRACED) != 0
+        // StikDebug may detach after granting process JIT permission.
+        // Verify that the kernel actually allows a disposable MAP_JIT mapping.
+        // Never execute memory from this probe or assume that it enables JIT.
+        let pageSize = Int(getpagesize())
+        let mapping = mmap(nil, pageSize, PROT_READ | PROT_WRITE | PROT_EXEC,
+                           MAP_PRIVATE | MAP_ANON | MAP_JIT, -1, 0)
+        let executableJIT = mapping != MAP_FAILED
+        if executableJIT { _ = munmap(mapping, pageSize) }
+        let detected = debuggerAttached || executableJIT
         let update = {
-            self.isJITEnabled = debuggerAttached
-            if !debuggerAttached && (self.currentStatus == "JIT confirmed via StikDebug" || self.currentStatus == "Ready") {
+            self.isJITEnabled = detected
+            if !detected && (self.currentStatus == "JIT confirmed via StikDebug" || self.currentStatus == "Ready") {
                 self.currentStatus = "JIT not detected. Enable it in StikDebug and return to iDeck."
             }
         }
@@ -163,16 +175,11 @@ class SystemCoordinator: ObservableObject {
                     return
                 }
 
-                self.prefixInstaller.installWinePrefix(to: mountPath) { success in
-                    DispatchQueue.main.async {
-                        if success {
-                            self.isContainerReady = true
-                            self.windowsEnvironment.configureWine(prefix: mountPath)
-                            self.setWindowsStatus(self.windowsEnvironment.hasRuntime(in: mountPath) ? "Windows Runtime Ready" : "Library Ready — Madeira native runtime is not bundled")
-                        } else {
-                            self.setWindowsStatus("Failed to Install Windows Environment")
-                        }
-                    }
+                DispatchQueue.main.async {
+                    self.isContainerReady = true
+                    self.windowsEnvironment.configureWine(prefix: mountPath)
+                    self.setWindowsStatus(self.windowsEnvironment.hasRuntime(in: mountPath)
+                        ? "Windows Runtime Ready" : "Library Ready — Madeira native runtime is not bundled")
                 }
             }
         }
@@ -337,7 +344,8 @@ class SystemCoordinator: ObservableObject {
                 }
 
                 self.windowsEnvironment.configureWine(prefix: mountPath)
-                if let profile {
+                if var profile {
+                    if self.isMetalFXEnabled { profile.metalFXEnabled = true }
                     self.windowsEnvironment.applyGameProfile(profile)
                 }
                 self.windowsEnvironment.execute(
@@ -405,7 +413,9 @@ class SystemCoordinator: ObservableObject {
         }
 
         windowsEnvironment.configureWine(prefix: prefixPath.path)
-        windowsEnvironment.applyGameProfile(profile)
+        var effectiveProfile = profile
+        if isMetalFXEnabled { effectiveProfile.metalFXEnabled = true }
+        windowsEnvironment.applyGameProfile(effectiveProfile)
         setWindowsStatus("Launching Steam game...")
         windowsEnvironment.execute(binary: executableURL,
                                    arguments: profile.arguments.isEmpty ? entry.arguments : profile.arguments,

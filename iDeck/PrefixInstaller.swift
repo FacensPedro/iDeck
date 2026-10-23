@@ -355,6 +355,14 @@ enum ZipExtractor {
             }
             cursor = nameStart + nameLength + extraLength + commentLength
 
+            // Non-payload ZIP metadata (macOS AppleDouble, metadata plists,
+            // resource forks) should never be extracted or permitted to
+            // invalidate an otherwise safe IPA bundle.
+            let components = name.replacingOccurrences(of: "\\", with: "/")
+                .split(separator: "/", omittingEmptySubsequences: true)
+                .filter { $0 != "." }
+            guard components.first == "Payload" else { continue }
+
             // Local header gives the real offset of the payload.
             guard try u32(data, localOffset) == 0x0403_4b50 else { throw ZipError.invalidArchive }
             let localName = try u16(data, localOffset + 26)
@@ -384,7 +392,9 @@ enum ZipExtractor {
         for part in normalizedName.split(separator: "/", omittingEmptySubsequences: true) {
             if part == "." { continue }
             if part == ".." {
-                guard !safeComponents.isEmpty else { throw ZipError.unsafePath }
+                // Keep every extracted entry inside Payload; never allow a
+                // relative path from one application to reach another.
+                guard safeComponents.count > 1 else { throw ZipError.unsafePath }
                 safeComponents.removeLast()
                 continue
             }
@@ -394,8 +404,8 @@ enum ZipExtractor {
             }
             safeComponents.append(String(part))
         }
-        guard !safeComponents.isEmpty else { return }
-
+        guard safeComponents.first == "Payload" else { throw ZipError.unsafePath }
+        if safeComponents.count == 1 { return }
         let target = safeComponents.reduce(destination) { $0.appendingPathComponent($1) }
         let standardizedTarget = target.standardizedFileURL.path
         guard standardizedTarget.hasPrefix(lexicalRoot + "/") else { throw ZipError.unsafePath }
@@ -420,7 +430,8 @@ enum ZipExtractor {
         if fileType == 0xA000 { // symbolic link
             guard method == 0, let linkTarget = String(data: payload, encoding: .utf8),
                   !linkTarget.hasPrefix("/") else { throw ZipError.unsafePath }
-            let resolved = URL(fileURLWithPath: linkTarget, relativeTo: resolvedParent).standardizedFileURL
+            let resolved = URL(fileURLWithPath: linkTarget, relativeTo: resolvedParent)
+                .standardizedFileURL.resolvingSymlinksInPath()
             try ensureInside(resolved, root: resolvedRoot)
             try fm.createSymbolicLink(atPath: target.path, withDestinationPath: linkTarget)
             return
