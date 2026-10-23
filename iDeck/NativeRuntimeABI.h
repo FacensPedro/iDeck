@@ -19,7 +19,9 @@ extern "C" {
  *                   {"version":1,"arguments":[...],
  *                    "is32Bit":false,"isSteam":false}
  *
- * Returns 0 once the guest session starts, nonzero on startup failure.\n * Process exit and rendering updates must be delivered through the\n * separately integrated Wine runtime/session callbacks.
+ * Returns 0 once the guest session starts, nonzero on startup failure.
+ * Process exit and rendering updates must be delivered through the
+ * separately integrated Wine runtime/session callbacks.
  * Implementation must initialize FEX, wineserver and Wine in the correct
  * upstream order and install the DXMT/Direct3D 12 components. It must not
  * use posix_spawn/exec to launch unsigned native binaries on iOS.
