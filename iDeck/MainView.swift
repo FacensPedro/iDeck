@@ -3,32 +3,11 @@ import UniformTypeIdentifiers
 
 enum AppMode: String, CaseIterable, Identifiable {
     case windows = "Windows"
-    case liveContainer = "LiveContainer"
 
     var id: String { rawValue }
-
-    /// Name of an optional image set in Assets.xcassets holding the official mark of the engine
-    /// behind this mode (drop the files in as "MadeiraLogo" / "LiveContainerSymbol").
-    var brandAsset: String {
-        switch self {
-        case .windows: return "MadeiraLogo"
-        case .liveContainer: return "LiveContainerSymbol"
-        }
-    }
-
-    var fallbackSymbol: String {
-        switch self {
-        case .windows: return "window.casement"
-        case .liveContainer: return "cube.box.fill"
-        }
-    }
-
-    var subtitle: String {
-        switch self {
-        case .windows: return tr("Run Windows apps and Steam through Wine")
-        case .liveContainer: return tr("Run iOS apps inside iDeck")
-        }
-    }
+    var brandAsset: String { "MadeiraLogo" }
+    var fallbackSymbol: String { "window.casement" }
+    var subtitle: String { tr("Windows, Steam and iOS apps in one library") }
 }
 
 /// Shows the image set `assetName` when it exists in the asset catalog, an SF Symbol otherwise.
@@ -192,10 +171,7 @@ struct MainView: View {
         ScrollView {
             VStack(spacing: 24) {
                 header
-                switch mode {
-                case .windows: windowsActions
-                case .liveContainer: liveContainerActions
-                }
+                windowsActions
             }
             .frame(maxWidth: 720)
             .padding(.horizontal, isWide ? 32 : 16)
@@ -215,7 +191,7 @@ struct MainView: View {
                 .font(.subheadline)
                 .foregroundColor(.gray)
                 .multilineTextAlignment(.center)
-            Text(trStatus(mode == .windows ? coordinator.windowsStatus : coordinator.liveContainerStatus))
+            Text(trStatus(coordinator.windowsStatus))
                 .font(.footnote)
                 .foregroundColor(.gray)
                 .multilineTextAlignment(.center)
@@ -261,17 +237,6 @@ struct MainView: View {
         }
     }
 
-    private var liveContainerActions: some View {
-        VStack(spacing: 16) {
-            actionButton(tr("Start LiveContainer"), symbol: "power") {
-                coordinator.forceJITAndStartLiveContainer()
-            }
-            GuestAppListView(coordinator: coordinator)
-                .frame(height: 340)
-                .background(Color(red: 0.1, green: 0.1, blue: 0.1))
-                .cornerRadius(12)
-        }
-    }
 }
 
 
