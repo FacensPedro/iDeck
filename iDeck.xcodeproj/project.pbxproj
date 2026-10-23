@@ -36,6 +36,7 @@
 		A10000000000000000000003 /* SteamDepotManifest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000003 /* SteamDepotManifest.swift */; };
 		A10000000000000000000004 /* SteamAppManifestWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000004 /* SteamAppManifestWriter.swift */; };
 		A10000000000000000000005 /* SteamInstall.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000005 /* SteamInstall.swift */; };
+		A10000000000000000000006 /* WindowsLibraryModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000006 /* WindowsLibraryModels.swift */; };
 
 		222222222222222222222221 /* iDeckApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iDeckApp.swift; sourceTree = "<group>"; };
 		222222222222222222222222 /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
@@ -73,6 +74,7 @@
 		A20000000000000000000003 /* SteamDepotManifest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamDepotManifest.swift; sourceTree = "<group>"; };
 		A20000000000000000000004 /* SteamAppManifestWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamAppManifestWriter.swift; sourceTree = "<group>"; };
 		A20000000000000000000005 /* SteamInstall.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamInstall.swift; sourceTree = "<group>"; };
+		A20000000000000000000006 /* WindowsLibraryModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowsLibraryModels.swift; sourceTree = "<group>"; };
 
 		333333333333333333333331 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
@@ -112,6 +114,7 @@
 				A10000000000000000000003 /* SteamDepotManifest.swift in Sources */,
 				A10000000000000000000004 /* SteamAppManifestWriter.swift in Sources */,
 				A10000000000000000000005 /* SteamInstall.swift in Sources */,
+				A10000000000000000000006 /* WindowsLibraryModels.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -158,6 +161,7 @@
 				A20000000000000000000003 /* SteamDepotManifest.swift */,
 				A20000000000000000000004 /* SteamAppManifestWriter.swift */,
 				A20000000000000000000005 /* SteamInstall.swift */,
+				A20000000000000000000006 /* WindowsLibraryModels.swift */,
 			);
 			path = iDeck;
 			sourceTree = "<group>";

@@ -4614,6 +4614,22 @@ final class SteamOwnedGamesModel: ObservableObject {
         return SteamInstallFiles.buildID(appID: Int(appID), steamApps: steamApps) != nil
     }
 
+    func uninstall(appID: UInt32, prefixPath: URL) -> Bool {
+        guard let app = games.first(where: { $0.appID == appID }),
+              !app.installDir.isEmpty else {
+            downloadErrors[appID] = "Steam install metadata is missing. Refresh the library before uninstalling."
+            return false
+        }
+        let drive = prefixPath.appendingPathComponent("drive_c", isDirectory: true)
+        let steamApps = SteamInstallPaths.steamApps(drive: drive)
+        SteamInstallFiles.delete(appID: Int(appID), folderName: app.installDir, steamApps: steamApps)
+        installedApps.remove(appID)
+        downloadProgress.removeValue(forKey: appID)
+        installingApps.remove(appID)
+        downloadErrors.removeValue(forKey: appID)
+        return !isInstalled(appID: appID, prefixPath: prefixPath)
+    }
+
     func install(appID: UInt32, prefixPath: URL) async {
         guard !installingApps.contains(appID) else { return }
         guard SteamSignIn.isSignedIn else {

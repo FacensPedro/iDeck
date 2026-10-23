@@ -23,6 +23,7 @@ enum IPAInstallError: LocalizedError {
 
 class AppManager: ObservableObject {
     @Published var installedApps: [URL] = []
+    @Published private(set) var artworkRevision = 0
     private let fileManager = FileManager.default
     private var appsDirectory: URL { fileManager.urls(for: .documentDirectory, in: .userDomainMask).first!.appendingPathComponent("GuestApps", isDirectory: true) }
 
@@ -36,6 +37,102 @@ class AppManager: ObservableObject {
             let contents = try fileManager.contentsOfDirectory(at: appsDirectory, includingPropertiesForKeys: [.isDirectoryKey])
             installedApps = contents.filter { url in (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true && url.pathExtension == "app" }.sorted { $0.lastPathComponent.localizedCaseInsensitiveCompare($1.lastPathComponent) == .orderedAscending }
         } catch { installedApps = [] }
+    }
+
+    func displayName(for appURL: URL) -> String {
+        guard let info = NSDictionary(contentsOf: appURL.appendingPathComponent("Info.plist")) as? [String: Any] else {
+            return appURL.deletingPathExtension().lastPathComponent
+        }
+        return (info["CFBundleDisplayName"] as? String)
+            ?? (info["CFBundleName"] as? String)
+            ?? appURL.deletingPathExtension().lastPathComponent
+    }
+
+    func bundleIdentifier(for appURL: URL) -> String? {
+        guard let info = NSDictionary(contentsOf: appURL.appendingPathComponent("Info.plist")) as? [String: Any] else {
+            return nil
+        }
+        return info["CFBundleIdentifier"] as? String
+    }
+
+    func iconURL(for appURL: URL) -> URL? {
+        if let custom = customArtworkURL(for: appURL) {
+            return custom
+        }
+        guard let info = NSDictionary(contentsOf: appURL.appendingPathComponent("Info.plist")) as? [String: Any] else {
+            return nil
+        }
+        let bundleIcons = info["CFBundleIcons"] as? [String: Any]
+        let primaryIcon = bundleIcons?["CFBundlePrimaryIcon"] as? [String: Any]
+        let iconNames = primaryIcon?["CFBundleIconFiles"] as? [String] ?? []
+        for name in iconNames.reversed() {
+            let candidates = [
+                appURL.appendingPathComponent(name + ".png"),
+                appURL.appendingPathComponent(name)
+            ]
+            if let found = candidates.first(where: { fileManager.fileExists(atPath: $0.path) }) {
+                return found
+            }
+        }
+        return nil
+    }
+
+    func customArtworkURL(for appURL: URL) -> URL? {
+        let basename = artworkBasename(for: appURL)
+        for ext in ["png", "jpg", "jpeg", "heic"] {
+            let url = artworkDirectory.appendingPathComponent(basename + "." + ext)
+            if fileManager.fileExists(atPath: url.path) { return url }
+        }
+        return nil
+    }
+
+    func setArtwork(from source: URL, for appURL: URL) throws {
+        let hasScope = source.startAccessingSecurityScopedResource()
+        defer { if hasScope { source.stopAccessingSecurityScopedResource() } }
+        let ext = source.pathExtension.lowercased()
+        guard ["png", "jpg", "jpeg", "heic"].contains(ext) else {
+            throw IPAInstallError.copyFailed("Choose a PNG, JPG, JPEG or HEIC image.")
+        }
+        try fileManager.createDirectory(at: artworkDirectory, withIntermediateDirectories: true)
+        let basename = artworkBasename(for: appURL)
+        for existingExt in ["png", "jpg", "jpeg", "heic"] {
+            let old = artworkDirectory.appendingPathComponent(basename + "." + existingExt)
+            if fileManager.fileExists(atPath: old.path) { try fileManager.removeItem(at: old) }
+        }
+        let destination = artworkDirectory.appendingPathComponent(basename + "." + ext)
+        let temporary = artworkDirectory.appendingPathComponent(UUID().uuidString + "." + ext)
+        try fileManager.copyItem(at: source, to: temporary)
+        try fileManager.moveItem(at: temporary, to: destination)
+        artworkRevision &+= 1
+    }
+
+    private func artworkBasename(for appURL: URL) -> String {
+        let key = bundleIdentifier(for: appURL) ?? appURL.lastPathComponent
+        let encoded = Data(key.utf8).base64EncodedString()
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "=", with: "")
+        return String(encoded.prefix(96))
+    }
+
+    private var artworkDirectory: URL {
+        fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("iDeck/GuestAppsArtwork", isDirectory: true)
+    }
+
+    func uninstallApp(at url: URL) throws {
+        let appsRoot = appsDirectory.standardizedFileURL.resolvingSymlinksInPath()
+        let target = url.standardizedFileURL
+        guard target.pathExtension == "app",
+              target.deletingLastPathComponent().resolvingSymlinksInPath() == appsRoot,
+              target.resolvingSymlinksInPath().deletingLastPathComponent() == appsRoot else {
+            throw IPAInstallError.copyFailed("Refused to remove an app outside iDeck's app library.")
+        }
+        let artwork = customArtworkURL(for: target)
+        try fileManager.removeItem(at: target)
+        if let artwork { try? fileManager.removeItem(at: artwork) }
+        artworkRevision &+= 1
+        refreshInstalledApps()
     }
 
     func installIPA(from url: URL, completion: @escaping (Result<URL, IPAInstallError>) -> Void) {
