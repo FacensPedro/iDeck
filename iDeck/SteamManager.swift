@@ -3895,10 +3895,10 @@ struct SteamAppInfo {
     /// depots that publish a public manifest. A 64-bit selection falls back
     /// to 32-bit depots when the app only publishes those.
     func installDepots(os: String = "windows", arch: String = "64",
-                       language: String = "english") -> [DepotInfo] {
+                       language: String = "english", includingDLC: Set<UInt32> = []) -> [DepotInfo] {
         func select(_ arch: String) -> [DepotInfo] {
             depots.filter { d in
-                d.supports(os: os) && d.dlcAppID == nil && !d.isSharedInstall &&
+                d.supports(os: os) && (d.dlcAppID == nil || d.dlcAppID.map { includingDLC.contains($0) } == true) && !d.isSharedInstall &&
                 d.publicManifestID != nil && !d.lowViolence &&
                 (d.osarch.isEmpty || d.osarch == arch) &&
                 (d.language.isEmpty || d.language.caseInsensitiveCompare(language) == .orderedSame)
@@ -4596,6 +4596,7 @@ final class SteamOwnedGamesModel: ObservableObject {
     @Published private(set) var downloadProgress: [UInt32: SteamDownloadProgress] = [:]
     @Published private(set) var downloadErrors: [UInt32: String] = [:]
     @Published private(set) var installedApps: Set<UInt32> = []
+    @Published private(set) var availableDLC: [UInt32: [UInt32]] = [:]
 
     private let session = SteamSession()
     private lazy var fetcher = SteamLibraryFetcher(session: session)
@@ -4618,6 +4619,28 @@ final class SteamOwnedGamesModel: ObservableObject {
         } catch {
             errorMessage = SteamSignIn.message(error)
             games = []
+        }
+    }
+
+    func loadDLC(appID: UInt32) async {
+        do {
+            guard let info = try await fetcher.fetchInstallInfo(appID: appID) else {
+                availableDLC[appID] = []
+                return
+            }
+            guard info.appID == appID else {
+                availableDLC[appID] = []
+                return
+            }
+            availableDLC[appID] = Array(Set(info.depots.compactMap { depot -> UInt32? in
+                guard depot.publicManifestID != nil,
+                      depot.supports(os: "windows"),
+                      let dlc = depot.dlcAppID,
+                      dlc != appID else { return nil }
+                return dlc
+            })).sorted()
+        } catch {
+            availableDLC[appID] = []
         }
     }
 
@@ -4673,6 +4696,46 @@ final class SteamOwnedGamesModel: ObservableObject {
             )
             installedApps.insert(appID)
             downloadErrors[appID] = nil
+        } catch {
+            downloadErrors[appID] = SteamSignIn.message(error)
+        }
+    }
+
+    func installDLC(appID: UInt32, dlcAppID: UInt32, prefixPath: URL) async {
+        guard isInstalled(appID: appID, prefixPath: prefixPath) else {
+            downloadErrors[appID] = "Install this game before installing its DLC."
+            return
+        }
+        guard !installingApps.contains(appID) else { return }
+        guard SteamSignIn.isSignedIn else {
+            downloadErrors[appID] = "Sign in to install Steam games."
+            return
+        }
+        installingApps.insert(appID)
+        downloadErrors[appID] = nil
+        downloadProgress[appID] = SteamDownloadProgress()
+        defer { installingApps.remove(appID) }
+        do {
+            guard let app = try await fetcher.fetchInstallInfo(appID: appID),
+                  app.appID == appID,
+                  app.installableOnWindows,
+                  availableDLC[appID]?.contains(dlcAppID) == true,
+                  app.depots.contains(where: {
+                      $0.dlcAppID == dlcAppID &&
+                      $0.publicManifestID != nil &&
+                      $0.supports(os: "windows")
+                  }) else {
+                throw SteamError.depotNotFound(dlcAppID)
+            }
+            let steamApps = SteamInstallPaths.steamApps(
+                drive: prefixPath.appendingPathComponent("drive_c", isDirectory: true))
+            try FileManager.default.createDirectory(at: steamApps, withIntermediateDirectories: true)
+            _ = try await downloader.install(app, steamApps: steamApps,
+                ownedDepots: { [weak self] in try? await self?.fetcher.ownedDepotIDs() },
+                includedDLC: [dlcAppID],
+                dlcOnly: true,
+                progress: { [weak self] progress in self?.downloadProgress[appID] = progress })
+            installedApps.insert(appID)
         } catch {
             downloadErrors[appID] = SteamSignIn.message(error)
         }

@@ -56,6 +56,12 @@ func trStatus(_ status: String) -> String {
 enum Translations {
     static let table: [String: [String: String]] = [
         // Modes
+        "Choose a mode": ["pt": "Escolha um modo", "es": "Elige un modo"],
+        "PC Gaming": ["pt": "Jogos de PC", "es": "Juegos de PC"],
+        "Steam games and Windows apps": ["pt": "Jogos Steam e aplicativos de PC", "es": "Juegos de Steam y aplicaciones de PC"],
+        "Install and run IPA apps": ["pt": "Instale e execute aplicativos IPA", "es": "Instala y ejecuta aplicaciones IPA"],
+        "Size unavailable": ["pt": "Tamanho indisponível", "es": "Tamaño no disponible"],
+        "Install DLC": ["pt": "Instalar DLC", "es": "Instalar DLC"],
         "Run Windows apps and Steam through Wine": ["pt": "Execute apps do Windows e o Steam via Wine", "es": "Ejecuta apps de Windows y Steam con Wine"],
         "Run iOS apps inside iDeck": ["pt": "Execute apps iOS dentro do iDeck", "es": "Ejecuta apps de iOS dentro de iDeck"],
         "Mode": ["pt": "Modo", "es": "Modo"],
