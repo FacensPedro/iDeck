@@ -8,9 +8,27 @@ class WindowsEnvironment {
     let steamManager = SteamManager()
     
     func hasRuntime(in prefix: String) -> Bool {
-        let root = URL(fileURLWithPath: prefix)
-        let required = ["usr/bin/box64", "usr/bin/wine64"]
-        return required.allSatisfy { FileManager.default.isExecutableFile(atPath: root.appendingPathComponent($0).path) }
+        guard let manifestURL = Bundle.main.url(forResource: "MadeiraRuntimeManifest", withExtension: "plist"),
+              let data = try? Data(contentsOf: manifestURL),
+              let rawManifest = try? PropertyListSerialization.propertyList(from: data, options: [], format: nil),
+              let manifest = rawManifest as? [String: Any],
+              manifest["runtimeABI"] as? Int == 1,
+              manifest["fexInProcess"] as? Bool == true,
+              manifest["wineInProcess"] as? Bool == true,
+              manifest["dxmtLinked"] as? Bool == true,
+              manifest["d3d12Linked"] as? Bool == true else {
+            return false
+        }
+        let requiredSymbols = [
+            "fex_initialize",
+            "wineserver_start",
+            "wine_process_start",
+            "madeira_dxmt_runtime_ready",
+            "madeira_d3d12_runtime_ready"
+        ]
+        return requiredSymbols.allSatisfy { name in
+            name.withCString { dlsym(RTLD_DEFAULT, $0) != nil }
+        }
     }
 
     func configureWine(prefix: String) {
