@@ -3,7 +3,7 @@ import MetalKit
 
 struct WindowsRendererView: UIViewRepresentable {
     func makeUIView(context: Context) -> MTKView {
-        let mtkView = MTKView()
+        let mtkView = MTKView(frame: .zero)
         
         if let defaultDevice = MTLCreateSystemDefaultDevice() {
             mtkView.device = defaultDevice
@@ -13,6 +13,9 @@ struct WindowsRendererView: UIViewRepresentable {
         mtkView.isOpaque = true
         mtkView.enableSetNeedsDisplay = false
         mtkView.isPaused = false
+        mtkView.autoResizeDrawable = true
+        mtkView.framebufferOnly = false
+        mtkView.contentMode = .scaleAspectFit
         
         setenv("MVK_CONFIG_IOS_SURFACE", "1", 1)
         
@@ -20,5 +23,6 @@ struct WindowsRendererView: UIViewRepresentable {
     }
     
     func updateUIView(_ uiView: MTKView, context: Context) {
+        uiView.setNeedsLayout()
     }
 }

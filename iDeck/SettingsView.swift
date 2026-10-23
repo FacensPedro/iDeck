@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @ObservedObject var coordinator: SystemCoordinator
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.presentationMode) var presentationMode
     @StateObject private var inputManager = InputManager.shared
     @AppStorage("controllerLeftSensitivity") private var controllerLeftSensitivity = 1.0
@@ -93,7 +94,9 @@ struct SettingsView: View {
                             toggleRow(title: tr("Inject Guest Hooks"), isOn: $coordinator.isGuestHooksEnabled)
                         }
                     }
-                    .padding()
+                    .padding(horizontalSizeClass == .compact ? 14 : 28)
+                    .frame(maxWidth: 720)
+                    .frame(maxWidth: .infinity)
                 }
             }
             .navigationTitle(tr("Settings"))

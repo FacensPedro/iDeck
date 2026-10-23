@@ -8,8 +8,12 @@ struct GameSessionView: View {
         ZStack {
             Color.black.ignoresSafeArea()
             
-            WindowsRendererView()
-                .ignoresSafeArea()
+            GeometryReader { geometry in
+                WindowsRendererView()
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+                    .clipped()
+            }
+            .ignoresSafeArea(edges: .bottom)
             
             VStack {
                 HStack {
@@ -19,7 +23,8 @@ struct GameSessionView: View {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 30))
                             .foregroundColor(.white.opacity(0.5))
-                            .padding()
+                            .frame(width: 44, height: 44)
+                            .padding(8)
                     }
                     Spacer()
                 }
