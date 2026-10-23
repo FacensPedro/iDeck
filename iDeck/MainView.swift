@@ -859,14 +859,9 @@ struct WindowsWorkspaceView: View {
                             selectedExecutable = SelectedLibraryURL(url: executableURL)
                         } label: {
                             VStack(alignment: .leading, spacing: 9) {
-                                ZStack {
-                                    LinearGradient(colors: [Color(red: 0.13, green: 0.18, blue: 0.24), panelColor], startPoint: .topLeading, endPoint: .bottomTrailing)
-                                    Image(systemName: "app.dashed")
-                                        .font(.system(size: 42, weight: .medium))
-                                        .foregroundColor(.white.opacity(0.82))
-                                }
-                                .frame(height: 152)
-                                .clipShape(RoundedRectangle(cornerRadius: 9))
+                                WindowsExecutableArtworkView(executableURL: executableURL, library: windowsLibrary, fallbackColor: panelColor)
+                                    .frame(height: 152)
+                                    .clipShape(RoundedRectangle(cornerRadius: 9))
                                 Text(executableURL.deletingPathExtension().lastPathComponent)
                                     .font(.subheadline.weight(.semibold))
                                     .foregroundColor(.white)
@@ -903,6 +898,33 @@ struct WindowsWorkspaceView: View {
     }
 }
 
+
+private struct WindowsExecutableArtworkView: View {
+    let executableURL: URL
+    @ObservedObject var library: WindowsLibraryStore
+    let fallbackColor: Color
+
+    var body: some View {
+        let profile = library.profile(for: library.profileID(for: executableURL), title: executableURL.deletingPathExtension().lastPathComponent)
+        Group {
+            if let url = library.artworkURL(for: profile), let image = UIImage(contentsOfFile: url.path) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                ZStack {
+                    LinearGradient(colors: [Color(red: 0.13, green: 0.18, blue: 0.24), fallbackColor], startPoint: .topLeading, endPoint: .bottomTrailing)
+                    Image(systemName: "app.dashed")
+                        .font(.system(size: 42, weight: .medium))
+                        .foregroundColor(.white.opacity(0.82))
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .clipped()
+        .accessibilityLabel(profile.title)
+    }
+}
 
 private struct AppBundleArtworkView: View {
     let appURL: URL
@@ -1014,6 +1036,7 @@ private struct WindowsExecutableDetailsView: View {
     @State private var profile: WindowsGameProfile
     @State private var errorMessage: String?
     @State private var showError = false
+    @State private var isArtworkPickerPresented = false
 
     init(executableURL: URL, prefixPath: URL?, library: WindowsLibraryStore, coordinator: SystemCoordinator) {
         self.executableURL = executableURL
@@ -1029,12 +1052,15 @@ private struct WindowsExecutableDetailsView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     VStack(spacing: 10) {
-                        Image(systemName: "app.dashed")
-                            .font(.system(size: 52))
-                            .foregroundColor(.white)
-                            .frame(width: 150, height: 150)
-                            .background(Color.white.opacity(0.07))
+                        WindowsExecutableArtworkView(executableURL: executableURL, library: library, fallbackColor: Color(red: 0.12, green: 0.15, blue: 0.2))
+                            .frame(width: 190, height: 190)
                             .clipShape(RoundedRectangle(cornerRadius: 22))
+                        Button {
+                            isArtworkPickerPresented = true
+                        } label: {
+                            Label(tr("Change cover"), systemImage: "photo")
+                        }
+                        .buttonStyle(.bordered)
                         Text(executableURL.deletingPathExtension().lastPathComponent)
                             .font(.title2.bold())
                             .foregroundColor(.white)
@@ -1082,6 +1108,22 @@ private struct WindowsExecutableDetailsView: View {
             .background(Color.black.ignoresSafeArea())
             .navigationTitle(tr("Game details"))
             .navigationBarTitleDisplayMode(.inline)
+            .fileImporter(isPresented: $isArtworkPickerPresented, allowedContentTypes: [.image], allowsMultipleSelection: false) { result in
+                switch result {
+                case .success(let urls):
+                    guard let url = urls.first else { return }
+                    do {
+                        profile.artworkFilename = try library.setArtwork(from: url, for: profile.id)
+                        library.save(profile)
+                    } catch {
+                        errorMessage = error.localizedDescription
+                        showError = true
+                    }
+                case .failure(let error):
+                    errorMessage = error.localizedDescription
+                    showError = true
+                }
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(tr("Cancel")) { dismiss() }
