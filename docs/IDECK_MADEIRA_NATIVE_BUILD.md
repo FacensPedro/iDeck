@@ -39,7 +39,8 @@ device-testable runtime. Follow the upstream license and third-party notices.
 
 The function has the exact C declaration in `iDeck/NativeRuntimeABI.h`.
 It receives UTF-8 executable path, Wine prefix and JSON parameters, and
-returns after the Windows guest session has started. Session exit handling\nrequires separate integration with Wine's native callbacks. A compatible implementation
+returns after the Windows guest session has started. Session exit handling
+requires separate integration with Wine's native callbacks. A compatible implementation
 needs to invoke the **real** upstream in-process FEX/Wine/wineserver machinery
 and must use DXMT/D3D12 resources for graphics.
 
