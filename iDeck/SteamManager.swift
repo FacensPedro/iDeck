@@ -4707,6 +4707,16 @@ final class SteamOwnedGamesModel: ObservableObject {
         return removed
     }
 
+    func refreshInstalledApps(prefixPath: URL) {
+        let steamApps = SteamInstallPaths.steamApps(
+            drive: prefixPath.appendingPathComponent("drive_c", isDirectory: true))
+        let names = (try? FileManager.default.contentsOfDirectory(atPath: steamApps.path)) ?? []
+        installedApps = Set(names.compactMap { filename -> UInt32? in
+            guard filename.hasPrefix("appmanifest_"), filename.hasSuffix(".acf") else { return nil }
+            return UInt32(filename.dropFirst("appmanifest_".count).dropLast(4))
+        })
+    }
+
     func isInstalled(appID: UInt32, prefixPath: URL) -> Bool {
         let drive = prefixPath.appendingPathComponent("drive_c", isDirectory: true)
         let steamApps = SteamInstallPaths.steamApps(drive: drive)
@@ -4740,6 +4750,7 @@ final class SteamOwnedGamesModel: ObservableObject {
         downloadProgress[appID] = SteamDownloadProgress()
         defer { installingApps.remove(appID) }
         var installFolder: String?
+        var installFolderAlreadyExisted = false
         let drive = prefixPath.appendingPathComponent("drive_c", isDirectory: true)
         let steamApps = SteamInstallPaths.steamApps(drive: drive)
         let wasInstalled = isInstalled(appID: appID, prefixPath: prefixPath)
@@ -4750,6 +4761,11 @@ final class SteamOwnedGamesModel: ObservableObject {
             }
             installFolder = SteamInstallFiles.safeFolderName(
                 app.installDir.isEmpty ? "app_\(app.appID)" : app.installDir)
+            if let installFolder {
+                installFolderAlreadyExisted = FileManager.default.fileExists(atPath:
+                    steamApps.appendingPathComponent("common", isDirectory: true)
+                        .appendingPathComponent(installFolder, isDirectory: true).path)
+            }
             guard app.installableOnWindows else {
                 throw SteamError.depotNotFound(appID)
             }
@@ -4767,9 +4783,14 @@ final class SteamOwnedGamesModel: ObservableObject {
             downloadErrors[appID] = nil
         } catch {
             let cancelled = Task.isCancelled || error is CancellationError
-            if cancelled, !wasInstalled, let installFolder {
-                SteamInstallFiles.delete(appID: Int(appID), folderName: installFolder,
-                                         steamApps: steamApps)
+            if cancelled, !wasInstalled {
+                if !installFolderAlreadyExisted, let installFolder {
+                    SteamInstallFiles.delete(appID: Int(appID), folderName: installFolder,
+                                             steamApps: steamApps)
+                } else {
+                    try? FileManager.default.removeItem(at:
+                        steamApps.appendingPathComponent("downloading/\(appID)", isDirectory: true))
+                }
             }
             downloadProgress.removeValue(forKey: appID)
             downloadErrors[appID] = cancelled ? nil : SteamSignIn.message(error)

@@ -258,8 +258,7 @@ struct WindowsWorkspaceView: View {
     private var installedSteamGames: [SteamAppInfo] {
         steamLibrary.games.filter { game in
             steamLibrary.installingApps.contains(game.appID) ||
-            steamLibrary.installedApps.contains(game.appID) ||
-            (prefixPath.map { steamLibrary.isInstalled(appID: game.appID, prefixPath: $0) } ?? false)
+            steamLibrary.installedApps.contains(game.appID)
         }
     }
 
@@ -366,7 +365,7 @@ struct WindowsWorkspaceView: View {
         }
         .fileImporter(
             isPresented: $isExecutablePickerPresented,
-            allowedContentTypes: [.data],
+            allowedContentTypes: [UTType(filenameExtension: "exe") ?? .data, .data],
             allowsMultipleSelection: false
         ) { result in
             guard case .success(let urls) = result, let url = urls.first, let prefixPath else { return }
@@ -407,6 +406,7 @@ struct WindowsWorkspaceView: View {
         .task(id: coordinator.isSteamConnected) {
             if coordinator.isSteamConnected {
                 await steamLibrary.refresh()
+                if let prefixPath { steamLibrary.refreshInstalledApps(prefixPath: prefixPath) }
             } else {
                 steamLibrary.disconnect()
             }
@@ -660,13 +660,7 @@ struct WindowsWorkspaceView: View {
     private func gameCard(_ game: SteamAppInfo) -> some View {
         let progress = steamLibrary.downloadProgress[game.appID]
         let percent = Int(((progress?.fraction ?? 0) * 100).rounded())
-        let installedOnDisk: Bool
-        if let prefixPath {
-            installedOnDisk = steamLibrary.isInstalled(appID: game.appID, prefixPath: prefixPath)
-        } else {
-            installedOnDisk = false
-        }
-        let installed = steamLibrary.installedApps.contains(game.appID) || installedOnDisk
+        let installed = steamLibrary.installedApps.contains(game.appID)
 
         return VStack(alignment: .center, spacing: 10) {
             Button {
@@ -773,6 +767,7 @@ struct WindowsWorkspaceView: View {
             Task { @MainActor in
                 prefixPath = root
                 windowsLibrary.refresh(prefixPath: root)
+                steamLibrary.refreshInstalledApps(prefixPath: root)
                 appManager.refreshInstalledApps()
             }
         }
