@@ -272,63 +272,79 @@ class SystemCoordinator: ObservableObject {
         }
     }
     
-    func launchWindowsExecutable(at url: URL) {
+    func launchWindowsExecutable(at url: URL, profile: WindowsGameProfile? = nil) {
         guard isContainerReady else { return }
-        
         refreshJITStatus()
-        setWindowsStatus("Importing Executable...")
-        let hasScope = url.startAccessingSecurityScopedResource()
-        let stagedExecutable = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathExtension("exe")
-        do {
-            guard url.pathExtension.lowercased() == "exe" else {
-                if hasScope { url.stopAccessingSecurityScopedResource() }
-                setWindowsStatus("Invalid executable file")
-                return
-            }
-            try FileManager.default.copyItem(at: url, to: stagedExecutable)
-        } catch {
-            if hasScope { url.stopAccessingSecurityScopedResource() }
-            setWindowsStatus("Executable import failed: \(error.localizedDescription)")
+
+        guard url.pathExtension.lowercased() == "exe" else {
+            setWindowsStatus("Choose a Windows .exe executable.")
             return
         }
-        if hasScope { url.stopAccessingSecurityScopedResource() }
+
+        setWindowsStatus("Preparing executable...")
+        let fileManager = FileManager.default
+        let hasScope = url.startAccessingSecurityScopedResource()
+
         containerHost.mountEnvironment { [weak self] mountPath in
-            defer { try? FileManager.default.removeItem(at: stagedExecutable) }
-            guard let self = self else { return }
-            guard let mountPath = mountPath else {
+            defer { if hasScope { url.stopAccessingSecurityScopedResource() } }
+            guard let self else { return }
+            guard let mountPath else {
                 self.setWindowsStatus("Container initialization failed")
                 return
             }
+
             do {
-                let downloads = URL(fileURLWithPath: mountPath).appendingPathComponent("WindowsDownloads", isDirectory: true)
-                try FileManager.default.createDirectory(at: downloads, withIntermediateDirectories: true)
-                let destination = downloads.appendingPathComponent(stagedExecutable.lastPathComponent)
-                if FileManager.default.fileExists(atPath: destination.path) {
-                    try FileManager.default.removeItem(at: destination)
+                let root = URL(fileURLWithPath: mountPath, isDirectory: true)
+                let downloads = root.appendingPathComponent("WindowsDownloads", isDirectory: true)
+                try fileManager.createDirectory(at: downloads, withIntermediateDirectories: true)
+
+                let source = url.standardizedFileURL
+                let downloadDirectory = downloads.standardizedFileURL
+                let isAlreadyInLibrary = source.deletingLastPathComponent() == downloadDirectory
+                let destination: URL
+
+                if isAlreadyInLibrary {
+                    guard fileManager.fileExists(atPath: source.path) else {
+                        throw CocoaError(.fileNoSuchFile)
+                    }
+                    destination = source
+                } else {
+                    var candidate = downloads.appendingPathComponent(url.lastPathComponent)
+                    if fileManager.fileExists(atPath: candidate.path) {
+                        let stem = candidate.deletingPathExtension().lastPathComponent
+                        candidate = downloads.appendingPathComponent("\(stem)-\(UUID().uuidString.prefix(8)).exe")
+                    }
+                    try fileManager.copyItem(at: url, to: candidate)
+                    destination = candidate
                 }
-                try FileManager.default.copyItem(at: stagedExecutable, to: destination)
+
                 guard self.isJITEnabled else {
-                    DispatchQueue.main.async {
-                        self.setWindowsStatus("Executable imported. Enable JIT for iDeck in StikDebug before running it.")
-                    }
+                    self.setWindowsStatus("Executable is in the library. Enable JIT in Settings before launching.")
                     return
                 }
+
                 guard self.windowsEnvironment.hasRuntime(in: mountPath) else {
-                    DispatchQueue.main.async {
-                        self.setWindowsStatus("Madeira runtime missing: FEX/box64 and Wine ARM64EC are not installed.")
-                    }
+                    self.setWindowsStatus("Madeira runtime missing: the in-process FEX/Wine/DXMT runtime has not been installed in this build.")
                     return
                 }
+
                 self.windowsEnvironment.configureWine(prefix: mountPath)
-                self.windowsEnvironment.execute(binary: destination, is32Bit: false, isSteam: false, jitEnabler: self.jitEnabler) { result in
+                if let profile {
+                    self.windowsEnvironment.applyGameProfile(profile)
+                }
+                self.windowsEnvironment.execute(
+                    binary: destination,
+                    arguments: profile?.arguments ?? "",
+                    is32Bit: false,
+                    isSteam: false,
+                    jitEnabler: self.jitEnabler
+                ) { result in
                     DispatchQueue.main.async {
-                        self.setWindowsStatus(result ? "Running" : "Execution Error: Madeira Wine/FEX runtime is missing or failed to start")
+                        self.setWindowsStatus(result ? "Running" : "Execution Error: the configured Windows runtime failed to start")
                     }
                 }
             } catch {
-                DispatchQueue.main.async {
-                    self.setWindowsStatus("Executable import failed: \(error.localizedDescription)")
-                }
+                self.setWindowsStatus("Executable import failed: \(error.localizedDescription)")
             }
         }
     }
