@@ -324,36 +324,100 @@ static int LCGuestUIApplicationMain(int argc, char *_Nullable *_Nonnull argv, NS
     NSDictionary *info = [NSDictionary dictionaryWithContentsOfFile:[appPath stringByAppendingPathComponent:@"Info.plist"]];
     if (!info) return LCFail(errorMessage, @"Guest Info.plist could not be read");
 
-    NSString *prepError = nil;
-    NSString *patched = LCPreparePatchedBinary(appPath, info, &prepError);
-    if (!patched) return LCFail(errorMessage, prepError);
-
-    dlerror();
-    void *handle = dlopen(patched.fileSystemRepresentation, RTLD_LAZY | RTLD_GLOBAL);
-    if (!handle) {
-        const char *dlerr = dlerror();
-        return LCFail(errorMessage, [NSString stringWithFormat:@"dlopen failed: %s", dlerr ? dlerr : "unknown error"]);
+    NSString *execName = info[@"CFBundleExecutable"];
+    if (![execName isKindOfClass:[NSString class]] ||
+        execName.length == 0 || [execName containsString:@"/"] ||
+        [execName containsString:@"\\"] || [execName isEqualToString:@"."] ||
+        [execName isEqualToString:@".."]) {
+        return LCFail(errorMessage, @"O IPA contém um executável inválido.");
     }
 
-    intptr_t slide = 0;
-    const struct mach_header_64 *mh = LCFindImage(patched, &slide);
-    uintptr_t entry = mh ? LCFindEntryPoint(mh) : 0;
-    if (!entry) {
-        dlclose(handle);
-        return LCFail(errorMessage, @"Could not locate the guest entry point (LC_MAIN)");
+    NSString *execPath = [appPath stringByAppendingPathComponent:execName];
+    BOOL isExecutableDirectory = NO;
+    if (![[NSFileManager defaultManager] fileExistsAtPath:execPath isDirectory:&isExecutableDirectory] ||
+        isExecutableDirectory) {
+        return LCFail(errorMessage, @"O executável do IPA não foi encontrado.");
     }
 
-    setenv("GUEST_APP_PATH", appPath.fileSystemRepresentation, 1);
-    gGuestBundle = [NSBundle bundleWithPath:appPath];
-    LCRebindSymbol(mh, slide, "_UIApplicationMain", (void *)LCGuestUIApplicationMain);
+    NSData *binary = [NSData dataWithContentsOfFile:execPath options:NSDataReadingMappedIfSafe error:nil];
+    if (binary.length < sizeof(struct mach_header_64)) {
+        return LCFail(errorMessage, @"O executável do IPA está incompleto ou corrompido.");
+    }
+    // iOS does not expose macOS SecStaticCodeCheckValidity to third-party
+    // applications. The Mach-O metadata below is only a structural check;
+    // it is NOT cryptographic signature validation.
+    const uint8_t *raw = binary.bytes;
+    size_t sliceOffset = 0;
+    size_t sliceLength = binary.length;
+    uint32_t magic = 0;
+    memcpy(&magic, raw, sizeof(magic));
+    if (magic == FAT_CIGAM || magic == FAT_MAGIC) {
+        if (binary.length < sizeof(struct fat_header)) {
+            return LCFail(errorMessage, @"O arquivo Mach-O está incompleto.");
+        }
+        const struct fat_header *fat = (const struct fat_header *)raw;
+        uint32_t count = OSSwapBigToHostInt32(fat->nfat_arch);
+        if (count == 0 || count > 32 ||
+            sizeof(*fat) + (size_t)count * sizeof(struct fat_arch) > binary.length) {
+            return LCFail(errorMessage, @"O cabeçalho Mach-O é inválido.");
+        }
+        const struct fat_arch *archs = (const struct fat_arch *)(fat + 1);
+        BOOL found = NO;
+        for (uint32_t i = 0; i < count; i++) {
+            if ((cpu_type_t)OSSwapBigToHostInt32(archs[i].cputype) != CPU_TYPE_ARM64) continue;
+            sliceOffset = OSSwapBigToHostInt32(archs[i].offset);
+            sliceLength = OSSwapBigToHostInt32(archs[i].size);
+            found = YES;
+            break;
+        }
+        if (!found || sliceOffset > binary.length || sliceLength > binary.length - sliceOffset) {
+            return LCFail(errorMessage, @"Este IPA não possui um executável ARM64 válido.");
+        }
+    }
+    if (sliceLength < sizeof(struct mach_header_64)) {
+        return LCFail(errorMessage, @"O executável ARM64 é inválido.");
+    }
+    struct mach_header_64 header;
+    memcpy(&header, raw + sliceOffset, sizeof(header));
+    if (header.magic != MH_MAGIC_64 || header.cputype != CPU_TYPE_ARM64 ||
+        header.filetype != MH_EXECUTE || header.sizeofcmds > sliceLength - sizeof(header) ||
+        header.ncmds > 2048) {
+        return LCFail(errorMessage, @"O executável não é um aplicativo Mach-O ARM64 compatível.");
+    }
+    size_t position = sliceOffset + sizeof(header);
+    size_t commandsEnd = position + header.sizeofcmds;
+    BOOL hasSignatureBlob = NO;
+    for (uint32_t i = 0; i < header.ncmds; i++) {
+        struct load_command command;
+        if (position > commandsEnd || sizeof(command) > commandsEnd - position) break;
+        memcpy(&command, raw + position, sizeof(command));
+        if (command.cmdsize < sizeof(command) || command.cmdsize > commandsEnd - position) break;
+        if (command.cmd == LC_CODE_SIGNATURE && command.cmdsize >= sizeof(struct linkedit_data_command)) {
+            struct linkedit_data_command signature;
+            memcpy(&signature, raw + position, sizeof(signature));
+            if (signature.datasize > 0 && signature.dataoff <= sliceLength &&
+                signature.datasize <= sliceLength - signature.dataoff) {
+                hasSignatureBlob = YES;
+            }
+        }
+        position += command.cmdsize;
+    }
+    if (!hasSignatureBlob) {
+        return LCFail(errorMessage,
+                      @"Este IPA não possui dados de assinatura de código no executável. Uma assinatura válida é necessária para instalá-lo no iPadOS.");
+    }
 
-    NSString *execPath = [appPath stringByAppendingPathComponent:info[@"CFBundleExecutable"]];
-    char *argv0 = strdup(execPath.fileSystemRepresentation);
-    dispatch_async(dispatch_get_main_queue(), ^{
-        char *argv[2] = { argv0, NULL };
-        ((int (*)(int, char **))entry)(1, argv);
-    });
-    return YES;
+    // The previous loader rewrote the Mach-O header from MH_EXECUTE to
+    // MH_BUNDLE, then loaded the modified bytes with dlopen(). Such a rewrite
+    // invalidates the code signature on iPadOS. It cannot be repaired by JIT
+    // detection, and must not be performed at launch.
+    //
+    // An iOS app executable cannot be directly dlopen()'d as a framework.
+    // Accepting a properly signed IPA for import does not grant permission
+    // to run its entrypoint inside the host app. A compatible guest runtime
+    // and its signing/provisioning flow must be integrated separately.
+    return LCFail(errorMessage,
+                  @"Este IPA tem uma assinatura válida, mas o carregador atual do iDeck não consegue executar apps iOS dentro de outro app. É necessário um runtime LiveContainer compatível e devidamente assinado.");
 }
 
 @end
