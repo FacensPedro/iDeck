@@ -130,6 +130,8 @@ struct WindowsWorkspaceView: View {
     @State private var installMessage: String?
     @State private var isShowingInstallResult = false
     @Environment(\.openURL) private var openURL
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private let panelColor = Color(red: 0.105, green: 0.105, blue: 0.115)
     private let secondaryColor = Color(red: 0.16, green: 0.16, blue: 0.17)
@@ -147,8 +149,10 @@ struct WindowsWorkspaceView: View {
         return steamLibrary.games.filter { steamLibrary.isInstalled(appID: $0.appID, prefixPath: prefixPath) }
     }
 
+    private var isCompact: Bool { horizontalSizeClass == .compact }
+
     private var columns: [GridItem] {
-        [GridItem(.adaptive(minimum: 158), spacing: 14)]
+        [GridItem(.adaptive(minimum: isCompact ? 128 : 174, maximum: isCompact ? 210 : 260), spacing: isCompact ? 10 : 16)]
     }
 
     var body: some View {
@@ -158,27 +162,15 @@ struct WindowsWorkspaceView: View {
                 topBar
                 ScrollView {
                     VStack(alignment: .leading, spacing: 22) {
-                        HStack(alignment: .center, spacing: 14) {
-                            VStack(alignment: .leading, spacing: 5) {
-                                Text(tr("Game Library"))
-                                    .font(.system(size: 29, weight: .bold, design: .rounded))
-                                    .foregroundColor(.white)
-                                Text(tr("Install games from your Steam library"))
-                                    .font(.subheadline)
-                                    .foregroundColor(.gray)
+                        ViewThatFits(in: .horizontal) {
+                            HStack(alignment: .center, spacing: 14) {
+                                libraryHeading
+                                Spacer(minLength: 8)
+                                steamConnectButton
                             }
-                            Spacer(minLength: 8)
-                            Button {
-                                isSteamSignInPresented = true
-                            } label: {
-                                Label(tr(coordinator.isSteamConnected ? "Steam connected" : "Connect Steam"),
-                                      systemImage: coordinator.isSteamConnected ? "checkmark.circle.fill" : "person.crop.circle")
-                                    .font(.subheadline.weight(.semibold))
-                                    .foregroundColor(.white)
-                                    .padding(.horizontal, 13)
-                                    .padding(.vertical, 11)
-                                    .background(Color(red: 0.12, green: 0.35, blue: 0.65))
-                                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                            VStack(alignment: .leading, spacing: 14) {
+                                libraryHeading
+                                steamConnectButton
                             }
                         }
 
@@ -227,7 +219,8 @@ struct WindowsWorkspaceView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 14))
                         }
 
-                        HStack(spacing: 12) {
+                        ViewThatFits(in: .horizontal) {
+                            HStack(spacing: 12) {
                             Button {
                                 isExecutablePickerPresented = true
                             } label: {
@@ -250,11 +243,36 @@ struct WindowsWorkspaceView: View {
                                     .background(Color(red: 0.12, green: 0.35, blue: 0.65))
                                     .clipShape(RoundedRectangle(cornerRadius: 12))
                             }
+                            }
+                            VStack(spacing: 12) {
+                            Button {
+                                isExecutablePickerPresented = true
+                            } label: {
+                                Label(tr("Add Windows app"), systemImage: "square.and.arrow.down")
+                                    .font(.headline)
+                                    .foregroundColor(.white)
+                                    .padding(.vertical, 15)
+                                    .frame(maxWidth: .infinity)
+                                    .background(secondaryColor)
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                            }
+                            Button {
+                                isIPAPickerPresented = true
+                            } label: {
+                                Label(tr("Install IPA"), systemImage: "app.badge.plus")
+                                    .font(.headline)
+                                    .foregroundColor(.white)
+                                    .padding(.vertical, 15)
+                                    .frame(maxWidth: .infinity)
+                                    .background(Color(red: 0.12, green: 0.35, blue: 0.65))
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                            }
+                            }
                         }
                     }
                     .frame(maxWidth: 1000)
-                    .padding(.horizontal, 20)
-                    .padding(.top, 24)
+                    .padding(.horizontal, isCompact ? 14 : 28)
+                    .padding(.top, isCompact ? 16 : 28)
                     .padding(.bottom, 30)
                     .frame(maxWidth: .infinity)
                 }
@@ -329,6 +347,35 @@ struct WindowsWorkspaceView: View {
         .preferredColorScheme(.dark)
     }
 
+    private var libraryHeading: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(tr("Game Library"))
+                .font(.system(size: isCompact ? 25 : 29, weight: .bold, design: .rounded))
+                .foregroundColor(.white)
+            Text(tr("Install games from your Steam library"))
+                .font(.subheadline)
+                .foregroundColor(.gray)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var steamConnectButton: some View {
+        Button {
+            isSteamSignInPresented = true
+        } label: {
+            Label(tr(coordinator.isSteamConnected ? "Steam connected" : "Connect Steam"),
+                  systemImage: coordinator.isSteamConnected ? "checkmark.circle.fill" : "person.crop.circle")
+                .font(.subheadline.weight(.semibold))
+                .foregroundColor(.white)
+                .padding(.horizontal, 13)
+                .padding(.vertical, 11)
+                .frame(minHeight: 44)
+                .background(Color(red: 0.12, green: 0.35, blue: 0.65))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+        }
+        .accessibilityLabel(tr(coordinator.isSteamConnected ? "Steam connected" : "Connect Steam"))
+    }
+
     private var topBar: some View {
         HStack(spacing: 12) {
             if let onBack = onBack {
@@ -352,7 +399,7 @@ struct WindowsWorkspaceView: View {
             }
             .accessibilityLabel(tr("Settings"))
         }
-        .padding(.horizontal, 18)
+        .padding(.horizontal, isCompact ? 14 : 24)
         .padding(.vertical, 10)
         .background(Color.black)
     }
