@@ -712,15 +712,23 @@ struct WindowsWorkspaceView: View {
         let installed = steamLibrary.installedApps.contains(game.appID) || installedOnDisk
 
         return VStack(alignment: .leading, spacing: 10) {
-            SteamGameArtworkView(game: game)
-                .frame(height: 188)
-                .clipShape(RoundedRectangle(cornerRadius: 9))
-            Text(game.name.isEmpty ? tr("Untitled Steam app") : game.name)
-                .font(.subheadline.weight(.semibold))
-                .foregroundColor(.white)
-                .lineLimit(2)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .frame(height: 38, alignment: .topLeading)
+            Button {
+                selectedSteamGame = SelectedSteamGame(game: game)
+            } label: {
+                VStack(alignment: .leading, spacing: 9) {
+                    SteamGameArtworkView(game: game)
+                        .frame(height: 188)
+                        .clipShape(RoundedRectangle(cornerRadius: 9))
+                    Text(game.name.isEmpty ? tr("Untitled Steam app") : game.name)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundColor(.white)
+                        .lineLimit(2)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .frame(height: 38, alignment: .topLeading)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
             let downloadBytes = game.downloadSize(for: "windows")
             if downloadBytes > 0 {
                 Text(tr("Approx. download size: %@", ByteCountFormatter.string(fromByteCount: Int64(clamping: downloadBytes), countStyle: .file)))
@@ -778,10 +786,6 @@ struct WindowsWorkspaceView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(panelColor)
         .clipShape(RoundedRectangle(cornerRadius: 13))
-        .contentShape(RoundedRectangle(cornerRadius: 13))
-        .onTapGesture {
-            selectedSteamGame = SelectedSteamGame(game: game)
-        }
     }
 
     private func resolvePrefixPath() {
