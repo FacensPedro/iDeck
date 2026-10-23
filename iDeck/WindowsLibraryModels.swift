@@ -107,7 +107,7 @@ final class WindowsLibraryStore: ObservableObject {
             throw WindowsLibraryError.unsupportedArtwork
         }
         try fileManager.createDirectory(at: artworkDirectory, withIntermediateDirectories: true)
-        let safeID = String(Data(profileID.utf8).base64EncodedString().replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "+", with: "-").prefix(80))
+        let safeID = String(Data(profileID.utf8).base64EncodedString().replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "=", with: "").prefix(80))
         let filename = safeID + "." + ext
         let destination = artworkDirectory.appendingPathComponent(filename)
         let temporary = artworkDirectory.appendingPathComponent(UUID().uuidString + "." + ext)
@@ -169,8 +169,15 @@ final class WindowsLibraryStore: ObservableObject {
               target.resolvingSymlinksInPath().deletingLastPathComponent() == directory.resolvingSymlinksInPath() else {
             throw WindowsLibraryError.unsafePath
         }
+        let id = profileID(for: target)
+        if let artworkFilename = profiles[id]?.artworkFilename {
+            let artwork = artworkDirectory.appendingPathComponent(artworkFilename).standardizedFileURL
+            if artwork.deletingLastPathComponent() == artworkDirectory.standardizedFileURL {
+                try? fileManager.removeItem(at: artwork)
+            }
+        }
         try fileManager.removeItem(at: target)
-        profiles.removeValue(forKey: profileID(for: target))
+        profiles.removeValue(forKey: id)
         persistProfiles()
         refresh(prefixPath: prefixPath)
     }
