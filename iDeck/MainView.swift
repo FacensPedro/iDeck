@@ -1,238 +1,34 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-enum AppMode: String, CaseIterable, Identifiable {
-    case windows = "Windows"
-
-    var id: String { rawValue }
-    var brandAsset: String { "MadeiraLogo" }
-    var fallbackSymbol: String { "window.casement" }
-    var subtitle: String { tr("Windows, Steam and iOS apps in one library") }
-}
-
-/// Shows the image set `assetName` when it exists in the asset catalog, an SF Symbol otherwise.
-struct BrandMark: View {
-    let assetName: String
-    let fallbackSymbol: String
-
-    var body: some View {
-        if UIImage(named: assetName) != nil {
-            Image(assetName)
-                .resizable()
-                .scaledToFit()
-        } else {
-            Image(systemName: fallbackSymbol)
-                .resizable()
-                .scaledToFit()
-                .foregroundColor(.white)
-        }
-    }
-}
-
 struct MainView: View {
     @ObservedObject var coordinator: SystemCoordinator
-    @StateObject private var inputManager = InputManager.shared
-    @State private var mode: AppMode = .windows
-    @State private var isHome = true
-    @State private var isDocumentPickerPresented = false
-    @State private var isSettingsPresented = false
-    @State private var isWindowsWorkspacePresented = false
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.scenePhase) private var scenePhase
-    @AppStorage(AppLanguage.storageKey) private var appLanguage = AppLanguage.system.rawValue // re-renders on change
-
-    private let cardColor = Color(red: 0.15, green: 0.15, blue: 0.15)
-
-    private var isWide: Bool { horizontalSizeClass == .regular }
-    private var actionsEnabled: Bool { coordinator.isJITEnabled && coordinator.isContainerReady }
 
     var body: some View {
-        ZStack {
-            Color.black.ignoresSafeArea()
-            VStack(spacing: 0) {
-                topBar
-                if isHome {
-                    homeScreen
-                } else {
-                    detail
+        WindowsWorkspaceView(coordinator: coordinator, onBack: nil)
+            .onAppear {
+                coordinator.refreshJITStatus()
+                if !coordinator.isContainerReady {
+                    coordinator.forceJITAndStartWindows()
                 }
             }
-        }
-        .onAppear { coordinator.refreshJITStatus() }
-        .onChange(of: scenePhase) { phase in
-            if phase == .active { coordinator.refreshJITStatus() }
-        }
-        .sheet(isPresented: $isSettingsPresented) { SettingsView(coordinator: coordinator) }
-        .fileImporter(isPresented: $isDocumentPickerPresented, allowedContentTypes: [.data], allowsMultipleSelection: false) { result in
-            if case .success(let urls) = result, let url = urls.first { coordinator.launchWindowsExecutable(at: url) }
-        }
-        .onChange(of: coordinator.windowsStatus) { status in
-            if status == "Windows Ready" && !isHome { isWindowsWorkspacePresented = true }
-        }
-        .fullScreenCover(isPresented: $isWindowsWorkspacePresented) {
-            WindowsWorkspaceView(coordinator: coordinator, onBack: { isWindowsWorkspacePresented = false; isHome = true }, onAddExecutable: { isDocumentPickerPresented = true })
-        }
-        .fullScreenCover(isPresented: Binding<Bool>(
-            get: { !isHome && (coordinator.windowsStatus == "Steam Running" || coordinator.windowsStatus == "Running") },
-            set: { _ in coordinator.setWindowsStatus("Windows Ready") }
-        )) { GameSessionView(coordinator: coordinator) }
-    }
-
-    private func selectMode(_ selectedMode: AppMode) {
-        mode = selectedMode
-        isHome = false
-        guard selectedMode == .windows else { return }
-        if coordinator.windowsStatus == "Windows Ready" {
-            isWindowsWorkspacePresented = true
-        } else {
-            coordinator.forceJITAndStartWindows()
-        }
-    }
-
-    // MARK: Layout pieces
-
-    private var topBar: some View {
-        HStack {
-            Image("IDeckLogo")
-                .resizable()
-                .scaledToFit()
-                .frame(height: 44)
-            Spacer()
-            Button(action: { isSettingsPresented = true }) {
-                Image(systemName: "gearshape.fill")
-                    .font(.title3)
-                    .foregroundColor(.white)
-                    .padding(10)
-                    .background(cardColor)
-                    .clipShape(Circle())
-            }
-        }
-        .padding(.horizontal)
-        .padding(.vertical, 8)
-    }
-
-    private var homeScreen: some View {
-        ScrollView {
-            VStack(spacing: 22) {
-                Image("IDeckLogo")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(maxWidth: isWide ? 240 : 190)
-                    .padding(.bottom, 6)
-                Text(tr("Home"))
-                    .font(.system(size: isWide ? 34 : 28, weight: .heavy, design: .rounded))
-                    .foregroundColor(.white)
-                Text(tr("Choose a mode to continue"))
-                    .font(.subheadline)
-                    .foregroundColor(.gray)
-                    .multilineTextAlignment(.center)
-                ForEach(AppMode.allCases) { item in
-                    Button {
-                        selectMode(item)
-                    } label: {
-                        HStack(spacing: 16) {
-                            BrandMark(assetName: item.brandAsset, fallbackSymbol: item.fallbackSymbol)
-                                .frame(width: 54, height: 54)
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text(tr(item.rawValue))
-                                    .font(.headline)
-                                    .foregroundColor(.white)
-                                Text(item.subtitle)
-                                    .font(.subheadline)
-                                    .foregroundColor(.gray)
-                                    .multilineTextAlignment(.leading)
-                            }
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .foregroundColor(.gray)
-                        }
-                        .padding(18)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(cardColor)
-                        .cornerRadius(14)
-                    }
-                    .buttonStyle(.plain)
+            .onChange(of: scenePhase) { phase in
+                if phase == .active {
+                    coordinator.refreshJITStatus()
                 }
             }
-            .frame(maxWidth: 620)
-            .padding(.horizontal, isWide ? 32 : 20)
-            .padding(.vertical, 28)
-            .frame(maxWidth: .infinity)
-        }
-    }
-
-    private var detail: some View {
-        ScrollView {
-            VStack(spacing: 24) {
-                header
-                windowsActions
+            .fullScreenCover(isPresented: Binding<Bool>(
+                get: {
+                    coordinator.windowsStatus == "Steam Running" ||
+                    coordinator.windowsStatus == "Running"
+                },
+                set: { _ in coordinator.setWindowsStatus("Windows Ready") }
+            )) {
+                GameSessionView(coordinator: coordinator)
             }
-            .frame(maxWidth: 720)
-            .padding(.horizontal, isWide ? 32 : 16)
-            .padding(.vertical, 24)
-            .frame(maxWidth: .infinity)
-        }
     }
-
-    private var header: some View {
-        VStack(spacing: 12) {
-            BrandMark(assetName: mode.brandAsset, fallbackSymbol: mode.fallbackSymbol)
-                .frame(width: isWide ? 120 : 88, height: isWide ? 120 : 88)
-            Text(tr(mode.rawValue))
-                .font(.system(size: isWide ? 34 : 28, weight: .heavy, design: .rounded))
-                .foregroundColor(.white)
-            Text(mode.subtitle)
-                .font(.subheadline)
-                .foregroundColor(.gray)
-                .multilineTextAlignment(.center)
-            Text(trStatus(coordinator.windowsStatus))
-                .font(.footnote)
-                .foregroundColor(.gray)
-                .multilineTextAlignment(.center)
-
-            if coordinator.prefixInstaller.isInstalling {
-                VStack(spacing: 6) {
-                    ProgressView(value: Double(coordinator.prefixInstaller.progress))
-                        .tint(.white)
-                        .frame(maxWidth: 240)
-                    Text(tr("Installing Windows environment..."))
-                        .font(.caption)
-                        .foregroundColor(.gray)
-                }
-            }
-        }
-    }
-
-    private var columns: [GridItem] {
-        [GridItem(.adaptive(minimum: 260), spacing: 16)]
-    }
-
-    private func actionButton(_ title: String, symbol: String, enabled: Bool = true, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack {
-                Image(systemName: symbol)
-                Text(title).fontWeight(.semibold)
-            }
-            .frame(maxWidth: .infinity)
-            .padding()
-            .background(cardColor)
-            .foregroundColor(.white)
-            .cornerRadius(12)
-        }
-        .disabled(!enabled)
-        .opacity(enabled ? 1.0 : 0.5)
-    }
-
-    private var windowsActions: some View {
-        LazyVGrid(columns: columns, spacing: 16) {
-            actionButton(tr("Start Windows Environment"), symbol: "power") {
-                coordinator.forceJITAndStartWindows()
-            }
-        }
-    }
-
 }
-
 
 struct SteamGameArtworkView: View {
     let game: SteamAppInfo
@@ -317,8 +113,7 @@ struct StatusPill: View {
 
 struct WindowsWorkspaceView: View {
     @ObservedObject var coordinator: SystemCoordinator
-    let onBack: () -> Void
-    let onAddExecutable: () -> Void
+    let onBack: (() -> Void)?
 
     @State private var isSettingsPresented = false
     @State private var isSteamSignInPresented = false
@@ -536,9 +331,11 @@ struct WindowsWorkspaceView: View {
 
     private var topBar: some View {
         HStack(spacing: 12) {
-            Button(action: onBack) {
-                Label(tr("Back"), systemImage: "chevron.left")
-                    .foregroundColor(.white)
+            if let onBack = onBack {
+                Button(action: onBack) {
+                    Label(tr("Back"), systemImage: "chevron.left")
+                        .foregroundColor(.white)
+                }
             }
             Spacer()
             Text(tr("Windows"))
