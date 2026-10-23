@@ -1712,7 +1712,7 @@ enum SteamSignIn {
     /// none. Valve still decides whether the token is accepted.
     static func credentialsForDock() -> (accountName: String, refreshToken: String)? {
         guard let tokens = SteamTokenStore().loadTokens() else { return nil }
-        guard let valid = usable(accountName: tokens.accountName, refreshToken: tokens.accessToken, now: Date()) else { return nil }
+        guard let valid = usable(accountName: tokens.accountName, refreshToken: tokens.refreshToken, now: Date()) else { return nil }
         return valid
     }
 
@@ -2871,7 +2871,7 @@ import Observation
 /// Manages the authenticated Steam session: login, heartbeat, reconnection, message routing.
 @Observable
 @MainActor
-class SteamSession {
+class SteamSession: SteamCMSession {
     // MARK: - Published State
 
     private(set) var connectionState: SteamConnectionState = .disconnected
@@ -4579,9 +4579,14 @@ final class SteamOwnedGamesModel: ObservableObject {
     @Published private(set) var games: [SteamAppInfo] = []
     @Published private(set) var isLoading = false
     @Published private(set) var errorMessage: String?
+    @Published private(set) var installingApps: Set<UInt32> = []
+    @Published private(set) var downloadProgress: [UInt32: SteamDownloadProgress] = [:]
+    @Published private(set) var downloadErrors: [UInt32: String] = [:]
+    @Published private(set) var installedApps: Set<UInt32> = []
 
     private let session = SteamSession()
     private lazy var fetcher = SteamLibraryFetcher(session: session)
+    private lazy var downloader = DepotDownloader(session: session)
 
     func refresh() async {
         guard SteamSignIn.isSignedIn else {
@@ -4603,9 +4608,51 @@ final class SteamOwnedGamesModel: ObservableObject {
         }
     }
 
+    func isInstalled(appID: UInt32, prefixPath: URL) -> Bool {
+        let drive = prefixPath.appendingPathComponent("drive_c", isDirectory: true)
+        let steamApps = SteamInstallPaths.steamApps(drive: drive)
+        return SteamInstallFiles.buildID(appID: Int(appID), steamApps: steamApps) != nil
+    }
+
+    func install(appID: UInt32, prefixPath: URL) async {
+        guard !installingApps.contains(appID) else { return }
+        guard SteamSignIn.isSignedIn else {
+            downloadErrors[appID] = "Sign in to install Steam games."
+            return
+        }
+        installingApps.insert(appID)
+        downloadErrors[appID] = nil
+        downloadProgress[appID] = SteamDownloadProgress()
+        defer { installingApps.remove(appID) }
+        do {
+            guard let app = try await fetcher.fetchInstallInfo(appID: appID) else {
+                throw SteamError.depotNotFound(appID)
+            }
+            guard app.installableOnWindows else {
+                throw SteamError.depotNotFound(appID)
+            }
+            let drive = prefixPath.appendingPathComponent("drive_c", isDirectory: true)
+            let steamApps = SteamInstallPaths.steamApps(drive: drive)
+            try FileManager.default.createDirectory(at: steamApps, withIntermediateDirectories: true)
+            _ = try await downloader.install(
+                app,
+                steamApps: steamApps,
+                ownedDepots: { [weak self] in try? await self?.fetcher.ownedDepotIDs() },
+                progress: { [weak self] progress in
+                    self?.downloadProgress[appID] = progress
+                }
+            )
+            installedApps.insert(appID)
+            downloadErrors[appID] = nil
+        } catch {
+            downloadErrors[appID] = SteamSignIn.message(error)
+        }
+    }
+
     func disconnect() {
         games = []
         errorMessage = nil
+        downloadErrors = [:]
         Task { await session.disconnectGracefully() }
     }
 }

@@ -364,9 +364,12 @@ struct WindowsWorkspaceView: View {
     @State private var isSettingsPresented = false
     @State private var isSteamSignInPresented = false
     @State private var searchText = ""
+    @State private var prefixPath: URL?
     @StateObject private var steamLibrary = SteamOwnedGamesModel()
     @Environment(\.openURL) private var openURL
-    private let panelColor = Color(red: 0.12, green: 0.12, blue: 0.12)
+
+    private let panelColor = Color(red: 0.105, green: 0.105, blue: 0.115)
+    private let secondaryColor = Color(red: 0.16, green: 0.16, blue: 0.17)
 
     private var filteredSteamGames: [SteamAppInfo] {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -376,88 +379,100 @@ struct WindowsWorkspaceView: View {
         }
     }
 
+    private var columns: [GridItem] {
+        [GridItem(.adaptive(minimum: 158), spacing: 14)]
+    }
+
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
             VStack(spacing: 0) {
-                HStack(spacing: 12) {
-                    Button(action: onBack) {
-                        Label(tr("Back"), systemImage: "chevron.left")
-                            .foregroundColor(.white)
-                    }
-                    Spacer()
-                    Text(tr("Windows"))
-                        .font(.headline)
-                        .foregroundColor(.white)
-                    Spacer()
-                    Button { isSettingsPresented = true } label: {
-                        Image(systemName: "gearshape.fill")
-                            .font(.title3)
-                            .foregroundColor(.white)
-                            .frame(width: 42, height: 42)
-                    }
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
+                topBar
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 22) {
+                        HStack(alignment: .center, spacing: 14) {
+                            VStack(alignment: .leading, spacing: 5) {
+                                Text(tr("Game Library"))
+                                    .font(.system(size: 29, weight: .bold, design: .rounded))
+                                    .foregroundColor(.white)
+                                Text(tr("Install games from your Steam library"))
+                                    .font(.subheadline)
+                                    .foregroundColor(.gray)
+                            }
+                            Spacer(minLength: 8)
+                            Button {
+                                isSteamSignInPresented = true
+                            } label: {
+                                Label(tr(coordinator.isSteamConnected ? "Steam connected" : "Connect Steam"),
+                                      systemImage: coordinator.isSteamConnected ? "checkmark.circle.fill" : "person.crop.circle")
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 13)
+                                    .padding(.vertical, 11)
+                                    .background(Color(red: 0.12, green: 0.35, blue: 0.65))
+                                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                            }
+                        }
 
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(tr("Game Library"))
-                            .font(.title2.bold())
-                            .foregroundColor(.white)
-                        Text(tr("Your Steam library and Windows apps"))
-                            .font(.caption)
-                            .foregroundColor(.gray)
-                    }
-                    Spacer()
-                    Button {
-                        isSteamSignInPresented = true
-                    } label: {
-                        Label(tr(coordinator.isSteamConnected ? "Steam connected" : "Connect Steam"), systemImage: coordinator.isSteamConnected ? "checkmark.circle.fill" : "link")
-                            .font(.subheadline.bold())
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 10)
-                            .background(Color.blue)
-                            .cornerRadius(10)
-                    }
-                }
-                .padding(16)
-
-                VStack(spacing: 12) {
-                    if coordinator.isSteamConnected {
-                        Text(tr("Signed in as %@",
-                                SteamSignIn.accountName ?? tr("Connected")))
-                            .font(.subheadline)
-                            .foregroundColor(.gray)
-                            .multilineTextAlignment(.center)
-                        Text(tr("Steam game launching requires the Madeira runtime."))
-                            .font(.subheadline)
-                            .foregroundColor(.gray)
-                            .multilineTextAlignment(.center)
-                        libraryContent
-                    } else {
-                        Text(tr("Sign in directly with Steam. iDeck does not store your password; the sign-in token is saved in this device's Keychain."))
-                            .font(.subheadline)
-                            .foregroundColor(.gray)
-                            .multilineTextAlignment(.center)
-                        Text(tr("Sign in to load your library."))
-                            .font(.subheadline)
-                            .foregroundColor(.gray)
-                            .multilineTextAlignment(.center)
-                    }
-                    Button(action: onAddExecutable) {
-                        Label(tr("Install .exe"), systemImage: "square.and.arrow.down")
-                            .foregroundColor(.white)
-                            .padding()
-                            .frame(maxWidth: .infinity)
+                        if coordinator.isSteamConnected {
+                            HStack(spacing: 8) {
+                                Image(systemName: "person.crop.circle.fill")
+                                    .foregroundColor(.gray)
+                                Text(tr("Signed in as %@",
+                                        SteamSignIn.accountName ?? tr("Connected")))
+                                    .font(.subheadline)
+                                    .foregroundColor(.gray)
+                                Spacer()
+                                Button {
+                                    Task { await steamLibrary.refresh() }
+                                } label: {
+                                    Image(systemName: "arrow.clockwise")
+                                        .foregroundColor(.white)
+                                        .padding(10)
+                                        .background(secondaryColor)
+                                        .clipShape(Circle())
+                                }
+                                .accessibilityLabel(tr("Refresh library"))
+                            }
+                            libraryContent
+                            Text(tr("Steam game installation is available. Launching requires the Madeira runtime."))
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        } else {
+                            VStack(alignment: .leading, spacing: 10) {
+                                Label(tr("Connect Steam to continue"), systemImage: "steam")
+                                    .font(.headline)
+                                    .foregroundColor(.white)
+                                Text(tr("Sign in directly with Steam. iDeck does not store your password; the sign-in token is saved in this device's Keychain."))
+                                    .font(.subheadline)
+                                    .foregroundColor(.gray)
+                                Text(tr("Sign in to load the Steam game library."))
+                                    .font(.subheadline)
+                                    .foregroundColor(.gray)
+                            }
+                            .padding(18)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                             .background(panelColor)
-                            .cornerRadius(12)
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                        }
+
+                        Button(action: onAddExecutable) {
+                            Label(tr("Install .exe"), systemImage: "square.and.arrow.down")
+                                .font(.headline)
+                                .foregroundColor(.white)
+                                .padding(.vertical, 15)
+                                .frame(maxWidth: .infinity)
+                                .background(secondaryColor)
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                        }
                     }
+                    .frame(maxWidth: 1000)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 24)
+                    .padding(.bottom, 30)
+                    .frame(maxWidth: .infinity)
                 }
-                .padding(24)
-                .frame(maxWidth: 560)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .sheet(isPresented: $isSettingsPresented) {
@@ -473,48 +488,108 @@ struct WindowsWorkspaceView: View {
                 steamLibrary.disconnect()
             }
         }
+        .onAppear(perform: resolvePrefixPath)
         .preferredColorScheme(.dark)
     }
 
-    
+    private var topBar: some View {
+        HStack(spacing: 12) {
+            Button(action: onBack) {
+                Label(tr("Back"), systemImage: "chevron.left")
+                    .foregroundColor(.white)
+            }
+            Spacer()
+            Text(tr("Windows"))
+                .font(.headline)
+                .foregroundColor(.white)
+            Spacer()
+            Button { isSettingsPresented = true } label: {
+                Image(systemName: "gearshape.fill")
+                    .font(.title3)
+                    .foregroundColor(.white)
+                    .frame(width: 42, height: 42)
+                    .background(secondaryColor)
+                    .clipShape(Circle())
+            }
+            .accessibilityLabel(tr("Settings"))
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 10)
+        .background(Color.black)
+    }
+
     @ViewBuilder
     private var libraryContent: some View {
         if steamLibrary.isLoading {
             HStack(spacing: 10) {
-                ProgressView()
+                ProgressView().tint(.white)
                 Text(tr("Loading Steam library..."))
                     .foregroundColor(.gray)
             }
-            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity, minHeight: 150)
+            .background(panelColor)
+            .clipShape(RoundedRectangle(cornerRadius: 14))
         } else if let error = steamLibrary.errorMessage {
-            Text(tr(error))
-                .font(.footnote)
-                .foregroundColor(.red)
-                .multilineTextAlignment(.center)
-            Button {
-                Task { await steamLibrary.refresh() }
-            } label: {
-                Label(tr("Refresh library"), systemImage: "arrow.clockwise")
-                    .foregroundColor(.white)
-            }
-            .padding(.vertical, 6)
-        } else if !steamLibrary.games.isEmpty {
             VStack(spacing: 12) {
+                Image(systemName: "exclamationmark.triangle")
+                    .font(.largeTitle)
+                    .foregroundColor(.orange)
+                Text(tr(error))
+                    .font(.subheadline)
+                    .foregroundColor(.white)
+                    .multilineTextAlignment(.center)
+                Button {
+                    Task { await steamLibrary.refresh() }
+                } label: {
+                    Label(tr("Refresh library"), systemImage: "arrow.clockwise")
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .background(secondaryColor)
+                        .clipShape(RoundedRectangle(cornerRadius: 9))
+                }
+            }
+            .frame(maxWidth: .infinity, minHeight: 150)
+            .padding(18)
+            .background(panelColor)
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+        } else if steamLibrary.games.isEmpty {
+            VStack(spacing: 10) {
+                Image(systemName: "gamecontroller")
+                    .font(.system(size: 34))
+                    .foregroundColor(.gray)
+                Text(tr("No owned games found yet."))
+                    .font(.headline)
+                    .foregroundColor(.white)
+                Text(tr("Check your Steam account and refresh the library."))
+                    .font(.subheadline)
+                    .foregroundColor(.gray)
+                    .multilineTextAlignment(.center)
+                Button {
+                    Task { await steamLibrary.refresh() }
+                } label: {
+                    Label(tr("Refresh library"), systemImage: "arrow.clockwise")
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .background(secondaryColor)
+                        .clipShape(RoundedRectangle(cornerRadius: 9))
+                }
+            }
+            .frame(maxWidth: .infinity, minHeight: 200)
+            .padding(18)
+            .background(panelColor)
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+        } else {
+            VStack(alignment: .leading, spacing: 14) {
                 HStack {
                     Text(tr("Owned games: %d", steamLibrary.games.count))
-                        .font(.subheadline.bold())
+                        .font(.subheadline.weight(.semibold))
                         .foregroundColor(.white)
                     Spacer()
-                    Button {
-                        Task { await steamLibrary.refresh() }
-                    } label: {
-                        Image(systemName: "arrow.clockwise")
-                            .foregroundColor(.white)
-                            .padding(8)
-                            .background(panelColor)
-                            .clipShape(Circle())
-                    }
-                    .accessibilityLabel(tr("Refresh library"))
+                    Text(tr("Windows games"))
+                        .font(.caption)
+                        .foregroundColor(.gray)
                 }
 
                 HStack(spacing: 10) {
@@ -525,8 +600,8 @@ struct WindowsWorkspaceView: View {
                         .autocorrectionDisabled()
                         .foregroundColor(.white)
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
+                .padding(.horizontal, 13)
+                .padding(.vertical, 12)
                 .background(panelColor)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
 
@@ -534,67 +609,118 @@ struct WindowsWorkspaceView: View {
                     Text(tr("No games match this search"))
                         .font(.subheadline)
                         .foregroundColor(.gray)
-                        .padding(.vertical, 20)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 32)
                 } else {
-                    ScrollView {
-                        LazyVStack(spacing: 8) {
-                            ForEach(filteredSteamGames, id: \.appID) { game in
-                                HStack(spacing: 12) {
-                                    SteamGameArtworkView(game: game)
-                                        .frame(width: 64, height: 88)
-                                    VStack(alignment: .leading, spacing: 5) {
-                                        Text(game.name.isEmpty ? tr("Untitled Steam app") : game.name)
-                                            .font(.subheadline.weight(.semibold))
-                                            .foregroundColor(.white)
-                                            .lineLimit(2)
-                                        Text(tr("App ID: %u", game.appID))
-                                            .font(.caption)
-                                            .foregroundColor(.gray)
-                                        Text(game.oslist.localizedCaseInsensitiveContains("windows") ? tr("Windows") : tr("Windows support not listed"))
-                                            .font(.caption2)
-                                            .foregroundColor(.gray)
-                                    }
-                                    Spacer(minLength: 4)
-                                    Button {
-                                        if let url = URL(string: "https://store.steampowered.com/app/\(game.appID)/") {
-                                            openURL(url)
-                                        }
-                                    } label: {
-                                        Label(tr("Open Steam Store"), systemImage: "arrow.up.right.square")
-                                            .font(.caption2.weight(.semibold))
-                                            .foregroundColor(.white)
-                                            .padding(.horizontal, 8)
-                                            .padding(.vertical, 9)
-                                            .background(Color.blue.opacity(0.8))
-                                            .clipShape(RoundedRectangle(cornerRadius: 9))
-                                    }
-                                    .accessibilityLabel(tr("Open Steam Store"))
-                                }
-                                .padding(10)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(panelColor)
-                                .cornerRadius(10)
-                            }
+                    LazyVGrid(columns: columns, spacing: 14) {
+                        ForEach(filteredSteamGames, id: \.appID) { game in
+                            gameCard(game)
                         }
                     }
-                    .frame(maxHeight: 420)
                 }
-                Text(tr("Direct Steam game downloads need the Madeira downloader and Windows runtime, which are not integrated yet."))
+            }
+        }
+    }
+
+    private func gameCard(_ game: SteamAppInfo) -> some View {
+        let progress = steamLibrary.downloadProgress[game.appID]
+        let percent = Int(((progress?.fraction ?? 0) * 100).rounded())
+        let installedOnDisk: Bool
+        if let prefixPath {
+            installedOnDisk = steamLibrary.isInstalled(appID: game.appID, prefixPath: prefixPath)
+        } else {
+            installedOnDisk = false
+        }
+        let installed = steamLibrary.installedApps.contains(game.appID) || installedOnDisk
+
+        return VStack(alignment: .leading, spacing: 10) {
+            SteamGameArtworkView(game: game)
+                .frame(height: 188)
+                .clipShape(RoundedRectangle(cornerRadius: 9))
+            Text(game.name.isEmpty ? tr("Untitled Steam app") : game.name)
+                .font(.subheadline.weight(.semibold))
+                .foregroundColor(.white)
+                .lineLimit(2)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(height: 38, alignment: .topLeading)
+            let downloadBytes = game.downloadSize(for: "windows")
+            if downloadBytes > 0 {
+                Text(tr("Approx. download size: %@", ByteCountFormatter.string(fromByteCount: Int64(clamping: downloadBytes), countStyle: .file)))
                     .font(.caption)
                     .foregroundColor(.gray)
-                    .multilineTextAlignment(.center)
+                    .lineLimit(1)
+            } else {
+                Text(tr("App ID: %u", game.appID))
+                    .font(.caption)
+                    .foregroundColor(.gray)
             }
-        } else {
-            Text(tr("No owned games found yet."))
-                .font(.subheadline)
-                .foregroundColor(.gray)
-            Button {
-                Task { await steamLibrary.refresh() }
-            } label: {
-                Label(tr("Refresh library"), systemImage: "arrow.clockwise")
-                    .foregroundColor(.white)
+
+            if installed {
+                Label(tr("Installed"), systemImage: "checkmark.circle.fill")
+                    .font(.caption.weight(.semibold))
+                    .foregroundColor(.green)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 8)
+            } else if steamLibrary.installingApps.contains(game.appID) {
+                VStack(alignment: .leading, spacing: 6) {
+                    ProgressView(value: progress?.fraction ?? 0)
+                        .tint(.white)
+                    Text(tr("Downloading %d%%", percent))
+                        .font(.caption.weight(.medium))
+                        .foregroundColor(.white)
+                }
+                .padding(.vertical, 4)
+            } else {
+                if let error = steamLibrary.downloadErrors[game.appID] {
+                    Text(tr(error))
+                        .font(.caption2)
+                        .foregroundColor(.red)
+                        .lineLimit(3)
+                }
+                if game.installableOnWindows {
+                    Button { install(game) } label: {
+                        Label(tr("Install"), systemImage: "arrow.down.circle.fill")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                            .background(Color(red: 0.12, green: 0.35, blue: 0.65))
+                            .clipShape(RoundedRectangle(cornerRadius: 9))
+                    }
+                } else {
+                    Text(tr("Not available for Windows"))
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.vertical, 8)
+                }
             }
-            .padding(.vertical, 6)
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(panelColor)
+        .clipShape(RoundedRectangle(cornerRadius: 13))
+    }
+
+    private func resolvePrefixPath() {
+        coordinator.containerHost.mountEnvironment { mountedPath in
+            guard let mountedPath else { return }
+            let root = URL(fileURLWithPath: mountedPath, isDirectory: true)
+            Task { @MainActor in prefixPath = root }
+        }
+    }
+
+    private func install(_ game: SteamAppInfo) {
+        coordinator.containerHost.mountEnvironment { mountedPath in
+            guard let mountedPath else {
+                coordinator.setWindowsStatus("Container initialization failed")
+                return
+            }
+            let root = URL(fileURLWithPath: mountedPath, isDirectory: true)
+            Task { @MainActor in
+                prefixPath = root
+                await steamLibrary.install(appID: game.appID, prefixPath: root)
+            }
         }
     }
 }

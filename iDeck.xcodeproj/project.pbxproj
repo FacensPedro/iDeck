@@ -31,6 +31,11 @@
 		111111111111111111111128 /* WineInputBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222240 /* WineInputBridge.swift */; };
 		111111111111111111111129 /* LiveContainerHook.m in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222241 /* LiveContainerHook.m */; };
 		111111111111111111111130 /* LiveContainerInit.c in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222242 /* LiveContainerInit.c */; };
+		A10000000000000000000001 /* SteamDepotDownloader.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000001 /* SteamDepotDownloader.swift */; };
+		A10000000000000000000002 /* SteamContentDecryptor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000002 /* SteamContentDecryptor.swift */; };
+		A10000000000000000000003 /* SteamDepotManifest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000003 /* SteamDepotManifest.swift */; };
+		A10000000000000000000004 /* SteamAppManifestWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000004 /* SteamAppManifestWriter.swift */; };
+		A10000000000000000000005 /* SteamInstall.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000005 /* SteamInstall.swift */; };
 
 		222222222222222222222221 /* iDeckApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iDeckApp.swift; sourceTree = "<group>"; };
 		222222222222222222222222 /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
@@ -63,6 +68,11 @@
 		222222222222222222222242 /* LiveContainerInit.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = "LiveContainerInit.c"; sourceTree = "<group>"; };
 		222222222222222222222243 /* LiveContainerHook.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "LiveContainerHook.h"; sourceTree = "<group>"; };
 		222222222222222222222244 /* iDeck-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "iDeck-Bridging-Header.h"; sourceTree = "<group>"; };
+		A20000000000000000000001 /* SteamDepotDownloader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamDepotDownloader.swift; sourceTree = "<group>"; };
+		A20000000000000000000002 /* SteamContentDecryptor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamContentDecryptor.swift; sourceTree = "<group>"; };
+		A20000000000000000000003 /* SteamDepotManifest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamDepotManifest.swift; sourceTree = "<group>"; };
+		A20000000000000000000004 /* SteamAppManifestWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamAppManifestWriter.swift; sourceTree = "<group>"; };
+		A20000000000000000000005 /* SteamInstall.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamInstall.swift; sourceTree = "<group>"; };
 
 		333333333333333333333331 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
@@ -97,6 +107,11 @@
 				111111111111111111111128 /* WineInputBridge.swift in Sources */,
 				111111111111111111111129 /* LiveContainerHook.m in Sources */,
 				111111111111111111111130 /* LiveContainerInit.c in Sources */,
+				A10000000000000000000001 /* SteamDepotDownloader.swift in Sources */,
+				A10000000000000000000002 /* SteamContentDecryptor.swift in Sources */,
+				A10000000000000000000003 /* SteamDepotManifest.swift in Sources */,
+				A10000000000000000000004 /* SteamAppManifestWriter.swift in Sources */,
+				A10000000000000000000005 /* SteamInstall.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -138,6 +153,11 @@
 				222222222222222222222242 /* LiveContainerInit.c */,
 				222222222222222222222243 /* LiveContainerHook.h */,
 				222222222222222222222244 /* iDeck-Bridging-Header.h */,
+				A20000000000000000000001 /* SteamDepotDownloader.swift */,
+				A20000000000000000000002 /* SteamContentDecryptor.swift */,
+				A20000000000000000000003 /* SteamDepotManifest.swift */,
+				A20000000000000000000004 /* SteamAppManifestWriter.swift */,
+				A20000000000000000000005 /* SteamInstall.swift */,
 			);
 			path = iDeck;
 			sourceTree = "<group>";

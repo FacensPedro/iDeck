@@ -306,7 +306,7 @@ class SystemCoordinator: ObservableObject {
                 if FileManager.default.fileExists(atPath: destination.path) {
                     try FileManager.default.removeItem(at: destination)
                 }
-                try FileManager.default.copyItem(at: url, to: destination)
+                try FileManager.default.copyItem(at: stagedExecutable, to: destination)
                 guard self.isJITEnabled else {
                     DispatchQueue.main.async {
                         self.setWindowsStatus("Executable imported. Enable JIT for iDeck in StikDebug before running it.")
