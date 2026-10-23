@@ -6,6 +6,17 @@
 	objectVersion = 56;
 	objects = {
 
+		D10000000000000000000001 /* RuntimeLifecycle.mm in Sources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000001 /* RuntimeLifecycle.mm */; };
+		D10000000000000000000002 /* FEXMemoryManager.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000002 /* FEXMemoryManager.cpp */; };
+		D10000000000000000000003 /* WineEnvironmentManager.c in Sources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000003 /* WineEnvironmentManager.c */; };
+		D10000000000000000000004 /* WineDLLLoader.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000004 /* WineDLLLoader.cpp */; };
+		D10000000000000000000005 /* WindowsFileSystem.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000005 /* WindowsFileSystem.cpp */; };
+		D10000000000000000000006 /* MetalSwapchain.mm in Sources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000006 /* MetalSwapchain.mm */; };
+		D10000000000000000000007 /* MetalShaderManager.mm in Sources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000007 /* MetalShaderManager.mm */; };
+		D10000000000000000000008 /* DirectInputBridge.mm in Sources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000008 /* DirectInputBridge.mm */; };
+		D10000000000000000000009 /* WindowsAudioBridge.mm in Sources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000009 /* WindowsAudioBridge.mm */; };
+		D10000000000000000000010 /* RuntimeErrorHandler.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000010 /* RuntimeErrorHandler.cpp */; };
+		D10000000000000000000011 /* RuntimeConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000011 /* RuntimeConfiguration.swift */; };
 		C10000000000000000000001 /* MadeiraRuntimeBridge.mm in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000001 /* MadeiraRuntimeBridge.mm */; };
 		C10000000000000000000002 /* FEXRuntime.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000002 /* FEXRuntime.cpp */; };
 		C10000000000000000000003 /* WineServerBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000003 /* WineServerBridge.m */; };
@@ -47,6 +58,18 @@
 		A10000000000000000000005 /* SteamInstall.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000005 /* SteamInstall.swift */; };
 		A10000000000000000000006 /* WindowsLibraryModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000006 /* WindowsLibraryModels.swift */; };
 
+		D20000000000000000000001 /* RuntimeLifecycle.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = NativeRuntime/RuntimeLifecycle.mm; sourceTree = "<group>"; };
+		D20000000000000000000002 /* FEXMemoryManager.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = NativeRuntime/FEXMemoryManager.cpp; sourceTree = "<group>"; };
+		D20000000000000000000003 /* WineEnvironmentManager.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = NativeRuntime/WineEnvironmentManager.c; sourceTree = "<group>"; };
+		D20000000000000000000004 /* WineDLLLoader.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = NativeRuntime/WineDLLLoader.cpp; sourceTree = "<group>"; };
+		D20000000000000000000005 /* WindowsFileSystem.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = NativeRuntime/WindowsFileSystem.cpp; sourceTree = "<group>"; };
+		D20000000000000000000006 /* MetalSwapchain.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = NativeRuntime/MetalSwapchain.mm; sourceTree = "<group>"; };
+		D20000000000000000000007 /* MetalShaderManager.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = NativeRuntime/MetalShaderManager.mm; sourceTree = "<group>"; };
+		D20000000000000000000008 /* DirectInputBridge.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = NativeRuntime/DirectInputBridge.mm; sourceTree = "<group>"; };
+		D20000000000000000000009 /* WindowsAudioBridge.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = NativeRuntime/WindowsAudioBridge.mm; sourceTree = "<group>"; };
+		D20000000000000000000010 /* RuntimeErrorHandler.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = NativeRuntime/RuntimeErrorHandler.cpp; sourceTree = "<group>"; };
+		D20000000000000000000011 /* RuntimeConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeConfiguration.swift; sourceTree = "<group>"; };
+		D20000000000000000000012 /* RuntimeSupport.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = NativeRuntime/RuntimeSupport.h; sourceTree = "<group>"; };
 		C20000000000000000000001 /* MadeiraRuntimeBridge.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = NativeRuntime/MadeiraRuntimeBridge.mm; sourceTree = "<group>"; };
 		C20000000000000000000002 /* FEXRuntime.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = NativeRuntime/FEXRuntime.cpp; sourceTree = "<group>"; };
 		C20000000000000000000003 /* WineServerBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = NativeRuntime/WineServerBridge.m; sourceTree = "<group>"; };
@@ -114,6 +137,17 @@
 				111111111111111111111115 /* ContainerHost.swift in Sources */,
 				111111111111111111111116 /* WindowsEnvironment.swift in Sources */,
 				B10000000000000000000001 /* NativeRuntimeDiagnostics.mm in Sources */,
+				D10000000000000000000001 /* RuntimeLifecycle.mm in Sources */,
+				D10000000000000000000002 /* FEXMemoryManager.cpp in Sources */,
+				D10000000000000000000003 /* WineEnvironmentManager.c in Sources */,
+				D10000000000000000000004 /* WineDLLLoader.cpp in Sources */,
+				D10000000000000000000005 /* WindowsFileSystem.cpp in Sources */,
+				D10000000000000000000006 /* MetalSwapchain.mm in Sources */,
+				D10000000000000000000007 /* MetalShaderManager.mm in Sources */,
+				D10000000000000000000008 /* DirectInputBridge.mm in Sources */,
+				D10000000000000000000009 /* WindowsAudioBridge.mm in Sources */,
+				D10000000000000000000010 /* RuntimeErrorHandler.cpp in Sources */,
+				D10000000000000000000011 /* RuntimeConfiguration.swift in Sources */,
 				C10000000000000000000001 /* MadeiraRuntimeBridge.mm in Sources */,
 				C10000000000000000000002 /* FEXRuntime.cpp in Sources */,
 				C10000000000000000000003 /* WineServerBridge.m in Sources */,
@@ -173,6 +207,18 @@
 				222222222222222222222225 /* ContainerHost.swift */,
 				222222222222222222222226 /* WindowsEnvironment.swift */,
 				B20000000000000000000001 /* NativeRuntimeDiagnostics.mm */,
+				D20000000000000000000001 /* RuntimeLifecycle.mm */,
+				D20000000000000000000002 /* FEXMemoryManager.cpp */,
+				D20000000000000000000003 /* WineEnvironmentManager.c */,
+				D20000000000000000000004 /* WineDLLLoader.cpp */,
+				D20000000000000000000005 /* WindowsFileSystem.cpp */,
+				D20000000000000000000006 /* MetalSwapchain.mm */,
+				D20000000000000000000007 /* MetalShaderManager.mm */,
+				D20000000000000000000008 /* DirectInputBridge.mm */,
+				D20000000000000000000009 /* WindowsAudioBridge.mm */,
+				D20000000000000000000010 /* RuntimeErrorHandler.cpp */,
+				D20000000000000000000011 /* RuntimeConfiguration.swift */,
+				D20000000000000000000012 /* RuntimeSupport.h */,
 				C20000000000000000000001 /* MadeiraRuntimeBridge.mm */,
 				C20000000000000000000002 /* FEXRuntime.cpp */,
 				C20000000000000000000003 /* WineServerBridge.m */,
