@@ -312,5 +312,7 @@ enum Translations {
         "Choose a PNG, JPG, JPEG or HEIC image for the cover.": ["pt": "Escolha uma imagem PNG, JPG, JPEG ou HEIC para a capa.", "es": "Elige una imagen PNG, JPG, JPEG o HEIC para la portada."],
         "Windows, Steam and iOS apps in one library": ["pt": "Apps do Windows, Steam e iOS em uma biblioteca", "es": "Apps de Windows, Steam e iOS en una sola biblioteca"],
         "Steam · Windows game": ["pt": "Steam · jogo para Windows", "es": "Steam · juego de Windows"],
+        "Choose a PNG, JPG, JPEG or HEIC image.": ["pt": "Escolha uma imagem PNG, JPG, JPEG ou HEIC.", "es": "Elige una imagen PNG, JPG, JPEG o HEIC."],
+        "This app is stored in iDeck's shared library. Opening it uses the current in-process guest-app loader.": ["pt": "Este app está na biblioteca compartilhada do iDeck. Abrir usa o carregador atual de apps convidados em processo.", "es": "Esta app está en la biblioteca compartida de iDeck. Al abrirla se usa el cargador actual de apps invitados en proceso."],
     ]
 }
