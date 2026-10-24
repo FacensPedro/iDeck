@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DEST="${1:-$ROOT/vendor/Madeira}"
-REV="279fd0f83170425db002fe25d6bd62f6355f497d"
+REV="${IDECK_MADEIRA_REV:-fd9f2f3d0434a4116e4c3351f286a0fc376b4e36}"
 
 command -v git >/dev/null || { echo "git is required" >&2; exit 1; }
 if [ ! -d "$DEST/.git" ]; then
@@ -24,5 +24,5 @@ for dir in FEX wine dxmt; do
 done
 
 echo "Madeira sources checked out at $REV"
-echo "These are SOURCES only. iOS libraries are not compiled or linked into iDeck."
+echo "Source checkout complete. Run bash scripts/build_native_runtime.sh on macOS to compile, link and package."
 echo "Read $DEST/docs/BUILDING.md for the platform toolchains and licensed prerequisites."
