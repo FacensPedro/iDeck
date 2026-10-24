@@ -349,26 +349,44 @@ class SystemCoordinator: ObservableObject {
                     return
                 }
 
-                guard self.windowsEnvironment.hasRuntime(in: mountPath) else {
-                    self.setWindowsStatus("Madeira runtime missing: the in-process FEX/Wine/DXMT runtime has not been installed in this build.")
-                    return
+                let launchPrepared: () -> Void = { [weak self] in
+                    guard let self else { return }
+                    guard self.windowsEnvironment.hasRuntime(in: mountPath) else {
+                        let missing = self.windowsEnvironment.missingRuntimeComponents(in: mountPath)
+                        self.setWindowsStatus("Madeira runtime missing: " + missing.joined(separator: ", "))
+                        return
+                    }
+                    self.windowsEnvironment.configureWine(prefix: mountPath)
+                    if var profile {
+                        if self.isMetalFXEnabled { profile.metalFXEnabled = true }
+                        self.windowsEnvironment.applyGameProfile(profile)
+                    }
+                    self.windowsEnvironment.execute(
+                        binary: destination,
+                        arguments: profile?.arguments ?? "",
+                        is32Bit: false,
+                        isSteam: false,
+                        jitEnabler: self.jitEnabler
+                    ) { result in
+                        DispatchQueue.main.async {
+                            self.setWindowsStatus(result ? "Running" : "Execution Error: Windows runtime failed to start")
+                        }
+                    }
                 }
 
-                self.windowsEnvironment.configureWine(prefix: mountPath)
-                if var profile {
-                    if self.isMetalFXEnabled { profile.metalFXEnabled = true }
-                    self.windowsEnvironment.applyGameProfile(profile)
-                }
-                self.windowsEnvironment.execute(
-                    binary: destination,
-                    arguments: profile?.arguments ?? "",
-                    is32Bit: false,
-                    isSteam: false,
-                    jitEnabler: self.jitEnabler
-                ) { result in
-                    DispatchQueue.main.async {
-                        self.setWindowsStatus(result ? "Running" : "Execution Error: the configured Windows runtime failed to start")
+                let prefixURL = URL(fileURLWithPath: mountPath, isDirectory: true)
+                if !PrefixInstaller.isPrefixInstalled(at: prefixURL) &&
+                    Bundle.main.url(forResource: "prefix-template", withExtension: "tar.gz") != nil {
+                    self.setWindowsStatus("Preparing Wine prefix...")
+                    self.prefixInstaller.installWinePrefix(to: mountPath) { [weak self] success in
+                        if success {
+                            launchPrepared()
+                        } else {
+                            self?.setWindowsStatus("Wine prefix setup failed")
+                        }
                     }
+                } else {
+                    launchPrepared()
                 }
             } catch {
                 self.setWindowsStatus("Executable import failed: \(error.localizedDescription)")
