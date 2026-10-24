@@ -30,6 +30,21 @@ class WindowsEnvironment {
         }
     }
 
+    func missingRuntimeComponents(in prefix: String) -> [String] {
+        var missing: [String] = []
+        if !FileManager.default.fileExists(atPath: prefix) {
+            missing.append("Wine prefix")
+        }
+        let native = ideck_native_capabilities()
+        if !native.fex_linked { missing.append("FEX") }
+        if !native.wine_linked { missing.append("Wine ARM64EC / wineserver") }
+        if !native.dxmt_linked { missing.append("DXMT") }
+        if !native.d3d12_linked { missing.append("D3D12") }
+        if !native.launcher_linked { missing.append("Madeira native launcher") }
+        if !native.metal_available { missing.append("Metal device") }
+        return missing
+    }
+
     func configureWine(prefix: String) {
         self.winePrefixPath = prefix
         setenv("WINEPREFIX", prefix, 1)
