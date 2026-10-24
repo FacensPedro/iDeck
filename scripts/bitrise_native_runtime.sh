@@ -5,13 +5,37 @@ ROOT="$(cd "$ROOT" && pwd)"
 DEPLOY_DIR="${BITRISE_DEPLOY_DIR:?BITRISE_DEPLOY_DIR must be set by Bitrise}"
 cd "$ROOT"
 
+# Bitrise may be configured to check out an older commit even when the
+# current default branch already contains the native runtime scripts.
+# Fail or recover BEFORE installing Homebrew packages.
+if [[ ! -f scripts/link_madeira_native.sh ]]; then
+  echo "Native linker missing from checkout: $(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
+  REF="${IDECK_SOURCE_REF:-main}"
+  if [[ -n "$(git status --porcelain 2>/dev/null)" ]]; then
+    echo "ERROR: checkout has local modifications; refusing to switch revisions." >&2
+    exit 2
+  fi
+  if ! git remote get-url origin >/dev/null 2>&1; then
+    echo "ERROR: no origin remote; configure Bitrise Git Clone to check out the current iDeck branch." >&2
+    exit 2
+  fi
+  echo "Fetching intended source ref: $REF"
+  git fetch --depth=1 origin "$REF"
+  git checkout --detach FETCH_HEAD
+  if [[ ! -f scripts/link_madeira_native.sh ]]; then
+    echo "ERROR: $REF still lacks scripts/link_madeira_native.sh." >&2
+    exit 2
+  fi
+fi
+echo "Building iDeck revision: $(git rev-parse --short HEAD)"
+
 [[ "$(uname -s)" == "Darwin" ]] || { echo 'ERROR: Bitrise must use a macOS stack with Xcode.' >&2; exit 2; }
 for tool in xcodebuild xcrun brew python3 git; do
   command -v "$tool" >/dev/null 2>&1 || { echo "ERROR: missing $tool" >&2; exit 2; }
 done
 xcodebuild -version
 xcrun --sdk iphoneos --show-sdk-path
-brew install cmake ninja meson bison pkg-config
+HOMEBREW_NO_AUTO_UPDATE=1 brew install cmake ninja meson bison pkg-config
 export PATH="$(brew --prefix bison)/bin:$PATH"
 
 if ! xcrun --sdk iphoneos --find metal >/dev/null 2>&1; then
