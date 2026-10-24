@@ -63,6 +63,7 @@
 		A10000000000000000000006 /* WindowsLibraryModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000006 /* WindowsLibraryModels.swift */; };
 		A10000000000000000000007 /* SteamCloud.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000007 /* SteamCloud.swift */; };
 		A10000000000000000000008 /* SteamCloudSyncEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000008 /* SteamCloudSyncEngine.swift */; };
+		A10000000000000000000009 /* IPAArchivePath.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000009 /* IPAArchivePath.swift */; };
 
 		D20000000000000000000001 /* RuntimeLifecycle.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = NativeRuntime/RuntimeLifecycle.mm; sourceTree = "<group>"; };
 		D20000000000000000000002 /* FEXMemoryManager.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = NativeRuntime/FEXMemoryManager.cpp; sourceTree = "<group>"; };
@@ -134,6 +135,7 @@
 		A20000000000000000000006 /* WindowsLibraryModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowsLibraryModels.swift; sourceTree = "<group>"; };
 		A20000000000000000000007 /* SteamCloud.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamCloud.swift; sourceTree = "<group>"; };
 		A20000000000000000000008 /* SteamCloudSyncEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamCloudSyncEngine.swift; sourceTree = "<group>"; };
+		A20000000000000000000009 /* IPAArchivePath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IPAArchivePath.swift; sourceTree = "<group>"; };
 
 		333333333333333333333331 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
@@ -200,6 +202,7 @@
 				A10000000000000000000006 /* WindowsLibraryModels.swift in Sources */,
 				A10000000000000000000007 /* SteamCloud.swift in Sources */,
 				A10000000000000000000008 /* SteamCloudSyncEngine.swift in Sources */,
+				A10000000000000000000009 /* IPAArchivePath.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -280,6 +283,7 @@
 				A20000000000000000000006 /* WindowsLibraryModels.swift */,
 				A20000000000000000000007 /* SteamCloud.swift */,
 				A20000000000000000000008 /* SteamCloudSyncEngine.swift */,
+				A20000000000000000000009 /* IPAArchivePath.swift */,
 			);
 			path = iDeck;
 			sourceTree = "<group>";

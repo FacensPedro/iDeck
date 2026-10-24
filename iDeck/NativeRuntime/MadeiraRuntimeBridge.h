@@ -15,11 +15,11 @@ typedef enum {
 bool ideck_fex_available(void);
 bool ideck_fex_initialize(void);
 bool ideck_wineserver_available(void);
-bool ideck_wineserver_initialize(void);
+bool ideck_wineserver_initialize(const char *wine_prefix);
 bool ideck_wineserver_ready(void);
 bool ideck_wineprocess_available(void);
 bool ideck_wineprocess_running(void);
-int32_t ideck_wineprocess_start(const char *executable_path);
+int32_t ideck_wineprocess_start(const char *wine_prefix);
 bool ideck_dxmt_available(void);
 bool ideck_d3d12_available(void);
 bool ideck_metal_available(void);
