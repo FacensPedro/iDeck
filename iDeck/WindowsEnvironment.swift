@@ -85,7 +85,14 @@ class WindowsEnvironment {
     func installAndRunSteam(jitEnabler: JITEnabler, completion: @escaping (Bool) -> Void) {
         let steamSetupURL = URL(string: "https://cdn.akamai.steamstatic.com/client/installer/SteamSetup.exe")!
         let fileManager = FileManager.default
-        let downloadPath = fileManager.temporaryDirectory.appendingPathComponent("SteamSetup.exe")
+        let wineRoot = URL(fileURLWithPath: winePrefixPath, isDirectory: true)
+        let downloads = wineRoot.appendingPathComponent("drive_c/WindowsDownloads", isDirectory: true)
+        let downloadPath = downloads.appendingPathComponent("SteamSetup.exe")
+        guard PrefixInstaller.isPrefixInstalled(at: wineRoot),
+              (try? fileManager.createDirectory(at: downloads, withIntermediateDirectories: true)) != nil else {
+            completion(false)
+            return
+        }
         
         if fileManager.fileExists(atPath: downloadPath.path) {
             try? fileManager.removeItem(at: downloadPath)
