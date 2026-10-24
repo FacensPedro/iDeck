@@ -5,33 +5,39 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 BUILD_DIR="build"
-rm -rf "$BUILD_DIR" Payload iDeck.ipa
+rm -rf "$BUILD_DIR/Build" "$BUILD_DIR/Logs" Payload iDeck.ipa
 mkdir -p "$BUILD_DIR"
 
 EXTRA_XCODE_SETTINGS=()
+CONFIGURATION="${IDECK_CONFIGURATION:-Release}"
 if [ "${IDECK_REQUIRE_MADEIRA:-0}" = "1" ]; then
-  echo "Building required upstream Madeira components before the iDeck Xcode target..."
+  CONFIGURATION="${IDECK_CONFIGURATION:-Debug}"
   bash scripts/build_madeira_components.sh
-fi
-if [ "${IDECK_REQUIRE_MADEIRA:-0}" = "1" ]; then
-  EXTRA_XCODE_SETTINGS+=(GCC_PREPROCESSOR_DEFINITIONS="IDECK_NATIVE_MADEIRA_ENABLED=1")
+  bash scripts/link_madeira_native.sh
+  NATIVE_LINK_FLAGS="$(cat "$BUILD_DIR/madeira-native/link-flags.txt")"
+  [[ -n "$NATIVE_LINK_FLAGS" ]] || { echo "Missing Madeira linker flags" >&2; exit 2; }
+  EXTRA_XCODE_SETTINGS+=(
+    "IDECK_NATIVE_CFLAGS=-DIDECK_NATIVE_MADEIRA_ENABLED=1"
+    "IDECK_NATIVE_LINK_FLAGS=$NATIVE_LINK_FLAGS"
+  )
 fi
 
 xcodebuild clean build \
   -project iDeck.xcodeproj \
   -scheme iDeck \
-  -configuration Release \
+  -configuration "$CONFIGURATION" \
   -sdk iphoneos \
   -derivedDataPath "$BUILD_DIR" \
   CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO \
   "${EXTRA_XCODE_SETTINGS[@]}"
 
-APP="$BUILD_DIR/Build/Products/Release-iphoneos/iDeck.app"
+APP="$BUILD_DIR/Build/Products/$CONFIGURATION-iphoneos/iDeck.app"
 [ -d "$APP" ] || { echo "error: $APP not found" >&2; exit 1; }
 [ -d "$APP/PlugIns/VPNExtension.appex" ] || { echo "error: VPNExtension.appex was not embedded" >&2; exit 1; }
 
 if [ "${IDECK_REQUIRE_MADEIRA:-0}" = "1" ]; then
-  bash scripts/stage_madeira_payload.sh "$APP"
+  IDECK_MADEIRA_APP_ROOT="${IDECK_MADEIRA_ROOT:-$(pwd)/vendor/Madeira}/app/Madeira" \
+    bash scripts/stage_madeira_payload.sh "$APP"
   python3 scripts/verify_madeira_bundle.py --app "$APP" --require
 else
   python3 scripts/verify_madeira_bundle.py --app "$APP"

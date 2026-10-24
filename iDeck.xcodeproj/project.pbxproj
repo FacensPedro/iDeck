@@ -504,7 +504,8 @@
 				CODE_SIGN_STYLE = Automatic;
 				INFOPLIST_FILE = iDeck/Info.plist;
 				SWIFT_OBJC_BRIDGING_HEADER = "iDeck/iDeck-Bridging-Header.h";
-				OTHER_LDFLAGS = ("$(inherited)", "-lz");
+				OTHER_LDFLAGS = "$(inherited) -lz $(IDECK_NATIVE_LINK_FLAGS)";
+				OTHER_CFLAGS = "$(inherited) $(IDECK_NATIVE_CFLAGS)";
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_PREVIEWS = YES;
@@ -537,7 +538,8 @@
 				CODE_SIGN_STYLE = Automatic;
 				INFOPLIST_FILE = iDeck/Info.plist;
 				SWIFT_OBJC_BRIDGING_HEADER = "iDeck/iDeck-Bridging-Header.h";
-				OTHER_LDFLAGS = ("$(inherited)", "-lz");
+				OTHER_LDFLAGS = "$(inherited) -lz $(IDECK_NATIVE_LINK_FLAGS)";
+				OTHER_CFLAGS = "$(inherited) $(IDECK_NATIVE_CFLAGS)";
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_PREVIEWS = YES;
