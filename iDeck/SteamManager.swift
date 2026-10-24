@@ -3777,7 +3777,7 @@ struct SteamAppInfo {
 
     /// One `ufs.savefiles` entry: `root` names a folder ("WinAppDataLocalLow",
     /// "GameInstall", ...), `path` a subfolder of it, `pattern` a wildcard.
-    struct SaveFile: Equatable {
+    struct SaveFile: Equatable, Sendable {
         var root: String
         var path: String
         var pattern: String
@@ -3788,7 +3788,7 @@ struct SteamAppInfo {
 
     /// One `ufs.rootoverrides` entry: on `os`, files the cloud lists under
     /// `root` are kept under `useInstead` + `addPath`.
-    struct RootOverride: Equatable {
+    struct RootOverride: Equatable, Sendable {
         var root: String
         var os: String
         var useInstead: String

@@ -263,8 +263,9 @@ final class SteamCloudSyncEngine {
         guard session.steamID != 0 else { throw SteamFileError.invalid("A Steam não está conectada.") }
         let paths = try cloudContext(appID: appID, info: info, prefixPath: prefixPath)
         let remote = try await listing(appID: appID)
+        let saveFiles = info.saveFiles
         let audit = await Task.detached(priority: .utility) {
-            SteamCloudAudit.run(listing: remote, saveFiles: info.saveFiles, paths: paths)
+            SteamCloudAudit.run(listing: remote, saveFiles: saveFiles, paths: paths)
         }.value
         let plan = SteamCloudPlan.make(audit: audit, baseline: baseline(appID: appID))
         settle(appID: appID, plan.settled)
@@ -281,7 +282,7 @@ final class SteamCloudSyncEngine {
         }
         let after = try await listing(appID: appID)
         let reAudit = await Task.detached(priority: .utility) {
-            SteamCloudAudit.run(listing: after, saveFiles: info.saveFiles, paths: paths)
+            SteamCloudAudit.run(listing: after, saveFiles: saveFiles, paths: paths)
         }.value
         let afterPlan = SteamCloudPlan.make(audit: reAudit, baseline: baseline(appID: appID))
         settle(appID: appID, afterPlan.settled)
