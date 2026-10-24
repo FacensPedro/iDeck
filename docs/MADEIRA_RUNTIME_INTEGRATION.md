@@ -39,3 +39,11 @@ A integração do pipeline de compilação Xcode das bibliotecas upstream **cont
 ### Importação IPA / LiveContainer
 
 O reparo do extrator aceita registros legítimos de diretório (`Payload/GetMoreRam.app/`) e adia a criação dessas pastas até haver arquivos para gravar. Mantém checagem de traversal e links simbólicos. **Importar um IPA não significa executá-lo no LiveContainer**. Executar aplicativos dentro de outro aplicativo depende de um runtime compatível e das restrições de assinatura do iPadOS.
+
+### Empacotamento opcional do runtime
+
+O script `scripts/build_ipa.sh` permanece compatível com IPA de interface sem as bibliotecas Madeira. Ao usar `IDECK_REQUIRE_MADEIRA=1`, ele ativa a ABI de lançamento **somente nesse build**, executa `scripts/stage_madeira_payload.sh` para copiar as DLLs compiladas do Wine/DXMT/FEX para `iDeck.app/MadeiraRuntime` e então executa o verificador em modo obrigatório. Se faltar alguma biblioteca, símbolo nativo ou arquivo do bundle, o build termina em erro — não é produzido um IPA anunciado como funcional.
+
+A biblioteca proprietária Metal Shader Converter só será incluída com `IDECK_ACCEPT_METAL_CONVERTER_LICENSE=1`, após o responsável confirmar que possui autorização para redistribuí-la, e ainda deverá ser assinada adequadamente. Esta etapa **não** compila nem vincula as bibliotecas estáticas upstream, nem os arquivos-fonte de integração originais. Enquanto isso não for feito, o modo obrigatório deve falhar, como esperado.
+
+O GitHub Actions reutiliza agora o mesmo `scripts/build_ipa.sh` para evitar que builds locais e CI empacotem conteúdos diferentes. A infraestrutura macOS/Xcode e o status de billing da conta continuam requisitos externos.
