@@ -52,8 +52,17 @@ jobs:
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: iDeck
+          name: iDeck-IPA
           path: iDeck.ipa
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Show IPA download instructions
+        if: success()
+        run: |
+          echo '## iDeck.ipa generated successfully' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Download the **iDeck-IPA** artifact from the Artifacts section of this workflow run.' >> "$GITHUB_STEP_SUMMARY"
+          echo "[Open artifacts for this run](https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Publish release
         if: startsWith(github.ref, 'refs/tags/') || inputs.release_tag != ''
