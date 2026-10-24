@@ -43,7 +43,8 @@ class ContainerHost {
             virtualRoot.appendingPathComponent("tmp", isDirectory: true),
             virtualRoot.appendingPathComponent("GuestApps", isDirectory: true),
             virtualRoot.appendingPathComponent("Windows", isDirectory: true),
-            virtualRoot.appendingPathComponent("WindowsDownloads", isDirectory: true)
+            virtualRoot.appendingPathComponent("WindowsDownloads", isDirectory: true),
+            virtualRoot.appendingPathComponent("drive_c/WindowsDownloads", isDirectory: true)
         ]
         do {
             for directory in directories {
