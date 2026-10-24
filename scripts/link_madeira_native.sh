@@ -26,6 +26,7 @@ INCLUDES=(
   "-I$FEX/build-ios/include"
   "-I$FEX/build-ios/FEXCore/Source"
   "-I$FEX"
+  "-I$MD/madeira-d3d12/third_party/metal-shader-converter/include"
 )
 
 SOURCES=(
@@ -59,6 +60,15 @@ for entry in "${SOURCES[@]}"; do
   "${CMD[@]}" -c "$src" -o "$obj"
   OBJS+=("$obj")
 done
+
+CANARY_SRC="$MD/madeira-d3d12/tests/native/msc_canary.mm"
+[[ -s "$CANARY_SRC" ]] || { echo "ERROR: upstream D3D12 canary source missing: $CANARY_SRC" >&2; exit 2; }
+CANARY_OBJ="$OUT/obj/msc_canary.o"
+echo "Compiling upstream D3D12 Metal Shader Converter canary"
+xcrun --sdk iphoneos clang++ -arch arm64 -isysroot "$SDK" -miphoneos-version-min=18.0 \
+  -O2 -fPIC -fobjc-arc -std=c++20 -fexceptions -frtti \
+  "${INCLUDES[@]}" -c "$CANARY_SRC" -o "$CANARY_OBJ"
+OBJS+=("$CANARY_OBJ")
 
 echo "Compiling iDeck host log callbacks"
 xcrun --sdk iphoneos clang -arch arm64 -isysroot "$SDK" -miphoneos-version-min=18.0 -O2 \
