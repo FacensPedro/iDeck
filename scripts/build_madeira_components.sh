@@ -42,8 +42,11 @@ if [[ "$REBUILD" == "1" ]]; then
     fi
   done
 
-  # The upstream iOS CMake invocation does not set CMAKE_SYSTEM_PROCESSOR.
-  # On cross builds this can be empty, causing FEX's processor check to fail.
+  # FEX defaults TUNE_CPU to "native" and probes Linux /proc/cpuinfo.
+  # A macOS runner building for iOS has no /proc/cpuinfo, so the FEX CPU
+  # discovery scripts fail and CMake's string(STRIP ...) receives no value.
+  # Disable host CPU tuning: the shipped binary must support Apple ARM64 devices,
+  # not a guessed CPU type from the build runner.
   FEX_IOS_BUILD="$MD/FEX/build-ios"
   if [[ ! -f "$FEX_IOS_BUILD/CMakeCache.txt" ]]; then
     cmake -S "$MD/FEX" -B "$FEX_IOS_BUILD" -G Ninja \
@@ -53,6 +56,7 @@ if [[ "$REBUILD" == "1" ]]; then
       -DCMAKE_OSX_SYSROOT=iphoneos \
       -DCMAKE_OSX_DEPLOYMENT_TARGET=17.0 \
       -DCMAKE_BUILD_TYPE=Release \
+      -DTUNE_CPU=none \
       -DBUILD_TESTING=OFF \
       -DBUILD_THUNKS=OFF \
       -DBUILD_FEXCONFIG=OFF \
@@ -61,6 +65,11 @@ if [[ "$REBUILD" == "1" ]]; then
       -DENABLE_ASSERTIONS=OFF \
       -DENABLE_CLANG_THUNKS=ON \
       -DENABLE_CCACHE=ON
+  else
+    # Also repair caches from earlier unsuccessful configure attempts.
+    cmake -S "$MD/FEX" -B "$FEX_IOS_BUILD" \
+      -DCMAKE_SYSTEM_PROCESSOR=arm64 \
+      -DTUNE_CPU=none
   fi
   bash "$MD/build/fex-ios/build.sh"
   bash "$MD/build/fex-arm64ec/build.sh"
