@@ -85,9 +85,22 @@ if [[ "$REBUILD" == "1" ]]; then
   }
   if [[ ! -s "$MD/wine/build-macos/include/config.h" ]]; then
     mkdir -p "$MD/wine/build-macos"
-    (cd "$MD/wine/build-macos" && ../configure --without-x --disable-tests)
+    (cd "$MD/wine/build-macos" && \
+      PATH="$MD/toolchains/llvm-mingw-20260421-ucrt-macos-universal/bin:$PATH" \
+      ../configure --without-x --disable-tests)
   fi
-  bash "$MD/build/ntdll-unix/build.sh"
+  NTDLL_LOG="$MD/build/ntdll-unix/build-ideck.log"
+  if ! bash "$MD/build/ntdll-unix/build.sh" 2>&1 | tee "$NTDLL_LOG"; then
+    FAILED_UNIXLIBS="$(sed -n 's/^Failed://p' "$NTDLL_LOG")"
+    for name in $FAILED_UNIXLIBS; do
+      ERR_FILE="$MD/build/ntdll-unix/obj/$name.err"
+      if [[ -s "$ERR_FILE" ]]; then
+        echo "=== compiler diagnostics: $name ===" >&2
+        cat "$ERR_FILE" >&2
+      fi
+    done
+    exit 1
+  fi
   bash "$MD/build/wineserver/build.sh"
   bash "$MD/build/win32u-unix/build.sh"
 
@@ -128,12 +141,19 @@ if [[ "$REBUILD" == "1" ]]; then
       -Dwine_build_path=../../wine/build-arm64ec \
       --cross-file="$MD/dxmt/build-arm64ec-win.txt"
   fi
-  ninja -C "$MD/dxmt/build-arm64ec" src/winemetal/winemetal.dll
-  WINEMETAL_EC="$MD/dxmt/build-arm64ec/src/winemetal/winemetal.dll"
-  [[ -s "$WINEMETAL_EC" ]] || {
-    echo "ERROR: WineMetal ARM64EC compilation produced no DLL." >&2; exit 2;
-  }
-  cp "$WINEMETAL_EC" "$MD/app/Madeira/arm64ec-windows/winemetal.dll"
+  DXMT_EC_MODULES=(winemetal/winemetal.dll dxgi/dxgi.dll d3d11/d3d11.dll d3d10/d3d10core.dll)
+  DXMT_EC_TARGETS=()
+  for module in "${DXMT_EC_MODULES[@]}"; do
+    DXMT_EC_TARGETS+=("src/$module")
+  done
+  ninja -C "$MD/dxmt/build-arm64ec" "${DXMT_EC_TARGETS[@]}"
+  for module in "${DXMT_EC_MODULES[@]}"; do
+    src="$MD/dxmt/build-arm64ec/src/$module"
+    [[ -s "$src" ]] || {
+      echo "ERROR: DXMT ARM64EC compilation produced no DLL: $module" >&2; exit 2;
+    }
+    cp "$src" "$MD/app/Madeira/arm64ec-windows/${module##*/}"
+  done
 
   bash "$MD/build/madeira-d3d12/build-pe.sh"
   D3D="$MD/build/madeira-d3d12/out-pe"
@@ -154,6 +174,9 @@ for file in \
   "$MD/app/Madeira/libdxmt_combined.a" \
   "$MD/app/Madeira/arm64ec-windows/xtajit64.dll" \
   "$MD/app/Madeira/arm64ec-windows/ntdll.dll" \
+  "$MD/app/Madeira/arm64ec-windows/d3d11.dll" \
+  "$MD/app/Madeira/arm64ec-windows/dxgi.dll" \
+  "$MD/app/Madeira/arm64ec-windows/d3d10core.dll" \
   "$MD/app/Madeira/aarch64-windows/winemetal.dll" \
   "$MD/app/Madeira/prefix-template.tar.gz" \
   "$MD/app/Madeira/arm64ec-windows/d3d12.dll" \
