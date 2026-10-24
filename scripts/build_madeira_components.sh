@@ -32,23 +32,37 @@ if [[ ! -d "$UPSTREAM/toolchains/llvm-ios-build" ]]; then
   exit 2
 fi
 
-echo "[1/4] Building Madeira's iOS FEX native archives..."
+echo "[1/9] Building Madeira's iOS FEX native archives..."
 bash scripts/build_fex.sh
+echo "[2/9] FEX ARM64EC guest..."
+( cd "$UPSTREAM/build/fex-arm64ec" && bash build.sh )
 
-echo "[2/4] Building Madeira's iOS Wine ntdll unix bridge..."
+echo "[3/9] Building Madeira's iOS Wine ntdll unix bridge..."
 bash scripts/build_wine.sh
+echo "[4/9] Wine wineserver..."
+( cd "$UPSTREAM/build/wineserver" && bash build.sh )
+echo "[5/9] Wine win32u Unix..."
+( cd "$UPSTREAM/build/win32u-unix" && bash build.sh )
+echo "[6/9] Wine ARM64EC ntdll PE..."
+( cd "$UPSTREAM/build/wine-pe" && bash build-ntdll.sh )
+echo "[7/9] Wine ARM64EC PE modules..."
+( cd "$UPSTREAM/build/wine-pe" && bash build-modules.sh )
 
-echo "[3/4] Building Madeira's iOS DXMT native archive..."
+echo "[8/9] Building Madeira's iOS DXMT native archive..."
 bash scripts/build_dxmt.sh
 
-echo "[4/4] Building Madeira's ARM64EC D3D12 PE libraries..."
+echo "[9/9] Building Madeira's ARM64EC D3D12 PE libraries..."
 bash scripts/build_d3d12.sh
 
 echo "Native build stages completed; checking outputs."
 required=(
   "$UPSTREAM/FEX/build-ios/FEXCore/Source/libFEXCore.a"
   "$UPSTREAM/FEX/build-ios/FEXCore/Source/libFEXCore_Base.a"
-  "$UPSTREAM/app/Madeira/libdxmt_combined.a"
+  "$UPSTREAM/build/dxmt-ios/libdxmt_unix.a"
+  "$UPSTREAM/app/Madeira/libntdll_unix.a"
+  "$UPSTREAM/app/Madeira/libwineserver.a"
+  "$UPSTREAM/app/Madeira/libwin32u_unix.a"
+  "$UPSTREAM/app/Madeira/arm64ec-windows/ntdll.dll"
   "$UPSTREAM/app/Madeira/arm64ec-windows/d3d12.dll"
   "$UPSTREAM/app/Madeira/arm64ec-windows/d3d12core.dll"
   "$UPSTREAM/app/Madeira/arm64ec-windows/xtajit64.dll"
