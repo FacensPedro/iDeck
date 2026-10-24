@@ -3,6 +3,7 @@
 import argparse
 import plistlib
 import re
+import struct
 import subprocess
 import sys
 from pathlib import Path
@@ -18,6 +19,8 @@ SYMBOLS = (
 PE_FILES = (
     "aarch64-windows/d3d11.dll",
     "aarch64-windows/dxgi.dll",
+    "aarch64-windows/winemetal.dll",
+    "arm64ec-windows/ntdll.dll",
     "arm64ec-windows/d3d12.dll",
     "arm64ec-windows/d3d12core.dll",
     "arm64ec-windows/xtajit64.dll",
@@ -46,8 +49,22 @@ def inspect(app: Path) -> list[str]:
         dll = runtime / path
         if not dll.is_file() or dll.stat().st_size < 1024:
             errors.append(f"missing compiled Windows PE library: {dll}")
-        elif dll.open("rb").read(2) != b"MZ":
-            errors.append(f"invalid PE signature: {dll}")
+        else:
+            with dll.open("rb") as stream:
+                dos = stream.read(64)
+                offset = struct.unpack_from("<I", dos, 0x3c)[0] if len(dos) == 64 and dos[:2] == b"MZ" else -1
+                if offset < 64 or offset > 64 * 1024 * 1024:
+                    errors.append(f"invalid PE DOS header: {dll}")
+                    continue
+                stream.seek(offset)
+                signature = stream.read(6)
+            if len(signature) != 6 or signature[:4] != b"PE" + bytes((0, 0)):
+                errors.append(f"invalid PE signature: {dll}")
+                continue
+            machine = struct.unpack_from("<H", signature, 4)[0]
+            expected = {0xA641, 0xA64E} if path.startswith("arm64ec-windows/") else {0xAA64, 0xA64E}
+            if machine not in expected:
+                errors.append(f"unexpected PE machine {machine:#06x} for {dll}")
     converter = runtime / "d3d12" / "libmetalirconverter.dylib"
     if not converter.is_file() or converter.stat().st_size < 1024:
         errors.append(f"missing or empty iOS shader converter dependency: {converter}")
@@ -55,7 +72,7 @@ def inspect(app: Path) -> list[str]:
     prefix = app / "prefix-template.tar.gz"
     if not prefix.is_file() or prefix.stat().st_size < 1024:
         errors.append(f"missing Madeira Wine prefix template: {prefix}")
-    elif prefix.open("rb").read(2) != b"\\x1f\\x8b":
+    elif prefix.open("rb").read(2) != bytes((0x1f, 0x8b)):
         errors.append(f"invalid Wine prefix gzip signature: {prefix}")
     return errors
 
