@@ -61,6 +61,8 @@
 		A10000000000000000000004 /* SteamAppManifestWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000004 /* SteamAppManifestWriter.swift */; };
 		A10000000000000000000005 /* SteamInstall.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000005 /* SteamInstall.swift */; };
 		A10000000000000000000006 /* WindowsLibraryModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000006 /* WindowsLibraryModels.swift */; };
+		A10000000000000000000007 /* SteamCloud.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000007 /* SteamCloud.swift */; };
+		A10000000000000000000008 /* SteamCloudSyncEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000008 /* SteamCloudSyncEngine.swift */; };
 
 		D20000000000000000000001 /* RuntimeLifecycle.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = NativeRuntime/RuntimeLifecycle.mm; sourceTree = "<group>"; };
 		D20000000000000000000002 /* FEXMemoryManager.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = NativeRuntime/FEXMemoryManager.cpp; sourceTree = "<group>"; };
@@ -130,6 +132,8 @@
 		E20000000000000000000007 /* Precomp.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SteamLZMA/Precomp.h; sourceTree = "<group>"; };
 		E20000000000000000000008 /* Compiler.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SteamLZMA/Compiler.h; sourceTree = "<group>"; };
 		A20000000000000000000006 /* WindowsLibraryModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowsLibraryModels.swift; sourceTree = "<group>"; };
+		A20000000000000000000007 /* SteamCloud.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamCloud.swift; sourceTree = "<group>"; };
+		A20000000000000000000008 /* SteamCloudSyncEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamCloudSyncEngine.swift; sourceTree = "<group>"; };
 
 		333333333333333333333331 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
@@ -194,6 +198,8 @@
 				E10000000000000000000002 /* SteamChunkCodecs.c in Sources */,
 				E10000000000000000000005 /* LzmaDec.c in Sources */,
 				A10000000000000000000006 /* WindowsLibraryModels.swift in Sources */,
+				A10000000000000000000007 /* SteamCloud.swift in Sources */,
+				A10000000000000000000008 /* SteamCloudSyncEngine.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -272,6 +278,8 @@
 				E20000000000000000000007 /* Precomp.h */,
 				E20000000000000000000008 /* Compiler.h */,
 				A20000000000000000000006 /* WindowsLibraryModels.swift */,
+				A20000000000000000000007 /* SteamCloud.swift */,
+				A20000000000000000000008 /* SteamCloudSyncEngine.swift */,
 			);
 			path = iDeck;
 			sourceTree = "<group>";

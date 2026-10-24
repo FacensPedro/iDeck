@@ -399,7 +399,9 @@ class SystemCoordinator: ObservableObject {
         let executableURL = selected.url
         let entryArguments = selected.arguments
         guard windowsEnvironment.hasRuntime(in: prefixPath.path) else {
-            setWindowsStatus("Madeira runtime missing: FEX/Wine/DXMT must be installed and linked.")
+            let missing = windowsEnvironment.missingRuntimeComponents(in: prefixPath.path)
+            setWindowsStatus("Madeira runtime missing: " + missing.joined(separator: ", ") +
+                             ". Compile and link the native runtime into the iDeck IPA.")
             return
         }
 

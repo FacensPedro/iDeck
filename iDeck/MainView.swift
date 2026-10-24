@@ -68,7 +68,7 @@ struct MainView: View {
                             coordinator.forceJITAndStartWindows()
                         }
                     } label: {
-                        modeTile(title: tr("Madeira"), subtitle: tr("Steam games and Windows apps"), symbol: "gamecontroller.fill")
+                        modeTile(title: tr("Madeira Emulator"), subtitle: tr("Steam games and Windows apps"), symbol: "gamecontroller.fill")
                     }
                     .buttonStyle(.plain)
                     Button {
@@ -528,7 +528,7 @@ struct WindowsWorkspaceView: View {
                 }
             }
             Spacer()
-            Text(mode == .pc ? tr("Madeira") : tr("LiveContainer"))
+            Text(mode == .pc ? tr("Madeira Emulator") : tr("LiveContainer"))
                 .font(.headline)
                 .foregroundColor(.white)
             Spacer()
@@ -818,7 +818,7 @@ struct WindowsWorkspaceView: View {
                                 SteamGameArtworkView(game: game)
                                     .frame(width: artworkWidth, height: artworkHeight)
                                 cardTitle(game.name.isEmpty ? tr("Untitled Steam app") : game.name)
-                                Text(tr("Steam · Windows game"))
+                                Text("Steam")
                                     .font(.caption)
                                     .foregroundColor(.gray)
                             }
@@ -1276,18 +1276,7 @@ private struct SteamProgramDetailsView: View {
                         .foregroundColor(installed ? .green : .gray)
                     WindowsGameProfileForm(profile: $profile,
                                            globalMetalFXEnabled: $coordinator.isMetalFXEnabled)
-                    if let saveURL = URL(string: "https://store.steampowered.com/account/remotestorageapp/?appid=\(game.appID)") {
-                        Link(destination: saveURL) {
-                            Label(tr("View Steam Cloud saves"), systemImage: "icloud")
-                                .frame(maxWidth: .infinity)
-                                .padding(12)
-                        }
-                        .buttonStyle(.bordered)
-                        Text(tr("Steam Cloud files open on Steam; in-app synchronization is not available yet."))
-                            .font(.caption)
-                            .foregroundColor(.gray)
-                            .multilineTextAlignment(.center)
-                    }
+                    steamCloudControls
                     if installing {
                         downloadStatus
                     } else if installed {
@@ -1303,13 +1292,24 @@ private struct SteamProgramDetailsView: View {
                             }
                             profile.metalFXEnabled = coordinator.isMetalFXEnabled || profile.metalFXEnabled
                             library.save(profile)
-                            coordinator.launchSteamGame(game: game, profile: profile, prefixPath: prefixPath)
-                            if coordinator.windowsStatus.hasPrefix("Cannot launch") ||
-                               coordinator.windowsStatus.hasPrefix("Madeira runtime missing") {
-                                presentError(coordinator.windowsStatus)
-                            } else {
-                                dismiss()
+                            Task {
+                                if autoSaveEnabled {
+                                    await steamLibrary.syncCloud(appID: game.appID, prefixPath: prefixPath)
+                                    if steamLibrary.cloudConflicts.contains(game.appID) {
+                                        presentError(tr("Steam Cloud has conflicting saves. Resolve them before playing, or turn off Auto Save."))
+                                        return
+                                    }
+                                }
+                                coordinator.launchSteamGame(game: game, profile: profile, prefixPath: prefixPath)
+                                if coordinator.windowsStatus.hasPrefix("Cannot launch") ||
+                                   coordinator.windowsStatus.hasPrefix("Madeira runtime missing") {
+                                    presentError(coordinator.windowsStatus)
+                                } else {
+                                    dismiss()
+                                }
                             }
+                            return
+
                         } label: {
                             Label(tr("Launch"), systemImage: "play.fill")
                                 .font(.headline)
@@ -1365,6 +1365,9 @@ private struct SteamProgramDetailsView: View {
                 await steamLibrary.loadDLC(appID: game.appID)
                 if let prefixPath {
                     steamLibrary.refreshInstalledDLC(appID: game.appID, prefixPath: prefixPath)
+                    if autoSaveEnabled {
+                        await steamLibrary.syncCloud(appID: game.appID, prefixPath: prefixPath)
+                    }
                 }
             }
             .toolbar {
@@ -1386,6 +1389,66 @@ private struct SteamProgramDetailsView: View {
             }
         }
         .preferredColorScheme(.dark)
+    }
+
+    @AppStorage("iDeck.steamCloud.autoSaveEnabled") private var autoSaveEnabled = true
+
+    private var steamCloudControls: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Label(tr("Steam Cloud saves"), systemImage: "icloud")
+                    .font(.headline)
+                Spacer()
+                if steamLibrary.cloudSyncing.contains(game.appID) {
+                    ProgressView()
+                }
+            }
+            Toggle(tr("Auto Save"), isOn: $autoSaveEnabled)
+                .tint(.blue)
+            Text(tr("Automatically sync Steam Cloud saves before playing when available. Conflicting saves are never overwritten."))
+                .font(.caption)
+                .foregroundColor(.gray)
+            if let message = steamLibrary.cloudMessages[game.appID] {
+                Text(message)
+                    .font(.caption)
+                    .foregroundColor(.gray)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if steamLibrary.cloudConflicts.contains(game.appID) {
+                Text(tr("Conflicting saves: choose which copy to keep. The replaced copy will be backed up."))
+                    .font(.caption)
+                    .foregroundColor(.orange)
+                HStack(spacing: 10) {
+                    Button(tr("Use Steam Cloud saves")) {
+                        guard let prefixPath else { return }
+                        Task {
+                            await steamLibrary.resolveCloud(
+                                appID: game.appID, prefixPath: prefixPath, preferCloud: true)
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    Button(tr("Use local saves")) {
+                        guard let prefixPath else { return }
+                        Task {
+                            await steamLibrary.resolveCloud(
+                                appID: game.appID, prefixPath: prefixPath, preferCloud: false)
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                }
+                .disabled(steamLibrary.cloudSyncing.contains(game.appID))
+            }
+            Button {
+                guard let prefixPath else { return }
+                Task { await steamLibrary.syncCloud(appID: game.appID, prefixPath: prefixPath) }
+            } label: {
+                Label(tr("Sync saves now"), systemImage: "arrow.triangle.2.circlepath.icloud")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .disabled(prefixPath == nil || steamLibrary.cloudSyncing.contains(game.appID))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var downloadStatus: some View {
@@ -1431,7 +1494,16 @@ private struct SteamProgramDetailsView: View {
                         .foregroundColor(.white)
                         .lineLimit(2)
                     Spacer(minLength: 6)
-                    if steamLibrary.installedDLC[game.appID]?.contains(id) == true {
+                    if steamLibrary.installingDLC[game.appID] == id {
+                        Button(role: .destructive) {
+                            steamLibrary.cancelDLCInstall(appID: game.appID, dlcAppID: id)
+                        } label: {
+                            Label(tr("Cancel"), systemImage: "xmark.circle.fill")
+                                .font(.caption.weight(.semibold))
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(steamLibrary.cancellingDLC.contains(id))
+                    } else if steamLibrary.installedDLC[game.appID]?.contains(id) == true {
                         Button(role: .destructive) {
                             guard let prefixPath,
                                   steamLibrary.uninstallDLC(appID: game.appID,
@@ -1450,15 +1522,14 @@ private struct SteamProgramDetailsView: View {
                                 presentError(tr("Windows environment is not ready."))
                                 return
                             }
-                            Task {
-                                await steamLibrary.installDLC(appID: game.appID,
-                                                               dlcAppID: id, prefixPath: prefixPath)
-                            }
+                            steamLibrary.startDLCInstall(appID: game.appID,
+                                                        dlcAppID: id, prefixPath: prefixPath)
                         } label: {
                             Text(tr("Install"))
                                 .font(.caption.weight(.semibold))
                         }
                         .buttonStyle(.borderedProminent)
+                        .disabled(steamLibrary.installingApps.contains(game.appID))
                     }
                 }
                 .padding(10)

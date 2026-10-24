@@ -310,6 +310,7 @@ enum TarGzExtractor {
 // MARK: - Minimal ZIP extractor (Process/unzip are unavailable on iOS)
 
 enum ZipError: Error {
+    case unsafePathEntry(String)
     case invalidArchive
     case unsupported
     case unsafePath
@@ -362,6 +363,13 @@ enum ZipExtractor {
                 .split(separator: "/", omittingEmptySubsequences: true)
                 .filter { $0 != "." }
             guard components.first == "Payload" else { continue }
+            // AppleDouble files, macOS ZIP metadata and Finder thumbnails are
+            // not part of an iOS app. Skip them without relaxing path checks
+            // for executable/resource files inside Payload.
+            if components.contains(where: {
+                $0 == "__MACOSX" || $0 == ".DS_Store" ||
+                $0.hasPrefix("._") || $0 == ".Spotlight-V100"
+            }) { continue }
 
             // Local header gives the real offset of the payload.
             guard try u32(data, localOffset) == 0x0403_4b50 else { throw ZipError.invalidArchive }
@@ -371,9 +379,16 @@ enum ZipExtractor {
             guard payloadStart + compressedSize <= data.count else { throw ZipError.invalidArchive }
             let payload = data.subdata(in: payloadStart..<(payloadStart + compressedSize))
 
-            try writeEntry(name: name, method: method, payload: payload, uncompressedSize: uncompressedSize,
-                           unixMode: externalAttributes >> 16, lexicalRoot: lexicalRoot,
-                           resolvedRoot: resolvedRoot, destination: destination)
+            do {
+                try writeEntry(name: name, method: method, payload: payload, uncompressedSize: uncompressedSize,
+                               unixMode: externalAttributes >> 16, lexicalRoot: lexicalRoot,
+                               resolvedRoot: resolvedRoot, destination: destination)
+            } catch ZipError.unsafePath {
+                let safeLabel = name.unicodeScalars.prefix(160).map {
+                    $0.value >= 0x20 && $0.value != 0x7f ? String($0) : "?"
+                }.joined()
+                throw ZipError.unsafePathEntry(safeLabel)
+            }
         }
     }
 
@@ -394,7 +409,7 @@ enum ZipExtractor {
             if part == ".." {
                 // Keep every extracted entry inside Payload; never allow a
                 // relative path from one application to reach another.
-                guard safeComponents.count > 1 else { throw ZipError.unsafePath }
+                guard safeComponents.count > 2 else { throw ZipError.unsafePath }
                 safeComponents.removeLast()
                 continue
             }
@@ -406,6 +421,9 @@ enum ZipExtractor {
         }
         guard safeComponents.first == "Payload" else { throw ZipError.unsafePath }
         if safeComponents.count == 1 { return }
+        guard safeComponents[1].lowercased().hasSuffix(".app") else {
+            throw ZipError.unsafePath
+        }
         let target = safeComponents.reduce(destination) { $0.appendingPathComponent($1) }
         let standardizedTarget = target.standardizedFileURL.path
         guard standardizedTarget.hasPrefix(lexicalRoot + "/") else { throw ZipError.unsafePath }

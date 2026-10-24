@@ -55,6 +55,15 @@ func trStatus(_ status: String) -> String {
 
 enum Translations {
     static let table: [String: [String: String]] = [
+        "Madeira Emulator": ["pt": "Madeira Emulator", "es": "Madeira Emulator"],
+        "Steam Cloud saves": ["pt": "Saves do Steam Cloud", "es": "Guardados de Steam Cloud"],
+        "Auto Save": ["pt": "Auto Save", "es": "Guardado automático"],
+        "Automatically sync Steam Cloud saves before playing when available. Conflicting saves are never overwritten.": ["pt": "Sincroniza os saves com o Steam Cloud antes de jogar, quando disponível. Saves em conflito não serão sobrescritos automaticamente.", "es": "Sincroniza los guardados con Steam Cloud antes de jugar cuando esté disponible. No sobrescribe conflictos automáticamente."],
+        "Sync saves now": ["pt": "Sincronizar saves agora", "es": "Sincronizar guardados ahora"],
+        "Conflicting saves: choose which copy to keep. The replaced copy will be backed up.": ["pt": "Saves em conflito: escolha qual cópia manter. A cópia substituída será salva em backup.", "es": "Guardados en conflicto: elige qué copia conservar. Se hará una copia de seguridad de la reemplazada."],
+        "Use Steam Cloud saves": ["pt": "Usar saves da Steam Cloud", "es": "Usar guardados de Steam Cloud"],
+        "Use local saves": ["pt": "Usar saves locais", "es": "Usar guardados locales"],
+        "Steam Cloud has conflicting saves. Resolve them before playing, or turn off Auto Save.": ["pt": "Existem saves em conflito. Resolva antes de jogar ou desative Auto Save.", "es": "Hay guardados en conflicto. Resuélvelos antes de jugar o desactiva el guardado automático."],
         // Modes
         "Madeira": ["pt": "Madeira", "es": "Madeira"],
         "Installed games": ["pt": "Jogos instalados", "es": "Juegos instalados"],

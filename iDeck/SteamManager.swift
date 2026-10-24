@@ -3777,7 +3777,7 @@ struct SteamAppInfo {
 
     /// One `ufs.savefiles` entry: `root` names a folder ("WinAppDataLocalLow",
     /// "GameInstall", ...), `path` a subfolder of it, `pattern` a wildcard.
-    struct SaveFile: Equatable {
+    struct SaveFile: Equatable, Sendable {
         var root: String
         var path: String
         var pattern: String
@@ -3788,7 +3788,7 @@ struct SteamAppInfo {
 
     /// One `ufs.rootoverrides` entry: on `os`, files the cloud lists under
     /// `root` are kept under `useInstead` + `addPath`.
-    struct RootOverride: Equatable {
+    struct RootOverride: Equatable, Sendable {
         var root: String
         var os: String
         var useInstead: String
@@ -4619,13 +4619,20 @@ final class SteamOwnedGamesModel: ObservableObject {
     @Published private(set) var dlcMetadata: [UInt32: SteamAppInfo] = [:]
     @Published private(set) var installedDLC: [UInt32: Set<UInt32>] = [:]
     @Published private(set) var cancellingApps: Set<UInt32> = []
+    @Published private(set) var installingDLC: [UInt32: UInt32] = [:]
+    @Published private(set) var cancellingDLC: Set<UInt32> = []
+    @Published private(set) var cloudMessages: [UInt32: String] = [:]
+    @Published private(set) var cloudConflicts: Set<UInt32> = []
+    @Published private(set) var cloudSyncing: Set<UInt32> = []
 
     private var installTasks: [UInt32: Task<Void, Never>] = [:]
+    private var dlcTasks: [UInt32: Task<Void, Never>] = [:]
     private var lastRefresh: Date?
     private var lastAccountName: String?
     private let session = SteamSession()
     private lazy var fetcher = SteamLibraryFetcher(session: session)
     private lazy var downloader = DepotDownloader(session: session)
+    private lazy var cloudEngine = SteamCloudSyncEngine(session: session)
 
     func refresh(force: Bool = false) async {
         guard SteamSignIn.isSignedIn else {
@@ -4704,6 +4711,62 @@ final class SteamOwnedGamesModel: ObservableObject {
         guard let task = installTasks[appID] else { return }
         cancellingApps.insert(appID)
         task.cancel()
+    }
+
+    func startDLCInstall(appID: UInt32, dlcAppID: UInt32, prefixPath: URL) {
+        guard dlcTasks[appID] == nil, !installingApps.contains(appID) else { return }
+        installingDLC[appID] = dlcAppID
+        dlcTasks[appID] = Task { @MainActor in
+            await installDLC(appID: appID, dlcAppID: dlcAppID, prefixPath: prefixPath)
+            dlcTasks.removeValue(forKey: appID)
+            installingDLC.removeValue(forKey: appID)
+            cancellingDLC.remove(dlcAppID)
+        }
+    }
+
+    func cancelDLCInstall(appID: UInt32, dlcAppID: UInt32) {
+        guard installingDLC[appID] == dlcAppID, let task = dlcTasks[appID] else { return }
+        cancellingDLC.insert(dlcAppID)
+        task.cancel()
+    }
+
+    func syncCloud(appID: UInt32, prefixPath: URL) async {
+        guard !cloudSyncing.contains(appID), SteamSignIn.isSignedIn else { return }
+        cloudSyncing.insert(appID)
+        cloudMessages[appID] = "Sincronizando saves com a Steam..."
+        defer { cloudSyncing.remove(appID) }
+        do {
+            guard let info = games.first(where: { $0.appID == appID }) else {
+                throw SteamFileError.invalid("O jogo não está disponível na biblioteca Steam.")
+            }
+            let result = try await cloudEngine.sync(
+                appID: appID, info: info, prefixPath: prefixPath)
+            cloudMessages[appID] = result.message
+            if result.conflicts > 0 {
+                cloudConflicts.insert(appID)
+            } else {
+                cloudConflicts.remove(appID)
+            }
+        } catch {
+            cloudMessages[appID] = "Steam Cloud: " + SteamSignIn.message(error)
+        }
+    }
+
+    func resolveCloud(appID: UInt32, prefixPath: URL, preferCloud: Bool) async {
+        guard !cloudSyncing.contains(appID), SteamSignIn.isSignedIn else { return }
+        cloudSyncing.insert(appID)
+        defer { cloudSyncing.remove(appID) }
+        do {
+            guard let info = games.first(where: { $0.appID == appID }) else {
+                throw SteamFileError.invalid("O jogo não está disponível na biblioteca Steam.")
+            }
+            let result = try await cloudEngine.resolve(
+                appID: appID, info: info, prefixPath: prefixPath, preferCloud: preferCloud)
+            cloudMessages[appID] = result.message
+            if result.conflicts == 0 { cloudConflicts.remove(appID) }
+        } catch {
+            cloudMessages[appID] = SteamSignIn.message(error)
+        }
     }
 
     func refreshInstalledDLC(appID: UInt32, prefixPath: URL) {
@@ -4832,6 +4895,7 @@ final class SteamOwnedGamesModel: ObservableObject {
         downloadProgress[appID] = SteamDownloadProgress()
         defer { installingApps.remove(appID) }
         do {
+            try Task.checkCancellation()
             guard let app = try await fetcher.fetchInstallInfo(
                 appID: appID, cached: games.first(where: { $0.appID == appID })),
                   app.appID == appID,
@@ -4852,14 +4916,26 @@ final class SteamOwnedGamesModel: ObservableObject {
                 includedDLC: [dlcAppID],
                 dlcOnly: true,
                 progress: { [weak self] progress in self?.downloadProgress[appID] = progress })
+            try Task.checkCancellation()
             installedApps.insert(appID)
             refreshInstalledDLC(appID: appID, prefixPath: prefixPath)
         } catch {
-            downloadErrors[appID] = SteamSignIn.message(error)
+            if Task.isCancelled || error is CancellationError {
+                downloadErrors[appID] = nil
+                downloadProgress.removeValue(forKey: appID)
+            } else {
+                downloadErrors[appID] = SteamSignIn.message(error)
+            }
         }
     }
 
     func disconnect() {
+        for task in dlcTasks.values { task.cancel() }
+        dlcTasks.removeAll()
+        installingDLC.removeAll()
+        cancellingDLC.removeAll()
+        cloudMessages.removeAll()
+        cloudConflicts.removeAll()
         for task in installTasks.values { task.cancel() }
         installTasks.removeAll()
         lastRefresh = nil

@@ -214,6 +214,9 @@ class AppManager: ObservableObject {
                 result = .success(destination)
             } catch let error as IPAInstallError { result = .failure(error) }
             catch ZipError.unsupported { result = .failure(.unsupportedArchive) }
+            catch ZipError.unsafePathEntry(let name) {
+                result = .failure(.copyFailed("Entrada ZIP rejeitada por caminho inseguro: \(name)"))
+            }
             catch ZipError.unsafePath { result = .failure(.unsafeArchivePath) }
             catch ZipError.invalidArchive { result = .failure(.invalidArchive) }
             catch { result = .failure(.copyFailed(error.localizedDescription)) }
