@@ -6,10 +6,40 @@
 #include <stdlib.h>
 #include <string.h>
 
+#if defined(IDECK_NATIVE_MADEIRA_ENABLED) && IDECK_NATIVE_MADEIRA_ENABLED
+extern "C" void madeira_seed_prefix_if_needed(const char *prefix_path);
+#endif
+
+static bool ideck_valid_wine_prefix(const char *path) {
+    if (!path || !*path) return false;
+    NSString *base = [NSString stringWithUTF8String:path];
+    if (!base) return false;
+    NSFileManager *fm = [NSFileManager defaultManager];
+    return [fm fileExistsAtPath:[base stringByAppendingPathComponent:@".update-timestamp"]] &&
+           [fm fileExistsAtPath:[base stringByAppendingPathComponent:@"system.reg"]] &&
+           [fm fileExistsAtPath:[base stringByAppendingPathComponent:@"drive_c/windows"]];
+}
+
 extern "C" int32_t ideck_runtime_prepare(const char *wine_prefix) {
     if (wine_prefix == nullptr || wine_prefix[0] == '\0') return EINVAL;
     struct stat info {};
     if (stat(wine_prefix, &info) != 0 || !S_ISDIR(info.st_mode)) return ENOENT;
+#if defined(IDECK_NATIVE_MADEIRA_ENABLED) && IDECK_NATIVE_MADEIRA_ENABLED
+    // Seed the registry and DOS links before starting wineserver.
+    madeira_seed_prefix_if_needed(wine_prefix);
+    if (!ideck_valid_wine_prefix(wine_prefix)) return ENOENT;
+    NSString *bundle = NSBundle.mainBundle.bundlePath;
+    for (NSString *file in @[ @"arm64ec-windows/xtajit64.dll",
+                              @"arm64ec-windows/ntdll.dll",
+                              @"arm64ec-windows/winemetal.dll",
+                              @"aarch64-windows/winemetal.dll" ]) {
+        if (![[NSFileManager defaultManager] fileExistsAtPath:[bundle stringByAppendingPathComponent:file]]) {
+            return ENOENT;
+        }
+    }
+#else
+    return ENOSYS;
+#endif
     if (!ideck_metal_available() || !ideck_fex_available() ||
         !ideck_wineserver_available() || !ideck_wineprocess_available() ||
         !ideck_dxmt_available() || !ideck_d3d12_available()) return ENOSYS;
