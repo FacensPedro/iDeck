@@ -8,7 +8,17 @@ class WindowsEnvironment {
     let steamManager = SteamManager()
     
     func hasRuntime(in prefix: String) -> Bool {
-        guard FileManager.default.fileExists(atPath: prefix) else { return false }
+        guard PrefixInstaller.isPrefixInstalled(at: URL(fileURLWithPath: prefix)) else { return false }
+        let assets = [
+            "arm64ec-windows/xtajit64.dll",
+            "arm64ec-windows/ntdll.dll",
+            "arm64ec-windows/winemetal.dll",
+            "aarch64-windows/winemetal.dll",
+            "prefix-template.tar.gz"
+        ]
+        guard assets.allSatisfy({
+            FileManager.default.fileExists(atPath: Bundle.main.bundleURL.appendingPathComponent($0).path)
+        }) else { return false }
         // A missing plist is not evidence that the native runtime is absent.
         // Actual linker symbols and native capabilities determine readiness.
         // This still correctly rejects placeholder bridge-only builds.
@@ -32,8 +42,22 @@ class WindowsEnvironment {
 
     func missingRuntimeComponents(in prefix: String) -> [String] {
         var missing: [String] = []
-        if !FileManager.default.fileExists(atPath: prefix) {
+        if !PrefixInstaller.isPrefixInstalled(at: URL(fileURLWithPath: prefix)) {
             missing.append("Wine prefix")
+        }
+        let assets = [
+            "arm64ec-windows/xtajit64.dll": "FEX ARM64EC",
+            "arm64ec-windows/ntdll.dll": "Wine ARM64EC ntdll",
+            "arm64ec-windows/winemetal.dll": "WineMetal ARM64EC",
+            "aarch64-windows/winemetal.dll": "WineMetal ARM64",
+            "prefix-template.tar.gz": "Wine prefix template"
+        ]
+        for (relativePath, label) in assets {
+            if !FileManager.default.fileExists(
+                atPath: Bundle.main.bundleURL.appendingPathComponent(relativePath).path
+            ) {
+                missing.append(label)
+            }
         }
         let native = ideck_native_capabilities()
         if !native.fex_linked { missing.append("FEX") }
