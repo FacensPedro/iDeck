@@ -29,18 +29,7 @@ for component in FEX wine dxmt; do
 done
 
 if [[ "$REBUILD" == "1" ]]; then
-  for src in "$MD/app/Madeira/libgmp.a" "$MD/app/Madeira/libnettle.a" "$MD/app/Madeira/libhogweed.a" "$MD/app/Madeira/libgnutls.a"; do
-    if [[ ! -s "$src" ]]; then
-      bash "$MD/build/gnutls-ios/build.sh"
-      break
-    fi
-  done
-  for src in "$MD/app/Madeira/libavformat.a" "$MD/app/Madeira/libavcodec.a" "$MD/app/Madeira/libswresample.a" "$MD/app/Madeira/libavutil.a"; do
-    if [[ ! -s "$src" ]]; then
-      bash "$MD/build/ffmpeg/build.sh"
-      break
-    fi
-  done
+  bash "$ROOT/scripts/prepare_madeira_dependencies.sh" "$MD"
 
   # FEX defaults TUNE_CPU to "native" and probes Linux /proc/cpuinfo.
   # A macOS runner building for iOS has no /proc/cpuinfo, so the FEX CPU
@@ -89,6 +78,17 @@ if [[ "$REBUILD" == "1" ]]; then
       PATH="$MD/toolchains/llvm-mingw-20260421-ucrt-macos-universal/bin:$PATH" \
       ../configure --without-x --disable-tests)
   fi
+  # configure creates config.h, but not the widl-generated SDK headers.
+  # Build include targets in both trees used by the native Unix libraries.
+  for wine_build in "$MD/wine/build-macos" "$MD/wine/build-arm64ec"; do
+    PATH="$MD/toolchains/llvm-mingw-20260421-ucrt-macos-universal/bin:$PATH" \
+      make -C "$wine_build" -j"$(sysctl -n hw.ncpu)" include/all
+    for header in wtypes.h mfobjects.h mftransform.h dwrite.h dwrite_3.h; do
+      [[ -s "$wine_build/include/$header" ]] || {
+        echo "ERROR: generated Wine header missing: $wine_build/include/$header" >&2; exit 2;
+      }
+    done
+  done
   NTDLL_LOG="$MD/build/ntdll-unix/build-ideck.log"
   if ! bash "$MD/build/ntdll-unix/build.sh" 2>&1 | tee "$NTDLL_LOG"; then
     FAILED_UNIXLIBS="$(sed -n 's/^Failed://p' "$NTDLL_LOG")"
