@@ -177,9 +177,20 @@ class SystemCoordinator: ObservableObject {
 
                 DispatchQueue.main.async {
                     self.isContainerReady = true
-                    self.windowsEnvironment.configureWine(prefix: mountPath)
-                    self.setWindowsStatus(self.windowsEnvironment.hasRuntime(in: mountPath)
-                        ? "Windows Runtime Ready" : "Library Ready — Madeira native runtime is not bundled")
+                    guard Bundle.main.url(forResource: "prefix-template", withExtension: "tar.gz") != nil else {
+                        self.setWindowsStatus("Library Ready — Madeira native runtime is not bundled")
+                        return
+                    }
+                    self.setWindowsStatus("Preparing Wine prefix...")
+                    self.prefixInstaller.installWinePrefix(to: mountPath) { success in
+                        guard success else {
+                            self.setWindowsStatus("Wine prefix setup failed")
+                            return
+                        }
+                        self.windowsEnvironment.configureWine(prefix: mountPath)
+                        self.setWindowsStatus(self.windowsEnvironment.hasRuntime(in: mountPath)
+                            ? "Windows Runtime Ready" : "Madeira runtime components are missing")
+                    }
                 }
             }
         }
@@ -310,7 +321,7 @@ class SystemCoordinator: ObservableObject {
 
             do {
                 let root = URL(fileURLWithPath: mountPath, isDirectory: true)
-                let downloads = root.appendingPathComponent("WindowsDownloads", isDirectory: true)
+                let downloads = root.appendingPathComponent("drive_c/WindowsDownloads", isDirectory: true)
                 try fileManager.createDirectory(at: downloads, withIntermediateDirectories: true)
 
                 let source = url.standardizedFileURL
@@ -398,6 +409,19 @@ class SystemCoordinator: ObservableObject {
         }
         let executableURL = selected.url
         let entryArguments = selected.arguments
+        if !PrefixInstaller.isPrefixInstalled(at: prefixPath) &&
+            Bundle.main.url(forResource: "prefix-template", withExtension: "tar.gz") != nil {
+            setWindowsStatus("Preparing Wine prefix...")
+            prefixInstaller.installWinePrefix(to: prefixPath.path) { [weak self] success in
+                guard let self else { return }
+                if success {
+                    self.launchSteamGame(game: game, profile: profile, prefixPath: prefixPath)
+                } else {
+                    self.setWindowsStatus("Wine prefix setup failed")
+                }
+            }
+            return
+        }
         guard windowsEnvironment.hasRuntime(in: prefixPath.path) else {
             let missing = windowsEnvironment.missingRuntimeComponents(in: prefixPath.path)
             setWindowsStatus("Madeira runtime missing: " + missing.joined(separator: ", ") +
