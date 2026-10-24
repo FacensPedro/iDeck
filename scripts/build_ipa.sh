@@ -27,6 +27,7 @@ xcodebuild clean build \
   -scheme iDeck \
   -configuration "$CONFIGURATION" \
   -sdk iphoneos \
+  -destination 'generic/platform=iOS' \
   -derivedDataPath "$BUILD_DIR" \
   CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO \
   ${EXTRA_XCODE_SETTINGS[@]+"${EXTRA_XCODE_SETTINGS[@]}"}
