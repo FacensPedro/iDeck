@@ -22,8 +22,12 @@ done
   echo "ERROR: missing Wine prefix-template.tar.gz" >&2; exit 2;
 }
 cp "$SOURCE/prefix-template.tar.gz" "$APP/prefix-template.tar.gz"
+[[ "$(od -An -tx1 -N2 "$APP/prefix-template.tar.gz" | tr -d '[:space:]')" == "1f8b" ]] || {
+  echo "ERROR: invalid Wine prefix archive gzip header" >&2; exit 2;
+}
 
 for path in aarch64-windows/d3d11.dll aarch64-windows/dxgi.dll \
+            aarch64-windows/winemetal.dll arm64ec-windows/ntdll.dll \
             arm64ec-windows/d3d12.dll arm64ec-windows/d3d12core.dll \
             arm64ec-windows/xtajit64.dll arm64ec-windows/winemetal.dll; do
   FILE="$APP/$path"
