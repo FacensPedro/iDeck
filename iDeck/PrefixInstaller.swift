@@ -46,6 +46,27 @@ class PrefixInstaller: ObservableObject {
             self.progress = 0.0
         }
 
+        if let bundled = Bundle.main.url(forResource: "prefix-template", withExtension: "tar.gz") {
+            DispatchQueue.global(qos: .utility).async { [weak self] in
+                guard let self else { return }
+                do {
+                    try TarGzExtractor.extract(
+                        archive: bundled,
+                        to: destinationURL,
+                        stripping: PrefixInstaller.archiveRoot,
+                        skipArchiveSymlinks: true
+                    )
+                    try PrefixInstaller.createDosDevices(in: destinationURL)
+                    PrefixInstaller.migrateLegacyWindowsDownloads(in: destinationURL)
+                    self.finish(PrefixInstaller.isPrefixInstalled(at: destinationURL), completion)
+                } catch {
+                    print("PrefixInstaller: bundled Wine prefix failed: \(error)")
+                    self.finish(false, completion)
+                }
+            }
+            return
+        }
+
         let task = URLSession.shared.downloadTask(with: PrefixInstaller.templateURL) { [weak self] localURL, response, error in
             guard let self = self else { return }
 
@@ -65,6 +86,7 @@ class PrefixInstaller: ObservableObject {
 
                 try TarGzExtractor.extract(archive: localURL, to: destinationURL, stripping: PrefixInstaller.archiveRoot)
                 try PrefixInstaller.createDosDevices(in: destinationURL)
+                PrefixInstaller.migrateLegacyWindowsDownloads(in: destinationURL)
 
                 self.finish(PrefixInstaller.isPrefixInstalled(at: destinationURL), completion)
             } catch {
@@ -77,12 +99,35 @@ class PrefixInstaller: ObservableObject {
 
     /// The template ships without dosdevices (a "z:" -> "/" link would be wrong on iOS).
     /// Only the C: drive is created, pointing at drive_c inside the prefix.
+    private static func migrateLegacyWindowsDownloads(in prefix: URL) {
+        let fm = FileManager.default
+        let old = prefix.appendingPathComponent("WindowsDownloads", isDirectory: true)
+        let destination = prefix.appendingPathComponent("drive_c/WindowsDownloads", isDirectory: true)
+        guard let files = try? fm.contentsOfDirectory(at: old, includingPropertiesForKeys: [.isRegularFileKey]) else {
+            return
+        }
+        do {
+            try fm.createDirectory(at: destination, withIntermediateDirectories: true)
+            for source in files where source.pathExtension.lowercased() == "exe" {
+                let target = destination.appendingPathComponent(source.lastPathComponent)
+                guard !fm.fileExists(atPath: target.path) else { continue }
+                try fm.moveItem(at: source, to: target)
+            }
+        } catch {
+            print("PrefixInstaller: could not migrate legacy Windows executable: \(error)")
+        }
+    }
+
     private static func createDosDevices(in prefix: URL) throws {
         let fm = FileManager.default
         let dosdevices = prefix.appendingPathComponent("dosdevices")
         try fm.createDirectory(at: dosdevices, withIntermediateDirectories: true)
         let link = dosdevices.appendingPathComponent("c:")
-        if (try? fm.destinationOfSymbolicLink(atPath: link.path)) == nil {
+        let current = try? fm.destinationOfSymbolicLink(atPath: link.path)
+        if current != "../drive_c" {
+            if current != nil || fm.fileExists(atPath: link.path) {
+                try fm.removeItem(at: link)
+            }
             try fm.createSymbolicLink(atPath: link.path, withDestinationPath: "../drive_c")
         }
     }
@@ -105,7 +150,7 @@ enum TarGzExtractor {
 
     /// Extracts a gzip-compressed ustar/pax archive. `stripping` removes one leading directory.
     /// Supports files, directories and relative symlinks; anything escaping `destination` is rejected.
-    static func extract(archive: URL, to destination: URL, stripping root: String?) throws {
+    static func extract(archive: URL, to destination: URL, stripping root: String?, skipArchiveSymlinks: Bool = false) throws {
         let tar = try gunzip(Data(contentsOf: archive, options: .alwaysMapped))
         let fm = FileManager.default
         try fm.createDirectory(at: destination, withIntermediateDirectories: true)
@@ -144,6 +189,9 @@ enum TarGzExtractor {
                 if name == root || name == root + "/" { continue }
                 if name.hasPrefix(root + "/") { name = String(name.dropFirst(root.count + 1)) }
             }
+            // The Madeira Wine prefix has build-machine symlinks. Its native
+            // extractor skips them and Wine reconstructs its own links.
+            if skipArchiveSymlinks && type == UInt8(ascii: "2") { continue }
             // Skip macOS AppleDouble metadata files.
             if name.split(separator: "/").contains(where: { $0.hasPrefix("._") }) { continue }
 
