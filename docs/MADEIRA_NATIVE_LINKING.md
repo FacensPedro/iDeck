@@ -40,3 +40,24 @@ Caso todas as bibliotecas já estejam compiladas e autenticadas, a opção `IDEC
 - A integração total com Steam, compatibilidade de jogos e desempenho ainda não foram verificados em hardware real.
 
 A compilação padrão (sem `IDECK_REQUIRE_MADEIRA`) continua criando um IPA de interface, **sem** declarar suporte ao emulador. Nunca o rotule como runtime Madeira integrado.
+
+## ARM64EC, WineMetal e prefixo de Wine no iDeck
+
+A preparação ARM64EC segue o fork Madeira fixado por `scripts/fetch_madeira_sources.sh`:
+
+- `build/fex-arm64ec/build.sh` produz o tradutor real `xtajit64.dll` para jogos Windows x64;
+- `build/wine-pe/build-ntdll.sh` configura a toolchain ARM64EC do Wine, constrói `ntdll.dll` e prepara `wine/build-arm64ec` antes de o DXMT tentar vincular WineMetal;
+- `dxmt/build-arm64ec` produz `winemetal.dll`, copiado à pasta `arm64ec-windows`; o frontend ARM64 (`aarch64-windows/winemetal.dll`) também integra o bundle;
+- `build/ntdll-unix/build.sh`, `build/wineserver/build.sh`, `build/win32u-unix/build.sh` e `build/dxmt-ios/build.sh` são os componentes arm64 iOS que precisam ser vinculados ao aplicativo. `IDECK_REBUILD_WINE_PE_MODULES=1` solicita adicionalmente a recompilação dos módulos PE do Wine; sem essa opção, a farm de DLLs já versionada pelo Madeira é utilizada.
+
+O arquivo `prefix-template.tar.gz` é copiado do checkout Madeira diretamente para o aplicativo. Ao abrir o modo Windows, `PrefixInstaller` prefere **o modelo incluído no próprio IPA**; extrai registro e diretórios para `Documents/VirtualRoot`, prepara `dosdevices/c:` e migra arquivos `.exe` antigos de `WindowsDownloads` para `drive_c/WindowsDownloads` sem sobrescrever os destinos existentes. O lançamento nativo também chama `madeira_seed_prefix_if_needed` do upstream **antes** do wineserver, e verifica `system.reg`, `.update-timestamp` e `drive_c/windows`. O Wine recria os links aos módulos PE dentro do prefixo quando a sessão inicia.
+
+A verificação do build exige os módulos PE com cabeçalho `MZ/PE` e tipo de máquina coerente (`ARM64EC` ou `ARM64X` para a farm ARM64EC; `ARM64` ou `ARM64X` para a farm ARM64), além do prefixo gzip, arquivos gráficos e símbolos nativos. Arquivos vazios ou bibliotecas ARM64 erradas não devem ser aceitos como um runtime válido.
+
+### Limitações verificáveis
+
+- O script do upstream `build/wineserver/build.sh` ainda depende de um arquivo-base `libwineserver.a` que o checkout público Madeira não inclui como binário versionado. Se ele não tiver sido gerado pela preparação nativa anterior, o build encerra com erro. Não há substituto fictício no iDeck.
+- É necessária a toolchain LLVM compilada para iOS, bem como as demais dependências e permissões de distribuição do Metal Shader Converter. A compilação limpa de todas essas dependências ainda não foi comprovada no GitHub Actions.
+- `ARM64EC` permite preparar a execução de jogos Windows 64-bit, mas **não equivale a WoW64/i386**. Aplicativos de 32 bits ainda exigem a farm i386 e o `xtajit.dll` próprios do Madeira.
+- `Madeira runtime missing` só deixa de ocorrer num IPA efetivamente gerado com `IDECK_REQUIRE_MADEIRA=1` e verificado, nunca no artefato padrão `iDeck-interface-only`.
+- A presença de arquivos e símbolos não garante que o jogo funcione no dispositivo; JIT, permissões, assinatura de dylibs, iniciação Wine e renderização Metal precisam de testes reais.
