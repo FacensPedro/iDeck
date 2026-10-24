@@ -82,7 +82,7 @@ cmake -S "$LLVM_SRC/llvm" -B "$LLVM_IOS" -G Ninja \
   -DLLVM_TABLEGEN="$TBLGEN" \
   -DLLVM_TABLEGEN_EXE="$TBLGEN" \
   -DLLVM_NATIVE_TOOL_DIR="$LLVM_HOST/bin"
-cmake --build "$LLVM_IOS" --parallel "$JOBS"
+cmake --build "$LLVM_IOS" --target llvm-libraries --parallel "$JOBS"
 
 [[ -f "$LLVM_CONFIG" ]] || { echo "ERROR: LLVM generated header missing: $LLVM_CONFIG" >&2; exit 1; }
 compgen -G "$LLVM_IOS/lib/*.a" >/dev/null || { echo 'ERROR: no iOS LLVM archives were built.' >&2; exit 1; }
