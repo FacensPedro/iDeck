@@ -82,7 +82,12 @@ cmake -S "$LLVM_SRC/llvm" -B "$LLVM_IOS" -G Ninja \
   -DLLVM_TABLEGEN="$TBLGEN" \
   -DLLVM_TABLEGEN_EXE="$TBLGEN" \
   -DLLVM_NATIVE_TOOL_DIR="$LLVM_HOST/bin"
-cmake --build "$LLVM_IOS" --target llvm-libraries --parallel "$JOBS"
+LLVM_STATIC_ARCHIVES=()
+while IFS= read -r archive; do
+  [[ -n "$archive" ]] && LLVM_STATIC_ARCHIVES+=("$archive")
+done < <(ninja -C "$LLVM_IOS" -t targets all | awk -F: '$1 ~ /^lib\/libLLVM[^/]*\.a$/ {print $1}' | sort -u)
+[[ ${#LLVM_STATIC_ARCHIVES[@]} -gt 0 ]] || { echo 'ERROR: LLVM static library targets not found.' >&2; exit 1; }
+cmake --build "$LLVM_IOS" --parallel "$JOBS" --target "${LLVM_STATIC_ARCHIVES[@]}"
 
 [[ -f "$LLVM_CONFIG" ]] || { echo "ERROR: LLVM generated header missing: $LLVM_CONFIG" >&2; exit 1; }
 compgen -G "$LLVM_IOS/lib/*.a" >/dev/null || { echo 'ERROR: no iOS LLVM archives were built.' >&2; exit 1; }
