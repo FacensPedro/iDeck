@@ -300,9 +300,9 @@ final class SteamCloudSyncEngine {
             throw SteamFileError.invalid("Não há saves em conflito para este jogo.")
         }
         busyApps.insert(appID)
-        try await session.ensureConnected()
         let paths: SteamCloudPaths
         do {
+            try await session.ensureConnected()
             paths = try cloudContext(appID: appID, info: info, prefixPath: prefixPath)
             if preferCloud {
                 _ = try await download(appID: appID, entries: conflicts, paths: paths)
