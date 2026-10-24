@@ -20,6 +20,8 @@ PE_FILES = (
     "aarch64-windows/dxgi.dll",
     "arm64ec-windows/d3d12.dll",
     "arm64ec-windows/d3d12core.dll",
+    "arm64ec-windows/xtajit64.dll",
+    "arm64ec-windows/winemetal.dll",
 )
 
 
@@ -47,8 +49,14 @@ def inspect(app: Path) -> list[str]:
         elif dll.open("rb").read(2) != b"MZ":
             errors.append(f"invalid PE signature: {dll}")
     converter = runtime / "d3d12" / "libmetalirconverter.dylib"
-    if not converter.is_file():
-        errors.append(f"missing iOS shader converter dependency: {converter}")
+    if not converter.is_file() or converter.stat().st_size < 1024:
+        errors.append(f"missing or empty iOS shader converter dependency: {converter}")
+
+    prefix = app / "prefix-template.tar.gz"
+    if not prefix.is_file() or prefix.stat().st_size < 1024:
+        errors.append(f"missing Madeira Wine prefix template: {prefix}")
+    elif prefix.open("rb").read(2) != b"\\x1f\\x8b":
+        errors.append(f"invalid Wine prefix gzip signature: {prefix}")
     return errors
 
 
