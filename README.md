@@ -38,3 +38,18 @@ Add the official files from those projects yourself (check their brand/licence t
 ## Third-party components
 
 The Steam authentication code in `iDeck/SteamManager.swift` includes adapted source from [Madeira](https://github.com/willfaust/Madeira), including the SwiftSteam sign-in flow. The upstream source headers and copyright notices are retained in the file. Consult [LICENSES/Madeira-COPYING](LICENSES/Madeira-COPYING) and [LICENSES/Madeira-LICENSE-EXCEPTION.md](LICENSES/Madeira-LICENSE-EXCEPTION.md) for the upstream terms. This iDeck fork integrates Steam sign-in, querying the owned-games list, depot downloads and install manifests. The Windows workspace now includes a shared visual library for installed Steam games, imported Windows executables and IPA-installed guest apps, with per-item details, safe uninstall paths and local game profiles. The native Madeira runtime is still not integrated: FEX, Wine, DXMT and the Madeira Direct3D 12 bridge must be built and linked in-process before Windows apps can launch. See [docs/MADEIRA_RUNTIME_INTEGRATION.md](docs/MADEIRA_RUNTIME_INTEGRATION.md) for the exact missing pieces and required verification.
+
+
+## Compilar IPA com Madeira (FEX/Wine/DXMT/D3D12)
+
+**Aviso:** o workflow padrão produz `iDeck-interface-only`. Ele permite testar a interface e o Steam, mas **não executa jogos de Windows**. Um IPA pequeno com esse nome não é uma compilação do Madeira.
+
+Para tentar a compilação nativa no GitHub:
+
+1. Abra [GitHub Actions → iOS Build](https://github.com/FacensPedro/iDeck/actions/workflows/ios.yml) e escolha **Run workflow** na branch `main`.
+2. Marque **Require real FEX/Wine/DXMT/D3D12 binaries and linked bridge** (`require_madeira=true`).
+3. Leia os termos do **Apple Metal Shader Converter**. Marque a confirmação `accept_converter_license` **somente** se tiver autorização para incluí-lo no IPA que será disponibilizado.
+4. Execute o workflow. A etapa nativa busca o Madeira fixado, prepara LLVM-MinGW e LLVM iOS, compila e vincula FEX/Wine/DXMT e verifica os módulos PE, símbolos Mach-O e o manifesto do bundle.
+5. O upload só terá o nome `iDeck-Madeira-native` se todas as etapas exigidas terminarem com sucesso. Se a compilação falhar por falta de dependências ou incompatibilidade das toolchains, **não existe um IPA nativo utilizável nessa execução**.
+
+A compilação nativa é experimental, exigente em armazenamento/tempo de CPU e ainda não foi validada em dispositivo. Mesmo com todos os arquivos presentes, são necessários assinatura compatível com o iPad, JIT funcional e testes reais de inicialização do Wine, FEX, gráficos e jogos. Consulte [a documentação da vinculação Madeira](docs/MADEIRA_NATIVE_LINKING.md).
