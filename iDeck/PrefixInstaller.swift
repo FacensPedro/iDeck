@@ -37,7 +37,10 @@ class PrefixInstaller: ObservableObject {
         let destinationURL = URL(fileURLWithPath: destinationPath)
 
         if PrefixInstaller.isPrefixInstalled(at: destinationURL) {
-            DispatchQueue.main.async { completion(true) }
+            DispatchQueue.global(qos: .utility).async {
+                PrefixInstaller.migrateLegacyWindowsDownloads(in: destinationURL)
+                DispatchQueue.main.async { completion(true) }
+            }
             return
         }
 
