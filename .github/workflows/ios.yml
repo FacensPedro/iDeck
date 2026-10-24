@@ -132,6 +132,10 @@ jobs:
             vendor/Madeira/wine/build-arm64ec/config.log
             vendor/Madeira/dxmt/build-arm64ec/meson-logs/meson-log.txt
             vendor/Madeira/build/ntdll-unix/obj/*.err
+            vendor/Madeira/wine/build-macos/config.log
+            vendor/Madeira/build/gnutls-ios/obj/*.log
+            vendor/Madeira/build/ffmpeg/obj/*.log
+            vendor/Madeira/build/freetype-ios/build/CMakeFiles/CMakeConfigureLog.yaml
           if-no-files-found: warn
           retention-days: 14
 
