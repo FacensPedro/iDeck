@@ -1,0 +1,7 @@
+diff --git a/build/wine-pe/build-ntdll.sh b/build/wine-pe/build-ntdll.sh
+--- a/build/wine-pe/build-ntdll.sh
++++ b/build/wine-pe/build-ntdll.sh
+@@ -20,2 +20,2 @@
+-cd "$B" && make -C dlls/ntdll
++cd "$B" && make dlls/ntdll/arm64ec-windows/ntdll.dll
+ SRC="$B/dlls/ntdll/arm64ec-windows/ntdll.dll"; OUT="$R/app/Madeira/arm64ec-windows/ntdll.dll"

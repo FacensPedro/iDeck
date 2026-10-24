@@ -16,6 +16,18 @@ git -C "$DEST" checkout --detach "$REV"
 git -C "$DEST" submodule sync --recursive
 git -C "$DEST" submodule update --init --recursive
 
+# The pinned Madeira script says it builds the ARM64EC PE ntdll, but
+# `make -C dlls/ntdll` also links the host ntdll.so. That Unix target
+# references Madeira's iOS-only ios_avail_phys hook and fails on macOS.
+# Apply the narrow upstream overlay so the native build produces only the
+# PE artifact consumed by the iOS app.
+PATCH="$ROOT/patches/madeira-ntdll-pe-only.patch"
+NTDLL_SCRIPT="$DEST/build/wine-pe/build-ntdll.sh"
+if ! grep -Fq 'make dlls/ntdll/arm64ec-windows/ntdll.dll' "$NTDLL_SCRIPT"; then
+  git -C "$DEST" apply --check "$PATCH"
+  git -C "$DEST" apply "$PATCH"
+fi
+
 for dir in FEX wine dxmt; do
   test -d "$DEST/$dir/.git" -o -f "$DEST/$dir/.git" || {
     echo "Missing Madeira dependency: $dir (check published submodule commits)." >&2
