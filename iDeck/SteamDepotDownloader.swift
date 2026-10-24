@@ -49,7 +49,17 @@ final class DepotDownloader {
     private let session: SteamCMSession
     private var depotKeys: [UInt32: Data] = [:]
     private var cdnAuthTokens: [String: String] = [:]  // "depot|host" -> "?auth=…" fragment
-    private let maxConcurrentChunks = 8
+    private var maxConcurrentChunks: Int {
+        let process = ProcessInfo.processInfo
+        if process.isLowPowerModeEnabled { return 4 }
+        switch process.thermalState {
+        case .nominal: return 12
+        case .fair: return 8
+        case .serious: return 4
+        case .critical: return 2
+        @unknown default: return 6
+        }
+    }
     private let attemptsPerChunk = 5
     private let hostPoolSize = 8
     private var cachedContentServers: [String] = []
@@ -61,7 +71,8 @@ final class DepotDownloader {
         config.requestCachePolicy = .reloadIgnoringLocalCacheData
         config.timeoutIntervalForRequest = 30
         config.timeoutIntervalForResource = 300
-        config.httpMaximumConnectionsPerHost = 8
+        // No bandwidth throttle is applied. This is a connection safety limit.
+        config.httpMaximumConnectionsPerHost = 12
         return URLSession(configuration: config)
     }()
 
