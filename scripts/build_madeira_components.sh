@@ -89,7 +89,18 @@ if [[ "$REBUILD" == "1" ]]; then
       PATH="$MD/toolchains/llvm-mingw-20260421-ucrt-macos-universal/bin:$PATH" \
       ../configure --without-x --disable-tests)
   fi
-  bash "$MD/build/ntdll-unix/build.sh"
+  NTDLL_LOG="$MD/build/ntdll-unix/build-ideck.log"
+  if ! bash "$MD/build/ntdll-unix/build.sh" 2>&1 | tee "$NTDLL_LOG"; then
+    FAILED_UNIXLIBS="$(sed -n 's/^Failed://p' "$NTDLL_LOG")"
+    for name in $FAILED_UNIXLIBS; do
+      ERR_FILE="$MD/build/ntdll-unix/obj/$name.err"
+      if [[ -s "$ERR_FILE" ]]; then
+        echo "=== compiler diagnostics: $name ===" >&2
+        cat "$ERR_FILE" >&2
+      fi
+    done
+    exit 1
+  fi
   bash "$MD/build/wineserver/build.sh"
   bash "$MD/build/win32u-unix/build.sh"
 

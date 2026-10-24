@@ -131,6 +131,7 @@ jobs:
             vendor/Madeira/FEX/build-arm64ec/CMakeFiles/CMakeConfigureLog.yaml
             vendor/Madeira/wine/build-arm64ec/config.log
             vendor/Madeira/dxmt/build-arm64ec/meson-logs/meson-log.txt
+            vendor/Madeira/build/ntdll-unix/obj/*.err
           if-no-files-found: warn
           retention-days: 14
 
