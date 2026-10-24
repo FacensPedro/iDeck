@@ -69,7 +69,7 @@ final class WindowsLibraryStore: ObservableObject {
             return
         }
 
-        let directory = prefixPath.appendingPathComponent("WindowsDownloads", isDirectory: true)
+        let directory = prefixPath.appendingPathComponent("drive_c/WindowsDownloads", isDirectory: true)
         do {
             try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
             executableURLs = try fileManager.contentsOfDirectory(
@@ -169,7 +169,7 @@ final class WindowsLibraryStore: ObservableObject {
             throw WindowsLibraryError.unsupportedExecutable
         }
 
-        let directory = prefixPath.appendingPathComponent("WindowsDownloads", isDirectory: true)
+        let directory = prefixPath.appendingPathComponent("drive_c/WindowsDownloads", isDirectory: true)
         try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
 
         let safeName = source.lastPathComponent
@@ -188,7 +188,7 @@ final class WindowsLibraryStore: ObservableObject {
     }
 
     func uninstallExecutable(at url: URL, prefixPath: URL) throws {
-        let directory = prefixPath.appendingPathComponent("WindowsDownloads", isDirectory: true).standardizedFileURL
+        let directory = prefixPath.appendingPathComponent("drive_c/WindowsDownloads", isDirectory: true).standardizedFileURL
         let target = url.standardizedFileURL
         guard target.deletingLastPathComponent() == directory,
               target.pathExtension.lowercased() == "exe",
