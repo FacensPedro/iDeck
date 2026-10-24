@@ -396,41 +396,19 @@ enum ZipExtractor {
                                    unixMode: Int, lexicalRoot: String, resolvedRoot: String, destination: URL) throws {
         let fm = FileManager.default
 
-        // Normalize harmless dot segments while rejecting absolute paths and paths
-        // that would escape the extraction root. Some valid IPA framework bundles
-        // contain relative entries such as Payload/App.app/Frameworks/../Framework.
-        let normalizedName = name.replacingOccurrences(of: "\\", with: "/")
-        if normalizedName.hasPrefix("/") || normalizedName.unicodeScalars.contains(where: { $0.value == 0 }) {
+        guard let safeComponents = IPAArchivePath.components(name) else {
             throw ZipError.unsafePath
         }
-        var safeComponents: [String] = []
-        for part in normalizedName.split(separator: "/", omittingEmptySubsequences: true) {
-            if part == "." { continue }
-            if part == ".." {
-                // Keep every extracted entry inside Payload; never allow a
-                // relative path from one application to reach another.
-                guard safeComponents.count > 2 else { throw ZipError.unsafePath }
-                safeComponents.removeLast()
-                continue
-            }
-            guard !part.contains(":"),
-                  !part.unicodeScalars.contains(where: { $0.value < 0x20 || $0.value == 0x7F }) else {
-                throw ZipError.unsafePath
-            }
-            safeComponents.append(String(part))
-        }
-        guard safeComponents.first == "Payload" else { throw ZipError.unsafePath }
         if safeComponents.count == 1 { return }
-        guard safeComponents[1].lowercased().hasSuffix(".app") else {
-            throw ZipError.unsafePath
-        }
         let target = safeComponents.reduce(destination) { $0.appendingPathComponent($1) }
         let standardizedTarget = target.standardizedFileURL.path
         guard standardizedTarget.hasPrefix(lexicalRoot + "/") else { throw ZipError.unsafePath }
 
-        if name.hasSuffix("/") {
-            try fm.createDirectory(at: target, withIntermediateDirectories: true)
-            try ensureInside(target.resolvingSymlinksInPath(), root: resolvedRoot)
+        // Directory records carry no payload. Deferring directory creation until
+        // a real file or symlink is extracted also avoids a false iPadOS
+        // path-resolution failure on entries like Payload/GetMoreRam.app/.
+        // Parents are checked for escaping symlinks immediately before writes.
+        if IPAArchivePath.isDirectory(name, unixMode: unixMode) {
             return
         }
 
@@ -445,12 +423,20 @@ enum ZipExtractor {
         }
 
         let fileType = unixMode & 0xF000
+        if fileType != 0 && fileType != 0x8000 && fileType != 0xA000 {
+            throw ZipError.unsafePath
+        }
         if fileType == 0xA000 { // symbolic link
             guard method == 0, let linkTarget = String(data: payload, encoding: .utf8),
                   !linkTarget.hasPrefix("/") else { throw ZipError.unsafePath }
             let resolved = URL(fileURLWithPath: linkTarget, relativeTo: resolvedParent)
                 .standardizedFileURL.resolvingSymlinksInPath()
             try ensureInside(resolved, root: resolvedRoot)
+            let appRoot = destination
+                .appendingPathComponent("Payload", isDirectory: true)
+                .appendingPathComponent(safeComponents[1], isDirectory: true)
+                .resolvingSymlinksInPath()
+            try ensureInside(resolved, root: appRoot.path)
             try fm.createSymbolicLink(atPath: target.path, withDestinationPath: linkTarget)
             return
         }

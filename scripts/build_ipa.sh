@@ -8,19 +8,26 @@ BUILD_DIR="build"
 rm -rf "$BUILD_DIR" Payload iDeck.ipa
 mkdir -p "$BUILD_DIR"
 
+EXTRA_XCODE_SETTINGS=()
+if [ "${IDECK_REQUIRE_MADEIRA:-0}" = "1" ]; then
+  EXTRA_XCODE_SETTINGS+=(GCC_PREPROCESSOR_DEFINITIONS="IDECK_NATIVE_MADEIRA_ENABLED=1")
+fi
+
 xcodebuild clean build \
   -project iDeck.xcodeproj \
   -scheme iDeck \
   -configuration Release \
   -sdk iphoneos \
   -derivedDataPath "$BUILD_DIR" \
-  CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO
+  CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO \
+  "${EXTRA_XCODE_SETTINGS[@]}"
 
 APP="$BUILD_DIR/Build/Products/Release-iphoneos/iDeck.app"
 [ -d "$APP" ] || { echo "error: $APP not found" >&2; exit 1; }
 [ -d "$APP/PlugIns/VPNExtension.appex" ] || { echo "error: VPNExtension.appex was not embedded" >&2; exit 1; }
 
 if [ "${IDECK_REQUIRE_MADEIRA:-0}" = "1" ]; then
+  bash scripts/stage_madeira_payload.sh "$APP"
   python3 scripts/verify_madeira_bundle.py --app "$APP" --require
 else
   python3 scripts/verify_madeira_bundle.py --app "$APP"
