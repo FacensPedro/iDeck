@@ -10,6 +10,10 @@ mkdir -p "$BUILD_DIR"
 
 EXTRA_XCODE_SETTINGS=()
 if [ "${IDECK_REQUIRE_MADEIRA:-0}" = "1" ]; then
+  echo "Building required upstream Madeira components before the iDeck Xcode target..."
+  bash scripts/build_madeira_components.sh
+fi
+if [ "${IDECK_REQUIRE_MADEIRA:-0}" = "1" ]; then
   EXTRA_XCODE_SETTINGS+=(GCC_PREPROCESSOR_DEFINITIONS="IDECK_NATIVE_MADEIRA_ENABLED=1")
 fi
 
