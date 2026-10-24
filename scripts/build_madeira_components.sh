@@ -42,6 +42,26 @@ if [[ "$REBUILD" == "1" ]]; then
     fi
   done
 
+  # The upstream iOS CMake invocation does not set CMAKE_SYSTEM_PROCESSOR.
+  # On cross builds this can be empty, causing FEX's processor check to fail.
+  FEX_IOS_BUILD="$MD/FEX/build-ios"
+  if [[ ! -f "$FEX_IOS_BUILD/CMakeCache.txt" ]]; then
+    cmake -S "$MD/FEX" -B "$FEX_IOS_BUILD" -G Ninja \
+      -DCMAKE_SYSTEM_NAME=iOS \
+      -DCMAKE_SYSTEM_PROCESSOR=arm64 \
+      -DCMAKE_OSX_ARCHITECTURES=arm64 \
+      -DCMAKE_OSX_SYSROOT=iphoneos \
+      -DCMAKE_OSX_DEPLOYMENT_TARGET=17.0 \
+      -DCMAKE_BUILD_TYPE=Release \
+      -DBUILD_TESTING=OFF \
+      -DBUILD_THUNKS=OFF \
+      -DBUILD_FEXCONFIG=OFF \
+      -DBUILD_FEX_LINUX_TESTS=OFF \
+      -DENABLE_FEX_ALLOCATOR=OFF \
+      -DENABLE_ASSERTIONS=OFF \
+      -DENABLE_CLANG_THUNKS=ON \
+      -DENABLE_CCACHE=ON
+  fi
   bash "$MD/build/fex-ios/build.sh"
   bash "$MD/build/fex-arm64ec/build.sh"
   bash "$MD/build/wine-pe/build-ntdll.sh"
