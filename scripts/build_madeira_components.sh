@@ -44,6 +44,20 @@ if [[ "$REBUILD" == "1" ]]; then
 
   bash "$MD/build/fex-ios/build.sh"
   bash "$MD/build/fex-arm64ec/build.sh"
+  bash "$MD/build/wine-pe/build-ntdll.sh"
+  [[ -s "$MD/app/Madeira/arm64ec-windows/ntdll.dll" ]] || {
+    echo "ERROR: Wine ARM64EC ntdll.dll was not generated." >&2; exit 2;
+  }
+  if [[ "${IDECK_REBUILD_WINE_PE_MODULES:-0}" == "1" ]]; then
+    bash "$MD/build/wine-pe/build-modules.sh"
+  fi
+  [[ -f "$MD/wine/build-arm64ec/config.status" ]] || {
+    echo "ERROR: Wine ARM64EC configure did not complete." >&2; exit 2;
+  }
+  if [[ ! -s "$MD/wine/build-macos/include/config.h" ]]; then
+    mkdir -p "$MD/wine/build-macos"
+    (cd "$MD/wine/build-macos" && ../configure --without-x --disable-tests)
+  fi
   bash "$MD/build/ntdll-unix/build.sh"
   bash "$MD/build/wineserver/build.sh"
   bash "$MD/build/win32u-unix/build.sh"
@@ -86,6 +100,11 @@ if [[ "$REBUILD" == "1" ]]; then
       --cross-file="$MD/dxmt/build-arm64ec-win.txt"
   fi
   ninja -C "$MD/dxmt/build-arm64ec" src/winemetal/winemetal.dll
+  WINEMETAL_EC="$MD/dxmt/build-arm64ec/src/winemetal/winemetal.dll"
+  [[ -s "$WINEMETAL_EC" ]] || {
+    echo "ERROR: WineMetal ARM64EC compilation produced no DLL." >&2; exit 2;
+  }
+  cp "$WINEMETAL_EC" "$MD/app/Madeira/arm64ec-windows/winemetal.dll"
 
   bash "$MD/build/madeira-d3d12/build-pe.sh"
   D3D="$MD/build/madeira-d3d12/out-pe"
@@ -94,9 +113,6 @@ if [[ "$REBUILD" == "1" ]]; then
     cp "$D3D/$name" "$MD/app/Madeira/arm64ec-windows/$name"
   done
 
-  if [[ -s "$MD/dxmt/build-arm64ec/src/winemetal/winemetal.dll" ]]; then
-    cp "$MD/dxmt/build-arm64ec/src/winemetal/winemetal.dll" "$MD/app/Madeira/arm64ec-windows/winemetal.dll"
-  fi
 fi
 
 for file in \
@@ -108,6 +124,9 @@ for file in \
   "$MD/app/Madeira/libwin32u_unix.a" \
   "$MD/app/Madeira/libdxmt_combined.a" \
   "$MD/app/Madeira/arm64ec-windows/xtajit64.dll" \
+  "$MD/app/Madeira/arm64ec-windows/ntdll.dll" \
+  "$MD/app/Madeira/aarch64-windows/winemetal.dll" \
+  "$MD/app/Madeira/prefix-template.tar.gz" \
   "$MD/app/Madeira/arm64ec-windows/d3d12.dll" \
   "$MD/app/Madeira/arm64ec-windows/d3d12core.dll" \
   "$MD/app/Madeira/arm64ec-windows/winemetal.dll"; do
