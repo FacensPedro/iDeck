@@ -28,6 +28,8 @@ cp "$SOURCE/prefix-template.tar.gz" "$APP/prefix-template.tar.gz"
 
 for path in aarch64-windows/d3d11.dll aarch64-windows/dxgi.dll \
             aarch64-windows/winemetal.dll arm64ec-windows/ntdll.dll \
+            arm64ec-windows/d3d11.dll arm64ec-windows/dxgi.dll \
+            arm64ec-windows/d3d10core.dll \
             arm64ec-windows/d3d12.dll arm64ec-windows/d3d12core.dll \
             arm64ec-windows/xtajit64.dll arm64ec-windows/winemetal.dll; do
   FILE="$APP/$path"

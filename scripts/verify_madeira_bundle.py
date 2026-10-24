@@ -12,7 +12,10 @@ SYMBOLS = (
     "ideck_madeira_launch_v1",
     "fex_initialize",
     "wineserver_start",
+    "wineserver_is_ready",
     "wine_process_start",
+    "wine_process_is_running",
+    "madeira_seed_prefix_if_needed",
     "madeira_get_present_count",
     "madeira_d3d12_canary_run",
 )
@@ -21,6 +24,9 @@ PE_FILES = (
     "aarch64-windows/dxgi.dll",
     "aarch64-windows/winemetal.dll",
     "arm64ec-windows/ntdll.dll",
+    "arm64ec-windows/d3d11.dll",
+    "arm64ec-windows/dxgi.dll",
+    "arm64ec-windows/d3d10core.dll",
     "arm64ec-windows/d3d12.dll",
     "arm64ec-windows/d3d12core.dll",
     "arm64ec-windows/xtajit64.dll",
@@ -72,8 +78,10 @@ def inspect(app: Path) -> list[str]:
     prefix = app / "prefix-template.tar.gz"
     if not prefix.is_file() or prefix.stat().st_size < 1024:
         errors.append(f"missing Madeira Wine prefix template: {prefix}")
-    elif prefix.open("rb").read(2) != bytes((0x1f, 0x8b)):
-        errors.append(f"invalid Wine prefix gzip signature: {prefix}")
+    else:
+        with prefix.open("rb") as stream:
+            if stream.read(2) != bytes((0x1f, 0x8b)):
+                errors.append(f"invalid Wine prefix gzip signature: {prefix}")
     return errors
 
 
