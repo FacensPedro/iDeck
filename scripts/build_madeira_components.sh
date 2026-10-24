@@ -85,7 +85,9 @@ if [[ "$REBUILD" == "1" ]]; then
   }
   if [[ ! -s "$MD/wine/build-macos/include/config.h" ]]; then
     mkdir -p "$MD/wine/build-macos"
-    (cd "$MD/wine/build-macos" && ../configure --without-x --disable-tests)
+    (cd "$MD/wine/build-macos" && \
+      PATH="$MD/toolchains/llvm-mingw-20260421-ucrt-macos-universal/bin:$PATH" \
+      ../configure --without-x --disable-tests)
   fi
   bash "$MD/build/ntdll-unix/build.sh"
   bash "$MD/build/wineserver/build.sh"
