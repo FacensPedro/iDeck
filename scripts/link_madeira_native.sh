@@ -116,6 +116,14 @@ if ! xcrun --sdk iphoneos nm -gU "$APP/libdxmt_combined.a" | awk '
   exit 2
 fi
 
+# Report the remaining strong-symbol overlaps before the Xcode link. This
+# analysis is diagnostic: a member that is never extracted from its archive
+# cannot actually collide, so reporting a candidate must not break the build.
+python3 "$ROOT/scripts/report_madeira_symbol_collisions.py" \
+  "$OUT/libideck_madeira_upstream_bridges.a" \
+  "$APP/libwineserver.a" "$APP/libntdll_unix.a" \
+  "$APP/libwin32u_unix.a" "$APP/libdxmt_combined.a" || true
+
 FLAGS=( -lz -lc++ -lsqlite3 -llzma
   -framework Metal -framework MetalFX -framework QuartzCore -framework AVFoundation
   -framework AudioToolbox -framework VideoToolbox -framework CoreMedia
