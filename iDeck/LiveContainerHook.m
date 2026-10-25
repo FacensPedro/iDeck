@@ -282,7 +282,8 @@ static int LCGuestUIApplicationMain(int argc, char *_Nullable *_Nonnull argv, NS
         if (sceneClass) {
             gGuestSceneDelegate = [[sceneClass alloc] init];
             if ([gGuestSceneDelegate respondsToSelector:@selector(scene:willConnectToSession:options:)]) {
-                [gGuestSceneDelegate scene:hostScene willConnectToSession:hostScene.session options:nil];
+                UISceneConnectionOptions *options = [[UISceneConnectionOptions alloc] init];
+                [gGuestSceneDelegate scene:hostScene willConnectToSession:hostScene.session options:options];
             }
             if ([gGuestSceneDelegate respondsToSelector:@selector(window)]) window = [gGuestSceneDelegate window];
         }
@@ -293,8 +294,8 @@ static int LCGuestUIApplicationMain(int argc, char *_Nullable *_Nonnull argv, NS
         NSString *storyboard = info[@"UIMainStoryboardFile"];
         if (storyboard.length) {
             UIViewController *vc = [[UIStoryboard storyboardWithName:storyboard bundle:gGuestBundle] instantiateInitialViewController];
-            if (vc) {
-                window = [[UIWindow alloc] initWithFrame:UIScreen.mainScreen.bounds];
+            if (vc && hostScene) {
+                window = [[UIWindow alloc] initWithWindowScene:hostScene];
                 window.rootViewController = vc;
             }
         }
