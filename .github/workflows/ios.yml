@@ -132,6 +132,7 @@ jobs:
             vendor/Madeira/wine/build-arm64ec/config.log
             vendor/Madeira/dxmt/build-arm64ec/meson-logs/meson-log.txt
             vendor/Madeira/build/ntdll-unix/obj/*.err
+            vendor/Madeira/build/wineserver/obj/err-*.txt
             vendor/Madeira/wine/build-macos/config.log
             vendor/Madeira/build/gnutls-ios/obj/*.log
             vendor/Madeira/build/ffmpeg/obj/*.log
@@ -172,3 +173,4 @@ jobs:
           else
             gh release create "$TAG" iDeck.ipa --target "${{ github.sha }}" --title "iDeck $TAG" --generate-notes
           fi
+

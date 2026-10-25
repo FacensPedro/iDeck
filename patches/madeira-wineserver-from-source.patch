@@ -1,0 +1,65 @@
+--- a/build/wineserver/build.sh
++++ b/build/wineserver/build.sh
+@@ -11,16 +11,6 @@
+ # Object files and library go in build dir
+ OBJ_DIR="$BUILD_DIR/obj"
+ mkdir -p "$OBJ_DIR"
+-
+-# Copy the base library if we don't have one yet
+-if [ ! -f "$OBJ_DIR/libwineserver.a" ]; then
+-    if [ -f "$APP_LIB" ]; then
+-        cp "$APP_LIB" "$OBJ_DIR/libwineserver.a"
+-    else
+-        echo "ERROR: No base libwineserver.a found"
+-        exit 1
+-    fi
+-fi
+ 
+ CC_FLAGS=(
+     -arch arm64 -isysroot "$SDK" -miphoneos-version-min=17.0 -O2
+@@ -114,6 +104,33 @@
+     "storage_device_ios:storage_device_ios.c:storage_device_ios.o"
+ )
+ 
++# A clean checkout has no base archive. Compile every unmodified server
++# source with the same iOS flags; PATCHED_FILES supplies the replacements.
++if [[ "${1:-all}" == "all" ]]; then
++    BASE_OBJECTS=()
++    SERVER_SOURCES="$(sed -n 's/^[[:space:]]*\([[:alnum:]_]*\)\.c[[:space:]\\]*$/\1/p' "$WINE_SRC/server/Makefile.in")"
++    [[ -n "$SERVER_SOURCES" ]] || { echo "ERROR: no Wine server sources found" >&2; exit 1; }
++    for name in $SERVER_SOURCES; do
++        patched=0
++        for entry in "${PATCHED_FILES[@]}"; do
++            if [[ "${entry##*:}" == "$name.o" ]]; then
++                patched=1
++                break
++            fi
++        done
++        if [[ "$patched" == "0" ]]; then
++            compile_one "$WINE_SRC/server/$name.c" "$name"
++            BASE_OBJECTS+=("$OBJ_DIR/$name.o")
++        fi
++    done
++    [[ "${#BASE_OBJECTS[@]}" -gt 0 ]] || { echo "ERROR: no base server objects built" >&2; exit 1; }
++    rm -f "$OBJ_DIR/libwineserver.a"
++    xcrun --sdk iphoneos ar rcs "$OBJ_DIR/libwineserver.a" "${BASE_OBJECTS[@]}"
++elif [[ ! -s "$OBJ_DIR/libwineserver.a" ]]; then
++    echo "ERROR: run a full wineserver build before a partial rebuild" >&2
++    exit 1
++fi
++
+ echo "=== Building kill wrapper (without kill macro) ==="
+ echo -n "  wineserver_ios_kill... "
+ # Compile WITHOUT -include wineserver_ios_kill.h to avoid recursive macro
+@@ -208,8 +225,9 @@
+ # we know collide with win32u-unix, repackage. Affects definitions AND
+ # references uniformly, so cross-file calls inside wineserver still
+ # resolve. Externals (win32u, etc.) only see the ws_-prefixed names.
+-OBJCOPY=$(command -v llvm-objcopy || echo /opt/homebrew/opt/llvm/bin/llvm-objcopy)
+-[ -x "$OBJCOPY" ] || OBJCOPY=/opt/homebrew/Cellar/llvm/22.1.0/bin/llvm-objcopy
++OBJCOPY="$REPO_ROOT/toolchains/llvm-mingw-20260421-ucrt-macos-universal/bin/llvm-objcopy"
++[[ -x "$OBJCOPY" ]] || OBJCOPY="$(command -v llvm-objcopy || true)"
++[[ -x "$OBJCOPY" ]] || { echo "ERROR: llvm-objcopy is required for wineserver symbol renaming" >&2; exit 1; }
+ COLLISIONS=(
+     alloc_user_handle free_user_handle get_virtual_screen_rect
+     destroy_thread_windows get_window_thread is_desktop_class

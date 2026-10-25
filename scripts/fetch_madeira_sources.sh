@@ -28,6 +28,14 @@ if ! grep -Fq 'make dlls/ntdll/arm64ec-windows/ntdll.dll' "$NTDLL_SCRIPT"; then
   git -C "$DEST" apply "$PATCH"
 fi
 
+# Upstream only updates a private prebuilt wineserver archive. Build the
+# complete iOS archive from the pinned server sources on clean runners.
+SERVER_PATCH="$ROOT/patches/madeira-wineserver-from-source.patch"
+if ! grep -Fq 'SERVER_SOURCES=' "$DEST/build/wineserver/build.sh"; then
+  git -C "$DEST" apply --check "$SERVER_PATCH"
+  git -C "$DEST" apply "$SERVER_PATCH"
+fi
+
 for dir in FEX wine dxmt; do
   test -d "$DEST/$dir/.git" -o -f "$DEST/$dir/.git" || {
     echo "Missing Madeira dependency: $dir (check published submodule commits)." >&2
@@ -38,3 +46,4 @@ done
 echo "Madeira sources checked out at $REV"
 echo "Source checkout complete. Run bash scripts/build_native_runtime.sh on macOS to compile, link and package."
 echo "Read $DEST/docs/BUILDING.md for the platform toolchains and licensed prerequisites."
+
