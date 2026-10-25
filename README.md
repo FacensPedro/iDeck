@@ -13,7 +13,7 @@ iDeck combines a SwiftUI interface with native C, C++, Objective-C, Objective-C+
 - **Hosted apps:** LiveContainer-inspired guest app management. Importing an IPA does not guarantee it can run inside another app; code signing, process restrictions, and iPadOS behavior still apply.
 - **Rendering configuration:** Metal-based host adapters and configurable rendering options. GPU translation depends on properly built DXMT and D3D12 components.
 - **JIT workflow:** external activation through [StikDebug](https://github.com/StikDebug/StikDebug). iDeck does **not** grant JIT permissions or bypass iOS security.
-- **Native performance utilities:** a bounded C++ task queue, reusable non-executable memory pool, Metal layer configuration helpers, and opt-in timing instrumentation. These utilities do not imply higher frame rates without profiling.
+- **Native performance and memory controls:** a bounded C++ task queue, capped scratch-buffer allocations, automatic cache trimming on iPadOS memory warnings, Metal layer configuration helpers, and opt-in timing instrumentation. These utilities do not expand physical RAM or guarantee higher frame rates.
 
 ## Architecture
 
@@ -26,7 +26,7 @@ iDeck combines a SwiftUI interface with native C, C++, Objective-C, Objective-C+
 | Windows runtime (optional build) | Madeira / FEX / Wine / DXMT / D3D12 | Experimental Windows compatibility components compiled from pinned upstream sources |
 | Build and verification | Bash / Python / Xcode | Dependency preparation, archive verification, and regression tests |
 
-The native adapters in `iDeck/NativeRuntime/` are **not substitutes** for a complete FEX or Wine implementation. See [runtime integration status](docs/MADEIRA_RUNTIME_INTEGRATION.md), [native build and linking](docs/MADEIRA_NATIVE_LINKING.md), and [performance module documentation](docs/NATIVE_PERFORMANCE.md).
+See [iOS memory management](docs/IOS_MEMORY_MANAGEMENT.md) for the pressure-aware memory policy and its limitations. No FEX guest pages or system RAM are swapped to disk.\n\nThe native adapters in `iDeck/NativeRuntime/` are **not substitutes** for a complete FEX or Wine implementation. See [runtime integration status](docs/MADEIRA_RUNTIME_INTEGRATION.md), [native build and linking](docs/MADEIRA_NATIVE_LINKING.md), and [performance module documentation](docs/NATIVE_PERFORMANCE.md).
 
 ## Requirements
 
@@ -113,7 +113,7 @@ For native module responsibilities and safe ownership rules, see [Native Perform
 - [Native runtime architecture](docs/NATIVE_RUNTIME_MODULES.md)
 - [Madeira integration status](docs/MADEIRA_RUNTIME_INTEGRATION.md)
 - [Native linking and verification](docs/MADEIRA_NATIVE_LINKING.md)
-- [Native performance foundation](docs/NATIVE_PERFORMANCE.md)
+- [Native performance foundation](docs/NATIVE_PERFORMANCE.md)\n- [iPadOS memory management](docs/IOS_MEMORY_MANAGEMENT.md)
 
 ## Upstream projects, licensing, and attribution
 

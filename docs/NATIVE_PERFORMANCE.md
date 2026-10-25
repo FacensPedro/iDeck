@@ -12,6 +12,8 @@ The performance modules in `iDeck/NativeRuntime/` provide small, independently t
 | `RuntimePerformanceMonitor.mm` | `ideck_performance_*` | Lightweight, atomic frame-time and swapchain creation counters | Reset during native session preparation; swapchains counted automatically |
 | `NativePerformanceClock.cpp` | `ideck_performance_now_ns`, `ideck_performance_record_interval` | Monotonic nanosecond clock and explicit frame-interval reporting | Opt-in; frame durations require explicit instrumentation |
 | `NativePerformance.h` | C ABI | Public interface callable from Swift and C/Objective-C/C++ | Imported by `iDeck-Bridging-Header.h` |
+| `NativeMemoryManager.cpp` | `ideck_native_memory_*` | Bounded scratch-memory allocation and cache reclamation under pressure | Initialized at app launch; only used by explicit scratch clients |
+| `NativeMemoryPressure.mm` | UIKit notifications | Reacts to app memory warnings and background/foreground transitions | Registered once during app launch |
 
 ## Behavioral contract
 
@@ -42,3 +44,4 @@ The iOS Build GitHub Actions workflow runs the same host tests and validates tha
 ## Future profiling
 
 A meaningful optimization should first capture frame-time percentiles, allocation peaks, memory pressure, and processor usage on a physical iPad. Compare the same game scene before and after each change. These modules alone do not establish performance improvements or Windows-game compatibility.
+\nSee [iOS memory management](IOS_MEMORY_MANAGEMENT.md) for the scratch-buffer budget, UIKit pressure callbacks and limitations; ordinary guest/JIT memory remains outside this pool.\n

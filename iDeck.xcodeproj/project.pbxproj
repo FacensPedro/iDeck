@@ -34,6 +34,8 @@
 		F30000000000000000000003 /* RuntimePerformanceMonitor.mm in Sources */ = {isa = PBXBuildFile; fileRef = F40000000000000000000003 /* RuntimePerformanceMonitor.mm */; };
 		F30000000000000000000004 /* MetalFrameOptimizer.mm in Sources */ = {isa = PBXBuildFile; fileRef = F40000000000000000000004 /* MetalFrameOptimizer.mm */; };
 		F30000000000000000000005 /* NativePerformanceClock.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F40000000000000000000005 /* NativePerformanceClock.cpp */; };
+		F50000000000000000000001 /* NativeMemoryManager.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F60000000000000000000001 /* NativeMemoryManager.cpp */; };
+		F50000000000000000000002 /* NativeMemoryPressure.mm in Sources */ = {isa = PBXBuildFile; fileRef = F60000000000000000000002 /* NativeMemoryPressure.mm */; };
 		F10000000000000000000001 /* NativeRuntimeDiagnostics.mm in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000001 /* NativeRuntimeDiagnostics.mm */; };
 		111111111111111111111111 /* iDeckApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222221 /* iDeckApp.swift */; };
 		111111111111111111111112 /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222222 /* MainView.swift */; };
@@ -98,6 +100,9 @@
 		F40000000000000000000004 /* MetalFrameOptimizer.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = NativeRuntime/MetalFrameOptimizer.mm; sourceTree = "<group>"; };
 		F40000000000000000000005 /* NativePerformanceClock.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = NativeRuntime/NativePerformanceClock.cpp; sourceTree = "<group>"; };
 		F40000000000000000000006 /* NativePerformance.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = NativeRuntime/NativePerformance.h; sourceTree = "<group>"; };
+		F60000000000000000000001 /* NativeMemoryManager.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = NativeRuntime/NativeMemoryManager.cpp; sourceTree = "<group>"; };
+		F60000000000000000000002 /* NativeMemoryPressure.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = NativeRuntime/NativeMemoryPressure.mm; sourceTree = "<group>"; };
+		F60000000000000000000003 /* NativeMemoryManager.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = NativeRuntime/NativeMemoryManager.h; sourceTree = "<group>"; };
 		F20000000000000000000001 /* NativeRuntimeDiagnostics.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = NativeRuntimeDiagnostics.mm; sourceTree = "<group>"; };
 		B20000000000000000000002 /* NativeRuntimeDiagnostics.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = NativeRuntimeDiagnostics.h; sourceTree = "<group>"; };
 		222222222222222222222221 /* iDeckApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iDeckApp.swift; sourceTree = "<group>"; };
@@ -174,6 +179,8 @@
 				F30000000000000000000003 /* RuntimePerformanceMonitor.mm in Sources */,
 				F30000000000000000000004 /* MetalFrameOptimizer.mm in Sources */,
 				F30000000000000000000005 /* NativePerformanceClock.cpp in Sources */,
+				F50000000000000000000001 /* NativeMemoryManager.cpp in Sources */,
+				F50000000000000000000002 /* NativeMemoryPressure.mm in Sources */,
 				D10000000000000000000001 /* RuntimeLifecycle.mm in Sources */,
 				D10000000000000000000002 /* FEXMemoryManager.cpp in Sources */,
 				D10000000000000000000003 /* WineEnvironmentManager.c in Sources */,
@@ -257,6 +264,9 @@
 				F40000000000000000000004 /* MetalFrameOptimizer.mm */,
 				F40000000000000000000005 /* NativePerformanceClock.cpp */,
 				F40000000000000000000006 /* NativePerformance.h */,
+				F60000000000000000000001 /* NativeMemoryManager.cpp */,
+				F60000000000000000000002 /* NativeMemoryPressure.mm */,
+				F60000000000000000000003 /* NativeMemoryManager.h */,
 				D20000000000000000000001 /* RuntimeLifecycle.mm */,
 				D20000000000000000000002 /* FEXMemoryManager.cpp */,
 				D20000000000000000000003 /* WineEnvironmentManager.c */,

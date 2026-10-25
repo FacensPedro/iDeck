@@ -30,6 +30,7 @@ void *ideck_memory_pool_acquire(IDeckGuestMemoryPool *pool, size_t size);
 bool ideck_memory_pool_release(IDeckGuestMemoryPool *pool, void *pointer);
 bool ideck_memory_pool_stats(const IDeckGuestMemoryPool *pool, IDeckMemoryPoolStats *output);
 void ideck_memory_pool_trim(IDeckGuestMemoryPool *pool);
+bool ideck_memory_pool_set_cache_limit(IDeckGuestMemoryPool *pool, size_t max_cached_bytes);
 void ideck_memory_pool_destroy(IDeckGuestMemoryPool *pool);
 
 typedef struct IDeckPerformanceSnapshot {
