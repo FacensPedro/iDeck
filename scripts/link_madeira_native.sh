@@ -61,20 +61,14 @@ for entry in "${SOURCES[@]}"; do
   OBJS+=("$obj")
 done
 
-CANARY_SRC="$MD/madeira-d3d12/tests/native/msc_canary.mm"
-[[ -s "$CANARY_SRC" ]] || { echo "ERROR: upstream D3D12 canary source missing: $CANARY_SRC" >&2; exit 2; }
-CANARY_OBJ="$OUT/obj/msc_canary.o"
-echo "Compiling upstream D3D12 Metal Shader Converter canary"
-xcrun --sdk iphoneos clang++ -arch arm64 -isysroot "$SDK" -miphoneos-version-min=18.0 \
-  -O2 -fPIC -fobjc-arc -std=c++20 -fexceptions -frtti \
-  "${INCLUDES[@]}" -c "$CANARY_SRC" -o "$CANARY_OBJ"
-OBJS+=("$CANARY_OBJ")
-
-echo "Compiling iDeck host log callbacks"
-xcrun --sdk iphoneos clang -arch arm64 -isysroot "$SDK" -miphoneos-version-min=18.0 -O2 \
-  -fobjc-arc -c "$ROOT/iDeck/NativeRuntime/MadeiraHostCallbacks.m" \
-  -o "$OUT/obj/MadeiraHostCallbacks.o"
-OBJS+=("$OUT/obj/MadeiraHostCallbacks.o")
+# The pinned Madeira DXMT archive already contains msc_canary.o, including
+# madeira_d3d12_canary_run and madeira_d3d12_canary_run_log.
+# Never recompile it into the forced-load iDeck bridge archive: doing so
+# duplicates both globally exported symbols in the final Mach-O link.
+#
+# Madeira's libwineserver.a likewise owns wine_ui_log / its callback setter.
+# Do not build iDeck/NativeRuntime/MadeiraHostCallbacks.m into this archive;
+# that file defines another wine_ui_log and collides with wine_log_ios.o.
 xcrun --sdk iphoneos ar rcs "$OUT/libideck_madeira_upstream_bridges.a" "${OBJS[@]}"
 xcrun --sdk iphoneos ranlib "$OUT/libideck_madeira_upstream_bridges.a"
 
@@ -109,6 +103,18 @@ for file in "${ARCHIVES[@]}"; do
   }
   [[ " $archs " == *" arm64 "* ]] || { echo "ERROR: archive does not contain arm64: $file ($archs)" >&2; exit 2; }
 done
+
+# The D3D12 diagnostic ABI must be provided by the single DXMT archive.
+# Checking now prevents an invalid duplicate or a missing symbol from reaching
+# the much slower Xcode link. nm -gU reports defined external Mach-O symbols.
+if ! xcrun --sdk iphoneos nm -gU "$APP/libdxmt_combined.a" | awk '
+  $NF == "_madeira_d3d12_canary_run" { run = 1 }
+  $NF == "_madeira_d3d12_canary_run_log" { log = 1 }
+  END { if (!(run && log)) exit 1 }
+'; then
+  echo "ERROR: the native DXMT archive must export both D3D12 canary entry points." >&2
+  exit 2
+fi
 
 FLAGS=( -lz -lc++ -lsqlite3 -llzma
   -framework Metal -framework MetalFX -framework QuartzCore -framework AVFoundation
