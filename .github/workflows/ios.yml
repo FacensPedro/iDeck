@@ -50,6 +50,17 @@ jobs:
           bash -n scripts/ensure_metal_toolchain.sh
           python3 -m unittest discover -s tests/host -p 'test_metal_toolchain.py' -v
 
+      - name: Verify iPhoneOS LLVM linker system libraries
+        run: |
+          set -euo pipefail
+          SDK="$(xcrun --sdk iphoneos --show-sdk-path)"
+          xcrun --sdk iphoneos clang -arch arm64 -isysroot "$SDK" \
+            -miphoneos-version-min=18.0 \
+            tests/host/NativeIOSLinkDependencies.c \
+            -lcurses -lxml2 -o /tmp/ideck-ios-llvm-dependency-check
+          test "$(xcrun lipo -archs /tmp/ideck-ios-llvm-dependency-check)" = arm64
+          python3 -m unittest discover -s tests/host -p 'test_native_llvm_link.py' -v
+
       - name: Test DXMT shader compatibility patch
         run: |
           bash -n scripts/fetch_madeira_sources.sh
