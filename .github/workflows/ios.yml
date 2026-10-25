@@ -72,6 +72,12 @@ jobs:
           bash -n scripts/build_fex_ios_allocator.sh
           python3 -m unittest discover -s tests/host -p 'test_fex_ios_allocator.py' -v
 
+      - name: Test Madeira native symbol ownership
+        run: |
+          bash -n scripts/link_madeira_native.sh
+          python3 -m unittest discover -s tests/host -p 'test_madeira_native_duplicate_symbols.py' -v
+
+
       - name: Test native performance C++ modules
         run: |
           xcrun clang++ -std=c++20 -O2 -pthread -x c++ \
