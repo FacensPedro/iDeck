@@ -52,7 +52,8 @@ jobs:
 
       - name: Test DXMT shader compatibility patch
         run: |
-          bash -n scripts/fetch_madeira_sources.sh scripts/build_madeira_components.sh
+          bash -n scripts/fetch_madeira_sources.sh
+          bash -n scripts/build_madeira_components.sh
           python3 -m unittest discover -s tests/host -p 'test_dxmt_shader_patch.py' -v
 
       - name: Validate Xcode project source references
