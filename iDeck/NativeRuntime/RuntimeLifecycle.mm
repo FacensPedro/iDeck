@@ -1,4 +1,5 @@
 #import "RuntimeSupport.h"
+#import "NativePerformance.h"
 #import "MadeiraRuntimeBridge.h"
 #import <Foundation/Foundation.h>
 #include <atomic>
