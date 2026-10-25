@@ -7,10 +7,10 @@ struct WindowsGameProfile: Codable, Equatable, Identifiable {
     var id: String
     var title: String
     var arguments: String = ""
-    var resolution: String = "1280x720"
+    var resolution: String = "960x540"
     var graphicsAPI: String = "Automatic"
     var metalFXEnabled: Bool = false
-    var fpsLimit: String = "60"
+    var fpsLimit: String = "30"
     var avxEnabled: Bool = false
     var artworkFilename: String? = nil
     var updatedAt: Date = Date()
@@ -19,7 +19,7 @@ struct WindowsGameProfile: Codable, Equatable, Identifiable {
         case id, title, arguments, resolution, graphicsAPI, metalFXEnabled, fpsLimit, avxEnabled, artworkFilename, updatedAt
     }
 
-    init(id: String, title: String, arguments: String = "", resolution: String = "1280x720", graphicsAPI: String = "Automatic", metalFXEnabled: Bool = false, fpsLimit: String = "60", avxEnabled: Bool = false, artworkFilename: String? = nil, updatedAt: Date = Date()) {
+    init(id: String, title: String, arguments: String = "", resolution: String = "960x540", graphicsAPI: String = "Automatic", metalFXEnabled: Bool = false, fpsLimit: String = "30", avxEnabled: Bool = false, artworkFilename: String? = nil, updatedAt: Date = Date()) {
         self.id = id
         self.title = title
         self.arguments = arguments
@@ -37,10 +37,10 @@ struct WindowsGameProfile: Codable, Equatable, Identifiable {
         id = try values.decode(String.self, forKey: .id)
         title = try values.decode(String.self, forKey: .title)
         arguments = try values.decodeIfPresent(String.self, forKey: .arguments) ?? ""
-        resolution = try values.decodeIfPresent(String.self, forKey: .resolution) ?? "1280x720"
+        resolution = try values.decodeIfPresent(String.self, forKey: .resolution) ?? "960x540"
         graphicsAPI = try values.decodeIfPresent(String.self, forKey: .graphicsAPI) ?? "Automatic"
         metalFXEnabled = try values.decodeIfPresent(Bool.self, forKey: .metalFXEnabled) ?? false
-        fpsLimit = try values.decodeIfPresent(String.self, forKey: .fpsLimit) ?? "60"
+        fpsLimit = try values.decodeIfPresent(String.self, forKey: .fpsLimit) ?? "30"
         avxEnabled = try values.decodeIfPresent(Bool.self, forKey: .avxEnabled) ?? false
         artworkFilename = try values.decodeIfPresent(String.self, forKey: .artworkFilename)
         updatedAt = try values.decodeIfPresent(Date.self, forKey: .updatedAt) ?? Date()

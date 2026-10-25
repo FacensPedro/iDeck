@@ -4,6 +4,8 @@
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
+SDK_VERSION="$(xcrun --sdk iphoneos --show-sdk-version)"
+[[ "${SDK_VERSION%%.*}" -ge 27 ]] || { echo "ERROR: iDeck requires the iOS 27 SDK or newer." >&2; exit 2; }
 BUILD_DIR="build"
 rm -rf "$BUILD_DIR/Build" "$BUILD_DIR/Logs" Payload iDeck.ipa
 mkdir -p "$BUILD_DIR"
@@ -34,6 +36,10 @@ xcodebuild clean build \
 
 APP="$BUILD_DIR/Build/Products/$CONFIGURATION-iphoneos/iDeck.app"
 [ -d "$APP" ] || { echo "error: $APP not found" >&2; exit 1; }
+for bundle in "$APP" "$APP/PlugIns/VPNExtension.appex"; do
+  MINIMUM_OS="$(/usr/libexec/PlistBuddy -c 'Print :MinimumOSVersion' "$bundle/Info.plist")"
+  [[ "$MINIMUM_OS" == "27.0" ]] || { echo "ERROR: incorrect minimum OS in $bundle: $MINIMUM_OS" >&2; exit 2; }
+done
 [ -d "$APP/PlugIns/VPNExtension.appex" ] || { echo "error: VPNExtension.appex was not embedded" >&2; exit 1; }
 
 if [ "${IDECK_REQUIRE_MADEIRA:-0}" = "1" ]; then

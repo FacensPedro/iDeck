@@ -3,6 +3,7 @@
 #import <Metal/Metal.h>
 #include <dlfcn.h>
 #include <stdio.h>
+#include <unistd.h>
 
 static bool ideck_symbol(const char *name) {
     return dlsym(RTLD_DEFAULT, name) != NULL;
@@ -56,4 +57,12 @@ bool ideck_native_validate_pe(const char *path) {
     }
     fclose(file);
     return valid;
+}
+
+bool ideck_process_has_jit_permission(void) {
+    typedef int (*CodeSignStatus)(pid_t, unsigned int, void *, size_t);
+    auto status = reinterpret_cast<CodeSignStatus>(dlsym(RTLD_DEFAULT, "csops"));
+    uint32_t flags = 0;
+    return status && status(getpid(), 0, &flags, sizeof(flags)) == 0 &&
+           (flags & 0x10000000u) != 0;
 }

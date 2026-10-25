@@ -16,6 +16,7 @@ typedef struct {
     uint64_t recommended_max_buffer_length;
 } IDeckNativeCapabilities;
 IDeckNativeCapabilities ideck_native_capabilities(void);
+bool ideck_process_has_jit_permission(void);
 bool ideck_native_validate_pe(const char *path);
 #ifdef __cplusplus
 }

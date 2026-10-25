@@ -141,6 +141,7 @@ class WindowsEnvironment {
         if profile.resolution == "Device native" {
             unsetenv("MADEIRA_SCREEN_W")
             unsetenv("MADEIRA_SCREEN_H")
+            unsetenv("MADEIRA_SCREEN_SRC")
         } else {
             let parts = profile.resolution.split(separator: "x")
             if parts.count == 2, let width = Int(parts[0]), let height = Int(parts[1]),
@@ -165,6 +166,13 @@ class WindowsEnvironment {
 
         setenv("IDECK_PREFERRED_GRAPHICS_API", profile.graphicsAPI, 1)
         setenv("IDECK_FPS_LIMIT", profile.fpsLimit, 1)
+        let limit = profile.fpsLimit == "Uncapped" ? 0 : RuntimeConfiguration.settings(for: profile).framesPerSecond
+        let existing = getenv("DXMT_CONFIG").map { String(cString: $0) } ?? ""
+        var options = existing.split(separator: ";").map(String.init).filter {
+            $0.split(separator: "=", maxSplits: 1).first?.trimmingCharacters(in: .whitespaces) != "d3d11.preferredMaxFrameRate"
+        }
+        options.append("d3d11.preferredMaxFrameRate = \(limit)")
+        setenv("DXMT_CONFIG", options.joined(separator: ";"), 1)
     }
 }
 

@@ -226,7 +226,7 @@ enum Translations {
         "Steam account sign-in and library loading require Madeira's runtime integration, which is not included in this build yet.": ["pt": "Entrar na conta Steam e carregar a biblioteca exige a integração do runtime Madeira, que ainda não está incluída nesta versão.", "es": "Iniciar sesión en Steam y cargar la biblioteca requiere la integración del runtime Madeira, que todavía no está incluida en esta versión."],
         "Steam": ["pt": "Steam", "es": "Steam"],
         "Steam account": ["pt": "Conta Steam", "es": "Cuenta de Steam"],
-        "Connected": ["pt": "Conectada", "es": "Conectada"],
+        "Connected": ["pt": "Conectado", "es": "Conectado"],
         "Disconnect Steam": ["pt": "Desconectar Steam", "es": "Desconectar Steam"],
         "JIT detected": ["pt": "JIT detectado", "es": "JIT detectado"],
         "JIT not detected": ["pt": "JIT não detectado", "es": "JIT no detectado"],

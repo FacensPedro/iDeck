@@ -29,7 +29,7 @@ permissions:
 jobs:
   build:
     name: Build iDeck IPA
-    runs-on: macos-15
+    runs-on: xcode-27
     # Native validation is required for this integration PR branch.
     # The branch-scoped rule runs the licensed build after each PR update; release_tag remains empty.
     env:
@@ -43,10 +43,15 @@ jobs:
       - name: Setup Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: '26.0.1'
+          xcode-version: 'latest-stable'
 
       - name: Test native bundle verifier
         run: python3 -m unittest discover -s tests/host -p 'test_madeira_bundle.py' -v
+
+      - name: Test rendering configuration and window resizing
+        run: |
+          xcrun swiftc iDeck/RuntimeConfiguration.swift tests/host/RuntimeConfigurationTests.swift -o /tmp/ideck-runtime-tests
+          /tmp/ideck-runtime-tests
 
       - name: Validate native runtime requirements
         if: ${{ env.IDECK_NATIVE_BUILD == '1' }}
@@ -131,6 +136,7 @@ jobs:
             vendor/Madeira/FEX/build-arm64ec/CMakeFiles/CMakeConfigureLog.yaml
             vendor/Madeira/wine/build-arm64ec/config.log
             vendor/Madeira/dxmt/build-arm64ec/meson-logs/meson-log.txt
+            vendor/Madeira/dxmt/build-pe/meson-logs/meson-log.txt
             vendor/Madeira/build/ntdll-unix/obj/*.err
             vendor/Madeira/build/dxmt-ios/obj/*.err
             vendor/Madeira/build/dxmt-ios/build-ideck.log

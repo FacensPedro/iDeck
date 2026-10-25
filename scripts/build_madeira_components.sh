@@ -140,6 +140,20 @@ if [[ "$REBUILD" == "1" ]]; then
   fi
   cp "$COMBINED" "$MD/app/Madeira/libdxmt_combined.a"
 
+  # Meson links the Wine CRT and import libraries for each PE architecture.
+  for arch in aarch64 arm64ec; do
+    if [[ "$arch" == "aarch64" ]]; then
+      WINE_PE_BUILD="$MD/wine/build-macos"
+    else
+      WINE_PE_BUILD="$MD/wine/build-arm64ec"
+    fi
+    PATH="$MD/toolchains/llvm-mingw-20260421-ucrt-macos-universal/bin:$PATH" \
+      make -C "$WINE_PE_BUILD" -j"$(sysctl -n hw.ncpu)" \
+        "libs/winecrt0/$arch-windows/libwinecrt0.a" \
+        "dlls/ntdll/$arch-windows/libntdll.a" \
+        "dlls/dbghelp/$arch-windows/libdbghelp.a" tools/winebuild/winebuild
+  done
+
   # DXMT has both native iOS renderer code and Windows PE frontend modules.
   if [[ ! -e "$MD/dxmt/toolchains" ]]; then
     ln -s ../toolchains "$MD/dxmt/toolchains"
@@ -148,7 +162,7 @@ if [[ "$REBUILD" == "1" ]]; then
     (cd "$MD/dxmt" && SDKROOT="$(xcrun --sdk macosx --show-sdk-path)" \
       PATH="$MD/toolchains/llvm-mingw-20260421-ucrt-macos-universal/bin:/usr/bin:/opt/homebrew/bin:$PATH" \
       meson setup --cross-file build-aarch64-win.txt --native-file build-osx.txt \
-        -Dwine_build_path=../../wine/build-macos build-pe)
+        -Dwine_build_path="$MD/wine/build-macos" build-pe)
   fi
   (cd "$MD/dxmt" && SDKROOT="$(xcrun --sdk macosx --show-sdk-path)" \
     PATH="$MD/toolchains/llvm-mingw-20260421-ucrt-macos-universal/bin:/usr/bin:/opt/homebrew/bin:$PATH" \
@@ -161,7 +175,7 @@ if [[ "$REBUILD" == "1" ]]; then
 
   if [[ ! -f "$MD/dxmt/build-arm64ec/build.ninja" ]]; then
     meson setup "$MD/dxmt/build-arm64ec" "$MD/dxmt" -Dbuildtype=release \
-      -Dwine_build_path=../../wine/build-arm64ec \
+      -Dwine_build_path="$MD/wine/build-arm64ec" \
       --cross-file="$MD/dxmt/build-arm64ec-win.txt"
   fi
   DXMT_EC_MODULES=(winemetal/winemetal.dll dxgi/dxgi.dll d3d11/d3d11.dll d3d10/d3d10core.dll)

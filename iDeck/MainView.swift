@@ -30,6 +30,14 @@ struct MainView: View {
             UIApplication.shared.isIdleTimerDisabled = phase == .active
             if phase == .active { coordinator.refreshJITStatus() }
         }
+        .task(id: scenePhase) {
+            guard scenePhase == .active else { return }
+            while !Task.isCancelled {
+                coordinator.refreshJITStatus()
+                do { try await Task.sleep(nanoseconds: 5_000_000_000) }
+                catch { return }
+            }
+        }
         .task(id: coordinator.isSteamConnected) {
             if coordinator.isSteamConnected {
                 await steamLibrary.refresh()

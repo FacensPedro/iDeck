@@ -114,14 +114,15 @@ class SystemCoordinator: ObservableObject {
         let result = sysctl(&mib, u_int(mib.count), &info, &size, nil, 0)
         let debuggerAttached = result == 0 && (info.kp_proc.p_flag & P_TRACED) != 0
         // StikDebug may detach after granting process JIT permission.
-        // Verify that the kernel actually allows a disposable MAP_JIT mapping.
-        // Never execute memory from this probe or assume that it enables JIT.
+        // CS_DEBUGGED survives debugger detach; another MAP_JIT allocation can
+        // fail while FEX already owns its JIT region. Probe only as a fallback.
         let pageSize = Int(getpagesize())
-        let mapping = mmap(nil, pageSize, PROT_READ | PROT_WRITE | PROT_EXEC,
+        let processPermission = ideck_process_has_jit_permission()
+        let mapping = (processPermission || debuggerAttached) ? MAP_FAILED : mmap(nil, pageSize, PROT_READ | PROT_WRITE | PROT_EXEC,
                            MAP_PRIVATE | MAP_ANON | MAP_JIT, -1, 0)
         let executableJIT = mapping != MAP_FAILED
         if executableJIT { _ = munmap(mapping, pageSize) }
-        let detected = debuggerAttached || executableJIT
+        let detected = processPermission || debuggerAttached || executableJIT
         let update = {
             self.isJITEnabled = detected
             if !detected && (self.currentStatus == "JIT confirmed via StikDebug" || self.currentStatus == "Ready") {
@@ -290,6 +291,7 @@ class SystemCoordinator: ObservableObject {
                 return
             }
             self.windowsEnvironment.configureWine(prefix: mountPath)
+            self.windowsEnvironment.applyGameProfile(WindowsGameProfile(id: "steam", title: "Steam"))
             self.windowsEnvironment.installAndRunSteam(jitEnabler: self.jitEnabler) { result in
                 DispatchQueue.main.async {
                     self.setWindowsStatus(result ? "Steam Running" : "Steam Error")
@@ -357,10 +359,9 @@ class SystemCoordinator: ObservableObject {
                         return
                     }
                     self.windowsEnvironment.configureWine(prefix: mountPath)
-                    if var profile {
-                        if self.isMetalFXEnabled { profile.metalFXEnabled = true }
-                        self.windowsEnvironment.applyGameProfile(profile)
-                    }
+                    var effectiveProfile = profile ?? WindowsGameProfile(id: destination.path, title: destination.deletingPathExtension().lastPathComponent)
+                    if self.isMetalFXEnabled { effectiveProfile.metalFXEnabled = true }
+                    self.windowsEnvironment.applyGameProfile(effectiveProfile)
                     self.windowsEnvironment.execute(
                         binary: destination,
                         arguments: profile?.arguments ?? "",
