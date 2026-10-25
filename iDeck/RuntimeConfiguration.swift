@@ -1,4 +1,5 @@
 import Foundation
+import CoreGraphics
 
 enum RuntimeConfiguration {
     static func fittedSize(content: CGSize, available: CGSize) -> CGSize {

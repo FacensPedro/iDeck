@@ -992,6 +992,64 @@ private struct GuestProgramDetailsView: View {
     private var displayName: String { appManager.displayName(for: appURL) }
     @State private var appSize: Int64 = 0
 
+    @State private var dataSelection = GuestContainerSelection()
+    @State private var containerName = ""
+    @State private var containerToDelete: GuestDataContainer?
+    @State private var confirmContainerDeletion = false
+
+    private var containerKey: String { appManager.bundleIdentifier(for: appURL) ?? appURL.lastPathComponent }
+
+    private func updateContainers(_ action: () throws -> Void) {
+        do {
+            try action()
+            dataSelection = try GuestContainerStore.shared.selection(for: containerKey)
+        } catch {
+            errorMessage = error.localizedDescription
+            showError = true
+        }
+    }
+
+    private var containerControls: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(tr("Data containers")).font(.headline)
+            Text(tr("Data is preserved when updating or uninstalling the app. Delete containers separately."))
+                .font(.caption).foregroundColor(.secondary)
+            ForEach(dataSelection.containers) { container in
+                HStack {
+                    Button {
+                        updateContainers { try GuestContainerStore.shared.select(container.id, for: containerKey) }
+                    } label: {
+                        Label(container.name, systemImage: dataSelection.selected == container.id ? "checkmark.circle.fill" : "circle")
+                    }
+                    Spacer()
+                    Button(role: .destructive) {
+                        containerToDelete = container
+                        confirmContainerDeletion = true
+                    } label: { Image(systemName: "trash") }
+                    .accessibilityLabel(tr("Delete container"))
+                }
+            }
+            TextField(tr("Container name"), text: $containerName).textFieldStyle(.roundedBorder)
+            HStack {
+                Button(tr("Create container")) {
+                    updateContainers {
+                        try GuestContainerStore.shared.create(for: containerKey, name: containerName)
+                        containerName = ""
+                    }
+                }
+                Button(tr("Rename selected")) {
+                    guard let selected = dataSelection.selected else { return }
+                    updateContainers {
+                        try GuestContainerStore.shared.rename(selected, for: containerKey, name: containerName)
+                        containerName = ""
+                    }
+                }.disabled(dataSelection.selected == nil)
+            }.disabled(containerName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            Text(tr("Container storage is ready. Running iOS apps still requires integration of the LiveContainer loader and signing."))
+                .font(.caption).foregroundColor(.secondary)
+        }
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -1015,6 +1073,7 @@ private struct GuestProgramDetailsView: View {
                         fromByteCount: appSize, countStyle: .file)))
                         .font(.subheadline)
                         .foregroundColor(.gray)
+                    containerControls
                     Button {
                         coordinator.refreshJITStatus()
                         guard coordinator.isJITEnabled else {
@@ -1059,6 +1118,7 @@ private struct GuestProgramDetailsView: View {
             .navigationTitle(tr("App details"))
             .navigationBarTitleDisplayMode(.inline)
             .task(id: appURL) {
+                updateContainers { }
                 let url = appURL
                 appSize = await Task.detached(priority: .utility) {
                     AppManager.sizeOfInstalledApp(at: url)
@@ -1084,7 +1144,15 @@ private struct GuestProgramDetailsView: View {
                     Button(tr("Done")) { dismiss() }
                 }
             }
-            .alert(tr("Uninstall failed"), isPresented: $showError) {
+            .confirmationDialog(tr("Delete container and all its data?"), isPresented: $confirmContainerDeletion, titleVisibility: .visible) {
+                Button(tr("Delete container"), role: .destructive) {
+                    guard let container = containerToDelete else { return }
+                    updateContainers { try GuestContainerStore.shared.remove(container.id, for: containerKey) }
+                    containerToDelete = nil
+                }
+                Button(tr("Cancel"), role: .cancel) { containerToDelete = nil }
+            }
+            .alert(tr("Error"), isPresented: $showError) {
                 Button(tr("OK"), role: .cancel) { }
             } message: {
                 Text(errorMessage ?? tr("Unknown error"))

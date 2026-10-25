@@ -26,6 +26,7 @@ class AppManager: ObservableObject {
     @Published var installedApps: [URL] = []
     @Published private(set) var artworkRevision = 0
     private let fileManager = FileManager.default
+    private let installQueue = DispatchQueue(label: "iDeck.ipa-install", qos: .userInitiated)
     private var appsDirectory: URL { fileManager.urls(for: .documentDirectory, in: .userDomainMask).first!.appendingPathComponent("GuestApps", isDirectory: true) }
 
     init() {
@@ -178,7 +179,7 @@ class AppManager: ObservableObject {
     func installIPA(from url: URL, completion: @escaping (Result<URL, IPAInstallError>) -> Void) {
         let hasScope = url.startAccessingSecurityScopedResource()
         let appsDirectory = self.appsDirectory
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+        installQueue.async { [weak self] in
             let fileManager = FileManager.default
             defer { if hasScope { url.stopAccessingSecurityScopedResource() } }
             let workDirectory = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
@@ -196,21 +197,43 @@ class AppManager: ObservableObject {
                 var isDirectory: ObjCBool = false
                 guard fileManager.fileExists(atPath: payloadPath.path, isDirectory: &isDirectory), isDirectory.boolValue else { throw IPAInstallError.missingPayload }
                 let contents = try fileManager.contentsOfDirectory(at: payloadPath, includingPropertiesForKeys: [.isDirectoryKey])
-                guard let appBundle = contents.first(where: { $0.pathExtension == "app" && (try? $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true }), fileManager.fileExists(atPath: appBundle.appendingPathComponent("Info.plist").path) else { throw IPAInstallError.missingAppBundle }
-                let safeName = appBundle.lastPathComponent
-                guard safeName != "." && safeName != ".." &&
-                    !safeName.contains("/") && !safeName.contains("\\") else {
-                    throw IPAInstallError.unsafeArchivePath
+                let bundles = contents.filter { $0.pathExtension == "app" && (try? $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true }
+                guard bundles.count == 1, let appBundle = bundles.first,
+                      let info = NSDictionary(contentsOf: appBundle.appendingPathComponent("Info.plist")) as? [String: Any],
+                      let bundleID = info["CFBundleIdentifier"] as? String, !bundleID.isEmpty, bundleID.utf8.count <= 255,
+                      let executable = info["CFBundleExecutable"] as? String, !executable.isEmpty,
+                      executable != ".", executable != "..", !executable.contains("/"), !executable.contains("\\"),
+                      fileManager.fileExists(atPath: appBundle.appendingPathComponent(executable).path) else {
+                    throw IPAInstallError.missingAppBundle
                 }
-                let destination = appsDirectory.appendingPathComponent(safeName, isDirectory: true)
-                do {
-                    let replacement = appsDirectory.appendingPathComponent(UUID().uuidString + ".app", isDirectory: true)
-                    try fileManager.moveItem(at: appBundle, to: replacement)
-                    if fileManager.fileExists(atPath: destination.path) {
-                        try fileManager.removeItem(at: destination)
+                if let minimum = info["MinimumOSVersion"] as? String {
+                    let current = ProcessInfo.processInfo.operatingSystemVersion
+                    let currentVersion = "\(current.majorVersion).\(current.minorVersion).\(current.patchVersion)"
+                    if minimum.compare(currentVersion, options: .numeric) == .orderedDescending {
+                        throw IPAInstallError.copyFailed("Requires iOS " + minimum)
                     }
-                    try fileManager.moveItem(at: replacement, to: destination)
-                } catch { throw IPAInstallError.copyFailed(error.localizedDescription) }
+                }
+                let installed = try fileManager.contentsOfDirectory(at: appsDirectory, includingPropertiesForKeys: nil)
+                let existing = installed.first { candidate in
+                    guard candidate.pathExtension == "app",
+                          let old = NSDictionary(contentsOf: candidate.appendingPathComponent("Info.plist")) else { return false }
+                    return old["CFBundleIdentifier"] as? String == bundleID
+                }
+                let destination = existing ?? appsDirectory.appendingPathComponent(UUID().uuidString + ".app", isDirectory: true)
+                let replacement = appsDirectory.appendingPathComponent(UUID().uuidString + ".staging", isDirectory: true)
+                let backup = appsDirectory.appendingPathComponent(UUID().uuidString + ".backup", isDirectory: true)
+                try fileManager.moveItem(at: appBundle, to: replacement)
+                defer { try? fileManager.removeItem(at: replacement) }
+                if existing != nil { try fileManager.moveItem(at: destination, to: backup) }
+                do { try fileManager.moveItem(at: replacement, to: destination) }
+                catch {
+                    if existing != nil {
+                        do { try fileManager.moveItem(at: backup, to: destination) }
+                        catch { throw IPAInstallError.copyFailed("Previous app preserved at " + backup.lastPathComponent) }
+                    }
+                    throw IPAInstallError.copyFailed(error.localizedDescription)
+                }
+                if existing != nil { try? fileManager.removeItem(at: backup) }
                 result = .success(destination)
             } catch let error as IPAInstallError { result = .failure(error) }
             catch ZipError.unsupported { result = .failure(.unsupportedArchive) }

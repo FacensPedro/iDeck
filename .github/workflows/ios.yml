@@ -53,6 +53,11 @@ jobs:
           xcrun swiftc iDeck/RuntimeConfiguration.swift tests/host/RuntimeConfigurationTests.swift -o /tmp/ideck-runtime-tests
           /tmp/ideck-runtime-tests
 
+      - name: Test guest data containers
+        run: |
+          xcrun swiftc iDeck/GuestContainerStore.swift tests/host/GuestContainerStoreTests.swift -o /tmp/ideck-container-tests
+          /tmp/ideck-container-tests
+
       - name: Validate native runtime requirements
         if: ${{ env.IDECK_NATIVE_BUILD == '1' }}
         env:

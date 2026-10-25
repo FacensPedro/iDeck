@@ -1,4 +1,5 @@
 import Foundation
+import CoreGraphics
 
 struct WindowsGameProfile {
     var resolution = "960x540"
