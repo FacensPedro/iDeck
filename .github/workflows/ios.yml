@@ -45,6 +45,9 @@ jobs:
         with:
           xcode-version: 'latest-stable'
 
+      - name: Validate Xcode project source references
+        run: python3 -m unittest discover -s tests/host -p 'test_xcode_project.py' -v
+
       - name: Test native bundle verifier
         run: python3 -m unittest discover -s tests/host -p 'test_madeira_bundle.py' -v
 
