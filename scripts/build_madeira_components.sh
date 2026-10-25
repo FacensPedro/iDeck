@@ -30,6 +30,23 @@ done
 
 bash "$ROOT/scripts/ensure_metal_toolchain.sh"
 
+# Validate the exact DXMT shader sources before the expensive Wine/FEX build.
+DXMT_PREFLIGHT_DIR="$(mktemp -d "${TMPDIR:-/tmp}/ideck-dxmt-shaders.XXXXXXXX")"
+for shader in air_msad air_samplepos air_tessellation; do
+  if ! xcrun --sdk macosx metal -std=metal3.1 --target=air64-apple-macos14.0 \
+    -o "$DXMT_PREFLIGHT_DIR/$shader.air" -c "$MD/dxmt/src/airconv/shaders/$shader.metal"; then
+    echo "ERROR: DXMT shader failed the Metal compiler preflight: $shader.metal" >&2
+    rm -rf "$DXMT_PREFLIGHT_DIR"
+    exit 2
+  fi
+  if [[ ! -s "$DXMT_PREFLIGHT_DIR/$shader.air" ]]; then
+    echo "ERROR: DXMT shader generated no AIR bytecode: $shader.metal" >&2
+    rm -rf "$DXMT_PREFLIGHT_DIR"
+    exit 2
+  fi
+done
+rm -rf "$DXMT_PREFLIGHT_DIR"
+
 if [[ "$REBUILD" == "1" ]]; then
   bash "$ROOT/scripts/prepare_madeira_dependencies.sh" "$MD"
 

@@ -50,6 +50,12 @@ jobs:
           bash -n scripts/ensure_metal_toolchain.sh
           python3 -m unittest discover -s tests/host -p 'test_metal_toolchain.py' -v
 
+      - name: Test DXMT shader compatibility patch
+        run: |
+          bash -n scripts/fetch_madeira_sources.sh
+          bash -n scripts/build_madeira_components.sh
+          python3 -m unittest discover -s tests/host -p 'test_dxmt_shader_patch.py' -v
+
       - name: Validate Xcode project source references
         run: python3 -m unittest discover -s tests/host -p 'test_xcode_project.py' -v
 

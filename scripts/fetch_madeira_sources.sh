@@ -43,6 +43,20 @@ for dir in FEX wine dxmt; do
   }
 done
 
+# Pinned willfaust/dxmt invokes a private four-argument Metal atomic intrinsic.
+# Metal Toolchain 27B47 requires five arguments, and the old call fails to compile.
+# Apply the equivalent public Metal atomic operation used by upstream DXMT.
+DXMT_SHADER="$DEST/dxmt/src/airconv/shaders/air_tessellation.metal"
+DXMT_PATCH="$ROOT/patches/dxmt-metal27-tessellation-atomic.patch"
+if [[ ! -f "$DXMT_SHADER" ]]; then
+  echo "ERROR: pinned DXMT tessellation shader is missing: $DXMT_SHADER" >&2
+  exit 2
+fi
+if ! grep -Fq 'reinterpret_cast<threadgroup atomic_int *>(out_count), 1, memory_order_relaxed)' "$DXMT_SHADER"; then
+  git -C "$DEST/dxmt" apply --check "$DXMT_PATCH"
+  git -C "$DEST/dxmt" apply "$DXMT_PATCH"
+fi
+
 echo "Madeira sources checked out at $REV"
 echo "Source checkout complete. Run bash scripts/build_native_runtime.sh on macOS to compile, link and package."
 echo "Read $DEST/docs/BUILDING.md for the platform toolchains and licensed prerequisites."
