@@ -1,4 +1,5 @@
 #import "RuntimeSupport.h"
+#import "NativePerformance.h"
 #import <Foundation/Foundation.h>
 #import <QuartzCore/CAMetalLayer.h>
 #import <Metal/Metal.h>
