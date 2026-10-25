@@ -72,6 +72,15 @@ jobs:
             -o /tmp/ideck-native-performance-tests
           /tmp/ideck-native-performance-tests
 
+      - name: Test native memory budgeting and pressure recovery
+        run: |
+          xcrun clang++ -std=c++20 -O2 -pthread \
+            tests/host/NativeMemoryManagerTests.cpp \
+            iDeck/NativeRuntime/NativeMemoryManager.cpp \
+            iDeck/NativeRuntime/GuestMemoryPool.cpp \
+            -o /tmp/ideck-memory-manager-tests
+          /tmp/ideck-memory-manager-tests
+
       - name: Validate Xcode project source references
         run: python3 -m unittest discover -s tests/host -p 'test_xcode_project.py' -v
 
