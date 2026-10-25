@@ -68,6 +68,39 @@ class XcodeProjectTests(unittest.TestCase):
         header = root / "iDeck" / "iDeck-Bridging-Header.h"
         self.assertIn("NativeRuntime/NativePerformance.h", header.read_text(encoding="utf-8"))
 
+    def test_native_memory_manager_sources_are_registered(self):
+        names = ("NativeMemoryManager.cpp", "NativeMemoryPressure.mm")
+        marker = "333333333333333333333332 /* Sources */ = {"
+        sources = self.project.split(marker, 1)[1].split("\n\t\t};", 1)[0]
+        refs = dict(BUILD_FILE.findall(self.project))
+        for filename in names:
+            with self.subTest(filename=filename):
+                entries = re.findall(
+                    r"^\s*([A-F0-9]{24})\s+/\* " + re.escape(filename)
+                    + r" in Sources \*/,?\s*$",
+                    sources,
+                    re.MULTILINE,
+                )
+                self.assertEqual(len(entries), 1)
+                self.assertIn(entries[0], refs)
+                referenced = refs[entries[0]]
+                self.assertRegex(
+                    self.project,
+                    re.compile(
+                        r"^\s*" + referenced + r"\s+/\* " + re.escape(filename)
+                        + r" \*/\s*=\s*\{isa = PBXFileReference;.*path = NativeRuntime/"
+                        + re.escape(filename) + r";",
+                        re.MULTILINE,
+                    ),
+                )
+
+    def test_native_memory_bridge_is_available_to_swift(self):
+        bridge = PROJECT.parents[1] / "iDeck" / "iDeck-Bridging-Header.h"
+        self.assertIn(
+            'NativeRuntime/NativeMemoryManager.h',
+            bridge.read_text(encoding="utf-8"),
+        )
+
     def test_native_diagnostics_and_guest_store_are_compiled_once(self):
         marker = "333333333333333333333332 /* Sources */ = {"
         self.assertIn(marker, self.project)
