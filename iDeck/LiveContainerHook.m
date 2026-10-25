@@ -282,8 +282,9 @@ static int LCGuestUIApplicationMain(int argc, char *_Nullable *_Nonnull argv, NS
         if (sceneClass) {
             gGuestSceneDelegate = [[sceneClass alloc] init];
             if ([gGuestSceneDelegate respondsToSelector:@selector(scene:willConnectToSession:options:)]) {
-                UISceneConnectionOptions *options = [[UISceneConnectionOptions alloc] init];
-                [gGuestSceneDelegate scene:hostScene willConnectToSession:hostScene.session options:options];
+                // UIKit creates connection options internally; instantiating them is unavailable.
+                // Hosted guests receive no new scene connection options.
+                [gGuestSceneDelegate scene:hostScene willConnectToSession:hostScene.session options:nil];
             }
             if ([gGuestSceneDelegate respondsToSelector:@selector(window)]) window = [gGuestSceneDelegate window];
         }
