@@ -104,7 +104,30 @@ if [[ "$REBUILD" == "1" ]]; then
   bash "$MD/build/wineserver/build.sh"
   bash "$MD/build/win32u-unix/build.sh"
 
-  bash "$MD/build/dxmt-ios/build.sh"
+  # airconv_context.cpp embeds AIR bitcode through these generated headers.
+  # Match DXMT's Meson recipe: Metal -> AIR -> C array, without metallib.
+  SHADER_HEADERS="$MD/build/dxmt-ios/shader-headers"
+  mkdir -p "$SHADER_HEADERS"
+  for shader in air_msad air_samplepos air_tessellation; do
+    xcrun -sdk macosx metal -std=metal3.1 --target=air64-apple-macos14.0 \
+      -o "$SHADER_HEADERS/$shader.air" -c "$MD/dxmt/src/airconv/shaders/$shader.metal"
+    xxd -n "$shader" -i "$SHADER_HEADERS/$shader.air" "$SHADER_HEADERS/$shader.h"
+    [[ -s "$SHADER_HEADERS/$shader.h" ]] || {
+      echo "ERROR: DXMT shader header missing: $shader.h" >&2; exit 2;
+    }
+  done
+  DXMT_LOG="$MD/build/dxmt-ios/build-ideck.log"
+  if ! bash "$MD/build/dxmt-ios/build.sh" 2>&1 | tee "$DXMT_LOG"; then
+    FAILED_DXMT="$(sed -n 's/^Failed://p' "$DXMT_LOG")"
+    for name in $FAILED_DXMT; do
+      ERR_FILE="$MD/build/dxmt-ios/obj/$name.err"
+      if [[ -s "$ERR_FILE" ]]; then
+        echo "=== DXMT compiler diagnostics: $name ===" >&2
+        cat "$ERR_FILE" >&2
+      fi
+    done
+    exit 1
+  fi
   COMBINED="$MD/build/dxmt-ios/libdxmt_combined.a"
   if [[ ! -s "$COMBINED" ]]; then
     LLVM_LIBS=("$MD/toolchains/llvm-ios-build/lib/"*.a)

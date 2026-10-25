@@ -132,6 +132,8 @@ jobs:
             vendor/Madeira/wine/build-arm64ec/config.log
             vendor/Madeira/dxmt/build-arm64ec/meson-logs/meson-log.txt
             vendor/Madeira/build/ntdll-unix/obj/*.err
+            vendor/Madeira/build/dxmt-ios/obj/*.err
+            vendor/Madeira/build/dxmt-ios/build-ideck.log
             vendor/Madeira/build/wineserver/obj/err-*.txt
             vendor/Madeira/wine/build-macos/config.log
             vendor/Madeira/build/gnutls-ios/obj/*.log
