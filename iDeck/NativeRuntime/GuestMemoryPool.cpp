@@ -93,6 +93,19 @@ extern "C" void ideck_memory_pool_trim(IDeckGuestMemoryPool *pool) {
     pool->cached_bytes = 0;
 }
 
+extern "C" bool ideck_memory_pool_set_cache_limit(IDeckGuestMemoryPool *pool, size_t max_cached_bytes) {
+    if (!pool) return false;
+    std::lock_guard<std::mutex> lock(pool->mutex);
+    pool->cache_limit = max_cached_bytes;
+    while (pool->cached_bytes > max_cached_bytes && !pool->cached.empty()) {
+        auto block = pool->cached.back();
+        pool->cached.pop_back();
+        pool->cached_bytes -= block.size;
+        std::free(block.pointer);
+    }
+    return true;
+}
+
 extern "C" void ideck_memory_pool_destroy(IDeckGuestMemoryPool *pool) {
     if (!pool) return;
     for (auto item : pool->active) std::free(item.first);
