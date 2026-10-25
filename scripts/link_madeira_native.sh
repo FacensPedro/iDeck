@@ -122,6 +122,11 @@ for index in "${!ARCHIVES[@]}"; do
   FLAGS+=("${ARCHIVES[$index]}")
 done
 
+# The cross-built LLVM archives bundled into DXMT depend on the iPhoneOS
+# terminfo (libcurses) and libxml2 SDK libraries. Keep these link inputs
+# after the native static archives so their undefined symbols are resolved.
+FLAGS+=(-lcurses -lxml2)
+
 printf '%s ' "${FLAGS[@]}" > "$OUT/link-flags.txt"
 echo >> "$OUT/link-flags.txt"
 echo "Prepared actual arm64 upstream native bridge and link flags: $OUT/link-flags.txt"
