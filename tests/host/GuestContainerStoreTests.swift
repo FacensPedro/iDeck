@@ -6,6 +6,26 @@ import Foundation
         defer { try? FileManager.default.removeItem(at: root) }
         let store = GuestContainerStore(root: root)
         let first = try store.create(for: "com.example.one", name: "Primary")
+        for invalidName in ["", " \n\t ", String(repeating: "a", count: 81)] {
+            do {
+                try store.create(for: "com.example.one", name: invalidName)
+                fatalError("Invalid create name was accepted")
+            } catch GuestContainerValidationError.invalidName { }
+            do {
+                try store.rename(first.id, for: "com.example.one", name: invalidName)
+                fatalError("Invalid rename name was accepted")
+            } catch GuestContainerValidationError.invalidName { }
+        }
+        do {
+            try store.create(for: "   ", name: "Valid name")
+            fatalError("Empty app identifier was accepted")
+        } catch GuestContainerValidationError.invalidAppIdentifier { }
+        let unchanged = try store.selection(for: "com.example.one")
+        precondition(unchanged.containers == [first] && unchanged.selected == first.id)
+        let boundaryName = String(repeating: "a", count: 80)
+        try store.rename(first.id, for: "com.example.one", name: boundaryName)
+        let boundary = try store.selection(for: "com.example.one")
+        precondition(boundary.containers.first?.name == boundaryName)
         let second = try store.create(for: "com.example.one", name: "Second")
         let other = try store.create(for: "com.example.two", name: "Primary")
         let file = root.appendingPathComponent(first.id.uuidString + "/Documents/save.txt")

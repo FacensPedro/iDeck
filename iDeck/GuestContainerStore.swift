@@ -1,5 +1,19 @@
 import Foundation
 
+enum GuestContainerValidationError: LocalizedError {
+    case invalidAppIdentifier
+    case invalidName
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidAppIdentifier:
+            return "The app identifier must not be empty."
+        case .invalidName:
+            return "The container name must contain between 1 and 80 characters."
+        }
+    }
+}
+
 struct GuestDataContainer: Codable, Identifiable, Equatable {
     let id: UUID
     var name: String
@@ -38,7 +52,8 @@ final class GuestContainerStore {
     func create(for app: String, name: String) throws -> GuestDataContainer {
         lock.lock(); defer { lock.unlock() }
         let cleanName = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !app.isEmpty, !cleanName.isEmpty, cleanName.count <= 80 else { throw CocoaError(.validationMissingMandatoryProperty) }
+        guard !app.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw GuestContainerValidationError.invalidAppIdentifier }
+        guard !cleanName.isEmpty, cleanName.count <= 80 else { throw GuestContainerValidationError.invalidName }
         var state = try read()
         var selection = state[app] ?? GuestContainerSelection()
         let container = GuestDataContainer(id: UUID(), name: cleanName)
@@ -70,7 +85,7 @@ final class GuestContainerStore {
     func rename(_ id: UUID, for app: String, name: String) throws {
         lock.lock(); defer { lock.unlock() }
         let cleanName = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !cleanName.isEmpty, cleanName.count <= 80 else { throw CocoaError(.validationMissingMandatoryProperty) }
+        guard !cleanName.isEmpty, cleanName.count <= 80 else { throw GuestContainerValidationError.invalidName }
         var state = try read()
         guard var selection = state[app], let index = selection.containers.firstIndex(where: { $0.id == id }) else { throw CocoaError(.fileNoSuchFile) }
         selection.containers[index].name = cleanName
