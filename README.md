@@ -30,7 +30,7 @@ The native adapters in `iDeck/NativeRuntime/` are **not substitutes** for a comp
 
 ## Requirements
 
-- macOS and a compatible Xcode installation with the iPhoneOS SDK to compile an IPA.
+- macOS and a compatible Xcode installation with the iOS SDK to compile an IPA.
 - An appropriate signing method and provisioning configuration to install an unsigned build on a physical device.
 - A compatible iOS/iPadOS device for testing; iPadOS security restrictions still apply.
 - For the native Madeira build: the pinned upstream repositories, ARM64EC and iOS LLVM toolchains, the Metal shader compiler, and additional dependencies installed by the build scripts.
