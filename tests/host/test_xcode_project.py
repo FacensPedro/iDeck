@@ -32,6 +32,42 @@ class XcodeProjectTests(unittest.TestCase):
             with self.subTest(build_id=build_id):
                 self.assertIn(file_id, ids)
 
+    def test_native_performance_sources_are_compiled_once(self):
+        names = (
+            "FEXExecutionScheduler.cpp",
+            "GuestMemoryPool.cpp",
+            "RuntimePerformanceMonitor.mm",
+            "MetalFrameOptimizer.mm",
+            "NativePerformanceClock.cpp",
+        )
+        marker = "333333333333333333333332 /* Sources */ = {"
+        sources = self.project.split(marker, 1)[1].split("\n\t\t};", 1)[0]
+        refs = dict(BUILD_FILE.findall(self.project))
+        for filename in names:
+            with self.subTest(filename=filename):
+                entries = re.findall(
+                    r"^\s*([A-F0-9]{24})\s+/\* " + re.escape(filename)
+                    + r" in Sources \*/,?\s*$",
+                    sources,
+                    re.MULTILINE,
+                )
+                self.assertEqual(len(entries), 1)
+                self.assertIn(entries[0], refs)
+                file_ref = refs[entries[0]]
+                expected = re.compile(
+                    r"^\s*" + file_ref + r"\s+/\* " + re.escape(filename)
+                    + r" \*/\s*=\s*\{isa = PBXFileReference;.*path = NativeRuntime/"
+                    + re.escape(filename) + r";",
+                    re.MULTILINE,
+                )
+                self.assertRegex(self.project, expected)
+
+    def test_performance_header_is_linked_to_swift(self):
+        self.assertIn("NativePerformance.h */ = {isa = PBXFileReference;", self.project)
+        root = PROJECT.parents[1]
+        header = root / "iDeck" / "iDeck-Bridging-Header.h"
+        self.assertIn("NativeRuntime/NativePerformance.h", header.read_text(encoding="utf-8"))
+
     def test_native_diagnostics_and_guest_store_are_compiled_once(self):
         marker = "333333333333333333333332 /* Sources */ = {"
         self.assertIn(marker, self.project)
