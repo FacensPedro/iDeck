@@ -3,6 +3,7 @@
 
 #import "LiveContainerHook.h"
 #import "NativeRuntimeDiagnostics.h"
+#import "NativeRuntime/NativePerformance.h"
 
 #import "SteamChunkCodecs.h"
 
