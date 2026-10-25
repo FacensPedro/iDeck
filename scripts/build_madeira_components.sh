@@ -28,6 +28,8 @@ for component in FEX wine dxmt; do
   [[ -e "$MD/$component/.git" ]] || { echo "ERROR: unpublished or missing Madeira $component submodule. Check upstream refs." >&2; exit 2; }
 done
 
+bash "$ROOT/scripts/ensure_metal_toolchain.sh"
+
 if [[ "$REBUILD" == "1" ]]; then
   bash "$ROOT/scripts/prepare_madeira_dependencies.sh" "$MD"
 
