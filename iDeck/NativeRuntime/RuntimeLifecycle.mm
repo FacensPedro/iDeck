@@ -8,6 +8,7 @@ static std::atomic<int32_t> session_state{IDECK_SESSION_STOPPED};
 extern "C" int32_t ideck_session_prepare(const char *prefix) {
     int32_t expected = IDECK_SESSION_STOPPED;
     if (!session_state.compare_exchange_strong(expected, IDECK_SESSION_PREPARING)) return EBUSY;
+    ideck_performance_reset();
     int32_t result = ideck_wine_environment_configure(prefix);
     if (!result) result = ideck_runtime_prepare(prefix);
     if (result) {
