@@ -42,6 +42,8 @@ void ideck_performance_reset(void);
 void ideck_performance_record_frame(uint64_t duration_ns);
 void ideck_performance_record_swapchain(void);
 IDeckPerformanceSnapshot ideck_performance_snapshot(void);
+uint64_t ideck_performance_now_ns(void);
+void ideck_performance_record_interval(uint64_t start_time_ns, uint64_t end_time_ns);
 
 bool ideck_metal_frame_prepare(void *metal_layer);
 bool ideck_metal_frame_resize(void *metal_layer, uint32_t pixel_width, uint32_t pixel_height);
