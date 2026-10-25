@@ -22,7 +22,8 @@ class MadeiraNativeDuplicateSymbolsTests(unittest.TestCase):
         self.assertIn('"_madeira_d3d12_canary_run"', source)
         self.assertIn('"_madeira_d3d12_canary_run_log"', source)
         self.assertNotIn('OBJS+=("$CANARY_OBJ")', source)
-        self.assertNotIn('xcrun --sdk iphoneos clang++ -arch arm64 -isysroot "$SDK" -miphoneos-version-min=18.0 \\\n  -O2 -fPIC -fobjc-arc -std=c++20 -fexceptions -frtti \\\n  "${INCLUDES[@]}" -c "$CANARY_SRC"', source)
+        self.assertNotIn('CANARY_OBJ="$OUT/obj/msc_canary.o"', source)
+
 
     def test_no_second_wine_ui_log(self):
         linker = LINKER.read_text(encoding="utf-8")
