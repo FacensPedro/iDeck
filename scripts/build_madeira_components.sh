@@ -80,6 +80,7 @@ if [[ "$REBUILD" == "1" ]]; then
       -DTUNE_CPU=none
   fi
   bash "$MD/build/fex-ios/build.sh"
+  bash "$ROOT/scripts/build_fex_ios_allocator.sh"
   bash "$MD/build/fex-arm64ec/build.sh"
   bash "$MD/build/wine-pe/build-ntdll.sh"
   [[ -s "$MD/app/Madeira/arm64ec-windows/ntdll.dll" ]] || {
