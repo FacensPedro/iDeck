@@ -13,7 +13,7 @@ for tool in xcrun xcodebuild; do
   fi
 done
 
-WORK_DIR="$(mktemp -d "\${TMPDIR:-/tmp}/ideck-metal.XXXXXXXX")"
+WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/ideck-metal.XXXXXXXX")"
 trap 'rm -rf "$WORK_DIR"' EXIT
 
 cat > "$WORK_DIR/probe.metal" <<'METAL'
