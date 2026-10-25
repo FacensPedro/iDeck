@@ -26,7 +26,7 @@ struct MainView: View {
             coordinator.refreshJITStatus()
             UIApplication.shared.isIdleTimerDisabled = true
         }
-        .onChange(of: scenePhase) { phase in
+        .onChange(of: scenePhase) { _, phase in
             UIApplication.shared.isIdleTimerDisabled = phase == .active
             if phase == .active { coordinator.refreshJITStatus() }
         }
@@ -666,8 +666,6 @@ struct WindowsWorkspaceView: View {
     }
 
     private func gameCard(_ game: SteamAppInfo) -> some View {
-        let progress = steamLibrary.downloadProgress[game.appID]
-        let percent = Int(((progress?.fraction ?? 0) * 100).rounded())
         let installed = steamLibrary.installedApps.contains(game.appID)
 
         return VStack(alignment: .center, spacing: 10) {
