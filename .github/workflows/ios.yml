@@ -61,6 +61,17 @@ jobs:
           bash -n scripts/build_fex_ios_allocator.sh
           python3 -m unittest discover -s tests/host -p 'test_fex_ios_allocator.py' -v
 
+      - name: Test native performance C++ modules
+        run: |
+          xcrun clang++ -std=c++20 -O2 -pthread -x c++ \
+            tests/host/NativePerformanceTests.cpp \
+            iDeck/NativeRuntime/FEXExecutionScheduler.cpp \
+            iDeck/NativeRuntime/GuestMemoryPool.cpp \
+            iDeck/NativeRuntime/NativePerformanceClock.cpp \
+            iDeck/NativeRuntime/RuntimePerformanceMonitor.mm \
+            -o /tmp/ideck-native-performance-tests
+          /tmp/ideck-native-performance-tests
+
       - name: Validate Xcode project source references
         run: python3 -m unittest discover -s tests/host -p 'test_xcode_project.py' -v
 
