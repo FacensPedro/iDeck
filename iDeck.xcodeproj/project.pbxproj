@@ -8,6 +8,7 @@
 
 		E10000000000000000000001 /* SteamKeyValues.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000001 /* SteamKeyValues.swift */; };
 		E10000000000000000000002 /* SteamChunkCodecs.c in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000002 /* SteamChunkCodecs.c */; };
+		E10000000000000000000010 /* SteamDepotRegionPolicy.c in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000010 /* SteamDepotRegionPolicy.c */; };
 		E10000000000000000000005 /* LzmaDec.c in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000004 /* LzmaDec.c */; };
 		E10000000000000000000003 /* libzstd in Frameworks */ = {isa = PBXBuildFile; productRef = E40000000000000000000001 /* libzstd */; };
 		D10000000000000000000001 /* RuntimeLifecycle.mm in Sources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000001 /* RuntimeLifecycle.mm */; };
@@ -145,6 +146,8 @@
 		A20000000000000000000005 /* SteamInstall.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamInstall.swift; sourceTree = "<group>"; };
 		E20000000000000000000001 /* SteamKeyValues.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamKeyValues.swift; sourceTree = "<group>"; };
 		E20000000000000000000002 /* SteamChunkCodecs.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = SteamChunkCodecs.c; sourceTree = "<group>"; };
+		E20000000000000000000010 /* SteamDepotRegionPolicy.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = SteamDepotRegionPolicy.c; sourceTree = "<group>"; };
+		E20000000000000000000011 /* SteamDepotRegionPolicy.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SteamDepotRegionPolicy.h; sourceTree = "<group>"; };
 		E20000000000000000000003 /* SteamChunkCodecs.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SteamChunkCodecs.h; sourceTree = "<group>"; };
 		E20000000000000000000004 /* LzmaDec.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = SteamLZMA/LzmaDec.c; sourceTree = "<group>"; };
 		E20000000000000000000005 /* LzmaDec.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SteamLZMA/LzmaDec.h; sourceTree = "<group>"; };
@@ -226,6 +229,7 @@
 				A10000000000000000000005 /* SteamInstall.swift in Sources */,
 				E10000000000000000000001 /* SteamKeyValues.swift in Sources */,
 				E10000000000000000000002 /* SteamChunkCodecs.c in Sources */,
+				E10000000000000000000010 /* SteamDepotRegionPolicy.c in Sources */,
 				E10000000000000000000005 /* LzmaDec.c in Sources */,
 				A10000000000000000000006 /* WindowsLibraryModels.swift in Sources */,
 				A10000000000000000000007 /* SteamCloud.swift in Sources */,
@@ -313,6 +317,8 @@
 				A20000000000000000000005 /* SteamInstall.swift */,
 				E20000000000000000000001 /* SteamKeyValues.swift */,
 				E20000000000000000000002 /* SteamChunkCodecs.c */,
+				E20000000000000000000010 /* SteamDepotRegionPolicy.c */,
+				E20000000000000000000011 /* SteamDepotRegionPolicy.h */,
 				E20000000000000000000003 /* SteamChunkCodecs.h */,
 				E20000000000000000000004 /* LzmaDec.c */,
 				E20000000000000000000005 /* LzmaDec.h */,
