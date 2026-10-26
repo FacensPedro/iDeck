@@ -197,6 +197,40 @@ class SystemCoordinator: ObservableObject {
         }
     }
 
+    func requestStikDebugJIT() {
+        guard let bundleID = Bundle.main.bundleIdentifier, !bundleID.isEmpty else {
+            setWindowsStatus("Cannot request JIT: missing iDeck bundle identifier.")
+            return
+        }
+        // iOS does not expose SecTaskCreateFromSelf through the public Swift SDK.
+        // StikDebug validates the target's get-task-allow entitlement when
+        // attaching. A URL request must not be mistaken for JIT authorization.
+        var components = URLComponents()
+        components.scheme = "stikdebug"
+        components.host = "enable-jit"
+        components.queryItems = [
+            URLQueryItem(name: "bundle-id", value: bundleID),
+            URLQueryItem(name: "pid", value: String(getpid()))
+        ]
+        // iPadOS 27 on A17 Pro requires a debugger-side breakpoint script.
+        // The bundled Madeira JIT uses the universal BRK #0xf00d protocol.
+        if #available(iOS 26.0, *) {
+            components.queryItems?.append(
+                URLQueryItem(name: "script-name", value: "universal.js")
+            )
+        }
+        guard let url = components.url else {
+            setWindowsStatus("Cannot create StikDebug request.")
+            return
+        }
+        UIApplication.shared.open(url, options: [:]) { [weak self] opened in
+            guard let self else { return }
+            self.setWindowsStatus(opened
+                ? "StikDebug requested. Return to iDeck after JIT is enabled; FEX must still prepare its executable memory."
+                : "StikDebug could not be opened. Install and configure StikDebug first.")
+        }
+    }
+
     func confirmJITActivatedByStikDebug() {
         refreshJITStatus()
     }

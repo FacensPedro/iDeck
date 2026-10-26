@@ -383,10 +383,16 @@ enum ZipExtractor {
         if entryCount == 0xFFFF || directoryOffset == 0xFFFF_FFFF { throw ZipError.unsupported }
 
         var cursor = directoryOffset
+        var extractedBytes: UInt64 = 0
+        var seenPaths = Set<String>()
+        let maxExpandedBytes: UInt64 = 16 * 1024 * 1024 * 1024
         for _ in 0..<entryCount {
             guard try u32(data, cursor) == 0x0201_4b50 else { throw ZipError.invalidArchive }
             let flags = try u16(data, cursor + 8)
             let method = try u16(data, cursor + 10)
+            guard flags & 0x2041 == 0, method == 0 || method == 8 else {
+                throw ZipError.unsupported
+            }
             let compressedSize = try u32(data, cursor + 20)
             let uncompressedSize = try u32(data, cursor + 24)
             let nameLength = try u16(data, cursor + 28)
@@ -403,6 +409,10 @@ enum ZipExtractor {
             let nameStart = cursor + 46
             guard nameStart + nameLength <= data.count else { throw ZipError.invalidArchive }
             guard let name = String(data: data.subdata(in: nameStart..<(nameStart + nameLength)), encoding: .utf8) else {
+                throw ZipError.invalidArchive
+            }
+            guard extraLength <= data.count - (nameStart + nameLength),
+                  commentLength <= data.count - (nameStart + nameLength + extraLength) else {
                 throw ZipError.invalidArchive
             }
             cursor = nameStart + nameLength + extraLength + commentLength
@@ -422,12 +432,42 @@ enum ZipExtractor {
                 $0.hasPrefix("._") || $0 == ".Spotlight-V100"
             }) { continue }
 
-            // Local header gives the real offset of the payload.
-            guard try u32(data, localOffset) == 0x0403_4b50 else { throw ZipError.invalidArchive }
+            // Canonicalize before writing. A ZIP may contain duplicate entries
+            // that overwrite a previously validated executable or symlink.
+            guard let safePath = IPAArchivePath.components(name) else {
+                throw ZipError.unsafePathEntry(name)
+            }
+            let key = safePath.joined(separator: "/").lowercased()
+            guard !seenPaths.contains(key) else { throw ZipError.invalidArchive }
+            seenPaths.insert(key)
+            if !IPAArchivePath.isDirectory(name, unixMode: externalAttributes >> 16) {
+                let (total, overflow) = extractedBytes.addingReportingOverflow(UInt64(uncompressedSize))
+                guard !overflow, total <= maxExpandedBytes,
+                      uncompressedSize <= 4 * 1024 * 1024 * 1024,
+                      compressedSize > 0 || uncompressedSize == 0,
+                      uncompressedSize <= max(compressedSize, 1) * 500 else {
+                    throw ZipError.unsupported
+                }
+                extractedBytes = total
+            }
+
+            // Verify local and central directory agree before extracting.
+            guard try u32(data, localOffset) == 0x0403_4b50,
+                  try u16(data, localOffset + 6) == flags,
+                  try u16(data, localOffset + 8) == method else {
+                throw ZipError.invalidArchive
+            }
             let localName = try u16(data, localOffset + 26)
             let localExtra = try u16(data, localOffset + 28)
             let payloadStart = localOffset + 30 + localName + localExtra
-            guard payloadStart + compressedSize <= data.count else { throw ZipError.invalidArchive }
+            guard localName == nameLength,
+                  localOffset + 30 + localName <= data.count,
+                  data.subdata(in: (localOffset + 30)..<(localOffset + 30 + localName)) ==
+                    data.subdata(in: nameStart..<(nameStart + nameLength)),
+                  payloadStart <= data.count,
+                  compressedSize <= data.count - payloadStart else {
+                throw ZipError.invalidArchive
+            }
             let payload = data.subdata(in: payloadStart..<(payloadStart + compressedSize))
 
             do {

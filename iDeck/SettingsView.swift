@@ -118,6 +118,13 @@ struct SettingsView: View {
             Text(coordinator.isJITEnabled ? tr("JIT detected") : tr("JIT not detected"))
                 .font(.footnote)
                 .foregroundColor(coordinator.isJITEnabled ? .green : .white)
+            Button("Enable JIT with StikDebug") {
+                coordinator.requestStikDebugJIT()
+            }
+            .buttonStyle(.borderedProminent)
+            Text("StikDebug requires pairing, LocalDevVPN, and a debug-signable iDeck. Opening StikDebug does not prove FEX JIT is ready.")
+                .font(.caption)
+                .foregroundColor(.gray)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
