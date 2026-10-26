@@ -39,8 +39,11 @@ for path in aarch64-windows/d3d11.dll aarch64-windows/dxgi.dll \
   }
 done
 
+# Windows-side IPA signers enumerate bundle entries through APIs that cannot
+# reliably inspect Unix symlinks. Package physical directories in the native
+# runtime mirror, preserving the original top-level paths used by Madeira.
 for folder in aarch64-windows arm64ec-windows; do
-  ln -s "../$folder" "$RUNTIME/$folder"
+  cp -R "$APP/$folder" "$RUNTIME/$folder"
 done
 
 mkdir -p "$APP/d3d12" "$RUNTIME/d3d12"
@@ -60,7 +63,7 @@ done
   exit 2
 }
 cp "$SOURCE/d3d12/libmetalirconverter.dylib" "$APP/d3d12/libmetalirconverter.dylib"
-ln -s "../../d3d12/libmetalirconverter.dylib" "$RUNTIME/d3d12/libmetalirconverter.dylib"
+cp "$APP/d3d12/libmetalirconverter.dylib" "$RUNTIME/d3d12/libmetalirconverter.dylib"
 
 # Dynamic code must be signed by the same signing workflow as the host IPA.
 # An ad hoc signature alone is not a distribution/developer identity.
