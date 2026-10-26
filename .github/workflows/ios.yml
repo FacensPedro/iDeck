@@ -104,6 +104,12 @@ jobs:
       - name: Test native bundle verifier
         run: python3 -m unittest discover -s tests/host -p 'test_madeira_bundle.py' -v
 
+      - name: Verify Windows-compatible native payload staging
+        run: |
+          bash -n scripts/stage_madeira_payload.sh
+          python3 -m unittest discover -s tests/host -p 'test_madeira_payload_staging.py' -v
+
+
       - name: Test rendering configuration and window resizing
         run: |
           xcrun swiftc iDeck/RuntimeConfiguration.swift tests/host/RuntimeConfigurationTests.swift -o /tmp/ideck-runtime-tests
