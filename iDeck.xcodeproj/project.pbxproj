@@ -50,6 +50,7 @@
 		111111111111111111111121 /* VPNManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222232 /* VPNManager.swift */; };
 		111111111111111111111122 /* PrefixInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222233 /* PrefixInstaller.swift */; };
 		111111111111111111111123 /* SteamManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222235 /* SteamManager.swift */; };
+		A1000000000000000000000D /* SteamLibraryPreviewCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000D /* SteamLibraryPreviewCache.swift */; };
 		999999999999999999999914 /* UpdateChecker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 999999999999999999999906 /* UpdateChecker.swift */; };
 		999999999999999999999915 /* Localization.swift in Sources */ = {isa = PBXBuildFile; fileRef = 999999999999999999999907 /* Localization.swift */; };
 		999999999999999999999911 /* PacketTunnelProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 999999999999999999999901 /* PacketTunnelProvider.swift */; };
@@ -120,6 +121,7 @@
 		222222222222222222222233 /* PrefixInstaller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrefixInstaller.swift; sourceTree = "<group>"; };
 		222222222222222222222234 /* iDeck.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = iDeck.entitlements; sourceTree = "<group>"; };
 		222222222222222222222235 /* SteamManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamManager.swift; sourceTree = "<group>"; };
+		A2000000000000000000000D /* SteamLibraryPreviewCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamLibraryPreviewCache.swift; sourceTree = "<group>"; };
 		999999999999999999999906 /* UpdateChecker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateChecker.swift; sourceTree = "<group>"; };
 		999999999999999999999907 /* Localization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Localization.swift; sourceTree = "<group>"; };
 		999999999999999999999901 /* PacketTunnelProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PacketTunnelProvider.swift; sourceTree = "<group>"; };
@@ -207,6 +209,7 @@
 				111111111111111111111121 /* VPNManager.swift in Sources */,
 				111111111111111111111122 /* PrefixInstaller.swift in Sources */,
 				111111111111111111111123 /* SteamManager.swift in Sources */,
+				A1000000000000000000000D /* SteamLibraryPreviewCache.swift in Sources */,
 				999999999999999999999914 /* UpdateChecker.swift in Sources */,
 				999999999999999999999915 /* Localization.swift in Sources */,
 				111111111111111111111124 /* AppManager.swift in Sources */,
@@ -253,6 +256,7 @@
 				222222222222222222222232 /* VPNManager.swift */,
 				222222222222222222222233 /* PrefixInstaller.swift */,
 				222222222222222222222235 /* SteamManager.swift */,
+				A2000000000000000000000D /* SteamLibraryPreviewCache.swift */,
 				222222222222222222222223 /* SystemCoordinator.swift */,
 				222222222222222222222224 /* JITEnabler.swift */,
 				222222222222222222222225 /* ContainerHost.swift */,

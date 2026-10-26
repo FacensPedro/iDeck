@@ -124,6 +124,11 @@ jobs:
           xcrun swiftc iDeck/RuntimeConfiguration.swift tests/host/RuntimeConfigurationTests.swift -o /tmp/ideck-runtime-tests
           /tmp/ideck-runtime-tests
 
+      - name: Test Steam library preview cache
+        run: |
+          xcrun swiftc iDeck/SteamLibraryPreviewCache.swift tests/host/SteamLibraryPreviewCacheTests.swift -o /tmp/ideck-steam-library-cache-tests
+          /tmp/ideck-steam-library-cache-tests
+
       - name: Test guest data containers
         run: |
           xcrun swiftc iDeck/GuestContainerStore.swift tests/host/GuestContainerStoreTests.swift -o /tmp/ideck-container-tests

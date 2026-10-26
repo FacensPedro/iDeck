@@ -1717,7 +1717,11 @@ enum SteamSignIn {
     }
 
     static func signOut() {
+        let previousAccount = accountName
         SteamTokenStore().clearTokens()
+        if let previousAccount {
+            SteamLibraryPreviewCache.remove(account: previousAccount)
+        }
         SteamLog.event("[steam-signin] signed out")
         notifyChange()
     }
@@ -4634,28 +4638,79 @@ final class SteamOwnedGamesModel: ObservableObject {
     private lazy var downloader = DepotDownloader(session: session)
     private lazy var cloudEngine = SteamCloudSyncEngine(session: session)
 
+    /// Display a lightweight cached library immediately while PICS refreshes.
+    /// Cached preview entries contain no depot metadata: installing a game
+    /// still requires fresh Steam metadata and authorization.
     func refresh(force: Bool = false) async {
-        guard SteamSignIn.isSignedIn else {
+        guard SteamSignIn.isSignedIn, let account = SteamSignIn.accountName,
+              !account.isEmpty else {
             games = []
+            lastAccountName = nil
+            lastRefresh = nil
             errorMessage = nil
             return
         }
         guard !isLoading else { return }
-        let account = SteamSignIn.accountName
-        if !force, !games.isEmpty, lastAccountName == account,
-           let lastRefresh, Date().timeIntervalSince(lastRefresh) < 120 {
+        if lastAccountName != account {
+            games = []
+            lastRefresh = nil
+            lastAccountName = account
+        }
+        if !force, !games.isEmpty, let lastRefresh,
+           Date().timeIntervalSince(lastRefresh) < 120 {
             return
         }
+
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
+
+        if games.isEmpty {
+            let preview = await Task.detached(priority: .utility) {
+                SteamLibraryPreviewCache.load(account: account)
+            }.value
+            guard SteamSignIn.accountName == account else { return }
+            if let preview {
+                games = preview.map { cached in
+                    var app = SteamAppInfo(appID: cached.appID)
+                    app.name = cached.name
+                    app.type = SteamAppInfo.AppType(pics: cached.type)
+                    app.installDir = cached.installDir
+                    app.oslist = cached.oslist
+                    app.buildID = cached.buildID
+                    app.libraryCapsule = cached.libraryCapsule
+                    app.libraryHero = cached.libraryHero
+                    app.headerImage = cached.headerImage
+                    app.parentID = cached.parentID
+                    return app
+                }
+                SteamLog.event("[steam-library] loaded \(games.count) cached game previews")
+            }
+        }
+
         do {
-            games = try await fetcher.fetchOwnedApps().sorted {
+            let fresh = try await fetcher.fetchOwnedApps().sorted {
                 $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
             }
+            guard SteamSignIn.accountName == account else { return }
+            games = fresh
             lastRefresh = Date()
             lastAccountName = account
+            let previews = fresh.map { game in
+                SteamLibraryCachedGame(
+                    appID: game.appID, name: game.name,
+                    type: game.type.rawValue, installDir: game.installDir,
+                    oslist: game.oslist, buildID: game.buildID,
+                    libraryCapsule: game.libraryCapsule,
+                    libraryHero: game.libraryHero,
+                    headerImage: game.headerImage, parentID: game.parentID
+                )
+            }
+            Task.detached(priority: .utility) {
+                SteamLibraryPreviewCache.save(account: account, games: previews)
+            }
         } catch {
+            guard SteamSignIn.accountName == account else { return }
             errorMessage = SteamSignIn.message(error)
         }
     }
