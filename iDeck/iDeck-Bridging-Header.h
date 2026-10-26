@@ -5,6 +5,7 @@
 #import "NativeRuntimeDiagnostics.h"
 #import "NativeRuntime/NativePerformance.h"
 #import "NativeRuntime/NativeMemoryManager.h"
+#import "NativeRuntime/MadeiraRuntimeBridge.h"
 
 #import "SteamChunkCodecs.h"
 
