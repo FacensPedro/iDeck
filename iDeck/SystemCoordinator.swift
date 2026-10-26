@@ -203,8 +203,9 @@ class SystemCoordinator: ObservableObject {
             setWindowsStatus("Cannot request JIT: missing iDeck bundle identifier.")
             return
         }
-        guard SecTaskCopyValueForEntitlement(
-            SecTaskCreateFromSelf(nil)!, "get-task-allow" as CFString, nil) as? Bool == true else {
+        guard let task = SecTaskCreateFromSelf(nil),
+              SecTaskCopyValueForEntitlement(
+                task, "get-task-allow" as CFString, nil) as? Bool == true else {
             setWindowsStatus("Cannot request JIT: iDeck must be signed with get-task-allow.")
             return
         }
