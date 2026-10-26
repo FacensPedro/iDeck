@@ -98,6 +98,15 @@ jobs:
             -o /tmp/ideck-memory-manager-tests
           /tmp/ideck-memory-manager-tests
 
+      - name: Test live debugger guard for FEX JIT
+        run: |
+          xcrun clang++ -std=c++20 -O2 -pthread \
+            tests/host/FEXJITGuardTests.cpp \
+            iDeck/NativeRuntime/FEXRuntime.cpp \
+            -o /tmp/ideck-fex-jit-guard-tests
+          /tmp/ideck-fex-jit-guard-tests
+          python3 -m unittest discover -s tests/host -p 'test_fex_jit_guard.py' -v
+
       - name: Validate Xcode project source references
         run: python3 -m unittest discover -s tests/host -p 'test_xcode_project.py' -v
 
