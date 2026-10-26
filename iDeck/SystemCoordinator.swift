@@ -3,7 +3,6 @@ import Combine
 import UIKit
 import QuartzCore
 import Darwin
-import Security
 
 class SystemCoordinator: ObservableObject {
     @Published var isJITEnabled: Bool = false
@@ -203,12 +202,9 @@ class SystemCoordinator: ObservableObject {
             setWindowsStatus("Cannot request JIT: missing iDeck bundle identifier.")
             return
         }
-        guard let task = SecTaskCreateFromSelf(nil),
-              SecTaskCopyValueForEntitlement(
-                task, "get-task-allow" as CFString, nil) as? Bool == true else {
-            setWindowsStatus("Cannot request JIT: iDeck must be signed with get-task-allow.")
-            return
-        }
+        // iOS does not expose SecTaskCreateFromSelf through the public Swift SDK.
+        // StikDebug validates the target's get-task-allow entitlement when
+        // attaching. A URL request must not be mistaken for JIT authorization.
         var components = URLComponents()
         components.scheme = "stikdebug"
         components.host = "enable-jit"
