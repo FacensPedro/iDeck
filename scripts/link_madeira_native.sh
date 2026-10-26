@@ -108,9 +108,9 @@ done
 # Checking now prevents an invalid duplicate or a missing symbol from reaching
 # the much slower Xcode link. nm -gU reports defined external Mach-O symbols.
 if ! xcrun --sdk iphoneos nm -gU "$APP/libdxmt_combined.a" | awk '
-  $NF == "_madeira_d3d12_canary_run" { run = 1 }
-  $NF == "_madeira_d3d12_canary_run_log" { log = 1 }
-  END { if (!(run && log)) exit 1 }
+  $NF == "_madeira_d3d12_canary_run" { seen_run = 1 }
+  $NF == "_madeira_d3d12_canary_run_log" { seen_run_log = 1 }
+  END { if (!(seen_run && seen_run_log)) exit 1 }
 '; then
   echo "ERROR: the native DXMT archive must export both D3D12 canary entry points." >&2
   exit 2
