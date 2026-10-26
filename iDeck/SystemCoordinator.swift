@@ -276,7 +276,11 @@ class SystemCoordinator: ObservableObject {
     
     func launchSteam() {
         guard isJITEnabled && isContainerReady else { return }
-        
+        guard ideck_fex_jit_ready() else {
+            setWindowsStatus("Cannot launch: StikDebug must remain attached to iDeck with the Madeira JIT script until FEX memory is prepared.")
+            return
+        }
+
         setWindowsStatus("Downloading Steam...")
         containerHost.mountEnvironment { [weak self] mountPath in
             guard let self = self else { return }
@@ -350,6 +354,10 @@ class SystemCoordinator: ObservableObject {
                     self.setWindowsStatus("Executable is in the library. Enable JIT in Settings before launching.")
                     return
                 }
+                guard ideck_fex_jit_ready() else {
+                    self.setWindowsStatus("Executable imported. JIT permission is present but StikDebug is no longer attached. Attach it to iDeck with the Madeira JIT script and retry.")
+                    return
+                }
 
                 let launchPrepared: () -> Void = { [weak self] in
                     guard let self else { return }
@@ -401,6 +409,10 @@ class SystemCoordinator: ObservableObject {
         refreshJITStatus()
         guard isJITEnabled else {
             setWindowsStatus("Cannot launch: activate JIT in StikDebug first.")
+            return
+        }
+        guard ideck_fex_jit_ready() else {
+            setWindowsStatus("Cannot launch: StikDebug must remain attached to iDeck with the Madeira JIT script until the FEX pool is ready.")
             return
         }
 
