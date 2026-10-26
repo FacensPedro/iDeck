@@ -53,5 +53,21 @@ fi
 mkdir -p Payload
 cp -R "$APP" Payload/
 zip -qry iDeck.ipa Payload
+if [[ "${IDECK_REQUIRE_MADEIRA:-0}" == "1" ]]; then
+  python3 - <<'PY'
+import stat
+import zipfile
+
+with zipfile.ZipFile("iDeck.ipa") as archive:
+    links = [
+        item.filename for item in archive.infolist()
+        if item.filename.startswith("Payload/iDeck.app/MadeiraRuntime/")
+        and stat.S_ISLNK(item.external_attr >> 16)
+    ]
+    if links:
+        raise SystemExit("ERROR: Native IPA contains Unix symlinks unsupported by some Windows sideloaders: " + ", ".join(links))
+    print("Native IPA runtime contains no Unix symlinks")
+PY
+fi
 rm -rf Payload
 echo "Created $(pwd)/iDeck.ipa"
