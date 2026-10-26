@@ -657,12 +657,16 @@ struct WindowsWorkspaceView: View {
     }
 
     private func displayedSize(for game: SteamAppInfo) -> UInt64 {
-        let known = game.downloadSize(for: "windows")
-        guard known == 0, let prefixPath else { return known }
-        let steamApps = SteamInstallPaths.steamApps(
-            drive: prefixPath.appendingPathComponent("drive_c", isDirectory: true))
-        return UInt64(max(0, SteamInstallFiles.sizeOnDisk(
-            appID: Int(game.appID), steamApps: steamApps) ?? 0))
+        if steamLibrary.installedApps.contains(game.appID), let prefixPath {
+            let steamApps = SteamInstallPaths.steamApps(
+                drive: prefixPath.appendingPathComponent("drive_c", isDirectory: true))
+            if let installed = SteamInstallFiles.sizeOnDisk(
+                appID: Int(game.appID), steamApps: steamApps), installed > 0 {
+                return UInt64(installed)
+            }
+        }
+        let onDisk = game.installedSize(for: "windows")
+        return onDisk > 0 ? onDisk : game.downloadSize(for: "windows")
     }
 
     private func gameCard(_ game: SteamAppInfo) -> some View {
@@ -680,9 +684,9 @@ struct WindowsWorkspaceView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            let downloadBytes = displayedSize(for: game)
-            if downloadBytes > 0 {
-                Text("(\(ByteCountFormatter.string(fromByteCount: Int64(clamping: downloadBytes), countStyle: .file)))")
+            let displayedBytes = displayedSize(for: game)
+            if displayedBytes > 0 {
+                Text("(~\(ByteCountFormatter.string(fromByteCount: Int64(clamping: displayedBytes), countStyle: .file)))")
                     .font(.caption)
                     .foregroundColor(.gray)
                     .lineLimit(1)
