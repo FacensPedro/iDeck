@@ -3910,7 +3910,7 @@ struct SteamAppInfo {
                 ideck_steam_black_desert_is_regional_depot($0.depotID) != 0 &&
                 $0.publicManifestID != nil && !$0.isSharedInstall &&
                 !$0.lowViolence && $0.supports(os: os) &&
-                ($0.dlcAppID == nil || includingDLC.contains($0.dlcAppID!)) &&
+                ($0.dlcAppID.map { includingDLC.contains($0) } ?? true) &&
                 ($0.language.isEmpty || $0.language.caseInsensitiveCompare(language) == .orderedSame)
             }.map(\.depotID))
             guard !ids.isEmpty else { return nil }
@@ -3994,6 +3994,9 @@ struct SteamAppInfo {
 
     func downloadSize(for os: String) -> UInt64 {
         let selected = installDepots(os: os)
+        // If no regional Black Desert depot is installable, the correct
+        // answer is "unavailable", not the sum of nine unrelated editions.
+        if appID == 582660 && selected.isEmpty { return 0 }
         let candidates: [DepotInfo]
         if !selected.isEmpty {
             candidates = selected
