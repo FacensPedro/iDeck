@@ -52,7 +52,7 @@ A preparação ARM64EC segue o fork Madeira fixado por `scripts/fetch_madeira_so
 
 O arquivo `prefix-template.tar.gz` é copiado do checkout Madeira diretamente para o aplicativo. Ao abrir o modo Windows, `PrefixInstaller` prefere **o modelo incluído no próprio IPA**; extrai registro e diretórios para `Documents/VirtualRoot`, prepara `dosdevices/c:` e migra arquivos `.exe` antigos de `WindowsDownloads` para `drive_c/WindowsDownloads` sem sobrescrever os destinos existentes. O lançamento nativo também chama `madeira_seed_prefix_if_needed` do upstream **antes** do wineserver, e verifica `system.reg`, `.update-timestamp` e `drive_c/windows`. O Wine recria os links aos módulos PE dentro do prefixo quando a sessão inicia.
 
-A verificação do build exige os módulos PE com cabeçalho `MZ/PE` e tipo de máquina coerente (`ARM64EC` ou `ARM64X` para a farm ARM64EC; `ARM64` ou `ARM64X` para a farm ARM64), além do prefixo gzip, arquivos gráficos e símbolos nativos. Arquivos vazios ou bibliotecas ARM64 erradas não devem ser aceitos como um runtime válido.
+A verificação do build exige módulos PE válidos com cabeçalho `MZ/PE`. Para **imagens finais ARM64EC**, o campo COFF Machine é normalmente `0x8664` (AMD64), acompanhado de metadados **CHPE** na estrutura Load Configuration; `0xA641` identifica arquivos objeto ARM64EC, não uma DLL final. O verificador confirma os metadados CHPE e rejeita DLLs x64 comuns. A farm ARM64 nativa exige `0xAA64`. Também são verificados o prefixo gzip, recursos gráficos e os símbolos nativos, incluindo `iDeck.debug.dylib` em builds Debug do Xcode. Arquivos vazios ou bibliotecas ARM64 erradas não devem ser aceitos como um runtime válido.
 
 ### Limitações verificáveis
 
