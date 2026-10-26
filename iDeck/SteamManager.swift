@@ -3907,7 +3907,11 @@ struct SteamAppInfo {
         let selectedBlackDesertRegion: UInt32? = {
             guard appID == 582660 else { return nil }
             let ids = Set(depots.filter {
-                ideck_steam_black_desert_is_regional_depot($0.depotID) != 0
+                ideck_steam_black_desert_is_regional_depot($0.depotID) != 0 &&
+                $0.publicManifestID != nil && !$0.isSharedInstall &&
+                !$0.lowViolence && $0.supports(os: os) &&
+                ($0.dlcAppID == nil || includingDLC.contains($0.dlcAppID!)) &&
+                ($0.language.isEmpty || $0.language.caseInsensitiveCompare(language) == .orderedSame)
             }.map(\.depotID))
             guard !ids.isEmpty else { return nil }
             let country = Locale.current.region?.identifier ?? ""
