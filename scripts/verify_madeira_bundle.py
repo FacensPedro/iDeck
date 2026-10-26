@@ -62,7 +62,7 @@ def _pe_arch_error(dll: Path, require_arm64ec: bool) -> str | None:
             if pe_offset < 64 or pe_offset > 64 * 1024 * 1024:
                 return f"invalid PE DOS header: {dll}"
             signature = _read_at(stream, pe_offset, 24, size)
-            if signature[:4] != b"PE\\0\\0":
+            if signature[:4] != b"PE\0\0":
                 return f"invalid PE signature: {dll}"
             machine, sections = struct.unpack_from("<HH", signature, 4)
             optional_size = struct.unpack_from("<H", signature, 20)[0]
@@ -148,7 +148,7 @@ def inspect(app: Path) -> list[str]:
                 stderr=subprocess.PIPE
             )
             exported.update(re.findall(
-                r"(?m)^.*\\s_([A-Za-z][A-Za-z0-9_]*)\\s*$", result.stdout
+                r"(?m)^.*\s_([A-Za-z][A-Za-z0-9_]*)\s*$", result.stdout
             ))
         except (OSError, subprocess.CalledProcessError) as exc:
             errors.append(f"unable to inspect linked arm64 symbols in {image}: {exc}")
