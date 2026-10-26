@@ -1,5 +1,6 @@
 import importlib.util
 import re
+import subprocess
 import unittest
 from pathlib import Path
 
@@ -24,6 +25,35 @@ class MadeiraNativeDuplicateSymbolsTests(unittest.TestCase):
         self.assertNotIn('OBJS+=("$CANARY_OBJ")', source)
         self.assertNotIn('CANARY_OBJ="$OUT/obj/msc_canary.o"', source)
 
+
+    def test_dxmt_canary_awk_preflight_is_executable(self):
+        source = LINKER.read_text(encoding="utf-8")
+        delimiter = 'nm -gU "$APP/libdxmt_combined.a" | awk \''
+        start = source.index(delimiter) + len(delimiter)
+        end = source.index("\\n'; then", start)
+        program = source[start:end]
+        canary_run = "0000000000000000 T _madeira_d3d12_canary_run\\n"
+        canary_log = "0000000000000000 T _madeira_d3d12_canary_run_log\\n"
+        test_cases = (
+            (canary_run + canary_log, 0),
+            (canary_run, 1),
+            (canary_log, 1),
+            ("0000000000000000 T _unrelated_symbol\\n", 1),
+        )
+        for symbols, expected in test_cases:
+            with self.subTest(symbols=symbols):
+                result = subprocess.run(
+                    ["awk", program],
+                    input=symbols,
+                    text=True,
+                    capture_output=True,
+                    check=False,
+                )
+                self.assertEqual(
+                    result.returncode, expected,
+                    f"awk preflight failed: {result.stderr}",
+                )
+                self.assertEqual(result.stderr, "")
 
     def test_no_second_wine_ui_log(self):
         linker = LINKER.read_text(encoding="utf-8")
