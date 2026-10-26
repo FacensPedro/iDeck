@@ -13,6 +13,34 @@ bundle = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(bundle)
 
 
+def make_64bit_pe(machine: int, chpe: bool = False) -> bytes:
+    data = bytearray(4096)
+    data[:2] = b"MZ"
+    struct.pack_into("<I", data, 0x3C, 0x80)
+    data[0x80:0x84] = b"PE\0\0"
+    struct.pack_into("<H", data, 0x84, machine)
+    struct.pack_into("<H", data, 0x86, 1)
+    struct.pack_into("<H", data, 0x94, 240)
+    optional = 0x98
+    struct.pack_into("<H", data, optional, 0x20B)
+    struct.pack_into("<Q", data, optional + 24, 0x180000000)
+    struct.pack_into("<I", data, optional + 60, 0x400)
+    struct.pack_into("<I", data, optional + 108, 16)
+    # IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG (10)
+    if chpe:
+        struct.pack_into("<II", data, optional + 192, 0x1000, 208)
+    sections = optional + 240
+    data[sections:sections + 8] = b".rdata\0\0"
+    struct.pack_into("<IIII", data, sections + 8,
+                     0x800, 0x1000, 0x800, 0x400)
+    if chpe:
+        struct.pack_into("<I", data, 0x400, 208)
+        # IMAGE_LOAD_CONFIG_DIRECTORY64::CHPEMetadataPointer offset 0xC8
+        struct.pack_into("<Q", data, 0x400 + 0xC8, 0x180000000 + 0x1200)
+        struct.pack_into("<I", data, 0x600, 2)
+    return bytes(data)
+
+
 class MadeiraBundleTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
@@ -22,12 +50,9 @@ class MadeiraBundleTests(unittest.TestCase):
         for name in bundle.PE_FILES:
             path = self.app / "MadeiraRuntime" / name
             path.parent.mkdir(parents=True, exist_ok=True)
-            data = bytearray(2048)
-            data[:2] = b"MZ"
-            struct.pack_into("<I", data, 0x3c, 128)
-            data[128:132] = b"PE\0\0"
-            struct.pack_into("<H", data, 132, 0xA641 if name.startswith("arm64ec") else 0xAA64)
-            path.write_bytes(data)
+            arm64ec = name.startswith("arm64ec-windows/")
+            path.write_bytes(make_64bit_pe(0x8664 if arm64ec else 0xAA64,
+                                           chpe=arm64ec))
         converter = self.app / "MadeiraRuntime/d3d12/libmetalirconverter.dylib"
         converter.parent.mkdir()
         converter.write_bytes(bytes(2048))
@@ -47,12 +72,35 @@ class MadeiraBundleTests(unittest.TestCase):
         (self.app / "MadeiraRuntime/arm64ec-windows/d3d11.dll").unlink()
         self.assertTrue(any("missing compiled Windows PE" in error for error in self.inspect()))
 
-    def test_wrong_frontend_architecture(self):
+    def test_rejects_plain_x64_module_in_arm64ec_directory(self):
+        path = self.app / "MadeiraRuntime/arm64ec-windows/dxgi.dll"
+        path.write_bytes(make_64bit_pe(0x8664))
+        self.assertTrue(any("missing ARM64EC CHPE metadata" in error for error in self.inspect()))
+
+    def test_rejects_coff_object_machine_in_final_pe(self):
+        path = self.app / "MadeiraRuntime/arm64ec-windows/dxgi.dll"
+        path.write_bytes(make_64bit_pe(0xA641))
+        self.assertTrue(any("unexpected PE machine 0xa641" in error for error in self.inspect()))
+
+    def test_rejects_bad_chpe_metadata_pointer(self):
         path = self.app / "MadeiraRuntime/arm64ec-windows/dxgi.dll"
         data = bytearray(path.read_bytes())
-        struct.pack_into("<H", data, 132, 0x8664)
+        struct.pack_into("<Q", data, 0x400 + 0xC8, 0x180000000 + 0x990000)
         path.write_bytes(data)
-        self.assertTrue(any("unexpected PE machine" in error for error in self.inspect()))
+        self.assertTrue(any("invalid ARM64EC PE structure" in error for error in self.inspect()))
+
+    def test_rejects_bad_chpe_metadata_version(self):
+        path = self.app / "MadeiraRuntime/arm64ec-windows/dxgi.dll"
+        data = bytearray(path.read_bytes())
+        struct.pack_into("<I", data, 0x600, 0)
+        path.write_bytes(data)
+        self.assertTrue(any("invalid ARM64EC CHPE metadata version" in error
+                            for error in self.inspect()))
+
+    def test_rejects_x64_module_in_native_aarch64_directory(self):
+        path = self.app / "MadeiraRuntime/aarch64-windows/dxgi.dll"
+        path.write_bytes(make_64bit_pe(0x8664, chpe=True))
+        self.assertTrue(any("unexpected PE machine 0x8664" in error for error in self.inspect()))
 
     def test_missing_readiness_symbol(self):
         self.symbols.remove("wineserver_is_ready")
@@ -61,6 +109,25 @@ class MadeiraBundleTests(unittest.TestCase):
     def test_missing_prefix_entrypoint(self):
         self.symbols.remove("madeira_seed_prefix_if_needed")
         self.assertIn("native symbol not linked/exported: madeira_seed_prefix_if_needed", self.inspect())
+
+    def test_symbols_can_live_in_xcode_debug_dylib(self):
+        (self.app / "iDeck.debug.dylib").write_bytes(b"fixture")
+        all_symbols = "\n".join(f"00000000 T _{name}" for name in bundle.SYMBOLS)
+
+        def nm_side_effect(command, **kwargs):
+            output = all_symbols if str(command[-1]).endswith("iDeck.debug.dylib") else ""
+            return subprocess.CompletedProcess(command, 0, stdout=output, stderr="")
+
+        with patch.object(bundle.subprocess, "run", side_effect=nm_side_effect) as mocked:
+            self.assertEqual(bundle.inspect(self.app), [])
+            self.assertEqual(mocked.call_count, 2)
+
+    def test_missing_debug_dylib_symbols_are_not_ignored(self):
+        (self.app / "iDeck.debug.dylib").write_bytes(b"fixture")
+        result = subprocess.CompletedProcess([], 0, stdout="", stderr="")
+        with patch.object(bundle.subprocess, "run", return_value=result):
+            errors = bundle.inspect(self.app)
+        self.assertTrue(any("native symbol not linked/exported" in e for e in errors))
 
 
 if __name__ == "__main__":
