@@ -194,6 +194,7 @@ final class DepotDownloader {
         // 3. Chunks.
         let started = Date()
         let resumedBytes = state.doneBytes
+        var actualWrittenBytes: UInt64 = 0
         var lastReport = Date.distantPast
         for (index, plan) in plans.enumerated() {
             let journal = try JournalWriter(url: prepared.journals[index])
@@ -202,7 +203,7 @@ final class DepotDownloader {
             let paths = prepared.paths[index]
             let existing = prepared.existing[index]
             let maximum = maxConcurrentChunks, attempts = attemptsPerChunk
-            try await withThrowingTaskGroup(of: (UInt64, UInt64).self) { group in
+            try await withThrowingTaskGroup(of: (UInt64, UInt64, UInt64).self) { group in
                 var next = 0
                 func enqueue() {
                     guard next < work.count else { return }
@@ -211,15 +212,20 @@ final class DepotDownloader {
                     let path = paths[item.file]
                     let verify = existing[item.file]
                     group.addTask {
-                        if verify, Self.chunkAlreadyPresent(chunk, path: path) { return (item.key, UInt64(chunk.compressedSize)) }
-                        try await Self.fetchChunk(chunk, plan: plan, path: path, attempts: attempts, seed: item.file &+ item.chunk)
-                        return (item.key, UInt64(chunk.compressedSize))
+                        if verify, Self.chunkAlreadyPresent(chunk, path: path) {
+                            return (item.key, UInt64(chunk.compressedSize), 0)
+                        }
+                        let written = try await Self.fetchChunk(
+                            chunk, plan: plan, path: path, attempts: attempts,
+                            seed: item.file &+ item.chunk, reuseExisting: verify)
+                        return (item.key, UInt64(chunk.compressedSize), written)
                     }
                 }
                 for _ in 0..<min(maximum, work.count) { enqueue() }
-                for try await (key, bytes) in group {
+                for try await (key, bytes, written) in group {
                     journal.append(key)
                     state.doneBytes += bytes
+                    actualWrittenBytes &+= written
                     let now = Date()
                     if now.timeIntervalSince(lastReport) >= 0.25 {
                         lastReport = now
@@ -302,7 +308,7 @@ final class DepotDownloader {
             }
         }
         try? FileManager.default.removeItem(at: journalDir)
-        SteamLog.event("[steam-depot] install complete app=\(app.appID) bytes=\(prepared.totalUncompressed) seconds=\(Int(Date().timeIntervalSince(started)))")
+        SteamLog.event("[steam-depot] install complete app=\(app.appID) bytes=\(prepared.totalUncompressed) physical-write-requests=\(actualWrittenBytes) seconds=\(Int(Date().timeIntervalSince(started)))")
         return installURL
     }
 
@@ -384,7 +390,14 @@ final class DepotDownloader {
                 for (chunkIndex, chunk) in file.chunks.enumerated() {
                     let item = WorkItem(file: fileIndex, chunk: chunkIndex)
                     result.totalBytes += UInt64(chunk.compressedSize)
-                    if done.contains(item.key) {
+                    // Journal records are only valid if the corresponding file
+                    // was still present and large enough before ftruncate.
+                    // Otherwise an interrupted uninstall/reinstall could skip
+                    // missing content and leave an apparently complete game.
+                    let priorSize = hadContent ? UInt64(before.st_size) : 0
+                    if done.contains(item.key),
+                       chunk.offset <= priorSize,
+                       UInt64(chunk.uncompressedSize) <= priorSize - chunk.offset {
                         result.doneBytes += UInt64(chunk.compressedSize)
                     } else {
                         pending.append(item)
@@ -439,7 +452,8 @@ final class DepotDownloader {
     }
 
     private nonisolated static func fetchChunk(_ chunk: DepotManifest.ChunkEntry, plan: DepotPlan,
-                                               path: String, attempts: Int, seed: Int) async throws {
+                                               path: String, attempts: Int, seed: Int,
+                                               reuseExisting: Bool) async throws -> UInt64 {
         var lastError: Error = SteamError.chunkDownloadFailed("No content server responded.")
         for attempt in 0..<max(1, attempts) {
             try Task.checkCancellation()
@@ -453,9 +467,10 @@ final class DepotDownloader {
                                                              expectedCRC: chunk.crc,
                                                              expectedSize: Int(chunk.uncompressedSize))
                 guard data.count == Int(chunk.uncompressedSize) else { throw SteamError.checksumMismatch }
-                try write(data, to: path, offset: chunk.offset)
+                let written = try write(data, to: path, offset: chunk.offset,
+                                        reuseExisting: reuseExisting)
                 plan.health.recordSuccess(host)
-                return
+                return written
             } catch is CancellationError {
                 throw CancellationError()
             } catch {
@@ -476,18 +491,21 @@ final class DepotDownloader {
         return "other"
     }
 
-    private nonisolated static func write(_ data: Data, to path: String, offset: UInt64) throws {
-        let fd = open(path, O_WRONLY)
-        guard fd >= 0 else { throw SteamError.chunkDownloadFailed("Cannot open a game file (errno \(errno)).") }
-        defer { close(fd) }
-        try data.withUnsafeBytes { raw in
-            var written = 0
-            while written < raw.count {
-                let n = pwrite(fd, raw.baseAddress! + written, raw.count - written, off_t(offset) + off_t(written))
-                guard n > 0 else { throw SteamError.chunkDownloadFailed("Cannot write a game file (errno \(errno)).") }
-                written += n
+    private nonisolated static func write(_ data: Data, to path: String,
+                                           offset: UInt64, reuseExisting: Bool) throws -> UInt64 {
+        var written: UInt64 = 0
+        let errorCode = path.withCString { pathPointer in
+            data.withUnsafeBytes { raw in
+                ideck_steam_write_chunk(
+                    pathPointer, raw.baseAddress, raw.count, offset,
+                    reuseExisting ? 1 : 0, &written
+                )
             }
         }
+        guard errorCode == 0 else {
+            throw SteamError.chunkDownloadFailed("Cannot write a game file (errno \(errorCode)).")
+        }
+        return written
     }
 
     private nonisolated static func download(_ urlString: String) async throws -> Data {

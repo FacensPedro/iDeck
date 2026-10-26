@@ -6,6 +6,9 @@ struct IPAArchivePathTests {
         let accepted = [
             "Payload/",
             "Payload/GetMoreRam.app/",
+            "Payload/Husk.app/",
+            "Payload/Husk.app/Info.plist",
+            "Payload/Husk.app/Frameworks/Library.dylib",
             "Payload/GetMoreRam.app/Info.plist",
             "Payload/GetMoreRam.app/Frameworks/../Info.plist",
             "Payload\\GetMoreRam.app\\Frameworks\\foo.dylib",
@@ -30,6 +33,8 @@ struct IPAArchivePathTests {
             precondition(IPAArchivePath.components(path) == nil, "Unsafe IPA entry accepted: \(path)")
         }
         precondition(IPAArchivePath.isDirectory("Payload/GetMoreRam.app/", unixMode: 0))
+        precondition(IPAArchivePath.components("Payload/Husk.app/") == ["Payload", "Husk.app"])
+        precondition(IPAArchivePath.isDirectory("Payload/Husk.app/", unixMode: 0))
         precondition(IPAArchivePath.isDirectory("Payload/GetMoreRam.app", unixMode: 0o040755))
         precondition(!IPAArchivePath.isDirectory("Payload/GetMoreRam.app/Info.plist", unixMode: 0o100644))
         print("IPA archive path checks passed")

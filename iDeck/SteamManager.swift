@@ -3900,8 +3900,34 @@ struct SteamAppInfo {
     /// to 32-bit depots when the app only publishes those.
     func installDepots(os: String = "windows", arch: String = "64",
                        language: String = "english", includingDLC: Set<UInt32> = []) -> [DepotInfo] {
+        // Black Desert PICS publishes nine regional alternatives. Summing them
+        // would claim ~720 GB and downloading them all would waste storage.
+        // Filter the actual install as well as the size estimate. Prefer the
+        // user's country, then the global depot if that is what Valve exposes.
+        let selectedBlackDesertRegion: UInt32? = {
+            guard appID == 582660 else { return nil }
+            let ids = Set(depots.filter {
+                ideck_steam_black_desert_is_regional_depot($0.depotID) != 0 &&
+                $0.publicManifestID != nil && !$0.isSharedInstall &&
+                !$0.lowViolence && $0.supports(os: os) &&
+                ($0.dlcAppID.map { includingDLC.contains($0) } ?? true) &&
+                ($0.language.isEmpty || $0.language.caseInsensitiveCompare(language) == .orderedSame)
+            }.map(\.depotID))
+            guard !ids.isEmpty else { return nil }
+            let country = Locale.current.region?.identifier ?? ""
+            let preferred = country.withCString {
+                ideck_steam_black_desert_preferred_depot($0)
+            }
+            if ids.contains(preferred) { return preferred }
+            if ids.contains(582669) { return 582669 }
+            if let regional = ids.filter({ $0 != 582661 }).sorted().first { return regional }
+            return ids.sorted().first
+        }()
         func select(_ arch: String) -> [DepotInfo] {
             depots.filter { d in
+                (selectedBlackDesertRegion == nil ||
+                    ideck_steam_black_desert_is_regional_depot(d.depotID) == 0 ||
+                    d.depotID == selectedBlackDesertRegion) &&
                 d.supports(os: os) && (d.dlcAppID == nil || d.dlcAppID.map { includingDLC.contains($0) } == true) && !d.isSharedInstall &&
                 d.publicManifestID != nil && !d.lowViolence &&
                 (d.osarch.isEmpty || d.osarch == arch) &&
@@ -3950,8 +3976,27 @@ struct SteamAppInfo {
     /// apps since Valve's 2023 PICS change) and falls back to the legacy
     /// `maxsize`. DLC depots and `sharedinstall` redistributables are not part
     /// of the base install and are left out. Treat the figure as "about".
+    /// Uncompressed installation footprint, when Steam PICS supplies it.
+    /// Never interpret a compressed CDN total as disk usage.
+    func installedSize(for os: String) -> UInt64 {
+        let selected = installDepots(os: os)
+        guard !selected.isEmpty else { return 0 }
+        var result: UInt64 = 0
+        for depot in selected {
+            let size = depot.publicSizeBytes > 0 ? depot.publicSizeBytes : depot.maxSize
+            guard size > 0 else { return 0 }
+            let (sum, overflow) = result.addingReportingOverflow(size)
+            if overflow { return 0 }
+            result = sum
+        }
+        return result
+    }
+
     func downloadSize(for os: String) -> UInt64 {
         let selected = installDepots(os: os)
+        // If no regional Black Desert depot is installable, the correct
+        // answer is "unavailable", not the sum of nine unrelated editions.
+        if appID == 582660 && selected.isEmpty { return 0 }
         let candidates: [DepotInfo]
         if !selected.isEmpty {
             candidates = selected

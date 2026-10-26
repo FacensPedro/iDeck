@@ -8,5 +8,7 @@
 #import "NativeRuntime/MadeiraRuntimeBridge.h"
 
 #import "SteamChunkCodecs.h"
+#import "SteamDepotRegionPolicy.h"
+#import "SteamDiskIO.h"
 
 #endif /* iDeck_Bridging_Header_h */
