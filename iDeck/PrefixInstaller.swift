@@ -445,7 +445,7 @@ enum ZipExtractor {
                 guard !overflow, total <= maxExpandedBytes,
                       uncompressedSize <= 4 * 1024 * 1024 * 1024,
                       compressedSize > 0 || uncompressedSize == 0,
-                      uncompressedSize <= max(compressedSize, 1) * 5000 else {
+                      uncompressedSize <= max(compressedSize, 1) * 500 else {
                     throw ZipError.unsupported
                 }
                 extractedBytes = total
