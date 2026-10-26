@@ -51,13 +51,16 @@ final class DepotDownloader {
     private var cdnAuthTokens: [String: String] = [:]  // "depot|host" -> "?auth=…" fragment
     private var maxConcurrentChunks: Int {
         let process = ProcessInfo.processInfo
-        if process.isLowPowerModeEnabled { return 4 }
+        // iPadOS recorded 81% CPU while Steam chunks were being installed.
+        // Keep enough CDN parallelism to saturate the network while leaving
+        // CPU capacity for decrypting, inflating, SwiftUI and the JIT runtime.
+        if process.isLowPowerModeEnabled { return 2 }
         switch process.thermalState {
-        case .nominal: return 12
-        case .fair: return 8
-        case .serious: return 4
-        case .critical: return 2
-        @unknown default: return 6
+        case .nominal: return min(8, max(4, process.activeProcessorCount))
+        case .fair: return 4
+        case .serious: return 2
+        case .critical: return 1
+        @unknown default: return 4
         }
     }
     private let attemptsPerChunk = 5
@@ -72,7 +75,7 @@ final class DepotDownloader {
         config.timeoutIntervalForRequest = 30
         config.timeoutIntervalForResource = 300
         // No bandwidth throttle is applied. This is a connection safety limit.
-        config.httpMaximumConnectionsPerHost = 12
+        config.httpMaximumConnectionsPerHost = 8
         return URLSession(configuration: config)
     }()
 
