@@ -12,12 +12,56 @@ mkdir -p "$BUILD_DIR"
 
 EXTRA_XCODE_SETTINGS=()
 CONFIGURATION="${IDECK_CONFIGURATION:-Release}"
-if [ "${IDECK_REQUIRE_MADEIRA:-0}" = "1" ]; then
+NATIVE_ASSET_SOURCE=""
+EXPORT_NATIVE_KIT=0
+if [[ "${IDECK_REQUIRE_MADEIRA:-0}" == "1" ]]; then
   CONFIGURATION="${IDECK_CONFIGURATION:-Debug}"
-  bash scripts/build_madeira_components.sh
-  bash scripts/link_madeira_native.sh
+  [[ "${IDECK_ACCEPT_METAL_CONVERTER_LICENSE:-0}" == "1" ]] || {
+    echo "ERROR: Native build requires explicit Metal Shader Converter license/redistribution confirmation." >&2
+    exit 2
+  }
+  KIT_FLAGS=()
+  if [[ "${IDECK_BUILD_WOW64:-0}" == "1" ]]; then KIT_FLAGS+=(--wow64); fi
+  if [[ "${IDECK_BUNDLE_WINE_MONO:-0}" == "1" ]]; then KIT_FLAGS+=(--mono); fi
+  KIT_MODE="${IDECK_PREBUILT_MODE:-prefer}"
+  [[ "$KIT_MODE" == "prefer" || "$KIT_MODE" == "only" || "$KIT_MODE" == "off" ]] || {
+    echo "ERROR: IDECK_PREBUILT_MODE must be prefer, only or off." >&2
+    exit 2
+  }
+  KIT_ARCHIVE=""
+  if [[ "$KIT_MODE" != "off" ]]; then
+    if [[ -n "${IDECK_PREBUILT_ARCHIVE:-}" ]]; then
+      KIT_ARCHIVE="$IDECK_PREBUILT_ARCHIVE"
+      [[ -s "$KIT_ARCHIVE" ]] || {
+        echo "ERROR: explicit prebuilt Madeira kit not found: $KIT_ARCHIVE" >&2
+        exit 2
+      }
+    else
+      REPO_KIT="$(python3 scripts/madeira_native_kit.py path "${KIT_FLAGS[@]}")"
+      CACHE_KIT="$(python3 scripts/madeira_native_kit.py path --cache "${KIT_FLAGS[@]}")"
+      if [[ -s "$REPO_KIT" ]]; then
+        KIT_ARCHIVE="$REPO_KIT"
+      elif [[ -s "$CACHE_KIT" ]]; then
+        KIT_ARCHIVE="$CACHE_KIT"
+      fi
+    fi
+  fi
+  if [[ -n "$KIT_ARCHIVE" ]]; then
+    python3 scripts/madeira_native_kit.py install --archive "$KIT_ARCHIVE" "${KIT_FLAGS[@]}"
+    NATIVE_ASSET_SOURCE="$(pwd)/build/madeira-prebuilt/resources"
+    echo "Using precompiled Madeira FEX/Wine/DXMT/WineMetal/D3D12: $KIT_ARCHIVE"
+  else
+    if [[ "$KIT_MODE" == "only" ]]; then
+      echo "ERROR: no matching prebuilt Madeira kit. Build once with IDECK_PREBUILT_MODE=off IDECK_PREBUILT_EXPORT=1." >&2
+      exit 2
+    fi
+    bash scripts/build_madeira_components.sh
+    bash scripts/link_madeira_native.sh
+    NATIVE_ASSET_SOURCE="${IDECK_MADEIRA_ROOT:-$(pwd)/vendor/Madeira}/app/Madeira"
+    if [[ "${IDECK_PREBUILT_EXPORT:-0}" == "1" ]]; then EXPORT_NATIVE_KIT=1; fi
+  fi
   NATIVE_LINK_FLAGS="$(cat "$BUILD_DIR/madeira-native/link-flags.txt")"
-  [[ -n "$NATIVE_LINK_FLAGS" ]] || { echo "Missing Madeira linker flags" >&2; exit 2; }
+  [[ -n "$NATIVE_LINK_FLAGS" ]] || { echo "ERROR: empty Madeira link flags" >&2; exit 2; }
   EXTRA_XCODE_SETTINGS+=(
     "IDECK_NATIVE_CFLAGS=-DIDECK_NATIVE_MADEIRA_ENABLED=1"
     "IDECK_NATIVE_LINK_FLAGS=$NATIVE_LINK_FLAGS"
@@ -43,13 +87,16 @@ done
 [ -d "$APP/PlugIns/VPNExtension.appex" ] || { echo "error: VPNExtension.appex was not embedded" >&2; exit 1; }
 
 if [ "${IDECK_REQUIRE_MADEIRA:-0}" = "1" ]; then
-  IDECK_MADEIRA_APP_ROOT="${IDECK_MADEIRA_ROOT:-$(pwd)/vendor/Madeira}/app/Madeira" \
+  IDECK_MADEIRA_APP_ROOT="$NATIVE_ASSET_SOURCE" \
     bash scripts/stage_madeira_payload.sh "$APP"
   WOW64_FLAGS=()
   if [[ "${IDECK_BUILD_WOW64:-0}" == "1" ]]; then
     WOW64_FLAGS+=(--require-wow64)
   fi
   python3 scripts/verify_madeira_bundle.py --app "$APP" --require "${WOW64_FLAGS[@]}"
+  if [[ "$EXPORT_NATIVE_KIT" == "1" ]]; then
+    python3 scripts/madeira_native_kit.py create --cache --resource-root "$APP" "${KIT_FLAGS[@]}"
+  fi
 else
   python3 scripts/verify_madeira_bundle.py --app "$APP"
 fi
