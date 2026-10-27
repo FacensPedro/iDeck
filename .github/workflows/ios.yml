@@ -136,6 +136,9 @@ jobs:
             -o /tmp/ideck-steam-disk-tests
           /tmp/ideck-steam-disk-tests
 
+      - name: Test Steam WebSocket backpressure and graphics readiness diagnostics
+        run: python3 -m unittest discover -s tests/host -p 'test_steam_game_launch_diagnostics.py' -v
+
       - name: Test Husk IPA ZIP extraction
         run: |
           xcrun swiftc iDeck/IPAArchivePath.swift tests/host/IPAArchivePathTests.swift -o /tmp/ideck-ipa-path-tests

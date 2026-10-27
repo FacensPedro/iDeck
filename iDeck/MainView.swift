@@ -49,7 +49,8 @@ struct MainView: View {
             get: {
                 coordinator.windowsStatus == "Steam Running" ||
                 coordinator.windowsStatus == "Running" ||
-                coordinator.windowsStatus == "Launching Steam game..."
+                coordinator.windowsStatus == "Launching Steam game..." ||
+                coordinator.windowsStatus.hasPrefix("Execution Error:")
             },
             set: { _ in coordinator.setWindowsStatus("Windows Ready") }
         )) {
@@ -902,7 +903,7 @@ struct WindowsWorkspaceView: View {
         let profile = windowsLibrary.profile(for: "steam:\(game.appID)", title: game.name)
         coordinator.launchSteamGame(game: game, profile: profile, prefixPath: prefixPath)
         if coordinator.windowsStatus.hasPrefix("Cannot launch") || coordinator.windowsStatus.hasPrefix("Madeira runtime missing") {
-            installMessage = coordinator.windowsStatus
+            installMessage = trStatus(coordinator.windowsStatus)
             isShowingInstallResult = true
         }
     }
@@ -1380,7 +1381,7 @@ private struct SteamProgramDetailsView: View {
                                 coordinator.launchSteamGame(game: game, profile: profile, prefixPath: prefixPath)
                                 if coordinator.windowsStatus.hasPrefix("Cannot launch") ||
                                    coordinator.windowsStatus.hasPrefix("Madeira runtime missing") {
-                                    presentError(coordinator.windowsStatus)
+                                    presentError(trStatus(coordinator.windowsStatus))
                                 } else {
                                     dismiss()
                                 }
@@ -1440,8 +1441,10 @@ private struct SteamProgramDetailsView: View {
             .navigationBarTitleDisplayMode(.inline)
             .task(id: game.appID) {
                 await steamLibrary.loadDLC(appID: game.appID)
+                guard !Task.isCancelled else { return }
                 if let prefixPath {
                     steamLibrary.refreshInstalledDLC(appID: game.appID, prefixPath: prefixPath)
+                    guard !Task.isCancelled else { return }
                     if autoSaveEnabled {
                         await steamLibrary.syncCloud(appID: game.appID, prefixPath: prefixPath)
                     }

@@ -2568,14 +2568,13 @@ actor SteamConnection {
             case .success(let message):
                 switch message {
                 case .data(let data):
-                    Task { await self.dispatchMessage(data) }
+                    Task { await self.consumeThenReceive(data, from: task) }
                 case .string(let text):
                     SteamLog.trace("unexpected text frame (\(text.utf8.count) bytes)")
+                    Task { await self.consumeThenReceive(nil, from: task) }
                 @unknown default:
-                    break
+                    Task { await self.consumeThenReceive(nil, from: task) }
                 }
-                // Schedule the next receive immediately to keep the loop running
-                self.scheduleReceive(task)
 
             case .failure(let error):
                 // NSPOSIXErrorDomain 57 "Socket is not connected" is a normal disconnect
@@ -2589,8 +2588,11 @@ actor SteamConnection {
         }
     }
 
-    private func dispatchMessage(_ data: Data) {
-        messageHandler?(data)
+    private func consumeThenReceive(_ data: Data?, from task: URLSessionWebSocketTask) {
+        guard webSocketTask === task else { return }
+        if let data { messageHandler?(data) }
+        guard webSocketTask === task else { return }
+        scheduleReceive(task)
     }
 
     // MARK: - Send
@@ -4789,6 +4791,7 @@ final class SteamOwnedGamesModel: ObservableObject {
     }
 
     func loadDLC(appID: UInt32) async {
+        guard !Task.isCancelled else { return }
         do {
             let info: SteamAppInfo?
             if let cached = games.first(where: { $0.appID == appID }) {
@@ -4813,12 +4816,14 @@ final class SteamOwnedGamesModel: ObservableObject {
             })).sorted()
             availableDLC[appID] = ids
             for id in ids.prefix(32) where dlcMetadata[id] == nil {
+                guard !Task.isCancelled else { return }
                 if let details = try? await fetcher.fetchAppInfo(appID: id), details.appID == id {
+                    guard !Task.isCancelled else { return }
                     dlcMetadata[id] = details
                 }
             }
         } catch {
-            availableDLC[appID] = []
+            if !Task.isCancelled { availableDLC[appID] = [] }
         }
     }
 

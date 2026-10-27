@@ -19,6 +19,10 @@ private final class MadeiraMetalView: MTKView {
 }
 
 struct WindowsRendererView: UIViewRepresentable {
+    static var isNativeDisplayLinked: Bool {
+        dlsym(UnsafeMutableRawPointer(bitPattern: -2), "madeira_display_set_layer") != nil
+    }
+
     static var requestedSize: CGSize? {
         guard let w = getenv("MADEIRA_SCREEN_W"), let h = getenv("MADEIRA_SCREEN_H"),
               let width = Double(String(cString: w)), let height = Double(String(cString: h)),
