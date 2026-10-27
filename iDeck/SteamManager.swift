@@ -3937,7 +3937,7 @@ struct SteamAppInfo {
         }()
         func select(_ arch: String) -> [DepotInfo] {
             depots.filter { d in
-                (selectedBlackDesertRegion == nil ||
+                (appID != 582660 ||
                     ideck_steam_black_desert_is_regional_depot(d.depotID) == 0 ||
                     d.depotID == selectedBlackDesertRegion) &&
                 d.supports(os: os) && (d.dlcAppID == nil || d.dlcAppID.map { includingDLC.contains($0) } == true) && !d.isSharedInstall &&
