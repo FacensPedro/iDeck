@@ -441,12 +441,8 @@ class SystemCoordinator: ObservableObject {
     /// relative DLL and asset paths instead of copying the executable elsewhere.
     func launchSteamGame(game: SteamAppInfo, profile: WindowsGameProfile, prefixPath: URL) {
         refreshJITStatus()
-        guard isJITEnabled else {
-            setWindowsStatus("Cannot launch: activate JIT in StikDebug first.")
-            return
-        }
-        guard ideck_fex_jit_ready() else {
-            setWindowsStatus("Cannot launch: StikDebug must remain attached to iDeck with the Madeira JIT script until the FEX pool is ready.")
+        if ideck_wineprocess_running() {
+            setWindowsStatus("Running")
             return
         }
 
@@ -494,16 +490,26 @@ class SystemCoordinator: ObservableObject {
             return
         }
 
+        guard ideck_fex_jit_ready() else {
+            setWindowsStatus("Cannot launch: FEX needs executable-memory preparation. Enable StikDebug JIT and keep its universal.js debugger attached; the library and installation remain usable without JIT.")
+            return
+        }
         windowsEnvironment.configureWine(prefix: prefixPath.path)
         var effectiveProfile = profile
         if isMetalFXEnabled { effectiveProfile.metalFXEnabled = true }
         windowsEnvironment.applyGameProfile(effectiveProfile)
         setWindowsStatus("Launching Steam game...")
-        windowsEnvironment.execute(binary: executableURL,
-                                   arguments: profile.arguments.isEmpty ? entryArguments : profile.arguments,
-                                   jitEnabler: jitEnabler) { [weak self] success in
-            DispatchQueue.main.async {
-                self?.setWindowsStatus(success ? "Running" : "Execution Error: Windows game launch failed")
+        // Let SwiftUI create and publish its CAMetalLayer before native Wine
+        // starts submitting frames. A launch may otherwise bind no drawable.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            guard let self else { return }
+            self.windowsEnvironment.execute(binary: executableURL,
+                                            arguments: profile.arguments.isEmpty ? entryArguments : profile.arguments,
+                                            jitEnabler: self.jitEnabler) { [weak self] success in
+                DispatchQueue.main.async {
+                    guard let self, self.windowsStatus == "Launching Steam game..." else { return }
+                    self.setWindowsStatus(success ? "Running" : "Execution Error: Windows game launch failed")
+                }
             }
         }
     }

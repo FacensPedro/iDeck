@@ -1707,6 +1707,31 @@ enum SteamSignIn {
 
     static var accountName: String? { credentialsForDock()?.accountName }
 
+    static var contentCountryCode: String? {
+        guard let account = accountName else { return nil }
+        let key = "steam.licenseCountry." + account.lowercased()
+        guard let value = UserDefaults.standard.string(forKey: key),
+              value.utf8.count == 2,
+              value.utf8.allSatisfy({ (65...90).contains($0) }) else { return nil }
+        return value
+    }
+
+    static func updateLicenseCountry(_ codes: [String]) {
+        guard let account = accountName else { return }
+        let valid = codes.map { $0.uppercased() }.filter {
+            $0.utf8.count == 2 && $0.utf8.allSatisfy { (65...90).contains($0) }
+        }
+        let counts = Dictionary(valid.map { ($0, 1) }, uniquingKeysWith: +)
+        let key = "steam.licenseCountry." + account.lowercased()
+        if let preferred = counts.max(by: {
+            $0.value == $1.value ? $0.key > $1.key : $0.value < $1.value
+        })?.key {
+            UserDefaults.standard.set(preferred, forKey: key)
+        } else {
+            UserDefaults.standard.removeObject(forKey: key)
+        }
+    }
+
     /// The stored account name and refresh token, or nil when there is no
     /// usable sign-in. A token whose own expiry time has passed counts as
     /// none. Valve still decides whether the token is accepted.
@@ -1721,6 +1746,7 @@ enum SteamSignIn {
         SteamTokenStore().clearTokens()
         if let previousAccount {
             SteamLibraryPreviewCache.remove(account: previousAccount)
+            UserDefaults.standard.removeObject(forKey: "steam.licenseCountry." + previousAccount.lowercased())
         }
         SteamLog.event("[steam-signin] signed out")
         notifyChange()
@@ -2962,6 +2988,7 @@ class SteamSession: SteamCMSession {
                     let list = try CMsgClientLicenseList.deserialize(from: message.body)
                     let packageIDs = list.licenses.map { $0.packageID }
                     SteamLog.trace("ClientLicenseList: parsed \(packageIDs.count) packages (body \(message.body.count)B, eresult=\(list.eresult))")
+                    SteamSignIn.updateLicenseCountry(list.licenses.map(\.purchaseCountryCode))
                     self.licenseListBox.set(packageIDs)
                 } catch {
                     SteamLog.trace("ClientLicenseList deserialize FAILED (body \(message.body.count)B): \(error)")
@@ -3914,18 +3941,19 @@ struct SteamAppInfo {
                 ($0.language.isEmpty || $0.language.caseInsensitiveCompare(language) == .orderedSame)
             }.map(\.depotID))
             guard !ids.isEmpty else { return nil }
-            let country = Locale.current.region?.identifier ?? ""
+            // Steam license purchase country is account-associated metadata.
+            // Never use the iPad's locale to select a different regional edition.
+            let country = SteamSignIn.contentCountryCode ?? ""
             let preferred = country.withCString {
                 ideck_steam_black_desert_preferred_depot($0)
             }
             if ids.contains(preferred) { return preferred }
             if ids.contains(582669) { return 582669 }
-            if let regional = ids.filter({ $0 != 582661 }).sorted().first { return regional }
-            return ids.sorted().first
+            return nil
         }()
         func select(_ arch: String) -> [DepotInfo] {
             depots.filter { d in
-                (selectedBlackDesertRegion == nil ||
+                (appID != 582660 ||
                     ideck_steam_black_desert_is_regional_depot(d.depotID) == 0 ||
                     d.depotID == selectedBlackDesertRegion) &&
                 d.supports(os: os) && (d.dlcAppID == nil || d.dlcAppID.map { includingDLC.contains($0) } == true) && !d.isSharedInstall &&

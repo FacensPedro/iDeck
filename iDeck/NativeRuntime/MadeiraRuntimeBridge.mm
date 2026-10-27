@@ -5,6 +5,7 @@
 #include <sys/stat.h>
 #include <stdlib.h>
 #include <string.h>
+#include <mutex>
 
 #if defined(IDECK_NATIVE_MADEIRA_ENABLED) && IDECK_NATIVE_MADEIRA_ENABLED
 extern "C" void madeira_seed_prefix_if_needed(const char *prefix_path);
@@ -51,9 +52,14 @@ extern "C" int32_t ideck_runtime_prepare(const char *wine_prefix) {
     return 0;
 }
 
+static std::mutex ideck_launch_mutex;
+
 extern "C" int32_t ideck_runtime_launch(const char *executable_path,
                                          const char *wine_prefix,
                                          const char *request_json) {
+    std::unique_lock<std::mutex> launch_lock(ideck_launch_mutex, std::try_to_lock);
+    if (!launch_lock.owns_lock()) return EBUSY;
+    if (ideck_wineprocess_running()) return EALREADY;
     if (!executable_path || !*executable_path || !wine_prefix || !*wine_prefix ||
         !request_json || !*request_json) return EINVAL;
     @autoreleasepool {
