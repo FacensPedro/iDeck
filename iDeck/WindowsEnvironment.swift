@@ -12,8 +12,20 @@ class WindowsEnvironment {
         let assets = [
             "arm64ec-windows/xtajit64.dll",
             "arm64ec-windows/ntdll.dll",
+            "arm64ec-windows/kernel32.dll",
+            "arm64ec-windows/kernelbase.dll",
+            "arm64ec-windows/user32.dll",
+            "arm64ec-windows/gdi32.dll",
+            "arm64ec-windows/d3d11.dll",
+            "arm64ec-windows/dxgi.dll",
+            "arm64ec-windows/d3d12.dll",
+            "arm64ec-windows/d3d12core.dll",
             "arm64ec-windows/winemetal.dll",
+            "aarch64-windows/d3d11.dll",
+            "aarch64-windows/dxgi.dll",
             "aarch64-windows/winemetal.dll",
+            "nls/locale.nls",
+            "d3d12/libmetalirconverter.dylib",
             "prefix-template.tar.gz"
         ]
         guard assets.allSatisfy({
@@ -26,6 +38,11 @@ class WindowsEnvironment {
             "fex_initialize",
             "wineserver_start",
             "wine_process_start",
+            "wine_process_is_running",
+            "madeira_display_set_layer",
+            "macdrv_functions",
+            "winios_screen_size",
+            "winios_display_mode_changed",
             "madeira_get_present_count",
             "madeira_d3d12_canary_run",
             "ideck_madeira_launch_v1"
@@ -48,8 +65,20 @@ class WindowsEnvironment {
         let assets = [
             "arm64ec-windows/xtajit64.dll": "FEX ARM64EC",
             "arm64ec-windows/ntdll.dll": "Wine ARM64EC ntdll",
+            "arm64ec-windows/kernel32.dll": "Wine kernel32",
+            "arm64ec-windows/kernelbase.dll": "Wine kernelbase",
+            "arm64ec-windows/user32.dll": "Wine user32",
+            "arm64ec-windows/gdi32.dll": "Wine gdi32",
+            "arm64ec-windows/d3d11.dll": "DXMT D3D11",
+            "arm64ec-windows/dxgi.dll": "DXMT DXGI",
+            "arm64ec-windows/d3d12.dll": "D3D12 frontend",
+            "arm64ec-windows/d3d12core.dll": "D3D12 core",
             "arm64ec-windows/winemetal.dll": "WineMetal ARM64EC",
+            "aarch64-windows/d3d11.dll": "Wine D3D11 ARM64",
+            "aarch64-windows/dxgi.dll": "Wine DXGI ARM64",
             "aarch64-windows/winemetal.dll": "WineMetal ARM64",
+            "nls/locale.nls": "Wine locale data",
+            "d3d12/libmetalirconverter.dylib": "Metal shader converter",
             "prefix-template.tar.gz": "Wine prefix template"
         ]
         for (relativePath, label) in assets {
@@ -65,6 +94,17 @@ class WindowsEnvironment {
         if !native.dxmt_linked { missing.append("DXMT") }
         if !native.d3d12_linked { missing.append("D3D12") }
         if !native.launcher_linked { missing.append("Madeira native launcher") }
+        for (name, label) in [
+            ("madeira_display_set_layer", "Metal display bridge"),
+            ("macdrv_functions", "Wine Metal macdrv exports"),
+            ("winios_screen_size", "Wine virtual screen bridge"),
+            ("winios_display_mode_changed", "Wine display mode bridge"),
+            ("wine_process_is_running", "Wine process readiness")
+        ] {
+            if name.withCString({ dlsym(UnsafeMutableRawPointer(bitPattern: -2), $0) == nil }) {
+                missing.append(label)
+            }
+        }
         if !native.metal_available { missing.append("Metal device") }
         return missing
     }

@@ -27,7 +27,12 @@ cp "$SOURCE/prefix-template.tar.gz" "$APP/prefix-template.tar.gz"
 }
 
 for path in aarch64-windows/d3d11.dll aarch64-windows/dxgi.dll \
-            aarch64-windows/winemetal.dll arm64ec-windows/ntdll.dll \
+            aarch64-windows/winemetal.dll aarch64-windows/kernel32.dll \
+            aarch64-windows/user32.dll arm64ec-windows/ntdll.dll \
+            arm64ec-windows/kernel32.dll arm64ec-windows/kernelbase.dll \
+            arm64ec-windows/user32.dll arm64ec-windows/gdi32.dll \
+            arm64ec-windows/ws2_32.dll arm64ec-windows/d3d9.dll \
+            arm64ec-windows/vulkan-1.dll arm64ec-windows/madeira_d3d12.dll \
             arm64ec-windows/d3d11.dll arm64ec-windows/dxgi.dll \
             arm64ec-windows/d3d10core.dll \
             arm64ec-windows/d3d12.dll arm64ec-windows/d3d12core.dll \
@@ -42,9 +47,35 @@ done
 # Windows-side IPA signers enumerate bundle entries through APIs that cannot
 # reliably inspect Unix symlinks. Package physical directories in the native
 # runtime mirror, preserving the original top-level paths used by Madeira.
-for folder in aarch64-windows arm64ec-windows; do
+for folder in aarch64-windows arm64ec-windows nls; do
   cp -R "$APP/$folder" "$RUNTIME/$folder"
 done
+[[ -s "$RUNTIME/nls/locale.nls" ]] || {
+  echo "ERROR: Wine locale.nls is missing" >&2; exit 2;
+}
+
+# Official Microsoft VC++ libraries are not included in Madeira's git checkout.
+# When the owner supplies an authorized, complete distribution, stage it in
+# the exact location read by the upstream WineProcessBridge. No fake DLLs.
+VCRT_SOURCE="${IDECK_VCRUNTIME_DIR:-$SOURCE/x86_64-vcruntime}"
+if [[ -d "$VCRT_SOURCE" ]]; then
+  for name in concrt140.dll msvcp140.dll msvcp140_1.dll msvcp140_2.dll \
+              msvcp140_atomic_wait.dll msvcp140_codecvt_ids.dll \
+              vcamp140.dll vccorlib140.dll vcomp140.dll \
+              vcruntime140.dll vcruntime140_1.dll vcruntime140_threads.dll \
+              mfc140.dll mfc140u.dll; do
+    [[ -s "$VCRT_SOURCE/$name" ]] && [[ "$(head -c 2 "$VCRT_SOURCE/$name")" == "MZ" ]] || {
+      echo "ERROR: incomplete Microsoft VC++ runtime: $name" >&2; exit 2;
+    }
+  done
+  cp -R "$VCRT_SOURCE" "$APP/x86_64-vcruntime"
+  echo "Staged owner-supplied Microsoft VC++ runtime."
+elif [[ "${IDECK_REQUIRE_VCRUNTIME:-0}" == "1" ]]; then
+  echo "ERROR: provide authorized Microsoft VC++ DLLs in IDECK_VCRUNTIME_DIR" >&2
+  exit 2
+else
+  echo "WARNING: Microsoft VC++ runtime absent; games needing it may fail."
+fi
 
 mkdir -p "$APP/d3d12" "$RUNTIME/d3d12"
 for name in NOTICE.txt METAL-SHADER-CONVERTER-AGREEMENT.txt LICENSE-metal-shader-converter-headers.txt; do

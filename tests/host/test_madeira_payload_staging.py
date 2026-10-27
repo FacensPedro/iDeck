@@ -11,8 +11,10 @@ STAGER = ROOT / "scripts" / "stage_madeira_payload.sh"
 ARM64EC = (
     "ntdll.dll", "d3d11.dll", "dxgi.dll", "d3d10core.dll",
     "d3d12.dll", "d3d12core.dll", "xtajit64.dll", "winemetal.dll",
+    "kernel32.dll", "kernelbase.dll", "user32.dll", "gdi32.dll",
+    "ws2_32.dll", "d3d9.dll", "vulkan-1.dll", "madeira_d3d12.dll",
 )
-ARM64 = ("d3d11.dll", "dxgi.dll", "winemetal.dll")
+ARM64 = ("d3d11.dll", "dxgi.dll", "winemetal.dll", "kernel32.dll", "user32.dll")
 NOTICES = (
     "NOTICE.txt", "METAL-SHADER-CONVERTER-AGREEMENT.txt",
     "LICENSE-metal-shader-converter-headers.txt",
@@ -78,6 +80,10 @@ class MadeiraPayloadStagingTests(unittest.TestCase):
         self.assertEqual(canonical_converter.read_bytes(), mirror_converter.read_bytes())
         for path in (self.app / "MadeiraRuntime").rglob("*"):
             self.assertFalse(path.is_symlink(), str(path))
+        self.assertEqual(
+            (self.app / "MadeiraRuntime/nls/locale.nls").read_bytes(),
+            (self.source / "nls/locale.nls").read_bytes(),
+        )
         self.assertEqual(
             (self.app / "prefix-template.tar.gz").read_bytes(),
             (self.source / "prefix-template.tar.gz").read_bytes(),

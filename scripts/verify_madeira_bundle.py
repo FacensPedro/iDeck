@@ -15,6 +15,10 @@ SYMBOLS = (
     "wineserver_is_ready",
     "wine_process_start",
     "wine_process_is_running",
+    "madeira_display_set_layer",
+    "macdrv_functions",
+    "winios_screen_size",
+    "winios_display_mode_changed",
     "madeira_seed_prefix_if_needed",
     "madeira_get_present_count",
     "madeira_d3d12_canary_run",
@@ -23,7 +27,17 @@ PE_FILES = (
     "aarch64-windows/d3d11.dll",
     "aarch64-windows/dxgi.dll",
     "aarch64-windows/winemetal.dll",
+    "aarch64-windows/kernel32.dll",
+    "aarch64-windows/user32.dll",
     "arm64ec-windows/ntdll.dll",
+    "arm64ec-windows/kernel32.dll",
+    "arm64ec-windows/kernelbase.dll",
+    "arm64ec-windows/user32.dll",
+    "arm64ec-windows/gdi32.dll",
+    "arm64ec-windows/ws2_32.dll",
+    "arm64ec-windows/d3d9.dll",
+    "arm64ec-windows/vulkan-1.dll",
+    "arm64ec-windows/madeira_d3d12.dll",
     "arm64ec-windows/d3d11.dll",
     "arm64ec-windows/dxgi.dll",
     "arm64ec-windows/d3d10core.dll",
@@ -159,16 +173,22 @@ def inspect(app: Path) -> list[str]:
 
     runtime = app / "MadeiraRuntime"
     for path in PE_FILES:
-        dll = runtime / path
-        if not dll.is_file() or dll.stat().st_size < 1024:
-            errors.append(f"missing compiled Windows PE library: {dll}")
-            continue
-        problem = _pe_arch_error(dll, path.startswith("arm64ec-windows/"))
-        if problem:
-            errors.append(problem)
-    converter = runtime / "d3d12" / "libmetalirconverter.dylib"
-    if not converter.is_file() or converter.stat().st_size < 1024:
-        errors.append(f"missing or empty iOS shader converter dependency: {converter}")
+        for directory in (app, runtime):
+            dll = directory / path
+            if not dll.is_file() or dll.stat().st_size < 1024:
+                errors.append(f"missing compiled Windows PE library: {dll}")
+                continue
+            problem = _pe_arch_error(dll, path.startswith("arm64ec-windows/"))
+            if problem:
+                errors.append(problem)
+    for directory in (app, runtime):
+        locale = directory / "nls" / "locale.nls"
+        if not locale.is_file() or locale.stat().st_size == 0:
+            errors.append(f"missing Wine locale resource: {locale}")
+    for directory in (app, runtime):
+        converter = directory / "d3d12" / "libmetalirconverter.dylib"
+        if not converter.is_file() or converter.stat().st_size < 1024:
+            errors.append(f"missing or empty iOS shader converter dependency: {converter}")
 
     prefix = app / "prefix-template.tar.gz"
     if not prefix.is_file() or prefix.stat().st_size < 1024:

@@ -29,6 +29,18 @@ class SteamWebSocketBackpressureTests(unittest.TestCase):
         self.assertIn("pendingSteamGameID == game.appID", COORDINATOR)
         self.assertIn("let running = success && ideck_wineprocess_running()", COORDINATOR)
 
+    def test_metal_surface_required_before_wine_launch(self):
+        coordinator = COORDINATOR
+        renderer = (ROOT / "iDeck/WindowsRendererView.swift").read_text(encoding="utf-8")
+        main = (ROOT / "iDeck/MainView.swift").read_text(encoding="utf-8")
+        self.assertIn('withPreparedMetalDisplay(expectedStatus: "Launching Steam game...")', coordinator)
+        self.assertIn('withPreparedMetalDisplay(expectedStatus: "Launching Windows app...")', coordinator)
+        self.assertIn("WindowsRendererView.isReadyForFrames", coordinator)
+        self.assertNotIn("asyncAfter(deadline: .now() + 0.3)", coordinator)
+        self.assertIn("static var isReadyForFrames", renderer)
+        self.assertIn("override func didMoveToWindow()", renderer)
+        self.assertIn('coordinator.windowsStatus == "Launching Windows app..."', main)
+
     def test_dlc_requests_stop_after_details_close(self):
         self.assertIn("guard !Task.isCancelled else { return }", STEAM)
         self.assertIn("await steamLibrary.loadDLC(appID: game.appID)", (ROOT / "iDeck/MainView.swift").read_text(encoding="utf-8"))

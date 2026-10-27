@@ -4,23 +4,40 @@ import QuartzCore
 import Darwin
 
 private final class MadeiraMetalView: MTKView {
+    static var isAttachedAndSized = false
     var publishedSize: CGSize = .zero
+
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        refreshSurface()
+    }
 
     override func layoutSubviews() {
         super.layoutSubviews()
+        refreshSurface()
+    }
+
+    private func refreshSurface() {
         let requested = WindowsRendererView.requestedSize
         let scale = window?.screen.scale ?? traitCollection.displayScale
         let target = requested ?? CGSize(width: bounds.width * scale, height: bounds.height * scale)
         if target.width >= 2 && target.height >= 2 && drawableSize != target {
             drawableSize = target
         }
-        WindowsRendererView.publishLayer(self)
+        let ready = window != nil && device != nil && drawableSize.width >= 2 && drawableSize.height >= 2
+        WindowsRendererView.publishLayer(ready ? self : nil)
+        Self.isAttachedAndSized = ready
     }
 }
 
 struct WindowsRendererView: UIViewRepresentable {
     static var isNativeDisplayLinked: Bool {
-        dlsym(UnsafeMutableRawPointer(bitPattern: -2), "madeira_display_set_layer") != nil
+        dlsym(UnsafeMutableRawPointer(bitPattern: -2), "madeira_display_set_layer") != nil &&
+        dlsym(UnsafeMutableRawPointer(bitPattern: -2), "macdrv_functions") != nil
+    }
+
+    static var isReadyForFrames: Bool {
+        isNativeDisplayLinked && MadeiraMetalView.isAttachedAndSized
     }
 
     static var requestedSize: CGSize? {
@@ -66,7 +83,7 @@ struct WindowsRendererView: UIViewRepresentable {
         mtkView.framebufferOnly = false
         mtkView.contentMode = .scaleAspectFit
         setenv("MVK_CONFIG_IOS_SURFACE", "1", 1)
-        Self.publishLayer(mtkView)
+        MadeiraMetalView.isAttachedAndSized = false
         return mtkView
     }
 
@@ -77,5 +94,6 @@ struct WindowsRendererView: UIViewRepresentable {
 
     static func dismantleUIView(_ uiView: MTKView, coordinator: ()) {
         publishLayer(nil)
+        MadeiraMetalView.isAttachedAndSized = false
     }
 }

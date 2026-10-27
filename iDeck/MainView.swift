@@ -50,6 +50,7 @@ struct MainView: View {
                 coordinator.windowsStatus == "Steam Running" ||
                 coordinator.windowsStatus == "Running" ||
                 coordinator.windowsStatus == "Launching Steam game..." ||
+                coordinator.windowsStatus == "Launching Windows app..." ||
                 coordinator.windowsStatus.hasPrefix("Execution Error:")
             },
             set: { _ in coordinator.setWindowsStatus("Windows Ready") }
