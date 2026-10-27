@@ -105,6 +105,7 @@ struct GameSessionView: View {
                     }
                 }
                 if coordinator.windowsStatus == "Launching Steam game..." ||
+                    coordinator.windowsStatus == "Launching Steam client..." ||
                     coordinator.windowsStatus == "Launching Windows app..." {
                     HStack {
                         ProgressView()

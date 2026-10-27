@@ -327,9 +327,15 @@ class SystemCoordinator: ObservableObject {
             }
             self.windowsEnvironment.configureWine(prefix: mountPath)
             self.windowsEnvironment.applyGameProfile(WindowsGameProfile(id: "steam", title: "Steam"))
-            self.windowsEnvironment.installAndRunSteam(jitEnabler: self.jitEnabler) { result in
-                DispatchQueue.main.async {
-                    self.setWindowsStatus(result ? "Steam Running" : "Steam Error")
+            self.setWindowsStatus("Launching Steam client...")
+            self.withPreparedMetalDisplay(expectedStatus: "Launching Steam client...") { [weak self] in
+                guard let self else { return }
+                self.windowsEnvironment.installAndRunSteam(jitEnabler: self.jitEnabler) { result in
+                    DispatchQueue.main.async {
+                        guard self.windowsStatus == "Launching Steam client..." else { return }
+                        self.setWindowsStatus(result && ideck_wineprocess_running()
+                            ? "Steam Running" : "Execution Error: Windows Steam client failed to start.")
+                    }
                 }
             }
         }

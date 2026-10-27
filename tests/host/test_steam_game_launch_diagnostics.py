@@ -36,6 +36,9 @@ class SteamWebSocketBackpressureTests(unittest.TestCase):
         renderer = (ROOT / "iDeck/WindowsRendererView.swift").read_text(encoding="utf-8")
         main = (ROOT / "iDeck/MainView.swift").read_text(encoding="utf-8")
         self.assertIn('withPreparedMetalDisplay(expectedStatus: "Launching Steam game...")', coordinator)
+        self.assertIn('withPreparedMetalDisplay(expectedStatus: "Launching Steam client...")', coordinator)
+        self.assertIn('coordinator.windowsStatus == "Launching Steam client..."',
+                      (ROOT / "iDeck/MainView.swift").read_text(encoding="utf-8"))
         self.assertIn('withPreparedMetalDisplay(expectedStatus: "Launching Windows app...")', coordinator)
         self.assertIn("WindowsRendererView.isReadyForFrames", coordinator)
         self.assertNotIn("asyncAfter(deadline: .now() + 0.3)", coordinator)
