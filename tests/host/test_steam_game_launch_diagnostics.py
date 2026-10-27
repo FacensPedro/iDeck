@@ -27,23 +27,39 @@ class SteamWebSocketBackpressureTests(unittest.TestCase):
         self.assertIn("activeSteamGameID == game.appID", COORDINATOR)
         self.assertIn("activeSteamPrefix == standardizedPrefix", COORDINATOR)
         self.assertIn("pendingSteamGameID == game.appID", COORDINATOR)
-        self.assertIn("let running = success && ideck_wineprocess_running()", COORDINATOR)
+        self.assertIn("let running = success == 0 && ideck_wineprocess_running()", COORDINATOR)
+        self.assertIn("func refreshWindowsSessionHealth()", COORDINATOR)
+        self.assertIn("coordinator.refreshWindowsSessionHealth()", GAME)
 
     def test_metal_surface_required_before_wine_launch(self):
         coordinator = COORDINATOR
         renderer = (ROOT / "iDeck/WindowsRendererView.swift").read_text(encoding="utf-8")
         main = (ROOT / "iDeck/MainView.swift").read_text(encoding="utf-8")
         self.assertIn('withPreparedMetalDisplay(expectedStatus: "Launching Steam game...")', coordinator)
+        self.assertIn('withPreparedMetalDisplay(expectedStatus: "Launching Steam client...")', coordinator)
+        self.assertIn('coordinator.windowsStatus == "Launching Steam client..."',
+                      (ROOT / "iDeck/MainView.swift").read_text(encoding="utf-8"))
         self.assertIn('withPreparedMetalDisplay(expectedStatus: "Launching Windows app...")', coordinator)
         self.assertIn("WindowsRendererView.isReadyForFrames", coordinator)
         self.assertNotIn("asyncAfter(deadline: .now() + 0.3)", coordinator)
         self.assertIn("static var isReadyForFrames", renderer)
         self.assertIn("override func didMoveToWindow()", renderer)
+        self.assertIn("guard activeView === view else { return }", renderer)
+        self.assertIn("activeView.generation > view.generation", renderer)
+        self.assertIn("fileprivate static func releaseLayer(for view: MTKView)", renderer)
         runtime = (ROOT / "iDeck/NativeRuntime/MadeiraRuntimeBridge.mm").read_text(encoding="utf-8")
         environment = (ROOT / "iDeck/WindowsEnvironment.swift").read_text(encoding="utf-8")
         self.assertIn("Self.isPE32WindowsExecutable(binary)", environment)
         self.assertIn('@"i386-windows/ntdll.dll"', runtime)
         self.assertIn('coordinator.windowsStatus == "Launching Windows app..."', main)
+
+    def test_32_bit_steam_installer_requires_real_wow64(self):
+        workflow = (ROOT / ".github/workflows/ios.yml").read_text(encoding="utf-8")
+        environment = (ROOT / "iDeck/WindowsEnvironment.swift").read_text(encoding="utf-8")
+        self.assertIn("guard self.windowsEnvironment.hasWoW64Runtime() else", COORDINATOR)
+        self.assertIn("Self.isPE32WindowsExecutable(downloadPath)", environment)
+        self.assertIn("func hasWoW64Runtime() -> Bool", environment)
+        self.assertIn("IDECK_BUILD_WOW64: ${{ inputs.build_wow64 && '1' || '0' }}", workflow)
 
     def test_dlc_requests_stop_after_details_close(self):
         self.assertIn("guard !Task.isCancelled else { return }", STEAM)

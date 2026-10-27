@@ -101,8 +101,8 @@ extern "C" int32_t ideck_runtime_launch(const char *executable_path,
                             [relative stringByReplacingOccurrencesOfString:@"/" withString:@"\\"]];
         NSMutableArray<NSString *> *quoted = [NSMutableArray arrayWithCapacity:arguments.count];
         for (id arg in arguments) {
-            if (![arg isKindOfClass:[NSString class]] ||
-                [arg length] >= 1024 || [arg rangeOfString:@"\""].location != NSNotFound ||
+            if (![arg isKindOfClass:[NSString class]] || [arg length] >= 1024 ||
+                [arg rangeOfString:@"\""].location != NSNotFound ||
                 [arg rangeOfString:@"\n"].location != NSNotFound ||
                 [arg rangeOfString:@"\r"].location != NSNotFound) return EINVAL;
             NSString *value = (NSString *)arg;

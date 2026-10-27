@@ -321,11 +321,21 @@ class SystemCoordinator: ObservableObject {
                 }
                 return
             }
+            guard self.windowsEnvironment.hasWoW64Runtime() else {
+                self.setWindowsStatus("Cannot install the Windows Steam client: the native IPA has no 32-bit WoW64 support. Run the Madeira build with build_wow64 enabled.")
+                return
+            }
             self.windowsEnvironment.configureWine(prefix: mountPath)
             self.windowsEnvironment.applyGameProfile(WindowsGameProfile(id: "steam", title: "Steam"))
-            self.windowsEnvironment.installAndRunSteam(jitEnabler: self.jitEnabler) { result in
-                DispatchQueue.main.async {
-                    self.setWindowsStatus(result ? "Steam Running" : "Steam Error")
+            self.setWindowsStatus("Launching Steam client...")
+            self.withPreparedMetalDisplay(expectedStatus: "Launching Steam client...") { [weak self] in
+                guard let self else { return }
+                self.windowsEnvironment.installAndRunSteam(jitEnabler: self.jitEnabler) { result in
+                    DispatchQueue.main.async {
+                        guard self.windowsStatus == "Launching Steam client..." else { return }
+                        self.setWindowsStatus(result && ideck_wineprocess_running()
+                            ? "Steam Running" : "Execution Error: Windows Steam client failed to start.")
+                    }
                 }
             }
         }
@@ -437,8 +447,8 @@ class SystemCoordinator: ObservableObject {
                         ) { [weak self] result in
                             DispatchQueue.main.async {
                                 guard let self, self.windowsStatus == "Launching Windows app..." else { return }
-                                self.setWindowsStatus(result && ideck_wineprocess_running()
-                                    ? "Running" : "Execution Error: Windows runtime did not start.")
+                                self.setWindowsStatus(result == 0 && ideck_wineprocess_running()
+                                    ? "Running" : self.nativeLaunchFailure(result))
                             }
                         }
                     }
@@ -558,7 +568,7 @@ class SystemCoordinator: ObservableObject {
                 DispatchQueue.main.async {
                     guard let self else { return }
                     self.pendingSteamGameID = nil
-                    let running = success && ideck_wineprocess_running()
+                    let running = success == 0 && ideck_wineprocess_running()
                     if running {
                         self.activeSteamGameID = game.appID
                         self.activeSteamPrefix = standardizedPrefix
@@ -567,11 +577,38 @@ class SystemCoordinator: ObservableObject {
                         self.activeSteamPrefix = nil
                     }
                     if self.windowsStatus == "Launching Steam game..." {
-                        self.setWindowsStatus(running ? "Running" : "Execution Error: Wine did not keep the game session running.")
+                        self.setWindowsStatus(running ? "Running" : self.nativeLaunchFailure(success))
                     }
                 }
             }
         }
+    }
+
+    func refreshWindowsSessionHealth() {
+        guard windowsStatus == "Running" || windowsStatus == "Steam Running" else { return }
+        guard !ideck_wineprocess_running() else { return }
+        activeSteamGameID = nil
+        activeSteamPrefix = nil
+        pendingSteamGameID = nil
+        setWindowsStatus("Execution Error: Wine exited. The Windows program is no longer running.")
+    }
+
+    private func nativeLaunchFailure(_ status: Int) -> String {
+        if status == 0 {
+            return "Execution Error: the Wine process exited immediately after launch."
+        }
+        if status == Int(ENOTSUP) {
+            return "Execution Error: 32-bit Windows support (WoW64) is missing from this IPA."
+        }
+        if status == Int(EPERM) {
+            return "Execution Error: the FEX JIT needs StikDebug attached during startup."
+        }
+        if status == Int(ENOENT) {
+            return "Execution Error: Wine prefix or runtime components are missing."
+        }
+        let message = status > 0 && status < 256
+            ? String(cString: strerror(Int32(status))) : "unknown native error"
+        return "Execution Error: Madeira launch failed (code \(status): \(message))."
     }
 
     private func steamExecutable(game: SteamAppInfo, directory: URL) -> (url: URL, arguments: String)? {
