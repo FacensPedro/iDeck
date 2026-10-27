@@ -686,7 +686,7 @@ struct WindowsWorkspaceView: View {
             .buttonStyle(.plain)
             let displayedBytes = displayedSize(for: game)
             if displayedBytes > 0 {
-                Text("(~\(ByteCountFormatter.string(fromByteCount: Int64(clamping: displayedBytes), countStyle: .file)))")
+                Text(ByteCountFormatter.string(fromByteCount: Int64(clamping: displayedBytes), countStyle: .file))
                     .font(.caption)
                     .foregroundColor(.gray)
                     .lineLimit(1)
@@ -870,12 +870,6 @@ struct WindowsWorkspaceView: View {
                         }
                         .buttonStyle(.plain)
                         Button {
-                            coordinator.refreshJITStatus()
-                            guard coordinator.isJITEnabled else {
-                                installMessage = tr("Activate JIT with StikDebug, then confirm it in Settings.")
-                                isShowingInstallResult = true
-                                return
-                            }
                             let profile = windowsLibrary.profile(
                                 for: windowsLibrary.profileID(for: executableURL),
                                 title: executableURL.deletingPathExtension().lastPathComponent)
@@ -893,12 +887,6 @@ struct WindowsWorkspaceView: View {
     }
 
     private func launchSteamGame(_ game: SteamAppInfo) {
-        coordinator.refreshJITStatus()
-        guard coordinator.isJITEnabled else {
-            installMessage = tr("Activate JIT with StikDebug, then confirm it in Settings.")
-            isShowingInstallResult = true
-            return
-        }
         guard let prefixPath else {
             installMessage = tr("Windows environment is not ready.")
             isShowingInstallResult = true
@@ -1210,11 +1198,6 @@ private struct WindowsExecutableDetailsView: View {
                     WindowsGameProfileForm(profile: $profile,
                                            globalMetalFXEnabled: $coordinator.isMetalFXEnabled)
                     Button {
-                        guard coordinator.isJITEnabled else {
-                            errorMessage = tr("Activate JIT with StikDebug, then confirm it in Settings.")
-                            showError = true
-                            return
-                        }
                         guard let prefixPath, coordinator.windowsEnvironment.hasRuntime(in: prefixPath.path) else {
                             errorMessage = tr("The native Madeira runtime is not linked into this build yet.")
                             showError = true
@@ -1359,11 +1342,6 @@ private struct SteamProgramDetailsView: View {
                         downloadStatus
                     } else if installed {
                         Button {
-                            coordinator.refreshJITStatus()
-                            guard coordinator.isJITEnabled else {
-                                presentError(tr("JIT is not available. Activate it for iDeck in StikDebug."))
-                                return
-                            }
                             guard let prefixPath else {
                                 presentError(tr("Windows environment is not ready."))
                                 return
