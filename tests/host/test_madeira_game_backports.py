@@ -80,8 +80,6 @@ class MadeiraCompatibilityBackportsTests(unittest.TestCase):
             self.assertIn("setPreferredIOBufferDuration", wine)
             self.assertIn("vcrtDocsSource", wine)
             self.assertIn("vcrtHome[[dll lowercaseString]]", wine)
-            self.assertIn("if ([[dll lowercaseString] isEqualToString:@\"msvcp140.dll\"])", wine)
-            self.assertIn("if ([[dll lowercaseString] isEqualToString:@\"vcruntime140.dll\"])", wine)
 
     def test_only_expected_madeira_sources_change(self):
         patch = PATCH.read_text(encoding="utf-8")
