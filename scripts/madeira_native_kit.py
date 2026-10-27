@@ -47,6 +47,13 @@ REQUIRED_PE = (
     "arm64ec-windows/winemetal.dll", "arm64ec-windows/d3d11.dll",
     "arm64ec-windows/dxgi.dll", "arm64ec-windows/d3d12.dll",
     "arm64ec-windows/d3d12core.dll", "aarch64-windows/winemetal.dll",
+    "arm64ec-windows/dcomp.dll",
+    "arm64ec-windows/ktmw32.dll",
+    "arm64ec-windows/faultrep.dll",
+    "arm64ec-windows/xaudio2_7.dll",
+    "arm64ec-windows/d3dx11_43.dll",
+    "arm64ec-windows/d3dcompiler_47.dll",
+    "arm64ec-windows/dinput8.dll",
 )
 WOW64_FILES = (
     "i386-windows/ntdll.dll", "i386-windows/kernel32.dll",

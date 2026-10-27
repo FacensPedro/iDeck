@@ -48,7 +48,9 @@ for path in aarch64-windows/d3d11.dll aarch64-windows/dxgi.dll \
             arm64ec-windows/d3d11.dll arm64ec-windows/dxgi.dll \
             arm64ec-windows/d3d10core.dll \
             arm64ec-windows/d3d12.dll arm64ec-windows/d3d12core.dll \
-            arm64ec-windows/xtajit64.dll arm64ec-windows/winemetal.dll; do
+            arm64ec-windows/xtajit64.dll arm64ec-windows/winemetal.dll \
+            arm64ec-windows/dcomp.dll arm64ec-windows/ktmw32.dll arm64ec-windows/faultrep.dll arm64ec-windows/xaudio2_7.dll \
+            arm64ec-windows/d3dx11_43.dll arm64ec-windows/d3dcompiler_47.dll arm64ec-windows/dinput8.dll; do
   FILE="$APP/$path"
   [[ -s "$FILE" ]] || { echo "ERROR: missing PE module: $path" >&2; exit 2; }
   [[ "$(head -c 2 "$FILE")" == "MZ" ]] || {
