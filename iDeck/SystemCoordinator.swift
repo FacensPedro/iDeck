@@ -499,11 +499,16 @@ class SystemCoordinator: ObservableObject {
         if isMetalFXEnabled { effectiveProfile.metalFXEnabled = true }
         windowsEnvironment.applyGameProfile(effectiveProfile)
         setWindowsStatus("Launching Steam game...")
-        windowsEnvironment.execute(binary: executableURL,
-                                   arguments: profile.arguments.isEmpty ? entryArguments : profile.arguments,
-                                   jitEnabler: jitEnabler) { [weak self] success in
-            DispatchQueue.main.async {
-                self?.setWindowsStatus(success ? "Running" : "Execution Error: Windows game launch failed")
+        // Let SwiftUI create and publish its CAMetalLayer before native Wine
+        // starts submitting frames. A launch may otherwise bind no drawable.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            guard let self else { return }
+            self.windowsEnvironment.execute(binary: executableURL,
+                                            arguments: profile.arguments.isEmpty ? entryArguments : profile.arguments,
+                                            jitEnabler: self.jitEnabler) { [weak self] success in
+                DispatchQueue.main.async {
+                    self?.setWindowsStatus(success ? "Running" : "Execution Error: Windows game launch failed")
+                }
             }
         }
     }
