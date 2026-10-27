@@ -1440,8 +1440,10 @@ private struct SteamProgramDetailsView: View {
             .navigationBarTitleDisplayMode(.inline)
             .task(id: game.appID) {
                 await steamLibrary.loadDLC(appID: game.appID)
+                guard !Task.isCancelled else { return }
                 if let prefixPath {
                     steamLibrary.refreshInstalledDLC(appID: game.appID, prefixPath: prefixPath)
+                    guard !Task.isCancelled else { return }
                     if autoSaveEnabled {
                         await steamLibrary.syncCloud(appID: game.appID, prefixPath: prefixPath)
                     }
