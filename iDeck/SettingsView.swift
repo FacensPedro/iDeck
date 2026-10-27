@@ -130,7 +130,8 @@ struct SettingsView: View {
     }
     
     private var windowsCompatibilityContent: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 10) {
             Text(tr("Microsoft Visual C++ libraries"))
                 .font(.subheadline.weight(.semibold))
                 .foregroundColor(.white)
@@ -163,6 +164,7 @@ struct SettingsView: View {
             } catch {
                 vcRuntimeFolderStatus = tr("Could not prepare the Visual C++ folder.")
             }
+        }
         }
     }
 
