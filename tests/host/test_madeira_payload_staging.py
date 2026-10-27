@@ -48,6 +48,22 @@ class MadeiraPayloadStagingTests(unittest.TestCase):
         for notice in NOTICES:
             (converter / notice).write_text(notice, encoding="utf-8")
 
+    def test_vcruntime_requires_all_supplied_files(self):
+        source = self.source / "x86_64-vcruntime"
+        source.mkdir()
+        (source / "vcruntime140.dll").write_bytes(b"MZ" + bytes(128))
+        environment = dict(os.environ)
+        environment.update({
+            "IDECK_MADEIRA_APP_ROOT": str(self.source),
+            "IDECK_ACCEPT_METAL_CONVERTER_LICENSE": "1",
+        })
+        result = subprocess.run(
+            ["bash", str(STAGER), str(self.app)],
+            env=environment, check=False, text=True, capture_output=True,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("incomplete Microsoft VC++ runtime", result.stderr)
+
     def test_native_payload_has_no_madeira_symlinks(self):
         environment = dict(os.environ)
         environment.update({

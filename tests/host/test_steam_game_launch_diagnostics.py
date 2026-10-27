@@ -39,6 +39,10 @@ class SteamWebSocketBackpressureTests(unittest.TestCase):
         self.assertNotIn("asyncAfter(deadline: .now() + 0.3)", coordinator)
         self.assertIn("static var isReadyForFrames", renderer)
         self.assertIn("override func didMoveToWindow()", renderer)
+        runtime = (ROOT / "iDeck/NativeRuntime/MadeiraRuntimeBridge.mm").read_text(encoding="utf-8")
+        environment = (ROOT / "iDeck/WindowsEnvironment.swift").read_text(encoding="utf-8")
+        self.assertIn("Self.isPE32WindowsExecutable(binary)", environment)
+        self.assertIn('@"i386-windows/ntdll.dll"', runtime)
         self.assertIn('coordinator.windowsStatus == "Launching Windows app..."', main)
 
     def test_dlc_requests_stop_after_details_close(self):

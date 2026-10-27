@@ -142,7 +142,29 @@ def _pe_arch_error(dll: Path, require_arm64ec: bool) -> str | None:
         return f"invalid ARM64EC PE structure for {dll}: {exc}"
 
 
-def inspect(app: Path) -> list[str]:
+def _pe32_error(dll: Path) -> str | None:
+    try:
+        with dll.open("rb") as stream:
+            data = stream.read(64)
+            if len(data) != 64 or data[:2] != b"MZ":
+                return f"invalid WoW64 DOS header: {dll}"
+            offset = struct.unpack_from("<I", data, 0x3C)[0]
+            if offset < 64 or offset > 64 * 1024 * 1024:
+                return f"invalid WoW64 PE offset: {dll}"
+            stream.seek(offset)
+            header = stream.read(26)
+            if len(header) != 26 or header[:4] != b"PE\\0\\0":
+                return f"invalid WoW64 PE header: {dll}"
+            machine = struct.unpack_from("<H", header, 4)[0]
+            magic = struct.unpack_from("<H", header, 24)[0]
+            if machine != 0x014C or magic != 0x010B:
+                return f"WoW64 module must be i386 PE32: {dll}"
+    except OSError as exc:
+        return f"unreadable WoW64 module {dll}: {exc}"
+    return None
+
+
+def inspect(app: Path, require_wow64: bool = False) -> list[str]:
     errors = []
     executable = app / "iDeck"
     if not executable.is_file():
@@ -185,6 +207,30 @@ def inspect(app: Path) -> list[str]:
         locale = directory / "nls" / "locale.nls"
         if not locale.is_file() or locale.stat().st_size == 0:
             errors.append(f"missing Wine locale resource: {locale}")
+    wow64 = require_wow64 or (app / "i386-windows/ntdll.dll").is_file()
+    if wow64:
+        for directory in (app, runtime):
+            for name in ("ntdll.dll", "kernel32.dll", "user32.dll",
+                         "d3d11.dll", "dxgi.dll"):
+                dll = directory / "i386-windows" / name
+                if not dll.is_file() or dll.stat().st_size < 1024:
+                    errors.append(f"missing WoW64 i386 library: {dll}")
+                else:
+                    problem = _pe32_error(dll)
+                    if problem:
+                        errors.append(problem)
+        for name in ("aarch64-windows/xtajit.dll",
+                     "aarch64-windows/wow64.dll",
+                     "aarch64-windows/wow64win.dll"):
+            for directory in (app, runtime):
+                dll = directory / name
+                if not dll.is_file() or dll.stat().st_size < 1024:
+                    errors.append(f"missing WoW64 native host DLL: {dll}")
+                else:
+                    problem = _pe_arch_error(dll, False)
+                    if problem:
+                        errors.append(problem)
+
     for directory in (app, runtime):
         converter = directory / "d3d12" / "libmetalirconverter.dylib"
         if not converter.is_file() or converter.stat().st_size < 1024:
@@ -205,13 +251,15 @@ def main() -> int:
     parser.add_argument("--app", required=True, type=Path)
     parser.add_argument("--require", action="store_true",
                         help="fail if native runtime is absent; never produce a false-ready IPA")
+    parser.add_argument("--require-wow64", action="store_true",
+                        help="require a complete i386/ARM64 WoW64 payload")
     options = parser.parse_args()
     app = options.app
     manifest = app / "MadeiraRuntimeManifest.plist"
     if manifest.exists():
         manifest.unlink()
 
-    errors = inspect(app)
+    errors = inspect(app, require_wow64=options.require_wow64)
     if errors:
         for error in errors:
             print(f"Madeira check: {error}", file=sys.stderr)

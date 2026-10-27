@@ -77,6 +77,13 @@ class MadeiraBundleTests(unittest.TestCase):
         (self.app / "MadeiraRuntime/arm64ec-windows/d3d11.dll").unlink()
         self.assertTrue(any("missing compiled Windows PE" in error for error in self.inspect()))
 
+    def test_missing_required_wow64_farm(self):
+        output = "\\n".join(f"00000000 T _{name}" for name in self.symbols)
+        result = subprocess.CompletedProcess([], 0, stdout=output, stderr="")
+        with patch.object(bundle.subprocess, "run", return_value=result):
+            errors = bundle.inspect(self.app, require_wow64=True)
+        self.assertTrue(any("missing WoW64 i386 library" in e for e in errors))
+
     def test_missing_root_level_wine_module(self):
         (self.app / "arm64ec-windows/kernel32.dll").unlink()
         self.assertTrue(any("arm64ec-windows/kernel32.dll" in error

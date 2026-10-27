@@ -212,6 +212,13 @@ if [[ "$REBUILD" == "1" ]]; then
     cp "$src" "$MD/app/Madeira/arm64ec-windows/${module##*/}"
   done
 
+  if [[ "${IDECK_BUILD_WOW64:-0}" == "1" ]]; then
+    # Upstream's i386 Wine farm and the distinct FEX WOW64 translator.
+    # Unlike xtajit64.dll, xtajit.dll executes PE32 x86 guest code.
+    bash "$MD/build/fex-wow64/build.sh"
+    bash "$MD/build/wine-i386/build.sh"
+  fi
+
   bash "$MD/build/madeira-d3d12/build-pe.sh"
   D3D="$MD/build/madeira-d3d12/out-pe"
   for name in madeira_d3d12.dll d3d12.dll d3d12core.dll; do
@@ -241,6 +248,17 @@ for file in \
   "$MD/app/Madeira/arm64ec-windows/winemetal.dll"; do
   [[ -s "$file" ]] || { echo "ERROR: missing compiled native/PE component: $file" >&2; exit 2; }
 done
+
+if [[ "${IDECK_BUILD_WOW64:-0}" == "1" ]]; then
+  for name in aarch64-windows/xtajit.dll aarch64-windows/wow64.dll \
+              aarch64-windows/wow64win.dll i386-windows/ntdll.dll \
+              i386-windows/kernel32.dll i386-windows/user32.dll \
+              i386-windows/d3d11.dll i386-windows/dxgi.dll; do
+    [[ -s "$MD/app/Madeira/$name" ]] || {
+      echo "ERROR: WoW64 requested, but missing $name" >&2; exit 2;
+    }
+  done
+fi
 
 echo "Madeira FEX/Wine ARM64EC/DXMT/D3D12 native inputs are present."
 echo "Next: build the upstream host bridge and link the iDeck app."

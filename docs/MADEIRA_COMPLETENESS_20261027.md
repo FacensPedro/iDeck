@@ -34,10 +34,18 @@ supplied, the build warns and games requiring these Microsoft DLLs may fail.
 The Wine bridge reads `x86_64-vcruntime/` from the app bundle; do not
 rename x64 DLLs to ARM64EC or replace them with placeholders.
 
-Wine Mono is not packaged by this change: it must be obtained from WineHQ,
-verified and installed separately for Windows .NET Framework programs.
-The optional 32-bit WoW64/i386 runtime also remains unsupported by the
-iDeck launcher and must not be advertised as working.
+Wine Mono is optional: `IDECK_BUNDLE_WINE_MONO=1` fetches the upstream
+pinned WineHQ distribution with its SHA-256 verification and calls Madeira's
+bundle script. The upstream script patches one version-pinned mscorlib
+method; consult its licence and source comments before redistributing.
+
+Set `IDECK_BUILD_WOW64=1` to compile Madeira's FEX WoW64 DLL and full
+i386 Wine/DXMT farm. The build and verifier will reject partial results.
+The iDeck launcher now identifies PE32 i386 headers and routes those
+executables to the native Madeira WoW64 loader only if the required
+i386 and aarch64 files were packaged. These build paths have not been
+validated on macOS or hardware in this change; do not claim working
+32-bit games until those tests succeed.
 
 ## Revisions and validation
 

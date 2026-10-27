@@ -54,6 +54,24 @@ done
   echo "ERROR: Wine locale.nls is missing" >&2; exit 2;
 }
 
+if [[ -s "$SOURCE/i386-windows/ntdll.dll" ]]; then
+  for name in ntdll.dll kernel32.dll user32.dll d3d11.dll dxgi.dll; do
+    [[ -s "$SOURCE/i386-windows/$name" ]] || {
+      echo "ERROR: incomplete i386 Wine farm: $name" >&2; exit 2;
+    }
+  done
+  for name in xtajit.dll wow64.dll wow64win.dll; do
+    [[ -s "$SOURCE/aarch64-windows/$name" ]] || {
+      echo "ERROR: missing native WoW64 host module: $name" >&2; exit 2;
+    }
+  done
+  cp -R "$SOURCE/i386-windows" "$APP/i386-windows"
+  cp -R "$APP/i386-windows" "$RUNTIME/i386-windows"
+elif [[ "${IDECK_BUILD_WOW64:-0}" == "1" ]]; then
+  echo "ERROR: requested WoW64, but the i386 DLL farm was not compiled." >&2
+  exit 2
+fi
+
 # Official Microsoft VC++ libraries are not included in Madeira's git checkout.
 # When the owner supplies an authorized, complete distribution, stage it in
 # the exact location read by the upstream WineProcessBridge. No fake DLLs.
@@ -101,6 +119,18 @@ cp "$APP/d3d12/libmetalirconverter.dylib" "$RUNTIME/d3d12/libmetalirconverter.dy
 if [[ -n "${IDECK_CODESIGN_IDENTITY:-}" ]]; then
   codesign --force --sign "$IDECK_CODESIGN_IDENTITY" --timestamp=none \
     "$APP/d3d12/libmetalirconverter.dylib"
+fi
+
+if [[ "${IDECK_BUNDLE_WINE_MONO:-0}" == "1" ]]; then
+  MONO_ROOT="${IDECK_MADEIRA_ROOT:-$ROOT/vendor/Madeira}/build/wine-mono"
+  [[ -f "$MONO_ROOT/fetch.sh" && -f "$MONO_ROOT/bundle.sh" ]] || {
+    echo "ERROR: Wine Mono scripts missing from Madeira checkout" >&2; exit 2;
+  }
+  bash "$MONO_ROOT/fetch.sh"
+  bash "$MONO_ROOT/bundle.sh" "$APP/wine-mono"
+  [[ -s "$APP/wine-mono/bin/libmono-2.0-x86.dll" ]] || {
+    echo "ERROR: Wine Mono was not bundled correctly" >&2; exit 2;
+  }
 fi
 
 echo "Madeira Wine/DXMT/D3D12 resources staged under iDeck.app."
