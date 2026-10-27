@@ -4791,6 +4791,7 @@ final class SteamOwnedGamesModel: ObservableObject {
     }
 
     func loadDLC(appID: UInt32) async {
+        guard !Task.isCancelled else { return }
         do {
             let info: SteamAppInfo?
             if let cached = games.first(where: { $0.appID == appID }) {
@@ -4815,12 +4816,14 @@ final class SteamOwnedGamesModel: ObservableObject {
             })).sorted()
             availableDLC[appID] = ids
             for id in ids.prefix(32) where dlcMetadata[id] == nil {
+                guard !Task.isCancelled else { return }
                 if let details = try? await fetcher.fetchAppInfo(appID: id), details.appID == id {
+                    guard !Task.isCancelled else { return }
                     dlcMetadata[id] = details
                 }
             }
         } catch {
-            availableDLC[appID] = []
+            if !Task.isCancelled { availableDLC[appID] = [] }
         }
     }
 
