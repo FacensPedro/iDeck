@@ -38,7 +38,10 @@ python3 -c 'import json,sys;print(json.dumps(sys.argv[1:]))' ${FLAGS[@]+"${FLAGS
             content = path.read_text(encoding="utf-8")
             with self.subTest(path=path):
                 for name in ("KIT_FLAGS", "KIT_ARGS", "OPTIONS", "WOW64_FLAGS"):
-                    self.assertNotIn('"${' + name + '[@]}"', content)
+                    if name == "WOW64_FLAGS":
+                        self.assertNotIn(name + "[@]", content)
+                    else:
+                        self.assertIn(name + '[@]+"', content)
 
     def test_native_bundle_is_verified_with_and_without_wow64(self):
         source = (ROOT / "scripts/build_ipa.sh").read_text(encoding="utf-8")
