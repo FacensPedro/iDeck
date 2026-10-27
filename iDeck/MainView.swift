@@ -1272,10 +1272,15 @@ private struct WindowsExecutableDetailsView: View {
                     Button(tr("Cancel")) { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(tr("Save")) {
+                    Button {
                         library.save(profile)
                         dismiss()
+                    } label: {
+                        Label(tr("Save"), systemImage: "checkmark")
+                            .font(.subheadline.weight(.semibold))
                     }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.blue)
                 }
             }
             .alert(tr("Operation failed"), isPresented: $showError) {
@@ -1448,11 +1453,16 @@ private struct SteamProgramDetailsView: View {
                     Button(tr("Done")) { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(tr("Save")) {
+                    Button {
                         profile.metalFXEnabled = coordinator.isMetalFXEnabled || profile.metalFXEnabled
                         library.save(profile)
                         dismiss()
+                    } label: {
+                        Label(tr("Save"), systemImage: "checkmark")
+                            .font(.subheadline.weight(.semibold))
                     }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.blue)
                 }
             }
             .alert(tr("Operation failed"), isPresented: $showError) {
@@ -1491,32 +1501,43 @@ private struct SteamProgramDetailsView: View {
                 Text(tr("Conflicting saves: choose which copy to keep. The replaced copy will be backed up."))
                     .font(.caption)
                     .foregroundColor(.orange)
-                HStack(spacing: 10) {
-                    Button(tr("Use Steam Cloud saves")) {
+                VStack(spacing: 10) {
+                    Button {
                         guard let prefixPath else { return }
                         Task {
                             await steamLibrary.resolveCloud(
                                 appID: game.appID, prefixPath: prefixPath, preferCloud: true)
                         }
+                    } label: {
+                        Label(tr("Use Steam Cloud saves"), systemImage: "icloud.and.arrow.down")
+                            .font(.subheadline.weight(.semibold))
+                            .frame(maxWidth: .infinity, minHeight: 42)
                     }
                     .buttonStyle(.borderedProminent)
-                    Button(tr("Use local saves")) {
+                    .tint(.blue)
+                    Button {
                         guard let prefixPath else { return }
                         Task {
                             await steamLibrary.resolveCloud(
                                 appID: game.appID, prefixPath: prefixPath, preferCloud: false)
                         }
+                    } label: {
+                        Label(tr("Use local saves"), systemImage: "internaldrive")
+                            .font(.subheadline.weight(.semibold))
+                            .frame(maxWidth: .infinity, minHeight: 42)
                     }
                     .buttonStyle(.bordered)
+                    .tint(.white)
                 }
-                .disabled(steamLibrary.cloudSyncing.contains(game.appID))
+                .disabled(prefixPath == nil || steamLibrary.cloudSyncing.contains(game.appID))
             }
             Button {
                 guard let prefixPath else { return }
                 Task { await steamLibrary.syncCloud(appID: game.appID, prefixPath: prefixPath) }
             } label: {
                 Label(tr("Sync saves now"), systemImage: "arrow.triangle.2.circlepath.icloud")
-                    .frame(maxWidth: .infinity)
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity, minHeight: 44)
             }
             .buttonStyle(.bordered)
             .disabled(prefixPath == nil || steamLibrary.cloudSyncing.contains(game.appID))
