@@ -141,14 +141,18 @@ if [[ -n "${IDECK_CODESIGN_IDENTITY:-}" ]]; then
 fi
 
 if [[ "${IDECK_BUNDLE_WINE_MONO:-0}" == "1" ]]; then
-  MONO_ROOT="${IDECK_MADEIRA_ROOT:-$ROOT/vendor/Madeira}/build/wine-mono"
-  [[ -f "$MONO_ROOT/fetch.sh" && -f "$MONO_ROOT/bundle.sh" ]] || {
-    echo "ERROR: Wine Mono scripts missing from Madeira checkout" >&2; exit 2;
-  }
-  bash "$MONO_ROOT/fetch.sh"
-  bash "$MONO_ROOT/bundle.sh" "$APP/wine-mono"
+  if [[ -s "$SOURCE/wine-mono/bin/libmono-2.0-x86.dll" ]]; then
+    cp -R "$SOURCE/wine-mono" "$APP/wine-mono"
+  else
+    MONO_ROOT="${IDECK_MADEIRA_ROOT:-$ROOT/vendor/Madeira}/build/wine-mono"
+    [[ -f "$MONO_ROOT/fetch.sh" && -f "$MONO_ROOT/bundle.sh" ]] || {
+      echo "ERROR: Wine Mono files/scripts not available" >&2; exit 2;
+    }
+    bash "$MONO_ROOT/fetch.sh"
+    bash "$MONO_ROOT/bundle.sh" "$APP/wine-mono"
+  fi
   [[ -s "$APP/wine-mono/bin/libmono-2.0-x86.dll" ]] || {
-    echo "ERROR: Wine Mono was not bundled correctly" >&2; exit 2;
+    echo "ERROR: incomplete Wine Mono payload" >&2; exit 2;
   }
 fi
 
