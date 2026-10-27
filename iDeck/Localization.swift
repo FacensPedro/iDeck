@@ -124,6 +124,7 @@ enum Translations {
         "Language": ["pt": "Idioma", "es": "Idioma"],
         "System default": ["pt": "Padrão do sistema", "es": "Predeterminado del sistema"],
         "JIT & Debugging": ["pt": "JIT e depuração", "es": "JIT y depuración"],
+        "FEX JIT is not ready. JIT permission alone is insufficient. Keep StikDebug attached with universal.js during the first game launch, then retry.": ["pt": "O JIT do FEX ainda não está pronto. A permissão JIT sozinha não basta. Mantenha o StikDebug conectado com universal.js durante a primeira inicialização do jogo e tente novamente.", "es": "El JIT de FEX todavía no está listo. El permiso JIT por sí solo no basta. Mantén StikDebug conectado con universal.js durante el primer inicio del juego y vuelve a intentarlo."],
         "Enable JIT": ["pt": "Ativar JIT", "es": "Activar JIT"],
         "JIT permission does not guarantee that FEX is ready.": ["pt": "A permissão de JIT não garante que o FEX esteja pronto.", "es": "El permiso JIT no garantiza que FEX esté listo."],
         "StikDebug requires pairing, LocalDevVPN, and a debug-signable iDeck. Opening StikDebug does not prove FEX JIT is ready.": ["pt": "O StikDebug requer pareamento, LocalDevVPN e uma assinatura do iDeck que permita depuração. Abrir o StikDebug não confirma que o JIT do FEX esteja pronto.", "es": "StikDebug requiere emparejamiento, LocalDevVPN y una firma de iDeck que permita depuración. Abrir StikDebug no confirma que el JIT de FEX esté listo."],
