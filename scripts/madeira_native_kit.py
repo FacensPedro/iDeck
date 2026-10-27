@@ -140,8 +140,14 @@ def collect(madeira: Path, bridge: Path, wow64: bool, mono: bool,
     )
     for name in folders:
         for file in (app / name).rglob("*"):
-            if file.is_file():
-                entries["resources/" + file.relative_to(app).as_posix()] = file
+            if not file.is_file():
+                continue
+            # Madeira's resource folders contain empty Git directory
+            # placeholders (notably i386-windows/.gitkeep). Required
+            # runtime components are already validated by check_assets().
+            if file.stat().st_size == 0 or file.name in (".gitkeep", ".DS_Store"):
+                continue
+            entries["resources/" + file.relative_to(app).as_posix()] = file
     for key, path in entries.items():
         if not path.is_file() or not path.stat().st_size:
             raise KitError("Missing compiled output: " + key + " → " + str(path))

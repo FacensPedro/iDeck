@@ -138,6 +138,42 @@ class MadeiraNativeKitTests(unittest.TestCase):
         with self.assertRaisesRegex(kit.KitError, "symbolic links"):
             kit.inspect(path, False, False)
 
+    def test_export_ignores_empty_madeira_resource_placeholders(self):
+        madeira = self.root / "vendor/Madeira"
+        bridge = self.root / "build/madeira-native"
+        for name, path in kit.archive_paths(madeira, bridge).items():
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(b"!<arch>\n" + name.encode())
+
+        for wow64 in (False, True):
+            with self.subTest(wow64=wow64):
+                staged = self.root / ("staged-wow64" if wow64 else "staged-base")
+                staged.mkdir()
+                for name, value in self.entries(wow64=wow64).items():
+                    if name.startswith("resources/"):
+                        target = staged / name.removeprefix("resources/")
+                        target.parent.mkdir(parents=True, exist_ok=True)
+                        target.write_bytes(value)
+                for folder in ("arm64ec-windows", "i386-windows", "legal"):
+                    directory = staged / folder
+                    directory.mkdir(parents=True, exist_ok=True)
+                    (directory / ".gitkeep").touch()
+                    (directory / "unused-empty.txt").touch()
+                (staged / "legal" / ".DS_Store").write_bytes(b"incidental-metadata")
+
+                archive_path = self.root / ("kit-wow64.zip" if wow64 else "kit-base.zip")
+                with mock.patch.object(kit.subprocess, "check_output", return_value=kit.REVISION + "\n"):
+                    kit.build_kit(archive_path, madeira, bridge, wow64, False, staged)
+                with zipfile.ZipFile(archive_path) as archive:
+                    names = archive.namelist()
+                    self.assertIn("resources/arm64ec-windows/ntdll.dll", names)
+                    self.assertFalse(any(name.endswith((".gitkeep", "unused-empty.txt", ".DS_Store")) for name in names))
+                    if wow64:
+                        self.assertIn("resources/i386-windows/ntdll.dll", names)
+                installed = self.root / ("installed-wow64" if wow64 else "installed-base")
+                kit.install(archive_path, installed, wow64, False)
+                self.assertTrue((installed / "resources/arm64ec-windows/ntdll.dll").is_file())
+
     def test_collect_can_use_staged_ipa_as_resource_source(self):
         madeira = self.root / "vendor/Madeira"
         bridge = self.root / "build/madeira-native"
