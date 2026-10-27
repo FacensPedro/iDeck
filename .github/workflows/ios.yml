@@ -23,6 +23,11 @@ on:
         type: boolean
         required: false
         default: false
+      export_runtime_kit:
+        description: "Export native runtime ZIP as an artifact for authorized Git LFS storage (requires distribution rights)"
+        type: boolean
+        required: false
+        default: false
       release_tag:
         description: "Publish a GitHub release for this tag (e.g. 0.1.0); empty = build only"
         required: false
@@ -305,6 +310,37 @@ jobs:
           print("Confirmed IPA includes Madeira native manifest and Windows runtime payload")
           PY
           fi
+
+      - name: Prepare authorized compiled runtime export
+        if: ${{ env.IDECK_NATIVE_BUILD == '1' && inputs.export_runtime_kit && env.IDECK_ACCEPT_METAL_CONVERTER_LICENSE == '1' }}
+        env:
+          IDECK_BUILD_WOW64: ${{ inputs.build_wow64 && '1' || '0' }}
+          IDECK_BUNDLE_WINE_MONO: ${{ inputs.bundle_wine_mono && '1' || '0' }}
+        run: |
+          set -euo pipefail
+          OPTIONS=()
+          if [[ "$IDECK_BUILD_WOW64" == "1" ]]; then OPTIONS+=(--wow64); fi
+          if [[ "$IDECK_BUNDLE_WINE_MONO" == "1" ]]; then OPTIONS+=(--mono); fi
+          REPO_KIT="$(python3 scripts/madeira_native_kit.py path "${OPTIONS[@]}")"
+          CACHE_KIT="$(python3 scripts/madeira_native_kit.py path --cache "${OPTIONS[@]}")"
+          mkdir -p build/native-kit-export
+          if [[ -s "$CACHE_KIT" ]]; then
+            cp "$CACHE_KIT" build/native-kit-export/
+          elif [[ -s "$REPO_KIT" ]]; then
+            cp "$REPO_KIT" build/native-kit-export/
+          else
+            echo "::error::No compiled Madeira runtime kit exists to export."
+            exit 2
+          fi
+
+      - name: Upload authorized runtime kit
+        if: ${{ env.IDECK_NATIVE_BUILD == '1' && inputs.export_runtime_kit && env.IDECK_ACCEPT_METAL_CONVERTER_LICENSE == '1' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: iDeck-Madeira-precompiled-runtime
+          path: build/native-kit-export/madeira-*.zip
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Upload native build diagnostics
         if: ${{ always() && env.IDECK_NATIVE_BUILD == '1' }}

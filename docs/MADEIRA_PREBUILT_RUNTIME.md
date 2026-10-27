@@ -24,6 +24,18 @@ a instalação do LLVM/Meson ou a compilação das bibliotecas.
 O cache pode ser removido ou expirar e possui limitações de capacidade,
 escopo de branch e armazenamento. Para persistência, use Git LFS.
 
+### Exportar um kit compilado pelo próprio GitHub Actions
+
+O workflow manual também oferece `export_runtime_kit`. Ative apenas quando
+você tiver confirmado o direito de redistribuir **todos** os binários incluídos,
+principalmente o Apple Metal Shader Converter. Ao terminar o build nativo, o
+GitHub disponibilizará por sete dias o artefato
+`iDeck-Madeira-precompiled-runtime`, contendo o ZIP compatível com as opções
+de build selecionadas. Extraia o ZIP desse artefato no seu computador antes
+de colocá-lo na pasta do projeto com Git LFS. A exportação é **desativada**
+por padrão. Em repositórios públicos, confira quem pode acessar os artefatos
+e se o licenciamento permite esse compartilhamento.
+
 ## Armazenar permanentemente no próprio repositório
 
 Depois de uma compilação nativa bem-sucedida no Mac, os arquivos podem ter
