@@ -686,7 +686,7 @@ struct WindowsWorkspaceView: View {
             .buttonStyle(.plain)
             let displayedBytes = displayedSize(for: game)
             if displayedBytes > 0 {
-                Text("(~\(ByteCountFormatter.string(fromByteCount: Int64(clamping: displayedBytes), countStyle: .file)))")
+                Text(ByteCountFormatter.string(fromByteCount: Int64(clamping: displayedBytes), countStyle: .file).replacingOccurrences(of: ",", with: "."))
                     .font(.caption)
                     .foregroundColor(.gray)
                     .lineLimit(1)
@@ -893,12 +893,6 @@ struct WindowsWorkspaceView: View {
     }
 
     private func launchSteamGame(_ game: SteamAppInfo) {
-        coordinator.refreshJITStatus()
-        guard coordinator.isJITEnabled else {
-            installMessage = tr("Activate JIT with StikDebug, then confirm it in Settings.")
-            isShowingInstallResult = true
-            return
-        }
         guard let prefixPath else {
             installMessage = tr("Windows environment is not ready.")
             isShowingInstallResult = true
