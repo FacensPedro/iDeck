@@ -7,7 +7,13 @@ private final class GameRuntimeMetrics: ObservableObject {
     @Published private(set) var cpu = "N/D"
     @Published private(set) var gpuMemory = "N/D"
     @Published private(set) var frameCount: UInt64 = 0
+    @Published private(set) var secondsSinceLaunch: TimeInterval = 0
+    @Published private(set) var presentCounterAvailable = false
+    @Published private(set) var receivedNewFrames = false
 
+    private let startedAt = ProcessInfo.processInfo.systemUptime
+    private let metalDevice = MTLCreateSystemDefaultDevice()
+    private var baselineFrames: UInt64?
     private var previousUptime: TimeInterval?
     private var previousCPU: Double?
     private var previousFrames: UInt64?
@@ -15,6 +21,7 @@ private final class GameRuntimeMetrics: ObservableObject {
 
     func sample() {
         let uptime = ProcessInfo.processInfo.systemUptime
+        secondsSinceLaunch = max(0, uptime - startedAt)
         var usage = rusage()
         if getrusage(RUSAGE_SELF, &usage) == 0 {
             let consumed = Double(usage.ru_utime.tv_sec) + Double(usage.ru_utime.tv_usec) / 1_000_000 +
@@ -25,7 +32,10 @@ private final class GameRuntimeMetrics: ObservableObject {
             previousCPU = consumed
         }
         if let pointer = dlsym(UnsafeMutableRawPointer(bitPattern: -2), "madeira_get_present_count") {
+            presentCounterAvailable = true
             let count = unsafeBitCast(pointer, to: PresentCount.self)()
+            if baselineFrames == nil { baselineFrames = count }
+            if let baselineFrames, count > baselineFrames { receivedNewFrames = true }
             if let oldTime = previousUptime, let oldFrames = previousFrames, uptime > oldTime {
                 let delta = count >= oldFrames ? count - oldFrames : 0
                 fps = String(format: "%.0f", Double(delta) / (uptime - oldTime))
@@ -33,9 +43,10 @@ private final class GameRuntimeMetrics: ObservableObject {
             frameCount = count
             previousFrames = count
         } else {
+            presentCounterAvailable = false
             fps = "N/D"
         }
-        if let device = MTLCreateSystemDefaultDevice() {
+        if let device = metalDevice {
             gpuMemory = "\(device.currentAllocatedSize / (1024 * 1024)) MB"
         }
         previousUptime = uptime
@@ -99,8 +110,19 @@ struct GameSessionView: View {
                         .foregroundColor(.red)
                         .padding(10)
                         .background(.black.opacity(0.7), in: RoundedRectangle(cornerRadius: 8))
-                } else if coordinator.windowsStatus == "Running" && metrics.fps == "0" {
-                    Text("Nenhum quadro gráfico apresentado. Verifique o runtime Wine/Metal.")
+                } else if coordinator.windowsStatus == "Running" && !WindowsRendererView.isNativeDisplayLinked {
+                    Text(tr("Madeira display backend is missing. This build cannot present Windows graphics."))
+                        .foregroundColor(.orange)
+                        .padding(10)
+                        .background(.black.opacity(0.7), in: RoundedRectangle(cornerRadius: 8))
+                } else if coordinator.windowsStatus == "Running" && !metrics.presentCounterAvailable {
+                    Text(tr("Wine started, but the Metal presentation counter is unavailable. Graphics are not verified."))
+                        .foregroundColor(.orange)
+                        .padding(10)
+                        .background(.black.opacity(0.7), in: RoundedRectangle(cornerRadius: 8))
+                } else if coordinator.windowsStatus == "Running" &&
+                            metrics.secondsSinceLaunch >= 15 && !metrics.receivedNewFrames {
+                    Text(tr("Wine started, but no new Metal frames were detected. The game may still be loading."))
                         .foregroundColor(.yellow)
                         .padding(10)
                         .background(.black.opacity(0.7), in: RoundedRectangle(cornerRadius: 8))
