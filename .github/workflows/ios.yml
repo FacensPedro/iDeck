@@ -156,6 +156,7 @@ jobs:
       - name: Test reusable Madeira kit validation and shell build
         run: |
           python3 -m unittest discover -s tests/host -p 'test_madeira_native_kit.py' -v
+          python3 -m unittest discover -s tests/host -p 'test_ipa_optional_arrays.py' -v
           bash -n scripts/build_ipa.sh
           bash -n scripts/build_native_runtime.sh
 
@@ -222,8 +223,8 @@ jobs:
           OPTIONS=()
           if [[ "$IDECK_BUILD_WOW64" == "1" ]]; then OPTIONS+=(--wow64); fi
           if [[ "$IDECK_BUNDLE_WINE_MONO" == "1" ]]; then OPTIONS+=(--mono); fi
-          SOURCE="$(python3 scripts/madeira_native_kit.py path "${OPTIONS[@]}")"
-          CACHE="$(python3 scripts/madeira_native_kit.py path --cache "${OPTIONS[@]}")"
+          SOURCE="$(python3 scripts/madeira_native_kit.py path ${OPTIONS[@]+"${OPTIONS[@]}"})"
+          CACHE="$(python3 scripts/madeira_native_kit.py path --cache ${OPTIONS[@]+"${OPTIONS[@]}"})"
           if [[ -s "$SOURCE" || -s "$CACHE" ]]; then
             echo "available=true" >> "$GITHUB_OUTPUT"
             echo "Found native kit: no FEX/Wine/DXMT download or LLVM recompilation necessary."
@@ -321,8 +322,8 @@ jobs:
           OPTIONS=()
           if [[ "$IDECK_BUILD_WOW64" == "1" ]]; then OPTIONS+=(--wow64); fi
           if [[ "$IDECK_BUNDLE_WINE_MONO" == "1" ]]; then OPTIONS+=(--mono); fi
-          REPO_KIT="$(python3 scripts/madeira_native_kit.py path "${OPTIONS[@]}")"
-          CACHE_KIT="$(python3 scripts/madeira_native_kit.py path --cache "${OPTIONS[@]}")"
+          REPO_KIT="$(python3 scripts/madeira_native_kit.py path ${OPTIONS[@]+"${OPTIONS[@]}"})"
+          CACHE_KIT="$(python3 scripts/madeira_native_kit.py path --cache ${OPTIONS[@]+"${OPTIONS[@]}"})"
           mkdir -p build/native-kit-export
           if [[ -s "$CACHE_KIT" ]]; then
             cp "$CACHE_KIT" build/native-kit-export/
