@@ -3,6 +3,7 @@ import SwiftUI
 struct SettingsView: View {
     @ObservedObject var coordinator: SystemCoordinator
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.scenePhase) private var scenePhase
     @Environment(\.presentationMode) var presentationMode
     @StateObject private var inputManager = InputManager.shared
     @AppStorage("controllerLeftSensitivity") private var controllerLeftSensitivity = 1.0
@@ -115,6 +116,11 @@ struct SettingsView: View {
             coordinator.refreshJITStatus()
             await updater.check()
         }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active {
+                coordinator.refreshJITStatus()
+            }
+        }
         .preferredColorScheme(.dark)
     }
     
@@ -136,30 +142,32 @@ struct SettingsView: View {
                 }
                 Spacer(minLength: 0)
             }
-            Button {
-                coordinator.requestStikDebugJIT()
-            } label: {
-                HStack(spacing: 10) {
-                    Image(systemName: "bolt.fill")
-                        .font(.system(size: 16, weight: .semibold))
-                    Text(tr("Enable JIT"))
-                        .font(.subheadline.weight(.semibold))
-                    Spacer(minLength: 0)
-                    Image(systemName: "arrow.up.right")
-                        .font(.footnote.weight(.semibold))
-                        .opacity(0.7)
+            if !coordinator.isJITEnabled {
+                Button {
+                    coordinator.requestStikDebugJIT()
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "bolt.fill")
+                            .font(.system(size: 16, weight: .semibold))
+                        Text(tr("Enable JIT"))
+                            .font(.subheadline.weight(.semibold))
+                        Spacer(minLength: 0)
+                        Image(systemName: "arrow.up.right")
+                            .font(.footnote.weight(.semibold))
+                            .opacity(0.7)
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 16)
+                    .frame(minHeight: 48)
+                    .background(Color(red: 0.12, green: 0.34, blue: 0.70), in: RoundedRectangle(cornerRadius: 12))
                 }
-                .foregroundColor(.white)
-                .padding(.horizontal, 16)
-                .frame(minHeight: 48)
-                .background(Color(red: 0.12, green: 0.34, blue: 0.70), in: RoundedRectangle(cornerRadius: 12))
+                .buttonStyle(.plain)
+                .accessibilityLabel(tr("Enable JIT"))
+                Text(tr("StikDebug requires pairing, LocalDevVPN, and a debug-signable iDeck. Opening StikDebug does not prove FEX JIT is ready."))
+                    .font(.caption)
+                    .foregroundColor(.gray)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel(tr("Enable JIT"))
-            Text(tr("StikDebug requires pairing, LocalDevVPN, and a debug-signable iDeck. Opening StikDebug does not prove FEX JIT is ready."))
-                .font(.caption)
-                .foregroundColor(.gray)
-                .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
