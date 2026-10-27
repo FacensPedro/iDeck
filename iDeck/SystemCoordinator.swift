@@ -477,7 +477,7 @@ class SystemCoordinator: ObservableObject {
         }
 
         guard ideck_fex_jit_ready() else {
-            setWindowsStatus("Cannot launch: FEX needs executable-memory preparation. Enable StikDebug JIT and keep its universal.js debugger attached; the library and installation remain usable without JIT.")
+            setWindowsStatus("FEX JIT is not ready. JIT permission alone is insufficient. Keep StikDebug attached with universal.js during the first game launch, then retry.")
             return
         }
         windowsEnvironment.configureWine(prefix: prefixPath.path)
