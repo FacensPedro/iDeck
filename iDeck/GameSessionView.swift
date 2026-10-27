@@ -57,6 +57,7 @@ struct GameSessionView: View {
     @ObservedObject var coordinator: SystemCoordinator
     @Environment(\.presentationMode) var presentationMode
     @StateObject private var metrics = GameRuntimeMetrics()
+    @State private var showActiveWineAlert = false
     private let tick = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     var body: some View {
@@ -76,7 +77,12 @@ struct GameSessionView: View {
             VStack {
                 HStack(alignment: .top) {
                     Button(action: {
-                        presentationMode.wrappedValue.dismiss()
+                        if ideck_wineprocess_running() {
+                            showActiveWineAlert = true
+                        } else {
+                            coordinator.setWindowsStatus("Windows Ready")
+                            presentationMode.wrappedValue.dismiss()
+                        }
                     }) {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 30))
@@ -137,6 +143,12 @@ struct GameSessionView: View {
         }
         .onReceive(tick) { _ in
             metrics.sample()
+            coordinator.refreshWindowsSessionHealth()
+        }
+        .alert("Wine ainda está executando", isPresented: $showActiveWineAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Feche o jogo pelo próprio Windows antes de sair desta tela. Ocultar a superfície Metal com o Wine ativo pode interromper os gráficos. Se o jogo travou, encerre o iDeck pelo seletor de aplicativos.")
         }
     }
 }

@@ -7,7 +7,7 @@ on:
         description: "Require real FEX/Wine/DXMT/D3D12 binaries and linked bridge (no UI-only IPA)"
         type: boolean
         required: false
-        default: false
+        default: true
       accept_converter_license:
         description: "I have reviewed the Metal Shader Converter terms and have permission to package the converter in this IPA"
         type: boolean
@@ -33,8 +33,8 @@ jobs:
     # Native validation is required for this integration PR branch.
     # The branch-scoped rule runs the licensed build after each PR update; release_tag remains empty.
     env:
-      IDECK_NATIVE_BUILD: ${{ (inputs.require_madeira || (github.event_name == 'pull_request' && github.head_ref == 'fix/madeira-arm64ec-runtime-validation')) && '1' || '0' }}
-      IDECK_ACCEPT_METAL_CONVERTER_LICENSE: ${{ (inputs.accept_converter_license || (github.event_name == 'pull_request' && github.head_ref == 'fix/madeira-arm64ec-runtime-validation')) && '1' || '0' }}
+      IDECK_NATIVE_BUILD: ${{ inputs.require_madeira && '1' || '0' }}
+      IDECK_ACCEPT_METAL_CONVERTER_LICENSE: ${{ inputs.accept_converter_license && '1' || '0' }}
 
     steps:
       - name: Checkout

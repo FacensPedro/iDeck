@@ -102,25 +102,24 @@ extern "C" int32_t ideck_runtime_launch(const char *executable_path,
         NSMutableArray<NSString *> *quoted = [NSMutableArray arrayWithCapacity:arguments.count];
         for (id arg in arguments) {
             if (![arg isKindOfClass:[NSString class]] || [arg length] >= 1024 ||
-                [arg rangeOfString:@"\\n"].location != NSNotFound ||
-                [arg rangeOfString:@"\\r"].location != NSNotFound) return EINVAL;
-
+                [arg rangeOfString:@"\n"].location != NSNotFound ||
+                [arg rangeOfString:@"\r"].location != NSNotFound) return EINVAL;
             NSString *value = (NSString *)arg;
-            NSMutableString *encoded = [NSMutableString stringWithString:@"\\\""];
+            NSMutableString *encoded = [NSMutableString stringWithString:@"\""];
             NSUInteger slashCount = 0;
             for (NSUInteger index = 0; index < value.length; ++index) {
                 unichar ch = [value characterAtIndex:index];
-                if (ch == '\\\\') {
+                if (ch == '\\') {
                     ++slashCount;
                     continue;
                 }
-                NSUInteger count = ch == '\\\"' ? slashCount * 2 + 1 : slashCount;
-                for (NSUInteger n = 0; n < count; ++n) [encoded appendString:@"\\\\"];
+                NSUInteger count = ch == '"' ? slashCount * 2 + 1 : slashCount;
+                for (NSUInteger n = 0; n < count; ++n) [encoded appendString:@"\\"];
                 slashCount = 0;
                 [encoded appendFormat:@"%C", ch];
             }
-            for (NSUInteger n = 0; n < slashCount * 2; ++n) [encoded appendString:@"\\\\"];
-            [encoded appendString:@"\\\""];
+            for (NSUInteger n = 0; n < slashCount * 2; ++n) [encoded appendString:@"\\"];
+            [encoded appendString:@"\""];
             [quoted addObject:encoded];
         }
         NSString *argString = [quoted componentsJoinedByString:@" "];

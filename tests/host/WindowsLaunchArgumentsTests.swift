@@ -5,7 +5,8 @@ struct WindowsLaunchArgumentsTests {
     static func main() {
         assert(WindowsLaunchArguments.parse("") == [])
         assert(WindowsLaunchArguments.parse(" --dx11 -windowed ") == ["--dx11", "-windowed"])
-        assert(WindowsLaunchArguments.parse(#"--path=C:\Games\Steam\launcher.exe"#) == [#"- -"#.replacingOccurrences(of:"- -",with:#"--path=C:\Games\Steam\launcher.exe"#)])
+        assert(WindowsLaunchArguments.parse(#"--path=C:\Games\Steam\launcher.exe"#) ==
+               [#"--path=C:\Games\Steam\launcher.exe"#])
         assert(WindowsLaunchArguments.parse(#""C:\Program Files\Steam\game.exe" -dx12"#) ==
                [#"C:\Program Files\Steam\game.exe"#, "-dx12"])
         assert(WindowsLaunchArguments.parse(#"--path="C:\Program Files\Steam""#) ==

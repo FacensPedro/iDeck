@@ -27,7 +27,9 @@ class SteamWebSocketBackpressureTests(unittest.TestCase):
         self.assertIn("activeSteamGameID == game.appID", COORDINATOR)
         self.assertIn("activeSteamPrefix == standardizedPrefix", COORDINATOR)
         self.assertIn("pendingSteamGameID == game.appID", COORDINATOR)
-        self.assertIn("let running = success && ideck_wineprocess_running()", COORDINATOR)
+        self.assertIn("let running = success == 0 && ideck_wineprocess_running()", COORDINATOR)
+        self.assertIn("func refreshWindowsSessionHealth()", COORDINATOR)
+        self.assertIn("coordinator.refreshWindowsSessionHealth()", GAME)
 
     def test_metal_surface_required_before_wine_launch(self):
         coordinator = COORDINATOR
@@ -39,6 +41,8 @@ class SteamWebSocketBackpressureTests(unittest.TestCase):
         self.assertNotIn("asyncAfter(deadline: .now() + 0.3)", coordinator)
         self.assertIn("static var isReadyForFrames", renderer)
         self.assertIn("override func didMoveToWindow()", renderer)
+        self.assertIn("guard activeView === view else { return }", renderer)
+        self.assertIn("fileprivate static func releaseLayer(for view: MTKView)", renderer)
         runtime = (ROOT / "iDeck/NativeRuntime/MadeiraRuntimeBridge.mm").read_text(encoding="utf-8")
         environment = (ROOT / "iDeck/WindowsEnvironment.swift").read_text(encoding="utf-8")
         self.assertIn("Self.isPE32WindowsExecutable(binary)", environment)

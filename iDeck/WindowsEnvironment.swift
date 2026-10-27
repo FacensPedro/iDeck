@@ -118,7 +118,11 @@ class WindowsEnvironment {
     func configureWine(prefix: String) {
         self.winePrefixPath = prefix
         setenv("WINEPREFIX", prefix, 1)
-        setenv("WINEDEBUG", "-all", 1)
+        if ProcessInfo.processInfo.environment["IDECK_WINE_DIAGNOSTICS"] == "1" {
+            setenv("WINEDEBUG", "err+all,warn+all", 1)
+        } else {
+            setenv("WINEDEBUG", "-all", 1)
+        }
         setenv("WINEARCH", "win64", 1)
         setenv("STEAM_COMPAT_CLIENT_INSTALL_PATH", prefix + "/drive_c/Program Files (x86)/Steam", 1)
         setenv("WINEDLLOVERRIDES", "dwrite=d;winhttp=n,b;crypt32=n,b;secur32=n,b;nsi=n,b;rpcrt4=n,b;wbemprox=n", 1)
@@ -152,8 +156,8 @@ class WindowsEnvironment {
             
             do {
                 try fileManager.moveItem(at: localURL, to: downloadPath)
-                self?.execute(binary: downloadPath, is32Bit: true, isSteam: true, jitEnabler: jitEnabler) { success in
-                    completion(success)
+                self?.execute(binary: downloadPath, is32Bit: true, isSteam: true, jitEnabler: jitEnabler) { status in
+                    completion(status == 0)
                 }
             } catch {
                 completion(false)
@@ -184,11 +188,12 @@ class WindowsEnvironment {
         }
     }
 
-    func execute(binary: URL, arguments: String = "", is32Bit: Bool = false, isSteam: Bool = false, jitEnabler: JITEnabler, completion: @escaping (Bool) -> Void) {
+    func execute(binary: URL, arguments: String = "", is32Bit: Bool = false, isSteam: Bool = false, jitEnabler: JITEnabler, completion: @escaping (Int) -> Void) {
         guard FileManager.default.fileExists(atPath: binary.path),
               binary.path.withCString({ ideck_native_validate_pe($0) }),
               let parsedArguments = BoxTranslator.parseArguments(arguments) else {
-            completion(false)
+            SteamLog.event("[wine-launch] invalid executable or Windows launch arguments")
+            completion(Int(EINVAL))
             return
         }
 
@@ -201,7 +206,8 @@ class WindowsEnvironment {
             isSteam: isSteam,
             jitEnabler: jitEnabler
         ) { status in
-            completion(status == 0)
+            if status != 0 { SteamLog.event("[wine-launch] native launch failure code=\(status)") }
+            completion(status)
         }
     }
 
@@ -246,42 +252,7 @@ class WindowsEnvironment {
 
 private class BoxTranslator {
     static func parseArguments(_ command: String) -> [String]? {
-        guard command.utf8.count <= 4096 else { return nil }
-        var result: [String] = []
-        var current = ""
-        var inQuotes = false
-        var escaping = false
-        var hasToken = false
-
-        for character in command {
-            if escaping {
-                current.append(character)
-                escaping = false
-                hasToken = true
-            } else if character == "\\" {
-                escaping = true
-                hasToken = true
-            } else if character == "\"" {
-                inQuotes.toggle()
-                hasToken = true
-            } else if character.isWhitespace && !inQuotes {
-                if hasToken {
-                    result.append(current)
-                    current = ""
-                    hasToken = false
-                    if result.count > 64 { return nil }
-                }
-            } else {
-                current.append(character)
-                hasToken = true
-            }
-        }
-
-        if escaping { current.append("\\") }
-        guard !inQuotes else { return nil }
-        if hasToken { result.append(current) }
-        guard result.count <= 64 else { return nil }
-        return result
+        WindowsLaunchArguments.parse(command)
     }
 
     func translateAndRun(executablePath: String, arguments: [String], environment: String, is32Bit: Bool, isSteam: Bool, jitEnabler: JITEnabler, completion: @escaping (Int) -> Void) {
