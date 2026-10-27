@@ -140,8 +140,12 @@ def collect(madeira: Path, bridge: Path, wow64: bool, mono: bool,
             raise KitError("Missing compiled output: " + key + " → " + str(path))
         if path.stat().st_size > MAX_FILE:
             raise KitError("Oversized runtime output: " + key)
-        if path.is_symlink() and not path.resolve().is_relative_to(madeira.resolve()):
-            raise KitError("External symlink in runtime output: " + str(path))
+        if path.is_symlink():
+            target = path.resolve(strict=True)
+            roots = (madeira.resolve(), (resource_root or madeira / "app/Madeira").resolve(),
+                     bridge.resolve())
+            if not any(target.is_relative_to(root) for root in roots):
+                raise KitError("External symlink in runtime output: " + str(path))
     return entries
 
 
