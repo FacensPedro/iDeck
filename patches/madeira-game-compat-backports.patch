@@ -1,0 +1,132 @@
+diff --git a/app/Madeira/WineProcessBridge.m b/app/Madeira/WineProcessBridge.m
+--- a/app/Madeira/WineProcessBridge.m
++++ b/app/Madeira/WineProcessBridge.m
+@@ -1094,11 +1094,29 @@ static void madeira_publish_host_probe(void)
+             if (aerr) LOG("AVAudioSession setCategory failed: %{public}s",
+                           aerr.localizedDescription.UTF8String);
+             aerr = nil;
++            /* A shared-mode client that keeps only one 10 ms engine period queued
++             * (IAudioClient3 low latency) loses audio when RemoteIO pulls a larger
++             * slice per callback (iOS's default is ~1024 frames, 21 ms): every
++             * callback empties the queue and plays silence for the rest. Ask for a
++             * 5 ms slice; the driver reports an engine period of at least two
++             * slices (MADEIRA_AUDIO_IO_US, audio_null_ios.c). MADEIRA_AUDIO_IO_MS
++             * sets the slice; 0 keeps the system's. */
++            {
++                const char *io = getenv("MADEIRA_AUDIO_IO_MS");
++                double ms = io && *io ? atof(io) : 5.0;
++                if (ms > 0 && ![session setPreferredIOBufferDuration:ms / 1000.0 error:&aerr])
++                    LOG("AVAudioSession setPreferredIOBufferDuration(%.1fms) failed: %{public}s",
++                        ms, aerr.localizedDescription.UTF8String);
++                aerr = nil;
++            }
+             [session setActive:YES error:&aerr];
+             if (aerr) LOG("AVAudioSession setActive failed: %{public}s",
+                           aerr.localizedDescription.UTF8String);
+-            else LOG("AVAudioSession active: rate=%.0f latency=%.1fms",
+-                     session.sampleRate, session.outputLatency * 1000.0);
++            else LOG("AVAudioSession active: rate=%.0f latency=%.1fms io-buffer=%.2fms",
++                     session.sampleRate, session.outputLatency * 1000.0, session.IOBufferDuration * 1000.0);
++            char io_us[32];
++            snprintf(io_us, sizeof io_us, "%lld", (long long)(session.IOBufferDuration * 1e6));
++            setenv("MADEIRA_AUDIO_IO_US", io_us, 1);
+         }
+ 
+         /* 2026-07-04 BISECT RESULT: arm A (this env set, all handler fixes
+@@ -1786,8 +1804,32 @@ static void madeira_publish_host_probe(void)
+                 dprintf(STDERR_FILENO, "[WineProc] MADEIRA_WINE_VCRT=1: MS VC++ runtime overlay skipped\n");
+             } else
+             if (use_arm64ec) {
+-                NSString *vcrtSource = [bundlePath stringByAppendingPathComponent:@"x86_64-vcruntime"];
+-                NSArray *vcrtDlls = [fm contentsOfDirectoryAtPath:vcrtSource error:nil];
++                /* madeira-vcruntime-sources: two sources, not one.
++                 *
++                 * The bundle is read-only and signature-sealed, so DLLs placed
++                 * there can only arrive by rebuilding the app -- which for a
++                 * sideloaded build is the entire install cycle. Documents is
++                 * user-writable (UIFileSharingEnabled), so it is searched
++                 * first and a user-supplied file shadows a bundled one. */
++                NSString *vcrtBundleSource = [bundlePath stringByAppendingPathComponent:@"x86_64-vcruntime"];
++                NSString *vcrtDocsSource = [NSSearchPathForDirectoriesInDomains(
++                    NSDocumentDirectory, NSUserDomainMask, YES).firstObject
++                    stringByAppendingPathComponent:@"vcruntime"];
++                NSMutableArray *vcrtNames = [NSMutableArray array];
++                NSMutableDictionary *vcrtHome = [NSMutableDictionary dictionary];
++                for (NSString *dir in @[vcrtDocsSource, vcrtBundleSource]) {
++                    for (NSString *f in [fm contentsOfDirectoryAtPath:dir error:nil]) {
++                        /* Skip anything that is not a DLL. Without this the
++                         * placeholder README.txt that has to exist for Xcode's
++                         * resource copy to succeed is symlinked into system32,
++                         * and the "Symlinked N" count counts it. */
++                        if (![[f pathExtension] isEqualToString:@"dll"]) continue;
++                        if (vcrtHome[[f lowercaseString]]) continue;  /* Documents wins */
++                        vcrtHome[[f lowercaseString]] = [dir stringByAppendingPathComponent:f];
++                        [vcrtNames addObject:f];
++                    }
++                }
++                NSArray *vcrtDlls = vcrtNames;
+                 int vcrtLinked = 0, vcrtSkipped = 0;
+                 /* madeira-bcd: MFC (mfc140.dll, mfc140u.dll) comes from the same
+                  * VC_redist.x64.exe since 2026-10-09: Horizon Zero Dawn imports
+@@ -1842,7 +1884,7 @@ static void madeira_publish_host_probe(void)
+                         vcrtSkipped++;
+                         continue;
+                     }
+-                    NSString *src = [vcrtSource stringByAppendingPathComponent:dll];
++                    NSString *src = vcrtHome[[dll lowercaseString]];
+                     NSString *dst = [sys32Dir stringByAppendingPathComponent:dll];
+                     [fm removeItemAtPath:dst error:nil];
+                     if ([fm createSymbolicLinkAtPath:dst withDestinationPath:src error:nil])
+diff --git a/build/ntdll-unix/audio_null_ios.c b/build/ntdll-unix/audio_null_ios.c
+--- a/build/ntdll-unix/audio_null_ios.c
++++ b/build/ntdll-unix/audio_null_ios.c
+@@ -1578,10 +1578,35 @@ static NTSTATUS ios_get_mix_format(void *args) {
+     return STATUS_SUCCESS;
+ }
+ 
++/* The shared-mode engine period, in 100 ns units. A client that keeps one period
++ * queued (IAudioClient3) must cover a whole RemoteIO slice, or every render callback
++ * empties its queue and plays silence for the rest: at least two slices of the
++ * IOBufferDuration the app was granted (MADEIRA_AUDIO_IO_US, WineProcessBridge.m),
++ * and never under 10 ms. MADEIRA_AUDIO_PERIOD_MS sets it outright (10 = as before). */
++static REFERENCE_TIME ios_engine_period(void) {
++    static REFERENCE_TIME period = -1;
++    if (period < 0) {
++        const char *e = getenv( "MADEIRA_AUDIO_PERIOD_MS" );
++        REFERENCE_TIME hns = 100000;
++        double ms = e && *e ? atof( e ) : 0;
++        if (ms >= 1 && ms <= 200) hns = (REFERENCE_TIME)(ms * 10000);
++        else {
++            const char *io = getenv( "MADEIRA_AUDIO_IO_US" );
++            long long us = io ? atoll( io ) : 0;
++            if (us > 0 && us * 20 > hns) hns = us * 20;
++        }
++        period = hns;
++        fprintf( stderr, "[audio] engine period %.2f ms (io slice %s us)\n", period / 10000.0,
++                 getenv( "MADEIRA_AUDIO_IO_US" ) ? getenv( "MADEIRA_AUDIO_IO_US" ) : "?" );
++    }
++    return period;
++}
++
+ static NTSTATUS ios_get_device_period(void *args) {
+     struct get_device_period_params *p = args;
+-    if (p->def_period) *p->def_period = 100000; /* 10 ms in 100ns units */
+-    if (p->min_period) *p->min_period = 50000;  /* 5 ms */
++    REFERENCE_TIME period = ios_engine_period();
++    if (p->def_period) *p->def_period = period;
++    if (p->min_period) *p->min_period = period > 100000 ? period : 50000;  /* 5 ms floor as before */
+     p->result = S_OK;
+     return STATUS_SUCCESS;
+ }
+diff --git a/build/wineserver/mapping_ios.c b/build/wineserver/mapping_ios.c
+--- a/build/wineserver/mapping_ios.c
++++ b/build/wineserver/mapping_ios.c
+@@ -1503,7 +1503,7 @@ static struct session_object *find_free_session_object( mem_size_t size )
+ volatile void *alloc_shared_object( mem_size_t shm_size )
+ {
+     struct session_object *object;
+-    mem_size_t size = sizeof(*object) - sizeof(object_shm_t) + max(shm_size, sizeof(object_shm_t));
++    mem_size_t size = round_size( sizeof(*object) - sizeof(object_shm_t) + max(shm_size, sizeof(object_shm_t)), 7 );
+ 
+     if ((object = find_free_session_object( size )))
+         list_remove( &object->entry );

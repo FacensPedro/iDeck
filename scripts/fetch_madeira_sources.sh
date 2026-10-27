@@ -57,6 +57,22 @@ if ! grep -Fq 'reinterpret_cast<threadgroup atomic_int *>(out_count), 1, memory_
   git -C "$DEST/dxmt" apply "$DXMT_PATCH"
 fi
 
+# Backport only the upstream fixes verified against the pinned Madeira base:
+# - ARM64 shared-object alignment in wineserver (#377)
+# - iPad Documents/vcruntime directory precedence for VC++ DLLs
+# - RemoteIO slice / shared-mode Wine engine period for game audio (#349)
+# The Wine/FEX/DXMT ABI revision stays pinned; do not switch submodules to main.
+COMPAT_PATCH="$ROOT/patches/madeira-game-compat-backports.patch"
+if git -C "$DEST" apply --reverse --check "$COMPAT_PATCH" >/dev/null 2>&1; then
+  echo "Madeira game compatibility patch already applied."
+else
+  git -C "$DEST" apply --check "$COMPAT_PATCH" || {
+    echo "ERROR: pinned Madeira sources do not match the game compatibility backport." >&2
+    exit 2
+  }
+  git -C "$DEST" apply "$COMPAT_PATCH"
+fi
+
 echo "Madeira sources checked out at $REV"
 echo "Source checkout complete. Run bash scripts/build_native_runtime.sh on macOS to compile, link and package."
 echo "Read $DEST/docs/BUILDING.md for the platform toolchains and licensed prerequisites."
