@@ -58,6 +58,7 @@
 		999999999999999999999911 /* PacketTunnelProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 999999999999999999999901 /* PacketTunnelProvider.swift */; };
 		999999999999999999999912 /* VPNExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 999999999999999999999902 /* VPNExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		999999999999999999999913 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 999999999999999999999905 /* Assets.xcassets */; };
+		B10000000000000000000051 /* universal.js in Resources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000051 /* universal.js */; };
 		111111111111111111111124 /* AppManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222236 /* AppManager.swift */; };
 		111111111111111111111125 /* GameSessionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222237 /* GameSessionView.swift */; };
 		111111111111111111111126 /* GuestAppListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222238 /* GuestAppListView.swift */; };
@@ -131,6 +132,7 @@
 		999999999999999999999903 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		999999999999999999999904 /* VPNExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = VPNExtension.entitlements; sourceTree = "<group>"; };
 		999999999999999999999905 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		B20000000000000000000051 /* universal.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = ../scripts/jit/universal.js; sourceTree = "<group>"; };
 		222222222222222222222236 /* AppManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppManager.swift"; sourceTree = "<group>"; };
 		222222222222222222222237 /* GameSessionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GameSessionView.swift"; sourceTree = "<group>"; };
 		222222222222222222222238 /* GuestAppListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GuestAppListView.swift"; sourceTree = "<group>"; };
@@ -248,6 +250,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				999999999999999999999913 /* Assets.xcassets in Resources */,
+				B10000000000000000000051 /* universal.js in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -257,6 +260,7 @@
 			children = (
 				222222222222222222222234 /* iDeck.entitlements */,
 				999999999999999999999905 /* Assets.xcassets */,
+				B20000000000000000000051 /* universal.js */,
 				222222222222222222222221 /* iDeckApp.swift */,
 				222222222222222222222222 /* MainView.swift */,
 				222222222222222222222230 /* SettingsView.swift */,
