@@ -98,7 +98,8 @@ struct GameSessionView: View {
                         .background(.black.opacity(0.75), in: RoundedRectangle(cornerRadius: 8))
                     }
                 }
-                if coordinator.windowsStatus == "Launching Steam game..." {
+                if coordinator.windowsStatus == "Launching Steam game..." ||
+                    coordinator.windowsStatus == "Launching Windows app..." {
                     HStack {
                         ProgressView()
                         Text("Iniciando Wine e preparando gráficos...")

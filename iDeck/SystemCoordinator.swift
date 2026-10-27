@@ -331,6 +331,30 @@ class SystemCoordinator: ObservableObject {
         }
     }
     
+    private func withPreparedMetalDisplay(expectedStatus: String, remainingChecks: Int = 100, perform: @escaping () -> Void) {
+        if !Thread.isMainThread {
+            DispatchQueue.main.async { [weak self] in
+                self?.withPreparedMetalDisplay(expectedStatus: expectedStatus, remainingChecks: remainingChecks, perform: perform)
+            }
+            return
+        }
+        guard windowsStatus == expectedStatus else { return }
+        if WindowsRendererView.isReadyForFrames {
+            perform()
+            return
+        }
+        guard remainingChecks > 0 else {
+            pendingSteamGameID = nil
+            setWindowsStatus("Execution Error: Metal display surface did not become ready. Wine was not started.")
+            return
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            self?.withPreparedMetalDisplay(expectedStatus: expectedStatus,
+                                           remainingChecks: remainingChecks - 1,
+                                           perform: perform)
+        }
+    }
+
     func launchWindowsExecutable(at url: URL, profile: WindowsGameProfile? = nil) {
         guard isContainerReady else { return }
         refreshJITStatus()
@@ -397,15 +421,25 @@ class SystemCoordinator: ObservableObject {
                     var effectiveProfile = profile ?? WindowsGameProfile(id: destination.path, title: destination.deletingPathExtension().lastPathComponent)
                     if self.isMetalFXEnabled { effectiveProfile.metalFXEnabled = true }
                     self.windowsEnvironment.applyGameProfile(effectiveProfile)
-                    self.windowsEnvironment.execute(
-                        binary: destination,
-                        arguments: profile?.arguments ?? "",
-                        is32Bit: false,
-                        isSteam: false,
-                        jitEnabler: self.jitEnabler
-                    ) { result in
-                        DispatchQueue.main.async {
-                            self.setWindowsStatus(result ? "Running" : "Execution Error: Windows runtime failed to start")
+                    self.setWindowsStatus("Launching Windows app...")
+                    self.withPreparedMetalDisplay(expectedStatus: "Launching Windows app...") { [weak self] in
+                        guard let self else { return }
+                        guard !ideck_wineprocess_running() else {
+                            self.setWindowsStatus("Execution Error: another Wine process is already running.")
+                            return
+                        }
+                        self.windowsEnvironment.execute(
+                            binary: destination,
+                            arguments: profile?.arguments ?? "",
+                            is32Bit: false,
+                            isSteam: false,
+                            jitEnabler: self.jitEnabler
+                        ) { [weak self] result in
+                            DispatchQueue.main.async {
+                                guard let self, self.windowsStatus == "Launching Windows app..." else { return }
+                                self.setWindowsStatus(result && ideck_wineprocess_running()
+                                    ? "Running" : "Execution Error: Windows runtime did not start.")
+                            }
                         }
                     }
                 }
@@ -507,7 +541,7 @@ class SystemCoordinator: ObservableObject {
         windowsEnvironment.applyGameProfile(effectiveProfile)
         pendingSteamGameID = game.appID
         setWindowsStatus("Launching Steam game...")
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+        withPreparedMetalDisplay(expectedStatus: "Launching Steam game...") { [weak self] in
             guard let self, self.pendingSteamGameID == game.appID else { return }
             guard self.windowsStatus == "Launching Steam game..." else {
                 self.pendingSteamGameID = nil

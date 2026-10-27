@@ -11,6 +11,18 @@ SOURCE="${IDECK_MADEIRA_APP_ROOT:-$ROOT/vendor/Madeira/app/Madeira}"
 RUNTIME="$APP/MadeiraRuntime"
 mkdir -p "$RUNTIME"
 
+# Wine's crypt32 unix bridge requires the Mozilla trust bundle for TLS.
+[[ -s "$SOURCE/cacert.pem" ]] && grep -q "BEGIN CERTIFICATE" "$SOURCE/cacert.pem" || {
+  echo "ERROR: missing or invalid Madeira cacert.pem" >&2; exit 2;
+}
+cp "$SOURCE/cacert.pem" "$APP/cacert.pem"
+for folder in legal licenses; do
+  [[ -d "$SOURCE/$folder" ]] || {
+    echo "ERROR: missing Madeira license directory: $folder" >&2; exit 2;
+  }
+  cp -R "$SOURCE/$folder" "$APP/$folder"
+done
+
 # The upstream Madeira bridge uses NSBundle.mainBundle for these paths.
 # They must exist at the top level, not only under MadeiraRuntime.
 for folder in aarch64-windows arm64ec-windows nls; do
@@ -27,7 +39,12 @@ cp "$SOURCE/prefix-template.tar.gz" "$APP/prefix-template.tar.gz"
 }
 
 for path in aarch64-windows/d3d11.dll aarch64-windows/dxgi.dll \
-            aarch64-windows/winemetal.dll arm64ec-windows/ntdll.dll \
+            aarch64-windows/winemetal.dll aarch64-windows/kernel32.dll \
+            aarch64-windows/user32.dll arm64ec-windows/ntdll.dll \
+            arm64ec-windows/kernel32.dll arm64ec-windows/kernelbase.dll \
+            arm64ec-windows/user32.dll arm64ec-windows/gdi32.dll \
+            arm64ec-windows/ws2_32.dll arm64ec-windows/d3d9.dll \
+            arm64ec-windows/vulkan-1.dll arm64ec-windows/madeira_d3d12.dll \
             arm64ec-windows/d3d11.dll arm64ec-windows/dxgi.dll \
             arm64ec-windows/d3d10core.dll \
             arm64ec-windows/d3d12.dll arm64ec-windows/d3d12core.dll \
@@ -42,11 +59,62 @@ done
 # Windows-side IPA signers enumerate bundle entries through APIs that cannot
 # reliably inspect Unix symlinks. Package physical directories in the native
 # runtime mirror, preserving the original top-level paths used by Madeira.
-for folder in aarch64-windows arm64ec-windows; do
+for folder in aarch64-windows arm64ec-windows nls; do
   cp -R "$APP/$folder" "$RUNTIME/$folder"
 done
+[[ -s "$RUNTIME/nls/locale.nls" ]] || {
+  echo "ERROR: Wine locale.nls is missing" >&2; exit 2;
+}
+
+if [[ -s "$SOURCE/i386-windows/ntdll.dll" ]]; then
+  for name in ntdll.dll kernel32.dll user32.dll d3d11.dll dxgi.dll; do
+    [[ -s "$SOURCE/i386-windows/$name" ]] || {
+      echo "ERROR: incomplete i386 Wine farm: $name" >&2; exit 2;
+    }
+  done
+  for name in xtajit.dll wow64.dll wow64win.dll; do
+    [[ -s "$SOURCE/aarch64-windows/$name" ]] || {
+      echo "ERROR: missing native WoW64 host module: $name" >&2; exit 2;
+    }
+  done
+  cp -R "$SOURCE/i386-windows" "$APP/i386-windows"
+  cp -R "$APP/i386-windows" "$RUNTIME/i386-windows"
+elif [[ "${IDECK_BUILD_WOW64:-0}" == "1" ]]; then
+  echo "ERROR: requested WoW64, but the i386 DLL farm was not compiled." >&2
+  exit 2
+fi
+
+# Official Microsoft VC++ libraries are not included in Madeira's git checkout.
+# When the owner supplies an authorized, complete distribution, stage it in
+# the exact location read by the upstream WineProcessBridge. No fake DLLs.
+VCRT_SOURCE="${IDECK_VCRUNTIME_DIR:-$SOURCE/x86_64-vcruntime}"
+if [[ -d "$VCRT_SOURCE" ]]; then
+  for name in concrt140.dll msvcp140.dll msvcp140_1.dll msvcp140_2.dll \
+              msvcp140_atomic_wait.dll msvcp140_codecvt_ids.dll \
+              vcamp140.dll vccorlib140.dll vcomp140.dll \
+              vcruntime140.dll vcruntime140_1.dll vcruntime140_threads.dll \
+              mfc140.dll mfc140u.dll; do
+    [[ -s "$VCRT_SOURCE/$name" ]] && [[ "$(head -c 2 "$VCRT_SOURCE/$name")" == "MZ" ]] || {
+      echo "ERROR: incomplete Microsoft VC++ runtime: $name" >&2; exit 2;
+    }
+  done
+  cp -R "$VCRT_SOURCE" "$APP/x86_64-vcruntime"
+  echo "Staged owner-supplied Microsoft VC++ runtime."
+elif [[ "${IDECK_REQUIRE_VCRUNTIME:-0}" == "1" ]]; then
+  echo "ERROR: provide authorized Microsoft VC++ DLLs in IDECK_VCRUNTIME_DIR" >&2
+  exit 2
+else
+  echo "WARNING: Microsoft VC++ runtime absent; games needing it may fail."
+fi
 
 mkdir -p "$APP/d3d12" "$RUNTIME/d3d12"
+for name in canary_vs.dxil canary_ps.dxil canary_layout_vs.dxil canary_layout_ps.dxil; do
+  [[ -s "$SOURCE/d3d12/$name" ]] || {
+    echo "ERROR: missing D3D12 canary shader: $name" >&2; exit 2;
+  }
+  cp "$SOURCE/d3d12/$name" "$APP/d3d12/$name"
+  cp "$SOURCE/d3d12/$name" "$RUNTIME/d3d12/$name"
+done
 for name in NOTICE.txt METAL-SHADER-CONVERTER-AGREEMENT.txt LICENSE-metal-shader-converter-headers.txt; do
   [[ -f "$SOURCE/d3d12/$name" ]] || { echo "ERROR: missing converter legal notice: $name" >&2; exit 2; }
   cp "$SOURCE/d3d12/$name" "$APP/d3d12/$name"
@@ -70,6 +138,18 @@ cp "$APP/d3d12/libmetalirconverter.dylib" "$RUNTIME/d3d12/libmetalirconverter.dy
 if [[ -n "${IDECK_CODESIGN_IDENTITY:-}" ]]; then
   codesign --force --sign "$IDECK_CODESIGN_IDENTITY" --timestamp=none \
     "$APP/d3d12/libmetalirconverter.dylib"
+fi
+
+if [[ "${IDECK_BUNDLE_WINE_MONO:-0}" == "1" ]]; then
+  MONO_ROOT="${IDECK_MADEIRA_ROOT:-$ROOT/vendor/Madeira}/build/wine-mono"
+  [[ -f "$MONO_ROOT/fetch.sh" && -f "$MONO_ROOT/bundle.sh" ]] || {
+    echo "ERROR: Wine Mono scripts missing from Madeira checkout" >&2; exit 2;
+  }
+  bash "$MONO_ROOT/fetch.sh"
+  bash "$MONO_ROOT/bundle.sh" "$APP/wine-mono"
+  [[ -s "$APP/wine-mono/bin/libmono-2.0-x86.dll" ]] || {
+    echo "ERROR: Wine Mono was not bundled correctly" >&2; exit 2;
+  }
 fi
 
 echo "Madeira Wine/DXMT/D3D12 resources staged under iDeck.app."

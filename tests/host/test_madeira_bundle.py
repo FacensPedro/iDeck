@@ -48,15 +48,27 @@ class MadeiraBundleTests(unittest.TestCase):
         self.app = Path(self.temp.name)
         (self.app / "iDeck").write_bytes(b"fixture")
         for name in bundle.PE_FILES:
-            path = self.app / "MadeiraRuntime" / name
-            path.parent.mkdir(parents=True, exist_ok=True)
             arm64ec = name.startswith("arm64ec-windows/")
-            path.write_bytes(make_64bit_pe(0x8664 if arm64ec else 0xAA64,
-                                           chpe=arm64ec))
-        converter = self.app / "MadeiraRuntime/d3d12/libmetalirconverter.dylib"
-        converter.parent.mkdir()
-        converter.write_bytes(bytes(2048))
+            for base in (self.app, self.app / "MadeiraRuntime"):
+                path = base / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(make_64bit_pe(0x8664 if arm64ec else 0xAA64,
+                                               chpe=arm64ec))
+        for base in (self.app, self.app / "MadeiraRuntime"):
+            converter = base / "d3d12/libmetalirconverter.dylib"
+            converter.parent.mkdir(parents=True, exist_ok=True)
+            converter.write_bytes(bytes(2048))
+            locale = base / "nls/locale.nls"
+            locale.parent.mkdir(parents=True, exist_ok=True)
+            locale.write_bytes(b"locale-fixture")
         (self.app / "prefix-template.tar.gz").write_bytes(b"\x1f\x8b" + bytes(2048))
+        (self.app / "cacert.pem").write_bytes(b"-----BEGIN CERTIFICATE-----\nfixture")
+        for folder in ("legal", "licenses"):
+            (self.app / folder).mkdir()
+        for base in (self.app, self.app / "MadeiraRuntime"):
+            for name in ("canary_vs.dxil", "canary_ps.dxil",
+                         "canary_layout_vs.dxil", "canary_layout_ps.dxil"):
+                (base / "d3d12" / name).write_bytes(b"DXIL-test")
         self.symbols = list(bundle.SYMBOLS)
 
     def inspect(self):
@@ -71,6 +83,35 @@ class MadeiraBundleTests(unittest.TestCase):
     def test_missing_arm64ec_frontend(self):
         (self.app / "MadeiraRuntime/arm64ec-windows/d3d11.dll").unlink()
         self.assertTrue(any("missing compiled Windows PE" in error for error in self.inspect()))
+
+    def test_missing_https_trust_store(self):
+        (self.app / "cacert.pem").unlink()
+        self.assertTrue(any("missing Madeira HTTPS certificate bundle" in e
+                            for e in self.inspect()))
+
+    def test_missing_d3d12_canary_shader(self):
+        (self.app / "d3d12/canary_vs.dxil").unlink()
+        self.assertTrue(any("missing D3D12 canary fixture" in e for e in self.inspect()))
+
+    def test_missing_required_wow64_farm(self):
+        output = "\n".join(f"00000000 T _{name}" for name in self.symbols)
+        result = subprocess.CompletedProcess([], 0, stdout=output, stderr="")
+        with patch.object(bundle.subprocess, "run", return_value=result):
+            errors = bundle.inspect(self.app, require_wow64=True)
+        self.assertTrue(any("missing WoW64 i386 library" in e for e in errors))
+
+    def test_missing_root_level_wine_module(self):
+        (self.app / "arm64ec-windows/kernel32.dll").unlink()
+        self.assertTrue(any("arm64ec-windows/kernel32.dll" in error
+                            for error in self.inspect()))
+
+    def test_missing_display_export(self):
+        self.symbols.remove("macdrv_functions")
+        self.assertIn("native symbol not linked/exported: macdrv_functions", self.inspect())
+
+    def test_missing_locale(self):
+        (self.app / "nls/locale.nls").unlink()
+        self.assertTrue(any("missing Wine locale resource" in e for e in self.inspect()))
 
     def test_rejects_plain_x64_module_in_arm64ec_directory(self):
         path = self.app / "MadeiraRuntime/arm64ec-windows/dxgi.dll"

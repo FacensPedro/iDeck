@@ -70,7 +70,20 @@ extern "C" int32_t ideck_runtime_launch(const char *executable_path,
             ![request[@"version"] isEqual:@1]) return EINVAL;
         NSArray *arguments = request[@"arguments"];
         if (![arguments isKindOfClass:[NSArray class]] || arguments.count > 64) return EINVAL;
-        if ([request[@"is32Bit"] boolValue]) return ENOTSUP;
+        if ([request[@"is32Bit"] boolValue]) {
+            // Upstream WineProcessBridge detects the target's PE32 machine
+            // and starts its WoW64 path. Never attempt it with an empty i386
+            // farm, or the guest can fail after reserving its address window.
+            NSString *bundlePath = NSBundle.mainBundle.bundlePath;
+            for (NSString *name in @[ @"i386-windows/ntdll.dll",
+                                      @"i386-windows/kernel32.dll",
+                                      @"aarch64-windows/xtajit.dll",
+                                      @"aarch64-windows/wow64.dll",
+                                      @"aarch64-windows/wow64win.dll" ]) {
+                if (![[NSFileManager defaultManager] fileExistsAtPath:
+                      [bundlePath stringByAppendingPathComponent:name]]) return ENOTSUP;
+            }
+        }
 
         NSString *prefix = [[NSString stringWithUTF8String:wine_prefix] stringByStandardizingPath];
         NSString *executable = [[NSString stringWithUTF8String:executable_path] stringByStandardizingPath];
