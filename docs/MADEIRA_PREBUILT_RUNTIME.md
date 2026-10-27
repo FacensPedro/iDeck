@@ -98,3 +98,5 @@ arquivo; o IPA continua sendo validado por `verify_madeira_bundle.py`.
 
 Isso reduz downloads e recompilações do CI, mas não substitui a assinatura
 correta, JIT/StikDebug nem o teste de um jogo no iPad.
+
+**Compatibilidade das revisões:** após incorporar correções de alinhamento do wineserver, áudio e VC++ na compilação nativa, os kits pré-compilados antigos não contêm essas alterações. Recompile o kit e atualize-o no Git LFS; o cache Actions inclui o hash da pasta `patches/` para evitar reutilizar o cache nativo anterior.

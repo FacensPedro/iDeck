@@ -83,6 +83,7 @@ jobs:
           bash -n scripts/fetch_madeira_sources.sh
           bash -n scripts/build_madeira_components.sh
           python3 -m unittest discover -s tests/host -p 'test_dxmt_shader_patch.py' -v
+          python3 -m unittest discover -s tests/host -p 'test_madeira_game_backports.py' -v
 
       - name: Test StikDebug universal JIT register encoding
         run: node tests/host/universal_jit_register_tests.js
