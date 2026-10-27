@@ -92,7 +92,7 @@ def check_assets(app: Path, wow64: bool, mono: bool) -> None:
     for name in REQUIRED_PE + (WOW64_FILES if wow64 else ()):
         if (app / name).open("rb").read(2) != b"MZ":
             raise KitError("Not a Windows PE image: " + name)
-    if not (app / "cacert.pem").read_bytes().startswith(b"-----BEGIN CERTIFICATE-----"):
+    if b"-----BEGIN CERTIFICATE-----" not in (app / "cacert.pem").read_bytes():
         raise KitError("Invalid bundled TLS trust roots")
     if (app / "prefix-template.tar.gz").open("rb").read(2) != b"\x1f\x8b":
         raise KitError("Invalid Wine prefix-template header")
@@ -119,8 +119,9 @@ def archive_paths(madeira: Path, bridge: Path) -> dict[str, Path]:
     return archives
 
 
-def collect(madeira: Path, bridge: Path, wow64: bool, mono: bool) -> dict[str, Path]:
-    app = madeira / "app/Madeira"
+def collect(madeira: Path, bridge: Path, wow64: bool, mono: bool,
+            resource_root: Path | None = None) -> dict[str, Path]:
+    app = resource_root or madeira / "app/Madeira"
     check_assets(app, wow64, mono)
     entries = {"archives/" + name: path for name, path in archive_paths(madeira, bridge).items()}
     for name in BASIC_FILES:
@@ -142,11 +143,12 @@ def collect(madeira: Path, bridge: Path, wow64: bool, mono: bool) -> dict[str, P
     return entries
 
 
-def build_kit(output: Path, madeira: Path, bridge: Path, wow64: bool, mono: bool) -> None:
+def build_kit(output: Path, madeira: Path, bridge: Path, wow64: bool, mono: bool,
+              resource_root: Path | None = None) -> None:
     rev = subprocess.check_output(["git", "-C", str(madeira), "rev-parse", "HEAD"], text=True).strip()
     if rev != REVISION:
         raise KitError(f"Madeira revision differs: expected {REVISION}, got {rev}")
-    entries = collect(madeira, bridge, wow64, mono)
+    entries = collect(madeira, bridge, wow64, mono, resource_root)
     total = sum(path.stat().st_size for path in entries.values())
     if total > MAX_TOTAL:
         raise KitError("Native runtime exceeds the allowed kit size")
@@ -291,6 +293,7 @@ def main() -> int:
     parser.add_argument("--output", type=Path, default=ROOT / "build/madeira-prebuilt")
     parser.add_argument("--madeira", type=Path, default=ROOT / "vendor/Madeira")
     parser.add_argument("--bridge", type=Path, default=ROOT / "build/madeira-native")
+    parser.add_argument("--resource-root", type=Path)
     args = parser.parse_args()
     archive = args.archive or default_path(args.wow64, args.mono, args.cache)
     try:
@@ -299,7 +302,7 @@ def main() -> int:
         elif args.action == "create":
             if os.environ.get("IDECK_ACCEPT_METAL_CONVERTER_LICENSE") != "1":
                 raise KitError("Explicit Metal Shader Converter redistribution permission required")
-            build_kit(archive, args.madeira, args.bridge, args.wow64, args.mono)
+            build_kit(archive, args.madeira, args.bridge, args.wow64, args.mono, args.resource_root)
         elif args.action == "inspect":
             bundle, _ = inspect(archive, args.wow64, args.mono)
             bundle.close()
