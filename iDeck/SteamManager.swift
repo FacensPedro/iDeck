@@ -2896,6 +2896,7 @@ class SteamSession: SteamCMSession {
     private(set) var accountName: String = ""
     private(set) var personaName: String = ""
     private(set) var cellID: UInt32 = 0
+    private(set) var purchaseCountryCode: String?
     /// While true the session neither connects nor reconnects: a game session
     /// runs, and Valve's own client must be the only one logged on with this
     /// account (see `suspend()`).
@@ -2956,11 +2957,19 @@ class SteamSession: SteamCMSession {
             // Capture the license list Steam pushes right after logon.
             // Registered before connecting so the handler can never miss it.
             licenseListBox.reset()
+            purchaseCountryCode = nil
             registerHandler(for: .clientLicenseList) { [weak self] message in
                 guard let self else { return }
                 do {
                     let list = try CMsgClientLicenseList.deserialize(from: message.body)
                     let packageIDs = list.licenses.map { $0.packageID }
+                    self.purchaseCountryCode = list.licenses
+                        .filter { $0.purchaseCountryCode.count == 2 &&
+                                  $0.purchaseCountryCode.unicodeScalars.allSatisfy {
+                                      CharacterSet.letters.contains($0)
+                                  } }
+                        .max(by: { $0.timeCreated < $1.timeCreated })?
+                        .purchaseCountryCode.uppercased()
                     SteamLog.trace("ClientLicenseList: parsed \(packageIDs.count) packages (body \(message.body.count)B, eresult=\(list.eresult))")
                     self.licenseListBox.set(packageIDs)
                 } catch {
@@ -3759,6 +3768,8 @@ struct SteamAppInfo {
     var depots: [DepotInfo] = []
     var buildID: UInt32 = 0
     var freeToDownload = false
+    /// Country supplied by the logged-in account's Steam licenses, not device locale.
+    var accountCountryCode: String?
     /// Apps owning depots this app installs through `depotfromapp`, so the
     /// install record names them the way Valve's client does.
     var sharedOwners: [UInt32: SharedOwner] = [:]
@@ -3914,14 +3925,15 @@ struct SteamAppInfo {
                 ($0.language.isEmpty || $0.language.caseInsensitiveCompare(language) == .orderedSame)
             }.map(\.depotID))
             guard !ids.isEmpty else { return nil }
-            let country = Locale.current.region?.identifier ?? ""
+            let country = accountCountryCode ?? ""
             let preferred = country.withCString {
                 ideck_steam_black_desert_preferred_depot($0)
             }
-            if ids.contains(preferred) { return preferred }
+            if !country.isEmpty && ids.contains(preferred) { return preferred }
             if ids.contains(582669) { return 582669 }
-            if let regional = ids.filter({ $0 != 582661 }).sorted().first { return regional }
-            return ids.sorted().first
+            // Do not choose an arbitrary licensed regional edition when
+            // the Steam account has not supplied its purchase country.
+            return nil
         }()
         func select(_ arch: String) -> [DepotInfo] {
             depots.filter { d in
@@ -4738,7 +4750,11 @@ final class SteamOwnedGamesModel: ObservableObject {
                 $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
             }
             guard SteamSignIn.accountName == account else { return }
-            games = fresh
+            games = fresh.map { game in
+                var selected = game
+                selected.accountCountryCode = session.purchaseCountryCode
+                return selected
+            }
             lastRefresh = Date()
             lastAccountName = account
             let previews = fresh.map { game in
@@ -4938,10 +4954,11 @@ final class SteamOwnedGamesModel: ObservableObject {
         let wasInstalled = isInstalled(appID: appID, prefixPath: prefixPath)
         do {
             try Task.checkCancellation()
-            guard let app = try await fetcher.fetchInstallInfo(
+            guard var app = try await fetcher.fetchInstallInfo(
                 appID: appID, cached: games.first(where: { $0.appID == appID })) else {
                 throw SteamError.depotNotFound(appID)
             }
+            app.accountCountryCode = session.purchaseCountryCode
             installFolder = SteamInstallFiles.safeFolderName(
                 app.installDir.isEmpty ? "app_\(app.appID)" : app.installDir)
             if let installFolder {
@@ -4996,7 +5013,7 @@ final class SteamOwnedGamesModel: ObservableObject {
         defer { installingApps.remove(appID) }
         do {
             try Task.checkCancellation()
-            guard let app = try await fetcher.fetchInstallInfo(
+            guard var app = try await fetcher.fetchInstallInfo(
                 appID: appID, cached: games.first(where: { $0.appID == appID })),
                   app.appID == appID,
                   app.installableOnWindows,
@@ -5008,6 +5025,7 @@ final class SteamOwnedGamesModel: ObservableObject {
                   }) else {
                 throw SteamError.depotNotFound(dlcAppID)
             }
+            app.accountCountryCode = session.purchaseCountryCode
             let steamApps = SteamInstallPaths.steamApps(
                 drive: prefixPath.appendingPathComponent("drive_c", isDirectory: true))
             try FileManager.default.createDirectory(at: steamApps, withIntermediateDirectories: true)
