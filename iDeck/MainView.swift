@@ -1454,7 +1454,6 @@ private struct SteamProgramDetailsView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button {
-                        profile.metalFXEnabled = coordinator.isMetalFXEnabled || profile.metalFXEnabled
                         library.save(profile)
                         dismiss()
                     } label: {
