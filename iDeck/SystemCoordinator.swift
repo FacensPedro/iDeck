@@ -22,11 +22,6 @@ class SystemCoordinator: ObservableObject {
     @Published var isMetalFXEnabled: Bool = UserDefaults.standard.bool(forKey: "metalFXEnabled") {
         didSet {
             UserDefaults.standard.set(isMetalFXEnabled, forKey: "metalFXEnabled")
-            if isMetalFXEnabled {
-                setenv("MVK_CONFIG_USE_METALFX", "1", 1)
-            } else {
-                unsetenv("MVK_CONFIG_USE_METALFX")
-            }
         }
     }
     
@@ -59,7 +54,6 @@ class SystemCoordinator: ObservableObject {
     private var steamSignInObserver: NSObjectProtocol?
 
     init() {
-        if isMetalFXEnabled { setenv("MVK_CONFIG_USE_METALFX", "1", 1) }
         refreshJITStatus()
         isSteamConnected = SteamSignIn.isSignedIn
         steamSignInObserver = NotificationCenter.default.addObserver(
@@ -113,16 +107,10 @@ class SystemCoordinator: ObservableObject {
         var mib: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_PID, getpid()]
         let result = sysctl(&mib, u_int(mib.count), &info, &size, nil, 0)
         let debuggerAttached = result == 0 && (info.kp_proc.p_flag & P_TRACED) != 0
-        // StikDebug may detach after granting process JIT permission.
-        // CS_DEBUGGED survives debugger detach; another MAP_JIT allocation can
-        // fail while FEX already owns its JIT region. Probe only as a fallback.
-        let pageSize = Int(getpagesize())
-        let processPermission = ideck_process_has_jit_permission()
-        let mapping = (processPermission || debuggerAttached) ? MAP_FAILED : mmap(nil, pageSize, PROT_READ | PROT_WRITE | PROT_EXEC,
-                           MAP_PRIVATE | MAP_ANON | MAP_JIT, -1, 0)
-        let executableJIT = mapping != MAP_FAILED
-        if executableJIT { _ = munmap(mapping, pageSize) }
-        let detected = processPermission || debuggerAttached || executableJIT
+        // Query code-signing status without allocating executable memory.
+        // Repeated MAP_JIT probes can race with FEX memory initialization and
+        // do not establish that StikDebug's BRK handler is ready.
+        let detected = ideck_process_has_jit_permission() || debuggerAttached
         let update = {
             self.isJITEnabled = detected
             if !detected && (self.currentStatus == "JIT confirmed via StikDebug" || self.currentStatus == "Ready") {
@@ -495,6 +483,7 @@ class SystemCoordinator: ObservableObject {
             return
         }
         windowsEnvironment.configureWine(prefix: prefixPath.path)
+        windowsEnvironment.graphicsConfig.applyGraphicsEnvironment()
         var effectiveProfile = profile
         if isMetalFXEnabled { effectiveProfile.metalFXEnabled = true }
         windowsEnvironment.applyGameProfile(effectiveProfile)
