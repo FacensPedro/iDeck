@@ -5,6 +5,7 @@ import Darwin
 
 private final class MadeiraMetalView: MTKView {
     var publishedSize: CGSize = .zero
+    var generation = 0
 
     override func didMoveToWindow() {
         super.didMoveToWindow()
@@ -34,6 +35,7 @@ private final class MadeiraMetalView: MTKView {
 struct WindowsRendererView: UIViewRepresentable {
     fileprivate static weak var activeView: MadeiraMetalView?
     private static var activeLayer: CAMetalLayer?
+    private static var nextGeneration = 0
 
     static var isNativeDisplayLinked: Bool {
         dlsym(UnsafeMutableRawPointer(bitPattern: -2), "madeira_display_set_layer") != nil &&
@@ -60,6 +62,10 @@ struct WindowsRendererView: UIViewRepresentable {
     fileprivate static func publishLayer(_ view: MadeiraMetalView) {
         guard let layer = view.layer as? CAMetalLayer,
               let symbol = dlsym(UnsafeMutableRawPointer(bitPattern: -2), "madeira_display_set_layer") else {
+            return
+        }
+        if let activeView, activeView !== view,
+           activeView.window != nil && activeView.generation > view.generation {
             return
         }
 
@@ -89,6 +95,8 @@ struct WindowsRendererView: UIViewRepresentable {
 
     func makeUIView(context: Context) -> MTKView {
         let view = MadeiraMetalView(frame: .zero)
+        Self.nextGeneration += 1
+        view.generation = Self.nextGeneration
         view.device = MTLCreateSystemDefaultDevice()
         view.clearColor = MTLClearColorMake(0, 0, 0, 1)
         view.isOpaque = true
