@@ -1368,7 +1368,6 @@ private struct SteamProgramDetailsView: View {
                                 presentError(tr("Windows environment is not ready."))
                                 return
                             }
-                            profile.metalFXEnabled = coordinator.isMetalFXEnabled || profile.metalFXEnabled
                             library.save(profile)
                             Task {
                                 if autoSaveEnabled {
