@@ -441,12 +441,8 @@ class SystemCoordinator: ObservableObject {
     /// relative DLL and asset paths instead of copying the executable elsewhere.
     func launchSteamGame(game: SteamAppInfo, profile: WindowsGameProfile, prefixPath: URL) {
         refreshJITStatus()
-        guard isJITEnabled else {
-            setWindowsStatus("Cannot launch: activate JIT in StikDebug first.")
-            return
-        }
-        guard ideck_fex_jit_ready() else {
-            setWindowsStatus("Cannot launch: StikDebug must remain attached to iDeck with the Madeira JIT script until the FEX pool is ready.")
+        if ideck_wineprocess_running() {
+            setWindowsStatus("Running")
             return
         }
 
@@ -494,6 +490,10 @@ class SystemCoordinator: ObservableObject {
             return
         }
 
+        guard ideck_fex_jit_ready() else {
+            setWindowsStatus("Cannot launch: FEX needs executable-memory preparation. Enable StikDebug JIT and keep its universal.js debugger attached; the library and installation remain usable without JIT.")
+            return
+        }
         windowsEnvironment.configureWine(prefix: prefixPath.path)
         var effectiveProfile = profile
         if isMetalFXEnabled { effectiveProfile.metalFXEnabled = true }
