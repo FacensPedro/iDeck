@@ -56,9 +56,9 @@ final class DepotDownloader {
         // CPU capacity for decrypting, inflating, SwiftUI and the JIT runtime.
         if process.isLowPowerModeEnabled { return 2 }
         switch process.thermalState {
-        case .nominal: return min(8, max(4, process.activeProcessorCount))
-        case .fair: return 4
-        case .serious: return 2
+        case .nominal: return 12
+        case .fair: return 6
+        case .serious: return 3
         case .critical: return 1
         @unknown default: return 4
         }
@@ -75,7 +75,7 @@ final class DepotDownloader {
         config.timeoutIntervalForRequest = 30
         config.timeoutIntervalForResource = 300
         // No bandwidth throttle is applied. This is a connection safety limit.
-        config.httpMaximumConnectionsPerHost = 8
+        config.httpMaximumConnectionsPerHost = 12
         return URLSession(configuration: config)
     }()
 
@@ -455,29 +455,42 @@ final class DepotDownloader {
                                                path: String, attempts: Int, seed: Int,
                                                reuseExisting: Bool) async throws -> UInt64 {
         var lastError: Error = SteamError.chunkDownloadFailed("No content server responded.")
+        var attemptedHosts = Set<String>()
         for attempt in 0..<max(1, attempts) {
             try Task.checkCancellation()
-            // Healthy servers first, starting from a per-chunk offset.
+            if attemptedHosts.count == plan.hosts.count { attemptedHosts.removeAll() }
             let order = plan.health.order(plan.hosts, seed: seed)
-            let host = order[attempt % order.count]
+            let host = order.first { !attemptedHosts.contains($0) } ?? order[0]
+            attemptedHosts.insert(host)
             let url = "\(host)/depot/\(plan.depotID)/chunk/\(chunk.shaHex)\(plan.auth[host] ?? "")"
             do {
-                let encrypted = try await download(url)
+                let timing = SteamCDNRequestMetrics()
+                let started = ProcessInfo.processInfo.systemUptime
+                let encrypted = try await download(url, metrics: timing)
+                let transferSeconds = max(0.001, ProcessInfo.processInfo.systemUptime - started)
                 let data = try ContentDecryptor.processChunk(encryptedData: encrypted, depotKey: plan.key,
                                                              expectedCRC: chunk.crc,
                                                              expectedSize: Int(chunk.uncompressedSize))
                 guard data.count == Int(chunk.uncompressedSize) else { throw SteamError.checksumMismatch }
                 let written = try write(data, to: path, offset: chunk.offset,
                                         reuseExisting: reuseExisting)
-                plan.health.recordSuccess(host)
+                plan.health.recordSuccess(host, bytes: encrypted.count,
+                                          seconds: transferSeconds,
+                                          responseLatency: timing.firstByteSeconds)
                 return written
             } catch is CancellationError {
                 throw CancellationError()
             } catch {
                 if Task.isCancelled { throw CancellationError() }
                 lastError = error
-                plan.health.recordFailure(host, reason: failureReason(error))
-                SteamLog.trace("chunk attempt \(attempt + 1) failed: \(failureReason(error))")
+                let reason = failureReason(error)
+                if plan.health.recordFailure(host) {
+                    let server = host.replacingOccurrences(of: "https://", with: "")
+                    DispatchQueue.main.async {
+                        SteamLog.event("[steam-cdn] host demoted host=\(server) reason=\(reason)")
+                    }
+                }
+                SteamLog.trace("chunk attempt \(attempt + 1) failed: \(reason)")
                 if attempt + 1 < attempts { try await Task.sleep(nanoseconds: UInt64(attempt + 1) * 400_000_000) }
             }
         }
@@ -508,9 +521,16 @@ final class DepotDownloader {
         return written
     }
 
-    private nonisolated static func download(_ urlString: String) async throws -> Data {
+    private nonisolated static func download(_ urlString: String,
+                                             metrics: SteamCDNRequestMetrics? = nil) async throws -> Data {
         guard let url = URL(string: urlString) else { throw SteamError.chunkDownloadFailed("Invalid content URL.") }
-        let (data, response) = try await http.data(from: url)
+        let data: Data
+        let response: URLResponse
+        if let metrics {
+            (data, response) = try await http.data(for: URLRequest(url: url), delegate: metrics)
+        } else {
+            (data, response) = try await http.data(from: url)
+        }
         guard let status = (response as? HTTPURLResponse)?.statusCode, (200...299).contains(status) else {
             throw SteamError.chunkDownloadFailed("Content server returned HTTP \((response as? HTTPURLResponse)?.statusCode ?? 0).")
         }
@@ -791,38 +811,25 @@ final class DepotDownloader {
     }
 }
 
-/// Per-install content-server health. Chunks start on different servers
-/// (spreading load) and servers that keep failing move to the back of every
-/// chunk's rotation, instead of each chunk rediscovering a bad server.
-final class ContentHostHealth: @unchecked Sendable {
+private final class SteamCDNRequestMetrics: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
     private let lock = NSLock()
-    private var failures: [String: Int] = [:]
-    private var reported = 0
+    private var measuredFirstByteSeconds: Double?
 
-    func order(_ hosts: [String], seed: Int) -> [String] {
-        guard !hosts.isEmpty else { return hosts }
-        let rotated = (0..<hosts.count).map { hosts[($0 + seed) % hosts.count] }
-        lock.lock(); let counts = failures; lock.unlock()
-        return rotated.enumerated()
-            .sorted { ((counts[$0.element] ?? 0), $0.offset) < ((counts[$1.element] ?? 0), $1.offset) }
-            .map(\.element)
+    var firstByteSeconds: Double? {
+        lock.lock()
+        defer { lock.unlock() }
+        return measuredFirstByteSeconds
     }
 
-    func recordFailure(_ host: String, reason: String) {
+    func urlSession(_ session: URLSession, task: URLSessionTask,
+                    didFinishCollecting metrics: URLSessionTaskMetrics) {
+        guard let transaction = metrics.transactionMetrics.last,
+              let request = transaction.requestStartDate,
+              let response = transaction.responseStartDate else { return }
+        let latency = response.timeIntervalSince(request)
+        guard latency.isFinite, latency >= 0 else { return }
         lock.lock()
-        failures[host, default: 0] += 1
-        let report = failures[host] == 3 && reported < 8
-        if report { reported += 1 }
-        lock.unlock()
-        if report {
-            let server = host.replacingOccurrences(of: "https://", with: "")
-            DispatchQueue.main.async { SteamLog.event("[steam-cdn] host demoted host=\(server) reason=\(reason)") }
-        }
-    }
-
-    func recordSuccess(_ host: String) {
-        lock.lock()
-        if let count = failures[host], count > 0 { failures[host] = count - 1 }
+        measuredFirstByteSeconds = latency
         lock.unlock()
     }
 }
