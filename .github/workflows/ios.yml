@@ -202,6 +202,7 @@ jobs:
         run: |
           test -s iDeck.ipa
           unzip -tq iDeck.ipa
+          unzip -Z1 iDeck.ipa | grep -Fx 'Payload/iDeck.app/universal.js'
           if [[ "${{ env.IDECK_NATIVE_BUILD == '1' && '1' || '0' }}" == "1" ]]; then
             python3 - <<'PY'
           import plistlib
