@@ -321,6 +321,10 @@ class SystemCoordinator: ObservableObject {
                 }
                 return
             }
+            guard self.windowsEnvironment.hasWoW64Runtime() else {
+                self.setWindowsStatus("Cannot install the Windows Steam client: the native IPA has no 32-bit WoW64 support. Run the Madeira build with build_wow64 enabled.")
+                return
+            }
             self.windowsEnvironment.configureWine(prefix: mountPath)
             self.windowsEnvironment.applyGameProfile(WindowsGameProfile(id: "steam", title: "Steam"))
             self.windowsEnvironment.installAndRunSteam(jitEnabler: self.jitEnabler) { result in

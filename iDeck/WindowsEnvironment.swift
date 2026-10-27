@@ -60,6 +60,20 @@ class WindowsEnvironment {
         }
     }
 
+    func hasWoW64Runtime() -> Bool {
+        let assets = [
+            "i386-windows/ntdll.dll",
+            "i386-windows/kernel32.dll",
+            "aarch64-windows/xtajit.dll",
+            "aarch64-windows/wow64.dll",
+            "aarch64-windows/wow64win.dll"
+        ]
+        return assets.allSatisfy {
+            FileManager.default.fileExists(
+                atPath: Bundle.main.bundleURL.appendingPathComponent($0).path)
+        }
+    }
+
     func missingRuntimeComponents(in prefix: String) -> [String] {
         var missing: [String] = []
         if !PrefixInstaller.isPrefixInstalled(at: URL(fileURLWithPath: prefix)) {
@@ -156,7 +170,12 @@ class WindowsEnvironment {
             
             do {
                 try fileManager.moveItem(at: localURL, to: downloadPath)
-                self?.execute(binary: downloadPath, is32Bit: true, isSteam: true, jitEnabler: jitEnabler) { status in
+                guard let self, !Self.isPE32WindowsExecutable(downloadPath) || self.hasWoW64Runtime() else {
+                    SteamLog.event("[wine-launch] SteamSetup requires WoW64 i386 runtime")
+                    completion(false)
+                    return
+                }
+                self.execute(binary: downloadPath, is32Bit: false, isSteam: true, jitEnabler: jitEnabler) { status in
                     completion(status == 0)
                 }
             } catch {

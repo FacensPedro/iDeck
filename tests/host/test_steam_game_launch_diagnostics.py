@@ -49,6 +49,14 @@ class SteamWebSocketBackpressureTests(unittest.TestCase):
         self.assertIn('@"i386-windows/ntdll.dll"', runtime)
         self.assertIn('coordinator.windowsStatus == "Launching Windows app..."', main)
 
+    def test_32_bit_steam_installer_requires_real_wow64(self):
+        workflow = (ROOT / ".github/workflows/ios.yml").read_text(encoding="utf-8")
+        environment = (ROOT / "iDeck/WindowsEnvironment.swift").read_text(encoding="utf-8")
+        self.assertIn("guard self.windowsEnvironment.hasWoW64Runtime() else", COORDINATOR)
+        self.assertIn("Self.isPE32WindowsExecutable(downloadPath)", environment)
+        self.assertIn("func hasWoW64Runtime() -> Bool", environment)
+        self.assertIn("IDECK_BUILD_WOW64: ${{ inputs.build_wow64 && '1' || '0' }}", workflow)
+
     def test_dlc_requests_stop_after_details_close(self):
         self.assertIn("guard !Task.isCancelled else { return }", STEAM)
         self.assertIn("await steamLibrary.loadDLC(appID: game.appID)", (ROOT / "iDeck/MainView.swift").read_text(encoding="utf-8"))
