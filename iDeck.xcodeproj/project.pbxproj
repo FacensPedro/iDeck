@@ -132,7 +132,7 @@
 		999999999999999999999903 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		999999999999999999999904 /* VPNExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = VPNExtension.entitlements; sourceTree = "<group>"; };
 		999999999999999999999905 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		B20000000000000000000051 /* universal.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = ../scripts/jit/universal.js; sourceTree = "<group>"; };
+		B20000000000000000000051 /* universal.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "../scripts/jit/universal.js"; sourceTree = "<group>"; };
 		222222222222222222222236 /* AppManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppManager.swift"; sourceTree = "<group>"; };
 		222222222222222222222237 /* GameSessionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GameSessionView.swift"; sourceTree = "<group>"; };
 		222222222222222222222238 /* GuestAppListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GuestAppListView.swift"; sourceTree = "<group>"; };
