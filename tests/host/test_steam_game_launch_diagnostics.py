@@ -42,6 +42,7 @@ class SteamWebSocketBackpressureTests(unittest.TestCase):
         self.assertIn("static var isReadyForFrames", renderer)
         self.assertIn("override func didMoveToWindow()", renderer)
         self.assertIn("guard activeView === view else { return }", renderer)
+        self.assertIn("activeView.generation > view.generation", renderer)
         self.assertIn("fileprivate static func releaseLayer(for view: MTKView)", renderer)
         runtime = (ROOT / "iDeck/NativeRuntime/MadeiraRuntimeBridge.mm").read_text(encoding="utf-8")
         environment = (ROOT / "iDeck/WindowsEnvironment.swift").read_text(encoding="utf-8")
