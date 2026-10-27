@@ -37,6 +37,8 @@ class SteamWebSocketBackpressureTests(unittest.TestCase):
         self.assertIn("metrics.secondsSinceLaunch >= 15 && !metrics.receivedNewFrames", GAME)
         self.assertIn("!WindowsRendererView.isNativeDisplayLinked", GAME)
         self.assertIn("!metrics.presentCounterAvailable", GAME)
+        self.assertIn('coordinator.windowsStatus.hasPrefix("Execution Error:")',
+                      (ROOT / "iDeck/MainView.swift").read_text(encoding="utf-8"))
 
 if __name__ == "__main__":
     unittest.main()
