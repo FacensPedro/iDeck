@@ -136,6 +136,11 @@ jobs:
             -o /tmp/ideck-steam-disk-tests
           /tmp/ideck-steam-disk-tests
 
+      - name: Test Steam CDN host performance selection
+        run: |
+          xcrun swiftc iDeck/SteamCDNHostSelection.swift tests/host/SteamCDNHostSelectionTests.swift -o /tmp/ideck-cdn-selection-tests
+          /tmp/ideck-cdn-selection-tests
+
       - name: Test Steam WebSocket backpressure and graphics readiness diagnostics
         run: python3 -m unittest discover -s tests/host -p 'test_steam_game_launch_diagnostics.py' -v
 
