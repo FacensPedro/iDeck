@@ -29,6 +29,8 @@ struct SteamCDNHostSelectionTests {
         assert(responseTime.order([hosts[0], hosts[1]], seed: 1).first == hosts[0])
 
         for _ in 0..<5 {
+            health.recordSuccess(hosts[0], bytes: 1_000_000, seconds: 0.5,
+                                 responseLatency: 0.30)
             health.recordSuccess(hosts[1], bytes: 1_000_000, seconds: 0.1,
                                  responseLatency: 0.05)
         }
