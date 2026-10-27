@@ -132,39 +132,39 @@ struct SettingsView: View {
     private var windowsCompatibilityContent: some View {
         VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 10) {
-            Text(tr("Microsoft Visual C++ libraries"))
-                .font(.subheadline.weight(.semibold))
-                .foregroundColor(.white)
-            Text(tr("Madeira can load legally obtained x64 Visual C++ DLLs from the app's Documents/vcruntime folder. The application does not download Microsoft DLLs. Restart iDeck before launching a game after changing them."))
-                .font(.caption)
-                .foregroundColor(.gray)
-                .fixedSize(horizontal: false, vertical: true)
-            if let vcRuntimeFolderStatus {
-                Text(vcRuntimeFolderStatus)
+                Text(tr("Microsoft Visual C++ libraries"))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundColor(.white)
+                Text(tr("Madeira can load legally obtained x64 Visual C++ DLLs from the app's Documents/vcruntime folder. The application does not download Microsoft DLLs. Restart iDeck before launching a game after changing them."))
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.gray)
                     .fixedSize(horizontal: false, vertical: true)
+                if let vcRuntimeFolderStatus {
+                    Text(vcRuntimeFolderStatus)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(16)
 
-        actionButton(title: tr("Prepare Visual C++ folder"), icon: "folder.badge.plus") {
-            guard let documents = FileManager.default.urls(for: .documentDirectory,
-                                                           in: .userDomainMask).first else {
-                vcRuntimeFolderStatus = tr("Could not locate the app's Documents folder.")
-                return
+            actionButton(title: tr("Prepare Visual C++ folder"), icon: "folder.badge.plus") {
+                guard let documents = FileManager.default.urls(for: .documentDirectory,
+                                                               in: .userDomainMask).first else {
+                    vcRuntimeFolderStatus = tr("Could not locate the app's Documents folder.")
+                    return
+                }
+                do {
+                    try FileManager.default.createDirectory(
+                        at: documents.appendingPathComponent("vcruntime", isDirectory: true),
+                        withIntermediateDirectories: true
+                    )
+                    vcRuntimeFolderStatus = tr("Folder ready: Files > On My iPad > iDeck > vcruntime.")
+                } catch {
+                    vcRuntimeFolderStatus = tr("Could not prepare the Visual C++ folder.")
+                }
             }
-            do {
-                try FileManager.default.createDirectory(
-                    at: documents.appendingPathComponent("vcruntime", isDirectory: true),
-                    withIntermediateDirectories: true
-                )
-                vcRuntimeFolderStatus = tr("Folder ready: Files > On My iPad > iDeck > vcruntime.")
-            } catch {
-                vcRuntimeFolderStatus = tr("Could not prepare the Visual C++ folder.")
-            }
-        }
         }
     }
 
