@@ -515,7 +515,7 @@ class SystemCoordinator: ObservableObject {
             }
             guard !ideck_wineprocess_running() else {
                 self.pendingSteamGameID = nil
-                self.setWindowsStatus("Cannot launch: another Wine process started during game preparation.")
+                self.setWindowsStatus("Execution Error: another Wine process started during game preparation.")
                 return
             }
             self.windowsEnvironment.execute(binary: executableURL,
