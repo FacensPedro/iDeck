@@ -11,6 +11,18 @@ SOURCE="${IDECK_MADEIRA_APP_ROOT:-$ROOT/vendor/Madeira/app/Madeira}"
 RUNTIME="$APP/MadeiraRuntime"
 mkdir -p "$RUNTIME"
 
+# Wine's crypt32 unix bridge requires the Mozilla trust bundle for TLS.
+[[ -s "$SOURCE/cacert.pem" ]] && grep -q "BEGIN CERTIFICATE" "$SOURCE/cacert.pem" || {
+  echo "ERROR: missing or invalid Madeira cacert.pem" >&2; exit 2;
+}
+cp "$SOURCE/cacert.pem" "$APP/cacert.pem"
+for folder in legal licenses; do
+  [[ -d "$SOURCE/$folder" ]] || {
+    echo "ERROR: missing Madeira license directory: $folder" >&2; exit 2;
+  }
+  cp -R "$SOURCE/$folder" "$APP/$folder"
+done
+
 # The upstream Madeira bridge uses NSBundle.mainBundle for these paths.
 # They must exist at the top level, not only under MadeiraRuntime.
 for folder in aarch64-windows arm64ec-windows nls; do
@@ -96,6 +108,13 @@ else
 fi
 
 mkdir -p "$APP/d3d12" "$RUNTIME/d3d12"
+for name in canary_vs.dxil canary_ps.dxil canary_layout_vs.dxil canary_layout_ps.dxil; do
+  [[ -s "$SOURCE/d3d12/$name" ]] || {
+    echo "ERROR: missing D3D12 canary shader: $name" >&2; exit 2;
+  }
+  cp "$SOURCE/d3d12/$name" "$APP/d3d12/$name"
+  cp "$SOURCE/d3d12/$name" "$RUNTIME/d3d12/$name"
+done
 for name in NOTICE.txt METAL-SHADER-CONVERTER-AGREEMENT.txt LICENSE-metal-shader-converter-headers.txt; do
   [[ -f "$SOURCE/d3d12/$name" ]] || { echo "ERROR: missing converter legal notice: $name" >&2; exit 2; }
   cp "$SOURCE/d3d12/$name" "$APP/d3d12/$name"

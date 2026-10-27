@@ -26,6 +26,9 @@ class WindowsEnvironment {
             "aarch64-windows/winemetal.dll",
             "nls/locale.nls",
             "d3d12/libmetalirconverter.dylib",
+            "d3d12/canary_vs.dxil",
+            "d3d12/canary_ps.dxil",
+            "cacert.pem",
             "prefix-template.tar.gz"
         ]
         guard assets.allSatisfy({
@@ -79,6 +82,9 @@ class WindowsEnvironment {
             "aarch64-windows/winemetal.dll": "WineMetal ARM64",
             "nls/locale.nls": "Wine locale data",
             "d3d12/libmetalirconverter.dylib": "Metal shader converter",
+            "d3d12/canary_vs.dxil": "D3D12 vertex shader fixture",
+            "d3d12/canary_ps.dxil": "D3D12 pixel shader fixture",
+            "cacert.pem": "Wine HTTPS certificate trust store",
             "prefix-template.tar.gz": "Wine prefix template"
         ]
         for (relativePath, label) in assets {

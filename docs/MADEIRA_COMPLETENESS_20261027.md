@@ -18,8 +18,8 @@ the guest invisibly. The native symbols `macdrv_functions`,
 ## Resource layout
 
 The upstream Wine bridge resolves resources at the TOP LEVEL of iDeck.app,
-including `arm64ec-windows/`, `aarch64-windows/`, `nls/`, and
-`d3d12/`. The packaging verifier checks both those live locations and the
+including `arm64ec-windows/`, `aarch64-windows/`, `nls/`, `cacert.pem`,
+and `d3d12/`. The packaging verifier checks both those live locations and the
 `MadeiraRuntime/` mirror used for compatibility with Windows signers. The
 required minimum set of native/guest symbols and critical DLLs is audited;
 this is not proof that all installed games' dependency imports resolve.

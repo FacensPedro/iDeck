@@ -62,6 +62,13 @@ class MadeiraBundleTests(unittest.TestCase):
             locale.parent.mkdir(parents=True, exist_ok=True)
             locale.write_bytes(b"locale-fixture")
         (self.app / "prefix-template.tar.gz").write_bytes(b"\x1f\x8b" + bytes(2048))
+        (self.app / "cacert.pem").write_bytes(b"-----BEGIN CERTIFICATE-----\nfixture")
+        for folder in ("legal", "licenses"):
+            (self.app / folder).mkdir()
+        for base in (self.app, self.app / "MadeiraRuntime"):
+            for name in ("canary_vs.dxil", "canary_ps.dxil",
+                         "canary_layout_vs.dxil", "canary_layout_ps.dxil"):
+                (base / "d3d12" / name).write_bytes(b"DXIL-test")
         self.symbols = list(bundle.SYMBOLS)
 
     def inspect(self):
@@ -76,6 +83,15 @@ class MadeiraBundleTests(unittest.TestCase):
     def test_missing_arm64ec_frontend(self):
         (self.app / "MadeiraRuntime/arm64ec-windows/d3d11.dll").unlink()
         self.assertTrue(any("missing compiled Windows PE" in error for error in self.inspect()))
+
+    def test_missing_https_trust_store(self):
+        (self.app / "cacert.pem").unlink()
+        self.assertTrue(any("missing Madeira HTTPS certificate bundle" in e
+                            for e in self.inspect()))
+
+    def test_missing_d3d12_canary_shader(self):
+        (self.app / "d3d12/canary_vs.dxil").unlink()
+        self.assertTrue(any("missing D3D12 canary fixture" in e for e in self.inspect()))
 
     def test_missing_required_wow64_farm(self):
         output = "\n".join(f"00000000 T _{name}" for name in self.symbols)

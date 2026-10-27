@@ -37,6 +37,10 @@ class MadeiraPayloadStagingTests(unittest.TestCase):
             folder.mkdir(parents=True)
             for name in names:
                 (folder / name).write_bytes(b"MZ" + bytes(128))
+        (self.source / "cacert.pem").write_bytes(b"-----BEGIN CERTIFICATE-----\nfixture")
+        for folder in ("legal", "licenses"):
+            (self.source / folder).mkdir()
+            (self.source / folder / "NOTICE.txt").write_text("Madeira notice", encoding="utf-8")
         (self.source / "nls").mkdir()
         (self.source / "nls" / "locale.nls").write_bytes(b"nls-data")
         (self.source / "prefix-template.tar.gz").write_bytes(
@@ -47,6 +51,9 @@ class MadeiraPayloadStagingTests(unittest.TestCase):
         (converter / "libmetalirconverter.dylib").write_bytes(b"converter-fixture")
         for notice in NOTICES:
             (converter / notice).write_text(notice, encoding="utf-8")
+        for name in ("canary_vs.dxil", "canary_ps.dxil",
+                     "canary_layout_vs.dxil", "canary_layout_ps.dxil"):
+            (converter / name).write_bytes(b"DXIL-test")
 
     def test_vcruntime_requires_all_supplied_files(self):
         source = self.source / "x86_64-vcruntime"
@@ -94,6 +101,16 @@ class MadeiraPayloadStagingTests(unittest.TestCase):
         self.assertTrue(mirror_converter.is_file())
         self.assertFalse(mirror_converter.is_symlink())
         self.assertEqual(canonical_converter.read_bytes(), mirror_converter.read_bytes())
+        self.assertEqual(
+            (self.app / "cacert.pem").read_bytes(),
+            (self.source / "cacert.pem").read_bytes(),
+        )
+        for name in ("canary_vs.dxil", "canary_ps.dxil",
+                     "canary_layout_vs.dxil", "canary_layout_ps.dxil"):
+            self.assertEqual(
+                (self.app / "MadeiraRuntime/d3d12" / name).read_bytes(),
+                (self.source / "d3d12" / name).read_bytes(),
+            )
         for path in (self.app / "MadeiraRuntime").rglob("*"):
             self.assertFalse(path.is_symlink(), str(path))
         self.assertEqual(

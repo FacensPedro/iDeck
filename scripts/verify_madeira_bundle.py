@@ -231,7 +231,18 @@ def inspect(app: Path, require_wow64: bool = False) -> list[str]:
                     if problem:
                         errors.append(problem)
 
+    ca = app / "cacert.pem"
+    if not ca.is_file() or b"-----BEGIN CERTIFICATE-----" not in ca.read_bytes():
+        errors.append(f"missing Madeira HTTPS certificate bundle: {ca}")
+    for folder in ("legal", "licenses"):
+        if not (app / folder).is_dir():
+            errors.append(f"missing Madeira license directory: {app / folder}")
     for directory in (app, runtime):
+        for name in ("canary_vs.dxil", "canary_ps.dxil",
+                     "canary_layout_vs.dxil", "canary_layout_ps.dxil"):
+            fixture = directory / "d3d12" / name
+            if not fixture.is_file() or fixture.stat().st_size == 0:
+                errors.append(f"missing D3D12 canary fixture: {fixture}")
         converter = directory / "d3d12" / "libmetalirconverter.dylib"
         if not converter.is_file() or converter.stat().st_size < 1024:
             errors.append(f"missing or empty iOS shader converter dependency: {converter}")
