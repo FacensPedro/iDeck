@@ -15,7 +15,6 @@ class SystemCoordinator: ObservableObject {
     @Published var isHUDEnabled: Bool = false {
         didSet {
             windowsEnvironment.graphicsConfig.isHUDEnabled = isHUDEnabled
-            windowsEnvironment.graphicsConfig.applyGraphicsEnvironment()
         }
     }
     
@@ -28,7 +27,6 @@ class SystemCoordinator: ObservableObject {
     @Published var isD3DMetalEnabled: Bool = false {
         didSet {
             windowsEnvironment.graphicsConfig.useD3DMetal = isD3DMetalEnabled
-            windowsEnvironment.graphicsConfig.applyGraphicsEnvironment()
         }
     }
     
