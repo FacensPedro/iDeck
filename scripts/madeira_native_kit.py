@@ -90,12 +90,14 @@ def check_assets(app: Path, wow64: bool, mono: bool) -> None:
         if not file.is_file() or file.stat().st_size == 0:
             raise KitError("Missing native runtime resource: " + str(file))
     for name in REQUIRED_PE + (WOW64_FILES if wow64 else ()):
-        if (app / name).open("rb").read(2) != b"MZ":
-            raise KitError("Not a Windows PE image: " + name)
+        with (app / name).open("rb") as stream:
+            if stream.read(2) != b"MZ":
+                raise KitError("Not a Windows PE image: " + name)
     if b"-----BEGIN CERTIFICATE-----" not in (app / "cacert.pem").read_bytes():
         raise KitError("Invalid bundled TLS trust roots")
-    if (app / "prefix-template.tar.gz").open("rb").read(2) != b"\x1f\x8b":
-        raise KitError("Invalid Wine prefix-template header")
+    with (app / "prefix-template.tar.gz").open("rb") as stream:
+        if stream.read(2) != b"\x1f\x8b":
+            raise KitError("Invalid Wine prefix-template header")
     for name in BASIC_FOLDERS + (("i386-windows",) if wow64 else ()) + (
         ("wine-mono",) if mono else ()
     ):

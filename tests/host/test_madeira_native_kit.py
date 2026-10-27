@@ -70,7 +70,7 @@ class MadeiraNativeKitTests(unittest.TestCase):
         with zipfile.ZipFile(path, "w") as archive:
             archive.writestr("metadata.json", json.dumps(manifest))
             for name, data in entries.items():
-                archive.writestr(name, (b"changed" if name == corrupt else data))
+                archive.writestr(name, (b"x" * len(data) if name == corrupt else data))
             for name, data in extras or []:
                 with warnings.catch_warnings():
                     warnings.simplefilter("ignore", UserWarning)
@@ -154,7 +154,8 @@ class MadeiraNativeKitTests(unittest.TestCase):
         with mock.patch.object(kit.subprocess, "check_output", return_value=kit.REVISION + "\n"):
             output = self.root / "built.zip"
             kit.build_kit(output, madeira, bridge, False, False, resource_root)
-        self.assertIsNotNone(kit.inspect(output, False, False))
+        archive, _ = kit.inspect(output, False, False)
+        archive.close()
         kit.install(output, self.root / "reinstalled", False, False)
         self.assertTrue((self.root / "reinstalled/resources/d3d12/canary_ps.dxil").is_file())
 
