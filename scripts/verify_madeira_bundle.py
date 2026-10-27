@@ -153,7 +153,7 @@ def _pe32_error(dll: Path) -> str | None:
                 return f"invalid WoW64 PE offset: {dll}"
             stream.seek(offset)
             header = stream.read(26)
-            if len(header) != 26 or header[:4] != b"PE\\0\\0":
+            if len(header) != 26 or header[:4] != b"PE\0\0":
                 return f"invalid WoW64 PE header: {dll}"
             machine = struct.unpack_from("<H", header, 4)[0]
             magic = struct.unpack_from("<H", header, 24)[0]

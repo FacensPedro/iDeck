@@ -78,7 +78,7 @@ class MadeiraBundleTests(unittest.TestCase):
         self.assertTrue(any("missing compiled Windows PE" in error for error in self.inspect()))
 
     def test_missing_required_wow64_farm(self):
-        output = "\\n".join(f"00000000 T _{name}" for name in self.symbols)
+        output = "\n".join(f"00000000 T _{name}" for name in self.symbols)
         result = subprocess.CompletedProcess([], 0, stdout=output, stderr="")
         with patch.object(bundle.subprocess, "run", return_value=result):
             errors = bundle.inspect(self.app, require_wow64=True)
