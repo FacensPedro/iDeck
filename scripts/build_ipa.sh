@@ -37,8 +37,8 @@ if [[ "${IDECK_REQUIRE_MADEIRA:-0}" == "1" ]]; then
         exit 2
       }
     else
-      REPO_KIT="$(python3 scripts/madeira_native_kit.py path "${KIT_FLAGS[@]}")"
-      CACHE_KIT="$(python3 scripts/madeira_native_kit.py path --cache "${KIT_FLAGS[@]}")"
+      REPO_KIT="$(python3 scripts/madeira_native_kit.py path ${KIT_FLAGS[@]+"${KIT_FLAGS[@]}"})"
+      CACHE_KIT="$(python3 scripts/madeira_native_kit.py path --cache ${KIT_FLAGS[@]+"${KIT_FLAGS[@]}"})"
       if [[ -s "$REPO_KIT" ]]; then
         KIT_ARCHIVE="$REPO_KIT"
       elif [[ -s "$CACHE_KIT" ]]; then
@@ -47,7 +47,7 @@ if [[ "${IDECK_REQUIRE_MADEIRA:-0}" == "1" ]]; then
     fi
   fi
   if [[ -n "$KIT_ARCHIVE" ]]; then
-    python3 scripts/madeira_native_kit.py install --archive "$KIT_ARCHIVE" "${KIT_FLAGS[@]}"
+    python3 scripts/madeira_native_kit.py install --archive "$KIT_ARCHIVE" ${KIT_FLAGS[@]+"${KIT_FLAGS[@]}"}
     NATIVE_ASSET_SOURCE="$(pwd)/build/madeira-prebuilt/resources"
     echo "Using precompiled Madeira FEX/Wine/DXMT/WineMetal/D3D12: $KIT_ARCHIVE"
   else
@@ -89,13 +89,13 @@ done
 if [ "${IDECK_REQUIRE_MADEIRA:-0}" = "1" ]; then
   IDECK_MADEIRA_APP_ROOT="$NATIVE_ASSET_SOURCE" \
     bash scripts/stage_madeira_payload.sh "$APP"
-  WOW64_FLAGS=()
   if [[ "${IDECK_BUILD_WOW64:-0}" == "1" ]]; then
-    WOW64_FLAGS+=(--require-wow64)
+    python3 scripts/verify_madeira_bundle.py --app "$APP" --require --require-wow64
+  else
+    python3 scripts/verify_madeira_bundle.py --app "$APP" --require
   fi
-  python3 scripts/verify_madeira_bundle.py --app "$APP" --require "${WOW64_FLAGS[@]}"
   if [[ "$EXPORT_NATIVE_KIT" == "1" ]]; then
-    python3 scripts/madeira_native_kit.py create --cache --resource-root "$APP" "${KIT_FLAGS[@]}"
+    python3 scripts/madeira_native_kit.py create --cache --resource-root "$APP" ${KIT_FLAGS[@]+"${KIT_FLAGS[@]}"}
   fi
 else
   python3 scripts/verify_madeira_bundle.py --app "$APP"
