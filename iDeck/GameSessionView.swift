@@ -1,13 +1,57 @@
 import SwiftUI
+import Metal
+import Darwin
+
+private final class GameRuntimeMetrics: ObservableObject {
+    @Published private(set) var fps = "N/D"
+    @Published private(set) var cpu = "N/D"
+    @Published private(set) var gpuMemory = "N/D"
+    @Published private(set) var frameCount: UInt64 = 0
+
+    private var previousUptime: TimeInterval?
+    private var previousCPU: Double?
+    private var previousFrames: UInt64?
+    private typealias PresentCount = @convention(c) () -> UInt64
+
+    func sample() {
+        let uptime = ProcessInfo.processInfo.systemUptime
+        var usage = rusage()
+        if getrusage(RUSAGE_SELF, &usage) == 0 {
+            let consumed = Double(usage.ru_utime.tv_sec) + Double(usage.ru_utime.tv_usec) / 1_000_000 +
+                Double(usage.ru_stime.tv_sec) + Double(usage.ru_stime.tv_usec) / 1_000_000
+            if let oldTime = previousUptime, let oldCPU = previousCPU, uptime > oldTime {
+                cpu = String(format: "%.0f%%", max(0, (consumed - oldCPU) / (uptime - oldTime) * 100))
+            }
+            previousCPU = consumed
+        }
+        if let pointer = dlsym(UnsafeMutableRawPointer(bitPattern: -2), "madeira_get_present_count") {
+            let count = unsafeBitCast(pointer, to: PresentCount.self)()
+            if let oldTime = previousUptime, let oldFrames = previousFrames, uptime > oldTime {
+                let delta = count >= oldFrames ? count - oldFrames : 0
+                fps = String(format: "%.0f", Double(delta) / (uptime - oldTime))
+            }
+            frameCount = count
+            previousFrames = count
+        } else {
+            fps = "N/D"
+        }
+        if let device = MTLCreateSystemDefaultDevice() {
+            gpuMemory = "\(device.currentAllocatedSize / (1024 * 1024)) MB"
+        }
+        previousUptime = uptime
+    }
+}
 
 struct GameSessionView: View {
     @ObservedObject var coordinator: SystemCoordinator
     @Environment(\.presentationMode) var presentationMode
-    
+    @StateObject private var metrics = GameRuntimeMetrics()
+    private let tick = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
-            
+
             GeometryReader { geometry in
                 let requested = WindowsRendererView.requestedSize
                 let fitted = RuntimeConfiguration.fittedSize(content: requested ?? geometry.size, available: geometry.size)
@@ -17,25 +61,59 @@ struct GameSessionView: View {
                     .frame(width: geometry.size.width, height: geometry.size.height)
             }
             .ignoresSafeArea(edges: .bottom)
-            
+
             VStack {
-                HStack {
+                HStack(alignment: .top) {
                     Button(action: {
                         presentationMode.wrappedValue.dismiss()
                     }) {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 30))
-                            .foregroundColor(.white.opacity(0.5))
+                            .foregroundColor(.white.opacity(0.7))
                             .frame(width: 44, height: 44)
                             .padding(8)
                     }
                     Spacer()
+                    if coordinator.isHUDEnabled {
+                        VStack(alignment: .trailing, spacing: 3) {
+                            Text("FPS: \(metrics.fps)  CPU: \(metrics.cpu)")
+                            Text("Metal: \(metrics.gpuMemory)  GPU %: N/D")
+                            Text("GPU % não é disponibilizada por APIs públicas do iPadOS.")
+                                .font(.system(size: 9))
+                        }
+                        .font(.system(size: 12, design: .monospaced))
+                        .foregroundColor(.white)
+                        .padding(8)
+                        .background(.black.opacity(0.75), in: RoundedRectangle(cornerRadius: 8))
+                    }
+                }
+                if coordinator.windowsStatus == "Launching Steam game..." {
+                    HStack {
+                        ProgressView()
+                        Text("Iniciando Wine e preparando gráficos...")
+                    }
+                    .padding(10)
+                    .background(.black.opacity(0.7), in: RoundedRectangle(cornerRadius: 8))
+                } else if coordinator.windowsStatus.hasPrefix("Execution Error") {
+                    Text(coordinator.windowsStatus)
+                        .foregroundColor(.red)
+                        .padding(10)
+                        .background(.black.opacity(0.7), in: RoundedRectangle(cornerRadius: 8))
+                } else if coordinator.windowsStatus == "Running" && metrics.fps == "0" {
+                    Text("Nenhum quadro gráfico apresentado. Verifique o runtime Wine/Metal.")
+                        .foregroundColor(.yellow)
+                        .padding(10)
+                        .background(.black.opacity(0.7), in: RoundedRectangle(cornerRadius: 8))
                 }
                 Spacer()
             }
         }
         .onAppear {
             WineInputBridge.shared.startBridging()
+            metrics.sample()
+        }
+        .onReceive(tick) { _ in
+            metrics.sample()
         }
     }
 }
