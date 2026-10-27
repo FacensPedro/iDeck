@@ -76,6 +76,11 @@ struct SettingsView: View {
                             toggleRow(title: tr("Hold Display at Maximum Rate"), isOn: $coordinator.isMaxRefreshRateEnabled)
                             toggleRow(title: tr("DXVK HUD"), isOn: $coordinator.isHUDEnabled)
                             toggleRow(title: tr("D3DMetal Rendering"), isOn: $coordinator.isD3DMetalEnabled)
+                            Text(tr("Graphics changes apply when you launch the next game."))
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                                .padding(.horizontal, 16)
+                                .padding(.bottom, 12)
                         }
                         
                         settingsSection(title: tr("Updates")) {
@@ -114,21 +119,51 @@ struct SettingsView: View {
     }
     
     private var statusRow: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(coordinator.isJITEnabled ? tr("JIT detected") : tr("JIT not detected"))
-                .font(.footnote)
-                .foregroundColor(coordinator.isJITEnabled ? .green : .white)
-            Button("Enable JIT with StikDebug") {
-                coordinator.requestStikDebugJIT()
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 10) {
+                Image(systemName: coordinator.isJITEnabled ? "checkmark.shield.fill" : "shield.lefthalf.filled")
+                    .font(.title3)
+                    .foregroundColor(coordinator.isJITEnabled ? .green : .orange)
+                    .frame(width: 28, height: 28)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(coordinator.isJITEnabled ? tr("JIT detected") : tr("JIT not detected"))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundColor(.white)
+                    Text(tr("JIT permission does not guarantee that FEX is ready."))
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
             }
-            .buttonStyle(.borderedProminent)
-            Text("StikDebug requires pairing, LocalDevVPN, and a debug-signable iDeck. Opening StikDebug does not prove FEX JIT is ready.")
+            Button {
+                coordinator.requestStikDebugJIT()
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "bolt.fill")
+                        .font(.system(size: 16, weight: .semibold))
+                    Text(tr("Enable JIT"))
+                        .font(.subheadline.weight(.semibold))
+                    Spacer(minLength: 0)
+                    Image(systemName: "arrow.up.right")
+                        .font(.footnote.weight(.semibold))
+                        .opacity(0.7)
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 16)
+                .frame(minHeight: 48)
+                .background(Color(red: 0.12, green: 0.34, blue: 0.70), in: RoundedRectangle(cornerRadius: 12))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(tr("Enable JIT"))
+            Text(tr("StikDebug requires pairing, LocalDevVPN, and a debug-signable iDeck. Opening StikDebug does not prove FEX JIT is ready."))
                 .font(.caption)
                 .foregroundColor(.gray)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(Color(red: 0.15, green: 0.15, blue: 0.15))
+        .padding(16)
+        .background(Color(red: 0.15, green: 0.15, blue: 0.15), in: RoundedRectangle(cornerRadius: 12))
         .padding(.bottom, 2)
     }
     
