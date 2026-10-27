@@ -62,6 +62,29 @@ supported safe guest-stop API; the iDeck close control now refuses to
 detach an active guest display. If the process is permanently frozen,
 terminate iDeck using the iPadOS app switcher.
 
+## Backports from newer Madeira
+
+The pinned Madeira revision remains fixed for ABI and FEX/Wine/DXMT consistency.
+During source checkout, iDeck now backports three targeted fixes from Madeira's
+October 2026 code:
+
+- **ARM64 wineserver:** 8-byte shared-object allocation alignment to prevent
+  unaligned guest/server objects.
+- **Audio:** align shared-mode Wine engine period with the actual iOS RemoteIO
+  I/O slice; `MADEIRA_AUDIO_IO_MS=0` retains system-chosen buffer duration and
+  `MADEIRA_AUDIO_PERIOD_MS=10` requests the old fixed 10 ms engine period.
+- **Visual C++:** in addition to the application bundle, Wine scans
+  `Documents/vcruntime` for x64 Visual C++ DLLs supplied by the device owner,
+  preferring those copies over bundled ones. The Settings page can create the
+  folder under Files → On My iPad → iDeck → vcruntime. No Microsoft runtime is
+  distributed by this change. The native ARM64EC exemptions for
+  `vcruntime140.dll` and `msvcp140.dll` are maintained.
+
+The patch is verified and applied once to the pinned Madeira source checkout.
+Precompiled runtime kits created before these backports must be rebuilt to
+contain the fixes. Tests of source patch application are not a substitute for
+signed-device hardware testing.
+
 ## Remaining compatibility work
 
 - Full native FEX/Wine/DXMT/D3D12 macOS toolchain build and hardware tests.

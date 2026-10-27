@@ -13,6 +13,8 @@ ARM64EC = (
     "d3d12.dll", "d3d12core.dll", "xtajit64.dll", "winemetal.dll",
     "kernel32.dll", "kernelbase.dll", "user32.dll", "gdi32.dll",
     "ws2_32.dll", "d3d9.dll", "vulkan-1.dll", "madeira_d3d12.dll",
+    "dcomp.dll", "ktmw32.dll", "faultrep.dll", "xaudio2_7.dll",
+    "d3dx11_43.dll", "d3dcompiler_47.dll", "dinput8.dll",
 )
 ARM64 = ("d3d11.dll", "dxgi.dll", "winemetal.dll", "kernel32.dll", "user32.dll")
 NOTICES = (
