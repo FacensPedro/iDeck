@@ -106,7 +106,7 @@ struct GameSessionView: View {
                     .padding(10)
                     .background(.black.opacity(0.7), in: RoundedRectangle(cornerRadius: 8))
                 } else if coordinator.windowsStatus.hasPrefix("Execution Error") {
-                    Text(coordinator.windowsStatus)
+                    Text(trStatus(coordinator.windowsStatus))
                         .foregroundColor(.red)
                         .padding(10)
                         .background(.black.opacity(0.7), in: RoundedRectangle(cornerRadius: 8))
