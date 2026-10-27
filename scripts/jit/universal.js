@@ -208,27 +208,26 @@ function JIT26PrepareRegion(brkResponse) {
 
 // utilities
 function littleEndianHexStringToNumber(hexStr) {
-    const bytes = [];
-    for (let i = 0; i < hexStr.length; i += 2) {
-        bytes.push(parseInt(hexStr.substr(i, 2), 16));
+    if (!/^[0-9a-fA-F]{16}$/.test(hexStr)) {
+        throw new Error("Expected exactly eight register bytes");
     }
-    let num = 0n;
-    for (let i = 4; i >= 0; i--) {
-        num = (num << 8n) | BigInt(bytes[i]);
+    let value = 0n;
+    for (let i = 7; i >= 0; i--) {
+        value = (value << 8n) | BigInt(parseInt(hexStr.slice(i * 2, i * 2 + 2), 16));
     }
-    return num;
+    return value;
 }
 
-function numberToLittleEndianHexString(num) {
+function numberToLittleEndianHexString(value) {
+    if (typeof value !== "bigint" || value < 0n || value > 0xffffffffffffffffn) {
+        throw new Error("Register value must be an unsigned 64-bit bigint");
+    }
     const bytes = [];
-    for (let i = 0; i < 5; i++) {
-        bytes.push(Number(num & 0xFFn));
-        num >>= 8n;
+    for (let i = 0; i < 8; i++) {
+        bytes.push(Number(value & 0xffn).toString(16).padStart(2, "0"));
+        value >>= 8n;
     }
-    while (bytes.length < 8) {
-        bytes.push(0);
-    }
-    return bytes.map(b => b.toString(16).padStart(2, '0')).join('');
+    return bytes.join("");
 }
 
 function littleEndianHexToU32(hexStr) {

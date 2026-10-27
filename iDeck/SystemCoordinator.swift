@@ -198,11 +198,15 @@ class SystemCoordinator: ObservableObject {
             URLQueryItem(name: "bundle-id", value: bundleID),
             URLQueryItem(name: "pid", value: String(getpid()))
         ]
-        // iPadOS 27 on A17 Pro requires a debugger-side breakpoint script.
-        // The bundled Madeira JIT uses the universal BRK #0xf00d protocol.
         if #available(iOS 26.0, *) {
+            guard let scriptURL = Bundle.main.url(forResource: "universal", withExtension: "js"),
+                  let scriptData = try? Data(contentsOf: scriptURL),
+                  !scriptData.isEmpty else {
+                setWindowsStatus("Cannot request JIT: the bundled universal.js debugger script is missing.")
+                return
+            }
             components.queryItems?.append(
-                URLQueryItem(name: "script-name", value: "universal.js")
+                URLQueryItem(name: "script-data", value: scriptData.base64EncodedString())
             )
         }
         guard let url = components.url else {
@@ -477,7 +481,7 @@ class SystemCoordinator: ObservableObject {
         }
 
         guard ideck_fex_jit_ready() else {
-            setWindowsStatus("Cannot launch: FEX needs executable-memory preparation. Enable StikDebug JIT and keep its universal.js debugger attached; the library and installation remain usable without JIT.")
+            setWindowsStatus("FEX JIT is not ready. JIT permission alone is insufficient. Keep StikDebug attached with universal.js during the first game launch, then retry.")
             return
         }
         windowsEnvironment.configureWine(prefix: prefixPath.path)
