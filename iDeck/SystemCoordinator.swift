@@ -50,6 +50,9 @@ class SystemCoordinator: ObservableObject {
     let prefixInstaller = PrefixInstaller()
     private var displayLink: CADisplayLink?
     private var steamSignInObserver: NSObjectProtocol?
+    private var activeSteamGameID: UInt32?
+    private var activeSteamPrefix: String?
+    private var pendingSteamGameID: UInt32?
 
     init() {
         refreshJITStatus()
@@ -431,10 +434,23 @@ class SystemCoordinator: ObservableObject {
     /// relative DLL and asset paths instead of copying the executable elsewhere.
     func launchSteamGame(game: SteamAppInfo, profile: WindowsGameProfile, prefixPath: URL) {
         refreshJITStatus()
+        if let pendingSteamGameID {
+            setWindowsStatus(pendingSteamGameID == game.appID
+                ? "Launching Steam game..."
+                : "Cannot launch: a different Steam game is already starting.")
+            return
+        }
+        let standardizedPrefix = prefixPath.standardizedFileURL.path
         if ideck_wineprocess_running() {
+            guard activeSteamGameID == game.appID, activeSteamPrefix == standardizedPrefix else {
+                setWindowsStatus("Cannot launch: Wine is already running a different or unverified session. Exit that Wine session before launching this game.")
+                return
+            }
             setWindowsStatus("Running")
             return
         }
+        activeSteamGameID = nil
+        activeSteamPrefix = nil
 
         let steamApps = SteamInstallPaths.steamApps(
             drive: prefixPath.appendingPathComponent("drive_c", isDirectory: true))
@@ -489,17 +505,36 @@ class SystemCoordinator: ObservableObject {
         var effectiveProfile = profile
         if isMetalFXEnabled { effectiveProfile.metalFXEnabled = true }
         windowsEnvironment.applyGameProfile(effectiveProfile)
+        pendingSteamGameID = game.appID
         setWindowsStatus("Launching Steam game...")
-        // Let SwiftUI create and publish its CAMetalLayer before native Wine
-        // starts submitting frames. A launch may otherwise bind no drawable.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-            guard let self else { return }
+            guard let self, self.pendingSteamGameID == game.appID else { return }
+            guard self.windowsStatus == "Launching Steam game..." else {
+                self.pendingSteamGameID = nil
+                return
+            }
+            guard !ideck_wineprocess_running() else {
+                self.pendingSteamGameID = nil
+                self.setWindowsStatus("Cannot launch: another Wine process started during game preparation.")
+                return
+            }
             self.windowsEnvironment.execute(binary: executableURL,
                                             arguments: profile.arguments.isEmpty ? entryArguments : profile.arguments,
                                             jitEnabler: self.jitEnabler) { [weak self] success in
                 DispatchQueue.main.async {
-                    guard let self, self.windowsStatus == "Launching Steam game..." else { return }
-                    self.setWindowsStatus(success ? "Running" : "Execution Error: Windows game launch failed")
+                    guard let self else { return }
+                    self.pendingSteamGameID = nil
+                    let running = success && ideck_wineprocess_running()
+                    if running {
+                        self.activeSteamGameID = game.appID
+                        self.activeSteamPrefix = standardizedPrefix
+                    } else {
+                        self.activeSteamGameID = nil
+                        self.activeSteamPrefix = nil
+                    }
+                    if self.windowsStatus == "Launching Steam game..." {
+                        self.setWindowsStatus(running ? "Running" : "Execution Error: Wine did not keep the game session running.")
+                    }
                 }
             }
         }
