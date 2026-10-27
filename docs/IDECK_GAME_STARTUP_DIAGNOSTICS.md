@@ -29,9 +29,9 @@ indicator does not by itself mean that a compatible debugger is still attached.
 4. Try a Direct3D 11 application to test DXMT/WineMetal after the basic
    process startup succeeds. D3D12 additionally depends on the licensed
    converter binaries and D3D12 PE components.
-5. Compare the displayed native launch status. Error 95 (ENOTSUP) indicates
+5. Compare the displayed native launch status. Error 45 (ENOTSUP) indicates
    a missing optional 32-bit runtime, 1 (EPERM) missing JIT startup permission,
-   2 (ENOENT) missing prefix/assets, and 11 (EAGAIN) incomplete native startup.
+   2 (ENOENT) missing prefix/assets, and 35 (EAGAIN) incomplete native startup.
 6. In the game overlay, look for whether `madeira_get_present_count` exists
    and actually advances. `wine_process_is_running` initially reports
    **thread creation**, not proof that the game reached first frame.
