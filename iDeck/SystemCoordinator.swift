@@ -507,7 +507,8 @@ class SystemCoordinator: ObservableObject {
                                             arguments: profile.arguments.isEmpty ? entryArguments : profile.arguments,
                                             jitEnabler: self.jitEnabler) { [weak self] success in
                 DispatchQueue.main.async {
-                    self?.setWindowsStatus(success ? "Running" : "Execution Error: Windows game launch failed")
+                    guard let self, self.windowsStatus == "Launching Steam game..." else { return }
+                    self.setWindowsStatus(success ? "Running" : "Execution Error: Windows game launch failed")
                 }
             }
         }
