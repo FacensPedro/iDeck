@@ -170,3 +170,14 @@ Sites de DLL avulsas são arriscados: podem conter arquivos adulterados, versõe
 `vc_redist.x64.exe` is Microsoft's official **Windows installer**, not a DLL to copy to iPadOS. With the appropriate rights, locate Windows **x64 DLLs** in a Visual Studio/MSVC redistributable directory and transfer the files you need to **Files → On My iPad → iDeck → vcruntime**. Restart iDeck before testing. For IPA builds, `IDECK_VCRUNTIME_DIR` is a separate developer option requiring the complete 14-DLL set and appropriate redistribution rights.
 
 Official references: [Microsoft downloads](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist), [DLL locations](https://learn.microsoft.com/en-us/cpp/windows/determining-which-dlls-to-redistribute), [Microsoft licensing](https://learn.microsoft.com/en-us/cpp/windows/redistributing-visual-cpp-files), [Apple Devices file sharing](https://support.apple.com/guide/devices-windows/transfer-files-between-your-devices-mchl4bd77d3a/windows).
+
+
+## DLL CAB extraction optimization
+
+The Microsoft Visual C++ CAB extractor now exits the nested-CAB traversal
+as soon as all 14 required x64 DLL files have passed the existing PE
+validation. It no longer searches the rest of the redistributable's
+remaining CAB items after success. Its nested-depth, file-count, byte
+budget, PE architecture and certificate-table checks remain in place.
+The extracted DLLs are still staged and atomically installed only after
+the complete set has been validated.
