@@ -161,13 +161,14 @@ extern "C" int32_t ideck_runtime_launch(const char *executable_path,
         NSString *argString = [quoted componentsJoinedByString:@" "];
         if (argString.length >= 4096) return E2BIG;
 
-        int32_t prepared = ideck_runtime_prepare(wine_prefix);
-        if (prepared != 0) return prepared;
         /* Direct Steam game launches must carry their own app identity. Without
          * it upstream Madeira currently falls back to a fixed test-game ID. */
         id steamID = request[@"steamAppID"];
         id steamFolder = request[@"steamInstallDirectory"];
+        id requestedWorkdir = request[@"steamWorkingDirectory"];
         if ((steamID == nil) != (steamFolder == nil)) return ideck_invalid_launch("steamAppID and steamInstallDirectory must be provided together");
+        if (requestedWorkdir != nil && steamID == nil)
+            return ideck_invalid_launch("Steam working folder requires an app identity");
         if ([request[@"isSteam"] boolValue] && steamID == nil) {
             if (setenv("MADEIRA_DOCK_SESSION", "1", 1)) return errno;
         } else {
@@ -193,12 +194,38 @@ extern "C" int32_t ideck_runtime_launch(const char *executable_path,
             if (relativeFolder.length == 0 || relativeFolder.length >= 850) return ENAMETOOLONG;
             NSString *windowsFolder = [@"C:\\" stringByAppendingString:
                 [relativeFolder stringByReplacingOccurrencesOfString:@"/" withString:@"\\"]];
-            /* Madeira's per-game working-folder contract is important for
-             * relative asset and DLL lookups, not only the Steam identity. */
+            NSString *workingDirectory = canonicalExecutable.stringByDeletingLastPathComponent;
+            if (requestedWorkdir != nil) {
+                if (![requestedWorkdir isKindOfClass:[NSString class]] ||
+                    [(NSString *)requestedWorkdir length] >= 1024)
+                    return ideck_invalid_launch("invalid Steam working directory");
+                workingDirectory = [[NSURL fileURLWithPath:(NSString *)requestedWorkdir]
+                    URLByResolvingSymlinksInPath].path;
+            }
+            BOOL insideFolder = [workingDirectory isEqualToString:canonicalFolder] ||
+                [workingDirectory hasPrefix:[canonicalFolder stringByAppendingString:@"/"]];
+            BOOL insideDrive = [workingDirectory hasPrefix:root];
+            BOOL directoryExists = NO;
+            if (!insideFolder || !insideDrive ||
+                ![[NSFileManager defaultManager] fileExistsAtPath:workingDirectory
+                                                      isDirectory:&directoryExists] ||
+                !directoryExists)
+                return ideck_invalid_launch("Steam working directory is missing or outside installed game");
+            NSString *relativeWorkingDirectory = [workingDirectory substringFromIndex:root.length];
+            NSString *windowsWorkingDirectory = [@"C:\\" stringByAppendingString:
+                [relativeWorkingDirectory stringByReplacingOccurrencesOfString:@"/" withString:@"\\"]];
+            if (windowsWorkingDirectory.length >= 480) return ENAMETOOLONG;
+            /* SteamAppPath is the install root, but Wine's working directory
+             * is the launch option's own workingdir (or EXE's parent). Games
+             * with a Binaries/Win64 EXE need these paths to differ. */
             if (setenv("MADEIRA_STEAM_APPID", appIDText.UTF8String, 1) ||
                 setenv("MADEIRA_STEAM_APPPATH", windowsFolder.UTF8String, 1) ||
-                setenv("MADEIRA_WORKDIR", windowsFolder.UTF8String, 1)) return errno;
+                setenv("MADEIRA_WORKDIR", windowsWorkingDirectory.UTF8String, 1)) return errno;
+            fprintf(stderr, "[iDeck game launch] Steam app=%s exe=%s cwd=%s\n",
+                    appIDText.UTF8String, winExe.UTF8String, windowsWorkingDirectory.UTF8String);
         }
+        int32_t prepared = ideck_runtime_prepare(wine_prefix);
+        if (prepared != 0) return prepared;
         if (setenv("MADEIRA_ENV_LOCKED", "MADEIRA_EXE,MADEIRA_ARGS,MADEIRA_STEAM_APPID,MADEIRA_STEAM_APPPATH,MADEIRA_WORKDIR", 1))
             return errno;
         if (setenv("WINEPREFIX", wine_prefix, 1) != 0 ||

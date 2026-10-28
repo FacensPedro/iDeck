@@ -650,6 +650,7 @@ class SystemCoordinator: ObservableObject {
         }
         let executableURL = selected.url
         let entryArguments = selected.arguments
+        SteamLog.event("[steam-start] app=\(game.appID) exe=\(executableURL.lastPathComponent) cwd=\(selected.workingDirectory.lastPathComponent) source=\(selected.source)")
         if !PrefixInstaller.isPrefixInstalled(at: prefixPath) &&
             Bundle.main.url(forResource: "prefix-template", withExtension: "tar.gz") != nil {
             setWindowsStatus("Preparing Wine prefix...")
@@ -701,6 +702,7 @@ class SystemCoordinator: ObservableObject {
                                             arguments: profile.arguments.isEmpty ? entryArguments : profile.arguments,
                                             steamAppID: game.appID,
                                             steamInstallDirectory: directory,
+                                            steamWorkingDirectory: selected.workingDirectory,
                                             jitEnabler: self.jitEnabler) { [weak self] success in
                 DispatchQueue.main.async {
                     guard let self else { return }
@@ -714,7 +716,10 @@ class SystemCoordinator: ObservableObject {
                         self.activeSteamPrefix = nil
                     }
                     if self.windowsStatus == "Launching Steam game..." {
-                        self.setWindowsStatus(running ? "Running" : self.nativeLaunchFailure(success))
+                        // Wine reports its loader thread as running before
+                        // the requested game's executable reaches first frame.
+                        self.setWindowsStatus(running
+                            ? "Wine started; waiting for game..." : self.nativeLaunchFailure(success))
                     }
                 }
             }
@@ -722,7 +727,8 @@ class SystemCoordinator: ObservableObject {
     }
 
     func refreshWindowsSessionHealth() {
-        guard windowsStatus == "Running" || windowsStatus == "Steam Running" else { return }
+        guard windowsStatus == "Running" || windowsStatus == "Steam Running" ||
+              windowsStatus == "Wine started; waiting for game..." else { return }
         guard !ideck_wineprocess_running() else { return }
         activeSteamGameID = nil
         activeSteamPrefix = nil
@@ -793,28 +799,48 @@ class SystemCoordinator: ObservableObject {
         return "Execution Error: Madeira launch failed (code \(status): \(message))."
     }
 
-    private func steamExecutable(game: SteamAppInfo, directory: URL) -> (url: URL, arguments: String)? {
+    private func steamExecutable(game: SteamAppInfo, directory: URL)
+        -> (url: URL, arguments: String, workingDirectory: URL, source: String)? {
         let fm = FileManager.default
         let root = directory.resolvingSymlinksInPath().standardizedFileURL
 
-        func verified(_ relative: String) -> URL? {
-            var folded: [String: String] = [:]
-            guard let path = SteamInstallFiles.safeRelativePath(relative, folded: &folded),
-                  path.lowercased().hasSuffix(".exe") else { return nil }
-            let file = root.appendingPathComponent(path)
-                .resolvingSymlinksInPath().standardizedFileURL
-            guard file.path.hasPrefix(root.path + "/"),
-                  (try? file.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true
-            else { return nil }
-            return file
+        let preferred = game.launches.enumerated().filter { _, option in
+            let platforms = option.oslist.lowercased()
+                .split(whereSeparator: { $0 == "," || $0 == " " || $0 == ";" })
+            return (platforms.isEmpty || platforms.contains("windows")) &&
+                   (option.requiredDLC?.isEmpty != false)
+        }.sorted { left, right in
+            // Prefer the normal Windows game over editors, tools and VR,
+            // retaining Valve's configuration order for equal priorities.
+            func priority(_ option: SteamLaunchOption) -> Int {
+                let type = option.type.lowercased()
+                let special = ["vr", "server", "editor", "launcher", "tool"]
+                    .contains(where: { type.contains($0) })
+                let arch64 = option.osarch == "64"
+                return (special ? 100 : 0) + (arch64 ? 0 : 10)
+            }
+            let a = priority(left.element), b = priority(right.element)
+            return a == b ? left.offset < right.offset : a < b
         }
 
-        for option in game.launches where
-            (option.oslist.isEmpty || option.oslist.lowercased().contains("windows")) &&
-            (option.requiredDLC?.isEmpty != false) {
-            if let executable = verified(option.executable) {
-                return (executable, option.arguments)
+        for (_, option) in preferred {
+            guard let executable = SteamInstallFiles.resolveLaunchPath(
+                option.executable, root: root, executable: true) else { continue }
+            let requestedDir = option.workingDir.trimmingCharacters(in: .whitespacesAndNewlines)
+            let workdir: URL
+            if requestedDir.isEmpty {
+                workdir = executable.deletingLastPathComponent()
+            } else if let resolved = SteamInstallFiles.resolveLaunchPath(
+                requestedDir, root: root, executable: false) {
+                workdir = resolved
+            } else {
+                // Steam can provide a stale/unsupported workingdir. Keep
+                // relative DLL and asset lookups inside the EXE's folder.
+                SteamLog.event("[steam-start] app=\(game.appID) invalid workingdir for option \(option.index ?? 0); using exe directory")
+                workdir = executable.deletingLastPathComponent()
             }
+            return (executable, option.arguments, workdir,
+                    "steam-config-\(option.index ?? 0)")
         }
 
         let blockedNames = Set([
@@ -859,7 +885,8 @@ class SystemCoordinator: ObservableObject {
                 ? $0.url.path.localizedCaseInsensitiveCompare($1.url.path) == .orderedAscending
                 : $0.score > $1.score
         }).first, best.score > -100 else { return nil }
-        return (best.url, "")
+        SteamLog.event("[steam-start] app=\(game.appID) using executable fallback; Steam metadata did not resolve")
+        return (best.url, "", best.url.deletingLastPathComponent(), "installed-files")
     }
 
     /// Loads and starts a guest .app inside this process (see LiveContainerHook).

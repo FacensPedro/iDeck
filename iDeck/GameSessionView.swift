@@ -80,7 +80,8 @@ struct GameSessionView: View {
            status == "Launching Windows app..." {
             return (0.45, "Starting Wine and FEX")
         }
-        if status == "Running" || status == "Steam Running" {
+        if status == "Running" || status == "Steam Running" ||
+           status == "Wine started; waiting for game..." {
             if metrics.receivedNewFrames {
                 let recentlyReady = metrics.secondsSinceLaunch - (metrics.firstFrameAt ?? 0) < 2.5
                 return recentlyReady ? (1.0, "First Metal frame displayed") : nil
@@ -289,12 +290,28 @@ struct GameSessionView: View {
                         .foregroundColor(.orange)
                         .padding(10)
                         .background(.black.opacity(0.7), in: RoundedRectangle(cornerRadius: 8))
-                } else if coordinator.windowsStatus == "Running" &&
-                            metrics.secondsSinceLaunch >= 15 && !metrics.receivedNewFrames {
-                    Text(tr("Wine started, but no new Metal frames were detected. The game may still be loading."))
-                        .foregroundColor(.yellow)
-                        .padding(10)
-                        .background(.black.opacity(0.7), in: RoundedRectangle(cornerRadius: 8))
+                } else if (coordinator.windowsStatus == "Wine started; waiting for game..." ||
+                           coordinator.windowsStatus == "Running") &&
+                           metrics.secondsSinceLaunch >= 20 && !metrics.receivedNewFrames {
+                    VStack(alignment: .leading, spacing: 9) {
+                        Text(tr("Wine started, but no game frame was detected. The selected executable may require Steam, a different working folder or missing runtime DLLs."))
+                            .foregroundColor(.yellow)
+                        Text(tr("Wine is still active. Check its log before closing the session."))
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.75))
+                        if let logURL = wineLogURL {
+                            ShareLink(item: logURL) {
+                                Label(tr("Share Wine log"), systemImage: "square.and.arrow.up")
+                            }
+                            .font(.subheadline)
+                            Text(tr("Wine logs can contain personal or account information. Review before sharing."))
+                                .font(.caption2)
+                                .foregroundColor(.gray)
+                        }
+                    }
+                    .padding(12)
+                    .background(.black.opacity(0.7), in: RoundedRectangle(cornerRadius: 8))
+                    .padding(.horizontal, 12)
                 }
                 Spacer()
             }
@@ -309,6 +326,13 @@ struct GameSessionView: View {
         }
         .onReceive(tick) { _ in
             metrics.sample()
+            if coordinator.windowsStatus == "Wine started; waiting for game..." &&
+               metrics.receivedNewFrames {
+                // The loader thread being alive is insufficient. Require a
+                // native Metal presentation before promoting game readiness.
+                SteamLog.event("[steam-start] first Metal frame detected after Wine startup")
+                coordinator.setWindowsStatus("Running")
+            }
             coordinator.refreshWindowsSessionHealth()
             if closeRequested && !ideck_wineprocess_running() {
                 closeRequested = false

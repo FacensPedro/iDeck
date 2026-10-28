@@ -27,6 +27,12 @@ class MadeiraLaunchIntegrationTests(unittest.TestCase):
         self.assertIn('request[@"steamInstallDirectory"]', NATIVE)
         self.assertIn('setenv("MADEIRA_STEAM_APPID"', NATIVE)
         self.assertIn('setenv("MADEIRA_STEAM_APPPATH"', NATIVE)
+        self.assertIn('request[@"steamWorkingDirectory"]', NATIVE)
+        self.assertIn('setenv("MADEIRA_WORKDIR", windowsWorkingDirectory.UTF8String, 1)', NATIVE)
+        self.assertIn('launchDetails["steamWorkingDirectory"]', ENVIRONMENT)
+        self.assertIn("steamWorkingDirectory: selected.workingDirectory", COORDINATOR)
+        self.assertIn('Steam working directory is missing or outside installed game', NATIVE)
+
         self.assertIn('unsetenv("MADEIRA_STEAM_APPID")', NATIVE)
         self.assertIn('unsetenv("MADEIRA_STEAM_APPPATH")', NATIVE)
         self.assertIn('setenv("MADEIRA_ENV_LOCKED"', NATIVE)

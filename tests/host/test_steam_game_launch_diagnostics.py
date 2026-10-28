@@ -70,7 +70,9 @@ class SteamWebSocketBackpressureTests(unittest.TestCase):
         self.assertIn("await steamLibrary.loadDLC(appID: game.appID)", (ROOT / "iDeck/MainView.swift").read_text(encoding="utf-8"))
 
     def test_graphics_diagnostic_requires_elapsed_time(self):
-        self.assertIn("metrics.secondsSinceLaunch >= 15 && !metrics.receivedNewFrames", GAME)
+        self.assertIn("metrics.secondsSinceLaunch >= 20 && !metrics.receivedNewFrames", GAME)
+        self.assertIn('coordinator.windowsStatus == "Wine started; waiting for game..."', GAME)
+        self.assertIn('coordinator.setWindowsStatus("Running")', GAME)
         self.assertIn("!WindowsRendererView.isNativeDisplayLinked", GAME)
         self.assertIn("!metrics.presentCounterAvailable", GAME)
         self.assertIn('coordinator.windowsStatus.hasPrefix("Execution Error:")',

@@ -37,9 +37,12 @@ class WineStartupSessionTests(unittest.TestCase):
         self.assertIn("if (ideck_wine_session_started) return EALREADY;", NATIVE)
 
     def test_steam_working_folder_is_set_for_relative_assets(self):
-        self.assertIn('setenv("MADEIRA_WORKDIR", windowsFolder.UTF8String, 1)', NATIVE)
+        self.assertIn('setenv("MADEIRA_STEAM_APPPATH", windowsFolder.UTF8String, 1)', NATIVE)
+        self.assertIn('setenv("MADEIRA_WORKDIR", windowsWorkingDirectory.UTF8String, 1)', NATIVE)
+        self.assertIn('request[@"steamWorkingDirectory"]', NATIVE)
         self.assertIn('unsetenv("MADEIRA_WORKDIR")', NATIVE)
         self.assertIn("MADEIRA_WORKDIR", NATIVE)
+        self.assertNotIn('setenv("MADEIRA_WORKDIR", windowsFolder.UTF8String, 1)', NATIVE)
 
     def test_opt_in_child_process_compatibility(self):
         self.assertIn("var keepChildProcessesRunning: Bool = false", PROFILES)

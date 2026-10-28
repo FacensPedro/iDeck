@@ -56,6 +56,8 @@ func trStatus(_ status: String) -> String {
 enum Translations {
     static let table: [String: [String: String]] = [
         "Share Wine log": ["pt": "Compartilhar log do Wine", "es": "Compartir registro de Wine"],
+        "Wine started, but no game frame was detected. The selected executable may require Steam, a different working folder or missing runtime DLLs.": ["pt": "O Wine iniciou, mas nenhum quadro do jogo foi detectado. O executável pode precisar do cliente Steam, de outra pasta de trabalho ou de DLLs ausentes.", "es": "Wine se inició, pero no se detectaron fotogramas del juego. El ejecutable puede necesitar Steam, otra carpeta de trabajo o DLL faltantes."],
+        "Wine is still active. Check its log before closing the session.": ["pt": "O Wine continua ativo. Consulte o log antes de encerrar a sessão.", "es": "Wine sigue activo. Consulta el registro antes de cerrar la sesión."],
         "Last Wine log indicates an executable JIT allocation or mapping failure.": ["pt": "O último log do Wine indica falha na alocação ou no mapeamento de memória JIT executável.", "es": "El último registro de Wine indica un fallo de asignación o mapeo de memoria JIT ejecutable."],
         "Last Wine log indicates that executable memory permissions were denied.": ["pt": "O último log do Wine indica que as permissões de memória executável foram negadas.", "es": "El último registro de Wine indica que se denegaron los permisos de memoria ejecutable."],
         "Last Wine log indicates the Windows process ran out of memory.": ["pt": "O último log do Wine indica que o processo Windows ficou sem memória.", "es": "El último registro de Wine indica que el proceso de Windows se quedó sin memoria."],

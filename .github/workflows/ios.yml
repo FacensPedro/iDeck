@@ -255,6 +255,11 @@ jobs:
           /tmp/ideck-wine-exit-tests
           python3 -m unittest discover -s tests/host -p 'test_madeira_launch_integration.py' -v
 
+      - name: Test installed Steam executable and working-directory launch paths
+        run: |
+          xcrun swiftc iDeck/SteamKeyValues.swift iDeck/SteamInstall.swift tests/host/SteamInstallLaunchPathTests.swift -o /tmp/ideck-steam-launch-path-tests
+          /tmp/ideck-steam-launch-path-tests
+
       - name: Test Windows launch arguments and path escaping
         run: |
           xcrun swiftc iDeck/WindowsLaunchArguments.swift tests/host/WindowsLaunchArgumentsTests.swift -o /tmp/ideck-launch-args-tests
