@@ -294,6 +294,7 @@ def main() -> int:
             "wineInProcess": True,
             "dxmtLinked": True,
             "d3d12Linked": True,
+            "wow64Enabled": (app / "i386-windows/ntdll.dll").is_file(),
         }, handle)
     print("Native payload and symbols found. Device integration testing is still required.")
     return 0

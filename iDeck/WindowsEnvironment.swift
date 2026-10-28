@@ -68,16 +68,34 @@ class WindowsEnvironment {
     }
 
     func hasWoW64Runtime() -> Bool {
+        let bundle = Bundle.main.bundleURL
+        let manifestURL = bundle.appendingPathComponent("MadeiraRuntimeManifest.plist")
+        guard let data = try? Data(contentsOf: manifestURL),
+              let manifest = try? PropertyListSerialization.propertyList(
+                from: data, options: [], format: nil) as? [String: Any],
+              manifest["wow64Enabled"] as? Bool == true else {
+            return false
+        }
+
         let assets = [
             "i386-windows/ntdll.dll",
             "i386-windows/kernel32.dll",
+            "i386-windows/user32.dll",
+            "i386-windows/d3d11.dll",
+            "i386-windows/dxgi.dll",
             "aarch64-windows/xtajit.dll",
             "aarch64-windows/wow64.dll",
             "aarch64-windows/wow64win.dll"
         ]
-        return assets.allSatisfy {
-            FileManager.default.fileExists(
-                atPath: Bundle.main.bundleURL.appendingPathComponent($0).path)
+        return assets.allSatisfy { name in
+            let file = bundle.appendingPathComponent(name)
+            guard let attributes = try? FileManager.default.attributesOfItem(atPath: file.path),
+                  let size = attributes[.size] as? NSNumber, size.intValue >= 1024,
+                  let handle = try? FileHandle(forReadingFrom: file) else {
+                return false
+            }
+            defer { try? handle.close() }
+            return (try? handle.read(upToCount: 2)) == Data([0x4d, 0x5a])
         }
     }
 
@@ -192,7 +210,7 @@ class WindowsEnvironment {
                     completion(false)
                     return
                 }
-                self.execute(binary: downloadPath, is32Bit: false, isSteam: true, jitEnabler: jitEnabler) { status in
+                self.execute(binary: downloadPath, is32Bit: Self.isPE32WindowsExecutable(downloadPath), isSteam: true, jitEnabler: jitEnabler) { status in
                     completion(status == 0)
                 }
             } catch {
@@ -235,12 +253,19 @@ class WindowsEnvironment {
             return
         }
 
+        let needsWoW64 = is32Bit || Self.isPE32WindowsExecutable(binary)
+        guard !needsWoW64 || hasWoW64Runtime() else {
+            SteamLog.event("[wine-launch] rejected PE32 i386 executable: complete WoW64 runtime is missing")
+            completion(Int(ENOTSUP))
+            return
+        }
+
         let architectureTranslator = BoxTranslator()
         architectureTranslator.translateAndRun(
             executablePath: binary.path,
             arguments: parsedArguments,
             environment: winePrefixPath,
-            is32Bit: is32Bit || Self.isPE32WindowsExecutable(binary),
+            is32Bit: needsWoW64,
             isSteam: isSteam,
             steamAppID: steamAppID,
             steamInstallDirectory: steamInstallDirectory,

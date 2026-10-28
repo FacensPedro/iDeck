@@ -12,6 +12,7 @@
 | --- | --- | --- |
 | Steam | Sign-in, owned-game library, metadata, and downloads | Some games require Steam's Windows client and DRM authentication |
 | Windows | EXE import, Wine prefixes, game profiles, and the Madeira runtime | Requires an actual native IPA, FEX/JIT, and compatible Wine functionality |
+| WoW64 (32-bit x86) | Native Madeira builds include the i386 FEX translator, 32-bit Wine DLL farm and WoW64 host DLLs by default | Real device compatibility depends on the JIT pool, Wine prefix and individual game requirements |
 | Graphics | Metal adapters, DXMT, WineMetal, D3D12, and MetalFX settings | Game rendering and performance require hardware testing |
 | iOS app hosting | LiveContainer-inspired integration | Subject to iPadOS entitlements, signing, and sandbox restrictions |
 | JIT | Integration with the external [StikDebug](https://github.com/StikDebug/StikDebug) workflow | iDeck cannot independently grant JIT permissions or bypass iOS security |
@@ -24,7 +25,7 @@ iDeck combines SwiftUI, C/C++, Objective-C++, Wine, and native Metal interfaces.
 - **To build:** macOS, a compatible Xcode installation with the iOS/iPadOS 27 SDK, and the appropriate native toolchains.
 - **To install:** An IPA properly signed and provisioned for your device.
 - **To run Windows games:** A verified Madeira-native IPA, a functioning Wine prefix, appropriate graphics components, and JIT when required.
-- **For some 32-bit Windows installers and games:** Optional WoW64 support must be present in the native build.
+- **For 32-bit Windows installers and games (PE32/i386):** WoW64 is enabled by default in Madeira-native builds. The IPA must contain a complete, validated i386 Wine DLL farm and FEX/WoW64 components; interface-only IPAs cannot execute Windows programs.
 
 The Xcode project currently targets **iOS/iPadOS 27.0** as its minimum OS version.
 
@@ -35,7 +36,7 @@ The Xcode project currently targets **iOS/iPadOS 27.0** as its minimum OS versio
 1. Open [Actions → iOS Build](https://github.com/FacensPedro/iDeck/actions/workflows/ios.yml).
 2. Choose the branch and select **Run workflow**.
 3. For an interface-only build, disable **Require Madeira runtime**.
-4. For an experimental Windows runtime, enable **Require Madeira runtime** and, when needed, **WoW64** or **Wine Mono**.
+4. For an experimental Windows runtime, enable **Require Madeira runtime**. **WoW64 is selected by default** for 32-bit Windows programs; leave it enabled. Select **Wine Mono** if needed for compatible .NET apps.
 5. Review the Apple Metal Shader Converter license. Confirm the license option only if you have the necessary rights to use and distribute the component.
 6. After the workflow finishes successfully, confirm which artifact it produced:
    - `iDeck-interface-only` — app interface only; **cannot execute Windows games**.
@@ -51,7 +52,7 @@ Interface-only:
 bash scripts/build_ipa.sh
 ```
 
-Native build (with the required toolchains and appropriate license rights):
+Native build (WoW64 for i386 Windows apps is included by default, with the required toolchains and appropriate license rights):
 
 ```bash
 IDECK_REQUIRE_MADEIRA=1 \
@@ -60,6 +61,36 @@ bash scripts/build_native_runtime.sh
 ```
 
 The output is `iDeck.ipa` when the required steps succeed. Set your own signing team, bundle identifiers, App Group, and provisioning configuration.
+
+### WoW64: 32-bit Windows applications
+
+**WoW64 is included by default in Madeira-native builds.** It combines the
+32-bit x86 guest translator (`aarch64-windows/xtajit.dll`), Madeira's
+`wow64.dll` and `wow64win.dll` host modules, and the i386 Wine/DXMT
+DLLs under `i386-windows/`. The native launcher detects PE32/i386
+executables and routes them through Wine's WoW64 path, including the
+`C:\\windows\\syswow64` prefix farm. A 64-bit Wine prefix (`WINEARCH=win64`)
+is intentional: WoW64 runs 32-bit apps inside that environment.
+
+To build from source with both 64-bit and 32-bit support:
+
+```bash
+IDECK_REQUIRE_MADEIRA=1 \
+IDECK_ACCEPT_METAL_CONVERTER_LICENSE=1 \
+IDECK_BUILD_WOW64=1 \
+bash scripts/build_ipa.sh
+```
+
+GitHub Actions → **iOS Build** → **Build WoW64** is enabled by default.
+For an intentionally 64-bit-only IPA, set `IDECK_BUILD_WOW64=0` or
+disable that checkbox. WoW64 is not provided by an interface-only IPA.
+
+The build rejects missing WoW64 components when enabled; runtime checks
+also verify the bundle manifest and required DLLs before attempting a
+32-bit launch. This is **experimental compatibility**, not proof that
+a particular 32-bit game, installer, DRM component or Steam client will
+run on an iPad. A compatible native IPA, JIT/debugger preparation and
+on-device testing are still necessary.
 
 ### Reuse precompiled FEX, Wine, and DXMT
 

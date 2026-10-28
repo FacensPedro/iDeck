@@ -20,8 +20,11 @@ if [[ "${IDECK_REQUIRE_MADEIRA:-0}" == "1" ]]; then
     echo "ERROR: Native build requires explicit Metal Shader Converter license/redistribution confirmation." >&2
     exit 2
   }
+  # A Madeira-native IPA includes both Win64 and WoW64 by default.
+  # Set IDECK_BUILD_WOW64=0 only for a deliberately 64-bit-only variant.
+  export IDECK_BUILD_WOW64="${IDECK_BUILD_WOW64:-1}"
   KIT_FLAGS=()
-  if [[ "${IDECK_BUILD_WOW64:-0}" == "1" ]]; then KIT_FLAGS+=(--wow64); fi
+  if [[ "$IDECK_BUILD_WOW64" == "1" ]]; then KIT_FLAGS+=(--wow64); fi
   if [[ "${IDECK_BUNDLE_WINE_MONO:-0}" == "1" ]]; then KIT_FLAGS+=(--mono); fi
   KIT_MODE="${IDECK_PREBUILT_MODE:-prefer}"
   [[ "$KIT_MODE" == "prefer" || "$KIT_MODE" == "only" || "$KIT_MODE" == "off" ]] || {

@@ -38,15 +38,17 @@ e se o licenciamento permite esse compartilhamento.
 
 ## Armazenar permanentemente no próprio repositório
 
+WoW64 é habilitado por padrão nas compilações nativas. O kit `madeira-base.zip` agora é destinado apenas à opção explícita `IDECK_BUILD_WOW64=0`. O nome do pacote deve corresponder aos binários efetivamente compilados.
+
 Depois de uma compilação nativa bem-sucedida no Mac, os arquivos podem ter
 estes nomes:
 
 | Configuração | Pacote |
 | --- | --- |
-| Normal | `madeira-base.zip` |
-| WoW64 (32 bits) | `madeira-wow64.zip` |
-| Wine Mono | `madeira-mono.zip` |
-| WoW64 e Wine Mono | `madeira-wow64-mono.zip` |
+| Nativo padrão (inclui WoW64 de 32 bits) | `madeira-wow64.zip` |
+| Somente 64 bits (`IDECK_BUILD_WOW64=0`) | `madeira-base.zip` |
+| Somente 64 bits + Wine Mono | `madeira-mono.zip` |
+| WoW64 + Wine Mono | `madeira-wow64-mono.zip` |
 
 **Somente se todas as licenças autorizarem a redistribuição** do conteúdo
 (inclusive o Apple Metal Shader Converter), coloque um pacote compilado
@@ -55,8 +57,8 @@ no repositório usando Git LFS:
 ```bash
 git lfs install
 mkdir -p runtime/prebuilt/ios-arm64
-cp build/native-cache/madeira-base.zip runtime/prebuilt/ios-arm64/
-git add .gitattributes runtime/prebuilt/ios-arm64/madeira-base.zip
+cp build/native-cache/madeira-wow64.zip runtime/prebuilt/ios-arm64/
+git add .gitattributes runtime/prebuilt/ios-arm64/madeira-wow64.zip
 git commit -m "Add precompiled Madeira runtime"
 git push
 ```
