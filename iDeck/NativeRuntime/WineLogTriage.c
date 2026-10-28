@@ -45,24 +45,42 @@ int32_t ideck_wine_log_diagnose(const char *path) {
         if (buffer[i] >= 'A' && buffer[i] <= 'Z')
             buffer[i] = (char)(buffer[i] - 'A' + 'a');
     }
+    // Some iDeck logs append multiple Wine sessions. Never attribute an
+    // error in a prior launch to a subsequent healthy launch when both are
+    // present in the scanned tail. If this session grew beyond 512 KiB, the
+    // tail remains bounded and we only classify evidence still in the tail.
+    const char *current_session = buffer;
+    const char *next_session = buffer;
+    const char *session_marker = "[wineserver-bridge] ws_log test";
+    while ((next_session = strstr(next_session, session_marker)) != NULL) {
+        current_session = next_session;
+        next_session += strlen(session_marker);
+    }
     int32_t code = IDECK_WINE_LOG_NONE;
-    if (strstr(buffer, "vm_remap failed") ||
-        strstr(buffer, "vm_protect(rw) failed") ||
-        strstr(buffer, "jit-pool] exhausted") ||
-        strstr(buffer, "[ideck wine jit]")) {
+    if (strstr(current_session, "[wow-window] main-process reserve failed") &&
+        strstr(current_session, "c0000017")) {
+        code = IDECK_WINE_LOG_WOW64_ADDRESS_SPACE;
+    } else if (strstr(current_session, "[x18-decline]") &&
+               (strstr(current_session, "[mach_exc] unhandled") ||
+                strstr(current_session, "code=c000001d"))) {
+        code = IDECK_WINE_LOG_ARM64EC_EXCEPTION;
+    } else if (strstr(current_session, "vm_remap failed") ||
+        strstr(current_session, "vm_protect(rw) failed") ||
+        strstr(current_session, "jit-pool] exhausted") ||
+        strstr(current_session, "[ideck wine jit]")) {
         code = IDECK_WINE_LOG_JIT;
-    } else if (strstr(buffer, "mprotect errno 13") ||
-               strstr(buffer, "executable-permission")) {
+    } else if (strstr(current_session, "mprotect errno 13") ||
+               strstr(current_session, "executable-permission")) {
         code = IDECK_WINE_LOG_EXEC_PERMISSION;
-    } else if (strstr(buffer, "c0000017") ||
-               strstr(buffer, "out of memory")) {
+    } else if (strstr(current_session, "c0000017") ||
+               strstr(current_session, "out of memory")) {
         code = IDECK_WINE_LOG_OOM;
-    } else if (strstr(buffer, "c0000005") ||
-               strstr(buffer, "unhandled page fault") ||
-               strstr(buffer, "access violation")) {
+    } else if (strstr(current_session, "c0000005") ||
+               strstr(current_session, "unhandled page fault") ||
+               strstr(current_session, "access violation")) {
         code = IDECK_WINE_LOG_ACCESS_VIOLATION;
-    } else if (strstr(buffer, "err:module:import_dll") ||
-               strstr(buffer, "failed to load dll")) {
+    } else if (strstr(current_session, "err:module:import_dll") ||
+               strstr(current_session, "failed to load dll")) {
         code = IDECK_WINE_LOG_MISSING_DLL;
     }
     free(buffer);
