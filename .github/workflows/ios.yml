@@ -191,6 +191,11 @@ jobs:
             /tmp/ideck-vcrt-objects/VCArchiveExtractor.o -o /tmp/ideck-vcredist-tests
           /tmp/ideck-vcredist-tests
 
+      - name: Test fast Steam existing-file verification
+        run: |
+          xcrun swiftc iDeck/SteamExistingChunkVerifier.swift tests/host/SteamExistingChunkVerifierTests.swift -o /tmp/ideck-steam-existing-chunk-tests
+          /tmp/ideck-steam-existing-chunk-tests
+
       - name: Test Steam CDN host performance selection
         run: |
           xcrun swiftc iDeck/SteamCDNHostSelection.swift tests/host/SteamCDNHostSelectionTests.swift -o /tmp/ideck-cdn-selection-tests

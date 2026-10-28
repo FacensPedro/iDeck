@@ -761,16 +761,26 @@ struct WindowsWorkspaceView: View {
         let progress = steamLibrary.downloadProgress[game.appID]
         let stopping = steamLibrary.cancellingApps.contains(game.appID)
         return VStack(spacing: 8) {
-            ProgressView(value: progress?.fraction ?? 0)
+            ProgressView(value: progress?.phase == .checking
+                         ? (progress?.checkFraction ?? 0)
+                         : (progress?.fraction ?? 0))
                 .tint(.white)
             Text(progress?.phase == .preparing
                  ? tr("Preparing download...")
+                 : progress?.phase == .checking
+                   ? tr("Checking existing files %d%%", Int(((progress?.checkFraction ?? 0) * 100).rounded()))
                  : progress?.phase == .finishing
                    ? tr("Finishing installation...")
                    : tr("Downloading %d%%", Int(((progress?.fraction ?? 0) * 100).rounded())))
                 .font(.caption)
                 .foregroundColor(.white)
                 .lineLimit(1)
+            if let progress, progress.reusedBytes > 0 {
+                Text(tr("Already on device: %@", ByteCountFormatter.string(
+                    fromByteCount: Int64(clamping: progress.reusedBytes), countStyle: .file)))
+                    .font(.caption2)
+                    .foregroundColor(.green)
+            }
             if steamLibrary.canCancelInstall(appID: game.appID) {
                 Button(role: .destructive) {
                     steamLibrary.cancelInstall(appID: game.appID)
@@ -1565,12 +1575,21 @@ private struct SteamProgramDetailsView: View {
         let progress = steamLibrary.downloadProgress[game.appID]
         let stopping = steamLibrary.cancellingApps.contains(game.appID)
         return VStack(spacing: 10) {
-            ProgressView(value: progress?.fraction ?? 0)
+            ProgressView(value: progress?.phase == .checking
+                         ? (progress?.checkFraction ?? 0)
+                         : (progress?.fraction ?? 0))
             Text(progress?.phase == .preparing ? tr("Preparing download...") :
+                 progress?.phase == .checking ? tr("Checking existing files %d%%", Int(((progress?.checkFraction ?? 0) * 100).rounded())) :
                  progress?.phase == .finishing ? tr("Finishing installation...") :
                  tr("Downloading %d%%", Int(((progress?.fraction ?? 0) * 100).rounded())))
                 .font(.caption)
                 .foregroundColor(.white)
+            if let progress, progress.reusedBytes > 0 {
+                Text(tr("Already on device: %@", ByteCountFormatter.string(
+                    fromByteCount: Int64(clamping: progress.reusedBytes), countStyle: .file)))
+                    .font(.caption2)
+                    .foregroundColor(.green)
+            }
             if steamLibrary.canCancelInstall(appID: game.appID) {
                 Button(role: .destructive) {
                     steamLibrary.cancelInstall(appID: game.appID)
