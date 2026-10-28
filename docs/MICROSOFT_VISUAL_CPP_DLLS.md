@@ -1,3 +1,5 @@
+> **Automatic first-game setup:** Current iDeck builds can offer to download the **official Microsoft x64 Visual C++ Redistributable** on the first Windows game launch and attempt to install it inside Wine. This requires your confirmation and a compatible Wine/WoW64 runtime; it is not guaranteed to work. The steps below remain a manual alternative if installation fails.
+
 # Microsoft Visual C++ no iDeck — guia de DLLs Windows x64
 
 Este guia mostra como **obter arquivos oficiais**, **identificar as DLLs corretas** e **transferi-las ao iDeck**. O processo para usuários do iPad é diferente da inclusão das bibliotecas dentro de um IPA.
