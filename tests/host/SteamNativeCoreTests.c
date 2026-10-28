@@ -86,9 +86,15 @@ int main(void) {
     // the last PKCS7 pad byte (0x06 becomes 0x07), unlike a random flip in
     // the final ciphertext block, which can rarely still yield valid padding.
     encrypted[16 + ciphertext - 16 - 1] ^= 0x01;
-    assert(ideck_steam_decrypt_chunk(encrypted, 16 + ciphertext, key,
-                                     32, output, sizeof(output),
-                                     &produced) != 0);
+    // CBC has no authentication: modified ciphertext may still decrypt with
+    // valid padding. The chunk's Adler-32 is checked by the Swift pipeline.
+    int32_t tampered = ideck_steam_decrypt_chunk(
+        encrypted, 16 + ciphertext, key, 32, output, sizeof(output), &produced);
+    assert(tampered != 0 || produced != sizeof(plain) ||
+           memcmp(output, plain, sizeof(plain)) != 0);
+    // A truncated ciphertext is never a valid AES-256-CBC Steam payload.
+    assert(ideck_steam_decrypt_chunk(
+        encrypted, 15 + ciphertext, key, 32, output, sizeof(output), &produced) != 0);
 
     free(payload);
     assert(unlink(alias) == 0);
