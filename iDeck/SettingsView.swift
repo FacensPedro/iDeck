@@ -64,12 +64,18 @@ struct SettingsView: View {
                                     .font(.caption).foregroundColor(inputManager.isControllerConnected ? .green : .gray)
                                     .multilineTextAlignment(.trailing)
                             }.padding()
-                            sensitivityRow(title: tr("Left stick sensitivity"), value: $controllerLeftSensitivity)
-                            sensitivityRow(title: tr("Right stick sensitivity"), value: $controllerRightSensitivity)
-                            VStack(alignment: .leading, spacing: 8) {
-                                HStack { Text(tr("Stick dead zone")).foregroundColor(.white); Spacer(); Text(String(format: "%.2f", controllerDeadzone)).foregroundColor(.gray) }
-                                Slider(value: $controllerDeadzone, in: 0...0.35, step: 0.01).tint(.blue)
-                            }.padding()
+                            if inputManager.isControllerConnected {
+                                sensitivityRow(title: tr("Left stick sensitivity"), value: $controllerLeftSensitivity)
+                                sensitivityRow(title: tr("Right stick sensitivity"), value: $controllerRightSensitivity)
+                                VStack(alignment: .leading, spacing: 8) {
+                                    HStack {
+                                        Text(tr("Stick dead zone")).foregroundColor(.white)
+                                        Spacer()
+                                        Text(String(format: "%.2f", controllerDeadzone)).foregroundColor(.gray)
+                                    }
+                                    Slider(value: $controllerDeadzone, in: 0...0.35, step: 0.01).tint(.blue)
+                                }.padding()
+                            }
                         }
 
                         settingsSection(title: tr("Graphics & Performance")) {
