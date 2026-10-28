@@ -72,8 +72,7 @@ final class DepotDownloader {
     }
     private let attemptsPerChunk = 5
     private let hostPoolSize = 8
-    private var cachedContentServers: [String] = []
-    private var cachedContentServersAt = Date.distantPast
+
 
     private nonisolated static let http: URLSession = {
         let config = URLSessionConfiguration.ephemeral
@@ -802,13 +801,13 @@ final class DepotDownloader {
     }
 
     private func contentServers(appID: UInt32) async throws -> [String] {
-        if !cachedContentServers.isEmpty,
-           Date().timeIntervalSince(cachedContentServersAt) < 10 * 60 {
-            return cachedContentServers
-        }
+        // Ask Valve again for every install, including after Wi-Fi, cellular,
+        // public IP or VPN changes. The Web API uses the request's source IP
+        // to geolocate when cell_id is omitted. A saved Steam cell can refer
+        // to a different network and route downloads through the wrong region.
         var hosts: [String] = []
         do {
-            guard let url = URL(string: "https://api.steampowered.com/IContentServerDirectoryService/GetServersForSteamPipe/v1/?cell_id=\(session.cellID)&max_servers=20") else {
+            guard let url = URL(string: "https://api.steampowered.com/IContentServerDirectoryService/GetServersForSteamPipe/v1/?max_servers=32") else {
                 throw SteamError.chunkDownloadFailed("Bad content directory URL")
             }
             let (data, response) = try await Self.http.data(from: url)
@@ -836,7 +835,7 @@ final class DepotDownloader {
                 let entry = "https://\(host)"
                 if !hosts.contains(entry) { hosts.append(entry) }
             }
-            SteamLog.event("[steam-cdn] offered=\(servers.count) usable=\(hosts.count) skipped-no-https=\(skippedHTTP) skipped-other=\(skippedOther)")
+            SteamLog.event("[steam-cdn] selection=outbound-public-ip (Valve directory) offered=\(servers.count) usable=\(hosts.count) skipped-no-https=\(skippedHTTP) skipped-other=\(skippedOther)")
         } catch is CancellationError {
             throw CancellationError()
         } catch {
@@ -844,8 +843,6 @@ final class DepotDownloader {
         }
         let fallback = "https://steampipe.akamaized.net"
         if !hosts.contains(fallback) { hosts.append(fallback) }
-        cachedContentServers = hosts
-        cachedContentServersAt = Date()
         return hosts
     }
 
