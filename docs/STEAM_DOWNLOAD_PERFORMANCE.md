@@ -27,3 +27,24 @@ unchanged. No artificial benchmark downloads are made.
 
 This is an optimization, not a guarantee of 2x throughput. Compare actual
 bytes per second and total time for the same game and network before/after.
+
+## Selection based on the current public IP
+
+Before each new game installation, iDeck requests Valve's SteamPipe content
+server directory **without a `cell_id` override**. Steam then chooses a
+regional server list using the outgoing public IP of the iPad's current
+connection (Wi-Fi, cellular or VPN), not the device's GPS or a stored
+Steam account cell. The directory call is refreshed per install instead
+of holding a ten-minute list through network changes. The first eight
+eligible HTTPS hosts are used for parallel chunks and existing throughput,
+latency, failure and exploration logic ranks them while data transfers.
+
+Steam's WebSocket CM directory likewise omits `cellid`, letting Valve select
+login gateways for the current public IP. A failure can still use the
+previously cached gateway list. No public IP is explicitly retrieved,
+logged, sent to a third-party geolocation service or used to guess a
+country. This optimizes **Steam download/authentication endpoints**, not
+the region of multiplayer game servers.
+
+The nearest datacenter is not always the fastest. Actual throughput and
+connection stability take precedence as chunk samples become available.

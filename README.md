@@ -135,7 +135,7 @@ See the [Microsoft Visual C++ DLL guide](docs/MICROSOFT_VISUAL_CPP_DLLS.md) and 
 
 ## JIT and platform restrictions
 
-StikDebug may provide the necessary JIT debugging workflow on supported devices. A JIT indicator does not prove FEX executable-memory allocation succeeded. Windows games, hosted apps, and native components remain subject to iOS/iPadOS signing, entitlements, and sandbox limitations.
+StikDebug may provide the necessary JIT debugging workflow on supported devices. Request it from **inside iDeck**, which passes the bundled `universal.js` BRK handler to StikDebug; enabling JIT in the StikDebug app list alone may detach the debugger before Wine can map its RX/RW pool. A JIT indicator does not prove FEX executable-memory allocation succeeded. Windows games, hosted apps, and native components remain subject to iOS/iPadOS signing, entitlements, and sandbox limitations.
 
 ## Wine session progress and close button
 
@@ -152,6 +152,7 @@ The IPA requests **increased-memory-limit** when its signing profile permits it.
 | Symptom | What to check |
 | --- | --- |
 | No Windows EXE starts | Confirm the IPA is `iDeck-Madeira-native`, the Wine prefix is prepared, and JIT/FEX is ready |
+| Wine ARM64EC JIT pool allocation fails | Request JIT from iDeck so StikDebug loads its bundled `universal.js`, leave the debugger connected until the RX/RW pools are mapped, and look for `[iDeck Wine JIT]` logs showing the first failed allocation, remap or protection step. The native runtime retries 384/256/192/128/96/64 MiB; insufficient virtual address space or a debugger without the BRK handler can still prevent startup. |
 | Screen stays black | Check Wine initialization, DXMT/D3D12, Metal presentation, and game-specific requirements |
 | Wine stops or exits instantly | Read the exact Wine exit code or NTSTATUS (e.g. `0xC0000135`: missing DLL); inspect Wine/FEX logs. Some games also require the real Steam client or hand off to another process. |
 | Automatic Visual C++ setup fails | Check Internet access, download availability, WoW64 support, and whether Wine can run Microsoft's installer |

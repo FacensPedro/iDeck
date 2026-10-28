@@ -155,3 +155,36 @@ instead of leaking a stale register value. This does **not** override
 kernel page-zero restrictions. Madeira's more complete upstream debugger
 script is at
 [Madeira JIT script](https://github.com/willfaust/madeira/blob/main/app/Madeira/madeira-jit.js).
+
+
+## Wine ARM64EC JIT pool allocation failures
+
+The native host allocates **two different** executable pools: the FEXCore
+translator's private pool, and Wine ARM64EC's RX pool with a writable
+`vm_remap` alias. A successful `fex_initialize` does not mean Wine's
+separate mapping exists.
+
+The iDeck Wine pool now tries 384, 256, 192, 128, 96 and 64 MiB, in order.
+A failed allocation releases its regions before trying the next size. The
+writable alias first uses a 0x300000000 address hint, with a zero-hint
+fallback for the restricted (non-extended) virtual address maps used on
+some sideloaded iPads. The pool is **never** replaced with ordinary
+non-executable memory.
+
+When you see an ENOMEM startup error:
+
+1. Request JIT **from inside iDeck**, allowing it to supply
+   `universal.js` to StikDebug for its BRK #0xf00d calls. The debugger
+   must still be attached during pool preparation. Setting CS_DEBUGGED
+   from StikDebug's own app list is not sufficient by itself.
+2. Inspect the on-device Wine stderr messages tagged `[iDeck Wine JIT]`.
+   `debugger could not allocate RX` means the debugger did not reserve
+   executable pages; `rejected RX` indicates the placement is not
+   usable; `vm_remap failed` identifies an unavailable writable alias;
+   `vm_protect(RW) failed` identifies a protection problem.
+3. If the smaller sizes also fail, verify the actual signing and memory
+   entitlements in the IPA and test a simple 64-bit EXE before Steam.
+
+This change improves fallback and reports the failure stage, but its
+success must still be verified on physical iPadOS hardware. It cannot
+override iPadOS debugger, signing or virtual-memory limits.
