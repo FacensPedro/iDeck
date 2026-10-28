@@ -120,9 +120,14 @@ extern "C" int32_t ideck_runtime_launch(const char *executable_path,
         id steamID = request[@"steamAppID"];
         id steamFolder = request[@"steamInstallDirectory"];
         if ((steamID == nil) != (steamFolder == nil)) return EINVAL;
-        unsetenv("MADEIRA_DOCK_SESSION");
+        if ([request[@"isSteam"] boolValue]) {
+            if (setenv("MADEIRA_DOCK_SESSION", "1", 1)) return errno;
+        } else {
+            unsetenv("MADEIRA_DOCK_SESSION");
+        }
         unsetenv("MADEIRA_STEAM_APPID");
         unsetenv("MADEIRA_STEAM_APPPATH");
+        if ([request[@"isSteam"] boolValue] && steamID != nil) return EINVAL;
         if (steamID != nil) {
             if (![steamID isKindOfClass:[NSNumber class]] ||
                 ![steamFolder isKindOfClass:[NSString class]]) return EINVAL;
