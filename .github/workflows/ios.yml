@@ -196,6 +196,11 @@ jobs:
           xcrun swiftc iDeck/SteamCDNHostSelection.swift tests/host/SteamCDNHostSelectionTests.swift -o /tmp/ideck-cdn-selection-tests
           /tmp/ideck-cdn-selection-tests
 
+      - name: Test graphics DLL override isolation
+        run: |
+          xcrun swiftc iDeck/GraphicsConfig.swift tests/host/GraphicsOverrideTests.swift -o /tmp/ideck-graphics-override-tests
+          /tmp/ideck-graphics-override-tests
+
       - name: Test Wine native exit diagnostics and Steam app identity
         run: |
           xcrun swiftc iDeck/WineExitDiagnostics.swift tests/host/WineExitDiagnosticsTests.swift -o /tmp/ideck-wine-exit-tests
