@@ -16,7 +16,7 @@ DLL_NAMES = (
 )
 
 
-def pe_file(arch=0x8664, cert=True):
+def pe_file(arch=0x8664, cert=True, identity=0):
     blob = bytearray(512)
     blob[0:2] = b"MZ"
     struct.pack_into("<I", blob, 0x3C, 0x80)
@@ -26,12 +26,14 @@ def pe_file(arch=0x8664, cert=True):
     struct.pack_into("<I", blob, 0x98 + 108, 16)
     if cert:
         struct.pack_into("<II", blob, 0x98 + 112 + 32, 384, 16)
+    blob[300] = identity
     return bytes(blob)
 
 
 def make_cab(missing=None, machine=0x8664, cert=True):
     names = [x for x in DLL_NAMES if x != missing]
-    files = [(f"F_CENTRAL_{name[:-4]}_amd64", pe_file(machine, cert)) for name in names]
+    files = [(f"F_CENTRAL_{name[:-4]}_amd64", pe_file(machine, cert, index + 1))
+             for index, name in enumerate(DLL_NAMES) if name != missing]
     total = b"".join(data for _, data in files)
     folder_bytes = bytearray()
     cursor = 0
@@ -72,6 +74,8 @@ class ExtractorTests(unittest.TestCase):
         result, stage = self.extract(make_cab())
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(sorted(p.name for p in stage.iterdir()), sorted(DLL_NAMES))
+        for i, name in enumerate(DLL_NAMES):
+            self.assertEqual((stage / name).read_bytes()[300], i + 1, name)
 
     def test_missing_dll_fails_without_claiming_success(self):
         result, stage = self.extract(make_cab(missing="mfc140.dll"))
