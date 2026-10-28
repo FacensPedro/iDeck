@@ -55,6 +55,9 @@ func trStatus(_ status: String) -> String {
 
 enum Translations {
     static let table: [String: [String: String]] = [
+        "Run in a Wine desktop": ["pt": "Executar no desktop do Wine", "es": "Ejecutar en el escritorio de Wine"],
+        "Wait for child processes (experimental)": ["pt": "Aguardar processos secundários (experimental)", "es": "Esperar procesos secundarios (experimental)"],
+        "For launchers that open another process. This can keep Wine running after the game closes.": ["pt": "Para launchers que abrem outro processo. Pode manter o Wine aberto depois do jogo fechar.", "es": "Para lanzadores que abren otro proceso. Puede mantener Wine abierto después de cerrar el juego."],
         "Starting Windows game": ["pt": "Iniciando jogo Windows", "es": "Iniciando juego de Windows"],
         "Waiting for the first rendered frame...": ["pt": "Aguardando o primeiro quadro renderizado...", "es": "Esperando el primer fotograma renderizado..."],
         "Preparing Wine, game dependencies and graphics...": ["pt": "Preparando Wine, dependências e gráficos...", "es": "Preparando Wine, dependencias y gráficos..."],

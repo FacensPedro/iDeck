@@ -576,6 +576,8 @@ class SystemCoordinator: ObservableObject {
                             arguments: profile?.arguments ?? "",
                             is32Bit: false,
                             isSteam: false,
+                            launchInDesktop: effectiveProfile.launchInDesktop,
+                            waitForChildProcesses: effectiveProfile.waitForChildProcesses,
                             jitEnabler: self.jitEnabler
                         ) { [weak self] result in
                             DispatchQueue.main.async {
@@ -707,6 +709,8 @@ class SystemCoordinator: ObservableObject {
                                             arguments: profile.arguments.isEmpty ? entryArguments : profile.arguments,
                                             steamAppID: game.appID,
                                             steamInstallDirectory: directory,
+                                            launchInDesktop: effectiveProfile.launchInDesktop,
+                                            waitForChildProcesses: effectiveProfile.waitForChildProcesses,
                                             jitEnabler: self.jitEnabler) { [weak self] success in
                 DispatchQueue.main.async {
                     guard let self else { return }

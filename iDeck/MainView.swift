@@ -58,7 +58,8 @@ struct MainView: View {
         }
         .fullScreenCover(isPresented: Binding<Bool>(
             get: {
-                coordinator.windowsStatus == "Steam Running" ||
+                if coordinator.needsVisualCRuntimeConsent { return false }
+                return coordinator.windowsStatus == "Steam Running" ||
                 coordinator.windowsStatus == "Running" ||
                 coordinator.windowsStatus == "Launching Steam game..." ||
                 coordinator.windowsStatus == "Launching Steam client..." ||
@@ -1683,6 +1684,13 @@ private struct WindowsGameProfileForm: View {
                 .tint(.blue)
             Toggle(tr("Enable AVX/AVX2 translation"), isOn: $profile.avxEnabled)
                 .tint(.blue)
+            Toggle(tr("Run in a Wine desktop"), isOn: $profile.launchInDesktop)
+                .tint(.blue)
+            Toggle(tr("Wait for child processes (experimental)"), isOn: $profile.waitForChildProcesses)
+                .tint(.blue)
+            Text(tr("For launchers that open another process. This can keep Wine running after the game closes."))
+                .font(.caption)
+                .foregroundColor(.gray)
         }
         .padding(16)
         .background(Color.white.opacity(0.055))
