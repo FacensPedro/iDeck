@@ -100,6 +100,13 @@ jobs:
           python3 -m unittest discover -s tests/host -p 'test_dxmt_shader_patch.py' -v
           python3 -m unittest discover -s tests/host -p 'test_madeira_game_backports.py' -v
 
+      - name: Test native ARM64EC syscall context restoration
+        run: |
+          python3 -m unittest discover -s tests/host -p 'test_arm64ec_mach_slowpath.py' -v
+          python3 -m unittest discover -s tests/host -p 'test_arm64ec_mach_compile.py' -v
+          bash -n scripts/fetch_madeira_sources.sh
+          bash -n scripts/build_ipa.sh
+
       - name: Test StikDebug universal JIT register encoding
         run: node tests/host/universal_jit_register_tests.js
 
