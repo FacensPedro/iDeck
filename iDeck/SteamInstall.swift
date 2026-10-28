@@ -106,6 +106,61 @@ enum SteamInstallFiles {
         return built.joined(separator: "/")
     }
 
+    /// Resolves Steam's Windows launch metadata against the installed files.
+    /// Valve's paths may have different casing than the extracted APFS tree.
+    /// Check an exact match first and only enumerate a directory on mismatch.
+    /// Ambiguous case-insensitive matches and symbolic links are refused.
+    nonisolated static func resolveLaunchPath(_ relative: String, root: URL,
+                                              executable: Bool) -> URL? {
+        let rootURL = root.resolvingSymlinksInPath().standardizedFileURL
+        let raw = relative.replacingOccurrences(of: "\\", with: "/")
+        var cleaned = raw
+        while cleaned.hasPrefix("./") { cleaned.removeFirst(2) }
+        if !executable && (cleaned.isEmpty || cleaned == ".") { return rootURL }
+
+        var folded: [String: String] = [:]
+        guard let safe = safeRelativePath(cleaned, folded: &folded),
+              safe.utf8.count < 1024,
+              !safe.isEmpty,
+              (!executable || safe.lowercased().hasSuffix(".exe")) else { return nil }
+
+        let components = safe.split(separator: "/").map(String.init)
+        guard components.count <= 32 else { return nil }
+        let manager = FileManager.default
+        var current = rootURL
+        for (index, component) in components.enumerated() {
+            let exact = current.appendingPathComponent(component)
+            let name: String
+            if (try? exact.resourceValues(forKeys: [.isRegularFileKey, .isDirectoryKey,
+                                                      .isSymbolicLinkKey])) != nil {
+                name = component
+            } else {
+                guard let contents = try? manager.contentsOfDirectory(atPath: current.path) else {
+                    return nil
+                }
+                let matches = contents.filter {
+                    $0.caseInsensitiveCompare(component) == .orderedSame
+                }
+                guard matches.count == 1 else { return nil }
+                name = matches[0]
+            }
+            let candidate = current.appendingPathComponent(name)
+            guard let attributes = try? candidate.resourceValues(
+                forKeys: [.isDirectoryKey, .isRegularFileKey, .isSymbolicLinkKey]),
+                  attributes.isSymbolicLink != true else { return nil }
+            let isLast = index == components.count - 1
+            if !isLast || !executable {
+                guard attributes.isDirectory == true else { return nil }
+            } else {
+                guard attributes.isRegularFile == true else { return nil }
+            }
+            let resolved = candidate.resolvingSymlinksInPath().standardizedFileURL
+            guard resolved.path.hasPrefix(rootURL.path + "/") else { return nil }
+            current = resolved
+        }
+        return current
+    }
+
     /// Install folders come from app metadata; keep them to one safe component.
     nonisolated static func safeFolderName(_ name: String) -> String {
         let cleaned = name.replacingOccurrences(of: "\\", with: "/").split(separator: "/").last.map(String.init) ?? ""
