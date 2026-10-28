@@ -12,6 +12,8 @@
 	<true/>
 	<key>com.apple.security.network.server</key>
 	<true/>
+	<key>com.apple.developer.kernel.increased-memory-limit</key>
+	<true/>
 	<key>dynamic-codesigning</key>
 	<true/>
 </dict>

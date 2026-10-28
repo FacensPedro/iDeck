@@ -59,7 +59,7 @@ extern "C" int32_t ideck_runtime_launch(const char *executable_path,
                                          const char *request_json) {
     std::unique_lock<std::mutex> launch_lock(ideck_launch_mutex, std::try_to_lock);
     if (!launch_lock.owns_lock()) return EBUSY;
-    if (ideck_wineprocess_running()) return EALREADY;
+    if (ideck_wineprocess_running() || ideck_wineprocess_session_used()) return EALREADY;
     if (!executable_path || !*executable_path || !wine_prefix || !*wine_prefix ||
         !request_json || !*request_json) return EINVAL;
     @autoreleasepool {
