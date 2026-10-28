@@ -138,7 +138,7 @@ extern "C" bool ideck_wine_jit_pool_prepare(void) {
     if (wine_pool_rx != 0) return export_pool(wine_pool_rx, wine_pool_rw, wine_pool_size);
     if (!debugger_attached()) {
         fprintf(stderr, "[iDeck Wine JIT] REFUSED: StikDebug is not attached to this process. "
-                        "Enabling JIT once from the app list does not keep the BRK handler attached.\\n");
+                        "Enabling JIT once from the app list does not keep the BRK handler attached.\n");
         return false;
     }
 
@@ -153,19 +153,19 @@ extern "C" bool ideck_wine_jit_pool_prepare(void) {
         // Every jit26_prepare_region call triggers BRK #0xf00d.
         // A detached debugger here would make the call process-fatal.
         if (!debugger_attached()) {
-            fprintf(stderr, "[iDeck Wine JIT] debugger detached during pool setup\\n");
+            fprintf(stderr, "[iDeck Wine JIT] debugger detached during pool setup\n");
             return false;
         }
-        fprintf(stderr, "[iDeck Wine JIT] requesting %zu MiB RX from StikDebug\\n", size / MiB);
+        fprintf(stderr, "[iDeck Wine JIT] requesting %zu MiB RX from StikDebug\n", size / MiB);
         void *result = jit26_prepare_region(nullptr, size);
         const uintptr_t rx = reinterpret_cast<uintptr_t>(result);
         if (rx == 0) {
-            fprintf(stderr, "[iDeck Wine JIT] debugger could not allocate %zu MiB RX\\n", size / MiB);
+            fprintf(stderr, "[iDeck Wine JIT] debugger could not allocate %zu MiB RX\n", size / MiB);
             continue;
         }
         if (!acceptable_pool(rx, size)) {
             fprintf(stderr, "[iDeck Wine JIT] rejected RX=0x%" PRIxPTR " size=%zu MiB "
-                            "(non-executable or collides with Wine image/guest window)\\n",
+                            "(non-executable or collides with Wine image/guest window)\n",
                     rx, size / MiB);
             vm_deallocate(mach_task_self(), static_cast<vm_address_t>(rx), size);
             continue;
@@ -185,7 +185,7 @@ extern "C" bool ideck_wine_jit_pool_prepare(void) {
                                         &current, &maximum, VM_INHERIT_NONE);
             if (kr != KERN_SUCCESS) {
                 fprintf(stderr, "[iDeck Wine JIT] vm_remap failed size=%zu MiB "
-                                "hint=0x%lx kr=%d\\n", size / MiB,
+                                "hint=0x%lx kr=%d\n", size / MiB,
                         static_cast<unsigned long>(hint), kr);
                 continue;
             }
@@ -194,7 +194,7 @@ extern "C" bool ideck_wine_jit_pool_prepare(void) {
             const bool overlapping = alias > UINTPTR_MAX - size ||
                 (alias < rx + size && alias + size > rx);
             if (overlapping) {
-                fprintf(stderr, "[iDeck Wine JIT] rejected overlapping RW alias=0x%lx\\n",
+                fprintf(stderr, "[iDeck Wine JIT] rejected overlapping RW alias=0x%lx\n",
                         static_cast<unsigned long>(rw));
                 vm_deallocate(mach_task_self(), rw, size);
                 continue;
@@ -203,7 +203,7 @@ extern "C" bool ideck_wine_jit_pool_prepare(void) {
                             VM_PROT_READ | VM_PROT_WRITE);
             if (kr != KERN_SUCCESS) {
                 fprintf(stderr, "[iDeck Wine JIT] vm_protect(RW) failed size=%zu MiB "
-                                "hint=0x%lx kr=%d\\n", size / MiB,
+                                "hint=0x%lx kr=%d\n", size / MiB,
                         static_cast<unsigned long>(hint), kr);
                 vm_deallocate(mach_task_self(), rw, size);
                 continue;
@@ -217,7 +217,7 @@ extern "C" bool ideck_wine_jit_pool_prepare(void) {
             wine_pool_rx = rx;
             wine_pool_rw = alias;
             wine_pool_size = size;
-            fprintf(stderr, "[iDeck Wine JIT] ready with %zu MiB (RX/RW mirror)\\n", size / MiB);
+            fprintf(stderr, "[iDeck Wine JIT] ready with %zu MiB (RX/RW mirror)\n", size / MiB);
             return true;
         }
         vm_deallocate(mach_task_self(), static_cast<vm_address_t>(rx), size);
@@ -225,7 +225,7 @@ extern "C" bool ideck_wine_jit_pool_prepare(void) {
 
     fprintf(stderr, "[iDeck Wine JIT] FAILED: unable to allocate and dual-map "
                     "even a 64 MiB executable pool. Check StikDebug's in-app "
-                    "BRK script, iPadOS memory limit and Wine JIT logs.\\n");
+                    "BRK script, iPadOS memory limit and Wine JIT logs.\n");
     return false;
 #else
     return false;
