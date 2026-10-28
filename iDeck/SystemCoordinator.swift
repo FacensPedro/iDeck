@@ -6,6 +6,8 @@ import Darwin
 
 class SystemCoordinator: ObservableObject {
     @Published var isJITEnabled: Bool = false
+    @Published var isStikDebugAttached: Bool = false
+    @Published var isWineJITPrepared: Bool = false
     @Published var isContainerReady: Bool = false
     @Published var currentStatus: String = "Ready"
     @Published var windowsStatus: String = "Ready"
@@ -116,8 +118,11 @@ class SystemCoordinator: ObservableObject {
         // Repeated MAP_JIT probes can race with FEX memory initialization and
         // do not establish that StikDebug's BRK handler is ready.
         let detected = ideck_process_has_jit_permission() || debuggerAttached
+        let wineReady = ideck_wine_jit_pool_ready()
         let update = {
-            self.isJITEnabled = detected
+            if self.isJITEnabled != detected { self.isJITEnabled = detected }
+            if self.isStikDebugAttached != debuggerAttached { self.isStikDebugAttached = debuggerAttached }
+            if self.isWineJITPrepared != wineReady { self.isWineJITPrepared = wineReady }
             if !detected && (self.currentStatus == "JIT confirmed via StikDebug" || self.currentStatus == "Ready") {
                 self.currentStatus = "JIT not detected. Enable it in StikDebug and return to iDeck."
             }
@@ -141,6 +146,12 @@ class SystemCoordinator: ObservableObject {
     func forceJITAndStartWindows() {
         refreshJITStatus()
         startWindows()
+        // StikDebug's app-list Enable JIT may only leave CS_DEBUGGED set.
+        // FEX/Wine still need the bundled BRK handler when a pool is missing.
+        // Reopen StikDebug with that script on the explicit Madeira mode action.
+        if isJITEnabled && !isStikDebugAttached && !ideck_wine_jit_pool_ready() {
+            requestStikDebugJIT()
+        }
     }
     
     private func startLiveContainer() {
@@ -309,6 +320,7 @@ class SystemCoordinator: ObservableObject {
         guard isJITEnabled && isContainerReady else { return }
         guard ideck_fex_jit_ready() else {
             setWindowsStatus("Cannot launch: StikDebug must remain attached to iDeck with the Madeira JIT script until FEX memory is prepared.")
+            requestStikDebugJIT()
             return
         }
 
@@ -505,6 +517,7 @@ class SystemCoordinator: ObservableObject {
                 }
                 guard ideck_fex_jit_ready() else {
                     self.setWindowsStatus("Executable imported. JIT permission is present but StikDebug is no longer attached. Attach it to iDeck with the Madeira JIT script and retry.")
+                    self.requestStikDebugJIT()
                     return
                 }
 
