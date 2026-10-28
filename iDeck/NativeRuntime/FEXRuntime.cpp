@@ -90,6 +90,46 @@ std::atomic<int32_t> wine_pool_last_rx_detail{0};
 std::vector<vm_address_t> wine_pool_low_va_pins;
 bool wine_pool_frontier_prepared = false;
 
+// Automatic pool selection avoids oversized initial BRK allocations on low-RAM devices.
+// An explicit override is honored only for sizes already supported by Madeira.
+std::vector<size_t> wine_pool_candidates() {
+    constexpr size_t MiB = 1024ULL * 1024;
+    constexpr size_t allowed[] = {384, 256, 192, 128, 96, 64};
+    size_t preferred = 128;
+    uint64_t physical_bytes = 0;
+    size_t length = sizeof(physical_bytes);
+    if (sysctlbyname("hw.memsize", &physical_bytes, &length, nullptr, 0) == 0 &&
+        length == sizeof(physical_bytes)) {
+        if (physical_bytes >= 8ULL * 1024 * MiB) preferred = 384;
+        else if (physical_bytes >= 6ULL * 1024 * MiB) preferred = 256;
+        else if (physical_bytes >= 4ULL * 1024 * MiB) preferred = 192;
+        else if (physical_bytes >= 3ULL * 1024 * MiB) preferred = 128;
+        else preferred = 96;
+    }
+    const char *override_text = getenv("IDECK_WINE_JIT_MIB");
+    if (override_text && *override_text) {
+        char *end = nullptr;
+        errno = 0;
+        unsigned long value = strtoul(override_text, &end, 10);
+        bool valid = errno == 0 && end != override_text && *end == '\\0';
+        if (valid) {
+            valid = false;
+            for (size_t candidate : allowed) {
+                if (value == candidate) { valid = true; break; }
+            }
+        }
+        if (valid) preferred = static_cast<size_t>(value);
+        else fprintf(stderr, "[iDeck Wine JIT] ignored unsupported IDECK_WINE_JIT_MIB=%s\\n",
+                     override_text);
+    }
+    std::vector<size_t> sizes;
+    for (size_t candidate : allowed)
+        if (candidate <= preferred) sizes.push_back(candidate * MiB);
+    fprintf(stderr, "[iDeck Wine JIT] initial pool preference=%zu MiB; fallback to 64 MiB\\n",
+            preferred);
+    return sizes;
+}
+
 void record_wine_pool_failure(int32_t stage, int32_t mach_code = 0) {
     if (stage >= wine_pool_last_failure.load()) {
         wine_pool_last_mach_code.store(mach_code);
@@ -269,8 +309,7 @@ extern "C" bool ideck_wine_jit_pool_prepare(void) {
     // progressively smaller allocations rather than treating that as a
     // permanent launch failure. Never create a non-executable substitute.
     constexpr size_t MiB = 1024ULL * 1024;
-    for (size_t size : {384ULL * MiB, 256ULL * MiB, 192ULL * MiB,
-                        128ULL * MiB, 96ULL * MiB, 64ULL * MiB}) {
+    for (size_t size : wine_pool_candidates()) {
         // Every jit26_prepare_region call triggers BRK #0xf00d.
         // A detached debugger here would make the call process-fatal.
         if (!debugger_attached()) {
