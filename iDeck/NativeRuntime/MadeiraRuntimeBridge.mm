@@ -53,6 +53,7 @@ extern "C" int32_t ideck_runtime_prepare(const char *wine_prefix) {
 }
 
 static std::mutex ideck_launch_mutex;
+static bool ideck_wine_session_started = false;
 
 extern "C" int32_t ideck_runtime_launch(const char *executable_path,
                                          const char *wine_prefix,
@@ -60,6 +61,7 @@ extern "C" int32_t ideck_runtime_launch(const char *executable_path,
     std::unique_lock<std::mutex> launch_lock(ideck_launch_mutex, std::try_to_lock);
     if (!launch_lock.owns_lock()) return EBUSY;
     if (ideck_wineprocess_running()) return EALREADY;
+    if (ideck_wine_session_started) return EALREADY;
     if (!executable_path || !*executable_path || !wine_prefix || !*wine_prefix ||
         !request_json || !*request_json) return EINVAL;
     @autoreleasepool {
@@ -153,7 +155,9 @@ extern "C" int32_t ideck_runtime_launch(const char *executable_path,
         if (setenv("WINEPREFIX", wine_prefix, 1) != 0 ||
             setenv("MADEIRA_EXE", winExe.UTF8String, 1) != 0 ||
             setenv("MADEIRA_ARGS", argString.UTF8String, 1) != 0) return errno;
-        return ideck_wineprocess_start(wine_prefix);
+        int32_t result = ideck_wineprocess_start(wine_prefix);
+        if (result == 0) ideck_wine_session_started = true;
+        return result;
     }
 }
 

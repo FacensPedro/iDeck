@@ -58,6 +58,26 @@ struct GameSessionView: View {
     @Environment(\.presentationMode) var presentationMode
     @StateObject private var metrics = GameRuntimeMetrics()
     @State private var showActiveWineAlert = false
+    @State private var closeRequested = false
+
+    private var gameLoading: (progress: Double, stage: String)? {
+        let status = coordinator.windowsStatus
+        if status == VisualCRuntimeBootstrap.installStatus {
+            return (0.15, "Preparing Microsoft Visual C++")
+        }
+        if status == "Preparing Wine prefix..." || status == "Preparing Windows Environment..." {
+            return (0.20, "Preparing Wine prefix")
+        }
+        if status == "Launching Steam game..." || status == "Launching Steam client..." ||
+           status == "Launching Windows app..." {
+            return (0.45, "Starting Wine and FEX")
+        }
+        if status == "Running" || status == "Steam Running" {
+            if metrics.receivedNewFrames { return (1.0, "First Metal frame displayed") }
+            return (0.90, "Waiting for the first game frame")
+        }
+        return nil
+    }
     private let tick = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     var body: some View {
@@ -78,6 +98,7 @@ struct GameSessionView: View {
                 HStack(alignment: .top) {
                     Button(action: {
                         if ideck_wineprocess_running() {
+                            closeRequested = ideck_wineprocess_request_close()
                             showActiveWineAlert = true
                         } else {
                             coordinator.setWindowsStatus("Windows Ready")
@@ -86,10 +107,11 @@ struct GameSessionView: View {
                     }) {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 30))
-                            .foregroundColor(.white.opacity(0.7))
+                            .foregroundColor(.white.opacity(0.85))
                             .frame(width: 44, height: 44)
                             .padding(8)
                     }
+                    .accessibilityLabel("Close Wine session")
                     Spacer()
                     if coordinator.isHUDEnabled {
                         VStack(alignment: .trailing, spacing: 3) {
@@ -103,6 +125,28 @@ struct GameSessionView: View {
                         .padding(8)
                         .background(.black.opacity(0.75), in: RoundedRectangle(cornerRadius: 8))
                     }
+                }
+                if let loading = gameLoading {
+                    VStack(alignment: .leading, spacing: 7) {
+                        HStack {
+                            Text(loading.stage)
+                            Spacer()
+                            Text("\(Int(loading.progress * 100))%")
+                                .monospacedDigit()
+                        }
+                        .font(.system(size: 13, weight: .medium))
+                        ProgressView(value: loading.progress, total: 1)
+                            .tint(.blue)
+                        if !metrics.receivedNewFrames {
+                            Text("Startup milestone, not the game's internal loading percentage.")
+                                .font(.system(size: 10))
+                                .foregroundColor(.gray)
+                        }
+                    }
+                    .foregroundColor(.white)
+                    .padding(12)
+                    .background(.black.opacity(0.8), in: RoundedRectangle(cornerRadius: 10))
+                    .padding(.horizontal, 14)
                 }
                 if coordinator.windowsStatus == "Launching Steam game..." ||
                     coordinator.windowsStatus == "Launching Steam client..." ||
@@ -152,11 +196,18 @@ struct GameSessionView: View {
         .onReceive(tick) { _ in
             metrics.sample()
             coordinator.refreshWindowsSessionHealth()
+            if closeRequested && !ideck_wineprocess_running() {
+                closeRequested = false
+                coordinator.setWindowsStatus("Windows Ready")
+                presentationMode.wrappedValue.dismiss()
+            }
         }
-        .alert("Wine ainda está executando", isPresented: $showActiveWineAlert) {
+        .alert("Close Wine session", isPresented: $showActiveWineAlert) {
             Button("OK", role: .cancel) {}
         } message: {
-            Text("Feche o jogo pelo próprio Windows antes de sair desta tela. Ocultar a superfície Metal com o Wine ativo pode interromper os gráficos. Se o jogo travou, encerre o iDeck pelo seletor de aplicativos.")
+            Text(closeRequested
+                ? "A Windows close request (Alt+F4) was sent. Save and confirm the exit inside the game. The Metal display stays attached until Wine stops."
+                : "The Wine keyboard queue is not available. Close the game using its own menu. The display stays attached while Wine runs; if it is frozen, close iDeck from the app switcher.")
         }
     }
 }

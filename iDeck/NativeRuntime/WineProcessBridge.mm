@@ -37,3 +37,19 @@ extern "C" bool ideck_wineprocess_last_ntstatus(uint32_t *code) {
     auto read = reinterpret_cast<CrashStatus>(dlsym(RTLD_DEFAULT, "wine_crash_exit_status"));
     return code && read && read(code) != 0;
 }
+
+extern "C" bool ideck_wineprocess_request_close(void) {
+    using PostKey = void (*)(unsigned int, int);
+    if (!ideck_wineprocess_running()) return false;
+    auto post = reinterpret_cast<PostKey>(dlsym(RTLD_DEFAULT, "winios_post_key"));
+    if (post == nullptr) return false;
+    post(0x12, 1);
+    post(0x73, 1);
+    // Do not block the UI; key-up is emitted shortly afterwards.
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 80 * NSEC_PER_MSEC),
+                   dispatch_get_main_queue(), ^{
+        post(0x73, 0);
+        post(0x12, 0);
+    });
+    return true;
+}
