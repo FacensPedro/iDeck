@@ -64,7 +64,7 @@ for (const response of ["E22", "E0c", "garbage", "", null, "1a00"]) {
 }
 for (const response of ["11a000000", "0x11a000000"]) {
     const result = executeJITRequest(response);
-    assert.equal(result.replies[0], "P0=0000a01101000000;thread:24;");
+    assert.equal(result.replies[0], "P0=0000001a01000000;thread:24;");
     assert.equal(result.prepared.length, 1);
     assert.equal(result.prepared[0].address, 0x11a000000n);
 }
