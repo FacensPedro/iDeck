@@ -147,3 +147,11 @@ Madeira's BRK protocol and a device-level test. If the game's PE code and
 FEX translations exceed this budget, larger pool and address-space
 placement work will be needed. No new ability to bypass iPadOS signing or
 JIT entitlement policy is implied.
+
+If launching through StikDebug with iDeck's `scripts/jit/universal.js`,
+the script now explicitly handles Madeira's `BRK #0xf00d` command 3
+(page-zero mapping request). An unsupported mapping is reported as failure
+instead of leaking a stale register value. This does **not** override
+kernel page-zero restrictions. Madeira's more complete upstream debugger
+script is at
+[Madeira JIT script](https://github.com/willfaust/madeira/blob/main/app/Madeira/madeira-jit.js).
