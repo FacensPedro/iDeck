@@ -73,6 +73,28 @@ else
   git -C "$DEST" apply "$COMPAT_PATCH"
 fi
 
+# The pinned Madeira FEX bridge assumes every iOS device is an Apple A15.
+# Patch its FEXCore HostFeatures construction to use actual iOS sysctl
+# capabilities. A missing feature query must never enable a JIT instruction.
+ARM_HOST_PATCH="$ROOT/patches/madeira-arm-host-feature-probe.patch"
+if git -C "$DEST" apply --reverse --check "$ARM_HOST_PATCH" >/dev/null 2>&1; then
+  echo "ARM host feature probe patch already applied."
+else
+  git -C "$DEST" apply --check "$ARM_HOST_PATCH" || {
+    echo "ERROR: pinned Madeira FEXBridge source does not match the ARM feature detection patch." >&2
+    exit 2
+  }
+  git -C "$DEST" apply "$ARM_HOST_PATCH"
+fi
+[[ -s "$DEST/app/Madeira/iDeckARMHostFeatures.h" ]] || {
+  echo "ERROR: native ARM host feature probe header is missing." >&2
+  exit 2
+}
+if grep -Fq 'Features.CPUMIDRs.resize(8, 0x611F0250)' "$DEST/app/Madeira/FEXBridge.mm"; then
+  echo "ERROR: Madeira FEX still spoofs the Apple A15 CPU model." >&2
+  exit 2
+fi
+
 # An ARM64EC CONTEXT_INTEGER return needing its original x16/x17 goes
 # through Wine's syscall_dispatcher_return_slowpath. On iOS 27 the pinned
 # raise(SIGUSR2) path was caught as a Mach host breakpoint, then incorrectly
