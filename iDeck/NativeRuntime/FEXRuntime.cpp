@@ -9,6 +9,8 @@
 #include <cstdint>
 #include <cstdlib>
 #include <atomic>
+#include <algorithm>
+#include <vector>
 
 namespace {
 std::mutex fex_mutex;
@@ -84,6 +86,9 @@ uintptr_t wine_pool_rw = 0;
 size_t wine_pool_size = 0;
 std::atomic<int32_t> wine_pool_last_failure{0};
 std::atomic<int32_t> wine_pool_last_mach_code{0};
+std::atomic<int32_t> wine_pool_last_rx_detail{0};
+std::vector<vm_address_t> wine_pool_low_va_pins;
+bool wine_pool_frontier_prepared = false;
 
 void record_wine_pool_failure(int32_t stage, int32_t mach_code = 0) {
     if (stage >= wine_pool_last_failure.load()) {
@@ -92,28 +97,96 @@ void record_wine_pool_failure(int32_t stage, int32_t mach_code = 0) {
     }
 }
 
+// Madeira's FEX dispatcher has a position-dependent RX literal limitation.
+// Reserve low virtual pages (not resident memory) to encourage the debugger's
+// subsequent executable allocation to land above the known 0x119000000
+// frontier. These placeholders are retained for this process lifetime.
+void prepare_wine_pool_frontier() {
+    if (wine_pool_frontier_prepared) return;
+    wine_pool_frontier_prepared = true;
+    constexpr vm_size_t chunk = 16ULL * 1024 * 1024;
+    for (int i = 0; i < 32; ++i) {
+        vm_address_t address = 0;
+        kern_return_t kr = vm_allocate(mach_task_self(), &address, chunk, VM_FLAGS_ANYWHERE);
+        if (kr != KERN_SUCCESS) {
+            fprintf(stderr, "[iDeck Wine JIT] low-VA pin stopped kr=%d at chunk %d\n", kr, i);
+            break;
+        }
+        if (address >= 0x119000000ULL) {
+            vm_deallocate(mach_task_self(), address, chunk);
+            break;
+        }
+        wine_pool_low_va_pins.push_back(address);
+        if (address > UINTPTR_MAX - chunk || address + chunk >= 0x119000000ULL) break;
+    }
+    fprintf(stderr, "[iDeck Wine JIT] pinned %zu low-VA placeholders before RX allocation\n",
+            wine_pool_low_va_pins.size());
+}
+
+// A single debugger RX allocation can contain multiple contiguous vm_region
+// entries. Reject holes/non-executable subregions, but not valid split regions.
 bool executable_mapping(uintptr_t rx, size_t size) {
-    vm_address_t address = static_cast<vm_address_t>(rx);
-    vm_size_t region_size = 0;
-    vm_region_basic_info_data_64_t info {};
-    mach_msg_type_number_t count = VM_REGION_BASIC_INFO_COUNT_64;
-    mach_port_t object = MACH_PORT_NULL;
-    kern_return_t status = vm_region_64(mach_task_self(), &address, &region_size,
-                                        VM_REGION_BASIC_INFO_64,
-                                        reinterpret_cast<vm_region_info_t>(&info),
-                                        &count, &object);
-    if (object != MACH_PORT_NULL) mach_port_deallocate(mach_task_self(), object);
-    return status == KERN_SUCCESS && address == rx &&
-           region_size >= size && (info.protection & VM_PROT_EXECUTE) != 0;
+    const uintptr_t end = rx + size; // acceptable_pool checked overflow
+    uintptr_t cursor = rx;
+    while (cursor < end) {
+        vm_address_t address = static_cast<vm_address_t>(cursor);
+        vm_size_t region_size = 0;
+        vm_region_basic_info_data_64_t info {};
+        mach_msg_type_number_t count = VM_REGION_BASIC_INFO_COUNT_64;
+        mach_port_t object = MACH_PORT_NULL;
+        kern_return_t status = vm_region_64(mach_task_self(), &address, &region_size,
+                                            VM_REGION_BASIC_INFO_64,
+                                            reinterpret_cast<vm_region_info_t>(&info),
+                                            &count, &object);
+        if (object != MACH_PORT_NULL) mach_port_deallocate(mach_task_self(), object);
+        if (status != KERN_SUCCESS) {
+            wine_pool_last_rx_detail.store(6);
+            fprintf(stderr, "[iDeck Wine JIT] vm_region_64 failed at 0x%" PRIxPTR
+                            " kr=%d\n", cursor, status);
+            return false;
+        }
+        if (address > cursor || region_size == 0 ||
+            address > UINTPTR_MAX - region_size || address + region_size <= cursor) {
+            wine_pool_last_rx_detail.store(7);
+            return false;
+        }
+        if ((info.protection & VM_PROT_EXECUTE) == 0) {
+            wine_pool_last_rx_detail.store(8);
+            fprintf(stderr, "[iDeck Wine JIT] RX page lacks VM_PROT_EXECUTE at 0x%" PRIxPTR
+                            " protection=0x%x max=0x%x\n", cursor,
+                    info.protection, info.max_protection);
+            return false;
+        }
+        cursor = std::min(end, static_cast<uintptr_t>(address + region_size));
+    }
+    return true;
 }
 
 bool acceptable_pool(uintptr_t address, size_t size) {
-    if (address < 0x119000000ULL || address > UINTPTR_MAX - size) return false;
-    uintptr_t end = address + size;
-    // Never place host JIT code inside Wine's guest PE address band or
-    // the common 0x140000000 executable-image placement window.
-    if (end > 0x7000000000ULL) return false;
-    if (address < 0x180000000ULL && end > 0x140000000ULL) return false;
+    wine_pool_last_rx_detail.store(0);
+    if (address < 0x119000000ULL) {
+        wine_pool_last_rx_detail.store(1);
+        return false;
+    }
+    if (address > UINTPTR_MAX - size) {
+        wine_pool_last_rx_detail.store(2);
+        return false;
+    }
+    const uintptr_t end = address + size;
+    // Do not place the JIT mapping inside Wine's PE image window or
+    // outside the supported guest/host VM layout.
+    if (end > 0x7000000000ULL) {
+        wine_pool_last_rx_detail.store(3);
+        return false;
+    }
+    if (address < 0x180000000ULL && end > 0x140000000ULL) {
+        wine_pool_last_rx_detail.store(4);
+        return false;
+    }
+    if (address % static_cast<uintptr_t>(vm_page_size) != 0) {
+        wine_pool_last_rx_detail.store(5);
+        return false;
+    }
     return executable_mapping(address, size);
 }
 
@@ -145,6 +218,14 @@ extern "C" int32_t ideck_wine_jit_pool_failure_stage(void) {
 #endif
 }
 
+extern "C" int32_t ideck_wine_jit_pool_failure_rx_detail(void) {
+#if defined(IDECK_NATIVE_MADEIRA_ENABLED) && IDECK_NATIVE_MADEIRA_ENABLED
+    return wine_pool_last_rx_detail.load();
+#else
+    return 0;
+#endif
+}
+
 extern "C" int32_t ideck_wine_jit_pool_failure_mach_code(void) {
 #if defined(IDECK_NATIVE_MADEIRA_ENABLED) && IDECK_NATIVE_MADEIRA_ENABLED
     return wine_pool_last_mach_code.load();
@@ -167,6 +248,7 @@ extern "C" bool ideck_wine_jit_pool_prepare(void) {
     std::lock_guard<std::mutex> lock(wine_pool_mutex);
     wine_pool_last_failure.store(0);
     wine_pool_last_mach_code.store(0);
+    wine_pool_last_rx_detail.store(0);
     if (wine_pool_rx != 0) {
         if (export_pool(wine_pool_rx, wine_pool_rw, wine_pool_size)) return true;
         record_wine_pool_failure(6);
@@ -178,6 +260,8 @@ extern "C" bool ideck_wine_jit_pool_prepare(void) {
                         "Enabling JIT once from the app list does not keep the BRK handler attached.\n");
         return false;
     }
+
+    prepare_wine_pool_frontier();
 
     // FEXCore already owns a separate 64 MiB pool. A second 384 MiB RX
     // reservation may fail on iPads with fragmented / restricted virtual
@@ -207,7 +291,9 @@ extern "C" bool ideck_wine_jit_pool_prepare(void) {
             fprintf(stderr, "[iDeck Wine JIT] rejected RX=0x%" PRIxPTR " size=%zu MiB "
                             "(non-executable or collides with Wine image/guest window)\n",
                     rx, size / MiB);
-            vm_deallocate(mach_task_self(), static_cast<vm_address_t>(rx), size);
+            // Never deallocate an unvalidated pointer supplied by an external
+            // debugger: it could belong to the app or a Wine PE image.
+            // A failed pool attempt is retried at a smaller size instead.
             continue;
         }
 
@@ -263,6 +349,7 @@ extern "C" bool ideck_wine_jit_pool_prepare(void) {
             wine_pool_size = size;
             wine_pool_last_failure.store(0);
             wine_pool_last_mach_code.store(0);
+            wine_pool_last_rx_detail.store(0);
             fprintf(stderr, "[iDeck Wine JIT] ready with %zu MiB (RX/RW mirror)\n", size / MiB);
             return true;
         }
