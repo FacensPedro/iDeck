@@ -48,6 +48,9 @@ extern "C" int32_t ideck_runtime_prepare(const char *wine_prefix) {
     // Never enter upstream BRK #0xf00d without a live debugger or FEX pool.
     if (!ideck_fex_jit_ready()) return EPERM;
     if (!ideck_fex_initialize()) return EAGAIN;
+    // Upstream Madeira requires RX/RW pool environment exports before __wine_main.
+    // Without these the first ARM64EC dispatcher faults on a non-executable PE page.
+    if (!ideck_wine_jit_pool_prepare() || !ideck_wine_jit_pool_ready()) return ENOMEM;
     if (!ideck_wineserver_initialize(wine_prefix)) return EAGAIN;
     return 0;
 }
