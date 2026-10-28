@@ -265,3 +265,14 @@ grace period** as adapted from Madeira, ending each system task when its
 install completes. This does not port Madeira's full iOS 26
 `BGContinuedProcessingTask` implementation and does not guarantee that
 a download will continue indefinitely after backgrounding the app.
+
+### Explicit debugger RX preparation failure
+
+The bundled `universal.js` now returns **zero** from the JIT BRK request
+when StikDebug's `prepare_memory_region` explicitly returns `false`, a
+GDB-style error code, or throws. Earlier versions returned an allocated
+address even after preparation failed, causing the Wine native host to
+report a confusing executable-permission RX validation error. A failed
+request is now retried at another size by the native allocator. A debugger
+that returns no explicit result remains subject to native Mach executable
+permission verification; this does not turn non-executable memory into JIT.
