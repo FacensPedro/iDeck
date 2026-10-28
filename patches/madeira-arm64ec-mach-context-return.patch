@@ -31,7 +31,7 @@ diff --git a/build/ntdll-unix/signal_arm64_ios.c b/build/ntdll-unix/signal_arm64
 +    uint64_t pc = arm_thread_state64_get_pc( *original );
 +    uintptr_t symbol = (uintptr_t)syscall_dispatcher_return_slowpath;
 +    uint32_t insn = 0;
-+    mach_vm_size_t got = 0;
++    vm_size_t got = 0;
 +    uint64_t teb_self = 0, frame_ptr = 0;
 +    struct syscall_frame frame;
 +    arm_thread_state64_t next;
@@ -44,27 +44,27 @@ diff --git a/build/ntdll-unix/signal_arm64_ios.c b/build/ntdll-unix/signal_arm64
 +    if (!have_neon || !teb || teb < 0x100000000ull || (teb & 0xfff) ||
 +        pc < symbol || pc - symbol >= 256 || (pc & 3))
 +        return 0;
-+    if (mach_vm_read_overwrite( mach_task_self(), pc, sizeof(insn),
-+            (mach_vm_address_t)(uintptr_t)&insn, &got ) != KERN_SUCCESS ||
++    if (vm_read_overwrite( mach_task_self(), pc, sizeof(insn),
++            (vm_address_t)(uintptr_t)&insn, &got ) != KERN_SUCCESS ||
 +        got != sizeof(insn) || insn != IDECK_ARM64EC_RETURN_BRK)
 +        return 0;
 +
 +    got = 0;
-+    if (mach_vm_read_overwrite( mach_task_self(), teb + 0x30,
-+            sizeof(teb_self), (mach_vm_address_t)(uintptr_t)&teb_self,
++    if (vm_read_overwrite( mach_task_self(), teb + 0x30,
++            sizeof(teb_self), (vm_address_t)(uintptr_t)&teb_self,
 +            &got ) != KERN_SUCCESS || got != sizeof(teb_self) || teb_self != teb)
 +        return 0;
 +    got = 0;
 +    /* Madeira's TEB + 0x378 is ntdll_thread_data->syscall_frame;
 +     * do not dereference guest or stale thread pointers in the Mach server. */
-+    if (mach_vm_read_overwrite( mach_task_self(), teb + 0x378,
-+            sizeof(frame_ptr), (mach_vm_address_t)(uintptr_t)&frame_ptr,
++    if (vm_read_overwrite( mach_task_self(), teb + 0x378,
++            sizeof(frame_ptr), (vm_address_t)(uintptr_t)&frame_ptr,
 +            &got ) != KERN_SUCCESS || got != sizeof(frame_ptr) ||
 +        frame_ptr < 0x100000000ull || (frame_ptr & 15))
 +        return 0;
 +    got = 0;
-+    if (mach_vm_read_overwrite( mach_task_self(), frame_ptr, sizeof(frame),
-+            (mach_vm_address_t)(uintptr_t)&frame, &got ) != KERN_SUCCESS ||
++    if (vm_read_overwrite( mach_task_self(), frame_ptr, sizeof(frame),
++            (vm_address_t)(uintptr_t)&frame, &got ) != KERN_SUCCESS ||
 +        got != sizeof(frame))
 +        return 0;
 +
