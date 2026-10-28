@@ -188,3 +188,15 @@ When you see an ENOMEM startup error:
 This change improves fallback and reports the failure stage, but its
 success must still be verified on physical iPadOS hardware. It cannot
 override iPadOS debugger, signing or virtual-memory limits.
+
+## On-screen JIT failure stages
+
+The Wine executable JIT pool is prepared before the Madeira process begins
+redirecting stdout/stderr into `Documents/madeira-log.txt`; that log may
+therefore not include a failed allocation attempt. The native host now
+publishes its most significant allocation failure stage and the Mach return
+code to the game error screen. Stages distinguish missing debugger, failed
+RX allocation, invalid RX address or protection, RW alias `vm_remap`, failed
+RW `vm_protect`, and failure to export the memory mapping. A successful
+subsequent attempt clears the last failure. Preserve the error text or an
+Xcode device console trace for the next diagnosis.
