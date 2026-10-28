@@ -62,7 +62,7 @@ enum Translations {
         ],
         "Checking existing files %d%%": ["pt": "Verificando arquivos existentes %d%%", "es": "Verificando archivos existentes %d%%"],
         "Already on device: %@": ["pt": "Já está no dispositivo: %@", "es": "Ya está en el dispositivo: %@"],
-        "Madeira Emulator": ["pt": "Madeira Emulator", "es": "Madeira Emulator"],
+        "Madeira": ["pt": "Madeira", "es": "Madeira"],
         "Steam Cloud saves": ["pt": "Saves do Steam Cloud", "es": "Guardados de Steam Cloud"],
         "Auto Save": ["pt": "Auto Save", "es": "Guardado automático"],
         "Automatically sync Steam Cloud saves before playing when available. Conflicting saves are never overwritten.": ["pt": "Sincroniza os saves com o Steam Cloud antes de jogar, quando disponível. Saves em conflito não serão sobrescritos automaticamente.", "es": "Sincroniza los guardados con Steam Cloud antes de jugar cuando esté disponible. No sobrescribe conflictos automáticamente."],
