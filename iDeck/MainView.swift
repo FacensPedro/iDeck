@@ -86,6 +86,8 @@ struct MainView: View {
                         selectedWorkspace = .pc
                         if !coordinator.isContainerReady {
                             coordinator.forceJITAndStartWindows()
+                        } else {
+                            coordinator.reconnectStikDebugForWineIfNeeded()
                         }
                     } label: {
                         modeTile(title: tr("Madeira"), symbol: "gamecontroller.fill")
