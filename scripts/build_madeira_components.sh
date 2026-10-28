@@ -212,7 +212,7 @@ if [[ "$REBUILD" == "1" ]]; then
     cp "$src" "$MD/app/Madeira/arm64ec-windows/${module##*/}"
   done
 
-  if [[ "${IDECK_BUILD_WOW64:-0}" == "1" ]]; then
+  if [[ "${IDECK_BUILD_WOW64:-1}" == "1" ]]; then
     # Upstream's i386 Wine farm and the distinct FEX WOW64 translator.
     # Unlike xtajit64.dll, xtajit.dll executes PE32 x86 guest code.
     bash "$MD/build/fex-wow64/build.sh"
@@ -249,7 +249,7 @@ for file in \
   [[ -s "$file" ]] || { echo "ERROR: missing compiled native/PE component: $file" >&2; exit 2; }
 done
 
-if [[ "${IDECK_BUILD_WOW64:-0}" == "1" ]]; then
+if [[ "${IDECK_BUILD_WOW64:-1}" == "1" ]]; then
   for name in aarch64-windows/xtajit.dll aarch64-windows/wow64.dll \
               aarch64-windows/wow64win.dll i386-windows/ntdll.dll \
               i386-windows/kernel32.dll i386-windows/user32.dll \
