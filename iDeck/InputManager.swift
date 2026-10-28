@@ -1,26 +1,37 @@
 import Foundation
 import GameController
 
-class InputManager: ObservableObject {
+final class InputManager: ObservableObject {
     static let shared = InputManager()
-    @Published var isControllerConnected: Bool = false
-    @Published var controllerName: String = "None"
-    
+
+    @Published private(set) var isControllerConnected = false
+    @Published private(set) var controllerName = "None"
+
     private init() {
-        isControllerConnected = !GCController.controllers().isEmpty
-        controllerName = GCController.controllers().first?.vendorName ?? "None"
-        NotificationCenter.default.addObserver(self, selector: #selector(controllerDidConnect), name: .GCControllerDidConnect, object: nil)
-        NotificationCenter.default.addObserver(self, selector: #selector(controllerDidDisconnect), name: .GCControllerDidDisconnect, object: nil)
+        refreshControllers()
+        NotificationCenter.default.addObserver(self, selector: #selector(controllerConnectionChanged),
+                                               name: .GCControllerDidConnect, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(controllerConnectionChanged),
+                                               name: .GCControllerDidDisconnect, object: nil)
         GCController.startWirelessControllerDiscovery {}
     }
-    
-    @objc private func controllerDidConnect(notification: Notification) {
-        isControllerConnected = true
-        controllerName = (notification.object as? GCController)?.vendorName ?? "Controller"
+
+    func refreshControllers() {
+        if !Thread.isMainThread {
+            DispatchQueue.main.async { [weak self] in self?.refreshControllers() }
+            return
+        }
+        let connected = GCController.controllers()
+        let first = connected.first
+        isControllerConnected = first != nil
+        controllerName = first?.vendorName ?? "None"
     }
-    
-    @objc private func controllerDidDisconnect(notification: Notification) {
-        isControllerConnected = !GCController.controllers().isEmpty
-        controllerName = GCController.controllers().first?.vendorName ?? "None"
+
+    @objc private func controllerConnectionChanged(_ notification: Notification) {
+        refreshControllers()
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
     }
 }
