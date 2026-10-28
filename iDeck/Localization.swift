@@ -55,6 +55,11 @@ func trStatus(_ status: String) -> String {
 
 enum Translations {
     static let table: [String: [String: String]] = [
+        "Share Wine log": ["pt": "Compartilhar log do Wine", "es": "Compartir registro de Wine"],
+        "Wine logs can contain personal or account information. Review before sharing.": [
+            "pt": "Os logs podem conter informações pessoais ou da conta. Revise antes de compartilhar.",
+            "es": "Los registros pueden contener información personal o de cuenta. Revísalos antes de compartir."
+        ],
         "Checking existing files %d%%": ["pt": "Verificando arquivos existentes %d%%", "es": "Verificando archivos existentes %d%%"],
         "Already on device: %@": ["pt": "Já está no dispositivo: %@", "es": "Ya está en el dispositivo: %@"],
         "Madeira Emulator": ["pt": "Madeira Emulator", "es": "Madeira Emulator"],
