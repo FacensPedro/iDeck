@@ -241,6 +241,13 @@ jobs:
           /tmp/ideck-cdn-selection-tests
           python3 -m unittest discover -s tests/host -p 'test_steam_ip_routing.py' -v
 
+      - name: Test Steam game executable and working directory resolution
+        run: |
+          xcrun swiftc iDeck/SteamKeyValues.swift iDeck/SteamInstall.swift \
+            tests/host/SteamInstallLaunchPathTests.swift -o /tmp/ideck-steam-path-tests
+          /tmp/ideck-steam-path-tests
+          python3 -m unittest discover -s tests/host -p 'test_madeira_launch_integration.py' -v
+
       - name: Test graphics DLL override isolation
         run: |
           xcrun swiftc iDeck/GraphicsConfig.swift tests/host/GraphicsOverrideTests.swift -o /tmp/ideck-graphics-override-tests
