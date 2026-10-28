@@ -128,6 +128,7 @@ extern "C" int32_t ideck_runtime_launch(const char *executable_path,
         unsetenv("MADEIRA_STEAM_APPID");
         unsetenv("MADEIRA_STEAM_APPPATH");
         if ([request[@"isSteam"] boolValue] && steamID != nil) return EINVAL;
+        NSString *steamWorkingFolder = nil;
         if (steamID != nil) {
             if (![steamID isKindOfClass:[NSNumber class]] ||
                 ![steamFolder isKindOfClass:[NSString class]]) return EINVAL;
@@ -145,14 +146,43 @@ extern "C" int32_t ideck_runtime_launch(const char *executable_path,
             if (relativeFolder.length == 0 || relativeFolder.length >= 850) return ENAMETOOLONG;
             NSString *windowsFolder = [@"C:\\" stringByAppendingString:
                 [relativeFolder stringByReplacingOccurrencesOfString:@"/" withString:@"\\"]];
+            steamWorkingFolder = windowsFolder;
             if (setenv("MADEIRA_STEAM_APPID", appIDText.UTF8String, 1) ||
                 setenv("MADEIRA_STEAM_APPPATH", windowsFolder.UTF8String, 1)) return errno;
         }
-        if (setenv("MADEIRA_ENV_LOCKED", "MADEIRA_EXE,MADEIRA_ARGS,MADEIRA_STEAM_APPID,MADEIRA_STEAM_APPPATH", 1))
+        NSString *launchExe = winExe;
+        NSString *launchArgs = argString;
+        NSString *workdir = steamWorkingFolder;
+        if ([request[@"launchInDesktop"] boolValue]) {
+            if ([winExe containsString:@"\""] ||
+                [winExe containsString:@"\r"] || [winExe containsString:@"\n"]) return EINVAL;
+            launchExe = @"explorer.exe";
+            launchArgs = [NSString stringWithFormat:@"/desktop=shell,960x540 \"%@\"%@",
+                          winExe, argString.length ? [@" " stringByAppendingString:argString] : @""];
+            if (launchArgs.length >= 4096) return E2BIG;
+            if (!workdir) {
+                NSRange lastSlash = [winExe rangeOfString:@"\\" options:NSBackwardsSearch];
+                workdir = lastSlash.location == NSNotFound
+                    ? @"C:\\" : [winExe substringToIndex:lastSlash.location];
+            }
+            if (setenv("MADEIRA_DESKTOP", "1", 1)) return errno;
+        } else {
+            unsetenv("MADEIRA_DESKTOP");
+        }
+        if (workdir && workdir.length > 0 && setenv("MADEIRA_WORKDIR", workdir.UTF8String, 1))
+            return errno;
+        if (!workdir) unsetenv("MADEIRA_WORKDIR");
+        if ([request[@"waitForChildProcesses"] boolValue]) {
+            if (setenv("MADEIRA_WAIT_CHILDREN", "1", 1)) return errno;
+        } else {
+            unsetenv("MADEIRA_WAIT_CHILDREN");
+        }
+        if (setenv("MADEIRA_ENV_LOCKED",
+                   "MADEIRA_EXE,MADEIRA_ARGS,MADEIRA_STEAM_APPID,MADEIRA_STEAM_APPPATH,MADEIRA_DESKTOP,MADEIRA_WORKDIR,MADEIRA_WAIT_CHILDREN", 1))
             return errno;
         if (setenv("WINEPREFIX", wine_prefix, 1) != 0 ||
-            setenv("MADEIRA_EXE", winExe.UTF8String, 1) != 0 ||
-            setenv("MADEIRA_ARGS", argString.UTF8String, 1) != 0) return errno;
+            setenv("MADEIRA_EXE", launchExe.UTF8String, 1) != 0 ||
+            setenv("MADEIRA_ARGS", launchArgs.UTF8String, 1) != 0) return errno;
         return ideck_wineprocess_start(wine_prefix);
     }
 }
