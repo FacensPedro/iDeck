@@ -44,6 +44,8 @@ class SteamIPRoutingTests(unittest.TestCase):
         self.assertIn("let written = try write(data, to: path, offset: chunk.offset)", DEPOT)
         self.assertNotIn("reuseExisting: verify", DEPOT)
         self.assertIn("ideck_steam_write_chunk(", DEPOT)
+        self.assertIn("var createdDirectories = Set<String>()", DEPOT)
+        self.assertIn("createdDirectories.insert(parent.path).inserted", DEPOT)
         self.assertIn("plan.health.recordFailure(host)", DEPOT)
         self.assertIn("let attempts = attemptsPerChunk", DEPOT)
 
