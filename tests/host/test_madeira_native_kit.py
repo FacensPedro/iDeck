@@ -60,6 +60,7 @@ class MadeiraNativeKitTests(unittest.TestCase):
             "platform": "iphoneos-arm64",
             "wow64": wow64,
             "wine_mono": mono,
+            "arm64ec_context_patch_sha256": kit.ARM64EC_CONTEXT_PATCH_SHA256,
             "files": {
                 name: {
                     "sha256": hashlib.sha256(data).hexdigest(),
@@ -121,6 +122,20 @@ class MadeiraNativeKitTests(unittest.TestCase):
             kit.inspect(path, False, False)
         path = self.save(entries, extras=[(next(iter(entries)), b"duplicate")])
         with self.assertRaisesRegex(kit.KitError, "duplicate"):
+            kit.inspect(path, False, False)
+
+    def test_rejects_old_or_wrong_arm64ec_runtime(self):
+        entries = self.entries()
+        path = self.save(entries)
+        with zipfile.ZipFile(path) as archive:
+            meta = json.loads(archive.read("metadata.json"))
+            files = {name: archive.read(name) for name in archive.namelist() if name != "metadata.json"}
+        meta["arm64ec_context_patch_sha256"] = "0" * 64
+        with zipfile.ZipFile(path, "w") as archive:
+            archive.writestr("metadata.json", json.dumps(meta))
+            for name, data in files.items():
+                archive.writestr(name, data)
+        with self.assertRaisesRegex(kit.KitError, "ARM64EC Mach context patch mismatch"):
             kit.inspect(path, False, False)
 
     def test_rejects_revision_mismatch(self):
