@@ -68,6 +68,14 @@
 		111111111111111111111130 /* LiveContainerInit.c in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222242 /* LiveContainerInit.c */; };
 		A10000000000000000000001 /* SteamDepotDownloader.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000001 /* SteamDepotDownloader.swift */; };
 		BEEF00000000000000000001 /* WindowsLaunchArguments.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEEF00000000000000000002 /* WindowsLaunchArguments.swift */; };
+		AC100000000000000000010 /* VCArchiveExtractor.c in Sources */ = {isa = PBXBuildFile; fileRef = AC200000000000000000010 /* VCArchiveExtractor.c */; };
+		AC100000000000000000011 /* cabd.c in Sources */ = {isa = PBXBuildFile; fileRef = AC200000000000000000011 /* cabd.c */; };
+		AC100000000000000000012 /* cabc.c in Sources */ = {isa = PBXBuildFile; fileRef = AC200000000000000000012 /* cabc.c */; };
+		AC100000000000000000013 /* system.c in Sources */ = {isa = PBXBuildFile; fileRef = AC200000000000000000013 /* system.c */; };
+		AC100000000000000000014 /* mszipd.c in Sources */ = {isa = PBXBuildFile; fileRef = AC200000000000000000014 /* mszipd.c */; };
+		AC100000000000000000015 /* lzxd.c in Sources */ = {isa = PBXBuildFile; fileRef = AC200000000000000000015 /* lzxd.c */; };
+		AC100000000000000000016 /* qtmd.c in Sources */ = {isa = PBXBuildFile; fileRef = AC200000000000000000016 /* qtmd.c */; };
+		AC100000000000000000017 /* crc32.c in Sources */ = {isa = PBXBuildFile; fileRef = AC200000000000000000017 /* crc32.c */; };
 		DEAD00000000000000000071 /* VisualCRuntimeBootstrap.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEAD00000000000000000072 /* VisualCRuntimeBootstrap.swift */; };
 		ABCD00000000000000000001 /* SteamCDNHostSelection.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCD00000000000000000002 /* SteamCDNHostSelection.swift */; };
 		A10000000000000000000002 /* SteamContentDecryptor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000002 /* SteamContentDecryptor.swift */; };
@@ -147,6 +155,14 @@
 		222222222222222222222244 /* iDeck-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "iDeck-Bridging-Header.h"; sourceTree = "<group>"; };
 		A20000000000000000000001 /* SteamDepotDownloader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamDepotDownloader.swift; sourceTree = "<group>"; };
 		BEEF00000000000000000002 /* WindowsLaunchArguments.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowsLaunchArguments.swift; sourceTree = "<group>"; };
+		AC200000000000000000010 /* VCArchiveExtractor.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = NativeRuntime/VCArchiveExtractor.c; sourceTree = "<group>"; };
+		AC200000000000000000011 /* cabd.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = ThirdParty/libmspack/cabd.c; sourceTree = "<group>"; };
+		AC200000000000000000012 /* cabc.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = ThirdParty/libmspack/cabc.c; sourceTree = "<group>"; };
+		AC200000000000000000013 /* system.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = ThirdParty/libmspack/system.c; sourceTree = "<group>"; };
+		AC200000000000000000014 /* mszipd.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = ThirdParty/libmspack/mszipd.c; sourceTree = "<group>"; };
+		AC200000000000000000015 /* lzxd.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = ThirdParty/libmspack/lzxd.c; sourceTree = "<group>"; };
+		AC200000000000000000016 /* qtmd.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = ThirdParty/libmspack/qtmd.c; sourceTree = "<group>"; };
+		AC200000000000000000017 /* crc32.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = ThirdParty/libmspack/crc32.c; sourceTree = "<group>"; };
 		DEAD00000000000000000072 /* VisualCRuntimeBootstrap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisualCRuntimeBootstrap.swift; sourceTree = "<group>"; };
 		ABCD00000000000000000002 /* SteamCDNHostSelection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamCDNHostSelection.swift; sourceTree = "<group>"; };
 		A20000000000000000000002 /* SteamContentDecryptor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamContentDecryptor.swift; sourceTree = "<group>"; };
@@ -236,6 +252,14 @@
 				A10000000000000000000001 /* SteamDepotDownloader.swift in Sources */,
 				BEEF00000000000000000001 /* WindowsLaunchArguments.swift in Sources */,
 				DEAD00000000000000000071 /* VisualCRuntimeBootstrap.swift in Sources */,
+				AC100000000000000000010 /* VCArchiveExtractor.c in Sources */,
+				AC100000000000000000011 /* cabd.c in Sources */,
+				AC100000000000000000012 /* cabc.c in Sources */,
+				AC100000000000000000013 /* system.c in Sources */,
+				AC100000000000000000014 /* mszipd.c in Sources */,
+				AC100000000000000000015 /* lzxd.c in Sources */,
+				AC100000000000000000016 /* qtmd.c in Sources */,
+				AC100000000000000000017 /* crc32.c in Sources */,
 				ABCD00000000000000000001 /* SteamCDNHostSelection.swift in Sources */,
 				A10000000000000000000002 /* SteamContentDecryptor.swift in Sources */,
 				A10000000000000000000003 /* SteamDepotManifest.swift in Sources */,
@@ -330,6 +354,14 @@
 				A20000000000000000000001 /* SteamDepotDownloader.swift */,
 				BEEF00000000000000000002 /* WindowsLaunchArguments.swift */,
 				DEAD00000000000000000072 /* VisualCRuntimeBootstrap.swift */,
+				AC200000000000000000010 /* VCArchiveExtractor.c */,
+				AC200000000000000000011 /* cabd.c */,
+				AC200000000000000000012 /* cabc.c */,
+				AC200000000000000000013 /* system.c */,
+				AC200000000000000000014 /* mszipd.c */,
+				AC200000000000000000015 /* lzxd.c */,
+				AC200000000000000000016 /* qtmd.c */,
+				AC200000000000000000017 /* crc32.c */,
 				ABCD00000000000000000002 /* SteamCDNHostSelection.swift */,
 				A20000000000000000000002 /* SteamContentDecryptor.swift */,
 				A20000000000000000000003 /* SteamDepotManifest.swift */,
@@ -575,6 +607,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				INFOPLIST_FILE = iDeck/Info.plist;
 				SWIFT_OBJC_BRIDGING_HEADER = "iDeck/iDeck-Bridging-Header.h";
+				HEADER_SEARCH_PATHS = ("$(inherited)", "$(SRCROOT)/iDeck/ThirdParty/libmspack");
 				OTHER_LDFLAGS = "$(inherited) -lz $(IDECK_NATIVE_LINK_FLAGS)";
 				OTHER_CFLAGS = "$(inherited) $(IDECK_NATIVE_CFLAGS)";
 				OTHER_CPLUSPLUSFLAGS = "$(inherited) $(IDECK_NATIVE_CFLAGS)";
@@ -611,6 +644,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				INFOPLIST_FILE = iDeck/Info.plist;
 				SWIFT_OBJC_BRIDGING_HEADER = "iDeck/iDeck-Bridging-Header.h";
+				HEADER_SEARCH_PATHS = ("$(inherited)", "$(SRCROOT)/iDeck/ThirdParty/libmspack");
 				OTHER_LDFLAGS = "$(inherited) -lz $(IDECK_NATIVE_LINK_FLAGS)";
 				OTHER_CFLAGS = "$(inherited) $(IDECK_NATIVE_CFLAGS)";
 				OTHER_CPLUSPLUSFLAGS = "$(inherited) $(IDECK_NATIVE_CFLAGS)";

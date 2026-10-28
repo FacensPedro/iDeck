@@ -6,6 +6,7 @@
 #import "NativeRuntime/NativePerformance.h"
 #import "NativeRuntime/NativeMemoryManager.h"
 #import "NativeRuntime/MadeiraRuntimeBridge.h"
+#import "NativeRuntime/VCArchiveExtractor.h"
 
 #import "SteamChunkCodecs.h"
 #import "SteamDepotRegionPolicy.h"

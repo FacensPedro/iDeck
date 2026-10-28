@@ -54,7 +54,7 @@ struct MainView: View {
                 coordinator.skipVisualCRuntimeInstallation()
             }
         } message: {
-            Text(tr("iDeck can download the official Microsoft x64 Visual C++ Redistributable when you launch your first Windows game. It will run once inside Wine. This may require WoW64 and may not be supported by all Wine versions."))
+            Text(tr("iDeck can download and extract the official Microsoft x64 Visual C++ Redistributable directly on this iPad before launching a Windows game. No Windows installer needs to run. The 14 x64 DLLs are verified before they are made available to Wine."))
         }
         .fullScreenCover(isPresented: Binding<Bool>(
             get: {

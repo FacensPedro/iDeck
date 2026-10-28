@@ -1,4 +1,4 @@
-> **Automatic first-game setup:** Current iDeck builds can offer to download the **official Microsoft x64 Visual C++ Redistributable** on the first Windows game launch and attempt to install it inside Wine. This requires your confirmation and a compatible Wine/WoW64 runtime; it is not guaranteed to work. The steps below remain a manual alternative if installation fails.
+> **Automatic on-device extraction:** iDeck can download the official Microsoft x64 redistributable after user approval and extract the embedded CAB archives **on the iPad** using bundled libmspack. The Wine installer is not executed. All 14 DLLs must pass architecture and PE signature-table checks; if extraction fails, use the manual procedure described below.
 
 # Microsoft Visual C++ no iDeck — guia de DLLs Windows x64
 

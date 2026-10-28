@@ -164,9 +164,31 @@ jobs:
           bash -n scripts/build_ipa.sh
           bash -n scripts/build_native_runtime.sh
 
-      - name: Test first-launch Microsoft Visual C++ preparation
+      - name: Test on-device Visual C++ CAB extraction
         run: |
-          xcrun swiftc iDeck/VisualCRuntimeBootstrap.swift tests/host/VisualCRuntimeBootstrapTests.swift -o /tmp/ideck-vcredist-tests
+          set -euo pipefail
+          mkdir -p /tmp/ideck-vcrt-objects
+          for name in cabd cabc system mszipd lzxd qtmd crc32; do
+            xcrun clang -std=c99 -D_POSIX_C_SOURCE=200809L \
+              -I iDeck/ThirdParty/libmspack \
+              -c "iDeck/ThirdParty/libmspack/$name.c" \
+              -o "/tmp/ideck-vcrt-objects/$name.o"
+          done
+          xcrun clang -std=c99 -D_POSIX_C_SOURCE=200809L \
+            -I iDeck/ThirdParty/libmspack \
+            -c iDeck/NativeRuntime/VCArchiveExtractor.c \
+            -o /tmp/ideck-vcrt-objects/VCArchiveExtractor.o
+          xcrun clang -std=c99 -I . -c tests/host/VisualCRuntimeCABHostTests.c \
+            -o /tmp/ideck-vcrt-objects/VisualCRuntimeCABHostTests.o
+          xcrun clang /tmp/ideck-vcrt-objects/*.o -o /tmp/ideck-vcrt-extractor-tests
+          python3 tests/host/test_vcrt_cab_extractor.py /tmp/ideck-vcrt-extractor-tests
+          xcrun swiftc -import-objc-header iDeck/NativeRuntime/VCArchiveExtractor.h \
+            iDeck/VisualCRuntimeBootstrap.swift tests/host/VisualCRuntimeBootstrapTests.swift \
+            /tmp/ideck-vcrt-objects/cabd.o /tmp/ideck-vcrt-objects/cabc.o \
+            /tmp/ideck-vcrt-objects/system.o /tmp/ideck-vcrt-objects/mszipd.o \
+            /tmp/ideck-vcrt-objects/lzxd.o /tmp/ideck-vcrt-objects/qtmd.o \
+            /tmp/ideck-vcrt-objects/crc32.o \
+            /tmp/ideck-vcrt-objects/VCArchiveExtractor.o -o /tmp/ideck-vcredist-tests
           /tmp/ideck-vcredist-tests
 
       - name: Test Steam CDN host performance selection
