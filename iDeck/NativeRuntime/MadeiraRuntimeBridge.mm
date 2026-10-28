@@ -129,6 +129,7 @@ extern "C" int32_t ideck_runtime_launch(const char *executable_path,
         }
         unsetenv("MADEIRA_STEAM_APPID");
         unsetenv("MADEIRA_STEAM_APPPATH");
+        unsetenv("MADEIRA_WORKDIR");
         if ([request[@"isSteam"] boolValue] && steamID != nil) return EINVAL;
         if (steamID != nil) {
             if (![steamID isKindOfClass:[NSNumber class]] ||
@@ -147,10 +148,13 @@ extern "C" int32_t ideck_runtime_launch(const char *executable_path,
             if (relativeFolder.length == 0 || relativeFolder.length >= 850) return ENAMETOOLONG;
             NSString *windowsFolder = [@"C:\\" stringByAppendingString:
                 [relativeFolder stringByReplacingOccurrencesOfString:@"/" withString:@"\\"]];
+            /* Madeira's per-game working-folder contract is important for
+             * relative asset and DLL lookups, not only the Steam identity. */
             if (setenv("MADEIRA_STEAM_APPID", appIDText.UTF8String, 1) ||
-                setenv("MADEIRA_STEAM_APPPATH", windowsFolder.UTF8String, 1)) return errno;
+                setenv("MADEIRA_STEAM_APPPATH", windowsFolder.UTF8String, 1) ||
+                setenv("MADEIRA_WORKDIR", windowsFolder.UTF8String, 1)) return errno;
         }
-        if (setenv("MADEIRA_ENV_LOCKED", "MADEIRA_EXE,MADEIRA_ARGS,MADEIRA_STEAM_APPID,MADEIRA_STEAM_APPPATH", 1))
+        if (setenv("MADEIRA_ENV_LOCKED", "MADEIRA_EXE,MADEIRA_ARGS,MADEIRA_STEAM_APPID,MADEIRA_STEAM_APPPATH,MADEIRA_WORKDIR", 1))
             return errno;
         if (setenv("WINEPREFIX", wine_prefix, 1) != 0 ||
             setenv("MADEIRA_EXE", winExe.UTF8String, 1) != 0 ||
