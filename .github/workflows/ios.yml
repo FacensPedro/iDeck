@@ -152,6 +152,8 @@ jobs:
             -o /tmp/ideck-fex-jit-guard-tests
           /tmp/ideck-fex-jit-guard-tests
           python3 -m unittest discover -s tests/host -p 'test_fex_jit_guard.py' -v
+          python3 -m unittest discover -s tests/host -p 'test_auto_wine_jit_pool.py' -v
+          python3 -m unittest discover -s tests/host -p 'test_madeira_arm_host_features.py' -v
           python3 -m unittest discover -s tests/host -p 'test_madeira_ui_jit_upstream.py' -v
 
       - name: Validate Xcode project source references
