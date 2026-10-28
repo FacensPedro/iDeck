@@ -23,6 +23,10 @@ bool ideck_wine_jit_pool_ready(void);
 // 3 RX validation, 4 RW remap, 5 RW protection, 6 environment export.
 int32_t ideck_wine_jit_pool_failure_stage(void);
 int32_t ideck_wine_jit_pool_failure_mach_code(void);
+// RX reject detail: 1 low address, 2 overflow, 3 unsupported upper range,
+// 4 overlaps guest PE window, 5 unaligned, 6 vm_region error,
+// 7 region gap, 8 non-executable page.
+int32_t ideck_wine_jit_pool_failure_rx_detail(void);
 bool ideck_wineserver_available(void);
 bool ideck_wineserver_initialize(const char *wine_prefix);
 bool ideck_wineserver_ready(void);
