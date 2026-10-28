@@ -121,6 +121,13 @@ enum Translations {
         "No apps installed. Tap + to install an .ipa": ["pt": "Nenhum app instalado. Toque em + para instalar um .ipa", "es": "No hay apps instaladas. Toca + para instalar un .ipa"],
 
         // Settings
+        "Windows compatibility": ["pt": "Compatibilidade do Windows", "es": "Compatibilidad con Windows"],
+        "Microsoft Visual C++ libraries": ["pt": "Bibliotecas do Microsoft Visual C++", "es": "Bibliotecas de Microsoft Visual C++"],
+        "Madeira can load legally obtained x64 Visual C++ DLLs from the app's Documents/vcruntime folder. The application does not download Microsoft DLLs. Restart iDeck before launching a game after changing them.": ["pt": "O Madeira pode carregar DLLs x64 do Visual C++ obtidas legalmente da pasta Documents/vcruntime do aplicativo. O iDeck não baixa DLLs da Microsoft. Após alterar esses arquivos, reinicie o iDeck antes de abrir um jogo.", "es": "Madeira puede cargar DLL x64 de Visual C++ obtenidas legalmente de la carpeta Documents/vcruntime de la aplicación. iDeck no descarga DLL de Microsoft. Después de modificar estos archivos, reinicia iDeck antes de iniciar un juego."],
+        "Prepare Visual C++ folder": ["pt": "Preparar pasta do Visual C++", "es": "Preparar carpeta de Visual C++"],
+        "Could not locate the app's Documents folder.": ["pt": "Não foi possível localizar a pasta Documentos do aplicativo.", "es": "No se pudo encontrar la carpeta Documentos de la aplicación."],
+        "Folder ready: Files > On My iPad > iDeck > vcruntime.": ["pt": "Pasta pronta: Arquivos > No Meu iPad > iDeck > vcruntime.", "es": "Carpeta lista: Archivos > En mi iPad > iDeck > vcruntime."],
+        "Could not prepare the Visual C++ folder.": ["pt": "Não foi possível preparar a pasta do Visual C++.", "es": "No se pudo preparar la carpeta de Visual C++."],
         "Language": ["pt": "Idioma", "es": "Idioma"],
         "System default": ["pt": "Padrão do sistema", "es": "Predeterminado del sistema"],
         "JIT & Debugging": ["pt": "JIT e depuração", "es": "JIT y depuración"],

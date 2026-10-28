@@ -78,6 +78,9 @@ jobs:
           test "$(xcrun lipo -archs /tmp/ideck-ios-llvm-dependency-check)" = arm64
           python3 -m unittest discover -s tests/host -p 'test_native_llvm_link.py' -v
 
+      - name: Test Windows compatibility translations
+        run: python3 -m unittest discover -s tests/host -p 'test_windows_compatibility_localization.py' -v
+
       - name: Test DXMT shader compatibility patch
         run: |
           bash -n scripts/fetch_madeira_sources.sh
