@@ -13,6 +13,13 @@ from pathlib import Path, PurePosixPath
 
 ROOT = Path(__file__).resolve().parents[1]
 REVISION = os.environ.get("IDECK_MADEIRA_REV", "fd9f2f3d0434a4116e4c3351f286a0fc376b4e36")
+# Prebuilt kits must contain the compiled ARM64EC Mach slow-context fix.
+# Hash the EXACT native overlay. A previous binary with the same upstream
+# Madeira commit cannot be mistaken for a patched native runtime.
+ARM64EC_CONTEXT_PATCH_SHA256 = hashlib.sha256(
+    (Path(__file__).resolve().parents[1] /
+     "patches/madeira-arm64ec-mach-context-return.patch").read_bytes()
+).hexdigest()
 ARCHIVES = (
     "libideck_madeira_upstream_bridges.a",
     "libFEXCore.a",
@@ -174,7 +181,9 @@ def build_kit(output: Path, madeira: Path, bridge: Path, wow64: bool, mono: bool
     hashes = {name: {"sha256": digest_file(path), "size": path.stat().st_size}
               for name, path in sorted(entries.items())}
     metadata = {"schema": 1, "madeira_revision": REVISION, "platform": "iphoneos-arm64",
-                "wow64": wow64, "wine_mono": mono, "files": hashes}
+                "wow64": wow64, "wine_mono": mono,
+                "arm64ec_context_patch_sha256": ARM64EC_CONTEXT_PATCH_SHA256,
+                "files": hashes}
     output.parent.mkdir(parents=True, exist_ok=True)
     temporary = output.with_suffix(".zip.part")
     try:
@@ -218,6 +227,8 @@ def inspect(archive: Path, wow64: bool, mono: bool):
            metadata.get("platform") != "iphoneos-arm64" or \
            metadata.get("wow64") is not wow64 or metadata.get("wine_mono") is not mono:
             raise KitError("Kit revision/platform/options mismatch; compile a matching native kit")
+        if metadata.get("arm64ec_context_patch_sha256") != ARM64EC_CONTEXT_PATCH_SHA256:
+            raise KitError("ARM64EC Mach context patch mismatch; rebuild the Madeira native kit")
         files = metadata.get("files")
         if not isinstance(files, dict) or set(names) != set(files) | {"metadata.json"}:
             raise KitError("Kit file list differs from signed inventory")
