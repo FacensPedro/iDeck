@@ -11,6 +11,7 @@
 		E10000000000000000000010 /* SteamDepotRegionPolicy.c in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000010 /* SteamDepotRegionPolicy.c */; };
 		E10000000000000000000012 /* SteamDiskIO.c in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000012 /* SteamDiskIO.c */; };
 		E10000000000000000000014 /* SteamNativeCore.c in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000014 /* SteamNativeCore.c */; };
+		F30000000000000000000007 /* WineLogTriage.c in Sources */ = {isa = PBXBuildFile; fileRef = F40000000000000000000007 /* WineLogTriage.c */; };
 		E10000000000000000000005 /* LzmaDec.c in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000004 /* LzmaDec.c */; };
 		E10000000000000000000003 /* libzstd in Frameworks */ = {isa = PBXBuildFile; productRef = E40000000000000000000001 /* libzstd */; };
 		D10000000000000000000001 /* RuntimeLifecycle.mm in Sources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000001 /* RuntimeLifecycle.mm */; };
@@ -182,6 +183,8 @@
 		E20000000000000000000013 /* SteamDiskIO.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SteamDiskIO.h; sourceTree = "<group>"; };
 		E20000000000000000000014 /* SteamNativeCore.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = SteamNativeCore.c; sourceTree = "<group>"; };
 		E20000000000000000000015 /* SteamNativeCore.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SteamNativeCore.h; sourceTree = "<group>"; };
+		F40000000000000000000007 /* WineLogTriage.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = NativeRuntime/WineLogTriage.c; sourceTree = "<group>"; };
+		F40000000000000000000008 /* WineLogTriage.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = NativeRuntime/WineLogTriage.h; sourceTree = "<group>"; };
 		E20000000000000000000003 /* SteamChunkCodecs.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SteamChunkCodecs.h; sourceTree = "<group>"; };
 		E20000000000000000000004 /* LzmaDec.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = SteamLZMA/LzmaDec.c; sourceTree = "<group>"; };
 		E20000000000000000000005 /* LzmaDec.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SteamLZMA/LzmaDec.h; sourceTree = "<group>"; };
@@ -279,6 +282,7 @@
 				E10000000000000000000010 /* SteamDepotRegionPolicy.c in Sources */,
 				E10000000000000000000012 /* SteamDiskIO.c in Sources */,
 				E10000000000000000000014 /* SteamNativeCore.c in Sources */,
+				F30000000000000000000007 /* WineLogTriage.c in Sources */,
 				E10000000000000000000005 /* LzmaDec.c in Sources */,
 				A10000000000000000000006 /* WindowsLibraryModels.swift in Sources */,
 				A10000000000000000000007 /* SteamCloud.swift in Sources */,
@@ -386,6 +390,8 @@
 				E20000000000000000000012 /* SteamDiskIO.c */,
 				E20000000000000000000014 /* SteamNativeCore.c */,
 				E20000000000000000000015 /* SteamNativeCore.h */,
+				F40000000000000000000007 /* WineLogTriage.c */,
+				F40000000000000000000008 /* WineLogTriage.h */,
 				E20000000000000000000013 /* SteamDiskIO.h */,
 				E20000000000000000000003 /* SteamChunkCodecs.h */,
 				E20000000000000000000004 /* LzmaDec.c */,
