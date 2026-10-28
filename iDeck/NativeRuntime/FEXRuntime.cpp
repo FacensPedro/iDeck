@@ -111,7 +111,7 @@ std::vector<size_t> wine_pool_candidates() {
         char *end = nullptr;
         errno = 0;
         unsigned long value = strtoul(override_text, &end, 10);
-        bool valid = errno == 0 && end != override_text && *end == '\\0';
+        bool valid = errno == 0 && end != override_text && *end == '\0';
         if (valid) {
             valid = false;
             for (size_t candidate : allowed) {
@@ -119,13 +119,13 @@ std::vector<size_t> wine_pool_candidates() {
             }
         }
         if (valid) preferred = static_cast<size_t>(value);
-        else fprintf(stderr, "[iDeck Wine JIT] ignored unsupported IDECK_WINE_JIT_MIB=%s\\n",
+        else fprintf(stderr, "[iDeck Wine JIT] ignored unsupported IDECK_WINE_JIT_MIB=%s\n",
                      override_text);
     }
     std::vector<size_t> sizes;
     for (size_t candidate : allowed)
         if (candidate <= preferred) sizes.push_back(candidate * MiB);
-    fprintf(stderr, "[iDeck Wine JIT] initial pool preference=%zu MiB; fallback to 64 MiB\\n",
+    fprintf(stderr, "[iDeck Wine JIT] initial pool preference=%zu MiB; fallback to 64 MiB\n",
             preferred);
     return sizes;
 }

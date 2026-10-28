@@ -12,6 +12,8 @@ class AutomaticWineJITPoolTests(unittest.TestCase):
         self.assertIn('constexpr size_t allowed[] = {384, 256, 192, 128, 96, 64}', FEX)
         self.assertIn('errno == 0 && end != override_text && *end ==', FEX)
         self.assertIn('if (value == candidate)', FEX)
+        self.assertIn("*end == '\\0'", FEX)
+        self.assertNotIn("*end == '\\\\0'", FEX)
         self.assertIn('for (size_t size : wine_pool_candidates())', FEX)
 
     def test_no_unvalidated_executable_mapping(self):

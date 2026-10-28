@@ -1,0 +1,36 @@
+name: ARM Host Feature Regression Tests
+
+on:
+  push:
+    branches:
+      - "feature/armv8-*"
+  pull_request:
+    paths:
+      - "patches/madeira-arm-host-feature-probe.patch"
+      - "scripts/fetch_madeira_sources.sh"
+      - "scripts/madeira_native_kit.py"
+      - "tests/host/test_madeira_arm_host_features.py"
+      - "tests/host/test_madeira_native_kit.py"
+      - "iDeck/NativeRuntime/FEXRuntime.cpp"
+      - "tests/host/test_auto_wine_jit_pool.py"
+      - "tests/host/test_fex_jit_guard.py"
+      - ".github/workflows/arm-host-features.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  host-tests:
+    name: Validate ARM ISA capability gates and native kits
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile ARMv8 feature probe and check Madeira patch
+        run: python3 -m unittest discover -s tests/host -p 'test_madeira_arm_host_features.py' -v
+      - name: Validate native kit versioning and feature markers
+        run: python3 -m unittest discover -s tests/host -p 'test_madeira_native_kit.py' -v
+      - name: Validate Wine JIT safeguards
+        run: |
+          python3 -m unittest discover -s tests/host -p 'test_auto_wine_jit_pool.py' -v
+          python3 -m unittest discover -s tests/host -p 'test_fex_jit_guard.py' -v

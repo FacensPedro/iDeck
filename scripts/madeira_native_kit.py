@@ -20,6 +20,26 @@ ARM64EC_CONTEXT_PATCH_SHA256 = hashlib.sha256(
     (Path(__file__).resolve().parents[1] /
      "patches/madeira-arm64ec-mach-context-return.patch").read_bytes()
 ).hexdigest()
+# Cached ARM64-native FEX bridges must contain the host feature probe too.
+ARM_HOST_FEATURE_PATCH_SHA256 = hashlib.sha256(
+    (Path(__file__).resolve().parents[1] /
+     "patches/madeira-arm-host-feature-probe.patch").read_bytes()
+).hexdigest()
+ARM_HOST_PROFILE_MARKER = b"ARMv8.4-A user-mode feature set"
+
+
+def has_arm_host_feature_probe(path: Path) -> bool:
+    if not path.is_file():
+        return False
+    tail = b""
+    with path.open("rb") as stream:
+        for block in iter(lambda: stream.read(1024 * 1024), b""):
+            if ARM_HOST_PROFILE_MARKER in tail + block:
+                return True
+            tail = block[-(len(ARM_HOST_PROFILE_MARKER) - 1):]
+    return False
+
+
 ARCHIVES = (
     "libideck_madeira_upstream_bridges.a",
     "libFEXCore.a",
@@ -195,6 +215,8 @@ def build_kit(output: Path, madeira: Path, bridge: Path, wow64: bool, mono: bool
     native_ntdll = madeira / "app/Madeira/libntdll_unix.a"
     if not has_arm64ec_mach_return(native_ntdll):
         raise KitError("ARM64EC Mach return opcode missing from compiled Wine ntdll Unix archive")
+    if not has_arm_host_feature_probe(bridge / ARCHIVES[0]):
+        raise KitError("ARM host feature probe missing from compiled FEX bridge archive")
     entries = collect(madeira, bridge, wow64, mono, resource_root)
     total = sum(path.stat().st_size for path in entries.values())
     if total > MAX_TOTAL:
@@ -204,6 +226,7 @@ def build_kit(output: Path, madeira: Path, bridge: Path, wow64: bool, mono: bool
     metadata = {"schema": 1, "madeira_revision": REVISION, "platform": "iphoneos-arm64",
                 "wow64": wow64, "wine_mono": mono,
                 "arm64ec_context_patch_sha256": ARM64EC_CONTEXT_PATCH_SHA256,
+                "arm_host_feature_patch_sha256": ARM_HOST_FEATURE_PATCH_SHA256,
                 "files": hashes}
     output.parent.mkdir(parents=True, exist_ok=True)
     temporary = output.with_suffix(".zip.part")
@@ -250,6 +273,8 @@ def inspect(archive: Path, wow64: bool, mono: bool):
             raise KitError("Kit revision/platform/options mismatch; compile a matching native kit")
         if metadata.get("arm64ec_context_patch_sha256") != ARM64EC_CONTEXT_PATCH_SHA256:
             raise KitError("ARM64EC Mach context patch mismatch; rebuild the Madeira native kit")
+        if metadata.get("arm_host_feature_patch_sha256") != ARM_HOST_FEATURE_PATCH_SHA256:
+            raise KitError("ARM host feature patch mismatch; rebuild the Madeira native kit")
         files = metadata.get("files")
         if not isinstance(files, dict) or set(names) != set(files) | {"metadata.json"}:
             raise KitError("Kit file list differs from signed inventory")
@@ -322,6 +347,8 @@ def install(archive: Path, output: Path, wow64: bool, mono: bool) -> None:
         check_assets(temp / "resources", wow64, mono)
         if not has_arm64ec_mach_return(temp / "archives/libntdll_unix.a"):
             raise KitError("ARM64EC Mach return opcode missing from extracted Wine archive")
+        if not has_arm_host_feature_probe(temp / "archives" / ARCHIVES[0]):
+            raise KitError("ARM host feature probe missing from extracted FEX bridge archive")
         if output.exists():
             shutil.rmtree(output)
         temp.replace(output)
