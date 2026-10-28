@@ -9,7 +9,7 @@ diff --git a/app/Madeira/FEXBridge.mm b/app/Madeira/FEXBridge.mm
  #include <mach/mach.h>
  #include <mach/vm_map.h>
  #include <sys/mman.h>
-@@ -427,27 +427,32 @@
+@@ -427,27 +428,32 @@
          return false;
      }
  
