@@ -32,6 +32,8 @@ int main(void) {
     assert(ideck_wine_log_diagnose(path) == IDECK_WINE_LOG_ACCESS_VIOLATION);
     write_log(path, "FATAL NTSTATUS c0000017 out of memory\n");
     assert(ideck_wine_log_diagnose(path) == IDECK_WINE_LOG_OOM);
+    write_log(path, "Failed to mprotect last page of code buffer\n");
+    assert(ideck_wine_log_diagnose(path) == IDECK_WINE_LOG_NONE);
     write_log(path, "Wine failed to mprotect errno 13\n");
     assert(ideck_wine_log_diagnose(path) == IDECK_WINE_LOG_EXEC_PERMISSION);
     write_log(path, "err:module:import_dll missing foo.dll\n[jit-pool] EXHAUSTED\n");
