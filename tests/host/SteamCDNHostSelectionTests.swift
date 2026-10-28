@@ -92,6 +92,9 @@ struct SteamCDNHostSelectionTests {
         assert(SteamChunkScheduler.batches(paths: [
             ["/game/shared"], ["/game/shared"], ["/game/shared"]
         ]) == [[0], [1], [2]])
+        assert(SteamChunkScheduler.batches(paths: [
+            ["/Games/Foo/File.DLL"], ["/games/foo/file.dll"]
+        ]) == [[0], [1]])
         assert(SteamChunkScheduler.batches(paths: []).isEmpty)
 
         print("PASS: Steam CDN throughput, response latency, exploration, failover, and concurrent ranking and fair depot pipelining")
