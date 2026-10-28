@@ -140,7 +140,7 @@ struct SettingsView: View {
                     .foregroundColor(.gray)
                     .fixedSize(horizontal: false, vertical: true)
                 if let vcRuntimeFolderStatus {
-                    Text(vcRuntimeFolderStatus)
+                    Text(tr(vcRuntimeFolderStatus))
                         .font(.caption)
                         .foregroundColor(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -152,7 +152,7 @@ struct SettingsView: View {
             actionButton(title: tr("Prepare Visual C++ folder"), icon: "folder.badge.plus") {
                 guard let documents = FileManager.default.urls(for: .documentDirectory,
                                                                in: .userDomainMask).first else {
-                    vcRuntimeFolderStatus = tr("Could not locate the app's Documents folder.")
+                    vcRuntimeFolderStatus = "Could not locate the app's Documents folder."
                     return
                 }
                 do {
@@ -160,9 +160,9 @@ struct SettingsView: View {
                         at: documents.appendingPathComponent("vcruntime", isDirectory: true),
                         withIntermediateDirectories: true
                     )
-                    vcRuntimeFolderStatus = tr("Folder ready: Files > On My iPad > iDeck > vcruntime.")
+                    vcRuntimeFolderStatus = "Folder ready: Files > On My iPad > iDeck > vcruntime."
                 } catch {
-                    vcRuntimeFolderStatus = tr("Could not prepare the Visual C++ folder.")
+                    vcRuntimeFolderStatus = "Could not prepare the Visual C++ folder."
                 }
             }
         }
