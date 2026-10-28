@@ -56,7 +56,7 @@ class FEXJITGuardTests(unittest.TestCase):
         self.assertIn("if (!debugger_attached())", FEX)
         self.assertIn("if (!ideck_wine_jit_pool_prepare() || !ideck_wine_jit_pool_ready()) return ENOMEM;", RUNTIME)
         self.assertLess(RUNTIME.index("ideck_wine_jit_pool_prepare()"), RUNTIME.index("ideck_wineserver_initialize(wine_prefix)"))
-        self.assertIn("Wine ARM64EC JIT pool", COORDINATOR)
+        self.assertIn("the Wine ARM64EC executable JIT pool", COORDINATOR)
 
     def test_page_zero_debugger_command_never_returns_stale_address(self):
         self.assertIn("const CMD_MAP_PAGE_ZERO = 3;", JIT_SCRIPT)
