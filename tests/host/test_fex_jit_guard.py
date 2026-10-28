@@ -8,6 +8,7 @@ RUNTIME = (ROOT / "iDeck/NativeRuntime/MadeiraRuntimeBridge.mm").read_text(encod
 COORDINATOR = (ROOT / "iDeck/SystemCoordinator.swift").read_text(encoding="utf-8")
 BRIDGE = (ROOT / "iDeck/iDeck-Bridging-Header.h").read_text(encoding="utf-8")
 HEADER = (ROOT / "iDeck/NativeRuntime/MadeiraRuntimeBridge.h").read_text(encoding="utf-8")
+JIT_SCRIPT = (ROOT / "scripts/jit/universal.js").read_text(encoding="utf-8")
 
 
 class FEXJITGuardTests(unittest.TestCase):
@@ -41,6 +42,12 @@ class FEXJITGuardTests(unittest.TestCase):
         self.assertIn("if (!ideck_wine_jit_pool_prepare() || !ideck_wine_jit_pool_ready()) return ENOMEM;", RUNTIME)
         self.assertLess(RUNTIME.index("ideck_wine_jit_pool_prepare()"), RUNTIME.index("ideck_wineserver_initialize(wine_prefix)"))
         self.assertIn("Wine ARM64EC executable JIT pool", COORDINATOR)
+
+    def test_page_zero_debugger_command_never_returns_stale_address(self):
+        self.assertIn("const CMD_MAP_PAGE_ZERO = 3;", JIT_SCRIPT)
+        self.assertIn("[CMD_MAP_PAGE_ZERO]: JIT26MapPageZero", JIT_SCRIPT)
+        self.assertIn("let success = 0n;", JIT_SCRIPT)
+        self.assertIn("numberToLittleEndianHexString(success)", JIT_SCRIPT)
 
     def test_all_windows_launch_paths_check_jit_readiness(self):
         self.assertGreaterEqual(COORDINATOR.count("ideck_fex_jit_ready()"), 3)
