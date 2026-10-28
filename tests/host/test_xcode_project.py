@@ -18,6 +18,22 @@ class XcodeProjectTests(unittest.TestCase):
     def setUpClass(cls):
         cls.project = PROJECT.read_text(encoding="utf-8")
 
+    def test_ideck_bundle_identifiers_are_consistent(self):
+        root = PROJECT.parents[1]
+        expected = (
+            "PRODUCT_BUNDLE_IDENTIFIER = com.ideck.ideck;",
+            "PRODUCT_BUNDLE_IDENTIFIER = com.ideck.ideck.VPNExtension;",
+        )
+        for value in expected:
+            with self.subTest(bundle=value):
+                self.assertEqual(self.project.count(value), 2)
+        self.assertNotIn("com.example.iDeck", self.project)
+        extension_entitlements = (root / "VPNExtension/VPNExtension.entitlements").read_text(encoding="utf-8")
+        self.assertIn("<string>group.com.ideck.ideck</string>", extension_entitlements)
+        self.assertNotIn("group.com.example.iDeck", extension_entitlements)
+        vpn_manager = (root / "iDeck/VPNManager.swift").read_text(encoding="utf-8")
+        self.assertIn('Bundle.main.bundleIdentifier! + ".VPNExtension"', vpn_manager)
+
     def test_object_identifiers_are_unique(self):
         ids = OBJECT.findall(self.project)
         self.assertTrue(ids, "No Xcode project objects found")
