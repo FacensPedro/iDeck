@@ -26,7 +26,7 @@ def pe_file(arch=0x8664, cert=True, identity=0):
     struct.pack_into("<I", blob, 0x98 + 108, 16)
     if cert:
         struct.pack_into("<II", blob, 0x98 + 112 + 32, 384, 16)
-    blob[300] = identity
+    blob[340] = identity
     return bytes(blob)
 
 
@@ -75,7 +75,7 @@ class ExtractorTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(sorted(p.name for p in stage.iterdir()), sorted(DLL_NAMES))
         for i, name in enumerate(DLL_NAMES):
-            self.assertEqual((stage / name).read_bytes()[300], i + 1, name)
+            self.assertEqual((stage / name).read_bytes()[340], i + 1, name)
 
     def test_missing_dll_fails_without_claiming_success(self):
         result, stage = self.extract(make_cab(missing="mfc140.dll"))
