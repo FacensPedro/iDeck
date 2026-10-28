@@ -10,6 +10,7 @@ private final class GameRuntimeMetrics: ObservableObject {
     @Published private(set) var secondsSinceLaunch: TimeInterval = 0
     @Published private(set) var presentCounterAvailable = false
     @Published private(set) var receivedNewFrames = false
+    @Published private(set) var firstFrameAt: TimeInterval?
 
     private let startedAt = ProcessInfo.processInfo.systemUptime
     private let metalDevice = MTLCreateSystemDefaultDevice()
@@ -35,7 +36,10 @@ private final class GameRuntimeMetrics: ObservableObject {
             presentCounterAvailable = true
             let count = unsafeBitCast(pointer, to: PresentCount.self)()
             if baselineFrames == nil { baselineFrames = count }
-            if let baselineFrames, count > baselineFrames { receivedNewFrames = true }
+            if let baselineFrames, count > baselineFrames {
+                if firstFrameAt == nil { firstFrameAt = secondsSinceLaunch }
+                receivedNewFrames = true
+            }
             if let oldTime = previousUptime, let oldFrames = previousFrames, uptime > oldTime {
                 let delta = count >= oldFrames ? count - oldFrames : 0
                 fps = String(format: "%.0f", Double(delta) / (uptime - oldTime))
@@ -73,7 +77,10 @@ struct GameSessionView: View {
             return (0.45, "Starting Wine and FEX")
         }
         if status == "Running" || status == "Steam Running" {
-            if metrics.receivedNewFrames { return (1.0, "First Metal frame displayed") }
+            if metrics.receivedNewFrames {
+                let recentlyReady = metrics.secondsSinceLaunch - (metrics.firstFrameAt ?? 0) < 2.5
+                return recentlyReady ? (1.0, "First Metal frame displayed") : nil
+            }
             return (0.90, "Waiting for the first game frame")
         }
         return nil
