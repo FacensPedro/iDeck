@@ -2752,7 +2752,7 @@ actor CMServerList {
 
     /// Fetch WebSocket CM server list from Steam Web API
     private func fetchServerList() async throws -> [CMServer] {
-        let urlString = "https://api.steampowered.com/ISteamDirectory/GetCMListForConnect/v1/?cellid=0&cmtype=websockets"
+        let urlString = "https://api.steampowered.com/ISteamDirectory/GetCMListForConnect/v1/?cmtype=websockets"
         guard let url = URL(string: urlString) else {
             throw SteamError.connectionFailed("Invalid CM directory URL")
         }
@@ -2784,7 +2784,7 @@ actor CMServerList {
             return CMServer(host: String(parts[0]), port: port)
         }
 
-        SteamLog.trace("Fetched \(servers.count) WebSocket CM servers")
+        SteamLog.trace("Fetched \(servers.count) WebSocket CM servers selected by Steam for the outgoing IP")
         return servers
     }
 
