@@ -24,10 +24,12 @@ void BreakSendJITScript(char* script, size_t len) {
 const CMD_DETACH = 0;
 const CMD_PREPARE_REGION = 1;
 const CMD_NEW_BREAKPOINTS = 2;
+const CMD_MAP_PAGE_ZERO = 3;
 const commands = {
     [CMD_DETACH]: JIT26Detach,
     [CMD_PREPARE_REGION]: JIT26PrepareRegion,
-    [CMD_NEW_BREAKPOINTS]: JIT26NewBreakpoints
+    [CMD_NEW_BREAKPOINTS]: JIT26NewBreakpoints,
+    [CMD_MAP_PAGE_ZERO]: JIT26MapPageZero
 };
 const legacyCommands = {
     [0x68]: JIT26NewBreakpoints,
@@ -204,6 +206,22 @@ function JIT26PrepareRegion(brkResponse) {
 
     let putX0Response = send_command(`P0=${numberToLittleEndianHexString(jitPageAddress)};thread:${tid};`);
     log(`putX0Response = ${putX0Response}`);
+}
+
+// Madeira's ARM64EC init_syscall_frame requests command 3. Never leave x0
+// unchanged: a stale address would be mistaken for a successful page-zero map.
+function JIT26MapPageZero(brkResponse) {
+    let success = 0n;
+    if (x0 !== 0n && x1 !== 0n) {
+        const tebOffset = x0 & 0x3fffn;
+        const tebData = send_command(`m${x0.toString(16)},100`);
+        if (/^(?:[a-fA-F0-9]{2})+$/.test(tebData) && tebData.length === 0x200) {
+            const response = send_command(`M${tebOffset.toString(16)},100:${tebData}`);
+            if (response === "OK") success = 1n;
+        }
+    }
+    send_command(`P0=${numberToLittleEndianHexString(success)};thread:${tid};`);
+    log(`Madeira page-zero request: success=${success}`);
 }
 
 // utilities
