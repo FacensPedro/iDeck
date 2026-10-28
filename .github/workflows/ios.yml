@@ -356,10 +356,16 @@ jobs:
               if not all(flags.get(key) is True for key in ("fexInProcess", "wineInProcess", "dxmtLinked", "d3d12Linked")):
                   raise SystemExit("Native Madeira manifest is incomplete")
               if "${{ (github.event_name != 'workflow_dispatch' || inputs.build_wow64) && '1' || '0' }}" == "1":
+                  if flags.get("wow64Enabled") is not True:
+                      raise SystemExit("Native Madeira manifest does not advertise verified WoW64")
                   required_wow64 = (
                       "i386-windows/ntdll.dll",
                       "i386-windows/kernel32.dll",
+                      "i386-windows/user32.dll",
+                      "i386-windows/d3d11.dll",
+                      "i386-windows/dxgi.dll",
                       "aarch64-windows/wow64.dll",
+                      "aarch64-windows/wow64win.dll",
                       "aarch64-windows/xtajit.dll",
                   )
                   missing_wow64 = [name for name in required_wow64 if prefix + name not in archive.namelist()]
