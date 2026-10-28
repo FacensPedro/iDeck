@@ -65,7 +65,8 @@ class ARM64ECMachSlowpathTests(unittest.TestCase):
         self.assertIn("frame.x[17]", PATCH)
         self.assertEqual(PATCH.count("+    __asm__ volatile( \"brk #0x5a5a\""), 1)
         self.assertIn("EXC_BREAKPOINT", PATCH)
-        self.assertIn("mach_vm_read_overwrite", PATCH)
+        self.assertIn("vm_read_overwrite", PATCH)
+        self.assertNotIn("+    mach_vm_size_t got", PATCH)
 
     def test_patch_hunks_have_self_consistent_line_counts(self):
         blocks = re.split(r"(?=^@@ -)", PATCH, flags=re.M)
