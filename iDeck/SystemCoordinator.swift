@@ -6,6 +6,8 @@ import Darwin
 
 class SystemCoordinator: ObservableObject {
     @Published var isJITEnabled: Bool = false
+    @Published var isStikDebugAttached: Bool = false
+    @Published var isWineJITPrepared: Bool = false
     @Published var isContainerReady: Bool = false
     @Published var currentStatus: String = "Ready"
     @Published var windowsStatus: String = "Ready"
@@ -116,8 +118,11 @@ class SystemCoordinator: ObservableObject {
         // Repeated MAP_JIT probes can race with FEX memory initialization and
         // do not establish that StikDebug's BRK handler is ready.
         let detected = ideck_process_has_jit_permission() || debuggerAttached
+        let wineReady = ideck_wine_jit_pool_ready()
         let update = {
-            self.isJITEnabled = detected
+            if self.isJITEnabled != detected { self.isJITEnabled = detected }
+            if self.isStikDebugAttached != debuggerAttached { self.isStikDebugAttached = debuggerAttached }
+            if self.isWineJITPrepared != wineReady { self.isWineJITPrepared = wineReady }
             if !detected && (self.currentStatus == "JIT confirmed via StikDebug" || self.currentStatus == "Ready") {
                 self.currentStatus = "JIT not detected. Enable it in StikDebug and return to iDeck."
             }
@@ -138,9 +143,19 @@ class SystemCoordinator: ObservableObject {
         startLiveContainer()
     }
 
-    func forceJITAndStartWindows() {
+    func reconnectStikDebugForWineIfNeeded() {
         refreshJITStatus()
+        // CS_DEBUGGED can stay set after StikDebug's app-list activation
+        // detaches its debugger. Send the bundled BRK script from Madeira
+        // when the user opens this mode, even with a ready Wine prefix.
+        if isJITEnabled && !isStikDebugAttached && !isWineJITPrepared {
+            requestStikDebugJIT()
+        }
+    }
+
+    func forceJITAndStartWindows() {
         startWindows()
+        reconnectStikDebugForWineIfNeeded()
     }
     
     private func startLiveContainer() {
@@ -307,8 +322,10 @@ class SystemCoordinator: ObservableObject {
     
     func launchSteam() {
         guard isJITEnabled && isContainerReady else { return }
-        guard ideck_fex_jit_ready() else {
+        guard ideck_fex_jit_ready() &&
+              (ideck_wine_jit_pool_ready() || ideck_jit_debugger_attached()) else {
             setWindowsStatus("Cannot launch: StikDebug must remain attached to iDeck with the Madeira JIT script until FEX memory is prepared.")
+            requestStikDebugJIT()
             return
         }
 
@@ -503,8 +520,10 @@ class SystemCoordinator: ObservableObject {
                     self.setWindowsStatus("Executable is in the library. Enable JIT in Settings before launching.")
                     return
                 }
-                guard ideck_fex_jit_ready() else {
+                guard ideck_fex_jit_ready() &&
+                      (ideck_wine_jit_pool_ready() || ideck_jit_debugger_attached()) else {
                     self.setWindowsStatus("Executable imported. JIT permission is present but StikDebug is no longer attached. Attach it to iDeck with the Madeira JIT script and retry.")
+                    self.requestStikDebugJIT()
                     return
                 }
 
@@ -632,8 +651,10 @@ class SystemCoordinator: ObservableObject {
             return
         }
 
-        guard ideck_fex_jit_ready() else {
-            setWindowsStatus("FEX JIT is not ready. JIT permission alone is insufficient. Keep StikDebug attached with universal.js during the first game launch, then retry.")
+        guard ideck_fex_jit_ready() &&
+              (ideck_wine_jit_pool_ready() || ideck_jit_debugger_attached()) else {
+            setWindowsStatus("FEX/Wine JIT is not ready. Request StikDebug with universal.js from Madeira and retry.")
+            requestStikDebugJIT()
             return
         }
         if prepareVisualCRuntimeIfNeeded(prefix: prefixPath, resume: { [weak self] in
@@ -725,7 +746,19 @@ class SystemCoordinator: ObservableObject {
             case 2:
                 return "Execution Error: StikDebug could not allocate the Wine executable RX region, including smaller pools. Keep the debugger attached and check available virtual memory."
             case 3:
-                return "Execution Error: Wine's RX region was allocated but failed address-range or executable-permission validation. Review [iDeck Wine JIT] native logs."
+                let cause: String
+                switch ideck_wine_jit_pool_failure_rx_detail() {
+                case 1: cause = "The JIT RX address is below Madeira's required FEX frontier."
+                case 2: cause = "The RX address range overflowed."
+                case 3: cause = "The RX region exceeds the supported virtual-memory layout."
+                case 4: cause = "The RX region overlaps the Windows executable-image address window."
+                case 5: cause = "The RX region is not page-aligned."
+                case 6: cause = "Mach could not inspect the RX region."
+                case 7: cause = "The RX region contains an unmapped gap."
+                case 8: cause = "A page in the RX region lacks executable permission."
+                default: cause = "The RX region failed validation."
+                }
+                return "Execution Error: Wine's RX pool was rejected: \(cause) Restart iDeck, request StikDebug JIT from Madeira and check [iDeck Wine JIT] logs. Do not reuse a JIT pool after a crash."
             case 4:
                 return "Execution Error: Wine's executable RX region was allocated, but iPadOS denied its writable RW mirror\(machDetail). Check [iDeck Wine JIT] logs."
             case 5:

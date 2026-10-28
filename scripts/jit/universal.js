@@ -199,10 +199,16 @@ function JIT26PrepareRegion(brkResponse) {
         try {
             const result = prepare_memory_region(jitPageAddress, x1);
             log_verbose(`prepare_memory_region returned ${result}`);
+            if (result === false ||
+                (typeof result === "string" && /^E[0-9a-f]+$/i.test(result))) {
+                log(`Failed to prepare RX memory: debugger replied ${result}`);
+                jitPageAddress = 0n;
+            }
         } catch (error) {
-            // Return the allocated address to the native allocator, which
-            // validates its actual permissions and can deallocate it safely.
+            // Never return an RX address when the debugger explicitly failed
+            // to prepare that memory. The host must not attempt to use it.
             log(`Failed to prepare RX memory: ${error}`);
+            jitPageAddress = 0n;
         }
     }
 
