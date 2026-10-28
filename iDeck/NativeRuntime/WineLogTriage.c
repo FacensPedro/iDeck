@@ -52,8 +52,7 @@ int32_t ideck_wine_log_diagnose(const char *path) {
         strstr(buffer, "[ideck wine jit]")) {
         code = IDECK_WINE_LOG_JIT;
     } else if (strstr(buffer, "mprotect errno 13") ||
-               strstr(buffer, "executable-permission") ||
-               strstr(buffer, "failed to mprotect")) {
+               strstr(buffer, "executable-permission")) {
         code = IDECK_WINE_LOG_EXEC_PERMISSION;
     } else if (strstr(buffer, "c0000017") ||
                strstr(buffer, "out of memory")) {
