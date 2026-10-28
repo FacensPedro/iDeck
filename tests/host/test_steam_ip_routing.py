@@ -35,6 +35,18 @@ class SteamIPRoutingTests(unittest.TestCase):
         self.assertIn("plan.health.recordFailure(host)", DEPOT)
         self.assertIn("cdnAuthFragment(depotID:", DEPOT)
 
+    def test_installation_pipeline_preserves_verification_and_retries(self):
+        self.assertIn("SteamChunkScheduler.batches(paths: prepared.paths)", DEPOT)
+        self.assertIn("var scheduler = SteamChunkScheduler(counts:", DEPOT)
+        self.assertIn("while inFlight < capacity && enqueue()", DEPOT)
+        self.assertIn("let journals = try prepared.journals.map", DEPOT)
+        self.assertIn("try await checkExisting(plans: plans", DEPOT)
+        self.assertIn("let written = try write(data, to: path, offset: chunk.offset)", DEPOT)
+        self.assertNotIn("reuseExisting: verify", DEPOT)
+        self.assertIn("ideck_steam_write_chunk(", DEPOT)
+        self.assertIn("plan.health.recordFailure(host)", DEPOT)
+        self.assertIn("let attempts = attemptsPerChunk", DEPOT)
+
     def test_jit_pool_retries_are_bounded_and_debugger_protected(self):
         self.assertIn("384ULL * MiB", FEX)
         self.assertIn("256ULL * MiB", FEX)
