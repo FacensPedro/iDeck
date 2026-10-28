@@ -370,7 +370,7 @@ class SystemCoordinator: ObservableObject {
     }
 
     func approveVisualCRuntimeInstallation() {
-        guard needsVisualCRuntimeConsent, let action = visualCRuntimeConsentAction else { return }
+        guard let action = visualCRuntimeConsentAction else { return }
         needsVisualCRuntimeConsent = false
         visualCRuntimeConsentAction = nil
         visualCRuntimeSkipAction = nil
@@ -379,8 +379,8 @@ class SystemCoordinator: ObservableObject {
     }
 
     func skipVisualCRuntimeInstallation() {
-        guard needsVisualCRuntimeConsent else { return }
         let action = visualCRuntimeSkipAction
+        guard action != nil else { return }
         needsVisualCRuntimeConsent = false
         visualCRuntimeConsentAction = nil
         visualCRuntimeSkipAction = nil
@@ -483,7 +483,13 @@ class SystemCoordinator: ObservableObject {
             return
         }
         setWindowsStatus("Windows Ready")
-        resume()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+            guard !ideck_wineprocess_running() else {
+                self.setWindowsStatus("Visual C++ setup cannot start while another Wine session is running.")
+                return
+            }
+            resume()
+        }
     }
 
     func launchWindowsExecutable(at url: URL, profile: WindowsGameProfile? = nil) {
