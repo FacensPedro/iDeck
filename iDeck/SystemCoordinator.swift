@@ -53,6 +53,7 @@ class SystemCoordinator: ObservableObject {
     private var displayLink: CADisplayLink?
     private var steamSignInObserver: NSObjectProtocol?
     private var steamSignInLoaded = false
+    private var nativeHostConfigured = false
     private var activeSteamGameID: UInt32?
     private var activeSteamPrefix: String?
     private var pendingSteamGameID: UInt32?
@@ -75,6 +76,13 @@ class SystemCoordinator: ObservableObject {
             self.steamSignInLoaded = true
             self.isSteamConnected = SteamSignIn.isSignedIn
         }
+    }
+
+    func configureNativeHostIfNeeded() {
+        guard !nativeHostConfigured else { return }
+        nativeHostConfigured = true
+        ideck_native_memory_install_notifications()
+        _ = ideck_native_memory_configure(64 * 1024 * 1024, 8 * 1024 * 1024)
     }
 
     func loadSteamAccountIfNeeded() {
