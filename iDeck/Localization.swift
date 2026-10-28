@@ -56,6 +56,11 @@ func trStatus(_ status: String) -> String {
 enum Translations {
     static let table: [String: [String: String]] = [
         "Share Wine log": ["pt": "Compartilhar log do Wine", "es": "Compartir registro de Wine"],
+        "Last Wine log indicates an executable JIT allocation or mapping failure.": ["pt": "O último log do Wine indica falha na alocação ou no mapeamento de memória JIT executável.", "es": "El último registro de Wine indica un fallo de asignación o mapeo de memoria JIT ejecutable."],
+        "Last Wine log indicates that executable memory permissions were denied.": ["pt": "O último log do Wine indica que as permissões de memória executável foram negadas.", "es": "El último registro de Wine indica que se denegaron los permisos de memoria ejecutable."],
+        "Last Wine log indicates the Windows process ran out of memory.": ["pt": "O último log do Wine indica que o processo Windows ficou sem memória.", "es": "El último registro de Wine indica que el proceso de Windows se quedó sin memoria."],
+        "Last Wine log indicates a Windows program memory access violation.": ["pt": "O último log do Wine indica violação de acesso à memória por um programa Windows.", "es": "El último registro de Wine indica una infracción de acceso a memoria de un programa de Windows."],
+        "Last Wine log indicates a missing or incompatible DLL.": ["pt": "O último log do Wine indica uma DLL ausente ou incompatível.", "es": "El último registro de Wine indica una DLL ausente o incompatible."],
         "Wine logs can contain personal or account information. Review before sharing.": [
             "pt": "Os logs podem conter informações pessoais ou da conta. Revise antes de compartilhar.",
             "es": "Los registros pueden contener información personal o de cuenta. Revísalos antes de compartir."
