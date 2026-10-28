@@ -14,10 +14,10 @@ on:
         required: false
         default: false
       build_wow64:
-        description: "Build and package 32-bit Windows WoW64 support (required by many 32-bit launchers)"
+        description: "Bundle WoW64 (i386 FEX and Wine) in the native IPA (enabled by default; disable only for 64-bit-only builds)"
         type: boolean
         required: false
-        default: false
+        default: true
       bundle_wine_mono:
         description: "Include Wine Mono for compatible .NET Framework applications"
         type: boolean
@@ -260,13 +260,13 @@ jobs:
         uses: actions/cache@v4
         with:
           path: build/native-cache
-          key: madeira-kit-v1-${{ runner.os }}-${{ runner.arch }}-${{ inputs.build_wow64 && 'wow64' || 'no-wow64' }}-${{ inputs.bundle_wine_mono && 'mono' || 'no-mono' }}-${{ hashFiles('scripts/madeira_native_kit.py', 'scripts/build_madeira_components.sh', 'scripts/link_madeira_native.sh', 'scripts/fetch_madeira_sources.sh', 'patches/*') }}
+          key: madeira-kit-v1-${{ runner.os }}-${{ runner.arch }}-${{ (github.event_name != 'workflow_dispatch' || inputs.build_wow64) && 'wow64' || 'no-wow64' }}-${{ inputs.bundle_wine_mono && 'mono' || 'no-mono' }}-${{ hashFiles('scripts/madeira_native_kit.py', 'scripts/build_madeira_components.sh', 'scripts/link_madeira_native.sh', 'scripts/fetch_madeira_sources.sh', 'patches/*') }}
 
       - name: Locate repository or cached Madeira runtime
         if: ${{ env.IDECK_NATIVE_BUILD == '1' }}
         id: madeira_kit
         env:
-          IDECK_BUILD_WOW64: ${{ inputs.build_wow64 && '1' || '0' }}
+          IDECK_BUILD_WOW64: ${{ (github.event_name != 'workflow_dispatch' || inputs.build_wow64) && '1' || '0' }}
           IDECK_BUNDLE_WINE_MONO: ${{ inputs.bundle_wine_mono && '1' || '0' }}
         run: |
           set -euo pipefail
@@ -306,7 +306,7 @@ jobs:
         env:
           IDECK_REQUIRE_MADEIRA: ${{ env.IDECK_NATIVE_BUILD }}
           IDECK_ACCEPT_METAL_CONVERTER_LICENSE: ${{ env.IDECK_ACCEPT_METAL_CONVERTER_LICENSE }}
-          IDECK_BUILD_WOW64: ${{ inputs.build_wow64 && '1' || '0' }}
+          IDECK_BUILD_WOW64: ${{ (github.event_name != 'workflow_dispatch' || inputs.build_wow64) && '1' || '0' }}
           IDECK_BUNDLE_WINE_MONO: ${{ inputs.bundle_wine_mono && '1' || '0' }}
           IDECK_PREBUILT_EXPORT: '1'
           IDECK_CONFIGURATION: ${{ env.IDECK_NATIVE_BUILD == '1' && 'Debug' || 'Release' }}
@@ -355,7 +355,7 @@ jobs:
               flags = plistlib.loads(archive.read(prefix + "MadeiraRuntimeManifest.plist"))
               if not all(flags.get(key) is True for key in ("fexInProcess", "wineInProcess", "dxmtLinked", "d3d12Linked")):
                   raise SystemExit("Native Madeira manifest is incomplete")
-              if "${{ inputs.build_wow64 && '1' || '0' }}" == "1":
+              if "${{ (github.event_name != 'workflow_dispatch' || inputs.build_wow64) && '1' || '0' }}" == "1":
                   required_wow64 = (
                       "i386-windows/ntdll.dll",
                       "i386-windows/kernel32.dll",
@@ -372,7 +372,7 @@ jobs:
       - name: Prepare authorized compiled runtime export
         if: ${{ env.IDECK_NATIVE_BUILD == '1' && inputs.export_runtime_kit && env.IDECK_ACCEPT_METAL_CONVERTER_LICENSE == '1' }}
         env:
-          IDECK_BUILD_WOW64: ${{ inputs.build_wow64 && '1' || '0' }}
+          IDECK_BUILD_WOW64: ${{ (github.event_name != 'workflow_dispatch' || inputs.build_wow64) && '1' || '0' }}
           IDECK_BUNDLE_WINE_MONO: ${{ inputs.bundle_wine_mono && '1' || '0' }}
         run: |
           set -euo pipefail
