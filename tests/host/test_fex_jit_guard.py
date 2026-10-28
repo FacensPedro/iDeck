@@ -24,6 +24,8 @@ class FEXJITGuardTests(unittest.TestCase):
 
     def test_launcher_returns_recoverable_errno_without_jit(self):
         self.assertIn("if (!ideck_fex_jit_ready()) return EPERM;", RUNTIME)
+        self.assertIn("if (!ideck_wine_jit_pool_ready() && !ideck_jit_debugger_attached()) return EPERM;", RUNTIME)
+        self.assertIn("bool ideck_jit_debugger_attached(void);", HEADER)
         self.assertIn("if (!ideck_fex_initialize()) return EAGAIN;", RUNTIME)
         self.assertIn("bool ideck_fex_jit_ready(void);", HEADER)
         self.assertIn('NativeRuntime/MadeiraRuntimeBridge.h', BRIDGE)
