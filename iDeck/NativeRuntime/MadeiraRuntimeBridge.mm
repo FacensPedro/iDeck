@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <mutex>
+#include <cstdio>
 
 #if defined(IDECK_NATIVE_MADEIRA_ENABLED) && IDECK_NATIVE_MADEIRA_ENABLED
 extern "C" void madeira_seed_prefix_if_needed(const char *prefix_path);
@@ -60,43 +61,43 @@ extern "C" int32_t ideck_runtime_prepare(const char *wine_prefix) {
 }
 
 static int32_t ideck_invalid_launch(const char *reason) {
-    fprintf(stderr, "[iDeck native launch] EINVAL: %s\\n", reason);
+    fprintf(stderr, "[iDeck native launch] EINVAL: %s\n", reason);
     return EINVAL;
 }
 
-// Quote a *parsed* Windows argument when recreating Madeira's command line.
-// Unlike rejecting quotes outright, this handles nested quoted arguments and
-// trailing backslashes without losing the user's original launch parameters.
+// Re-quote parsed Windows parameters for Madeira's single command-line string.
+// Backslashes immediately before quotes (and at the end of quoted parameters)
+// require doubling according to Windows CRT command-line parsing rules.
 static NSString *ideck_quote_windows_argument(NSString *arg) {
     BOOL requiresQuotes = arg.length == 0 ||
         [arg rangeOfCharacterFromSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]].location != NSNotFound ||
-        [arg rangeOfString:@"\\\""].location != NSNotFound;
+        [arg rangeOfString:@"\""].location != NSNotFound;
     if (!requiresQuotes) return arg;
-    NSMutableString *result = [NSMutableString stringWithString:@"\\\""];
+    NSMutableString *result = [NSMutableString stringWithString:@"\""];
     NSUInteger backslashes = 0;
     for (NSUInteger index = 0; index < arg.length; index++) {
         unichar ch = [arg characterAtIndex:index];
-        if (ch == '\\\\') {
+        if (ch == '\\') {
             backslashes++;
             continue;
         }
-        if (ch == '\\\"') {
+        if (ch == '"') {
             [result appendString:[@"" stringByPaddingToLength:backslashes * 2 + 1
-                                                   withString:@"\\\\"
+                                                   withString:@"\\"
                                               startingAtIndex:0]];
-            [result appendString:@"\\\""];
+            [result appendString:@"\""];
         } else {
             [result appendString:[@"" stringByPaddingToLength:backslashes
-                                                   withString:@"\\\\"
+                                                   withString:@"\\"
                                               startingAtIndex:0]];
             [result appendFormat:@"%C", ch];
         }
         backslashes = 0;
     }
     [result appendString:[@"" stringByPaddingToLength:backslashes * 2
-                                           withString:@"\\\\"
+                                           withString:@"\\"
                                       startingAtIndex:0]];
-    [result appendString:@"\\\""];
+    [result appendString:@"\""];
     return result;
 }
 
