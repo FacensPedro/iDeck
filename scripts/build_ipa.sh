@@ -88,6 +88,18 @@ for bundle in "$APP" "$APP/PlugIns/VPNExtension.appex"; do
   [[ "$MINIMUM_OS" == "27.0" ]] || { echo "ERROR: incorrect minimum OS in $bundle: $MINIMUM_OS" >&2; exit 2; }
 done
 [ -d "$APP/PlugIns/VPNExtension.appex" ] || { echo "error: VPNExtension.appex was not embedded" >&2; exit 1; }
+# Verify the unsigned bundle IDs before packaging. Sideloaders may rewrite IDs
+# while signing, so these checks intentionally run before external resigning.
+for spec in "$APP:com.ideck.ideck" "$APP/PlugIns/VPNExtension.appex:com.ideck.ideck.VPNExtension"; do
+  BUNDLE="${spec%%:*}"
+  EXPECTED="${spec#*:}"
+  ACTUAL="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$BUNDLE/Info.plist")"
+  [[ "$ACTUAL" == "$EXPECTED" ]] || {
+    echo "ERROR: unexpected bundle ID in $BUNDLE: expected $EXPECTED, got $ACTUAL" >&2
+    exit 2
+  }
+done
+
 
 if [ "${IDECK_REQUIRE_MADEIRA:-0}" = "1" ]; then
   IDECK_MADEIRA_APP_ROOT="$NATIVE_ASSET_SOURCE" \
