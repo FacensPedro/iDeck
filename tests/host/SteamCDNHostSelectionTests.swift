@@ -60,6 +60,43 @@ struct SteamCDNHostSelectionTests {
             _ = health.order(hosts, seed: index)
         }
 
-        print("PASS: Steam CDN throughput, response latency, exploration, failover, and concurrent ranking")
+        // Chunk work is interleaved without ever pre-materializing a huge
+        // per-game list, and empty depots never create phantom work.
+        var schedule = SteamChunkScheduler(counts: [3, 1, 2])
+        var order: [String] = []
+        while let item = schedule.next() {
+            order.append("\(item.depot):\(item.item)")
+        }
+        assert(order == ["0:0", "1:0", "2:0", "0:1", "2:1", "0:2"])
+        assert(schedule.remaining == 0 && schedule.next() == nil)
+        var emptySchedule = SteamChunkScheduler(counts: [0, 0])
+        assert(emptySchedule.remaining == 0 && emptySchedule.next() == nil)
+        var veryLargeSchedule = SteamChunkScheduler(counts: [250_000, 0])
+        assert(veryLargeSchedule.next()?.item == 0)
+        assert(veryLargeSchedule.remaining == 249_999)
+
+        // Output files shared between depots cannot be written concurrently.
+        // Last-writer order for Steam's overlay remains the same.
+        let batches = SteamChunkScheduler.batches(paths: [
+            ["/game/a", "/game/b", ""],
+            ["/game/c"],
+            ["/game/a", "/game/d"],
+            ["/game/d"],
+            ["/game/e"],
+            ["/game/b", "/game/c"]
+        ])
+        assert(batches == [[0, 1, 4], [2, 5], [3]], "\(batches)")
+        assert(SteamChunkScheduler.batches(paths: [
+            ["/game/one"], ["/game/two"], ["/game/three"]
+        ]) == [[0, 1, 2]])
+        assert(SteamChunkScheduler.batches(paths: [
+            ["/game/shared"], ["/game/shared"], ["/game/shared"]
+        ]) == [[0], [1], [2]])
+        assert(SteamChunkScheduler.batches(paths: [
+            ["/Games/Foo/File.DLL"], ["/games/foo/file.dll"]
+        ]) == [[0], [1]])
+        assert(SteamChunkScheduler.batches(paths: []).isEmpty)
+
+        print("PASS: Steam CDN throughput, response latency, exploration, failover, and concurrent ranking and fair depot pipelining")
     }
 }
