@@ -82,24 +82,19 @@ struct MainView: View {
                         .resizable()
                         .scaledToFit()
                         .frame(width: 140, height: 140)
-                    Text("iDeck")
-                        .font(.largeTitle.bold())
-                        .foregroundColor(.white)
-                    Text(tr("Choose a mode"))
-                        .foregroundColor(.gray)
                     Button {
                         selectedWorkspace = .pc
                         if !coordinator.isContainerReady {
                             coordinator.forceJITAndStartWindows()
                         }
                     } label: {
-                        modeTile(title: tr("Madeira Emulator"), subtitle: tr("Steam games and Windows apps"), symbol: "gamecontroller.fill")
+                        modeTile(title: tr("Madeira"), symbol: "gamecontroller.fill")
                     }
                     .buttonStyle(.plain)
                     Button {
                         selectedWorkspace = .liveContainer
                     } label: {
-                        modeTile(title: tr("LiveContainer"), subtitle: tr("Install and run IPA apps"), symbol: "square.stack.3d.up.fill")
+                        modeTile(title: tr("LiveContainer"), symbol: "square.stack.3d.up.fill")
                     }
                     .buttonStyle(.plain)
                 }
@@ -110,7 +105,7 @@ struct MainView: View {
         }
     }
 
-    private func modeTile(title: String, subtitle: String, symbol: String) -> some View {
+    private func modeTile(title: String, symbol: String) -> some View {
         VStack(spacing: 12) {
             Image(systemName: symbol)
                 .font(.system(size: 32))
@@ -118,10 +113,6 @@ struct MainView: View {
             Text(title)
                 .font(.title3.bold())
                 .foregroundColor(.white)
-                .multilineTextAlignment(.center)
-            Text(subtitle)
-                .font(.subheadline)
-                .foregroundColor(.gray)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
@@ -553,7 +544,7 @@ struct WindowsWorkspaceView: View {
                 }
             }
             Spacer()
-            Text(mode == .pc ? tr("Madeira Emulator") : tr("LiveContainer"))
+            Text(mode == .pc ? tr("Madeira") : tr("LiveContainer"))
                 .font(.headline)
                 .foregroundColor(.white)
             Spacer()
