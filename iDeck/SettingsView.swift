@@ -119,6 +119,7 @@ struct SettingsView: View {
             SteamSignInView()
         }
         .task {
+            inputManager.refreshControllers()
             coordinator.refreshJITStatus()
             await updater.check()
         }
@@ -148,14 +149,20 @@ struct SettingsView: View {
                 }
                 Spacer(minLength: 0)
             }
-            if !coordinator.isJITEnabled {
+            if coordinator.isJITEnabled && !coordinator.isStikDebugAttached && !coordinator.isWineJITPrepared {
+                Text(tr("JIT permission is active, but StikDebug's debugger script is not connected. Use the button below to reconnect before starting Wine."))
+                    .font(.caption)
+                    .foregroundColor(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if !coordinator.isJITEnabled || (!coordinator.isStikDebugAttached && !coordinator.isWineJITPrepared) {
                 Button {
                     coordinator.requestStikDebugJIT()
                 } label: {
                     HStack(spacing: 10) {
                         Image(systemName: "bolt.fill")
                             .font(.system(size: 16, weight: .semibold))
-                        Text(tr("Enable JIT"))
+                        Text(tr(coordinator.isJITEnabled ? "Reconnect JIT debugger" : "Enable JIT"))
                             .font(.subheadline.weight(.semibold))
                         Spacer(minLength: 0)
                         Image(systemName: "arrow.up.right")
@@ -168,7 +175,7 @@ struct SettingsView: View {
                     .background(Color(red: 0.12, green: 0.34, blue: 0.70), in: RoundedRectangle(cornerRadius: 12))
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(tr("Enable JIT"))
+                .accessibilityLabel(tr(coordinator.isJITEnabled ? "Reconnect JIT debugger" : "Enable JIT"))
                 Text(tr("StikDebug requires pairing, LocalDevVPN, and a debug-signable iDeck. Opening StikDebug does not prove FEX JIT is ready."))
                     .font(.caption)
                     .foregroundColor(.gray)
