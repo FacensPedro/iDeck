@@ -78,7 +78,7 @@ jobs:
           test "$(xcrun lipo -archs /tmp/ideck-ios-llvm-dependency-check)" = arm64
           python3 -m unittest discover -s tests/host -p 'test_native_llvm_link.py' -v
 
-      - name: Test Windows compatibility translations
+      - name: Test automatic Windows runtime settings
         run: python3 -m unittest discover -s tests/host -p 'test_windows_compatibility_localization.py' -v
 
       - name: Test DXMT shader compatibility patch
@@ -195,6 +195,12 @@ jobs:
         run: |
           xcrun swiftc iDeck/SteamCDNHostSelection.swift tests/host/SteamCDNHostSelectionTests.swift -o /tmp/ideck-cdn-selection-tests
           /tmp/ideck-cdn-selection-tests
+
+      - name: Test Wine native exit diagnostics and Steam app identity
+        run: |
+          xcrun swiftc iDeck/WineExitDiagnostics.swift tests/host/WineExitDiagnosticsTests.swift -o /tmp/ideck-wine-exit-tests
+          /tmp/ideck-wine-exit-tests
+          python3 -m unittest discover -s tests/host -p 'test_madeira_launch_integration.py' -v
 
       - name: Test Windows launch arguments and path escaping
         run: |

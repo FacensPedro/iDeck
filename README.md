@@ -92,7 +92,7 @@ This is a **best-effort** compatibility feature. Cabinet contents can change bet
 
 ### Manual fallback
 
-If extraction fails or you already have compatible DLLs that you are authorized to use, place the necessary x64 DLLs under **Files → On My iPad → iDeck → vcruntime**. Use **Settings → Windows compatibility → Prepare Visual C++ folder** to create the folder.
+If extraction fails or you already have compatible DLLs that you are authorized to use, place the necessary x64 DLLs under **Files → On My iPad → iDeck → vcruntime**. Create the folder manually with the Files app if automatic installation has not already created it.
 
 See the [Microsoft Visual C++ DLL guide](docs/MICROSOFT_VISUAL_CPP_DLLS.md) and [official Microsoft downloads](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist).
 
@@ -106,6 +106,7 @@ StikDebug may provide the necessary JIT debugging workflow on supported devices.
 | --- | --- |
 | No Windows EXE starts | Confirm the IPA is `iDeck-Madeira-native`, the Wine prefix is prepared, and JIT/FEX is ready |
 | Screen stays black | Check Wine initialization, DXMT/D3D12, Metal presentation, and game-specific requirements |
+| Wine stops or exits instantly | Read the exact Wine exit code or NTSTATUS (e.g. `0xC0000135`: missing DLL); inspect Wine/FEX logs. Some games also require the real Steam client or hand off to another process. |
 | Automatic Visual C++ setup fails | Check Internet access, download availability, WoW64 support, and whether Wine can run Microsoft's installer |
 | Visual C++ download succeeds but DLL verification fails | The Windows installer may not have completed; review the Wine logs and use the manual fallback if appropriate |
 | A 32-bit Windows app fails | Confirm that WoW64 is actually included and operational |
@@ -119,6 +120,7 @@ For more detail, read [Game startup and black-screen diagnostics](docs/IDECK_GAM
 - [Microsoft Visual C++ DLL setup](docs/MICROSOFT_VISUAL_CPP_DLLS.md)
 - [Precompiled Madeira runtime](docs/MADEIRA_PREBUILT_RUNTIME.md)
 - [Game startup diagnostics](docs/IDECK_GAME_STARTUP_DIAGNOSTICS.md)
+- [Madeira vs. iDeck Windows runtime differences](docs/WINE_RUNTIME_GAP_ANALYSIS.md)
 - [Madeira integration status](docs/MADEIRA_RUNTIME_INTEGRATION.md)
 - [Native Madeira build](docs/IDECK_MADEIRA_NATIVE_BUILD.md)
 - [Native linking and verification](docs/MADEIRA_NATIVE_LINKING.md)
