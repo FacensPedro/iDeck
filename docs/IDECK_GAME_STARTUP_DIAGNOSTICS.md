@@ -58,6 +58,48 @@ Windows client even when its files and real App ID are available.
 See [the source-level Madeira comparison](WINE_RUNTIME_GAP_ANALYSIS.md) for
 the remaining host/runtime differences and device-test guidance.
 
+## App closes immediately before the home screen
+
+Do not confuse a **cold-start app crash** with a Wine game-launch failure.
+After a previous JIT crash, restarting the process must not automatically
+restart FEX, Wine or the debugger.
+
+The iDeck root view now starts without reading a Steam token, creating the
+Steam library/session or probing the native FEX/Wine JIT pool. Even native
+memory notifications are configured only after the user selects Madeira or
+LiveContainer. The Steam model is constructed within the selected workspace,
+not in the home-screen root. The runtime and JIT behavior during an explicit
+Madeira launch remains unchanged.
+
+This also supports a signed **iPadOS 26 or later** installation; the app and
+VPN extension must both advertise `MinimumOSVersion = 26.0`, even though
+the build toolchain uses the iOS 27 SDK. Check the installed iPadOS version
+and the IPA's actual signed entitlements and bundle IDs before treating a
+pre-home termination as a Wine bug. A re-signer can alter both identifiers
+and entitlements.
+
+To locate the crash stage, inspect the device console for:
+
+- `[iDeck startup] SwiftUI App initialized without native runtime setup`:
+  the SwiftUI application initializer was reached.
+- `[iDeck startup] Home view ready; Wine and Steam not initialized`:
+  the first home view was rendered and the previous crash is not happening
+  in the entry-point setup.
+
+If the first line never appears, investigate the iPadOS `.ips` report for
+`dyld`, code signing, minimum OS errors, incompatible binary slices,
+`EXC_BAD_ACCESS` and app extension loading. Swift code running after the
+entry point cannot repair a loader-time termination. If only the first
+line appears, inspect the main-thread exception stack to identify which
+SwiftUI/state-model initializer failed. An iOS watchdog or jetsam event
+is not the same as a native executable-memory fault.
+
+Export the newest incident from **Settings → Privacy & Security → Analytics
+& Improvements → Analytics Data**. If you cannot open iDeck, the crash report
+is still accessible from iPadOS Settings. Preserve the existing installation
+and game data until it is backed up; changing the signed bundle identifier
+can create an independent app container.
+
 ## If the application stops or freezes
 
 The previous iPadOS `bug_type: 202` report showed significant cumulative CPU

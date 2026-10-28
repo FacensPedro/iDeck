@@ -52,6 +52,8 @@ class SystemCoordinator: ObservableObject {
     let prefixInstaller = PrefixInstaller()
     private var displayLink: CADisplayLink?
     private var steamSignInObserver: NSObjectProtocol?
+    private var steamSignInLoaded = false
+    private var nativeHostConfigured = false
     private var activeSteamGameID: UInt32?
     private var activeSteamPrefix: String?
     private var pendingSteamGameID: UInt32?
@@ -61,17 +63,34 @@ class SystemCoordinator: ObservableObject {
     private var bypassVisualCRuntimeForPrefix: String?
 
     init() {
-        refreshJITStatus()
-        isSteamConnected = SteamSignIn.isSignedIn
+        // Keep app startup free of native Wine/JIT probes and Keychain reads.
+        // In particular, a CS_DEBUGGED flag left behind by StikDebug or a
+        // previous Wine crash must not be used to initialize FEX on app open.
+        // The Madeira workspace explicitly asks for these checks on entry.
         steamSignInObserver = NotificationCenter.default.addObserver(
             forName: SteamSignIn.didChange,
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            self?.isSteamConnected = SteamSignIn.isSignedIn
+            guard let self else { return }
+            self.steamSignInLoaded = true
+            self.isSteamConnected = SteamSignIn.isSignedIn
         }
     }
-    
+
+    func configureNativeHostIfNeeded() {
+        guard !nativeHostConfigured else { return }
+        nativeHostConfigured = true
+        ideck_native_memory_install_notifications()
+        _ = ideck_native_memory_configure(64 * 1024 * 1024, 8 * 1024 * 1024)
+    }
+
+    func loadSteamAccountIfNeeded() {
+        guard !steamSignInLoaded else { return }
+        steamSignInLoaded = true
+        isSteamConnected = SteamSignIn.isSignedIn
+    }
+
     private func isLocalDevVPNActive() -> Bool {
         var interfaces: UnsafeMutablePointer<ifaddrs>?
         guard getifaddrs(&interfaces) == 0 else { return false }

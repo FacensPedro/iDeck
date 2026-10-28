@@ -27,7 +27,7 @@ iDeck combines SwiftUI, C/C++, Objective-C++, Wine, and native Metal interfaces.
 - **To run Windows games:** A verified Madeira-native IPA, a functioning Wine prefix, appropriate graphics components, and JIT when required.
 - **For 32-bit Windows installers and games (PE32/i386):** WoW64 is enabled by default in Madeira-native builds. The IPA must contain a complete, validated i386 Wine DLL farm and FEX/WoW64 components; interface-only IPAs cannot execute Windows programs.
 
-The Xcode project currently targets **iOS/iPadOS 27.0** as its minimum OS version.
+The Xcode project currently targets **iOS/iPadOS 26.0** as its minimum OS version. Compilation still requires the **iOS 27 SDK**. Signed IPA launch compatibility and native JIT functionality must be checked on a real device; lowering the deployment target does not grant executable-memory permissions.
 
 ## Build an IPA
 
@@ -162,6 +162,7 @@ The IPA requests **increased-memory-limit** when its signing profile permits it.
 
 | Symptom | What to check |
 | --- | --- |
+| App closes immediately when opened | The iDeck home screen no longer probes Wine/FEX JIT, Steam Keychain or native memory pools. Check the signed IPA, iPadOS 26.0+ requirement and the iPadOS `.ips` crash report. If the console never shows `[iDeck startup] SwiftUI App initialized`, investigate dyld/loading, code signing or OS compatibility; a passing GitHub build cannot verify device launch. |
 | No Windows EXE starts | Confirm the IPA is `iDeck-Madeira-native`, the Wine prefix is prepared, and JIT/FEX is ready |
 | Wine ARM64EC JIT pool allocation fails | Request JIT from iDeck so StikDebug loads its bundled `universal.js`, leave the debugger connected until the RX/RW pools are mapped, and look for `[iDeck Wine JIT]` logs showing the first failed allocation, remap or protection step. The native runtime retries 384/256/192/128/96/64 MiB; insufficient virtual address space or a debugger without the BRK handler can still prevent startup. |
 | Screen stays black | Check Wine initialization, DXMT/D3D12, Metal presentation, and game-specific requirements |

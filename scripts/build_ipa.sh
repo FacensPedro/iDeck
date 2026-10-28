@@ -85,7 +85,7 @@ APP="$BUILD_DIR/Build/Products/$CONFIGURATION-iphoneos/iDeck.app"
 [ -d "$APP" ] || { echo "error: $APP not found" >&2; exit 1; }
 for bundle in "$APP" "$APP/PlugIns/VPNExtension.appex"; do
   MINIMUM_OS="$(/usr/libexec/PlistBuddy -c 'Print :MinimumOSVersion' "$bundle/Info.plist")"
-  [[ "$MINIMUM_OS" == "27.0" ]] || { echo "ERROR: incorrect minimum OS in $bundle: $MINIMUM_OS" >&2; exit 2; }
+  [[ "$MINIMUM_OS" == "26.0" ]] || { echo "ERROR: incorrect minimum OS in $bundle: $MINIMUM_OS" >&2; exit 2; }
 done
 [ -d "$APP/PlugIns/VPNExtension.appex" ] || { echo "error: VPNExtension.appex was not embedded" >&2; exit 1; }
 # Verify the unsigned bundle IDs before packaging. Sideloaders may rewrite IDs

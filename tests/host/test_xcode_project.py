@@ -34,6 +34,13 @@ class XcodeProjectTests(unittest.TestCase):
         vpn_manager = (root / "iDeck/VPNManager.swift").read_text(encoding="utf-8")
         self.assertIn('Bundle.main.bundleIdentifier! + ".VPNExtension"', vpn_manager)
 
+    def test_ipados_26_deployment_is_consistent_for_app_and_extension(self):
+        self.assertEqual(self.project.count("IPHONEOS_DEPLOYMENT_TARGET = 26.0;"), 6)
+        self.assertNotIn("IPHONEOS_DEPLOYMENT_TARGET = 27.0;", self.project)
+        build = (PROJECT.parents[1] / "scripts/build_ipa.sh").read_text(encoding="utf-8")
+        self.assertIn('[[ "$MINIMUM_OS" == "26.0" ]]', build)
+        self.assertIn('[[ "${SDK_VERSION%%.*}" -ge 27 ]]', build)
+
     def test_object_identifiers_are_unique(self):
         ids = OBJECT.findall(self.project)
         self.assertTrue(ids, "No Xcode project objects found")
