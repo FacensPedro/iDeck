@@ -149,6 +149,22 @@ struct SettingsView: View {
                 }
                 Spacer(minLength: 0)
             }
+            if coordinator.isJITEnabled {
+                HStack {
+                    Text(tr("Debugger connection")).foregroundColor(.white)
+                    Spacer()
+                    Text(coordinator.isStikDebugAttached ? tr("Attached") : tr("Detached"))
+                        .foregroundColor(coordinator.isStikDebugAttached ? .green : .orange)
+                }
+                .font(.caption)
+                HStack {
+                    Text(tr("Wine JIT pool")).foregroundColor(.white)
+                    Spacer()
+                    Text(coordinator.isWineJITPrepared ? tr("Prepared") : tr("Not prepared"))
+                        .foregroundColor(coordinator.isWineJITPrepared ? .green : .orange)
+                }
+                .font(.caption)
+            }
             if coordinator.isJITEnabled && !coordinator.isStikDebugAttached && !coordinator.isWineJITPrepared {
                 Text(tr("JIT permission is active, but StikDebug's debugger script is not connected. Use the button below to reconnect before starting Wine."))
                     .font(.caption)
