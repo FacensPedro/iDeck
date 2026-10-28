@@ -36,6 +36,7 @@ final class UpdateChecker: ObservableObject {
     @Published var statuses: [ProjectStatus] = UpdateChecker.projects.map { ProjectStatus(project: $0) }
     @Published var isChecking = false
     @Published var hasChecked = false
+    @Published private(set) var installHandoffMessage: String?
 
     /// Version of the installed iDeck.
     var currentVersion: String {
@@ -51,7 +52,9 @@ final class UpdateChecker: ObservableObject {
     }
 
     func check() async {
+        guard !isChecking else { return }
         isChecking = true
+        installHandoffMessage = nil
         var result: [ProjectStatus] = []
         for project in Self.projects {
             result.append(await fetch(project))
@@ -61,23 +64,52 @@ final class UpdateChecker: ObservableObject {
         hasChecked = true
     }
 
-    /// Hands the new IPA to SideStore or AltStore (installs over the current app, data is kept).
-    /// Falls back to the release page when neither app is installed.
+    /// Open a signed update in the user's existing sideloading app. iOS does
+    /// not allow this process to overwrite its own code or skip resigning.
+    /// Opening the installer is not confirmation that an update was installed.
     func installIDeckUpdate() {
-        guard let status = availableIDeckUpdate, let ipa = status.ipaURL else { return }
-        let encoded = ipa.absoluteString.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ipa.absoluteString
-        let candidates = ["sidestore://install?url=\(encoded)", "altstore://install?url=\(encoded)"].compactMap(URL.init(string:))
+        guard let status = availableIDeckUpdate,
+              let ipa = status.ipaURL,
+              ipa.scheme == "https",
+              ipa.host?.lowercased() == "github.com",
+              ipa.path.hasPrefix("/FacensPedro/iDeck/releases/download/") else {
+            installHandoffMessage = "No verified iDeck IPA release is available."
+            return
+        }
+
+        let candidates = ["sidestore", "altstore"].compactMap { scheme -> URL? in
+            var parts = URLComponents()
+            parts.scheme = scheme
+            parts.host = "install"
+            parts.queryItems = [URLQueryItem(name: "url", value: ipa.absoluteString)]
+            return parts.url
+        }
 
         func attempt(_ index: Int) {
             guard index < candidates.count else {
-                if let page = status.pageURL { UIApplication.shared.open(page) }
+                installHandoffMessage = "SideStore or AltStore is required to install the signed update. Opening GitHub Releases instead."
+                if let page = status.pageURL {
+                    UIApplication.shared.open(page)
+                } else if let page = URL(string: "https://github.com/FacensPedro/iDeck/releases") {
+                    UIApplication.shared.open(page)
+                }
                 return
             }
-            UIApplication.shared.open(candidates[index], options: [:]) { opened in
-                if !opened { attempt(index + 1) }
+            UIApplication.shared.open(candidates[index], options: [:]) { [weak self] opened in
+                guard let self else { return }
+                if opened {
+                    self.installHandoffMessage = "The update was sent to the installer. Complete the installation there; iDeck cannot replace itself."
+                } else {
+                    attempt(index + 1)
+                }
             }
         }
         attempt(0)
+    }
+
+    func openIDeckReleases() {
+        guard let page = URL(string: "https://github.com/FacensPedro/iDeck/releases") else { return }
+        UIApplication.shared.open(page)
     }
 
     // MARK: Networking
@@ -97,10 +129,17 @@ final class UpdateChecker: ObservableObject {
             let releases = try JSONDecoder().decode([Release].self, from: data)
             // GitHub lists releases newest first; take the first published one that carries an IPA.
             for release in releases where !release.draft {
-                if let asset = release.assets.first(where: { $0.name.lowercased().hasSuffix(".ipa") }) {
+                if let asset = release.assets.first(where: { $0.name.lowercased().hasSuffix(".ipa") }),
+                   let ipa = URL(string: asset.browser_download_url),
+                   ipa.scheme == "https",
+                   ipa.host?.lowercased() == "github.com",
+                   ipa.path.hasPrefix("/\(project.owner)/\(project.repo)/releases/download/"),
+                   let page = URL(string: release.html_url),
+                   page.scheme == "https",
+                   page.host?.lowercased() == "github.com" {
                     status.latest = release.tag_name
-                    status.ipaURL = URL(string: asset.browser_download_url)
-                    status.pageURL = URL(string: release.html_url)
+                    status.ipaURL = ipa
+                    status.pageURL = page
                     break
                 }
             }
