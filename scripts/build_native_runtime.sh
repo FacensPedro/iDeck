@@ -17,8 +17,9 @@ for tool in xcodebuild xcrun python3; do
   command -v "$tool" >/dev/null || { echo "Missing build dependency: $tool" >&2; exit 2; }
 done
 
+export IDECK_BUILD_WOW64="${IDECK_BUILD_WOW64:-1}"
 KIT_ARGS=()
-if [[ "${IDECK_BUILD_WOW64:-0}" == "1" ]]; then KIT_ARGS+=(--wow64); fi
+if [[ "$IDECK_BUILD_WOW64" == "1" ]]; then KIT_ARGS+=(--wow64); fi
 if [[ "${IDECK_BUNDLE_WINE_MONO:-0}" == "1" ]]; then KIT_ARGS+=(--mono); fi
 REPO_KIT="$(python3 scripts/madeira_native_kit.py path ${KIT_ARGS[@]+"${KIT_ARGS[@]}"})"
 CACHE_KIT="$(python3 scripts/madeira_native_kit.py path --cache ${KIT_ARGS[@]+"${KIT_ARGS[@]}"})"
