@@ -378,6 +378,7 @@ final class DepotDownloader {
         let fm = FileManager.default
         var result = Prepared()
         var folded: [String: String] = [:]   // lowercased relative dir -> first spelling
+        var createdDirectories = Set<String>() // one mkdir traversal per distinct output directory
         let journalNames = Set(plans.map { "depot_\($0.depotID)_\($0.manifestGID).journal" })
         // A journal for an older manifest describes different file contents.
         for name in (try? fm.contentsOfDirectory(atPath: journalDir.path)) ?? [] where !journalNames.contains(name) {
@@ -400,10 +401,15 @@ final class DepotDownloader {
                 }
                 let url = installURL.appendingPathComponent(relative)
                 if file.isDirectory {
-                    try fm.createDirectory(at: url, withIntermediateDirectories: true)
+                    if createdDirectories.insert(url.path).inserted {
+                        try fm.createDirectory(at: url, withIntermediateDirectories: true)
+                    }
                     paths.append(""); existing.append(false); continue
                 }
-                try fm.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+                let parent = url.deletingLastPathComponent()
+                if createdDirectories.insert(parent.path).inserted {
+                    try fm.createDirectory(at: parent, withIntermediateDirectories: true)
+                }
                 var before = stat()
                 let hadContent = stat(url.path, &before) == 0 && before.st_size > 0
                 existing.append(hadContent)
