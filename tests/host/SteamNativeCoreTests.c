@@ -82,7 +82,10 @@ int main(void) {
                                      &produced) != 0);
     assert(ideck_steam_decrypt_chunk(encrypted, 16 + ciphertext, key,
                                      32, output, 3, &produced) != 0);
-    encrypted[16 + ciphertext - 1] ^= 0xff;
+    // A CBC flip in the prior ciphertext block deterministically corrupts
+    // the last PKCS7 pad byte (0x06 becomes 0x07), unlike a random flip in
+    // the final ciphertext block, which can rarely still yield valid padding.
+    encrypted[16 + ciphertext - 16 - 1] ^= 0x01;
     assert(ideck_steam_decrypt_chunk(encrypted, 16 + ciphertext, key,
                                      32, output, sizeof(output),
                                      &produced) != 0);
