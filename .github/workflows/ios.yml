@@ -456,11 +456,12 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
+      - name: Upload IPA directly (no outer ZIP)
+        id: ipa_artifact
+        uses: actions/upload-artifact@v7
         with:
-          name: ${{ env.IDECK_NATIVE_BUILD == '1' && 'iDeck-Madeira-native' || 'iDeck-interface-only' }}
           path: iDeck.ipa
+          archive: false
           if-no-files-found: error
           retention-days: 30
 
@@ -470,13 +471,15 @@ jobs:
           if [[ "${{ env.IDECK_NATIVE_BUILD == '1' && '1' || '0' }}" == "1" ]]; then
             echo '## iDeck Madeira native IPA: static checks passed' >> "$GITHUB_STEP_SUMMARY"
             echo 'The native payload passed build verification, but game execution, JIT and device signing are not verified.' >> "$GITHUB_STEP_SUMMARY"
-            echo 'Download **iDeck-Madeira-native** under Artifacts.' >> "$GITHUB_STEP_SUMMARY"
+            echo 'Download **iDeck.ipa** directly under Artifacts; the file is not wrapped in another ZIP.' >> "$GITHUB_STEP_SUMMARY"
           else
             echo '## iDeck interface-only IPA' >> "$GITHUB_STEP_SUMMARY"
             echo '**Windows games will not run in this IPA. FEX, Wine, DXMT and D3D12 were not compiled or linked.**' >> "$GITHUB_STEP_SUMMARY"
-            echo 'Download **iDeck-interface-only** under Artifacts, or manually run this workflow with Require Madeira runtime and the license confirmation.' >> "$GITHUB_STEP_SUMMARY"
+            echo 'Download **iDeck.ipa** directly under Artifacts. This is interface-only; enable the native runtime and confirm the license before building a game-capable IPA.' >> "$GITHUB_STEP_SUMMARY"
           fi
-          echo "[Open artifacts for this run](https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})" >> "$GITHUB_STEP_SUMMARY"
+          echo "[Download iDeck.ipa directly](${{ steps.ipa_artifact.outputs.artifact-url }})" >> "$GITHUB_STEP_SUMMARY"
+          echo "[Open all artifacts](https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})" >> "$GITHUB_STEP_SUMMARY"
+          echo 'An IPA is internally a ZIP-formatted iOS app package. The new artifact removes only the extra GitHub ZIP wrapper.' >> "$GITHUB_STEP_SUMMARY"
 
       - name: Publish release
         if: env.IDECK_NATIVE_BUILD == '1' && (startsWith(github.ref, 'refs/tags/') || inputs.release_tag != '')
