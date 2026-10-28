@@ -244,6 +244,7 @@ class WindowsEnvironment {
 
     func execute(binary: URL, arguments: String = "", is32Bit: Bool = false, isSteam: Bool = false,
                  steamAppID: UInt32? = nil, steamInstallDirectory: URL? = nil,
+                 steamWorkingDirectory: URL? = nil,
                  jitEnabler: JITEnabler, completion: @escaping (Int) -> Void) {
         guard FileManager.default.fileExists(atPath: binary.path),
               binary.path.withCString({ ideck_native_validate_pe($0) }),
@@ -269,6 +270,7 @@ class WindowsEnvironment {
             isSteam: isSteam,
             steamAppID: steamAppID,
             steamInstallDirectory: steamInstallDirectory,
+            steamWorkingDirectory: steamWorkingDirectory,
             jitEnabler: jitEnabler
         ) { status in
             if status != 0 { SteamLog.event("[wine-launch] native launch failure code=\(status)") }
@@ -329,6 +331,7 @@ private class BoxTranslator {
     func translateAndRun(executablePath: String, arguments: [String], environment: String,
                          is32Bit: Bool, isSteam: Bool,
                          steamAppID: UInt32?, steamInstallDirectory: URL?,
+                         steamWorkingDirectory: URL?,
                          jitEnabler: JITEnabler, completion: @escaping (Int) -> Void) {
         typealias NativeLaunch = @convention(c) (
             UnsafePointer<CChar>?,
@@ -345,6 +348,9 @@ private class BoxTranslator {
         if let steamAppID, let steamInstallDirectory {
             launchDetails["steamAppID"] = Int(steamAppID)
             launchDetails["steamInstallDirectory"] = steamInstallDirectory.standardizedFileURL.path
+            if let steamWorkingDirectory {
+                launchDetails["steamWorkingDirectory"] = steamWorkingDirectory.standardizedFileURL.path
+            }
         }
         guard let symbol = "ideck_madeira_launch_v1".withCString({ dlsym(UnsafeMutableRawPointer(bitPattern: -2), $0) }),
               !environment.isEmpty,
