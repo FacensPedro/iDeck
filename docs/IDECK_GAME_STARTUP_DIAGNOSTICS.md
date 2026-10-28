@@ -218,3 +218,50 @@ are correctly re-quoted rather than automatically rejected.
 The on-screen error for code 22 lists the relevant validation categories.
 Since imported executables and game arguments vary, retrieve the exact
 `[iDeck native launch]` or `[wine-launch]` message if it recurs.
+
+
+## External StikDebug Enable JIT vs. the Madeira BRK script
+
+StikDebug's normal app-list **Enable JIT** can leave the iDeck process with
+`CS_DEBUGGED` but with its debugger **detached**. Madeira's FEX and Wine
+execute a special `BRK #0xf00d` request to allocate executable RX pages.
+A stale permission flag is not a handler for that request; attempting the
+BRK without a live debugger can crash the app.
+
+On opening the **Madeira** workspace, iDeck now detects that state and
+requests StikDebug again with its bundled `universal.js` and the current PID,
+including when the Wine container has already been initialized. The JIT
+settings always expose a reconnect button while the debugger is detached
+and the Wine executable-memory pool is not ready. Existing successfully
+prepared pools do not need to be allocated again.
+
+### Low-address executable pool and last-failure details
+
+The upstream Madeira `StikJITHelper` uses reserved, non-resident low virtual
+pages to advance the allocation frontier above `0x119000000`, where its
+position-dependent FEX dispatcher fails. iDeck now applies this bounded
+low-VA reservation strategy before requesting its distinct Wine JIT pool.
+It retains these placeholders for process lifetime, just as Madeira does.
+
+A valid debugger RX range can span multiple contiguous Mach regions.
+The iDeck validator now checks every region for executable permission
+without wrongly requiring one large Mach region. The Windows PE image
+window, address overflow, unmapped holes, incompatible layouts and missing
+RX execution permissions remain rejected. iDeck **does not deallocate**
+an untrusted RX address supplied by an external debugger when validation
+fails, because it could belong to an existing mapping or executable image.
+
+On-screen errors now distinguish below-frontier addresses, image collisions,
+virtual-memory limits, missing execute permission and partial/unmapped
+regions. The Settings panel displays both the live debugger connection
+and whether Wine's RX/RW pool is prepared. This improves diagnoses and
+prevents unsafe cleanup; it does not prove that the debugger or device
+can supply valid executable memory. Test with a newly signed native IPA.
+
+### Madeira background-download compatibility
+
+Steam and DLC installers also request iPadOS's **short background execution
+grace period** as adapted from Madeira, ending each system task when its
+install completes. This does not port Madeira's full iOS 26
+`BGContinuedProcessingTask` implementation and does not guarantee that
+a download will continue indefinitely after backgrounding the app.
