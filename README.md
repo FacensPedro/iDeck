@@ -82,7 +82,7 @@ Some Windows games depend on Microsoft x64 C++ runtime DLLs such as `vcruntime14
 
 1. iDeck checks for a complete, previously verified set of 14 Microsoft x64 DLLs in `Documents/vcruntime` or the app bundle.
 2. If missing, iDeck asks for permission to download and extract the [official Microsoft x64 Visual C++ Redistributable](https://aka.ms/vc14/vc_redist.x64.exe).
-3. On approval, iDeck downloads the official Microsoft installer over HTTPS and **extracts its embedded CAB archives locally on the iPad** using a bundled open-source CAB decoder (`libmspack`). **The Windows installer is not executed.**
+3. On approval, iDeck downloads the official Microsoft installer over HTTPS and **extracts its embedded CAB archives locally on the iPad**, including nested Microsoft CAB payloads such as `a10` and `a11`, using a bundled open-source CAB decoder (`libmspack`). **The Windows installer is not executed.**
 4. iDeck checks that all 14 required DLLs are present, Windows x64 PE files and contain an Authenticode certificate-table structure, then installs the files in `Documents/vcruntime`.
 5. The Madeira Wine bridge makes the DLLs available to games through the prefix, preserving its native ARM64EC exemptions. Only when the files are successfully prepared does iDeck continue the game launch. Later launches reuse the files without downloading them again.
 
