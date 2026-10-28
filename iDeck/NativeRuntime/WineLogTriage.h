@@ -13,7 +13,9 @@ typedef enum {
     IDECK_WINE_LOG_EXEC_PERMISSION = 2,
     IDECK_WINE_LOG_OOM = 3,
     IDECK_WINE_LOG_ACCESS_VIOLATION = 4,
-    IDECK_WINE_LOG_MISSING_DLL = 5
+    IDECK_WINE_LOG_MISSING_DLL = 5,
+    IDECK_WINE_LOG_WOW64_ADDRESS_SPACE = 6,
+    IDECK_WINE_LOG_ARM64EC_EXCEPTION = 7
 } IDeckWineLogDiagnosis;
 int32_t ideck_wine_log_diagnose(const char *path);
 
