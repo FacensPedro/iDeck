@@ -137,57 +137,95 @@ extern "C" bool ideck_wine_jit_pool_prepare(void) {
     std::lock_guard<std::mutex> lock(wine_pool_mutex);
     if (wine_pool_rx != 0) return export_pool(wine_pool_rx, wine_pool_rw, wine_pool_size);
     if (!debugger_attached()) {
-        fprintf(stderr, "[iDeck Wine JIT] REFUSED: no live debugger for executable pool\n");
+        fprintf(stderr, "[iDeck Wine JIT] REFUSED: StikDebug is not attached to this process. "
+                        "Enabling JIT once from the app list does not keep the BRK handler attached.\\n");
         return false;
     }
 
-    // Deliberately conservative baseline. Madeira uses larger, profile-aware
-    // pools and sophisticated address-space placement for demanding games.
-    // Keep any failed attempt bounded; never start Wine without the pool.
-    for (size_t size : {384ULL * 1024 * 1024, 256ULL * 1024 * 1024}) {
-        void *result = jit26_prepare_region(nullptr, size);
-        uintptr_t rx = reinterpret_cast<uintptr_t>(result);
-        if (rx == 0 || !acceptable_pool(rx, size)) {
-            fprintf(stderr, "[iDeck Wine JIT] rejected RX=0x%" PRIxPTR " size=%zu\n", rx, size);
-            if (rx != 0) vm_deallocate(mach_task_self(), static_cast<vm_address_t>(rx), size);
-            continue;
-        }
-
-        vm_address_t rw = 0;
-        vm_prot_t current = 0, maximum = 0;
-        kern_return_t kr = vm_remap(mach_task_self(), &rw, size, 0,
-                                    VM_FLAGS_ANYWHERE, mach_task_self(),
-                                    static_cast<vm_address_t>(rx), FALSE,
-                                    &current, &maximum, VM_INHERIT_NONE);
-        if (kr != KERN_SUCCESS) {
-            fprintf(stderr, "[iDeck Wine JIT] vm_remap(RW) failed kr=%d\n", kr);
-            vm_deallocate(mach_task_self(), static_cast<vm_address_t>(rx), size);
-            continue;
-        }
-
-        kr = vm_protect(mach_task_self(), rw, size, FALSE,
-                        VM_PROT_READ | VM_PROT_WRITE);
-        if (kr != KERN_SUCCESS ||
-            (static_cast<uintptr_t>(rw) < rx + size &&
-             static_cast<uintptr_t>(rw) + size > rx)) {
-            fprintf(stderr, "[iDeck Wine JIT] RW alias invalid/protection failed kr=%d\n", kr);
-            vm_deallocate(mach_task_self(), rw, size);
-            vm_deallocate(mach_task_self(), static_cast<vm_address_t>(rx), size);
-            continue;
-        }
-
-        if (!export_pool(rx, static_cast<uintptr_t>(rw), size)) {
-            vm_deallocate(mach_task_self(), rw, size);
-            vm_deallocate(mach_task_self(), static_cast<vm_address_t>(rx), size);
+    // FEXCore already owns a separate 64 MiB pool. A second 384 MiB RX
+    // reservation may fail on iPads with fragmented / restricted virtual
+    // address space even when the debugger is correctly attached. Negotiate
+    // progressively smaller allocations rather than treating that as a
+    // permanent launch failure. Never create a non-executable substitute.
+    constexpr size_t MiB = 1024ULL * 1024;
+    for (size_t size : {384ULL * MiB, 256ULL * MiB, 192ULL * MiB,
+                        128ULL * MiB, 96ULL * MiB, 64ULL * MiB}) {
+        // Every jit26_prepare_region call triggers BRK #0xf00d.
+        // A detached debugger here would make the call process-fatal.
+        if (!debugger_attached()) {
+            fprintf(stderr, "[iDeck Wine JIT] debugger detached during pool setup\\n");
             return false;
         }
-        wine_pool_rx = rx;
-        wine_pool_rw = static_cast<uintptr_t>(rw);
-        wine_pool_size = size;
-        return true;
+        fprintf(stderr, "[iDeck Wine JIT] requesting %zu MiB RX from StikDebug\\n", size / MiB);
+        void *result = jit26_prepare_region(nullptr, size);
+        const uintptr_t rx = reinterpret_cast<uintptr_t>(result);
+        if (rx == 0) {
+            fprintf(stderr, "[iDeck Wine JIT] debugger could not allocate %zu MiB RX\\n", size / MiB);
+            continue;
+        }
+        if (!acceptable_pool(rx, size)) {
+            fprintf(stderr, "[iDeck Wine JIT] rejected RX=0x%" PRIxPTR " size=%zu MiB "
+                            "(non-executable or collides with Wine image/guest window)\\n",
+                    rx, size / MiB);
+            vm_deallocate(mach_task_self(), static_cast<vm_address_t>(rx), size);
+            continue;
+        }
+
+        // Madeira's 63 GiB (non-extended) map cannot fit the 0x7000000000
+        // RW alias hint used on devices with extended virtual addressing.
+        // Try a lower, non-guest hint, then a zero hint to let the kernel
+        // choose any available alias, without requiring extra entitlements.
+        for (vm_address_t hint : {static_cast<vm_address_t>(0x300000000ULL),
+                                  static_cast<vm_address_t>(0)}) {
+            vm_address_t rw = hint;
+            vm_prot_t current = 0, maximum = 0;
+            kern_return_t kr = vm_remap(mach_task_self(), &rw, size, 0,
+                                        VM_FLAGS_ANYWHERE, mach_task_self(),
+                                        static_cast<vm_address_t>(rx), FALSE,
+                                        &current, &maximum, VM_INHERIT_NONE);
+            if (kr != KERN_SUCCESS) {
+                fprintf(stderr, "[iDeck Wine JIT] vm_remap failed size=%zu MiB "
+                                "hint=0x%lx kr=%d\\n", size / MiB,
+                        static_cast<unsigned long>(hint), kr);
+                continue;
+            }
+
+            const uintptr_t alias = static_cast<uintptr_t>(rw);
+            const bool overlapping = alias > UINTPTR_MAX - size ||
+                (alias < rx + size && alias + size > rx);
+            if (overlapping) {
+                fprintf(stderr, "[iDeck Wine JIT] rejected overlapping RW alias=0x%lx\\n",
+                        static_cast<unsigned long>(rw));
+                vm_deallocate(mach_task_self(), rw, size);
+                continue;
+            }
+            kr = vm_protect(mach_task_self(), rw, size, FALSE,
+                            VM_PROT_READ | VM_PROT_WRITE);
+            if (kr != KERN_SUCCESS) {
+                fprintf(stderr, "[iDeck Wine JIT] vm_protect(RW) failed size=%zu MiB "
+                                "hint=0x%lx kr=%d\\n", size / MiB,
+                        static_cast<unsigned long>(hint), kr);
+                vm_deallocate(mach_task_self(), rw, size);
+                continue;
+            }
+
+            if (!export_pool(rx, alias, size)) {
+                vm_deallocate(mach_task_self(), rw, size);
+                vm_deallocate(mach_task_self(), static_cast<vm_address_t>(rx), size);
+                return false;
+            }
+            wine_pool_rx = rx;
+            wine_pool_rw = alias;
+            wine_pool_size = size;
+            fprintf(stderr, "[iDeck Wine JIT] ready with %zu MiB (RX/RW mirror)\\n", size / MiB);
+            return true;
+        }
+        vm_deallocate(mach_task_self(), static_cast<vm_address_t>(rx), size);
     }
 
-    fprintf(stderr, "[iDeck Wine JIT] FAILED: no valid RX/RW pool; Wine launch cancelled\n");
+    fprintf(stderr, "[iDeck Wine JIT] FAILED: unable to allocate and dual-map "
+                    "even a 64 MiB executable pool. Check StikDebug's in-app "
+                    "BRK script, iPadOS memory limit and Wine JIT logs.\\n");
     return false;
 #else
     return false;
