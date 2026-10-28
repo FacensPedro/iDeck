@@ -714,7 +714,7 @@ class SystemCoordinator: ObservableObject {
             return "Execution Error: Wine prefix or runtime components are missing."
         }
         if status == Int(ENOMEM) {
-            return "Execution Error: the Wine ARM64EC executable JIT pool could not be prepared. Keep the compatible StikDebug debugger attached and check RX/RW mapping in the Wine log."
+            return "Execution Error: the Wine ARM64EC JIT pool could not be allocated or mirrored into writable memory. Open JIT from iDeck using StikDebug with the bundled BRK script (not just Enable JIT in StikDebug), keep it attached until setup completes, and inspect [iDeck Wine JIT] logs for RX allocation, vm_remap or vm_protect failures. The native runtime retries smaller pools automatically."
         }
         let message = status > 0 && status < 256
             ? String(cString: strerror(Int32(status))) : "unknown native error"
