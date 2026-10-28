@@ -318,3 +318,96 @@ report a confusing executable-permission RX validation error. A failed
 request is now retried at another size by the native allocator. A debugger
 that returns no explicit result remains subject to native Mach executable
 permission verification; this does not turn non-executable memory into JIT.
+
+
+## October 28: actual iPad WoW64 address-space and ARM64EC x18 failures
+
+A subsequent 7,959-line device `madeira-log.txt` included four attempts:
+
+- **Honeygain_install.exe (PE32/i386):** the i386 DLL farm exists, but the
+  address-space allocator reported `5792 MB free VA`, below its required
+  `4096 MB` WoW64 window **plus** `MADEIRA_WOW_MIN_FREE_GB=8` of headroom.
+  This led to `[wow-window] main-process reserve FAILED 0xc0000017`.
+  Do **not** report this as a missing WoW64 IPA component, and do not
+  unconditionally remove the allocator's headroom check: it prevents
+  downstream address-space exhaustion.
+- **Cuphead.exe (PE32+/x64):** correctly selected the game executable and
+  executable directory, seeded the Wine DLL farms and entered FEX. Three
+  successive launches then reported `[x18-decline]`,
+  `[mach_exc] UNHANDLED`, and `[exc-disp] ... code=c000001d`, before
+  Wine exited with code 1. The logs also showed a protection warning
+  `Failed to mprotect last page of code buffer` that upstream Madeira
+  treats as nonfatal. The recurring unhandled native exception must be
+  investigated in **Madeira's ARM64EC/Mach exception handling and FEX**,
+  not misdiagnosed as an uninstalled Visual C++ runtime.
+- The log appended several sessions and substantial ongoing sampler output.
+  The native triage now prioritizes these two precise signatures and
+  disregards earlier sessions when a later session marker appears inside
+  its bounded 512 KiB tail. If the active session exceeds this tail,
+  diagnosis may be incomplete; share the full log for deeper investigation.
+
+**Do not claim these diagnostics fix the runtime.** Actual native repair
+requires symbolicated fault stacks and testing a matching Madeira runtime,
+FEX build and StikDebug session on the physical iPad. Successful wineserver
+initialization only proves that the Wine server started, not that a Windows
+application reached its first rendered frame.
+
+
+## ARM64EC complete-context return: native Mach path (iDeck backport)
+
+The repeated Cuphead 2026-10-28 device log identifies a more specific failure
+than the earlier `x18=0` warning alone:
+
+```text
+[task-exc] BREAKPOINT pc=0x18f3731e8 insn=0xa9bd57f6
+[mach_exc] UNHANDLED type=6 ... x18=0
+[mach_exc] sym pc=libsystem_platform.dylib, lr=pthread_kill
+[mach_exc] bt[0] raise
+[mach_exc] bt[1] __wine_syscall_dispatcher+0x16c
+[exc-disp] ... code=c000001d
+```
+
+The **breakpoint is in Apple's host signal-raising code**, not an ARM64EC
+instruction that uses `x18` as its base register. In Wine's pinned
+`build/ntdll-unix/signal_arm64_ios.c`, `__wine_syscall_dispatcher` takes
+the full-context slow return when `CONTEXT_INTEGER` requires preserving
+`x16 != PC` or `x17 != SP`. That slowpath previously used
+`raise(SIGUSR2)`, which can be intercepted as a Mach breakpoint under
+StikDebug before Wine's `usr2_handler` restores the syscall frame.
+Forwarding the resulting host fault as a guest illegal instruction gives
+the observed `0xC000001D`, even though the original Windows CPU instruction
+has not been established as illegal.
+
+**The native source patch** `patches/madeira-arm64ec-mach-context-return.patch`
+replaces the iOS slowpath's `SIGUSR2` with an explicit, reserved
+`BRK #0x5A5A`. Madeira's existing in-process Mach server can satisfy
+this one breakpoint only when the faulting PC is within Wine's own
+`syscall_dispatcher_return_slowpath` and the exact opcode, registered
+thread TEB, ntdll syscall-frame pointer and ARM64 context pass checks.
+It restores all integer registers, `x18` as the registered TEB,
+`PC`/`SP`/NZCV, and the NEON/FP register state with `thread_set_state`.
+The original FEX `x16` and `x17` values are preserved; no `sigreturn`
+trampoline may overwrite FEX's live call-return pointer.
+If validation or Mach state restoration fails, Wine declines the request:
+it **never guesses** that an unrelated breakpoint belongs to the game.
+Other Wine and StikDebug traps remain on their original paths, including
+StikDebug's separate `BRK #0xF00D`.
+
+This modifies a **Wine ntdll Unix-side native archive**. The arm64ec guest
+ntdll DLL alone, a previous FEX archive or a Swift rebuild is insufficient.
+`scripts/fetch_madeira_sources.sh` applies the patch only to the exact pinned
+Madeira revision. `scripts/madeira_native_kit.py` now hashes that patch
+in kit metadata; old ZIP kits built with the same upstream revision are
+rejected and rebuilt instead of being silently embedded in a new IPA.
+
+**Validation scope:** host CI checks the exact pinned source patch, safety
+guards, build linkage, and prebuilt-kit invalidation. A fully linked native
+iOS runtime still requires permitted Apple converter tooling and native
+compilation; only an on-device launch of Cuphead with the patched IPA can
+establish whether this resolves the entire launch sequence. Other
+`0xC000001D` causes and true guest illegal instructions are unaffected.
+
+For a new device trace, look for
+`[arm64ec-context] restored #1 ... (Mach, no SIGUSR2)`. If the game still
+fails, collect the subsequent native Wine/FEX log rather than inferring
+success from Wineserver startup.

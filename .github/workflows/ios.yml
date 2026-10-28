@@ -84,6 +84,12 @@ jobs:
           xcrun swiftc iDeck/Localization.swift tests/host/LocalizationLaunchSmokeTests.swift -o /tmp/ideck-localization-launch-tests
           /tmp/ideck-localization-launch-tests
 
+      - name: Test direct IPA downloads and in-app updates
+        run: |
+          python3 -m unittest discover -s tests/host -p 'test_direct_ipa_updater_clipboard.py' -v
+          xcrun swiftc iDeck/WineLogClipboard.swift tests/host/WineLogClipboardTests.swift -o /tmp/ideck-wine-log-clipboard-tests
+          /tmp/ideck-wine-log-clipboard-tests
+
       - name: Test automatic Windows runtime settings
         run: python3 -m unittest discover -s tests/host -p 'test_windows_compatibility_localization.py' -v
 
@@ -93,6 +99,13 @@ jobs:
           bash -n scripts/build_madeira_components.sh
           python3 -m unittest discover -s tests/host -p 'test_dxmt_shader_patch.py' -v
           python3 -m unittest discover -s tests/host -p 'test_madeira_game_backports.py' -v
+
+      - name: Test native ARM64EC syscall context restoration
+        run: |
+          python3 -m unittest discover -s tests/host -p 'test_arm64ec_mach_slowpath.py' -v
+          python3 -m unittest discover -s tests/host -p 'test_arm64ec_mach_compile.py' -v
+          bash -n scripts/fetch_madeira_sources.sh
+          bash -n scripts/build_ipa.sh
 
       - name: Test StikDebug universal JIT register encoding
         run: node tests/host/universal_jit_register_tests.js
@@ -242,6 +255,11 @@ jobs:
           /tmp/ideck-wine-exit-tests
           python3 -m unittest discover -s tests/host -p 'test_madeira_launch_integration.py' -v
 
+      - name: Test installed Steam executable and working-directory launch paths
+        run: |
+          xcrun swiftc iDeck/SteamKeyValues.swift iDeck/SteamInstall.swift tests/host/SteamInstallLaunchPathTests.swift -o /tmp/ideck-steam-launch-path-tests
+          /tmp/ideck-steam-launch-path-tests
+
       - name: Test Windows launch arguments and path escaping
         run: |
           xcrun swiftc iDeck/WindowsLaunchArguments.swift tests/host/WindowsLaunchArgumentsTests.swift -o /tmp/ideck-launch-args-tests
@@ -302,12 +320,23 @@ jobs:
           if [[ "$IDECK_BUNDLE_WINE_MONO" == "1" ]]; then OPTIONS+=(--mono); fi
           SOURCE="$(python3 scripts/madeira_native_kit.py path ${OPTIONS[@]+"${OPTIONS[@]}"})"
           CACHE="$(python3 scripts/madeira_native_kit.py path --cache ${OPTIONS[@]+"${OPTIONS[@]}"})"
-          if [[ -s "$SOURCE" || -s "$CACHE" ]]; then
+          FOUND=""
+          for ARCHIVE in "$SOURCE" "$CACHE"; do
+            if [[ -s "$ARCHIVE" ]] &&
+               python3 scripts/madeira_native_kit.py inspect --archive "$ARCHIVE" ${OPTIONS[@]+"${OPTIONS[@]}"} >/dev/null 2>&1; then
+              FOUND="$ARCHIVE"
+              break
+            fi
+            if [[ -s "$ARCHIVE" ]]; then
+              echo "Discarding stale runtime kit lacking the ARM64EC Mach context restore: $ARCHIVE"
+            fi
+          done
+          if [[ -n "$FOUND" ]]; then
             echo "available=true" >> "$GITHUB_OUTPUT"
-            echo "Found native kit: no FEX/Wine/DXMT download or LLVM recompilation necessary."
+            echo "Verified native kit including the ARM64EC Mach context return: $FOUND"
           else
             echo "available=false" >> "$GITHUB_OUTPUT"
-            echo "Compiling Madeira once and caching its binaries for subsequent IPAs."
+            echo "No matching patched runtime kit. Rebuilding Madeira/FEX/Wine and caching the new binaries."
           fi
 
       - name: Install and validate Metal Toolchain
@@ -456,11 +485,12 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
+      - name: Upload IPA directly (no outer ZIP)
+        id: ipa_artifact
+        uses: actions/upload-artifact@v7
         with:
-          name: ${{ env.IDECK_NATIVE_BUILD == '1' && 'iDeck-Madeira-native' || 'iDeck-interface-only' }}
           path: iDeck.ipa
+          archive: false
           if-no-files-found: error
           retention-days: 30
 
@@ -470,13 +500,15 @@ jobs:
           if [[ "${{ env.IDECK_NATIVE_BUILD == '1' && '1' || '0' }}" == "1" ]]; then
             echo '## iDeck Madeira native IPA: static checks passed' >> "$GITHUB_STEP_SUMMARY"
             echo 'The native payload passed build verification, but game execution, JIT and device signing are not verified.' >> "$GITHUB_STEP_SUMMARY"
-            echo 'Download **iDeck-Madeira-native** under Artifacts.' >> "$GITHUB_STEP_SUMMARY"
+            echo 'Download **iDeck.ipa** directly under Artifacts; the file is not wrapped in another ZIP.' >> "$GITHUB_STEP_SUMMARY"
           else
             echo '## iDeck interface-only IPA' >> "$GITHUB_STEP_SUMMARY"
             echo '**Windows games will not run in this IPA. FEX, Wine, DXMT and D3D12 were not compiled or linked.**' >> "$GITHUB_STEP_SUMMARY"
-            echo 'Download **iDeck-interface-only** under Artifacts, or manually run this workflow with Require Madeira runtime and the license confirmation.' >> "$GITHUB_STEP_SUMMARY"
+            echo 'Download **iDeck.ipa** directly under Artifacts. This is interface-only; enable the native runtime and confirm the license before building a game-capable IPA.' >> "$GITHUB_STEP_SUMMARY"
           fi
-          echo "[Open artifacts for this run](https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})" >> "$GITHUB_STEP_SUMMARY"
+          echo "[Download iDeck.ipa directly](${{ steps.ipa_artifact.outputs.artifact-url }})" >> "$GITHUB_STEP_SUMMARY"
+          echo "[Open all artifacts](https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})" >> "$GITHUB_STEP_SUMMARY"
+          echo 'An IPA is internally a ZIP-formatted iOS app package. The new artifact removes only the extra GitHub ZIP wrapper.' >> "$GITHUB_STEP_SUMMARY"
 
       - name: Publish release
         if: env.IDECK_NATIVE_BUILD == '1' && (startsWith(github.ref, 'refs/tags/') || inputs.release_tag != '')

@@ -73,6 +73,29 @@ else
   git -C "$DEST" apply "$COMPAT_PATCH"
 fi
 
+# An ARM64EC CONTEXT_INTEGER return needing its original x16/x17 goes
+# through Wine's syscall_dispatcher_return_slowpath. On iOS 27 the pinned
+# raise(SIGUSR2) path was caught as a Mach host breakpoint, then incorrectly
+# surfaced as guest NTSTATUS C000001D. The narrowly scoped patch routes the
+# slow return through Wine's already registered Mach exception server and
+# restores the complete frame without a sigreturn x17-clobbering trampoline.
+# This is native source, not a modification of the public Wine submodule ABI.
+ARM64EC_PATCH="$ROOT/patches/madeira-arm64ec-mach-context-return.patch"
+ARM64EC_SOURCE="$DEST/build/ntdll-unix/signal_arm64_ios.c"
+if git -C "$DEST" apply --reverse --check "$ARM64EC_PATCH" >/dev/null 2>&1; then
+  echo "ARM64EC Mach slowpath patch already applied."
+else
+  git -C "$DEST" apply --check "$ARM64EC_PATCH" || {
+    echo "ERROR: pinned Madeira ARM64EC source no longer matches the safe Mach resume patch." >&2
+    exit 2
+  }
+  git -C "$DEST" apply "$ARM64EC_PATCH"
+fi
+grep -Fq 'brk #0x5a5a' "$ARM64EC_SOURCE" || {
+  echo "ERROR: scoped ARM64EC Mach resume is absent from compiled Madeira sources." >&2
+  exit 2
+}
+
 echo "Madeira sources checked out at $REV"
 echo "Source checkout complete. Run bash scripts/build_native_runtime.sh on macOS to compile, link and package."
 echo "Read $DEST/docs/BUILDING.md for the platform toolchains and licensed prerequisites."

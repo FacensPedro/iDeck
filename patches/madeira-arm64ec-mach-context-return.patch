@@ -1,0 +1,194 @@
+diff --git a/build/ntdll-unix/signal_arm64_ios.c b/build/ntdll-unix/signal_arm64_ios.c
+--- a/build/ntdll-unix/signal_arm64_ios.c
++++ b/build/ntdll-unix/signal_arm64_ios.c
+@@ -1487,9 +1487,126 @@
+     dprintf( 2, "[jit-dump] ml1242 %s: wrote %zu of %zu pool bytes to %s (untouched pages left as holes)\n",
+              why, written, total, path );
+ }
+ 
+-static void *ios_mach_exception_thread( void *arg )
++/* iDeck ARM64EC slow-context return:
++ * A normal SIGUSR2 raised from Wine's syscall dispatcher is intercepted as an
++ * EXC_BREAKPOINT in Apple's pthread_kill/raise host machinery under StikDebug.
++ * It is not a guest instruction fault: forwarding it as EXC_BAD_INSTRUCTION
++ * terminates otherwise valid Windows games with STATUS_ILLEGAL_INSTRUCTION.
++ *
++ * A reserved BRK here is only serviced for the registered Wine thread, at
++ * Wine's own slowpath symbol, with a complete and validated syscall frame.
++ * Mach restores x16/x17/x18 and the SIMD state directly. No sigreturn
++ * trampoline is needed (that would destroy FEX's live x17 callret pointer).
++ * Other breakpoints, host faults and debugger protocol BRKs are untouched.
++ */
++#ifdef WINE_IOS
++void syscall_dispatcher_return_slowpath(void);
++#define IDECK_ARM64EC_RETURN_BRK 0xd42b4b40u /* brk #0x5a5a */
++
++static int ios_mach_resume_arm64ec_slowpath( thread_t thread, uintptr_t teb,
++        const arm_thread_state64_t *original, mach_msg_type_number_t state_count,
++        const arm_neon_state64_t *neon, mach_msg_type_number_t neon_count,
++        int have_neon )
++{
++    uint64_t pc = arm_thread_state64_get_pc( *original );
++    uintptr_t symbol = (uintptr_t)syscall_dispatcher_return_slowpath;
++    uint32_t insn = 0;
++    vm_size_t got = 0;
++    uint64_t teb_self = 0, frame_ptr = 0;
++    struct syscall_frame frame;
++    arm_thread_state64_t next;
++    arm_neon_state64_t next_neon;
++    unsigned i;
++    kern_return_t kr;
++
++    /* Both the exact BRK and its source matter: never adopt an arbitrary
++     * app/guest breakpoint (or a StikDebug BRK #0xf00d) as a context restore. */
++    if (!have_neon || !teb || teb < 0x100000000ull || (teb & 0xfff) ||
++        pc < symbol || pc - symbol >= 256 || (pc & 3))
++        return 0;
++    if (vm_read_overwrite( mach_task_self(), pc, sizeof(insn),
++            (vm_address_t)(uintptr_t)&insn, &got ) != KERN_SUCCESS ||
++        got != sizeof(insn) || insn != IDECK_ARM64EC_RETURN_BRK)
++        return 0;
++
++    got = 0;
++    if (vm_read_overwrite( mach_task_self(), teb + 0x30,
++            sizeof(teb_self), (vm_address_t)(uintptr_t)&teb_self,
++            &got ) != KERN_SUCCESS || got != sizeof(teb_self) || teb_self != teb)
++        return 0;
++    got = 0;
++    /* Madeira's TEB + 0x378 is ntdll_thread_data->syscall_frame;
++     * do not dereference guest or stale thread pointers in the Mach server. */
++    if (vm_read_overwrite( mach_task_self(), teb + 0x378,
++            sizeof(frame_ptr), (vm_address_t)(uintptr_t)&frame_ptr,
++            &got ) != KERN_SUCCESS || got != sizeof(frame_ptr) ||
++        frame_ptr < 0x100000000ull || (frame_ptr & 15))
++        return 0;
++    got = 0;
++    if (vm_read_overwrite( mach_task_self(), frame_ptr, sizeof(frame),
++            (vm_address_t)(uintptr_t)&frame, &got ) != KERN_SUCCESS ||
++        got != sizeof(frame))
++        return 0;
++
++    /* The slowpath is entered only when CONTEXT_INTEGER is set and the
++     * original x16/x17 cannot be discarded by the Wine fast return. */
++    if (!(frame.restore_flags & CONTEXT_INTEGER) ||
++        frame.pc < 0x100000000ull || (frame.pc & 3) ||
++        frame.sp < 0x100000000ull || (frame.sp & 15) ||
++        (frame.x[18] && frame.x[18] != teb))
++        return 0;
++
++    next = *original;
++    for (i = 0; i < 29; ++i) next.__x[i] = frame.x[i];
++    next.__x[18] = teb; /* x18 is the ARM64EC TEB, never Apple's host TLS. */
++    next.__fp = frame.fp;
++    next.__lr = frame.lr;
++    __darwin_arm_thread_state64_set_sp( next, frame.sp );
++    __darwin_arm_thread_state64_set_pc_fptr( next,
++                                             (void *)(uintptr_t)frame.pc );
++    /* Only user NZCV may change; preserve PSTATE mask bits from the kernel. */
++    next.__cpsr = (original->__cpsr & ~0xf0000000u) |
++                   (frame.cpsr & 0xf0000000u);
++
++    next_neon = *neon;
++    memcpy( next_neon.__v, frame.v, sizeof(frame.v) );
++    next_neon.__fpcr = frame.fpcr;
++    next_neon.__fpsr = frame.fpsr;
++    kr = thread_set_state( thread, ARM_NEON_STATE64,
++                           (thread_state_t)&next_neon, neon_count );
++    if (kr != KERN_SUCCESS)
++    {
++        dprintf( 2, "[arm64ec-context] SIMD restore rejected kr=%d\n", kr );
++        return 0;
++    }
++    kr = thread_set_state( thread, ARM_THREAD_STATE64,
++                           (thread_state_t)&next, state_count );
++    if (kr != KERN_SUCCESS)
++    {
++        /* Roll back the NEON state if the integer/control state is rejected. */
++        thread_set_state( thread, ARM_NEON_STATE64,
++                          (thread_state_t)neon, neon_count );
++        dprintf( 2, "[arm64ec-context] GPR restore rejected kr=%d\n", kr );
++        return 0;
++    }
++    {
++        static volatile unsigned restored;
++        unsigned n = __sync_add_and_fetch( &restored, 1 );
++        if (n <= 8 || !(n % 1000))
++            dprintf( 2, "[arm64ec-context] restored #%u pc=%p sp=%p "
++                        "x16=%p x17=%p x18=TEB (Mach, no SIGUSR2)\n",
++                     n, (void *)(uintptr_t)frame.pc,
++                     (void *)(uintptr_t)frame.sp,
++                     (void *)(uintptr_t)frame.x[16],
++                     (void *)(uintptr_t)frame.x[17] );
++    }
++    return 1;
++}
++#endif
++
++static void *ios_mach_exception_thread( void *arg )
+ {
+     mach_port_t port = (mach_port_t)(uintptr_t)arg;
+ 
+     /* Name this thread for debugging */
+@@ -1999,11 +2116,20 @@
+         arm_neon_state64_t neon_state;
+         mach_msg_type_number_t neon_count = ARM_NEON_STATE64_COUNT;
+         int have_neon = (thread_get_state(thread, ARM_NEON_STATE64,
+                                           (thread_state_t)&neon_state, &neon_count) == KERN_SUCCESS);
+-        if (kr == KERN_SUCCESS)
+-        {
+-            uintptr_t fault_addr = (uintptr_t)req->code[1];
++        if (kr == KERN_SUCCESS)
++        {
++#ifdef WINE_IOS
++            if (req->exception == EXC_BREAKPOINT &&
++                ios_mach_resume_arm64ec_slowpath( thread, thread_teb,
++                    &state, count, &neon_state, neon_count, have_neon ))
++            {
++                handled = 1;
++                goto ios_mach_send_reply;
++            }
++#endif
++            uintptr_t fault_addr = (uintptr_t)req->code[1];
+ #ifdef WINE_IOS
+             /* ml939: THE SUB-FLOOR SERVICE BELONGS HERE, NOT IN segv_handler.
+              *
+              * ml938 put it in segv_handler and the emulation itself was correct --
+@@ -6382,9 +6508,10 @@
+                 }
+             }
+         }
+ 
+-        /* Build reply */
++ios_mach_send_reply:
++        /* Build reply */
+         ios_exc_reply_t reply;
+         reply.head.msgh_bits = MACH_MSGH_BITS( MACH_MSGH_BITS_REMOTE(req->head.msgh_bits), 0 );
+         reply.head.msgh_size = sizeof(reply);
+         reply.head.msgh_remote_port = req->head.msgh_remote_port;
+@@ -13937,12 +14064,22 @@
+ 
+ /***********************************************************************
+  *           syscall_dispatcher_return_slowpath
+  */
+-void syscall_dispatcher_return_slowpath(void)
+-{
+-    raise( SIGUSR2 );
+-}
++void syscall_dispatcher_return_slowpath(void)
++{
++#ifdef WINE_IOS
++    /* Guest CONTEXT_INTEGER needs both x16 and x17 restored. SIGUSR2 via
++     * Apple's raise/pthread_kill is intercepted as a Mach breakpoint under
++     * StikDebug; it cannot faithfully restore FEX's live x17 and x18.
++     * The registered Wine Mach handler recognises this exact BRK and
++     * resumes the suspended thread from the full ntdll syscall frame. */
++    __asm__ volatile( "brk #0x5a5a" ::: "memory" );
++    __builtin_unreachable();
++#else
++    raise( SIGUSR2 );
++#endif
++}
+ 
+ /***********************************************************************
+  *           init_syscall_frame
+  */

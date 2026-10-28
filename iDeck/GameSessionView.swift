@@ -1,6 +1,7 @@
 import SwiftUI
 import Metal
 import Darwin
+import UIKit
 
 private final class GameRuntimeMetrics: ObservableObject {
     @Published private(set) var fps = "N/D"
@@ -64,6 +65,8 @@ struct GameSessionView: View {
     @State private var showActiveWineAlert = false
     @State private var closeRequested = false
     @State private var recentWineLogFinding: String?
+    @State private var logCopyMessage: String?
+    @State private var isCopyingWineLog = false
 
     private var gameLoading: (progress: Double, stage: String)? {
         let status = coordinator.windowsStatus
@@ -95,6 +98,26 @@ struct GameSessionView: View {
         return FileManager.default.fileExists(atPath: url.path) ? url : nil
     }
 
+    private func copyWineLog() {
+        guard let url = wineLogURL, !isCopyingWineLog else { return }
+        isCopyingWineLog = true
+        logCopyMessage = nil
+        Task {
+            let content = await Task.detached(priority: .utility) {
+                try? WineLogClipboard.read(from: url)
+            }.value
+            isCopyingWineLog = false
+            guard let content else {
+                logCopyMessage = "Could not copy Wine log."
+                return
+            }
+            UIPasteboard.general.string = content.text
+            logCopyMessage = content.truncated
+                ? "The newest 4 MiB of the Wine log were copied. Share the file for the complete log."
+                : "Wine log copied to the clipboard."
+        }
+    }
+
     // Based on Madeira's LogSummary, but performs a bounded, privacy-safe
     // native scan only on a launch error rather than parsing a large log on
     // each SwiftUI refresh.
@@ -116,6 +139,10 @@ struct GameSessionView: View {
             recentWineLogFinding = "Last Wine log indicates a Windows program memory access violation."
         case 5:
             recentWineLogFinding = "Last Wine log indicates a missing or incompatible DLL."
+        case 6:
+            recentWineLogFinding = "A 32-bit Windows program could not reserve its WoW64 address window. iPadOS virtual address space is insufficient for the current Madeira memory policy."
+        case 7:
+            recentWineLogFinding = "Wine/FEX encountered an unhandled native ARM64EC exception (x18 handler) and terminated with NTSTATUS 0xC000001D. This is a runtime compatibility failure, not proof of a missing game DLL."
         default:
             recentWineLogFinding = nil
         }
@@ -156,6 +183,16 @@ struct GameSessionView: View {
                     }
                     .accessibilityLabel("Close Wine session")
                     Spacer()
+                    if wineLogURL != nil {
+                        Button(action: copyWineLog) {
+                            Image(systemName: "doc.on.doc.fill")
+                                .font(.system(size: 20, weight: .medium))
+                                .foregroundColor(.white)
+                                .frame(width: 44, height: 44)
+                        }
+                        .disabled(isCopyingWineLog)
+                        .accessibilityLabel(tr("Copy Wine log"))
+                    }
                     if coordinator.isHUDEnabled {
                         VStack(alignment: .trailing, spacing: 3) {
                             Text("FPS: \(metrics.fps)  CPU: \(metrics.cpu)")
@@ -168,6 +205,14 @@ struct GameSessionView: View {
                         .padding(8)
                         .background(.black.opacity(0.75), in: RoundedRectangle(cornerRadius: 8))
                     }
+                }
+                if let logCopyMessage {
+                    Text(tr(logCopyMessage))
+                        .font(.caption)
+                        .foregroundColor(.white)
+                        .padding(8)
+                        .background(.black.opacity(0.8), in: RoundedRectangle(cornerRadius: 8))
+                        .padding(.horizontal, 12)
                 }
                 if let loading = gameLoading {
                     VStack(alignment: .leading, spacing: 7) {
@@ -217,8 +262,14 @@ struct GameSessionView: View {
                                 .foregroundColor(.orange)
                         }
                         if let logURL = wineLogURL {
-                            ShareLink(item: logURL) {
-                                Label(tr("Share Wine log"), systemImage: "square.and.arrow.up")
+                            HStack(spacing: 20) {
+                                Button(action: copyWineLog) {
+                                    Label(tr("Copy Wine log"), systemImage: "doc.on.doc")
+                                }
+                                .disabled(isCopyingWineLog)
+                                ShareLink(item: logURL) {
+                                    Label(tr("Share Wine log"), systemImage: "square.and.arrow.up")
+                                }
                             }
                             .font(.subheadline.weight(.semibold))
                             Text(tr("Wine logs can contain personal or account information. Review before sharing."))
