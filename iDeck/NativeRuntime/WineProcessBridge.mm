@@ -1,4 +1,5 @@
 #import "MadeiraRuntimeBridge.h"
+#include <dispatch/dispatch.h>
 #include <dlfcn.h>
 #include <cerrno>
 #include <climits>
