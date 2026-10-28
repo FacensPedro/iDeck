@@ -200,6 +200,7 @@ jobs:
         run: |
           xcrun swiftc iDeck/SteamCDNHostSelection.swift tests/host/SteamCDNHostSelectionTests.swift -o /tmp/ideck-cdn-selection-tests
           /tmp/ideck-cdn-selection-tests
+          python3 -m unittest discover -s tests/host -p 'test_steam_ip_routing.py' -v
 
       - name: Test graphics DLL override isolation
         run: |
