@@ -112,6 +112,8 @@ The emulated-game screen shows a **startup milestone percentage** for environmen
 
 The **X** button requests a graceful Windows close using the same Alt+F4 keyboard event queue as Madeira. If the game remains active, the Metal surface is **not** detached. If the keyboard bridge is unavailable or the game is frozen, use the game's own menu or close iDeck using the iPadOS app switcher. As with Madeira, the current in-process Wine server can run only one session in each iDeck process.
 
+For launchers that create a child game process and exit, each game's settings offer **Keep child game processes running (experimental)**. It enables Madeira's opt-in `MADEIRA_WAIT_CHILDREN=1` for that game only. Leave it off for ordinary programs: it can extend or hang the Wine session after gameplay.
+
 The IPA requests **increased-memory-limit** when its signing profile permits it. The entitlement is never guaranteed by declaring it in the project file; check the signed application's granted entitlements.
 
 ## Troubleshooting

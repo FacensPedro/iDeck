@@ -7,6 +7,9 @@ BRIDGE = (ROOT / "iDeck/NativeRuntime/WineProcessBridge.mm").read_text()
 HEADER = (ROOT / "iDeck/NativeRuntime/MadeiraRuntimeBridge.h").read_text()
 NATIVE = (ROOT / "iDeck/NativeRuntime/MadeiraRuntimeBridge.mm").read_text()
 ENTITLEMENTS = (ROOT / "iDeck/iDeck.entitlements").read_text()
+PROFILES = (ROOT / "iDeck/WindowsLibraryModels.swift").read_text()
+ENVIRONMENT = (ROOT / "iDeck/WindowsEnvironment.swift").read_text()
+UI = (ROOT / "iDeck/MainView.swift").read_text()
 
 
 class WineStartupSessionTests(unittest.TestCase):
@@ -37,6 +40,13 @@ class WineStartupSessionTests(unittest.TestCase):
         self.assertIn('setenv("MADEIRA_WORKDIR", windowsFolder.UTF8String, 1)', NATIVE)
         self.assertIn('unsetenv("MADEIRA_WORKDIR")', NATIVE)
         self.assertIn("MADEIRA_WORKDIR", NATIVE)
+
+    def test_opt_in_child_process_compatibility(self):
+        self.assertIn("var keepChildProcessesRunning: Bool = false", PROFILES)
+        self.assertIn("decodeIfPresent(Bool.self, forKey: .keepChildProcessesRunning) ?? false", PROFILES)
+        self.assertIn('setenv("MADEIRA_WAIT_CHILDREN", "1", 1)', ENVIRONMENT)
+        self.assertIn('unsetenv("MADEIRA_WAIT_CHILDREN")', ENVIRONMENT)
+        self.assertIn("isOn: $profile.keepChildProcessesRunning", UI)
 
     def test_memory_entitlement_is_requested(self):
         self.assertIn("com.apple.developer.kernel.increased-memory-limit", ENTITLEMENTS)
