@@ -14,6 +14,8 @@ struct WindowsLaunchProgressTests {
             progress = WindowsLaunchProgress.advance(current: progress, status: status)
             assert(progress == expected)
         }
+        assert(WindowsLaunchProgress.advance(current: 10, status: "Preparing executable...") == 20)
+        assert(WindowsLaunchProgress.shouldDisplay(status: "Preparing executable...", percentage: 20))
         assert(progress == 90)
         assert(WindowsLaunchProgress.shouldDisplay(status: "Running", percentage: progress))
         assert(WindowsLaunchProgress.afterFirstFrame(current: progress, wineRunning: false) == 90)
