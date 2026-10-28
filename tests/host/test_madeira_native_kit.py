@@ -30,7 +30,9 @@ class MadeiraNativeKitTests(unittest.TestCase):
 
     def entries(self, wow64=False, mono=False):
         data = {
-            "archives/" + name: b"!<arch>\n" + name.encode()
+            "archives/" + name: b"!<arch>\n" + name.encode() + (
+                kit.ARM64EC_MACH_RETURN_BYTES if name == "libntdll_unix.a" else b""
+            )
             for name in kit.ARCHIVES
         }
         data.update({
@@ -124,6 +126,14 @@ class MadeiraNativeKitTests(unittest.TestCase):
         with self.assertRaisesRegex(kit.KitError, "duplicate"):
             kit.inspect(path, False, False)
 
+    def test_rejects_binary_without_mach_return_even_with_current_metadata(self):
+        entries = self.entries()
+        entries["archives/libntdll_unix.a"] = b"!<arch>\n" + b"old-native"
+        path = self.save(entries)
+        with self.assertRaisesRegex(kit.KitError, "ARM64EC Mach return opcode missing"):
+            kit.install(path, self.root / "old-code", False, False)
+        self.assertFalse((self.root / "old-code").exists())
+
     def test_rejects_old_or_wrong_arm64ec_runtime(self):
         entries = self.entries()
         path = self.save(entries)
@@ -158,7 +168,10 @@ class MadeiraNativeKitTests(unittest.TestCase):
         bridge = self.root / "build/madeira-native"
         for name, path in kit.archive_paths(madeira, bridge).items():
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_bytes(b"!<arch>\n" + name.encode())
+            path.write_bytes(
+                b"!<arch>\n" + name.encode() +
+                (kit.ARM64EC_MACH_RETURN_BYTES if name == "libntdll_unix.a" else b"")
+            )
 
         for wow64 in (False, True):
             with self.subTest(wow64=wow64):
