@@ -180,7 +180,7 @@ function JIT26HandleBrk0xf00d(brkResponse) {
 function JIT26PrepareRegion(brkResponse) {
     let jitPageAddress = x0;
     if (x0 === 0n && x1 > 0n) {
-        const response = send_command(_M${x1.toString(16)},rx`);
+        const response = send_command(`_M${x1.toString(16)},rx`);
         const address = typeof response === "string" ? response.trim().replace(/^0x/i, "") : "";
         if (/^[0-9a-fA-F]{1,16}$/.test(address)) {
             const candidate = BigInt("0x" + address);
