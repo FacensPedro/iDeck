@@ -67,8 +67,8 @@ restart FEX, Wine or the debugger.
 The iDeck root view now starts without reading a Steam token, creating the
 Steam library/session or probing the native FEX/Wine JIT pool. Even native
 memory notifications are configured only after the user selects Madeira or
-LiveContainer. The Steam model is constructed within the selected workspace,
-not in the home-screen root. The runtime and JIT behavior during an explicit
+LiveContainer. The Steam model is created lazily when the user first selects a workspace,
+then retained while navigating home so active installations are not discarded. The runtime and JIT behavior during an explicit
 Madeira launch remains unchanged.
 
 This also supports a signed **iPadOS 26 or later** installation; the app and
