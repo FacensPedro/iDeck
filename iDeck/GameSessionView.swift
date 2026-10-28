@@ -85,6 +85,14 @@ struct GameSessionView: View {
         }
         return nil
     }
+    private var wineLogURL: URL? {
+        guard let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            return nil
+        }
+        let url = documents.appendingPathComponent("madeira-log.txt", isDirectory: false)
+        return FileManager.default.fileExists(atPath: url.path) ? url : nil
+    }
+
     private let tick = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     var body: some View {
@@ -172,10 +180,22 @@ struct GameSessionView: View {
                         .font(.caption)
                         .foregroundColor(.orange)
                 } else if coordinator.windowsStatus.hasPrefix("Execution Error") {
-                    Text(trStatus(coordinator.windowsStatus))
-                        .foregroundColor(.red)
-                        .padding(10)
-                        .background(.black.opacity(0.7), in: RoundedRectangle(cornerRadius: 8))
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text(trStatus(coordinator.windowsStatus))
+                            .foregroundColor(.red)
+                        if let logURL = wineLogURL {
+                            ShareLink(item: logURL) {
+                                Label(tr("Share Wine log"), systemImage: "square.and.arrow.up")
+                            }
+                            .font(.subheadline.weight(.semibold))
+                            Text(tr("Wine logs can contain personal or account information. Review before sharing."))
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                        }
+                    }
+                    .padding(12)
+                    .background(.black.opacity(0.7), in: RoundedRectangle(cornerRadius: 8))
+                    .padding(.horizontal, 12)
                 } else if coordinator.windowsStatus == "Running" && !WindowsRendererView.isNativeDisplayLinked {
                     Text(tr("Madeira display backend is missing. This build cannot present Windows graphics."))
                         .foregroundColor(.orange)
