@@ -42,12 +42,21 @@ if [[ "${IDECK_REQUIRE_MADEIRA:-0}" == "1" ]]; then
     else
       REPO_KIT="$(python3 scripts/madeira_native_kit.py path ${KIT_FLAGS[@]+"${KIT_FLAGS[@]}"})"
       CACHE_KIT="$(python3 scripts/madeira_native_kit.py path --cache ${KIT_FLAGS[@]+"${KIT_FLAGS[@]}"})"
-      if [[ -s "$REPO_KIT" ]]; then
-        KIT_ARCHIVE="$REPO_KIT"
-      elif [[ -s "$CACHE_KIT" ]]; then
-        KIT_ARCHIVE="$CACHE_KIT"
-      fi
+      # Prefer the repository archive when valid, but never load an old
+      # FEX/Wine binary that predates the required ARM64EC Mach context patch.
+      for CANDIDATE in "$REPO_KIT" "$CACHE_KIT"; do
+        if [[ -s "$CANDIDATE" ]] &&
+           python3 scripts/madeira_native_kit.py inspect --archive "$CANDIDATE" ${KIT_FLAGS[@]+"${KIT_FLAGS[@]}"} >/dev/null 2>&1; then
+          KIT_ARCHIVE="$CANDIDATE"
+          break
+        fi
+      done
     fi
+  fi
+  if [[ -n "$KIT_ARCHIVE" ]] &&
+     ! python3 scripts/madeira_native_kit.py inspect --archive "$KIT_ARCHIVE" ${KIT_FLAGS[@]+"${KIT_FLAGS[@]}"}; then
+    echo "ERROR: Selected Madeira kit predates the ARM64EC Mach-context fix. Build from sources." >&2
+    exit 2
   fi
   if [[ -n "$KIT_ARCHIVE" ]]; then
     python3 scripts/madeira_native_kit.py install --archive "$KIT_ARCHIVE" ${KIT_FLAGS[@]+"${KIT_FLAGS[@]}"}

@@ -30,7 +30,9 @@ class MadeiraNativeKitTests(unittest.TestCase):
 
     def entries(self, wow64=False, mono=False):
         data = {
-            "archives/" + name: b"!<arch>\n" + name.encode()
+            "archives/" + name: b"!<arch>\n" + name.encode() + (
+                kit.ARM64EC_MACH_RETURN_BYTES if name == "libntdll_unix.a" else b""
+            )
             for name in kit.ARCHIVES
         }
         data.update({
@@ -60,6 +62,7 @@ class MadeiraNativeKitTests(unittest.TestCase):
             "platform": "iphoneos-arm64",
             "wow64": wow64,
             "wine_mono": mono,
+            "arm64ec_context_patch_sha256": kit.ARM64EC_CONTEXT_PATCH_SHA256,
             "files": {
                 name: {
                     "sha256": hashlib.sha256(data).hexdigest(),
@@ -123,6 +126,28 @@ class MadeiraNativeKitTests(unittest.TestCase):
         with self.assertRaisesRegex(kit.KitError, "duplicate"):
             kit.inspect(path, False, False)
 
+    def test_rejects_binary_without_mach_return_even_with_current_metadata(self):
+        entries = self.entries()
+        entries["archives/libntdll_unix.a"] = b"!<arch>\n" + b"old-native"
+        path = self.save(entries)
+        with self.assertRaisesRegex(kit.KitError, "ARM64EC Mach return opcode missing"):
+            kit.install(path, self.root / "old-code", False, False)
+        self.assertFalse((self.root / "old-code").exists())
+
+    def test_rejects_old_or_wrong_arm64ec_runtime(self):
+        entries = self.entries()
+        path = self.save(entries)
+        with zipfile.ZipFile(path) as archive:
+            meta = json.loads(archive.read("metadata.json"))
+            files = {name: archive.read(name) for name in archive.namelist() if name != "metadata.json"}
+        meta["arm64ec_context_patch_sha256"] = "0" * 64
+        with zipfile.ZipFile(path, "w") as archive:
+            archive.writestr("metadata.json", json.dumps(meta))
+            for name, data in files.items():
+                archive.writestr(name, data)
+        with self.assertRaisesRegex(kit.KitError, "ARM64EC Mach context patch mismatch"):
+            kit.inspect(path, False, False)
+
     def test_rejects_revision_mismatch(self):
         path = self.save(self.entries(), revision="0" * 40)
         with self.assertRaisesRegex(kit.KitError, "revision/platform/options mismatch"):
@@ -143,7 +168,10 @@ class MadeiraNativeKitTests(unittest.TestCase):
         bridge = self.root / "build/madeira-native"
         for name, path in kit.archive_paths(madeira, bridge).items():
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_bytes(b"!<arch>\n" + name.encode())
+            path.write_bytes(
+                b"!<arch>\n" + name.encode() +
+                (kit.ARM64EC_MACH_RETURN_BYTES if name == "libntdll_unix.a" else b"")
+            )
 
         for wow64 in (False, True):
             with self.subTest(wow64=wow64):
@@ -186,7 +214,10 @@ class MadeiraNativeKitTests(unittest.TestCase):
                 destination.write_bytes(value)
         for name, path in kit.archive_paths(madeira, bridge).items():
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_bytes(b"!<arch>\n" + name.encode())
+            path.write_bytes(
+                b"!<arch>\n" + name.encode() +
+                (kit.ARM64EC_MACH_RETURN_BYTES if name == "libntdll_unix.a" else b"")
+            )
         with mock.patch.object(kit.subprocess, "check_output", return_value=kit.REVISION + "\n"):
             output = self.root / "built.zip"
             kit.build_kit(output, madeira, bridge, False, False, resource_root)

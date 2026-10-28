@@ -100,6 +100,13 @@ jobs:
           python3 -m unittest discover -s tests/host -p 'test_dxmt_shader_patch.py' -v
           python3 -m unittest discover -s tests/host -p 'test_madeira_game_backports.py' -v
 
+      - name: Test native ARM64EC syscall context restoration
+        run: |
+          python3 -m unittest discover -s tests/host -p 'test_arm64ec_mach_slowpath.py' -v
+          python3 -m unittest discover -s tests/host -p 'test_arm64ec_mach_compile.py' -v
+          bash -n scripts/fetch_madeira_sources.sh
+          bash -n scripts/build_ipa.sh
+
       - name: Test StikDebug universal JIT register encoding
         run: node tests/host/universal_jit_register_tests.js
 
@@ -308,12 +315,23 @@ jobs:
           if [[ "$IDECK_BUNDLE_WINE_MONO" == "1" ]]; then OPTIONS+=(--mono); fi
           SOURCE="$(python3 scripts/madeira_native_kit.py path ${OPTIONS[@]+"${OPTIONS[@]}"})"
           CACHE="$(python3 scripts/madeira_native_kit.py path --cache ${OPTIONS[@]+"${OPTIONS[@]}"})"
-          if [[ -s "$SOURCE" || -s "$CACHE" ]]; then
+          FOUND=""
+          for ARCHIVE in "$SOURCE" "$CACHE"; do
+            if [[ -s "$ARCHIVE" ]] &&
+               python3 scripts/madeira_native_kit.py inspect --archive "$ARCHIVE" ${OPTIONS[@]+"${OPTIONS[@]}"} >/dev/null 2>&1; then
+              FOUND="$ARCHIVE"
+              break
+            fi
+            if [[ -s "$ARCHIVE" ]]; then
+              echo "Discarding stale runtime kit lacking the ARM64EC Mach context restore: $ARCHIVE"
+            fi
+          done
+          if [[ -n "$FOUND" ]]; then
             echo "available=true" >> "$GITHUB_OUTPUT"
-            echo "Found native kit: no FEX/Wine/DXMT download or LLVM recompilation necessary."
+            echo "Verified native kit including the ARM64EC Mach context return: $FOUND"
           else
             echo "available=false" >> "$GITHUB_OUTPUT"
-            echo "Compiling Madeira once and caching its binaries for subsequent IPAs."
+            echo "No matching patched runtime kit. Rebuilding Madeira/FEX/Wine and caching the new binaries."
           fi
 
       - name: Install and validate Metal Toolchain

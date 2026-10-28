@@ -13,6 +13,13 @@ from pathlib import Path, PurePosixPath
 
 ROOT = Path(__file__).resolve().parents[1]
 REVISION = os.environ.get("IDECK_MADEIRA_REV", "fd9f2f3d0434a4116e4c3351f286a0fc376b4e36")
+# Prebuilt kits must contain the compiled ARM64EC Mach slow-context fix.
+# Hash the EXACT native overlay. A previous binary with the same upstream
+# Madeira commit cannot be mistaken for a patched native runtime.
+ARM64EC_CONTEXT_PATCH_SHA256 = hashlib.sha256(
+    (Path(__file__).resolve().parents[1] /
+     "patches/madeira-arm64ec-mach-context-return.patch").read_bytes()
+).hexdigest()
 ARCHIVES = (
     "libideck_madeira_upstream_bridges.a",
     "libFEXCore.a",
@@ -162,11 +169,32 @@ def collect(madeira: Path, bridge: Path, wow64: bool, mono: bool,
     return entries
 
 
+# The iOS ARM64 little-endian encoding of BRK #0x5A5A. Its presence in
+# libntdll_unix.a demonstrates that a kit's actual native binary contains
+# the new Mach-return call site, not merely a new metadata label.
+ARM64EC_MACH_RETURN_BYTES = bytes.fromhex("404b2bd4")
+
+
+def has_arm64ec_mach_return(path: Path) -> bool:
+    if not path.is_file():
+        return False
+    tail = b""
+    with path.open("rb") as stream:
+        for block in iter(lambda: stream.read(1024 * 1024), b""):
+            if ARM64EC_MACH_RETURN_BYTES in tail + block:
+                return True
+            tail = block[-3:]
+    return False
+
+
 def build_kit(output: Path, madeira: Path, bridge: Path, wow64: bool, mono: bool,
               resource_root: Path | None = None) -> None:
     rev = subprocess.check_output(["git", "-C", str(madeira), "rev-parse", "HEAD"], text=True).strip()
     if rev != REVISION:
         raise KitError(f"Madeira revision differs: expected {REVISION}, got {rev}")
+    native_ntdll = madeira / "app/Madeira/libntdll_unix.a"
+    if not has_arm64ec_mach_return(native_ntdll):
+        raise KitError("ARM64EC Mach return opcode missing from compiled Wine ntdll Unix archive")
     entries = collect(madeira, bridge, wow64, mono, resource_root)
     total = sum(path.stat().st_size for path in entries.values())
     if total > MAX_TOTAL:
@@ -174,7 +202,9 @@ def build_kit(output: Path, madeira: Path, bridge: Path, wow64: bool, mono: bool
     hashes = {name: {"sha256": digest_file(path), "size": path.stat().st_size}
               for name, path in sorted(entries.items())}
     metadata = {"schema": 1, "madeira_revision": REVISION, "platform": "iphoneos-arm64",
-                "wow64": wow64, "wine_mono": mono, "files": hashes}
+                "wow64": wow64, "wine_mono": mono,
+                "arm64ec_context_patch_sha256": ARM64EC_CONTEXT_PATCH_SHA256,
+                "files": hashes}
     output.parent.mkdir(parents=True, exist_ok=True)
     temporary = output.with_suffix(".zip.part")
     try:
@@ -218,6 +248,8 @@ def inspect(archive: Path, wow64: bool, mono: bool):
            metadata.get("platform") != "iphoneos-arm64" or \
            metadata.get("wow64") is not wow64 or metadata.get("wine_mono") is not mono:
             raise KitError("Kit revision/platform/options mismatch; compile a matching native kit")
+        if metadata.get("arm64ec_context_patch_sha256") != ARM64EC_CONTEXT_PATCH_SHA256:
+            raise KitError("ARM64EC Mach context patch mismatch; rebuild the Madeira native kit")
         files = metadata.get("files")
         if not isinstance(files, dict) or set(names) != set(files) | {"metadata.json"}:
             raise KitError("Kit file list differs from signed inventory")
@@ -288,6 +320,8 @@ def install(archive: Path, output: Path, wow64: bool, mono: bool) -> None:
             if digest.hexdigest() != info["sha256"]:
                 raise KitError("Runtime kit SHA-256 mismatch: " + name)
         check_assets(temp / "resources", wow64, mono)
+        if not has_arm64ec_mach_return(temp / "archives/libntdll_unix.a"):
+            raise KitError("ARM64EC Mach return opcode missing from extracted Wine archive")
         if output.exists():
             shutil.rmtree(output)
         temp.replace(output)
