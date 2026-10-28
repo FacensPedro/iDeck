@@ -62,7 +62,6 @@ enum Translations {
         ],
         "Checking existing files %d%%": ["pt": "Verificando arquivos existentes %d%%", "es": "Verificando archivos existentes %d%%"],
         "Already on device: %@": ["pt": "Já está no dispositivo: %@", "es": "Ya está en el dispositivo: %@"],
-        "Madeira": ["pt": "Madeira", "es": "Madeira"],
         "Reconnect JIT debugger": ["pt": "Reconectar depurador JIT", "es": "Reconectar depurador JIT"],
         "Debugger connection": ["pt": "Conexão do depurador", "es": "Conexión del depurador"],
         "Attached": ["pt": "Conectado", "es": "Conectado"],
