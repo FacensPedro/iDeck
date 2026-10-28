@@ -1,4 +1,4 @@
-> **Automatic on-device extraction:** iDeck can download the official Microsoft x64 redistributable after user approval and extract the embedded CAB archives **on the iPad** using bundled libmspack. The Wine installer is not executed. All 14 DLLs must pass architecture and PE signature-table checks; if extraction fails, use the manual procedure described below.
+> **Automatic on-device extraction:** iDeck can download the official Microsoft x64 redistributable after user approval and extract the embedded and nested CAB archives (including `a10` and `a11`) **on the iPad** using bundled libmspack. The Wine installer is not executed. All 14 DLLs must pass architecture and PE signature-table checks; if extraction fails, use the manual procedure described below.
 
 # Microsoft Visual C++ no iDeck — guia de DLLs Windows x64
 

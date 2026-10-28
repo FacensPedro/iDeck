@@ -30,10 +30,7 @@ def pe_file(arch=0x8664, cert=True, identity=0):
     return bytes(blob)
 
 
-def make_cab(missing=None, machine=0x8664, cert=True):
-    names = [x for x in DLL_NAMES if x != missing]
-    files = [(f"F_CENTRAL_{name[:-4]}_amd64", pe_file(machine, cert, index + 1))
-             for index, name in enumerate(DLL_NAMES) if name != missing]
+def make_cab_payloads(files):
     total = b"".join(data for _, data in files)
     folder_bytes = bytearray()
     cursor = 0
@@ -51,6 +48,26 @@ def make_cab(missing=None, machine=0x8664, cert=True):
                          file_offset, 0, 3, 1, 1, len(files), 0, 1, 0)
     folder = struct.pack("<IHH", data_offset, 1, 0)
     return header + folder + folder_bytes + data_block
+
+
+def make_cab(missing=None, machine=0x8664, cert=True, names=DLL_NAMES, filename_style="central"):
+    files = []
+    for name in names:
+        if name == missing:
+            continue
+        index = DLL_NAMES.index(name)
+        stored_name = (f"F_CENTRAL_{name[:-4]}_amd64"
+                       if filename_style == "central" else f"{name}_amd64")
+        files.append((stored_name, pe_file(machine, cert, index + 1)))
+    return make_cab_payloads(files)
+
+
+def make_nested_cab(missing=None, machine=0x8664, cert=True):
+    inner_crt = make_cab(missing=missing, names=DLL_NAMES[:12],
+                         machine=machine, cert=cert, filename_style="dll")
+    inner_mfc = make_cab(missing=missing, names=DLL_NAMES[12:],
+                         machine=machine, cert=cert, filename_style="central")
+    return make_cab_payloads([("a10", inner_crt), ("a11", inner_mfc)])
 
 
 class ExtractorTests(unittest.TestCase):
@@ -76,6 +93,28 @@ class ExtractorTests(unittest.TestCase):
         self.assertEqual(sorted(p.name for p in stage.iterdir()), sorted(DLL_NAMES))
         for i, name in enumerate(DLL_NAMES):
             self.assertEqual((stage / name).read_bytes()[340], i + 1, name)
+
+    def test_realistic_nested_a10_a11_cabinets_extract_all_x64_dlls(self):
+        result, stage = self.extract(make_nested_cab())
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(sorted(p.name for p in stage.iterdir()), sorted(DLL_NAMES))
+        for i, name in enumerate(DLL_NAMES):
+            self.assertEqual((stage / name).read_bytes()[340], i + 1, name)
+
+    def test_nested_archives_missing_concrt140_are_rejected(self):
+        result, _ = self.extract(make_nested_cab(missing="concrt140.dll"))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("concrt140.dll", result.stdout)
+
+    def test_nested_archives_wrong_architecture_are_rejected(self):
+        result, _ = self.extract(make_nested_cab(machine=0x014C))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("concrt140.dll", result.stdout)
+
+    def test_nested_cab_without_mfc_is_rejected(self):
+        result, _ = self.extract(make_nested_cab(missing="mfc140.dll"))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("mfc140.dll", result.stdout)
 
     def test_missing_dll_fails_without_claiming_success(self):
         result, stage = self.extract(make_cab(missing="mfc140.dll"))
