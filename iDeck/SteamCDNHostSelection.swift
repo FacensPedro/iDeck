@@ -79,3 +79,56 @@ final class ContentHostHealth: @unchecked Sendable {
         return shouldReport
     }
 }
+
+
+/// Bounded, round-robin scheduling across Steam depots. Only the next work
+/// index for each depot is retained, even for very large games.
+struct SteamChunkScheduler {
+    private let counts: [Int]
+    private var offsets: [Int]
+    private var nextDepot = 0
+    private(set) var remaining: Int
+
+    init(counts: [Int]) {
+        self.counts = counts.map { max(0, $0) }
+        offsets = [Int](repeating: 0, count: counts.count)
+        remaining = self.counts.reduce(0, +)
+    }
+
+    mutating func next() -> (depot: Int, item: Int)? {
+        guard remaining > 0, !counts.isEmpty else { return nil }
+        for _ in counts.indices {
+            let depot = nextDepot
+            nextDepot = (nextDepot + 1) % counts.count
+            guard offsets[depot] < counts[depot] else { continue }
+            let item = offsets[depot]
+            offsets[depot] += 1
+            remaining -= 1
+            return (depot, item)
+        }
+        return nil
+    }
+
+    /// Ordered waves of depots that can write concurrently without touching
+    /// the same file. Depots whose manifests include the same output file
+    /// stay sequential (the later depot retains the final contents), while
+    /// independent depots can transfer together. An empty string is a
+    /// skipped/directory manifest entry, not a file.
+    static func batches(paths: [[String]]) -> [[Int]] {
+        var lastBatchForFile: [String: Int] = [:]
+        var batches: [[Int]] = []
+        for (depot, files) in paths.enumerated() {
+            let uniqueFiles = Set(files.filter { !$0.isEmpty })
+            var batch = 0
+            for file in uniqueFiles {
+                if let previous = lastBatchForFile[file] {
+                    batch = max(batch, previous + 1)
+                }
+            }
+            while batches.count <= batch { batches.append([]) }
+            batches[batch].append(depot)
+            for file in uniqueFiles { lastBatchForFile[file] = batch }
+        }
+        return batches
+    }
+}
