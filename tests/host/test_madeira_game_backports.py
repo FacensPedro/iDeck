@@ -90,10 +90,13 @@ class MadeiraCompatibilityBackportsTests(unittest.TestCase):
         self.assertIn('git -C "$DEST" apply --reverse --check "$COMPAT_PATCH"', fetch)
         self.assertIn('git -C "$DEST" apply --check "$COMPAT_PATCH"', fetch)
 
-    def test_settings_exposes_owner_supplied_compatibility_folder(self):
+    def test_automatic_vc_setup_preserves_madeira_documents_overlay(self):
         settings = (ROOT / "iDeck/SettingsView.swift").read_text(encoding="utf-8")
-        self.assertIn('appendingPathComponent("vcruntime", isDirectory: true)', settings)
-        self.assertIn('settingsSection(title: tr("Windows compatibility"))', settings)
+        bootstrap = (ROOT / "iDeck/VisualCRuntimeBootstrap.swift").read_text(encoding="utf-8")
+        coordinator = (ROOT / "iDeck/SystemCoordinator.swift").read_text(encoding="utf-8")
+        self.assertNotIn('settingsSection(title: tr("Windows compatibility"))', settings)
+        self.assertIn('documents.appendingPathComponent("vcruntime", isDirectory: true)', bootstrap)
+        self.assertIn('VisualCRuntimeBootstrap.extractAndInstall(', coordinator)
         self.assertNotIn("vc_redist.x64.exe", settings)
 
 
