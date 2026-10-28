@@ -185,6 +185,11 @@ struct GameSessionView: View {
                 coordinator.markFirstWindowsFrame()
             }
             coordinator.refreshWindowsSessionHealth()
+            if coordinator.wineCloseRequested == false &&
+                coordinator.windowsStatus.hasPrefix("Wine exited") &&
+                !ideck_wineprocess_running() {
+                presentationMode.wrappedValue.dismiss()
+            }
         }
         .alert(tr("Could not close Wine"), isPresented: $showActiveWineAlert) {
             Button("OK", role: .cancel) {}
