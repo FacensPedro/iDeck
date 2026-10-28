@@ -118,7 +118,7 @@ struct SteamChunkScheduler {
         var lastBatchForFile: [String: Int] = [:]
         var batches: [[Int]] = []
         for (depot, files) in paths.enumerated() {
-            let uniqueFiles = Set(files.filter { !$0.isEmpty })
+            let uniqueFiles = Set(files.filter { !$0.isEmpty }.map { $0.lowercased() })
             var batch = 0
             for file in uniqueFiles {
                 if let previous = lastBatchForFile[file] {
