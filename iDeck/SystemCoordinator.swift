@@ -708,7 +708,7 @@ class SystemCoordinator: ObservableObject {
             return "Execution Error: 32-bit Windows support (WoW64) is missing from this IPA."
         }
         if status == Int(EPERM) {
-            return "Execution Error: the FEX JIT needs StikDebug attached during startup."
+            return "Execution Error: FEX/Wine JIT requires StikDebug to stay attached until both executable-memory pools are prepared. Request JIT inside iDeck with its bundled debugger script."
         }
         if status == Int(ENOENT) {
             return "Execution Error: Wine prefix or runtime components are missing."
