@@ -81,6 +81,7 @@ struct MainView: View {
                     Button {
                         // Defer Steam Keychain and native JIT reads until the
                         // user explicitly opens Madeira, not at app launch.
+                        coordinator.configureNativeHostIfNeeded()
                         coordinator.loadSteamAccountIfNeeded()
                         selectedWorkspace = .pc
                         if !coordinator.isContainerReady {
@@ -93,6 +94,7 @@ struct MainView: View {
                     }
                     .buttonStyle(.plain)
                     Button {
+                        coordinator.configureNativeHostIfNeeded()
                         selectedWorkspace = .liveContainer
                     } label: {
                         modeTile(title: tr("LiveContainer"), symbol: "square.stack.3d.up.fill")
