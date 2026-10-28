@@ -115,6 +115,36 @@ extern "C" int32_t ideck_runtime_launch(const char *executable_path,
 
         int32_t prepared = ideck_runtime_prepare(wine_prefix);
         if (prepared != 0) return prepared;
+        /* Direct Steam game launches must carry their own app identity. Without
+         * it upstream Madeira currently falls back to a fixed test-game ID. */
+        id steamID = request[@"steamAppID"];
+        id steamFolder = request[@"steamInstallDirectory"];
+        if ((steamID == nil) != (steamFolder == nil)) return EINVAL;
+        unsetenv("MADEIRA_DOCK_SESSION");
+        unsetenv("MADEIRA_STEAM_APPID");
+        unsetenv("MADEIRA_STEAM_APPPATH");
+        if (steamID != nil) {
+            if (![steamID isKindOfClass:[NSNumber class]] ||
+                ![steamFolder isKindOfClass:[NSString class]]) return EINVAL;
+            NSNumber *appID = (NSNumber *)steamID;
+            NSString *appIDText = appID.stringValue;
+            if (appID.unsignedIntValue == 0 || appIDText.length > 10 ||
+                [appIDText rangeOfCharacterFromSet:
+                    [[NSCharacterSet decimalDigitCharacterSet] invertedSet]].location != NSNotFound)
+                return EINVAL;
+            NSString *canonicalFolder = [[NSURL fileURLWithPath:(NSString *)steamFolder]
+                URLByResolvingSymlinksInPath].path;
+            if (![canonicalFolder hasPrefix:root] ||
+                ![[NSFileManager defaultManager] fileExistsAtPath:canonicalFolder]) return EACCES;
+            NSString *relativeFolder = [canonicalFolder substringFromIndex:root.length];
+            if (relativeFolder.length == 0 || relativeFolder.length >= 850) return ENAMETOOLONG;
+            NSString *windowsFolder = [@"C:\\" stringByAppendingString:
+                [relativeFolder stringByReplacingOccurrencesOfString:@"/" withString:@"\\"]];
+            if (setenv("MADEIRA_STEAM_APPID", appIDText.UTF8String, 1) ||
+                setenv("MADEIRA_STEAM_APPPATH", windowsFolder.UTF8String, 1)) return errno;
+        }
+        if (setenv("MADEIRA_ENV_LOCKED", "MADEIRA_EXE,MADEIRA_ARGS,MADEIRA_STEAM_APPID,MADEIRA_STEAM_APPPATH", 1))
+            return errno;
         if (setenv("WINEPREFIX", wine_prefix, 1) != 0 ||
             setenv("MADEIRA_EXE", winExe.UTF8String, 1) != 0 ||
             setenv("MADEIRA_ARGS", argString.UTF8String, 1) != 0) return errno;
