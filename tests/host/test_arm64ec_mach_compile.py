@@ -199,13 +199,17 @@ class ARM64ECMachCompiledTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="ideck-apple-mach-arm64ec-") as tmp:
             source = pathlib.Path(tmp) / "resume-ios.c"
             source.write_text(APPLE_MACH_SHIM + patched_handler())
-            subprocess.run([
+            checked = subprocess.run([
                 xcrun, "--sdk", "iphoneos", "clang",
                 "-target", "arm64-apple-ios18.0",
                 "-isysroot", sdk, "-std=c11", "-Wall", "-Wextra",
                 "-Werror", "-Wno-unused-function", "-fsyntax-only",
                 str(source)],
-                check=True, capture_output=True, text=True)
+                capture_output=True, text=True)
+            self.assertEqual(
+                checked.returncode, 0,
+                "iPhoneOS Mach header compilation rejected native ARM64EC handler:\\n" +
+                checked.stdout + checked.stderr)
 
     def test_actual_native_mach_handler_with_mocked_kernel_calls(self):
         compiler = shutil.which("clang")
