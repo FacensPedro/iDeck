@@ -105,15 +105,15 @@ struct GameSessionView: View {
         }
         let diagnosis = url.path.withCString { ideck_wine_log_diagnose($0) }
         switch diagnosis {
-        case Int32(IDECK_WINE_LOG_JIT.rawValue):
+        case 1:
             recentWineLogFinding = "Last Wine log indicates an executable JIT allocation or mapping failure."
-        case Int32(IDECK_WINE_LOG_EXEC_PERMISSION.rawValue):
+        case 2:
             recentWineLogFinding = "Last Wine log indicates that executable memory permissions were denied."
-        case Int32(IDECK_WINE_LOG_OOM.rawValue):
+        case 3:
             recentWineLogFinding = "Last Wine log indicates the Windows process ran out of memory."
-        case Int32(IDECK_WINE_LOG_ACCESS_VIOLATION.rawValue):
+        case 4:
             recentWineLogFinding = "Last Wine log indicates a Windows program memory access violation."
-        case Int32(IDECK_WINE_LOG_MISSING_DLL.rawValue):
+        case 5:
             recentWineLogFinding = "Last Wine log indicates a missing or incompatible DLL."
         default:
             recentWineLogFinding = nil
