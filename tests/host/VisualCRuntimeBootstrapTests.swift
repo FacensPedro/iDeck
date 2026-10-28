@@ -48,6 +48,7 @@ struct VisualCRuntimeBootstrapTests {
         assert(!VisualCRuntimeBootstrap.hasPE(first))
         try pe.write(to: first)
         pe[0x98 + 112 + 32] = 0
+        pe[0x98 + 112 + 33] = 0
         try pe.write(to: first)
         assert(ideck_vcrt_valid_pe_x64(first.path) == 0)
 
