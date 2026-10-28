@@ -30,6 +30,10 @@ extern "C" bool ideck_fex_available(void) {
     return dlsym(RTLD_DEFAULT, "fex_initialize") != nullptr;
 }
 
+extern "C" bool ideck_jit_debugger_attached(void) {
+    return debugger_attached();
+}
+
 extern "C" bool ideck_fex_jit_ready(void) {
     std::lock_guard<std::mutex> lock(fex_mutex);
     // Once the FEX pool exists, further launches do not need a debugger
