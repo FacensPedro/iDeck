@@ -241,7 +241,8 @@ final class DepotDownloader {
 
                 // Finished tasks release slots. Changes in Low Power Mode or
                 // thermal state are applied before scheduling new chunks.
-                while inFlight < maxConcurrentChunks && enqueue() {}
+                let initialCapacity = maxConcurrentChunks
+                while inFlight < initialCapacity && enqueue() {}
                 for try await (depotIndex, key, bytes, written) in group {
                     inFlight -= 1
                     journals[depotIndex].append(key)
@@ -256,7 +257,8 @@ final class DepotDownloader {
                         }
                         report(state)
                     }
-                    while inFlight < maxConcurrentChunks && enqueue() {}
+                    let capacity = maxConcurrentChunks
+                    while inFlight < capacity && enqueue() {}
                 }
             }
         }
