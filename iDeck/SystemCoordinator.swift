@@ -388,6 +388,12 @@ class SystemCoordinator: ObservableObject {
     }
 
     private func prepareVisualCRuntimeIfNeeded(prefix: URL, resume: @escaping () -> Void) -> Bool {
+        if !Thread.isMainThread {
+            DispatchQueue.main.async { [weak self] in
+                _ = self?.prepareVisualCRuntimeIfNeeded(prefix: prefix, resume: resume)
+            }
+            return true
+        }
         let prefix = prefix.standardizedFileURL
         let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
         if VisualCRuntimeBootstrap.installed(in: prefix, documents: documents) {

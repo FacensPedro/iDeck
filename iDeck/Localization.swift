@@ -121,6 +121,7 @@ enum Translations {
         "No apps installed. Tap + to install an .ipa": ["pt": "Nenhum app instalado. Toque em + para instalar um .ipa", "es": "No hay apps instaladas. Toca + para instalar un .ipa"],
 
         // Settings
+        "Preparing Wine and graphics...": ["pt": "Iniciando o Wine e preparando os gráficos...", "es": "Iniciando Wine y preparando los gráficos..."],
         "Install Microsoft Visual C++?": ["pt": "Instalar Microsoft Visual C++?", "es": "¿Instalar Microsoft Visual C++?"],
         "Install and play": ["pt": "Instalar e jogar", "es": "Instalar y jugar"],
         "Play without installing": ["pt": "Jogar sem instalar", "es": "Jugar sin instalar"],

@@ -110,7 +110,9 @@ struct GameSessionView: View {
                     coordinator.windowsStatus == VisualCRuntimeBootstrap.installStatus {
                     HStack {
                         ProgressView()
-                        Text("Iniciando Wine e preparando gráficos...")
+                        Text(coordinator.windowsStatus == VisualCRuntimeBootstrap.installStatus
+                            ? tr("Installing Microsoft Visual C++...")
+                            : tr("Preparing Wine and graphics..."))
                     }
                     .padding(10)
                     .background(.black.opacity(0.7), in: RoundedRectangle(cornerRadius: 8))

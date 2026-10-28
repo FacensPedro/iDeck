@@ -34,10 +34,26 @@ enum VisualCRuntimeBootstrap {
                                               contents: Data("Microsoft v14 x64 installed\n".utf8))
     }
 
-    static func hasPE(_ file: URL) -> Bool {
+    static func hasPE(_ file: URL, machines: Set<UInt16> = [0x8664]) -> Bool {
         guard let handle = try? FileHandle(forReadingFrom: file) else { return false }
         defer { try? handle.close() }
-        return (try? handle.read(upToCount: 2)) == Data([0x4D, 0x5A])
+        do {
+            guard let dos = try handle.read(upToCount: 64), dos.count == 64,
+                  dos[0] == 0x4D, dos[1] == 0x5A else { return false }
+            let offset = UInt64(dos[0x3C]) |
+                         (UInt64(dos[0x3D]) << 8) |
+                         (UInt64(dos[0x3E]) << 16) |
+                         (UInt64(dos[0x3F]) << 24)
+            guard (64...1_048_576).contains(offset) else { return false }
+            try handle.seek(toOffset: offset)
+            guard let pe = try handle.read(upToCount: 6), pe.count == 6,
+                  pe[0] == 0x50, pe[1] == 0x45, pe[2] == 0,
+                  pe[3] == 0 else { return false }
+            let machine = UInt16(pe[4]) | (UInt16(pe[5]) << 8)
+            return machines.contains(machine)
+        } catch {
+            return false
+        }
     }
 
     static func isTrustedDownloadURL(_ url: URL) -> Bool {
@@ -74,7 +90,8 @@ enum VisualCRuntimeBootstrap {
                     throw CocoaError(.fileReadUnknown)
                 }
                 let size = (try FileManager.default.attributesOfItem(atPath: temporary.path)[.size] as? NSNumber)?.int64Value ?? 0
-                guard (100_000...150_000_000).contains(size), hasPE(temporary) else {
+                guard (100_000...150_000_000).contains(size),
+                      hasPE(temporary, machines: [0x014C, 0x8664]) else {
                     throw CocoaError(.fileReadCorruptFile)
                 }
                 if FileManager.default.fileExists(atPath: destination.path) {
