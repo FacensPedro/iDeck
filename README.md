@@ -1,57 +1,57 @@
 # iDeck
 
-**iDeck é um projeto experimental para iOS/iPadOS que reúne biblioteca Steam, aplicativos hospedados e um ambiente de compatibilidade Windows baseado no [Madeira](https://github.com/willfaust/madeira).**
+**iDeck is an experimental iOS and iPadOS app that combines a Steam game library, hosted iOS apps, and a Windows compatibility environment powered by [Madeira](https://github.com/willfaust/madeira).**
 
-> **Atenção:** um IPA `interface-only` mostra a interface, mas **não executa jogos Windows**. Um IPA `Madeira-native` inclui componentes como FEX, Wine ARM64EC, DXMT, WineMetal e D3D12; concluir a compilação não garante que os jogos funcionem no iPad.
+> **Project status:** An **interface-only IPA cannot run Windows games**. A **Madeira-native IPA** includes native FEX, Wine ARM64EC, DXMT, WineMetal, and D3D12 components, but successful compilation does **not** guarantee that a game starts, renders, or runs correctly on an iPad.
 
-**English:** Experimental iOS/iPadOS Steam library and Windows compatibility project. Native build success does not guarantee game execution. For Microsoft Visual C++ setup, read the [DLL guide (Portuguese, with English summary)](docs/MICROSOFT_VISUAL_CPP_DLLS.md).
+[Features](#features) · [Requirements](#requirements) · [Build an IPA](#build-an-ipa) · [Automatic Visual C++ setup](#automatic-microsoft-visual-c-setup) · [Troubleshooting](#troubleshooting) · [Documentation](#documentation)
 
-[Como compilar](#como-compilar-o-ipa) · [DLLs Microsoft](#bibliotecas-microsoft-visual-c-dlls) · [Problemas comuns](#solução-de-problemas) · [Documentação](#documentação)
+## Features
 
-## Funcionalidades e limites
-
-| Componente | O que está implementado | O que depende de validação |
+| Component | What iDeck provides | Limitations |
 | --- | --- | --- |
-| Steam | Login, biblioteca de jogos, metadados e downloads | Autenticação exigida por determinados jogos e pelo cliente Windows |
-| Windows | Importação de `.exe`, perfis de jogos e Wine prefix | FEX/JIT, Wine e compatibilidade real dos programas |
-| Gráficos | Adaptadores Metal, DXMT, WineMetal, D3D12 e opções MetalFX | Apresentação de quadros e desempenho em hardware |
-| Aplicativos iOS | Integração inspirada no LiveContainer | Assinatura, entitlements e restrições do iPadOS |
-| JIT | Integração com [StikDebug](https://github.com/StikDebug/StikDebug) | O iDeck não ativa JIT por conta própria nem contorna a segurança do iPadOS |
-| Runtime reutilizável | Cache e kits pré-compilados do Madeira | Compilar um kit nativo real uma vez e respeitar suas licenças |
+| Steam | Sign-in, owned-game library, metadata, and downloads | Some games require Steam's Windows client and DRM authentication |
+| Windows | EXE import, Wine prefixes, game profiles, and the Madeira runtime | Requires an actual native IPA, FEX/JIT, and compatible Wine functionality |
+| Graphics | Metal adapters, DXMT, WineMetal, D3D12, and MetalFX settings | Game rendering and performance require hardware testing |
+| iOS app hosting | LiveContainer-inspired integration | Subject to iPadOS entitlements, signing, and sandbox restrictions |
+| JIT | Integration with the external [StikDebug](https://github.com/StikDebug/StikDebug) workflow | iDeck cannot independently grant JIT permissions or bypass iOS security |
+| Runtime caching | Precompiled Madeira kits through GitHub Actions cache or Git LFS | Requires a legitimate native build and permission to redistribute components |
 
-O iDeck utiliza SwiftUI, C/C++, Objective-C++, Wine e interfaces Metal. Os adaptadores do projeto não substituem um runtime Windows completo.
+iDeck combines SwiftUI, C/C++, Objective-C++, Wine, and native Metal interfaces. Its host adapters are not substitutes for a fully functional FEX or Wine runtime.
 
-## Requisitos
+## Requirements
 
-- **Para compilar:** macOS, Xcode com SDK de iOS/iPadOS 27 e ferramentas nativas adequadas.
-- **Para instalar:** IPA assinado para o seu dispositivo com provisionamento e permissões apropriados.
-- **Para jogos Windows:** IPA nativo, Wine prefix funcional, componentes gráficos e JIT compatível.
-- **Para programas Windows de 32 bits:** build opcional com WoW64; não é garantia de compatibilidade.
+- **To build:** macOS, a compatible Xcode installation with the iOS/iPadOS 27 SDK, and the appropriate native toolchains.
+- **To install:** An IPA properly signed and provisioned for your device.
+- **To run Windows games:** A verified Madeira-native IPA, a functioning Wine prefix, appropriate graphics components, and JIT when required.
+- **For some 32-bit Windows installers and games:** Optional WoW64 support must be present in the native build.
 
-O alvo mínimo atual do projeto é **iOS/iPadOS 27.0**.
+The Xcode project currently targets **iOS/iPadOS 27.0** as its minimum OS version.
 
-## Como compilar o IPA
+## Build an IPA
 
-### Pelo GitHub Actions
+### GitHub Actions
 
-1. Abra [Actions → iOS Build](https://github.com/FacensPedro/iDeck/actions/workflows/ios.yml).
-2. Escolha uma branch e clique em **Run workflow**.
-3. Para testar **somente a interface**, desmarque `Require Madeira runtime`.
-4. Para criar o IPA **nativo**, deixe `Require Madeira runtime` ativado e selecione WoW64 ou Wine Mono somente quando necessário.
-5. Verifique os termos do **Apple Metal Shader Converter**; confirme o aceite somente se tiver autorização para o uso e a distribuição pretendidos.
-6. Após o sucesso do workflow, confira o nome do artefato: `iDeck-interface-only` ou `iDeck-Madeira-native`.
+1. Open [Actions → iOS Build](https://github.com/FacensPedro/iDeck/actions/workflows/ios.yml).
+2. Choose the branch and select **Run workflow**.
+3. For an interface-only build, disable **Require Madeira runtime**.
+4. For an experimental Windows runtime, enable **Require Madeira runtime** and, when needed, **WoW64** or **Wine Mono**.
+5. Review the Apple Metal Shader Converter license. Confirm the license option only if you have the necessary rights to use and distribute the component.
+6. After the workflow finishes successfully, confirm which artifact it produced:
+   - `iDeck-interface-only` — app interface only; **cannot execute Windows games**.
+   - `iDeck-Madeira-native` — includes the native runtime, subject to device validation.
 
-Os builds automáticos de push/PR podem gerar apenas a interface. **Nunca confunda o IPA interface-only com um emulador Windows funcional.**
+Automatic push and pull-request builds may produce only the interface-only IPA. Build success in Xcode does not necessarily mean final IPA packaging succeeded.
 
-### Pelo Mac
+### Local builds on macOS
 
-Somente interface:
+Interface-only:
 
 ```bash
 bash scripts/build_ipa.sh
 ```
 
-Build nativo (com ferramentas preparadas e autorização de licença):
+Native build (with the required toolchains and appropriate license rights):
 
 ```bash
 IDECK_REQUIRE_MADEIRA=1 \
@@ -59,11 +59,11 @@ IDECK_ACCEPT_METAL_CONVERTER_LICENSE=1 \
 bash scripts/build_native_runtime.sh
 ```
 
-O arquivo gerado é `iDeck.ipa` quando todas as etapas passam. Configure os próprios Bundle IDs, App Group, Team ID e permissões para a assinatura do IPA.
+The output is `iDeck.ipa` when the required steps succeed. Set your own signing team, bundle identifiers, App Group, and provisioning configuration.
 
-### Evitar recompilar FEX, Wine e DXMT
+### Reuse precompiled FEX, Wine, and DXMT
 
-O iDeck reutiliza pacotes de runtime existentes no Git LFS ou cache do build. Para **não baixar nem recompilar** os componentes, exija um kit disponível:
+iDeck can reuse compatible native kits stored in `runtime/prebuilt/ios-arm64/` (Git LFS) or `build/native-cache/` (Actions cache). To **require** an already-compiled runtime and prevent source compilation:
 
 ```bash
 IDECK_REQUIRE_MADEIRA=1 \
@@ -72,76 +72,83 @@ IDECK_PREBUILT_MODE=only \
 bash scripts/build_ipa.sh
 ```
 
-Sem kit válido, esse comando falha em vez de criar um runtime fictício. Veja o [guia de runtime pré-compilado](docs/MADEIRA_PREBUILT_RUNTIME.md).
+Without a matching kit, this mode fails rather than creating placeholder binaries. See [Precompiled Madeira runtime](docs/MADEIRA_PREBUILT_RUNTIME.md).
 
-## Bibliotecas Microsoft Visual C++ (DLLs)
+## Automatic Microsoft Visual C++ setup
 
-Jogos Windows podem depender de bibliotecas como `vcruntime140.dll`, `msvcp140.dll` e `msvcp140_1.dll`. **O iDeck não baixa nem inclui DLLs proprietárias da Microsoft automaticamente.**
+Some Windows games require Microsoft Visual C++ runtime DLLs, including `vcruntime140.dll`, `msvcp140.dll`, and `msvcp140_1.dll`.
 
-### Onde obter
+**On the first Windows game or EXE launch for a Wine prefix:**
 
-- **[Microsoft — downloads oficiais do Visual C++](https://learn.microsoft.com/pt-br/cpp/windows/latest-supported-vc-redist)**, incluindo o instalador [`vc_redist.x64.exe`](https://aka.ms/vc14/vc_redist.x64.exe).
-- **[Microsoft — localização dos arquivos DLL redistribuíveis](https://learn.microsoft.com/en-us/cpp/windows/determining-which-dlls-to-redistribute)**, normalmente nas pastas de redistribuição x64 do Visual Studio com MSVC instalado.
-- **[Microsoft — termos para redistribuir bibliotecas Visual C++](https://learn.microsoft.com/pt-br/cpp/windows/redistributing-visual-cpp-files)**.
+1. If compatible user-provided DLLs or a previously verified installation are available, iDeck skips setup.
+2. Otherwise, iDeck offers a **one-time installation confirmation** before launching the game.
+3. After you choose **Install and play**, iDeck downloads the official [Microsoft x64 Visual C++ Redistributable](https://aka.ms/vc14/vc_redist.x64.exe) **directly from Microsoft**, not from a DLL mirror or this GitHub repository.
+4. iDeck attempts to run the Microsoft installer inside the Wine prefix with `/install /quiet /norestart`, waits for the Wine installation session to end, and checks for actual x64 runtime DLLs.
+5. **Only when the installation is verified** does iDeck continue to launch the game. On future launches in that prefix, setup is skipped.
 
-> **Diferença importante:** `vc_redist.x64.exe` é um **instalador para Windows**, não uma DLL para copiar ao iPad. Para o Wine, você deve fornecer os arquivos `.dll` x64 reais, obtidos de uma fonte confiável e com direitos de uso adequados. Não baixe DLLs de sites desconhecidos.
+**Important limitations:** The Microsoft installer may require **WoW64**, Windows services, or other features not yet supported by this Wine build. If it fails, iDeck reports the failure rather than pretending DLLs were installed. Choose **Play without installing** to skip the setup for that launch. Downloading the installer is not the same as guaranteeing it can run on iPadOS. You must review and agree to any applicable Microsoft licensing terms before installing.
 
-### Instalar no iDeck
+**No Microsoft DLLs or installers are committed to the iDeck repository or automatically bundled into the IPA.** On-device downloads are made from Microsoft at your request. Microsoft's Visual C++ licensing still governs their use and redistribution.
 
-1. Abra **Settings → Windows compatibility → Prepare Visual C++ folder**.
-2. Obtenha os arquivos **DLL Windows x64**, conforme o [guia detalhado](docs/MICROSOFT_VISUAL_CPP_DLLS.md).
-3. Transfira os arquivos pelo iCloud Drive, armazenamento externo ou [Apple Devices](https://support.apple.com/guide/devices-windows/transfer-files-between-your-devices-mchl4bd77d3a/windows).
-4. No iPad, mova os arquivos para **Arquivos → No Meu iPad → iDeck → vcruntime**.
-5. Feche completamente o iDeck e abra-o novamente.
+### Manual fallback
+
+If the automatic installer cannot run in your Wine environment, compatible DLLs you are authorized to use can be placed at:
 
 ```text
-No Meu iPad/
-└── iDeck/
-    └── vcruntime/
-        ├── vcruntime140.dll
-        ├── msvcp140.dll
-        └── msvcp140_1.dll
+Files/
+└── On My iPad/
+    └── iDeck/
+        └── vcruntime/
+            ├── vcruntime140.dll
+            ├── msvcp140.dll
+            └── msvcp140_1.dll
 ```
 
-Os nomes acima são **exemplos**: o jogo pode precisar de outras bibliotecas. Isso não instala o Redistributable completo nem resolve automaticamente falhas de FEX, Wine ou Metal.
+Use **Settings → Windows compatibility → Prepare Visual C++ folder** to create the directory, then transfer the necessary DLLs using Files or Apple Devices. These are **examples**, not a guaranteed complete set. The installer `vc_redist.x64.exe` itself is not a DLL.
 
-**[Tutorial completo: baixar, localizar, selecionar e transferir DLLs Microsoft Visual C++](docs/MICROSOFT_VISUAL_CPP_DLLS.md)**
+See the [Microsoft Visual C++ DLL guide](docs/MICROSOFT_VISUAL_CPP_DLLS.md), [official Microsoft downloads](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist), and [Microsoft redistribution terms](https://learn.microsoft.com/en-us/cpp/windows/redistributing-visual-cpp-files).
 
-## Solução de problemas
+## JIT and platform restrictions
 
-| Sintoma | O que conferir |
+StikDebug may provide the necessary JIT debugging workflow on supported devices. A JIT indicator does not prove FEX executable-memory allocation succeeded. Windows games, hosted apps, and native components remain subject to iOS/iPadOS signing, entitlements, and sandbox limitations.
+
+## Troubleshooting
+
+| Symptom | What to check |
 | --- | --- |
-| O jogo nem inicia | IPA nativo, prefixo Wine, JIT e dependências do programa |
-| Tela preta | Inicialização Wine/FEX, DXMT, contador de quadros e apresentação Metal |
-| Erro de `vcruntime140.dll` ou `msvcp140.dll` | DLLs x64 corretas na pasta `vcruntime` e compatibilidade com o jogo |
-| O instalador `vc_redist.x64.exe` não abre no iPad | Ele instala o redistribuível no Windows, não no iPadOS |
-| Jogo de 32 bits | IPA com WoW64, se disponível e funcional |
-| GitHub Actions terminou com erro | Leia o primeiro `ERROR` real; `BUILD SUCCEEDED` no Xcode não significa que o IPA final foi empacotado |
-| iDeck fecha após alguns minutos | Analise o relatório `.ips` completo; não conclua que Metal é a causa apenas pela tela preta |
+| No Windows EXE starts | Confirm the IPA is `iDeck-Madeira-native`, the Wine prefix is prepared, and JIT/FEX is ready |
+| Screen stays black | Check Wine initialization, DXMT/D3D12, Metal presentation, and game-specific requirements |
+| Automatic Visual C++ setup fails | Check Internet access, download availability, WoW64 support, and whether Wine can run Microsoft's installer |
+| Visual C++ download succeeds but DLL verification fails | The Windows installer may not have completed; review the Wine logs and use the manual fallback if appropriate |
+| A 32-bit Windows app fails | Confirm that WoW64 is actually included and operational |
+| GitHub Actions fails after `BUILD SUCCEEDED` | Inspect the **first real error** in packaging or native runtime validation |
+| iDeck terminates after a few minutes | Inspect the full iPadOS `.ips` diagnostic; a blank screen alone does not establish that Metal caused the termination |
 
-O indicador de JIT não prova que o FEX conseguiu inicializar suas páginas executáveis. Veja o [guia de diagnóstico de jogos](docs/IDECK_GAME_STARTUP_DIAGNOSTICS.md).
+For more detail, read [Game startup and black-screen diagnostics](docs/IDECK_GAME_STARTUP_DIAGNOSTICS.md).
 
-## Documentação
+## Documentation
 
-- [Microsoft Visual C++ no iDeck — guia completo](docs/MICROSOFT_VISUAL_CPP_DLLS.md)
-- [Runtime Madeira pré-compilado](docs/MADEIRA_PREBUILT_RUNTIME.md)
-- [Diagnóstico de inicialização e tela preta](docs/IDECK_GAME_STARTUP_DIAGNOSTICS.md)
-- [Status de integração do Madeira](docs/MADEIRA_RUNTIME_INTEGRATION.md)
-- [Build nativo do Madeira](docs/IDECK_MADEIRA_NATIVE_BUILD.md)
-- [Link e verificação nativos](docs/MADEIRA_NATIVE_LINKING.md)
-- [Módulos nativos](docs/NATIVE_RUNTIME_MODULES.md)
-- [Memória no iPadOS](docs/IOS_MEMORY_MANAGEMENT.md)
-- [Desempenho](docs/NATIVE_PERFORMANCE.md)
-- [Downloads da Steam](docs/STEAM_DOWNLOAD_PERFORMANCE.md)
+- [Microsoft Visual C++ DLL setup](docs/MICROSOFT_VISUAL_CPP_DLLS.md)
+- [Precompiled Madeira runtime](docs/MADEIRA_PREBUILT_RUNTIME.md)
+- [Game startup diagnostics](docs/IDECK_GAME_STARTUP_DIAGNOSTICS.md)
+- [Madeira integration status](docs/MADEIRA_RUNTIME_INTEGRATION.md)
+- [Native Madeira build](docs/IDECK_MADEIRA_NATIVE_BUILD.md)
+- [Native linking and verification](docs/MADEIRA_NATIVE_LINKING.md)
+- [Native runtime modules](docs/NATIVE_RUNTIME_MODULES.md)
+- [iPadOS memory management](docs/IOS_MEMORY_MANAGEMENT.md)
+- [Native performance](docs/NATIVE_PERFORMANCE.md)
+- [Steam download performance](docs/STEAM_DOWNLOAD_PERFORMANCE.md)
 
-## Licenças, segurança e créditos
+## Licenses, security, and attribution
 
-O iDeck integra ou adapta componentes de [Madeira](https://github.com/willfaust/madeira), [FEX](https://github.com/FEX-Emu/FEX), [Wine](https://www.winehq.org/), [DXMT](https://github.com/3Shain/dxmt), [StikDebug](https://github.com/StikDebug/StikDebug) e [LiveContainer](https://github.com/LiveContainer/LiveContainer). Consulte os arquivos de [licença](LICENSES) e os avisos dos respectivos projetos.
+iDeck integrates or adapts code and techniques from [Madeira](https://github.com/willfaust/madeira), [FEX](https://github.com/FEX-Emu/FEX), [Wine](https://www.winehq.org/), [DXMT](https://github.com/3Shain/dxmt), [StikDebug](https://github.com/StikDebug/StikDebug), and [LiveContainer](https://github.com/LiveContainer/LiveContainer).
 
-**Não publique DLLs Microsoft, ferramentas proprietárias Apple ou IPAs que as contenham sem confirmar os direitos de redistribuição correspondentes.** Não forneça logs com credenciais ou tokens Steam.
+Review the repository's [license notices](LICENSES) and the applicable upstream terms. Do not upload proprietary Microsoft DLLs, the Apple Metal Shader Converter, or distributing artifacts that contain them without the appropriate redistribution rights. Remove credentials, account tokens, and personal data from diagnostics.
 
-Para contribuir ou reportar problemas, informe versão do iPadOS, dispositivo, nome do jogo, tipo de IPA e logs relevantes, retirando dados privados.
+## Contributing
+
+When reporting an issue, include the iPad/iPhone model, iOS/iPadOS version, game, IPA type (interface-only or Madeira-native), and relevant build or device logs. Reproducible test cases and focused pull requests are welcome.
 
 ---
 
-**iDeck é experimental. Uma compilação bem-sucedida não representa garantia de compatibilidade com jogos Windows no iPad.**
+**iDeck is an experimental project, not a verified Windows compatibility product for iOS/iPadOS.**

@@ -45,6 +45,17 @@ struct MainView: View {
                 steamLibrary.disconnect()
             }
         }
+        .alert(tr("Install Microsoft Visual C++?"),
+               isPresented: $coordinator.needsVisualCRuntimeConsent) {
+            Button(tr("Install and play")) {
+                coordinator.approveVisualCRuntimeInstallation()
+            }
+            Button(tr("Play without installing"), role: .cancel) {
+                coordinator.skipVisualCRuntimeInstallation()
+            }
+        } message: {
+            Text(tr("iDeck can download the official Microsoft x64 Visual C++ Redistributable when you launch your first Windows game. It will run once inside Wine. This may require WoW64 and may not be supported by all Wine versions."))
+        }
         .fullScreenCover(isPresented: Binding<Bool>(
             get: {
                 coordinator.windowsStatus == "Steam Running" ||
@@ -52,6 +63,8 @@ struct MainView: View {
                 coordinator.windowsStatus == "Launching Steam game..." ||
                 coordinator.windowsStatus == "Launching Steam client..." ||
                 coordinator.windowsStatus == "Launching Windows app..." ||
+                coordinator.windowsStatus == VisualCRuntimeBootstrap.installStatus ||
+                coordinator.windowsStatus.hasPrefix("Visual C++") ||
                 coordinator.windowsStatus.hasPrefix("Execution Error:")
             },
             set: { _ in coordinator.setWindowsStatus("Windows Ready") }

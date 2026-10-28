@@ -106,13 +106,20 @@ struct GameSessionView: View {
                 }
                 if coordinator.windowsStatus == "Launching Steam game..." ||
                     coordinator.windowsStatus == "Launching Steam client..." ||
-                    coordinator.windowsStatus == "Launching Windows app..." {
+                    coordinator.windowsStatus == "Launching Windows app..." ||
+                    coordinator.windowsStatus == VisualCRuntimeBootstrap.installStatus {
                     HStack {
                         ProgressView()
-                        Text("Iniciando Wine e preparando gráficos...")
+                        Text(coordinator.windowsStatus == VisualCRuntimeBootstrap.installStatus
+                            ? tr("Installing Microsoft Visual C++...")
+                            : tr("Preparing Wine and graphics..."))
                     }
                     .padding(10)
                     .background(.black.opacity(0.7), in: RoundedRectangle(cornerRadius: 8))
+                } else if coordinator.windowsStatus.hasPrefix("Visual C++") {
+                    Text(trStatus(coordinator.windowsStatus))
+                        .font(.caption)
+                        .foregroundColor(.orange)
                 } else if coordinator.windowsStatus.hasPrefix("Execution Error") {
                     Text(trStatus(coordinator.windowsStatus))
                         .foregroundColor(.red)

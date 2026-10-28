@@ -68,6 +68,7 @@
 		111111111111111111111130 /* LiveContainerInit.c in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222242 /* LiveContainerInit.c */; };
 		A10000000000000000000001 /* SteamDepotDownloader.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000001 /* SteamDepotDownloader.swift */; };
 		BEEF00000000000000000001 /* WindowsLaunchArguments.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEEF00000000000000000002 /* WindowsLaunchArguments.swift */; };
+		DEAD00000000000000000071 /* VisualCRuntimeBootstrap.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEAD00000000000000000072 /* VisualCRuntimeBootstrap.swift */; };
 		ABCD00000000000000000001 /* SteamCDNHostSelection.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCD00000000000000000002 /* SteamCDNHostSelection.swift */; };
 		A10000000000000000000002 /* SteamContentDecryptor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000002 /* SteamContentDecryptor.swift */; };
 		A10000000000000000000003 /* SteamDepotManifest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000003 /* SteamDepotManifest.swift */; };
@@ -146,6 +147,7 @@
 		222222222222222222222244 /* iDeck-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "iDeck-Bridging-Header.h"; sourceTree = "<group>"; };
 		A20000000000000000000001 /* SteamDepotDownloader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamDepotDownloader.swift; sourceTree = "<group>"; };
 		BEEF00000000000000000002 /* WindowsLaunchArguments.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowsLaunchArguments.swift; sourceTree = "<group>"; };
+		DEAD00000000000000000072 /* VisualCRuntimeBootstrap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisualCRuntimeBootstrap.swift; sourceTree = "<group>"; };
 		ABCD00000000000000000002 /* SteamCDNHostSelection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamCDNHostSelection.swift; sourceTree = "<group>"; };
 		A20000000000000000000002 /* SteamContentDecryptor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamContentDecryptor.swift; sourceTree = "<group>"; };
 		A20000000000000000000003 /* SteamDepotManifest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamDepotManifest.swift; sourceTree = "<group>"; };
@@ -233,6 +235,7 @@
 				111111111111111111111130 /* LiveContainerInit.c in Sources */,
 				A10000000000000000000001 /* SteamDepotDownloader.swift in Sources */,
 				BEEF00000000000000000001 /* WindowsLaunchArguments.swift in Sources */,
+				DEAD00000000000000000071 /* VisualCRuntimeBootstrap.swift in Sources */,
 				ABCD00000000000000000001 /* SteamCDNHostSelection.swift in Sources */,
 				A10000000000000000000002 /* SteamContentDecryptor.swift in Sources */,
 				A10000000000000000000003 /* SteamDepotManifest.swift in Sources */,
@@ -326,6 +329,7 @@
 				222222222222222222222244 /* iDeck-Bridging-Header.h */,
 				A20000000000000000000001 /* SteamDepotDownloader.swift */,
 				BEEF00000000000000000002 /* WindowsLaunchArguments.swift */,
+				DEAD00000000000000000072 /* VisualCRuntimeBootstrap.swift */,
 				ABCD00000000000000000002 /* SteamCDNHostSelection.swift */,
 				A20000000000000000000002 /* SteamContentDecryptor.swift */,
 				A20000000000000000000003 /* SteamDepotManifest.swift */,

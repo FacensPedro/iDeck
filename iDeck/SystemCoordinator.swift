@@ -53,6 +53,10 @@ class SystemCoordinator: ObservableObject {
     private var activeSteamGameID: UInt32?
     private var activeSteamPrefix: String?
     private var pendingSteamGameID: UInt32?
+    @Published var needsVisualCRuntimeConsent = false
+    private var visualCRuntimeConsentAction: (() -> Void)?
+    private var visualCRuntimeSkipAction: (() -> Void)?
+    private var bypassVisualCRuntimeForPrefix: String?
 
     init() {
         refreshJITStatus()
@@ -365,6 +369,129 @@ class SystemCoordinator: ObservableObject {
         }
     }
 
+    func approveVisualCRuntimeInstallation() {
+        guard let action = visualCRuntimeConsentAction else { return }
+        needsVisualCRuntimeConsent = false
+        visualCRuntimeConsentAction = nil
+        visualCRuntimeSkipAction = nil
+        UserDefaults.standard.set(true, forKey: "ideckInstallOfficialVisualCRedist")
+        action()
+    }
+
+    func skipVisualCRuntimeInstallation() {
+        let action = visualCRuntimeSkipAction
+        guard action != nil else { return }
+        needsVisualCRuntimeConsent = false
+        visualCRuntimeConsentAction = nil
+        visualCRuntimeSkipAction = nil
+        action?()
+    }
+
+    private func prepareVisualCRuntimeIfNeeded(prefix: URL, resume: @escaping () -> Void) -> Bool {
+        if !Thread.isMainThread {
+            DispatchQueue.main.async { [weak self] in
+                _ = self?.prepareVisualCRuntimeIfNeeded(prefix: prefix, resume: resume)
+            }
+            return true
+        }
+        let prefix = prefix.standardizedFileURL
+        let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
+        if VisualCRuntimeBootstrap.installed(in: prefix, documents: documents) {
+            return false
+        }
+        if bypassVisualCRuntimeForPrefix == prefix.path {
+            bypassVisualCRuntimeForPrefix = nil
+            return false
+        }
+        if needsVisualCRuntimeConsent || windowsStatus == VisualCRuntimeBootstrap.installStatus {
+            return true
+        }
+        if UserDefaults.standard.bool(forKey: "ideckInstallOfficialVisualCRedist") {
+            beginVisualCRuntimeInstallation(prefix: prefix, resume: resume)
+            return true
+        }
+        visualCRuntimeConsentAction = { [weak self] in
+            self?.beginVisualCRuntimeInstallation(prefix: prefix, resume: resume)
+        }
+        visualCRuntimeSkipAction = { [weak self] in
+            self?.bypassVisualCRuntimeForPrefix = prefix.path
+            resume()
+        }
+        needsVisualCRuntimeConsent = true
+        return true
+    }
+
+    private func beginVisualCRuntimeInstallation(prefix: URL, resume: @escaping () -> Void) {
+        guard !ideck_wineprocess_running() else {
+            setWindowsStatus("Visual C++ setup cannot start while another Wine session is running.")
+            return
+        }
+        windowsEnvironment.configureWine(prefix: prefix.path)
+        setWindowsStatus(VisualCRuntimeBootstrap.installStatus)
+        withPreparedMetalDisplay(expectedStatus: VisualCRuntimeBootstrap.installStatus) { [weak self] in
+            guard let self else { return }
+            VisualCRuntimeBootstrap.download(in: prefix) { [weak self] result in
+                guard let self, self.windowsStatus == VisualCRuntimeBootstrap.installStatus else { return }
+                switch result {
+                case .failure(let error):
+                    self.setWindowsStatus("Visual C++ setup download failed: \(error.localizedDescription)")
+                case .success(let executable):
+                    guard !ideck_wineprocess_running() else {
+                        self.setWindowsStatus("Visual C++ setup cannot start while another Wine session is running.")
+                        return
+                    }
+                    self.windowsEnvironment.execute(
+                        binary: executable,
+                        arguments: "/install /quiet /norestart",
+                        jitEnabler: self.jitEnabler
+                    ) { [weak self] status in
+                        DispatchQueue.main.async {
+                            guard let self,
+                                  self.windowsStatus == VisualCRuntimeBootstrap.installStatus else { return }
+                            if status != 0 || !ideck_wineprocess_running() {
+                                self.setWindowsStatus("Visual C++ setup could not start in Wine (code \(status)). Check WoW64 and retry.")
+                                return
+                            }
+                            self.waitForVisualCRuntime(prefix: prefix, secondsRemaining: 240, resume: resume)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func waitForVisualCRuntime(prefix: URL, secondsRemaining: Int, resume: @escaping () -> Void) {
+        guard windowsStatus == VisualCRuntimeBootstrap.installStatus else { return }
+        if ideck_wineprocess_running() {
+            guard secondsRemaining > 0 else {
+                setWindowsStatus("Visual C++ setup timed out. Close the installer before launching a game.")
+                return
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
+                self?.waitForVisualCRuntime(prefix: prefix, secondsRemaining: secondsRemaining - 1, resume: resume)
+            }
+            return
+        }
+        typealias ExitCode = @convention(c) () -> Int32
+        guard let symbol = dlsym(UnsafeMutableRawPointer(bitPattern: -2), "wine_process_exit_code") else {
+            setWindowsStatus("Visual C++ setup finished, but Wine did not provide an exit status.")
+            return
+        }
+        let exitStatus = unsafeBitCast(symbol, to: ExitCode.self)()
+        guard exitStatus == 0, VisualCRuntimeBootstrap.complete(in: prefix) else {
+            setWindowsStatus("Visual C++ installation was not verified. Wine exit code: \(exitStatus).")
+            return
+        }
+        setWindowsStatus("Windows Ready")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+            guard !ideck_wineprocess_running() else {
+                self.setWindowsStatus("Visual C++ setup cannot start while another Wine session is running.")
+                return
+            }
+            resume()
+        }
+    }
+
     func launchWindowsExecutable(at url: URL, profile: WindowsGameProfile? = nil) {
         guard isContainerReady else { return }
         refreshJITStatus()
@@ -427,6 +554,10 @@ class SystemCoordinator: ObservableObject {
                         self.setWindowsStatus("Madeira runtime missing: " + missing.joined(separator: ", "))
                         return
                     }
+                    let prefix = URL(fileURLWithPath: mountPath, isDirectory: true)
+                    if self.prepareVisualCRuntimeIfNeeded(prefix: prefix, resume: { [weak self] in
+                        self?.launchWindowsExecutable(at: destination, profile: profile)
+                    }) { return }
                     self.windowsEnvironment.configureWine(prefix: mountPath)
                     var effectiveProfile = profile ?? WindowsGameProfile(id: destination.path, title: destination.deletingPathExtension().lastPathComponent)
                     if self.isMetalFXEnabled { effectiveProfile.metalFXEnabled = true }
@@ -544,6 +675,9 @@ class SystemCoordinator: ObservableObject {
             setWindowsStatus("FEX JIT is not ready. JIT permission alone is insufficient. Keep StikDebug attached with universal.js during the first game launch, then retry.")
             return
         }
+        if prepareVisualCRuntimeIfNeeded(prefix: prefixPath, resume: { [weak self] in
+            self?.launchSteamGame(game: game, profile: profile, prefixPath: prefixPath)
+        }) { return }
         windowsEnvironment.configureWine(prefix: prefixPath.path)
         windowsEnvironment.graphicsConfig.applyGraphicsEnvironment()
         var effectiveProfile = profile

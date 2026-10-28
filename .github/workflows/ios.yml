@@ -164,6 +164,11 @@ jobs:
           bash -n scripts/build_ipa.sh
           bash -n scripts/build_native_runtime.sh
 
+      - name: Test first-launch Microsoft Visual C++ preparation
+        run: |
+          xcrun swiftc iDeck/VisualCRuntimeBootstrap.swift tests/host/VisualCRuntimeBootstrapTests.swift -o /tmp/ideck-vcredist-tests
+          /tmp/ideck-vcredist-tests
+
       - name: Test Steam CDN host performance selection
         run: |
           xcrun swiftc iDeck/SteamCDNHostSelection.swift tests/host/SteamCDNHostSelectionTests.swift -o /tmp/ideck-cdn-selection-tests
