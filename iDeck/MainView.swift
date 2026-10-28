@@ -10,39 +10,35 @@ struct MainView: View {
     @ObservedObject var coordinator: SystemCoordinator
     @Environment(\.scenePhase) private var scenePhase
     @State private var selectedWorkspace: IDeckWorkspace?
-    @StateObject private var steamLibrary = SteamOwnedGamesModel()
 
     var body: some View {
         Group {
             if let selectedWorkspace {
-                WindowsWorkspaceView(coordinator: coordinator, onBack: {
+                WorkspaceHostView(coordinator: coordinator, onBack: {
                     self.selectedWorkspace = nil
-                }, mode: selectedWorkspace, steamLibrary: steamLibrary)
+                }, mode: selectedWorkspace)
             } else {
                 homeView
             }
         }
         .onAppear {
-            coordinator.refreshJITStatus()
+            // First paint must be independent of the native Madeira runtime,
+            // the external debugger and the stored Steam session.
+            print("[iDeck startup] Home view ready; Wine and Steam not initialized")
             UIApplication.shared.isIdleTimerDisabled = true
         }
         .onChange(of: scenePhase) { _, phase in
             UIApplication.shared.isIdleTimerDisabled = phase == .active
-            if phase == .active { coordinator.refreshJITStatus() }
+            if phase == .active && selectedWorkspace != nil {
+                coordinator.refreshJITStatus()
+            }
         }
-        .task(id: scenePhase) {
-            guard scenePhase == .active else { return }
+        .task(id: selectedWorkspace != nil && scenePhase == .active) {
+            guard selectedWorkspace != nil && scenePhase == .active else { return }
             while !Task.isCancelled {
                 coordinator.refreshJITStatus()
                 do { try await Task.sleep(nanoseconds: 5_000_000_000) }
                 catch { return }
-            }
-        }
-        .task(id: coordinator.isSteamConnected) {
-            if coordinator.isSteamConnected {
-                await steamLibrary.refresh()
-            } else {
-                steamLibrary.disconnect()
             }
         }
         .alert(tr("Install Microsoft Visual C++?"),
@@ -83,6 +79,9 @@ struct MainView: View {
                         .scaledToFit()
                         .frame(width: 140, height: 140)
                     Button {
+                        // Defer Steam Keychain and native JIT reads until the
+                        // user explicitly opens Madeira, not at app launch.
+                        coordinator.loadSteamAccountIfNeeded()
                         selectedWorkspace = .pc
                         if !coordinator.isContainerReady {
                             coordinator.forceJITAndStartWindows()
@@ -121,6 +120,29 @@ struct MainView: View {
         .padding(24)
         .background(Color.white.opacity(0.09))
         .clipShape(RoundedRectangle(cornerRadius: 16))
+    }
+}
+
+// Steam's session model can allocate resources and read cached credentials.
+// Keep it out of MainView so iDeck opens even if a previous Wine attempt
+// terminated unexpectedly. The model is created only inside a workspace.
+private struct WorkspaceHostView: View {
+    @ObservedObject var coordinator: SystemCoordinator
+    let onBack: (() -> Void)?
+    let mode: IDeckWorkspace
+    @StateObject private var steamLibrary = SteamOwnedGamesModel()
+
+    var body: some View {
+        WindowsWorkspaceView(coordinator: coordinator, onBack: onBack,
+                             mode: mode, steamLibrary: steamLibrary)
+            .task(id: mode == .pc && coordinator.isSteamConnected) {
+                guard mode == .pc else { return }
+                if coordinator.isSteamConnected {
+                    await steamLibrary.refresh()
+                } else {
+                    steamLibrary.disconnect()
+                }
+            }
     }
 }
 
