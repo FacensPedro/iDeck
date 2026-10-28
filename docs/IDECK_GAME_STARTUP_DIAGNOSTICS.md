@@ -125,3 +125,33 @@ signed-device hardware testing.
   pinned revision without ABI and build validation.
 - Root-cause analysis of an actual crash/termination stack after reproducing
   the exact problematic game on the target iPad.
+
+## October 28: ARM64EC execute fault, Wine exit 1
+
+A Cuphead device log showed a successful wineserver, an x64 executable and
+working directory, then `[pool-ledger] pool not initialised`, RX execution
+failure (`PROTECTION_FAILURE`), `0xC000001D` and Wine exit code 1.
+The original host initialized FEXCore's small internal JIT pool but omitted
+Madeira's **separate** Wine PE executable RX/RW pool and
+`WINE_IOS_JIT_RX`, `WINE_IOS_JIT_RW`, `WINE_IOS_JIT_SIZE` exports.
+
+The native launcher now requests a distinct debugger-backed executable RX
+region, remaps a writable alias, verifies executable permission and records
+the mapping before initializing the wineserver. Failure returns `ENOMEM`
+rather than allowing the guest to enter a non-executable ARM64EC dispatcher.
+
+This is an initial conservative pool-placement implementation (384MB with a
+256MB fallback), not a replacement for Madeira's profile-dependent 896MB+
+split-pool allocator. Allocation still needs a real debugger supporting
+Madeira's BRK protocol and a device-level test. If the game's PE code and
+FEX translations exceed this budget, larger pool and address-space
+placement work will be needed. No new ability to bypass iPadOS signing or
+JIT entitlement policy is implied.
+
+If launching through StikDebug with iDeck's `scripts/jit/universal.js`,
+the script now explicitly handles Madeira's `BRK #0xf00d` command 3
+(page-zero mapping request). An unsupported mapping is reported as failure
+instead of leaking a stale register value. This does **not** override
+kernel page-zero restrictions. Madeira's more complete upstream debugger
+script is at
+[Madeira JIT script](https://github.com/willfaust/madeira/blob/main/app/Madeira/madeira-jit.js).
