@@ -35,13 +35,11 @@ class LaunchStartupIsolationTests(unittest.TestCase):
         self.assertNotIn("coordinator.refreshJITStatus()\n            UIApplication", main)
         self.assertIn("selectedWorkspace != nil && scenePhase == .active", main)
         self.assertIn('NSLog("[iDeck startup] Home view ready', main)
-        self.assertIn("private struct WorkspaceHostView: View", MAIN)
-        start = MAIN.index("private struct WorkspaceHostView: View")
-        end = MAIN.index("struct SteamGameArtworkView", start)
-        workspace = MAIN[start:end]
-        self.assertIn("@StateObject private var steamLibrary = SteamOwnedGamesModel()", workspace)
-        self.assertIn("await steamLibrary.refresh()", workspace)
-        self.assertIn("mode == .pc && coordinator.isSteamConnected", workspace)
+        self.assertIn("@State private var steamLibrary: SteamOwnedGamesModel?", main)
+        self.assertNotIn("private struct WorkspaceHostView: View", MAIN)
+        self.assertEqual(MAIN.count("if steamLibrary == nil { steamLibrary = SteamOwnedGamesModel() }"), 2)
+        self.assertIn("await steamLibrary.refresh()", main)
+        self.assertIn("selectedWorkspace == .pc && coordinator.isSteamConnected", main)
 
     def test_madeira_still_loads_steam_and_jit_when_requested(self):
         home = MAIN.split("private var homeView:", 1)[1].split("private func modeTile", 1)[0]
