@@ -166,7 +166,47 @@ int main(void)
 """
 
 
+APPLE_MACH_SHIM = r"""
+#define _DARWIN_C_SOURCE
+#include <mach/mach.h>
+#include <mach/mach_vm.h>
+#include <mach/arm/thread_status.h>
+#include <mach/thread_act.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <string.h>
+#define CONTEXT_INTEGER 2
+#define IDECK_ARM64EC_RETURN_BRK 0xd42b4b40u
+#define arm_thread_state64_get_pc(st) __darwin_arm_thread_state64_get_pc(st)
+struct syscall_frame {
+    uint64_t x[29];
+    uint64_t fp,lr,sp,pc;
+    uint32_t cpsr,restore_flags;
+    uint8_t unused[32];
+    uint32_t fpcr,fpsr;
+    uint8_t v[32][16];
+};
+void syscall_dispatcher_return_slowpath(void);
+"""
+
 class ARM64ECMachCompiledTests(unittest.TestCase):
+    def test_handler_compiles_against_real_iphoneos_mach_headers(self):
+        xcrun = shutil.which("xcrun")
+        if xcrun is None:
+            self.skipTest("Requires Xcode on a macOS runner")
+        sdk = subprocess.check_output(
+            [xcrun, "--sdk", "iphoneos", "--show-sdk-path"], text=True).strip()
+        with tempfile.TemporaryDirectory(prefix="ideck-apple-mach-arm64ec-") as tmp:
+            source = pathlib.Path(tmp) / "resume-ios.c"
+            source.write_text(APPLE_MACH_SHIM + patched_handler())
+            subprocess.run([
+                xcrun, "--sdk", "iphoneos", "clang",
+                "-target", "arm64-apple-ios18.0",
+                "-isysroot", sdk, "-std=c11", "-Wall", "-Wextra",
+                "-Werror", "-Wno-unused-function", "-fsyntax-only",
+                str(source)],
+                check=True, capture_output=True, text=True)
+
     def test_actual_native_mach_handler_with_mocked_kernel_calls(self):
         compiler = shutil.which("clang")
         self.assertIsNotNone(compiler, "Clang is required")
