@@ -35,7 +35,7 @@ class MadeiraLaunchIntegrationTests(unittest.TestCase):
 
     def test_native_launch_accepts_escaped_quoted_arguments(self):
         self.assertIn('ideck_quote_windows_argument((NSString *)arg)', NATIVE)
-        self.assertIn('withString:@"\\\\\\\\"', NATIVE)
+        self.assertIn(r'withString:@"\\"', NATIVE)
         self.assertIn('ideck_invalid_launch("invalid or oversized launch JSON")', NATIVE)
         self.assertIn('ideck_invalid_launch("invalid Steam app ID")', NATIVE)
         self.assertIn("if status == Int(EINVAL)", COORDINATOR)
