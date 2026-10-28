@@ -27,8 +27,8 @@ SHIM = r"""
 #include <string.h>
 typedef int thread_t;
 typedef unsigned mach_msg_type_number_t;
-typedef uint64_t mach_vm_size_t;
-typedef uint64_t mach_vm_address_t;
+typedef uint64_t vm_size_t;
+typedef uint64_t vm_address_t;
 typedef uint32_t *thread_state_t;
 typedef int kern_return_t;
 #define KERN_SUCCESS 0
@@ -64,8 +64,8 @@ static arm_neon_state64_t last_neon;
 static int gpr_calls, neon_calls, reject_gpr, bad_opcode;
 void syscall_dispatcher_return_slowpath(void) {}
 static int mach_task_self(void) { return 0; }
-static kern_return_t mach_vm_read_overwrite(int task, mach_vm_address_t address,
-    size_t count, mach_vm_address_t destination, mach_vm_size_t *size)
+static kern_return_t vm_read_overwrite(int task, vm_address_t address,
+    size_t count, vm_address_t destination, vm_size_t *size)
 {
     uint32_t insn = bad_opcode ? 0xd4200000u : IDECK_ARM64EC_RETURN_BRK;
     uintptr_t sym = (uintptr_t)syscall_dispatcher_return_slowpath;
@@ -169,7 +169,6 @@ int main(void)
 APPLE_MACH_SHIM = r"""
 #define _DARWIN_C_SOURCE
 #include <mach/mach.h>
-#include <mach/mach_vm.h>
 #include <mach/arm/thread_status.h>
 #include <mach/thread_act.h>
 #include <stdint.h>
@@ -177,7 +176,6 @@ APPLE_MACH_SHIM = r"""
 #include <string.h>
 #define CONTEXT_INTEGER 2
 #define IDECK_ARM64EC_RETURN_BRK 0xd42b4b40u
-#define arm_thread_state64_get_pc(st) __darwin_arm_thread_state64_get_pc(st)
 struct syscall_frame {
     uint64_t x[29];
     uint64_t fp,lr,sp,pc;
