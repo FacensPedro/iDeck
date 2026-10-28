@@ -36,7 +36,7 @@ const prepareEnd = source.indexOf("// Madeira's ARM64EC init_syscall_frame", pre
 assert.ok(prepareStart >= 0 && prepareEnd > prepareStart);
 vm.runInContext(source.slice(prepareStart, prepareEnd), context, { timeout: 1000 });
 
-function executeJITRequest(allocResponse, originalAddress = 0n) {
+function executeJITRequest(allocResponse, originalAddress = 0n, preparation = true) {
     const replies = [];
     const prepared = [];
     context.x0 = originalAddress;
@@ -49,7 +49,8 @@ function executeJITRequest(allocResponse, originalAddress = 0n) {
     };
     context.prepare_memory_region = (address, size) => {
         prepared.push({ address, size });
-        return true;
+        if (preparation === "throw") throw new Error("Debugger preparation refused");
+        return preparation;
     };
     context.log = () => {};
     context.log_verbose = () => {};
@@ -71,4 +72,9 @@ for (const response of ["11a000000", "0x11a000000"]) {
 const existing = executeJITRequest("E22", 0x11b000000n);
 assert.equal(existing.prepared.length, 1);
 assert.equal(existing.prepared[0].address, 0x11b000000n);
-console.log("PASS: StikDebug invalid _M replies never produce stale Wine JIT addresses");
+for (const result of [false, "E22", "throw"]) {
+    const failed = executeJITRequest("11a000000", 0n, result);
+    assert.equal(failed.replies[0], "P0=0000000000000000;thread:24;");
+    assert.equal(failed.prepared.length, 1);
+}
+console.log("PASS: StikDebug invalid _M and failed RX preparation never return executable addresses");
