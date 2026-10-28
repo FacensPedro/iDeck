@@ -21,7 +21,7 @@ enum SteamExistingChunkVerifier {
 
         for (index, entry) in entries.enumerated() {
             if index.isMultiple(of: 16) { try Task.checkCancellation() }
-            guard entry.length > 0, entry.sha.count == IDECK_STEAM_SHA1_BYTES,
+            guard entry.length > 0, entry.sha.count == 20,
                   entry.offset <= UInt64(Int64.max),
                   UInt64(entry.length) <= UInt64(Int64.max) - entry.offset else { continue }
             results[index] = entry.sha.withUnsafeBytes { digest in
