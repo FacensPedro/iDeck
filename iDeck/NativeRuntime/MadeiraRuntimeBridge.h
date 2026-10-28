@@ -21,6 +21,8 @@ bool ideck_wineserver_initialize(const char *wine_prefix);
 bool ideck_wineserver_ready(void);
 bool ideck_wineprocess_available(void);
 bool ideck_wineprocess_running(void);
+bool ideck_wineprocess_last_exit_code(int32_t *code);
+bool ideck_wineprocess_last_ntstatus(uint32_t *code);
 int32_t ideck_wineprocess_start(const char *wine_prefix);
 bool ideck_dxmt_available(void);
 bool ideck_d3d12_available(void);

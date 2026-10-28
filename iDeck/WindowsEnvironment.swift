@@ -153,7 +153,6 @@ class WindowsEnvironment {
         }
         setenv("WINEARCH", "win64", 1)
         setenv("STEAM_COMPAT_CLIENT_INSTALL_PATH", prefix + "/drive_c/Program Files (x86)/Steam", 1)
-        setenv("WINEDLLOVERRIDES", "dwrite=d;winhttp=n,b;crypt32=n,b;secur32=n,b;nsi=n,b;rpcrt4=n,b;wbemprox=n", 1)
         
         _ = audioManager.configureAudioSession()
         graphicsConfig.applyGraphicsEnvironment()
@@ -221,7 +220,9 @@ class WindowsEnvironment {
         }
     }
 
-    func execute(binary: URL, arguments: String = "", is32Bit: Bool = false, isSteam: Bool = false, jitEnabler: JITEnabler, completion: @escaping (Int) -> Void) {
+    func execute(binary: URL, arguments: String = "", is32Bit: Bool = false, isSteam: Bool = false,
+                 steamAppID: UInt32? = nil, steamInstallDirectory: URL? = nil,
+                 jitEnabler: JITEnabler, completion: @escaping (Int) -> Void) {
         guard FileManager.default.fileExists(atPath: binary.path),
               binary.path.withCString({ ideck_native_validate_pe($0) }),
               let parsedArguments = BoxTranslator.parseArguments(arguments) else {
@@ -237,6 +238,8 @@ class WindowsEnvironment {
             environment: winePrefixPath,
             is32Bit: is32Bit || Self.isPE32WindowsExecutable(binary),
             isSteam: isSteam,
+            steamAppID: steamAppID,
+            steamInstallDirectory: steamInstallDirectory,
             jitEnabler: jitEnabler
         ) { status in
             if status != 0 { SteamLog.event("[wine-launch] native launch failure code=\(status)") }
@@ -288,22 +291,30 @@ private class BoxTranslator {
         WindowsLaunchArguments.parse(command)
     }
 
-    func translateAndRun(executablePath: String, arguments: [String], environment: String, is32Bit: Bool, isSteam: Bool, jitEnabler: JITEnabler, completion: @escaping (Int) -> Void) {
+    func translateAndRun(executablePath: String, arguments: [String], environment: String,
+                         is32Bit: Bool, isSteam: Bool,
+                         steamAppID: UInt32?, steamInstallDirectory: URL?,
+                         jitEnabler: JITEnabler, completion: @escaping (Int) -> Void) {
         typealias NativeLaunch = @convention(c) (
             UnsafePointer<CChar>?,
             UnsafePointer<CChar>?,
             UnsafePointer<CChar>?
         ) -> Int32
 
+        var launchDetails: [String: Any] = [
+            "version": 1,
+            "arguments": arguments,
+            "is32Bit": is32Bit,
+            "isSteam": isSteam
+        ]
+        if let steamAppID, let steamInstallDirectory {
+            launchDetails["steamAppID"] = Int(steamAppID)
+            launchDetails["steamInstallDirectory"] = steamInstallDirectory.standardizedFileURL.path
+        }
         guard let symbol = "ideck_madeira_launch_v1".withCString({ dlsym(UnsafeMutableRawPointer(bitPattern: -2), $0) }),
               !environment.isEmpty,
               FileManager.default.fileExists(atPath: executablePath),
-              let payload = try? JSONSerialization.data(withJSONObject: [
-                "version": 1,
-                "arguments": arguments,
-                "is32Bit": is32Bit,
-                "isSteam": isSteam
-              ]),
+              let payload = try? JSONSerialization.data(withJSONObject: launchDetails),
               let request = String(data: payload, encoding: .utf8) else {
             completion(-1)
             return

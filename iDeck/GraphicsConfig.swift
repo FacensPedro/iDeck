@@ -27,10 +27,23 @@ class GraphicsConfig {
         setenv("MVK_CONFIG_FULL_IMAGE_VIEW_SWIZZLE", "1", 1)
         setenv("MVK_ALLOW_METAL_FENCES", "1", 1)
         
-        if useD3DMetal {
-            appendEnvironmentList("WINEDLLOVERRIDES", "dxgi=n;d3d11=n;d3d10=n;d3d12=n")
+        let current = getenv("WINEDLLOVERRIDES").map { String(cString: $0) }
+        if let overrides = Self.d3dOverrides(current: current, enabled: useD3DMetal) {
+            setenv("WINEDLLOVERRIDES", overrides, 1)
         } else {
-            appendEnvironmentList("WINEDLLOVERRIDES", "dxgi=n;d3d11=n;d3d10=n")
+            unsetenv("WINEDLLOVERRIDES")
         }
     }
+    static func d3dOverrides(current: String?, enabled: Bool) -> String? {
+        let managed = Set(["dxgi=n", "d3d11=n", "d3d10=n", "d3d12=n"])
+        var options = (current ?? "").split(separator: ";").map(String.init).filter {
+            !managed.contains($0.trimmingCharacters(in: .whitespaces).lowercased())
+        }
+        if enabled {
+            options.append(contentsOf: ["dxgi=n", "d3d11=n", "d3d10=n", "d3d12=n"])
+        }
+        let result = options.joined(separator: ";")
+        return result.isEmpty ? nil : result
+    }
+
 }

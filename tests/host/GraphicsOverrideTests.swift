@@ -1,0 +1,21 @@
+import Foundation
+
+@main
+struct GraphicsOverrideTests {
+    static func main() {
+        assert(GraphicsConfig.d3dOverrides(current: nil, enabled: false) == nil)
+        assert(GraphicsConfig.d3dOverrides(current: nil, enabled: true) == "dxgi=n;d3d11=n;d3d10=n;d3d12=n")
+        assert(GraphicsConfig.d3dOverrides(current: "dxgi=n;d3d11=n;d3d10=n;d3d12=n", enabled: false) == nil)
+        assert(GraphicsConfig.d3dOverrides(current: "mmdevapi=b;dxgi=n;d3d11=n", enabled: false) == "mmdevapi=b")
+        assert(GraphicsConfig.d3dOverrides(current: "mmdevapi=b;dxgi=n", enabled: true) == "mmdevapi=b;dxgi=n;d3d11=n;d3d10=n;d3d12=n")
+        assert(GraphicsConfig.d3dOverrides(current: "dwrite=n,b;dxgi=n", enabled: false) == "dwrite=n,b")
+        let config = GraphicsConfig()
+        config.useD3DMetal = true
+        config.applyGraphicsEnvironment()
+        assert(String(cString: getenv("WINEDLLOVERRIDES")!).contains("dxgi=n"))
+        config.useD3DMetal = false
+        config.applyGraphicsEnvironment()
+        assert(!(getenv("WINEDLLOVERRIDES").map { String(cString: $0) } ?? "").contains("dxgi=n"))
+        print("PASS: managed DXMT override settings do not leak between games")
+    }
+}

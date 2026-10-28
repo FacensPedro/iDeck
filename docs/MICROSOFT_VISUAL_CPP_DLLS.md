@@ -102,7 +102,7 @@ O comando **não baixa DLLs** nem contorna os direitos de uso; ele organiza as D
 ## 3. Transferir as DLLs para o iDeck no iPad
 
 1. Instale e abra o iDeck pelo menos uma vez.
-2. Acesse **Settings → Windows compatibility → Prepare Visual C++ folder**. A ação cria a pasta `vcruntime`.
+2. O iDeck cria `Documents/vcruntime` durante a instalação automática do Visual C++. Se a pasta não existir, crie manualmente `vcruntime` pelo aplicativo Arquivos.
 3. Transfira os arquivos DLL x64 para o iPad pelo iCloud Drive, armazenamento externo ou **Apple Devices** no Windows.
 4. Pelo app **Arquivos**, mova os arquivos para **No Meu iPad → iDeck → vcruntime**.
 5. Feche completamente o iDeck e abra-o novamente antes de iniciar o jogo.

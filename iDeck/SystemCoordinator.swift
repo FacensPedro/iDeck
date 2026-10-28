@@ -659,6 +659,8 @@ class SystemCoordinator: ObservableObject {
             }
             self.windowsEnvironment.execute(binary: executableURL,
                                             arguments: profile.arguments.isEmpty ? entryArguments : profile.arguments,
+                                            steamAppID: game.appID,
+                                            steamInstallDirectory: directory,
                                             jitEnabler: self.jitEnabler) { [weak self] success in
                 DispatchQueue.main.async {
                     guard let self else { return }
@@ -685,12 +687,22 @@ class SystemCoordinator: ObservableObject {
         activeSteamGameID = nil
         activeSteamPrefix = nil
         pendingSteamGameID = nil
-        setWindowsStatus("Execution Error: Wine exited. The Windows program is no longer running.")
+        var exitCode: Int32 = 0
+        var crashStatus: UInt32 = 0
+        let code = ideck_wineprocess_last_exit_code(&exitCode) ? exitCode : nil
+        let ntstatus = ideck_wineprocess_last_ntstatus(&crashStatus) ? crashStatus : nil
+        let reason = WineExitDiagnostics.message(exitCode: code, crashStatus: ntstatus)
+        SteamLog.event("[wine-exit] \(reason)")
+        setWindowsStatus(reason)
     }
 
     private func nativeLaunchFailure(_ status: Int) -> String {
-        if status == 0 {
-            return "Execution Error: the Wine process exited immediately after launch."
+        if status == 0 || status == Int(EAGAIN) {
+            var exitCode: Int32 = 0
+            var crashStatus: UInt32 = 0
+            let code = ideck_wineprocess_last_exit_code(&exitCode) ? exitCode : nil
+            let ntstatus = ideck_wineprocess_last_ntstatus(&crashStatus) ? crashStatus : nil
+            return WineExitDiagnostics.message(exitCode: code, crashStatus: ntstatus)
         }
         if status == Int(ENOTSUP) {
             return "Execution Error: 32-bit Windows support (WoW64) is missing from this IPA."

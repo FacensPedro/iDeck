@@ -40,6 +40,24 @@ indicator does not by itself mean that a compatible debugger is still attached.
    path opens the game's EXE directly and does not implement Madeira Dock's
    authenticated Windows Steam `LaunchApp` path. No DRM is bypassed.
 
+## Understand an immediate Wine exit
+
+The pinned Madeira native Wine bridge exports both `wine_process_exit_code()`
+and `wine_crash_exit_status()`. The iDeck host now reads them when a
+Windows program ends instead of displaying the same generic error for every
+outcome. Exit code 0 is normal termination; NTSTATUS `0xC0000135` often means
+a missing DLL, `0xC000007B` an invalid image or CPU architecture, and
+`0xC0000005` an access violation.
+
+The Wine launcher may also exit after creating a child process. Madeira
+provides an opt-in `MADEIRA_WAIT_CHILDREN=1` compatibility switch, but the
+upstream implementation documents possible indefinite waits, so iDeck does
+not enable it for every game. A DRM-protected game may require Steam's
+Windows client even when its files and real App ID are available.
+
+See [the source-level Madeira comparison](WINE_RUNTIME_GAP_ANALYSIS.md) for
+the remaining host/runtime differences and device-test guidance.
+
 ## If the application stops or freezes
 
 The previous iPadOS `bug_type: 202` report showed significant cumulative CPU
@@ -75,9 +93,10 @@ October 2026 code:
   `MADEIRA_AUDIO_PERIOD_MS=10` requests the old fixed 10 ms engine period.
 - **Visual C++:** in addition to the application bundle, Wine scans
   `Documents/vcruntime` for x64 Visual C++ DLLs supplied by the device owner,
-  preferring those copies over bundled ones. The Settings page can create the
-  folder under Files → On My iPad → iDeck → vcruntime. No Microsoft runtime is
-  distributed by this change. The native ARM64EC exemptions for
+  preferring those copies over bundled ones. Automatic first-game setup
+  prepares Files → On My iPad → iDeck → vcruntime; if needed, the folder can
+  also be created manually with Files. No Microsoft runtime is shipped in the
+  IPA or Git repository. The native ARM64EC exemptions for
   `vcruntime140.dll` and `msvcp140.dll` are maintained.
 
 The patch is verified and applied once to the pinned Madeira source checkout.
