@@ -76,7 +76,6 @@
 		AC100000000000000000015 /* lzxd.c in Sources */ = {isa = PBXBuildFile; fileRef = AC200000000000000000015 /* lzxd.c */; };
 		AC100000000000000000016 /* qtmd.c in Sources */ = {isa = PBXBuildFile; fileRef = AC200000000000000000016 /* qtmd.c */; };
 		AC100000000000000000017 /* crc32.c in Sources */ = {isa = PBXBuildFile; fileRef = AC200000000000000000017 /* crc32.c */; };
-		AC100000000000000000018 /* debug.c in Sources */ = {isa = PBXBuildFile; fileRef = AC200000000000000000018 /* debug.c */; };
 		DEAD00000000000000000071 /* VisualCRuntimeBootstrap.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEAD00000000000000000072 /* VisualCRuntimeBootstrap.swift */; };
 		ABCD00000000000000000001 /* SteamCDNHostSelection.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCD00000000000000000002 /* SteamCDNHostSelection.swift */; };
 		A10000000000000000000002 /* SteamContentDecryptor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000002 /* SteamContentDecryptor.swift */; };
@@ -164,7 +163,6 @@
 		AC200000000000000000015 /* lzxd.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = ThirdParty/libmspack/lzxd.c; sourceTree = "<group>"; };
 		AC200000000000000000016 /* qtmd.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = ThirdParty/libmspack/qtmd.c; sourceTree = "<group>"; };
 		AC200000000000000000017 /* crc32.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = ThirdParty/libmspack/crc32.c; sourceTree = "<group>"; };
-		AC200000000000000000018 /* debug.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = ThirdParty/libmspack/debug.c; sourceTree = "<group>"; };
 		DEAD00000000000000000072 /* VisualCRuntimeBootstrap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisualCRuntimeBootstrap.swift; sourceTree = "<group>"; };
 		ABCD00000000000000000002 /* SteamCDNHostSelection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamCDNHostSelection.swift; sourceTree = "<group>"; };
 		A20000000000000000000002 /* SteamContentDecryptor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamContentDecryptor.swift; sourceTree = "<group>"; };
@@ -262,7 +260,6 @@
 				AC100000000000000000015 /* lzxd.c in Sources */,
 				AC100000000000000000016 /* qtmd.c in Sources */,
 				AC100000000000000000017 /* crc32.c in Sources */,
-				AC100000000000000000018 /* debug.c in Sources */,
 				ABCD00000000000000000001 /* SteamCDNHostSelection.swift in Sources */,
 				A10000000000000000000002 /* SteamContentDecryptor.swift in Sources */,
 				A10000000000000000000003 /* SteamDepotManifest.swift in Sources */,
@@ -365,7 +362,6 @@
 				AC200000000000000000015 /* lzxd.c */,
 				AC200000000000000000016 /* qtmd.c */,
 				AC200000000000000000017 /* crc32.c */,
-				AC200000000000000000018 /* debug.c */,
 				ABCD00000000000000000002 /* SteamCDNHostSelection.swift */,
 				A20000000000000000000002 /* SteamContentDecryptor.swift */,
 				A20000000000000000000003 /* SteamDepotManifest.swift */,
