@@ -58,13 +58,12 @@ final class DepotDownloader {
     private var cdnAuthTokens: [String: String] = [:]  // "depot|host" -> "?auth=…" fragment
     private var maxConcurrentChunks: Int {
         let process = ProcessInfo.processInfo
-        // iPadOS recorded 81% CPU while Steam chunks were being installed.
-        // Keep enough CDN parallelism to saturate the network while leaving
-        // CPU capacity for decrypting, inflating, SwiftUI and the JIT runtime.
+        // Allow extra requests while other chunks decrypt or write, but
+        // re-check thermal and Low Power Mode changes during the transfer.
         if process.isLowPowerModeEnabled { return 2 }
         switch process.thermalState {
-        case .nominal: return 12
-        case .fair: return 6
+        case .nominal: return min(16, max(12, process.activeProcessorCount * 2))
+        case .fair: return min(8, max(4, process.activeProcessorCount))
         case .serious: return 3
         case .critical: return 1
         @unknown default: return 4
@@ -81,7 +80,7 @@ final class DepotDownloader {
         config.timeoutIntervalForRequest = 30
         config.timeoutIntervalForResource = 300
         // No bandwidth throttle is applied. This is a connection safety limit.
-        config.httpMaximumConnectionsPerHost = 12
+        config.httpMaximumConnectionsPerHost = 16
         return URLSession(configuration: config)
     }()
 
@@ -205,46 +204,59 @@ final class DepotDownloader {
         try await checkExisting(plans: plans, prepared: prepared,
                                 pending: &pending, state: &state, report: report)
 
-        // 3b. Transfer only changed or absent chunks.
+        // 3b. Transfer changed/absent chunks across independent depots.
+        // Keep depots that write the same output path in ordered batches,
+        // preserving Steam's final overlay while using idle CDN connections.
         let started = Date()
         let resumedBytes = state.doneBytes
         var actualWrittenBytes: UInt64 = 0
         var lastReport = Date.distantPast
-        for (index, plan) in plans.enumerated() {
-            let journal = try JournalWriter(url: prepared.journals[index])
-            defer { journal.close() }
-            let work = pending[index]
-            let paths = prepared.paths[index]
-            let existing = prepared.existing[index]
-            let maximum = maxConcurrentChunks, attempts = attemptsPerChunk
-            try await withThrowingTaskGroup(of: (UInt64, UInt64, UInt64).self) { group in
-                var next = 0
-                func enqueue() {
-                    guard next < work.count else { return }
-                    let item = work[next]; next += 1
+        let batches = SteamChunkScheduler.batches(paths: prepared.paths)
+        let journals = try prepared.journals.map { try JournalWriter(url: $0) }
+        let attempts = attemptsPerChunk
+        defer { journals.forEach { $0.close() } }
+        SteamLog.event("[steam-depot] transfer batches=\(batches.count) initial-parallelism=\(maxConcurrentChunks)")
+        for batch in batches {
+            try Task.checkCancellation()
+            var scheduler = SteamChunkScheduler(counts: batch.map { pending[$0].count })
+            guard scheduler.remaining > 0 else { continue }
+            try await withThrowingTaskGroup(of: (Int, UInt64, UInt64, UInt64).self) { group in
+                var inFlight = 0
+                func enqueue() -> Bool {
+                    guard let next = scheduler.next() else { return false }
+                    let depotIndex = batch[next.depot]
+                    let plan = plans[depotIndex]
+                    let item = pending[depotIndex][next.item]
                     let chunk = plan.manifest.files[item.file].chunks[item.chunk]
-                    let path = paths[item.file]
-                    let verify = existing[item.file]
+                    let path = prepared.paths[depotIndex][item.file]
+                    inFlight += 1
                     group.addTask {
                         let written = try await Self.fetchChunk(
                             chunk, plan: plan, path: path, attempts: attempts,
-                            seed: item.file &+ item.chunk, reuseExisting: verify)
-                        return (item.key, UInt64(chunk.compressedSize), written)
+                            seed: item.file &+ item.chunk)
+                        return (depotIndex, item.key, UInt64(chunk.compressedSize), written)
                     }
+                    return true
                 }
-                for _ in 0..<min(maximum, work.count) { enqueue() }
-                for try await (key, bytes, written) in group {
-                    journal.append(key)
+
+                // Finished tasks release slots. Changes in Low Power Mode or
+                // thermal state are applied before scheduling new chunks.
+                while inFlight < maxConcurrentChunks && enqueue() {}
+                for try await (depotIndex, key, bytes, written) in group {
+                    inFlight -= 1
+                    journals[depotIndex].append(key)
                     state.doneBytes += bytes
                     actualWrittenBytes &+= written
                     let now = Date()
                     if now.timeIntervalSince(lastReport) >= 0.25 {
                         lastReport = now
                         let elapsed = now.timeIntervalSince(started)
-                        if elapsed > 1 { state.bytesPerSecond = Double(state.doneBytes - resumedBytes) / elapsed }
+                        if elapsed > 1 {
+                            state.bytesPerSecond = Double(state.doneBytes - resumedBytes) / elapsed
+                        }
                         report(state)
                     }
-                    enqueue()
+                    while inFlight < maxConcurrentChunks && enqueue() {}
                 }
             }
         }
@@ -534,8 +546,7 @@ final class DepotDownloader {
     }
 
     private nonisolated static func fetchChunk(_ chunk: DepotManifest.ChunkEntry, plan: DepotPlan,
-                                               path: String, attempts: Int, seed: Int,
-                                               reuseExisting: Bool) async throws -> UInt64 {
+                                               path: String, attempts: Int, seed: Int) async throws -> UInt64 {
         var lastError: Error = SteamError.chunkDownloadFailed("No content server responded.")
         var attemptedHosts = Set<String>()
         for attempt in 0..<max(1, attempts) {
@@ -554,8 +565,9 @@ final class DepotDownloader {
                                                              expectedCRC: chunk.crc,
                                                              expectedSize: Int(chunk.uncompressedSize))
                 guard data.count == Int(chunk.uncompressedSize) else { throw SteamError.checksumMismatch }
-                let written = try write(data, to: path, offset: chunk.offset,
-                                        reuseExisting: reuseExisting)
+                // Existing chunks were SHA-1 verified: remaining work must
+                // be rewritten, not reread before pwrite.
+                let written = try write(data, to: path, offset: chunk.offset)
                 plan.health.recordSuccess(host, bytes: encrypted.count,
                                           seconds: transferSeconds,
                                           responseLatency: timing.firstByteSeconds)
@@ -587,13 +599,13 @@ final class DepotDownloader {
     }
 
     private nonisolated static func write(_ data: Data, to path: String,
-                                           offset: UInt64, reuseExisting: Bool) throws -> UInt64 {
+                                           offset: UInt64) throws -> UInt64 {
         var written: UInt64 = 0
         let errorCode = path.withCString { pathPointer in
             data.withUnsafeBytes { raw in
                 ideck_steam_write_chunk(
                     pathPointer, raw.baseAddress, raw.count, offset,
-                    reuseExisting ? 1 : 0, &written
+                    0, &written
                 )
             }
         }
