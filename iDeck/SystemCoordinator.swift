@@ -738,7 +738,19 @@ class SystemCoordinator: ObservableObject {
             case 2:
                 return "Execution Error: StikDebug could not allocate the Wine executable RX region, including smaller pools. Keep the debugger attached and check available virtual memory."
             case 3:
-                return "Execution Error: Wine's RX region was allocated but failed address-range or executable-permission validation. Review [iDeck Wine JIT] native logs."
+                let cause: String
+                switch ideck_wine_jit_pool_failure_rx_detail() {
+                case 1: cause = "The JIT RX address is below Madeira's required FEX frontier."
+                case 2: cause = "The RX address range overflowed."
+                case 3: cause = "The RX region exceeds the supported virtual-memory layout."
+                case 4: cause = "The RX region overlaps the Windows executable-image address window."
+                case 5: cause = "The RX region is not page-aligned."
+                case 6: cause = "Mach could not inspect the RX region."
+                case 7: cause = "The RX region contains an unmapped gap."
+                case 8: cause = "A page in the RX region lacks executable permission."
+                default: cause = "The RX region failed validation."
+                }
+                return "Execution Error: Wine's RX pool was rejected: \(cause) Restart iDeck, request StikDebug JIT from Madeira and check [iDeck Wine JIT] logs. Do not reuse a JIT pool after a crash."
             case 4:
                 return "Execution Error: Wine's executable RX region was allocated, but iPadOS denied its writable RW mirror\(machDetail). Check [iDeck Wine JIT] logs."
             case 5:
