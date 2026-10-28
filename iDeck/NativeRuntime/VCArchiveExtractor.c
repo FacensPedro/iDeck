@@ -13,6 +13,9 @@
 #define DLL_COUNT 14
 #define MAX_DLL_SIZE (32u * 1024u * 1024u)
 #define MAX_FILES_PER_INSTALLER 20000u
+#define MAX_NESTED_CABS 48u
+#define MAX_NESTED_CAB_BYTES (64u * 1024u * 1024u)
+#define MAX_TOTAL_NESTED_BYTES (256u * 1024u * 1024u)
 
 static const char *const required[DLL_COUNT] = {
     "concrt140.dll", "msvcp140.dll", "msvcp140_1.dll",
@@ -93,6 +96,134 @@ static int name_match(const char *filename, const char *wanted) {
             body[base_len] == '.' || body[base_len] == '\0');
 }
 
+typedef struct {
+    int found[DLL_COUNT];
+    unsigned int file_count;
+    unsigned int nested_count;
+    uint64_t total_nested_bytes;
+    int saw_cabinet;
+} extract_state;
+
+static int nested_candidate(const char *filename) {
+    if (!filename) return 0;
+    const char *name = filename;
+    for (const char *p = filename; *p; p++) {
+        if (*p == '/' || *p == '\\') name = p + 1;
+    }
+    char lower[256];
+    size_t length = strlen(name);
+    if (!length || length >= sizeof lower) return 0;
+    for (size_t i = 0; i < length; i++)
+        lower[i] = (char)tolower((unsigned char)name[i]);
+    lower[length] = '\0';
+    if (length >= 4 &&
+        (!strcmp(lower + length - 4, ".cab") ||
+         !strcmp(lower + length - 4, ".msi"))) return 1;
+    if (length > 1 && (lower[0] == 'a' || lower[0] == 'u')) {
+        for (size_t i = 1; i < length; i++)
+            if (!isdigit((unsigned char)lower[i])) return 0;
+        return 1;
+    }
+    return 0;
+}
+
+static int contains_cabinet_header(const char *path) {
+    FILE *stream = fopen(path, "rb");
+    if (!stream) return 0;
+    unsigned char bytes[4];
+    int valid = fread(bytes, 1, sizeof bytes, stream) == sizeof bytes &&
+                memcmp(bytes, "MSCF", 4) == 0;
+    fclose(stream);
+    return valid;
+}
+
+/* VC_redist.x64.exe is a WiX bootstrapper: the first CAB often contains
+ * files named a10 and a11, each of which is itself a CAB. A single pass
+ * through mspack.search(installer) therefore misses all the real DLLs.
+ * Recursion is intentionally limited to two nested levels and 48 pieces. */
+static int inspect_cabinets(const char *source, const char *target,
+                            unsigned level, extract_state *state,
+                            char *message, size_t capacity) {
+    struct mscab_decompressor *dec = mspack_create_cab_decompressor(NULL);
+    if (!dec) {
+        error_set(message, capacity, "CAB decompressor unavailable.");
+        return -3;
+    }
+    struct mscabd_cabinet *head = dec->search(dec, source);
+    if (!head) {
+        mspack_destroy_cab_decompressor(dec);
+        return 0;
+    }
+    state->saw_cabinet = 1;
+    int status = 0;
+    for (struct mscabd_cabinet *cab = head; cab; cab = cab->next) {
+        for (struct mscabd_file *file = cab->files; file; file = file->next) {
+            if (++state->file_count > MAX_FILES_PER_INSTALLER) {
+                status = -5;
+                error_set(message, capacity, "CAB file count exceeds safety limit.");
+                goto finish;
+            }
+            if (file->length < 512) continue;
+            int best = -1;
+            size_t longest = 0;
+            if ((uint64_t)file->length <= MAX_DLL_SIZE) {
+                for (int i = 0; i < DLL_COUNT; i++) {
+                    if (name_match(file->filename, required[i])) {
+                        size_t length = strlen(required[i]);
+                        if (length > longest) { best = i; longest = length; }
+                    }
+                }
+            }
+            if (best >= 0 && !state->found[best]) {
+                char path[2048];
+                if (snprintf(path, sizeof path, "%s/%s", target, required[best]) >=
+                    (int)sizeof path) {
+                    status = -6;
+                    error_set(message, capacity, "Destination path too long.");
+                    goto finish;
+                }
+                if (dec->extract(dec, file, path) == MSPACK_ERR_OK &&
+                    ideck_vcrt_valid_pe_x64(path)) {
+                    state->found[best] = 1;
+                } else {
+                    unlink(path);
+                }
+            }
+            if (level >= 2 || !nested_candidate(file->filename) ||
+                (uint64_t)file->length > MAX_NESTED_CAB_BYTES) continue;
+            if (state->nested_count >= MAX_NESTED_CABS ||
+                state->total_nested_bytes + (uint64_t)file->length >
+                    MAX_TOTAL_NESTED_BYTES) {
+                status = -8;
+                error_set(message, capacity, "Nested Microsoft CAB limit exceeded.");
+                goto finish;
+            }
+            unsigned serial = ++state->nested_count;
+            state->total_nested_bytes += (uint64_t)file->length;
+            char nested[2048];
+            if (snprintf(nested, sizeof nested, "%s/.ideck-vcrt-cab-%u",
+                         target, serial) >= (int)sizeof nested) {
+                status = -6;
+                error_set(message, capacity, "CAB staging path too long.");
+                goto finish;
+            }
+            if (dec->extract(dec, file, nested) == MSPACK_ERR_OK &&
+                contains_cabinet_header(nested)) {
+                /* A separate decompressor prevents recursive use of the
+                 * same libmspack instance during the outer enumeration. */
+                status = inspect_cabinets(nested, target, level + 1,
+                                          state, message, capacity);
+            }
+            unlink(nested);
+            if (status) goto finish;
+        }
+    }
+finish:
+    dec->close(dec, head);
+    mspack_destroy_cab_decompressor(dec);
+    return status;
+}
+
 int ideck_vcrt_extract(const char *installer, const char *target,
                        char *message, size_t capacity) {
     if (!installer || !target || !*installer || !*target) {
@@ -105,69 +236,23 @@ int ideck_vcrt_extract(const char *installer, const char *target,
         error_set(message, capacity, "Destination must be a private directory.");
         return -2;
     }
-    struct mscab_decompressor *decompressor = mspack_create_cab_decompressor(NULL);
-    if (!decompressor) {
-        error_set(message, capacity, "CAB decompressor unavailable.");
-        return -3;
-    }
-    struct mscabd_cabinet *cabs = decompressor->search(decompressor, installer);
-    if (!cabs) {
-        mspack_destroy_cab_decompressor(decompressor);
+    extract_state state = {0};
+    int status = inspect_cabinets(installer, target, 0, &state, message, capacity);
+    if (status) return status;
+    if (!state.saw_cabinet) {
         error_set(message, capacity, "No readable Microsoft CAB archive in installer.");
         return -4;
     }
-    int found[DLL_COUNT] = {0};
-    unsigned count = 0;
-    int result = 0;
-    for (struct mscabd_cabinet *cab = cabs; cab; cab = cab->next) {
-        for (struct mscabd_file *file = cab->files; file; file = file->next) {
-            if (++count > MAX_FILES_PER_INSTALLER) {
-                result = -5;
-                error_set(message, capacity, "CAB file count exceeds safety limit.");
-                goto done;
-            }
-            if (file->length < 512 || file->length > MAX_DLL_SIZE) continue;
-            /* A name such as F_CENTRAL_msvcp140_1_amd64 matches both
-             * msvcp140 and msvcp140_1 at first glance. Choose the longest
-             * exact known family to prevent silently installing the wrong
-             * executable bytes under a different DLL name. */
-            int best = -1;
-            size_t longest = 0;
-            for (int i = 0; i < DLL_COUNT; i++) {
-                if (name_match(file->filename, required[i])) {
-                    size_t length = strlen(required[i]);
-                    if (length > longest) {
-                        best = i;
-                        longest = length;
-                    }
-                }
-            }
-            if (best < 0 || found[best]) continue;
-            char path[2048];
-            if (snprintf(path, sizeof path, "%s/%s", target, required[best]) >= (int)sizeof path) {
-                result = -6;
-                error_set(message, capacity, "Destination path too long.");
-                goto done;
-            }
-            if (decompressor->extract(decompressor, file, path) == MSPACK_ERR_OK &&
-                ideck_vcrt_valid_pe_x64(path)) {
-                found[best] = 1;
-            } else {
-                unlink(path);
-            }
-        }
-    }
     for (int i = 0; i < DLL_COUNT; i++) {
-        if (!found[i]) {
-            result = -7;
-            if (message && capacity)
-                snprintf(message, capacity, "Missing or invalid Microsoft x64 DLL: %s", required[i]);
-            break;
+        if (!state.found[i]) {
+            if (message && capacity) {
+                snprintf(message, capacity,
+                    "Missing or invalid Microsoft x64 DLL after nested CAB extraction: %s",
+                    required[i]);
+            }
+            return -7;
         }
     }
-    if (!result) error_set(message, capacity, "Extracted 14 signed-format x64 DLLs.");
-done:
-    decompressor->close(decompressor, cabs);
-    mspack_destroy_cab_decompressor(decompressor);
-    return result;
+    error_set(message, capacity, "Extracted all 14 Microsoft x64 DLLs from nested CABs.");
+    return 0;
 }
