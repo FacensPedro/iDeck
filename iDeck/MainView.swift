@@ -67,6 +67,7 @@ struct MainView: View {
             get: {
                 coordinator.windowsStatus == "Steam Running" ||
                 coordinator.windowsStatus == "Running" ||
+                coordinator.windowsStatus == "Wine started; waiting for game..." ||
                 coordinator.windowsStatus == "Launching Steam game..." ||
                 coordinator.windowsStatus == "Launching Steam client..." ||
                 coordinator.windowsStatus == "Launching Windows app..." ||
