@@ -318,3 +318,36 @@ report a confusing executable-permission RX validation error. A failed
 request is now retried at another size by the native allocator. A debugger
 that returns no explicit result remains subject to native Mach executable
 permission verification; this does not turn non-executable memory into JIT.
+
+
+## October 28: actual iPad WoW64 address-space and ARM64EC x18 failures
+
+A subsequent 7,959-line device `madeira-log.txt` included four attempts:
+
+- **Honeygain_install.exe (PE32/i386):** the i386 DLL farm exists, but the
+  address-space allocator reported `5792 MB free VA`, below its required
+  `4096 MB` WoW64 window **plus** `MADEIRA_WOW_MIN_FREE_GB=8` of headroom.
+  This led to `[wow-window] main-process reserve FAILED 0xc0000017`.
+  Do **not** report this as a missing WoW64 IPA component, and do not
+  unconditionally remove the allocator's headroom check: it prevents
+  downstream address-space exhaustion.
+- **Cuphead.exe (PE32+/x64):** correctly selected the game executable and
+  executable directory, seeded the Wine DLL farms and entered FEX. Three
+  successive launches then reported `[x18-decline]`,
+  `[mach_exc] UNHANDLED`, and `[exc-disp] ... code=c000001d`, before
+  Wine exited with code 1. The logs also showed a protection warning
+  `Failed to mprotect last page of code buffer` that upstream Madeira
+  treats as nonfatal. The recurring unhandled native exception must be
+  investigated in **Madeira's ARM64EC/Mach exception handling and FEX**,
+  not misdiagnosed as an uninstalled Visual C++ runtime.
+- The log appended several sessions and substantial ongoing sampler output.
+  The native triage now prioritizes these two precise signatures and
+  disregards earlier sessions when a later session marker appears inside
+  its bounded 512 KiB tail. If the active session exceeds this tail,
+  diagnosis may be incomplete; share the full log for deeper investigation.
+
+**Do not claim these diagnostics fix the runtime.** Actual native repair
+requires symbolicated fault stacks and testing a matching Madeira runtime,
+FEX build and StikDebug session on the physical iPad. Successful wineserver
+initialization only proves that the Wine server started, not that a Windows
+application reached its first rendered frame.
