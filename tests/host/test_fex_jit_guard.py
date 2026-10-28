@@ -27,6 +27,21 @@ class FEXJITGuardTests(unittest.TestCase):
         self.assertIn("bool ideck_fex_jit_ready(void);", HEADER)
         self.assertIn('NativeRuntime/MadeiraRuntimeBridge.h', BRIDGE)
 
+    def test_wine_requires_a_distinct_dual_mapped_executable_pool(self):
+        self.assertIn("bool ideck_wine_jit_pool_prepare(void);", HEADER)
+        self.assertIn("bool ideck_wine_jit_pool_ready(void);", HEADER)
+        self.assertIn('jit26_prepare_region(nullptr, size)', FEX)
+        self.assertIn("vm_remap(", FEX)
+        self.assertIn("VM_PROT_READ | VM_PROT_WRITE", FEX)
+        self.assertIn("VM_PROT_EXECUTE", FEX)
+        self.assertIn('"WINE_IOS_JIT_RX"', FEX)
+        self.assertIn('"WINE_IOS_JIT_RW"', FEX)
+        self.assertIn('"WINE_IOS_JIT_SIZE"', FEX)
+        self.assertIn("if (!debugger_attached())", FEX)
+        self.assertIn("if (!ideck_wine_jit_pool_prepare() || !ideck_wine_jit_pool_ready()) return ENOMEM;", RUNTIME)
+        self.assertLess(RUNTIME.index("ideck_wine_jit_pool_prepare()"), RUNTIME.index("ideck_wineserver_initialize(wine_prefix)"))
+        self.assertIn("Wine ARM64EC executable JIT pool", COORDINATOR)
+
     def test_all_windows_launch_paths_check_jit_readiness(self):
         self.assertGreaterEqual(COORDINATOR.count("ideck_fex_jit_ready()"), 3)
         self.assertIn("StikDebug must remain attached", COORDINATOR)
