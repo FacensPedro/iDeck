@@ -98,6 +98,7 @@ static int name_match(const char *filename, const char *wanted) {
 
 typedef struct {
     int found[DLL_COUNT];
+    unsigned int found_count;
     unsigned int file_count;
     unsigned int nested_count;
     uint64_t total_nested_bytes;
@@ -158,6 +159,7 @@ static int inspect_cabinets(const char *source, const char *target,
     int status = 0;
     for (struct mscabd_cabinet *cab = head; cab; cab = cab->next) {
         for (struct mscabd_file *file = cab->files; file; file = file->next) {
+            if (state->found_count == DLL_COUNT) goto finish;
             if (++state->file_count > MAX_FILES_PER_INSTALLER) {
                 status = -5;
                 error_set(message, capacity, "CAB file count exceeds safety limit.");
@@ -185,6 +187,7 @@ static int inspect_cabinets(const char *source, const char *target,
                 if (dec->extract(dec, file, path) == MSPACK_ERR_OK &&
                     ideck_vcrt_valid_pe_x64(path)) {
                     state->found[best] = 1;
+                    state->found_count++;
                 } else {
                     unlink(path);
                 }
@@ -216,6 +219,7 @@ static int inspect_cabinets(const char *source, const char *target,
             }
             unlink(nested);
             if (status) goto finish;
+            if (state->found_count == DLL_COUNT) goto finish;
         }
     }
 finish:
