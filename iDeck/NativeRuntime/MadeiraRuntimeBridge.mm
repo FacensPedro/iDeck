@@ -192,8 +192,8 @@ extern "C" int32_t ideck_runtime_launch(const char *executable_path,
                 ![[NSFileManager defaultManager] fileExistsAtPath:canonicalFolder]) return EACCES;
             NSString *relativeFolder = [canonicalFolder substringFromIndex:root.length];
             if (relativeFolder.length == 0 || relativeFolder.length >= 850) return ENAMETOOLONG;
-            NSString *windowsFolder = [@"C:\" stringByAppendingString:
-                [relativeFolder stringByReplacingOccurrencesOfString:@"/" withString:@"\"]];
+            NSString *windowsFolder = [@"C:\\" stringByAppendingString:
+                [relativeFolder stringByReplacingOccurrencesOfString:@"/" withString:@"\\"]];
             NSString *workingDirectory = canonicalExecutable.stringByDeletingLastPathComponent;
             if (requestedWorkdir != nil) {
                 if (![requestedWorkdir isKindOfClass:[NSString class]] ||
@@ -212,8 +212,8 @@ extern "C" int32_t ideck_runtime_launch(const char *executable_path,
                 !directoryExists)
                 return ideck_invalid_launch("Steam working directory is missing or outside installed game");
             NSString *relativeWorkingDirectory = [workingDirectory substringFromIndex:root.length];
-            NSString *windowsWorkingDirectory = [@"C:\" stringByAppendingString:
-                [relativeWorkingDirectory stringByReplacingOccurrencesOfString:@"/" withString:@"\"]];
+            NSString *windowsWorkingDirectory = [@"C:\\" stringByAppendingString:
+                [relativeWorkingDirectory stringByReplacingOccurrencesOfString:@"/" withString:@"\\"]];
             if (windowsWorkingDirectory.length >= 480) return ENAMETOOLONG;
             /* SteamAppPath is the install root, but Wine's working directory
              * is the launch option's own workingdir (or EXE's parent). Games
