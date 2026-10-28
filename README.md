@@ -60,7 +60,18 @@ IDECK_ACCEPT_METAL_CONVERTER_LICENSE=1 \
 bash scripts/build_native_runtime.sh
 ```
 
-The output is `iDeck.ipa` when the required steps succeed. Set your own signing team, bundle identifiers, App Group, and provisioning configuration.
+The output is `iDeck.ipa` when the required steps succeed. The default unsigned
+bundle identifier is **`com.ideck.ideck`**; its VPN extension uses
+`com.ideck.ideck.VPNExtension` and the extension's App Group entitlement
+is `group.com.ideck.ideck`. Configure compatible signing identities,
+provisioning profiles and App Group capabilities when signing. Third-party
+sideloaders such as AltStore may append a team-specific suffix (for example,
+`com.ideck.ideck.<suffix>`) or rewrite identifiers while resigning: that
+suffix cannot be controlled by changing the Xcode project's default ID.
+Make sure any extension remains signed and its bundle ID matches the main
+app's VPN provider reference. **Changing the app identifier is treated as
+a separate app by iPadOS** and may prevent access to data stored under the
+old identifier; back up the existing iDeck data before replacing the app.
 
 ### WoW64: 32-bit Windows applications
 

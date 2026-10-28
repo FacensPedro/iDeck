@@ -8,7 +8,7 @@
 	</array>
 	<key>com.apple.security.application-groups</key>
 	<array>
-		<string>group.com.example.iDeck</string>
+		<string>group.com.ideck.ideck</string>
 	</array>
 </dict>
 </plist>
