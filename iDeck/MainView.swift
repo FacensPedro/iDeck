@@ -1700,6 +1700,11 @@ private struct WindowsGameProfileForm: View {
                 .tint(.blue)
             Toggle(tr("Enable AVX/AVX2 translation"), isOn: $profile.avxEnabled)
                 .tint(.blue)
+            Toggle("Keep child game processes running (experimental)", isOn: $profile.keepChildProcessesRunning)
+                .tint(.blue)
+            Text("Use only when a launcher exits after starting its game. This may keep Wine running after the game ends.")
+                .font(.caption)
+                .foregroundColor(.gray)
         }
         .padding(16)
         .background(Color.white.opacity(0.055))

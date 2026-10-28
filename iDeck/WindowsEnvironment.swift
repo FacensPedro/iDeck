@@ -262,6 +262,12 @@ class WindowsEnvironment {
             }
         }
 
+        if profile.keepChildProcessesRunning {
+            setenv("MADEIRA_WAIT_CHILDREN", "1", 1)
+        } else {
+            unsetenv("MADEIRA_WAIT_CHILDREN")
+        }
+
         if profile.avxEnabled {
             setenv("MADEIRA_FEX_AVX", "1", 1)
         } else {

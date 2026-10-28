@@ -12,14 +12,15 @@ struct WindowsGameProfile: Codable, Equatable, Identifiable {
     var metalFXEnabled: Bool = false
     var fpsLimit: String = "30"
     var avxEnabled: Bool = false
+    var keepChildProcessesRunning: Bool = false
     var artworkFilename: String? = nil
     var updatedAt: Date = Date()
 
     private enum CodingKeys: String, CodingKey {
-        case id, title, arguments, resolution, graphicsAPI, metalFXEnabled, fpsLimit, avxEnabled, artworkFilename, updatedAt
+        case id, title, arguments, resolution, graphicsAPI, metalFXEnabled, fpsLimit, avxEnabled, keepChildProcessesRunning, artworkFilename, updatedAt
     }
 
-    init(id: String, title: String, arguments: String = "", resolution: String = "960x540", graphicsAPI: String = "Automatic", metalFXEnabled: Bool = false, fpsLimit: String = "30", avxEnabled: Bool = false, artworkFilename: String? = nil, updatedAt: Date = Date()) {
+    init(id: String, title: String, arguments: String = "", resolution: String = "960x540", graphicsAPI: String = "Automatic", metalFXEnabled: Bool = false, fpsLimit: String = "30", avxEnabled: Bool = false, keepChildProcessesRunning: Bool = false, artworkFilename: String? = nil, updatedAt: Date = Date()) {
         self.id = id
         self.title = title
         self.arguments = arguments
@@ -28,6 +29,7 @@ struct WindowsGameProfile: Codable, Equatable, Identifiable {
         self.metalFXEnabled = metalFXEnabled
         self.fpsLimit = fpsLimit
         self.avxEnabled = avxEnabled
+        self.keepChildProcessesRunning = keepChildProcessesRunning
         self.artworkFilename = artworkFilename
         self.updatedAt = updatedAt
     }
@@ -42,6 +44,7 @@ struct WindowsGameProfile: Codable, Equatable, Identifiable {
         metalFXEnabled = try values.decodeIfPresent(Bool.self, forKey: .metalFXEnabled) ?? false
         fpsLimit = try values.decodeIfPresent(String.self, forKey: .fpsLimit) ?? "30"
         avxEnabled = try values.decodeIfPresent(Bool.self, forKey: .avxEnabled) ?? false
+        keepChildProcessesRunning = try values.decodeIfPresent(Bool.self, forKey: .keepChildProcessesRunning) ?? false
         artworkFilename = try values.decodeIfPresent(String.self, forKey: .artworkFilename)
         updatedAt = try values.decodeIfPresent(Date.self, forKey: .updatedAt) ?? Date()
     }
