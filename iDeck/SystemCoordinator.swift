@@ -9,6 +9,8 @@ class SystemCoordinator: ObservableObject {
     @Published var isContainerReady: Bool = false
     @Published var currentStatus: String = "Ready"
     @Published var windowsStatus: String = "Ready"
+    @Published private(set) var windowsGameLoadingPercent: Int = 0
+    @Published private(set) var wineCloseRequested = false
     @Published var liveContainerStatus: String = "Ready"
     @Published var isSteamConnected: Bool = false
     
@@ -94,8 +96,42 @@ class SystemCoordinator: ObservableObject {
         let update = {
             self.windowsStatus = status
             self.currentStatus = status
+            self.windowsGameLoadingPercent = WindowsLaunchProgress.advance(current: self.windowsGameLoadingPercent, status: status)
         }
         if Thread.isMainThread { update() } else { DispatchQueue.main.async(execute: update) }
+    }
+
+    func beginWindowsGameLoading() {
+        let reset = {
+            self.windowsGameLoadingPercent = 0
+            self.wineCloseRequested = false
+            self.setWindowsStatus("Preparing game launch...")
+        }
+        if Thread.isMainThread { reset() } else { DispatchQueue.main.async(execute: reset) }
+    }
+
+    func markFirstWindowsFrame() {
+        guard windowsStatus == "Running" || windowsStatus == "Steam Running" else { return }
+        windowsGameLoadingPercent = WindowsLaunchProgress.afterFirstFrame(
+            current: windowsGameLoadingPercent, wineRunning: ideck_wineprocess_running())
+    }
+
+    func closeWindowsSession() -> Bool {
+        if !ideck_wineprocess_running() {
+            pendingSteamGameID = nil
+            wineCloseRequested = false
+            setWindowsStatus("Windows Ready")
+            windowsGameLoadingPercent = 0
+            return true
+        }
+        guard ideck_wineprocess_request_close() else {
+            SteamLog.event("[wine-exit] Madeira keyboard input missing; cannot send Alt+F4")
+            return false
+        }
+        wineCloseRequested = true
+        SteamLog.event("[wine-exit] graceful Alt+F4 close requested")
+        setWindowsStatus("Closing Windows game...")
+        return true
     }
 
     func setLiveContainerStatus(_ status: String) {
@@ -454,6 +490,11 @@ class SystemCoordinator: ObservableObject {
     }
 
     func launchWindowsExecutable(at url: URL, profile: WindowsGameProfile? = nil) {
+        if ideck_wineprocess_session_used() {
+            setWindowsStatus("Execution Error: Wine already ran in this iDeck process. Close and reopen iDeck before starting another app.")
+            return
+        }
+        beginWindowsGameLoading()
         guard isContainerReady else { return }
         refreshJITStatus()
 
@@ -587,6 +628,11 @@ class SystemCoordinator: ObservableObject {
         }
         activeSteamGameID = nil
         activeSteamPrefix = nil
+        if ideck_wineprocess_session_used() {
+            setWindowsStatus("Execution Error: Wine already ran in this iDeck process. Close and reopen iDeck before starting another game.")
+            return
+        }
+        beginWindowsGameLoading()
 
         let steamApps = SteamInstallPaths.steamApps(
             drive: prefixPath.appendingPathComponent("drive_c", isDirectory: true))
@@ -682,7 +728,8 @@ class SystemCoordinator: ObservableObject {
     }
 
     func refreshWindowsSessionHealth() {
-        guard windowsStatus == "Running" || windowsStatus == "Steam Running" else { return }
+        guard windowsStatus == "Running" || windowsStatus == "Steam Running" ||
+              windowsStatus == "Closing Windows game..." else { return }
         guard !ideck_wineprocess_running() else { return }
         activeSteamGameID = nil
         activeSteamPrefix = nil
@@ -693,6 +740,7 @@ class SystemCoordinator: ObservableObject {
         let ntstatus = ideck_wineprocess_last_ntstatus(&crashStatus) ? crashStatus : nil
         let reason = WineExitDiagnostics.message(exitCode: code, crashStatus: ntstatus)
         SteamLog.event("[wine-exit] \(reason)")
+        wineCloseRequested = false
         setWindowsStatus(reason)
     }
 
@@ -703,6 +751,9 @@ class SystemCoordinator: ObservableObject {
             let code = ideck_wineprocess_last_exit_code(&exitCode) ? exitCode : nil
             let ntstatus = ideck_wineprocess_last_ntstatus(&crashStatus) ? crashStatus : nil
             return WineExitDiagnostics.message(exitCode: code, crashStatus: ntstatus)
+        }
+        if status == Int(EALREADY) {
+            return "Execution Error: Wine already ran in this iDeck process. Close and reopen iDeck to launch another Windows game."
         }
         if status == Int(ENOTSUP) {
             return "Execution Error: 32-bit Windows support (WoW64) is missing from this IPA."
