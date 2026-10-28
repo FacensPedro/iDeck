@@ -3,35 +3,78 @@ import Foundation
 enum VisualCRuntimeBootstrap {
     static let downloadURL = URL(string: "https://aka.ms/vc14/vc_redist.x64.exe")!
     static let installStatus = "Installing Microsoft Visual C++..."
-    private static let markerName = ".ideck-vcredist-v14-installed"
-    private static let requiredDLLs = ["vcruntime140.dll", "msvcp140.dll"]
+    static let requiredDLLs = [
+        "concrt140.dll", "msvcp140.dll", "msvcp140_1.dll",
+        "msvcp140_2.dll", "msvcp140_atomic_wait.dll",
+        "msvcp140_codecvt_ids.dll", "vcamp140.dll", "vccorlib140.dll",
+        "vcomp140.dll", "vcruntime140.dll", "vcruntime140_1.dll",
+        "vcruntime140_threads.dll", "mfc140.dll", "mfc140u.dll"
+    ]
 
-    static func installed(in prefix: URL, documents: URL? = nil) -> Bool {
-        let paths = [
-            prefix.appendingPathComponent("drive_c/windows/system32", isDirectory: true),
-            prefix.appendingPathComponent("drive_c/windows/syswow64", isDirectory: true)
-        ]
-        if let documents {
-            let custom = documents.appendingPathComponent("vcruntime", isDirectory: true)
-            if requiredDLLs.allSatisfy({ hasPE(custom.appendingPathComponent($0)) }) {
-                return true
-            }
-        }
-        let marker = prefix.appendingPathComponent(markerName)
-        guard FileManager.default.fileExists(atPath: marker.path) else { return false }
-        return paths.contains { directory in
-            requiredDLLs.allSatisfy { hasPE(directory.appendingPathComponent($0)) }
+    static func hasCompleteRuntime(in directory: URL) -> Bool {
+        requiredDLLs.allSatisfy { name in
+            let path = directory.appendingPathComponent(name)
+            return path.path.withCString { ideck_vcrt_valid_pe_x64($0) != 0 }
         }
     }
 
-    static func complete(in prefix: URL) -> Bool {
-        let system32 = prefix.appendingPathComponent("drive_c/windows/system32", isDirectory: true)
-        guard requiredDLLs.allSatisfy({ hasPE(system32.appendingPathComponent($0)) }) else {
-            return false
+    static func installed(in prefix: URL, documents: URL? = nil) -> Bool {
+        if let documents,
+           hasCompleteRuntime(in: documents.appendingPathComponent("vcruntime", isDirectory: true)) {
+            return true
         }
-        let marker = prefix.appendingPathComponent(markerName)
-        return FileManager.default.createFile(atPath: marker.path,
-                                              contents: Data("Microsoft v14 x64 installed\n".utf8))
+        if let resources = Bundle.main.resourceURL,
+           hasCompleteRuntime(in: resources.appendingPathComponent("x86_64-vcruntime", isDirectory: true)) {
+            return true
+        }
+        return false
+    }
+
+    static func extractAndInstall(installer: URL, documents: URL,
+                                  completion: @escaping (Result<Void, Error>) -> Void) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            let fileManager = FileManager.default
+            let stage = documents.appendingPathComponent(".vcruntime-staging-\(UUID().uuidString)", isDirectory: true)
+            let live = documents.appendingPathComponent("vcruntime", isDirectory: true)
+            let backup = documents.appendingPathComponent(".vcruntime-backup-\(UUID().uuidString)", isDirectory: true)
+            var backedUp = false
+            do {
+                try fileManager.createDirectory(at: stage, withIntermediateDirectories: false,
+                                                attributes: [.posixPermissions: 0o700])
+                defer { try? fileManager.removeItem(at: stage) }
+                var output = [CChar](repeating: 0, count: 512)
+                let result = installer.path.withCString { source in
+                    stage.path.withCString { destination in
+                        ideck_vcrt_extract(source, destination, &output, output.count)
+                    }
+                }
+                guard result == 0, hasCompleteRuntime(in: stage) else {
+                    let reason = String(cString: output)
+                    throw NSError(domain: "iDeck.VisualC", code: Int(result),
+                                  userInfo: [NSLocalizedDescriptionKey: reason.isEmpty
+                                    ? "Microsoft CAB extraction failed." : reason])
+                }
+                if fileManager.fileExists(atPath: live.path) {
+                    try fileManager.moveItem(at: live, to: backup)
+                    backedUp = true
+                }
+                do {
+                    try fileManager.moveItem(at: stage, to: live)
+                    guard hasCompleteRuntime(in: live) else {
+                        throw NSError(domain: "iDeck.VisualC", code: -10,
+                                      userInfo: [NSLocalizedDescriptionKey: "Installed DLL verification failed."])
+                    }
+                    if backedUp { try? fileManager.removeItem(at: backup) }
+                    DispatchQueue.main.async { completion(.success(())) }
+                } catch {
+                    try? fileManager.removeItem(at: live)
+                    if backedUp { try? fileManager.moveItem(at: backup, to: live) }
+                    throw error
+                }
+            } catch {
+                DispatchQueue.main.async { completion(.failure(error)) }
+            }
+        }
     }
 
     static func hasPE(_ file: URL, machines: Set<UInt16> = [0x8664]) -> Bool {
