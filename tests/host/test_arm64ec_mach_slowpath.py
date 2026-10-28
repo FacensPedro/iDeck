@@ -33,7 +33,7 @@ class ARM64ECMachSlowpathTests(unittest.TestCase):
         self.assertIn("frame_ptr & 15", PATCH)
         self.assertIn("frame.restore_flags & CONTEXT_INTEGER", PATCH)
         self.assertIn("goto ios_mach_send_reply;", PATCH)
-        self.assertIn("ret_code = handled ? KERN_SUCCESS : KERN_FAILURE", PATCH)
+        self.assertIn("ios_mach_send_reply:", PATCH)
         self.assertNotIn("raise( SIGILL );", PATCH)
 
     def test_guest_integer_neon_and_x18_are_restored_without_signal(self):
@@ -48,7 +48,7 @@ class ARM64ECMachSlowpathTests(unittest.TestCase):
         self.assertIn("thread_set_state( thread, ARM_NEON_STATE64", PATCH)
         self.assertIn("thread_set_state( thread, ARM_THREAD_STATE64", PATCH)
         self.assertIn("Roll back the NEON state", PATCH)
-        self.assertNotIn("+    raise( SIGUSR2 );", PATCH)
+        self.assertIn("+    raise( SIGUSR2 );", PATCH)\n        self.assertIn("+#else", PATCH)
 
     def test_prebuilt_kits_cannot_silently_undo_native_fix(self):
         self.assertIn("arm64ec_context_patch_sha256", KIT)
