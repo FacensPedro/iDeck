@@ -214,7 +214,10 @@ class MadeiraNativeKitTests(unittest.TestCase):
                 destination.write_bytes(value)
         for name, path in kit.archive_paths(madeira, bridge).items():
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_bytes(b"!<arch>\n" + name.encode())
+            path.write_bytes(
+                b"!<arch>\n" + name.encode() +
+                (kit.ARM64EC_MACH_RETURN_BYTES if name == "libntdll_unix.a" else b"")
+            )
         with mock.patch.object(kit.subprocess, "check_output", return_value=kit.REVISION + "\n"):
             output = self.root / "built.zip"
             kit.build_kit(output, madeira, bridge, False, False, resource_root)
