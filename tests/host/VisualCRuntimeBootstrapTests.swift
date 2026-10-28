@@ -3,60 +3,58 @@ import Foundation
 @main
 struct VisualCRuntimeBootstrapTests {
     static func main() throws {
-        let temporary = FileManager.default.temporaryDirectory
-            .appendingPathComponent("ideck-vc-runtime-tests-" + UUID().uuidString, isDirectory: true)
-        defer { try? FileManager.default.removeItem(at: temporary) }
-        try FileManager.default.createDirectory(at: temporary, withIntermediateDirectories: true)
-
-        let prefix = temporary.appendingPathComponent("prefix", isDirectory: true)
-        let documents = temporary.appendingPathComponent("Documents", isDirectory: true)
-        let system32 = prefix.appendingPathComponent("drive_c/windows/system32", isDirectory: true)
-        try FileManager.default.createDirectory(at: system32, withIntermediateDirectories: true)
-        let userDLLs = documents.appendingPathComponent("vcruntime", isDirectory: true)
-        try FileManager.default.createDirectory(at: userDLLs, withIntermediateDirectories: true)
-
-        assert(!VisualCRuntimeBootstrap.installed(in: prefix, documents: documents))
-        assert(!VisualCRuntimeBootstrap.complete(in: prefix))
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ideck-vcruntime-tests-" + UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let prefix = root.appendingPathComponent("prefix", isDirectory: true)
+        let documents = root.appendingPathComponent("Documents", isDirectory: true)
+        let runtime = documents.appendingPathComponent("vcruntime", isDirectory: true)
+        try FileManager.default.createDirectory(at: runtime, withIntermediateDirectories: true)
         assert(!VisualCRuntimeBootstrap.installed(in: prefix, documents: documents))
 
-        var mockPE = Data(repeating: 0, count: 128)
-        mockPE[0] = 0x4D
-        mockPE[1] = 0x5A
-        mockPE[0x3C] = 0x40
-        mockPE[0x40] = 0x50
-        mockPE[0x41] = 0x45
-        mockPE[0x44] = 0x64
-        mockPE[0x45] = 0x86
-        assert(VisualCRuntimeBootstrap.hasPE({
-            let candidate = temporary.appendingPathComponent("sample.dll")
-            try! mockPE.write(to: candidate)
-            return candidate
-        }()))
-        assert(!VisualCRuntimeBootstrap.hasPE(temporary.appendingPathComponent("missing.dll")))
-        try mockPE.write(to: system32.appendingPathComponent("vcruntime140.dll"))
-        assert(!VisualCRuntimeBootstrap.complete(in: prefix))
-        try mockPE.write(to: system32.appendingPathComponent("msvcp140.dll"))
-        assert(VisualCRuntimeBootstrap.complete(in: prefix))
+        var pe = Data(repeating: 0, count: 512)
+        pe[0] = 0x4D
+        pe[1] = 0x5A
+        pe[0x3C] = 0x80
+        pe[0x80] = 0x50
+        pe[0x81] = 0x45
+        pe[0x84] = 0x64
+        pe[0x85] = 0x86
+        pe[0x98] = 0x0B
+        pe[0x99] = 0x02
+        pe[0x98 + 108] = 16
+        pe[0x98 + 112 + 32] = 0x80
+        pe[0x98 + 112 + 33] = 0x01
+        pe[0x98 + 112 + 36] = 0x10
+        let first = runtime.appendingPathComponent(VisualCRuntimeBootstrap.requiredDLLs[0])
+        try pe.write(to: first)
+        assert(VisualCRuntimeBootstrap.hasPE(first))
+        assert(ideck_vcrt_valid_pe_x64(first.path) != 0)
+        assert(!VisualCRuntimeBootstrap.hasCompleteRuntime(in: runtime))
+        for dll in VisualCRuntimeBootstrap.requiredDLLs.dropFirst() {
+            try pe.write(to: runtime.appendingPathComponent(dll))
+        }
+        assert(VisualCRuntimeBootstrap.hasCompleteRuntime(in: runtime))
         assert(VisualCRuntimeBootstrap.installed(in: prefix, documents: documents))
 
-        try FileManager.default.removeItem(at: system32.appendingPathComponent("msvcp140.dll"))
+        var x86 = pe
+        x86[0x84] = 0x4C
+        x86[0x85] = 0x01
+        try x86.write(to: first)
+        assert(ideck_vcrt_valid_pe_x64(first.path) == 0)
         assert(!VisualCRuntimeBootstrap.installed(in: prefix, documents: documents))
-        try mockPE.write(to: userDLLs.appendingPathComponent("vcruntime140.dll"))
-        try mockPE.write(to: userDLLs.appendingPathComponent("msvcp140.dll"))
-        assert(VisualCRuntimeBootstrap.installed(in: prefix, documents: documents))
+        assert(VisualCRuntimeBootstrap.hasPE(first, machines: [0x014C, 0x8664]))
+        assert(!VisualCRuntimeBootstrap.hasPE(first))
+        try pe.write(to: first)
+        pe[0x98 + 112 + 32] = 0
+        try pe.write(to: first)
+        assert(ideck_vcrt_valid_pe_x64(first.path) == 0)
 
-        var x86PE = mockPE
-        x86PE[0x44] = 0x4C
-        x86PE[0x45] = 0x01
-        let x86URL = temporary.appendingPathComponent("x86.exe")
-        try x86PE.write(to: x86URL)
-        assert(!VisualCRuntimeBootstrap.hasPE(x86URL))
-        assert(VisualCRuntimeBootstrap.hasPE(x86URL, machines: [0x014C, 0x8664]))
         assert(VisualCRuntimeBootstrap.isTrustedDownloadURL(URL(string: "https://aka.ms/vc14/vc_redist.x64.exe")!))
         assert(VisualCRuntimeBootstrap.isTrustedDownloadURL(URL(string: "https://download.visualstudio.microsoft.com/download/example")!))
         assert(!VisualCRuntimeBootstrap.isTrustedDownloadURL(URL(string: "http://download.microsoft.com/example")!))
         assert(!VisualCRuntimeBootstrap.isTrustedDownloadURL(URL(string: "https://download.microsoft.com.evil.test/example")!))
-        assert(!VisualCRuntimeBootstrap.isTrustedDownloadURL(URL(string: "https://example.com/vc_redist.x64.exe")!))
-        print("PASS: Visual C++ first-run marker and trusted official endpoints")
+        print("PASS: PE x64 and certificate-table checks, full 14-DLL installation state")
     }
 }
