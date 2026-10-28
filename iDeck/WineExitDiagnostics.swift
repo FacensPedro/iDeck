@@ -29,6 +29,9 @@ enum WineExitDiagnostics {
         if exitCode == 0 {
             return "Windows program closed normally (Wine exit code 0)."
         }
+        if exitCode == 1 {
+            return "Execution Error: Windows program stopped (Wine exit code 1). This generic exit code does not identify the cause. Share the Wine log to inspect DLL, launcher and graphics errors."
+        }
         return "Execution Error: Windows program stopped (Wine exit code \(exitCode)). Check the Wine/FEX logs."
     }
 }

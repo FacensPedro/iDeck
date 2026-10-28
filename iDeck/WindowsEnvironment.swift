@@ -147,9 +147,13 @@ class WindowsEnvironment {
         self.winePrefixPath = prefix
         setenv("WINEPREFIX", prefix, 1)
         if ProcessInfo.processInfo.environment["IDECK_WINE_DIAGNOSTICS"] == "1" {
-            setenv("WINEDEBUG", "err+all,warn+all", 1)
+            // Madeira's Wine process thread configures WINEDEBUG itself.
+            // Use its supported flag to request detailed native traces.
+            setenv("MADEIRA_DEBUG_VERBOSE", "1", 1)
+            setenv("WINEDEBUG", "err+all", 1)
         } else {
-            setenv("WINEDEBUG", "-all", 1)
+            // Match Madeira's lightweight default; do not suppress errors.
+            setenv("WINEDEBUG", "err+all,err-virtual,fixme-d3dcompiler", 1)
         }
         setenv("WINEARCH", "win64", 1)
         setenv("STEAM_COMPAT_CLIENT_INSTALL_PATH", prefix + "/drive_c/Program Files (x86)/Steam", 1)

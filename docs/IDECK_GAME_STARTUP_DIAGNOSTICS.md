@@ -69,10 +69,21 @@ Analytics & Improvements → Analytics Data**, using the iDeck incident
 timestamp. The full `.ips` report can distinguish a CPU resource report,
 a watchdog termination, an uncaught exception or a memory kill.
 
-For detailed Wine warnings during a development test, start the process
-with `IDECK_WINE_DIAGNOSTICS=1` in the environment; otherwise the bundled
-Wine debug verbosity remains disabled for performance. Do not publish logs
-containing Steam credentials or user tokens.
+Madeira writes Wine stdout/stderr and diagnostic messages to
+`Documents/madeira-log.txt` during a session. When a launch fails, the
+session screen offers **Share Wine log** if this file exists. The file may
+include older sessions and personal data; review it before sharing.
+
+Wine exit code 1 is a generic process failure, not a specific missing-DLL
+or graphics diagnostic. Inspect `err:`, `[WineProc]`, and game-specific
+messages in the log; also check for a launcher spawning another process.
+
+For detailed native Wine traces during a development test, launch iDeck with
+`IDECK_WINE_DIAGNOSTICS=1` in its environment. iDeck maps this to
+Madeira's `MADEIRA_DEBUG_VERBOSE=1` because Madeira resets `WINEDEBUG` in
+its native Wine thread. This can generate very large logs and reduce
+performance. The normal setting retains Madeira's lightweight error logging.
+Do not publish logs containing Steam credentials or user tokens.
 
 Do not forcibly detach/destroy the active Metal view while an in-process Wine
 guest continues running. The pinned upstream WineProcessBridge exposes no
