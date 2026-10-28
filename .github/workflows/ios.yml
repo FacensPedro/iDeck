@@ -91,6 +91,9 @@ jobs:
       - name: Test StikDebug universal JIT register encoding
         run: node tests/host/universal_jit_register_tests.js
 
+      - name: Test app cold-start isolation and crash-recovery entry
+        run: python3 -m unittest discover -s tests/host -p 'test_launch_startup_isolation.py' -v
+
       - name: Test FEX iOS allocator archive preparation
         run: |
           bash -n scripts/build_fex_ios_allocator.sh
