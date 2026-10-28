@@ -63,6 +63,7 @@ struct GameSessionView: View {
     @StateObject private var metrics = GameRuntimeMetrics()
     @State private var showActiveWineAlert = false
     @State private var closeRequested = false
+    @State private var recentWineLogFinding: String?
 
     private var gameLoading: (progress: Double, stage: String)? {
         let status = coordinator.windowsStatus
@@ -91,6 +92,32 @@ struct GameSessionView: View {
         }
         let url = documents.appendingPathComponent("madeira-log.txt", isDirectory: false)
         return FileManager.default.fileExists(atPath: url.path) ? url : nil
+    }
+
+    // Based on Madeira's LogSummary, but performs a bounded, privacy-safe
+    // native scan only on a launch error rather than parsing a large log on
+    // each SwiftUI refresh.
+    private func updateRecentWineLogFinding() {
+        guard coordinator.windowsStatus.hasPrefix("Execution Error"),
+              let url = wineLogURL else {
+            recentWineLogFinding = nil
+            return
+        }
+        let diagnosis = url.path.withCString { ideck_wine_log_diagnose($0) }
+        switch diagnosis {
+        case 1:
+            recentWineLogFinding = "Last Wine log indicates an executable JIT allocation or mapping failure."
+        case 2:
+            recentWineLogFinding = "Last Wine log indicates that executable memory permissions were denied."
+        case 3:
+            recentWineLogFinding = "Last Wine log indicates the Windows process ran out of memory."
+        case 4:
+            recentWineLogFinding = "Last Wine log indicates a Windows program memory access violation."
+        case 5:
+            recentWineLogFinding = "Last Wine log indicates a missing or incompatible DLL."
+        default:
+            recentWineLogFinding = nil
+        }
     }
 
     private let tick = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
@@ -183,6 +210,11 @@ struct GameSessionView: View {
                     VStack(alignment: .leading, spacing: 10) {
                         Text(trStatus(coordinator.windowsStatus))
                             .foregroundColor(.red)
+                        if let recentWineLogFinding {
+                            Text(tr(recentWineLogFinding))
+                                .font(.caption)
+                                .foregroundColor(.orange)
+                        }
                         if let logURL = wineLogURL {
                             ShareLink(item: logURL) {
                                 Label(tr("Share Wine log"), systemImage: "square.and.arrow.up")
@@ -219,6 +251,10 @@ struct GameSessionView: View {
         .onAppear {
             WineInputBridge.shared.startBridging()
             metrics.sample()
+            updateRecentWineLogFinding()
+        }
+        .onChange(of: coordinator.windowsStatus) { _, _ in
+            updateRecentWineLogFinding()
         }
         .onReceive(tick) { _ in
             metrics.sample()

@@ -233,14 +233,15 @@ struct SteamCloudAudit: Equatable, Sendable {
     func paths(_ kind: SteamCloudEntry.Kind) -> [String] { entries.filter { $0.kind == kind }.map(\.path) }
 
     static func sha1(of url: URL) -> Data? {
-        guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
-        defer { try? handle.close() }
-        var hasher = Insecure.SHA1()
-        while true {
-            guard let chunk = try? handle.read(upToCount: 1 << 20), !chunk.isEmpty else { break }
-            hasher.update(data: chunk)
+        // Stream with a 64 KiB native buffer, instead of allocating a Swift
+        // Data object for each MiB of a saved game. Reject symlink inputs.
+        var digest = [UInt8](repeating: 0, count: 20)
+        let success = url.path.withCString { path in
+            digest.withUnsafeMutableBufferPointer { bytes in
+                ideck_steam_sha1_file(path, bytes.baseAddress)
+            }
         }
-        return Data(hasher.finalize())
+        return success ? Data(digest) : nil
     }
 
     private static func attributes(_ url: URL) -> (size: UInt64, time: UInt64)? {

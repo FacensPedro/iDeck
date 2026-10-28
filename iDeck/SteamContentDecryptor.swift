@@ -31,57 +31,34 @@ struct ContentDecryptor {
         guard depotKey.count == 32 else {
             throw SteamError.decryptionFailed("Invalid depot key size: \(depotKey.count), expected 32")
         }
-        guard encryptedData.count > 16 else {
-            throw SteamError.decryptionFailed("Encrypted data too small")
+        guard encryptedData.count > 16, encryptedData.count <= 64 * 1024 * 1024 + 16 else {
+            throw SteamError.decryptionFailed("Invalid encrypted Steam payload size")
         }
 
-        let ivCipher = encryptedData.prefix(16)
-        let ciphertext = encryptedData.dropFirst(16)
-
-        var derivedIV = Data(count: 16)
-        var ivLen = 0
-        let ivStatus = depotKey.withUnsafeBytes { keyPtr in
-            ivCipher.withUnsafeBytes { inPtr in
-                derivedIV.withUnsafeMutableBytes { outPtr in
-                    CCCrypt(CCOperation(kCCDecrypt), CCAlgorithm(kCCAlgorithmAES), CCOptions(kCCOptionECBMode),
-                            keyPtr.baseAddress!, depotKey.count, nil,
-                            inPtr.baseAddress!, 16, outPtr.baseAddress!, 16, &ivLen)
+        // The native C routine performs both ECB-IV derivation and CBC/PKCS7
+        // decryption, with a stack IV and one contiguous output Data buffer.
+        // This avoids nested Swift Data slices and temporary IV allocations
+        // for every downloaded chunk, without changing the Steam protocol.
+        var decoded = Data(count: encryptedData.count)
+        var decodedLength = 0
+        let status = depotKey.withUnsafeBytes { key in
+            encryptedData.withUnsafeBytes { input in
+                decoded.withUnsafeMutableBytes { output in
+                    ideck_steam_decrypt_chunk(
+                        input.bindMemory(to: UInt8.self).baseAddress,
+                        input.count,
+                        key.bindMemory(to: UInt8.self).baseAddress,
+                        key.count,
+                        output.bindMemory(to: UInt8.self).baseAddress,
+                        output.count, &decodedLength)
                 }
             }
         }
-        guard ivStatus == kCCSuccess, ivLen == 16 else {
-            throw SteamError.decryptionFailed("IV derivation failed: \(ivStatus)")
+        guard status == 0, decodedLength <= decoded.count else {
+            throw SteamError.decryptionFailed("Steam native AES decrypt failed (\(status))")
         }
-
-        let outputBufferSize = ciphertext.count + kCCBlockSizeAES128
-        var decryptedData = Data(count: outputBufferSize)
-        var decryptedLength = 0
-
-        let status = depotKey.withUnsafeBytes { keyPtr in
-            derivedIV.withUnsafeBytes { ivPtr in
-                ciphertext.withUnsafeBytes { dataPtr in
-                    decryptedData.withUnsafeMutableBytes { outPtr in
-                        CCCrypt(
-                            CCOperation(kCCDecrypt),
-                            CCAlgorithm(kCCAlgorithmAES),
-                            CCOptions(kCCOptionPKCS7Padding),
-                            keyPtr.baseAddress!, depotKey.count,
-                            ivPtr.baseAddress!,
-                            dataPtr.baseAddress!, ciphertext.count,
-                            outPtr.baseAddress!, outputBufferSize,
-                            &decryptedLength
-                        )
-                    }
-                }
-            }
-        }
-
-        guard status == kCCSuccess else {
-            throw SteamError.decryptionFailed("AES decryption failed with status: \(status)")
-        }
-
-        decryptedData.count = decryptedLength
-        return decryptedData
+        decoded.count = decodedLength
+        return decoded
     }
 
     // MARK: - Decompression
