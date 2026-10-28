@@ -55,6 +55,12 @@ func trStatus(_ status: String) -> String {
 
 enum Translations {
     static let table: [String: [String: String]] = [
+        "Starting Windows game": ["pt": "Iniciando jogo Windows", "es": "Iniciando juego de Windows"],
+        "Waiting for the first rendered frame...": ["pt": "Aguardando o primeiro quadro renderizado...", "es": "Esperando el primer fotograma renderizado..."],
+        "Preparing Wine, game dependencies and graphics...": ["pt": "Preparando Wine, dependências e gráficos...", "es": "Preparando Wine, dependencias y gráficos..."],
+        "Closing Windows game...": ["pt": "Fechando jogo Windows...", "es": "Cerrando juego de Windows..."],
+        "Could not close Wine": ["pt": "Não foi possível fechar o Wine", "es": "No se pudo cerrar Wine"],
+        "The Madeira keyboard input is unavailable. Close the game inside Windows or restart iDeck if it is frozen. The Metal display remains attached while Wine is running.": ["pt": "A entrada de teclado do Madeira está indisponível. Feche o jogo no Windows ou reinicie o iDeck se travar. A tela Metal permanece conectada enquanto o Wine executa.", "es": "El teclado de Madeira no está disponible. Cierra el juego en Windows o reinicia iDeck si se bloquea. La pantalla Metal permanece conectada mientras Wine funciona."],
         "Madeira Emulator": ["pt": "Madeira Emulator", "es": "Madeira Emulator"],
         "Steam Cloud saves": ["pt": "Saves do Steam Cloud", "es": "Guardados de Steam Cloud"],
         "Auto Save": ["pt": "Auto Save", "es": "Guardado automático"],

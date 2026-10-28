@@ -78,6 +78,7 @@
 		AC100000000000000000017 /* crc32.c in Sources */ = {isa = PBXBuildFile; fileRef = AC200000000000000000017 /* crc32.c */; };
 		DEAD00000000000000000071 /* VisualCRuntimeBootstrap.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEAD00000000000000000072 /* VisualCRuntimeBootstrap.swift */; };
 		A70100000000000000000001 /* WineExitDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = A70200000000000000000001 /* WineExitDiagnostics.swift */; };
+		A80100000000000000000001 /* WindowsLaunchProgress.swift in Sources */ = {isa = PBXBuildFile; fileRef = A80200000000000000000001 /* WindowsLaunchProgress.swift */; };
 		ABCD00000000000000000001 /* SteamCDNHostSelection.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCD00000000000000000002 /* SteamCDNHostSelection.swift */; };
 		A10000000000000000000002 /* SteamContentDecryptor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000002 /* SteamContentDecryptor.swift */; };
 		A10000000000000000000003 /* SteamDepotManifest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000003 /* SteamDepotManifest.swift */; };
@@ -166,6 +167,7 @@
 		AC200000000000000000017 /* crc32.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = ThirdParty/libmspack/crc32.c; sourceTree = "<group>"; };
 		DEAD00000000000000000072 /* VisualCRuntimeBootstrap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisualCRuntimeBootstrap.swift; sourceTree = "<group>"; };
 		A70200000000000000000001 /* WineExitDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WineExitDiagnostics.swift; sourceTree = "<group>"; };
+		A80200000000000000000001 /* WindowsLaunchProgress.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowsLaunchProgress.swift; sourceTree = "<group>"; };
 		ABCD00000000000000000002 /* SteamCDNHostSelection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamCDNHostSelection.swift; sourceTree = "<group>"; };
 		A20000000000000000000002 /* SteamContentDecryptor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamContentDecryptor.swift; sourceTree = "<group>"; };
 		A20000000000000000000003 /* SteamDepotManifest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamDepotManifest.swift; sourceTree = "<group>"; };
@@ -255,6 +257,7 @@
 				BEEF00000000000000000001 /* WindowsLaunchArguments.swift in Sources */,
 				DEAD00000000000000000071 /* VisualCRuntimeBootstrap.swift in Sources */,
 				A70100000000000000000001 /* WineExitDiagnostics.swift in Sources */,
+				A80100000000000000000001 /* WindowsLaunchProgress.swift in Sources */,
 				AC100000000000000000010 /* VCArchiveExtractor.c in Sources */,
 				AC100000000000000000011 /* cabd.c in Sources */,
 				AC100000000000000000012 /* cabc.c in Sources */,
@@ -358,6 +361,7 @@
 				BEEF00000000000000000002 /* WindowsLaunchArguments.swift */,
 				DEAD00000000000000000072 /* VisualCRuntimeBootstrap.swift */,
 				A70200000000000000000001 /* WineExitDiagnostics.swift */,
+				A80200000000000000000001 /* WindowsLaunchProgress.swift */,
 				AC200000000000000000010 /* VCArchiveExtractor.c */,
 				AC200000000000000000011 /* cabd.c */,
 				AC200000000000000000012 /* cabc.c */,

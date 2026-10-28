@@ -77,11 +77,12 @@ struct GameSessionView: View {
             VStack {
                 HStack(alignment: .top) {
                     Button(action: {
-                        if ideck_wineprocess_running() {
-                            showActiveWineAlert = true
+                        if coordinator.closeWindowsSession() {
+                            if !ideck_wineprocess_running() {
+                                presentationMode.wrappedValue.dismiss()
+                            }
                         } else {
-                            coordinator.setWindowsStatus("Windows Ready")
-                            presentationMode.wrappedValue.dismiss()
+                            showActiveWineAlert = true
                         }
                     }) {
                         Image(systemName: "xmark.circle.fill")
@@ -91,6 +92,11 @@ struct GameSessionView: View {
                             .padding(8)
                     }
                     Spacer()
+                    if coordinator.wineCloseRequested {
+                        Text(tr("Closing Windows game..."))
+                            .font(.caption.weight(.semibold))
+                            .foregroundColor(.orange)
+                    }
                     if coordinator.isHUDEnabled {
                         VStack(alignment: .trailing, spacing: 3) {
                             Text("FPS: \(metrics.fps)  CPU: \(metrics.cpu)")
@@ -103,6 +109,30 @@ struct GameSessionView: View {
                         .padding(8)
                         .background(.black.opacity(0.75), in: RoundedRectangle(cornerRadius: 8))
                     }
+                }
+                if WindowsLaunchProgress.shouldDisplay(
+                    status: coordinator.windowsStatus,
+                    percentage: coordinator.windowsGameLoadingPercent) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text(tr("Starting Windows game"))
+                                .font(.subheadline.weight(.semibold))
+                            Spacer()
+                            Text("\(coordinator.windowsGameLoadingPercent)%")
+                                .font(.subheadline.monospacedDigit().weight(.semibold))
+                        }
+                        ProgressView(value: Double(coordinator.windowsGameLoadingPercent), total: 100)
+                            .tint(.blue)
+                        Text(coordinator.windowsGameLoadingPercent >= 90
+                             ? tr("Waiting for the first rendered frame...")
+                             : tr("Preparing Wine, game dependencies and graphics..."))
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.7))
+                    }
+                    .foregroundColor(.white)
+                    .padding(14)
+                    .background(.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 12))
+                    .padding(.horizontal, 12)
                 }
                 if coordinator.windowsStatus == "Launching Steam game..." ||
                     coordinator.windowsStatus == "Launching Steam client..." ||
@@ -151,12 +181,15 @@ struct GameSessionView: View {
         }
         .onReceive(tick) { _ in
             metrics.sample()
+            if metrics.receivedNewFrames {
+                coordinator.markFirstWindowsFrame()
+            }
             coordinator.refreshWindowsSessionHealth()
         }
-        .alert("Wine ainda está executando", isPresented: $showActiveWineAlert) {
+        .alert(tr("Could not close Wine"), isPresented: $showActiveWineAlert) {
             Button("OK", role: .cancel) {}
         } message: {
-            Text("Feche o jogo pelo próprio Windows antes de sair desta tela. Ocultar a superfície Metal com o Wine ativo pode interromper os gráficos. Se o jogo travou, encerre o iDeck pelo seletor de aplicativos.")
+            Text(tr("The Madeira keyboard input is unavailable. Close the game inside Windows or restart iDeck if it is frozen. The Metal display remains attached while Wine is running."))
         }
     }
 }

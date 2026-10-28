@@ -63,6 +63,8 @@ struct MainView: View {
                 coordinator.windowsStatus == "Launching Steam game..." ||
                 coordinator.windowsStatus == "Launching Steam client..." ||
                 coordinator.windowsStatus == "Launching Windows app..." ||
+                coordinator.windowsStatus == "Preparing game launch..." ||
+                coordinator.windowsStatus == "Closing Windows game..." ||
                 coordinator.windowsStatus == VisualCRuntimeBootstrap.installStatus ||
                 coordinator.windowsStatus.hasPrefix("Visual C++") ||
                 coordinator.windowsStatus.hasPrefix("Execution Error:")
