@@ -54,6 +54,9 @@ connection stability take precedence as chunk samples become available.
 
 ## Faster multi-depot installation
 
+When preparing the install tree, iDeck caches directory paths already created
+so large manifests do not repeatedly traverse the same parent directories.
+
 After downloading and authenticating the manifests, iDeck verifies existing
 chunks with SHA-1 before downloading replacements. A verified matching chunk
 is journaled and reused without network access. For the remaining chunks the
