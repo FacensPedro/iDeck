@@ -82,9 +82,9 @@ int main(void) {
                                      &produced) != 0);
     assert(ideck_steam_decrypt_chunk(encrypted, 16 + ciphertext, key,
                                      32, output, 3, &produced) != 0);
-    // A CBC flip in the prior ciphertext block deterministically corrupts
-    // the last PKCS7 pad byte (0x06 becomes 0x07), unlike a random flip in
-    // the final ciphertext block, which can rarely still yield valid padding.
+    // Alter a prior ciphertext block. The result must not silently
+    // reproduce the original plaintext; the Steam chunk checksum is still
+    // responsible for integrity because AES-CBC alone is not authenticated.
     encrypted[16 + ciphertext - 16 - 1] ^= 0x01;
     // CBC has no authentication: modified ciphertext may still decrypt with
     // valid padding. The chunk's Adler-32 is checked by the Swift pipeline.
