@@ -53,6 +53,7 @@ extern "C" int32_t ideck_runtime_prepare(const char *wine_prefix) {
 }
 
 static std::mutex ideck_launch_mutex;
+static bool ideck_wine_session_started = false;
 
 extern "C" int32_t ideck_runtime_launch(const char *executable_path,
                                          const char *wine_prefix,
@@ -60,6 +61,7 @@ extern "C" int32_t ideck_runtime_launch(const char *executable_path,
     std::unique_lock<std::mutex> launch_lock(ideck_launch_mutex, std::try_to_lock);
     if (!launch_lock.owns_lock()) return EBUSY;
     if (ideck_wineprocess_running()) return EALREADY;
+    if (ideck_wine_session_started) return EALREADY;
     if (!executable_path || !*executable_path || !wine_prefix || !*wine_prefix ||
         !request_json || !*request_json) return EINVAL;
     @autoreleasepool {
@@ -127,6 +129,7 @@ extern "C" int32_t ideck_runtime_launch(const char *executable_path,
         }
         unsetenv("MADEIRA_STEAM_APPID");
         unsetenv("MADEIRA_STEAM_APPPATH");
+        unsetenv("MADEIRA_WORKDIR");
         if ([request[@"isSteam"] boolValue] && steamID != nil) return EINVAL;
         if (steamID != nil) {
             if (![steamID isKindOfClass:[NSNumber class]] ||
@@ -145,15 +148,20 @@ extern "C" int32_t ideck_runtime_launch(const char *executable_path,
             if (relativeFolder.length == 0 || relativeFolder.length >= 850) return ENAMETOOLONG;
             NSString *windowsFolder = [@"C:\\" stringByAppendingString:
                 [relativeFolder stringByReplacingOccurrencesOfString:@"/" withString:@"\\"]];
+            /* Madeira's per-game working-folder contract is important for
+             * relative asset and DLL lookups, not only the Steam identity. */
             if (setenv("MADEIRA_STEAM_APPID", appIDText.UTF8String, 1) ||
-                setenv("MADEIRA_STEAM_APPPATH", windowsFolder.UTF8String, 1)) return errno;
+                setenv("MADEIRA_STEAM_APPPATH", windowsFolder.UTF8String, 1) ||
+                setenv("MADEIRA_WORKDIR", windowsFolder.UTF8String, 1)) return errno;
         }
-        if (setenv("MADEIRA_ENV_LOCKED", "MADEIRA_EXE,MADEIRA_ARGS,MADEIRA_STEAM_APPID,MADEIRA_STEAM_APPPATH", 1))
+        if (setenv("MADEIRA_ENV_LOCKED", "MADEIRA_EXE,MADEIRA_ARGS,MADEIRA_STEAM_APPID,MADEIRA_STEAM_APPPATH,MADEIRA_WORKDIR", 1))
             return errno;
         if (setenv("WINEPREFIX", wine_prefix, 1) != 0 ||
             setenv("MADEIRA_EXE", winExe.UTF8String, 1) != 0 ||
             setenv("MADEIRA_ARGS", argString.UTF8String, 1) != 0) return errno;
-        return ideck_wineprocess_start(wine_prefix);
+        int32_t result = ideck_wineprocess_start(wine_prefix);
+        if (result == 0) ideck_wine_session_started = true;
+        return result;
     }
 }
 

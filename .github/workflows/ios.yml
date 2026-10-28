@@ -206,6 +206,9 @@ jobs:
           xcrun swiftc iDeck/GraphicsConfig.swift tests/host/GraphicsOverrideTests.swift -o /tmp/ideck-graphics-override-tests
           /tmp/ideck-graphics-override-tests
 
+      - name: Test Wine game loading and safe close
+        run: python3 -m unittest discover -s tests/host -p 'test_wine_startup_session.py' -v
+
       - name: Test Wine native exit diagnostics and Steam app identity
         run: |
           xcrun swiftc iDeck/WineExitDiagnostics.swift tests/host/WineExitDiagnosticsTests.swift -o /tmp/ideck-wine-exit-tests
