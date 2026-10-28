@@ -81,7 +81,7 @@ if [[ -s "$SOURCE/i386-windows/ntdll.dll" ]]; then
   done
   cp -R "$SOURCE/i386-windows" "$APP/i386-windows"
   cp -R "$APP/i386-windows" "$RUNTIME/i386-windows"
-elif [[ "${IDECK_BUILD_WOW64:-0}" == "1" ]]; then
+elif [[ "${IDECK_BUILD_WOW64:-1}" == "1" ]]; then
   echo "ERROR: requested WoW64, but the i386 DLL farm was not compiled." >&2
   exit 2
 fi
