@@ -11,6 +11,7 @@
 // errors belong to the owned library and downloads (docs/STEAM_LIBRARY.md).
 
 import Foundation
+import UIKit
 
 /// Errors raised by the Steam sign-in, library and download code.
 enum SteamError: LocalizedError, Equatable {
@@ -4685,6 +4686,37 @@ enum SteamFileError: LocalizedError {
     }
 }
 
+// Adapted from Madeira's background-download grace strategy. This is the
+// short iPadOS background execution allowance, NOT an unlimited background
+// transfer entitlement. Completed chunks remain recoverable via journals.
+@MainActor
+private final class SteamDownloadBackgroundGrace {
+    private var identifier: UIBackgroundTaskIdentifier = .invalid
+
+    func begin(appID: UInt32) {
+        guard identifier == .invalid else { return }
+        identifier = UIApplication.shared.beginBackgroundTask(
+            withName: "Steam download \(appID)"
+        ) { [weak self] in
+            DispatchQueue.main.async {
+                SteamLog.event("[bg-download] grace expired; system may suspend transfers")
+                self?.end()
+            }
+        }
+    }
+
+    func end() {
+        guard identifier != .invalid else { return }
+        let task = identifier
+        identifier = .invalid
+        UIApplication.shared.endBackgroundTask(task)
+    }
+
+    deinit {
+        // This lease is explicitly ended from the owning download's defer.
+    }
+}
+
 @MainActor
 final class SteamOwnedGamesModel: ObservableObject {
     @Published private(set) var games: [SteamAppInfo] = []
@@ -4963,7 +4995,12 @@ final class SteamOwnedGamesModel: ObservableObject {
         installingApps.insert(appID)
         downloadErrors[appID] = nil
         downloadProgress[appID] = SteamDownloadProgress()
-        defer { installingApps.remove(appID) }
+        let backgroundGrace = SteamDownloadBackgroundGrace()
+        backgroundGrace.begin(appID: appID)
+        defer {
+            backgroundGrace.end()
+            installingApps.remove(appID)
+        }
         var installFolder: String?
         var installFolderAlreadyExisted = false
         let drive = prefixPath.appendingPathComponent("drive_c", isDirectory: true)
@@ -5026,7 +5063,12 @@ final class SteamOwnedGamesModel: ObservableObject {
         installingApps.insert(appID)
         downloadErrors[appID] = nil
         downloadProgress[appID] = SteamDownloadProgress()
-        defer { installingApps.remove(appID) }
+        let backgroundGrace = SteamDownloadBackgroundGrace()
+        backgroundGrace.begin(appID: appID)
+        defer {
+            backgroundGrace.end()
+            installingApps.remove(appID)
+        }
         do {
             try Task.checkCancellation()
             guard let app = try await fetcher.fetchInstallInfo(
