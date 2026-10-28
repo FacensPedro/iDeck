@@ -39,6 +39,45 @@ int main(void) {
     write_log(path, "err:module:import_dll missing foo.dll\n[jit-pool] EXHAUSTED\n");
     assert(ideck_wine_log_diagnose(path) == IDECK_WINE_LOG_JIT);
 
+    // A 32-bit Windows installer can fail before its entry point when
+    // iPadOS cannot reserve the minimum WoW64 guest window.
+    write_log(path,
+        "[wineserver-bridge] ws_log test - log file set up OK\\n"
+        "[wow-window] refused: map too small (5792 MB free VA)\\n"
+        "[wow-window] main-process reserve FAILED 0xc0000017\\n"
+        "[Wine ntdll] FATAL: no WoW64 guest window\\n");
+    assert(ideck_wine_log_diagnose(path) == IDECK_WINE_LOG_WOW64_ADDRESS_SPACE);
+
+    // Cuphead reaches Wine/FEX, then its native ARM64EC exception handler
+    // declines a broken x18 frame and reports NTSTATUS C000001D. A benign
+    // FEX mprotect warning must not be treated as the root cause.
+    write_log(path,
+        "[wineserver-bridge] ws_log test - log file set up OK\\n"
+        "E 24 Failed to mprotect last page of code buffer.\\n"
+        "[x18-decline] pc=0x18f3731e8 x18=0 teb=0x717ffe0000\\n"
+        "[mach_exc] UNHANDLED #1 type=6 x18=0x0\\n"
+        "[exc-disp] raise tid=0024 code=c000001d\\n"
+        "[wine-exit] Windows program stopped (Wine exit code 1)\\n");
+    assert(ideck_wine_log_diagnose(path) == IDECK_WINE_LOG_ARM64EC_EXCEPTION);
+
+    // The append-only Wine log can include several sessions. Only diagnose
+    // the latest session marker; otherwise an earlier crash would appear
+    // as the reason a later, healthy launch failed.
+    write_log(path,
+        "[wineserver-bridge] ws_log test first session\\n"
+        "[x18-decline] x18=0\\n"
+        "[exc-disp] raise code=c000001d\\n"
+        "[wineserver-bridge] ws_log test new session\\n"
+        "[WineProc] process started successfully\\n");
+    assert(ideck_wine_log_diagnose(path) == IDECK_WINE_LOG_NONE);
+
+    write_log(path,
+        "[wineserver-bridge] ws_log test first session\\n"
+        "[wow-window] main-process reserve FAILED 0xc0000017\\n"
+        "[wineserver-bridge] ws_log test second session\\n"
+        "err:module:import_dll Library game.dll not found\\n");
+    assert(ideck_wine_log_diagnose(path) == IDECK_WINE_LOG_MISSING_DLL);
+
     // Only the bounded tail is scanned, so ancient errors do not override
     // a later healthy session after the log becomes very large.
     FILE *file = fopen(path, "wb");
