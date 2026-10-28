@@ -12,7 +12,7 @@ import CommonCrypto
 
 /// Progress for one application install, across all of its depots.
 struct SteamDownloadProgress: Equatable, Sendable {
-    enum Phase: String, Sendable { case preparing, downloading, finishing }
+    enum Phase: String, Sendable { case preparing, checking, downloading, finishing }
     var phase: Phase = .preparing
     /// Compressed bytes to fetch for the whole install (all selected depots).
     var totalBytes: UInt64 = 0
@@ -20,6 +20,13 @@ struct SteamDownloadProgress: Equatable, Sendable {
     /// previous attempt.
     var doneBytes: UInt64 = 0
     var bytesPerSecond: Double = 0
+    var checkTotal: UInt64 = 0
+    var checkDone: UInt64 = 0
+    var reusedBytes: UInt64 = 0
+
+    var checkFraction: Double {
+        checkTotal > 0 ? min(1, Double(checkDone) / Double(checkTotal)) : 0
+    }
 
     var fraction: Double { totalBytes > 0 ? min(1, Double(doneBytes) / Double(totalBytes)) : 0 }
 }
@@ -191,7 +198,15 @@ final class DepotDownloader {
             if available < remaining { throw SteamError.insufficientDiskSpace(needed: remaining, available: available) }
         }
 
-        // 3. Chunks.
+        // 3a. Read existing game files sequentially in large blocks before
+        // requesting the network. This avoids opening and hashing the same
+        // file separately for every chunk, especially on updates and resumes.
+        // Only verified SHA-1 matches may skip an HTTP request.
+        var pending = prepared.pending
+        try await checkExisting(plans: plans, prepared: prepared,
+                                pending: &pending, state: &state, report: report)
+
+        // 3b. Transfer only changed or absent chunks.
         let started = Date()
         let resumedBytes = state.doneBytes
         var actualWrittenBytes: UInt64 = 0
@@ -199,7 +214,7 @@ final class DepotDownloader {
         for (index, plan) in plans.enumerated() {
             let journal = try JournalWriter(url: prepared.journals[index])
             defer { journal.close() }
-            let work = prepared.pending[index]
+            let work = pending[index]
             let paths = prepared.paths[index]
             let existing = prepared.existing[index]
             let maximum = maxConcurrentChunks, attempts = attemptsPerChunk
@@ -212,9 +227,6 @@ final class DepotDownloader {
                     let path = paths[item.file]
                     let verify = existing[item.file]
                     group.addTask {
-                        if verify, Self.chunkAlreadyPresent(chunk, path: path) {
-                            return (item.key, UInt64(chunk.compressedSize), 0)
-                        }
                         let written = try await Self.fetchChunk(
                             chunk, plan: plan, path: path, attempts: attempts,
                             seed: item.file &+ item.chunk, reuseExisting: verify)
@@ -433,22 +445,93 @@ final class DepotDownloader {
 
     // MARK: - Chunks
 
-    /// A chunk's ID is the SHA-1 of its uncompressed bytes. When a file
-    /// already had content (an update, or a resume without a journal), bytes
-    /// that already match are kept instead of downloaded again.
-    private nonisolated static func chunkAlreadyPresent(_ chunk: DepotManifest.ChunkEntry, path: String) -> Bool {
-        let length = Int(chunk.uncompressedSize)
-        guard chunk.sha.count == Int(CC_SHA1_DIGEST_LENGTH), length > 0,
-              length <= ContentDecryptor.maximumChunkBytes else { return false }
-        let fd = open(path, O_RDONLY)
-        guard fd >= 0 else { return false }
-        defer { close(fd) }
-        var buffer = [UInt8](repeating: 0, count: length)
-        let read = buffer.withUnsafeMutableBytes { pread(fd, $0.baseAddress, length, off_t(chunk.offset)) }
-        guard read == length else { return false }
-        var digest = [UInt8](repeating: 0, count: Int(CC_SHA1_DIGEST_LENGTH))
-        _ = CC_SHA1(buffer, CC_LONG(length), &digest)
-        return Data(digest) == chunk.sha
+    /// Verify only files that already had bytes, grouped by file and ordered
+    /// by offset. An unchanged chunk is written to the persistent journal; if
+    /// cancellation happens next, it remains safe to resume.
+    private func checkExisting(plans: [DepotPlan], prepared: Prepared,
+                               pending: inout [[WorkItem]],
+                               state: inout SteamDownloadProgress,
+                               report: (SteamDownloadProgress) -> Void) async throws {
+        struct Check: Sendable {
+            let depotIndex: Int
+            let path: String
+            let items: [WorkItem]
+            let entries: [SteamExistingChunkVerifier.Entry]
+        }
+        var checks: [Check] = []
+        for (depotIndex, plan) in plans.enumerated() {
+            var files: [Int: [WorkItem]] = [:]
+            for item in pending[depotIndex] where prepared.existing[depotIndex][item.file] {
+                files[item.file, default: []].append(item)
+            }
+            for (fileIndex, items) in files {
+                let chunks = plan.manifest.files[fileIndex].chunks
+                let ordered = items.sorted { chunks[$0.chunk].offset < chunks[$1.chunk].offset }
+                let entries = ordered.map { item in
+                    let chunk = chunks[item.chunk]
+                    return SteamExistingChunkVerifier.Entry(
+                        offset: chunk.offset, length: Int(chunk.uncompressedSize), sha: chunk.sha)
+                }
+                checks.append(Check(depotIndex: depotIndex,
+                                    path: prepared.paths[depotIndex][fileIndex],
+                                    items: ordered, entries: entries))
+            }
+        }
+        guard !checks.isEmpty else { return }
+        state.phase = .checking
+        state.checkTotal = checks.reduce(0) { count, check in
+            count + check.entries.reduce(0) { $0 + UInt64($1.length) }
+        }
+        state.checkDone = 0
+        report(state)
+        let isExternal = checks.contains { $0.path.contains("/LiveFiles/") || $0.path.contains("/External/") }
+        let readers = isExternal ? 2 : 5
+        let journals = try plans.indices.map { try JournalWriter(url: prepared.journals[$0]) }
+        defer { journals.forEach { $0.close() } }
+        var verified: [Set<UInt64>] = plans.map { _ in [] }
+        var lastReport = Date.distantPast
+        try await withThrowingTaskGroup(of: (Check, [Bool]).self) { group in
+            var next = 0
+            func enqueue() {
+                guard next < checks.count else { return }
+                let check = checks[next]
+                next += 1
+                group.addTask { (check, try SteamExistingChunkVerifier.verify(
+                    path: check.path, entries: check.entries)) }
+            }
+            for _ in 0..<min(readers, checks.count) { enqueue() }
+            for try await (check, results) in group {
+                try Task.checkCancellation()
+                for (index, matches) in results.enumerated() {
+                    let item = check.items[index]
+                    let chunk = plans[check.depotIndex].manifest.files[item.file].chunks[item.chunk]
+                    state.checkDone += UInt64(chunk.uncompressedSize)
+                    if matches {
+                        let key = item.key
+                        verified[check.depotIndex].insert(key)
+                        journals[check.depotIndex].append(key)
+                        let count = UInt64(chunk.compressedSize)
+                        state.doneBytes += count
+                        state.reusedBytes += count
+                    }
+                }
+                let now = Date()
+                if now.timeIntervalSince(lastReport) >= 0.25 {
+                    lastReport = now
+                    report(state)
+                }
+                enqueue()
+            }
+        }
+        for index in pending.indices {
+            pending[index].removeAll { verified[index].contains($0.key) }
+        }
+        state.checkDone = state.checkTotal
+        state.phase = .downloading
+        report(state)
+        SteamLog.event("[steam-depot] verified existing chunks=" +
+                       String(verified.reduce(0) { $0 + $1.count }) +
+                       " reused-bytes=" + String(state.reusedBytes))
     }
 
     private nonisolated static func fetchChunk(_ chunk: DepotManifest.ChunkEntry, plan: DepotPlan,
