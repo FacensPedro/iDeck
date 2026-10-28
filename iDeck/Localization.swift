@@ -55,6 +55,8 @@ func trStatus(_ status: String) -> String {
 
 enum Translations {
     static let table: [String: [String: String]] = [
+        "Checking existing files %d%%": ["pt": "Verificando arquivos existentes %d%%", "es": "Verificando archivos existentes %d%%"],
+        "Already on device: %@": ["pt": "Já está no dispositivo: %@", "es": "Ya está en el dispositivo: %@"],
         "Madeira Emulator": ["pt": "Madeira Emulator", "es": "Madeira Emulator"],
         "Steam Cloud saves": ["pt": "Saves do Steam Cloud", "es": "Guardados de Steam Cloud"],
         "Auto Save": ["pt": "Auto Save", "es": "Guardado automático"],

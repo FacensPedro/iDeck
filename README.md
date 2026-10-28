@@ -74,6 +74,12 @@ bash scripts/build_ipa.sh
 
 Without a matching kit, this mode fails rather than creating placeholder binaries. See [Precompiled Madeira runtime](docs/MADEIRA_PREBUILT_RUNTIME.md).
 
+## Faster Steam game installations
+
+iDeck fetches authorized Steam depot chunks concurrently from geographically selected CDN hosts. For game updates, interrupted downloads and repairs, the installer verifies existing file chunks in bounded, sequential read blocks before downloading. Every reusable chunk must match the manifest's SHA-1; only changed or missing chunks are fetched. This reduces redundant network traffic, especially when files are already on the device.
+
+Concurrent downloads automatically respect device thermal conditions and Low Power Mode. Existing download journals are preserved on cancellation; progress distinguishes **Checking existing files** from **Downloading** and reports the amount of verified content reused. Actual transfer speed depends on network, CDN and device conditions; no fixed 2× performance guarantee is made.
+
 ## Automatic Microsoft Visual C++ setup on the iPad
 
 Some Windows games depend on Microsoft x64 C++ runtime DLLs such as `vcruntime140.dll`, `msvcp140.dll`, and optional MFC components.
