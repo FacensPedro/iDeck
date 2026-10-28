@@ -58,6 +58,7 @@ struct GameSessionView: View {
     @Environment(\.presentationMode) var presentationMode
     @StateObject private var metrics = GameRuntimeMetrics()
     @State private var showActiveWineAlert = false
+    @State private var closeRequestedByUser = false
     private let tick = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     var body: some View {
@@ -78,6 +79,7 @@ struct GameSessionView: View {
                 HStack(alignment: .top) {
                     Button(action: {
                         if coordinator.closeWindowsSession() {
+                            closeRequestedByUser = true
                             if !ideck_wineprocess_running() {
                                 presentationMode.wrappedValue.dismiss()
                             }
@@ -185,9 +187,7 @@ struct GameSessionView: View {
                 coordinator.markFirstWindowsFrame()
             }
             coordinator.refreshWindowsSessionHealth()
-            if coordinator.wineCloseRequested == false &&
-                coordinator.windowsStatus.hasPrefix("Wine exited") &&
-                !ideck_wineprocess_running() {
+            if closeRequestedByUser && !ideck_wineprocess_running() {
                 presentationMode.wrappedValue.dismiss()
             }
         }
