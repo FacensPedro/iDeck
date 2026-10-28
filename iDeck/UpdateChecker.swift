@@ -96,11 +96,13 @@ final class UpdateChecker: ObservableObject {
                 return
             }
             UIApplication.shared.open(candidates[index], options: [:]) { [weak self] opened in
-                guard let self else { return }
-                if opened {
-                    self.installHandoffMessage = "The update was sent to the installer. Complete the installation there; iDeck cannot replace itself."
-                } else {
-                    attempt(index + 1)
+                DispatchQueue.main.async {
+                    guard let self else { return }
+                    if opened {
+                        self.installHandoffMessage = "The update was sent to the installer. Complete the installation there; iDeck cannot replace itself."
+                    } else {
+                        attempt(index + 1)
+                    }
                 }
             }
         }
