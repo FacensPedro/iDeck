@@ -33,6 +33,11 @@ class WineStartupSessionTests(unittest.TestCase):
         self.assertIn("ideck_wine_session_started", NATIVE)
         self.assertIn("if (ideck_wine_session_started) return EALREADY;", NATIVE)
 
+    def test_steam_working_folder_is_set_for_relative_assets(self):
+        self.assertIn('setenv("MADEIRA_WORKDIR", windowsFolder.UTF8String, 1)', NATIVE)
+        self.assertIn('unsetenv("MADEIRA_WORKDIR")', NATIVE)
+        self.assertIn("MADEIRA_WORKDIR", NATIVE)
+
     def test_memory_entitlement_is_requested(self):
         self.assertIn("com.apple.developer.kernel.increased-memory-limit", ENTITLEMENTS)
 
