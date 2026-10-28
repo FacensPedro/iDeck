@@ -127,21 +127,33 @@ int ideck_vcrt_extract(const char *installer, const char *target,
                 goto done;
             }
             if (file->length < 512 || file->length > MAX_DLL_SIZE) continue;
+            /* A name such as F_CENTRAL_msvcp140_1_amd64 matches both
+             * msvcp140 and msvcp140_1 at first glance. Choose the longest
+             * exact known family to prevent silently installing the wrong
+             * executable bytes under a different DLL name. */
+            int best = -1;
+            size_t longest = 0;
             for (int i = 0; i < DLL_COUNT; i++) {
-                if (found[i] || !name_match(file->filename, required[i])) continue;
-                char path[2048];
-                if (snprintf(path, sizeof path, "%s/%s", target, required[i]) >= (int)sizeof path) {
-                    result = -6;
-                    error_set(message, capacity, "Destination path too long.");
-                    goto done;
+                if (name_match(file->filename, required[i])) {
+                    size_t length = strlen(required[i]);
+                    if (length > longest) {
+                        best = i;
+                        longest = length;
+                    }
                 }
-                if (decompressor->extract(decompressor, file, path) == MSPACK_ERR_OK &&
-                    ideck_vcrt_valid_pe_x64(path)) {
-                    found[i] = 1;
-                } else {
-                    unlink(path);
-                }
-                break;
+            }
+            if (best < 0 || found[best]) continue;
+            char path[2048];
+            if (snprintf(path, sizeof path, "%s/%s", target, required[best]) >= (int)sizeof path) {
+                result = -6;
+                error_set(message, capacity, "Destination path too long.");
+                goto done;
+            }
+            if (decompressor->extract(decompressor, file, path) == MSPACK_ERR_OK &&
+                ideck_vcrt_valid_pe_x64(path)) {
+                found[best] = 1;
+            } else {
+                unlink(path);
             }
         }
     }
