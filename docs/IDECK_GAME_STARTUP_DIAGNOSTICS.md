@@ -188,3 +188,33 @@ When you see an ENOMEM startup error:
 This change improves fallback and reports the failure stage, but its
 success must still be verified on physical iPadOS hardware. It cannot
 override iPadOS debugger, signing or virtual-memory limits.
+
+## On-screen JIT failure stages
+
+The Wine executable JIT pool is prepared before the Madeira process begins
+redirecting stdout/stderr into `Documents/madeira-log.txt`; that log may
+therefore not include a failed allocation attempt. The native host now
+publishes its most significant allocation failure stage and the Mach return
+code to the game error screen. Stages distinguish missing debugger, failed
+RX allocation, invalid RX address or protection, RW alias `vm_remap`, failed
+RW `vm_protect`, and failure to export the memory mapping. A successful
+subsequent attempt clears the last failure. Preserve the error text or an
+Xcode device console trace for the next diagnosis.
+
+## Code 22: Invalid argument (EINVAL)
+
+An iDeck launch may reject an invalid PE file, malformed launch arguments,
+an incompatible request payload, or inconsistent Steam app identity. This
+error occurs **before** a Wine process is successfully started and is
+separate from an ARM64EC memory-pool failure.
+
+The native launcher now reports each request-validation rejection under
+`[iDeck native launch] EINVAL`. It accepts a directly launched Steam
+game even if an `isSteam` flag is also present; dock mode is limited
+to a Steam client launch without direct-game identity. Parsed Windows
+arguments containing embedded double quotes and trailing backslashes
+are correctly re-quoted rather than automatically rejected.
+
+The on-screen error for code 22 lists the relevant validation categories.
+Since imported executables and game arguments vary, retrieve the exact
+`[iDeck native launch]` or `[wine-launch]` message if it recurs.

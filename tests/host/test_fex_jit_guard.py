@@ -33,6 +33,13 @@ class FEXJITGuardTests(unittest.TestCase):
     def test_wine_requires_a_distinct_dual_mapped_executable_pool(self):
         self.assertIn("bool ideck_wine_jit_pool_prepare(void);", HEADER)
         self.assertIn("bool ideck_wine_jit_pool_ready(void);", HEADER)
+        self.assertIn("ideck_wine_jit_pool_failure_stage(void);", HEADER)
+        self.assertIn("ideck_wine_jit_pool_failure_mach_code(void);", HEADER)
+        self.assertIn("record_wine_pool_failure(2);", FEX)
+        self.assertIn("record_wine_pool_failure(3);", FEX)
+        self.assertIn("record_wine_pool_failure(4, kr);", FEX)
+        self.assertIn("record_wine_pool_failure(5, kr);", FEX)
+        self.assertIn("switch ideck_wine_jit_pool_failure_stage()", COORDINATOR)
         self.assertIn('jit26_prepare_region(nullptr, size)', FEX)
         self.assertIn('64ULL * MiB', FEX)
         self.assertIn('128ULL * MiB', FEX)
@@ -49,7 +56,7 @@ class FEXJITGuardTests(unittest.TestCase):
         self.assertIn("if (!debugger_attached())", FEX)
         self.assertIn("if (!ideck_wine_jit_pool_prepare() || !ideck_wine_jit_pool_ready()) return ENOMEM;", RUNTIME)
         self.assertLess(RUNTIME.index("ideck_wine_jit_pool_prepare()"), RUNTIME.index("ideck_wineserver_initialize(wine_prefix)"))
-        self.assertIn("Wine ARM64EC JIT pool", COORDINATOR)
+        self.assertIn("the Wine ARM64EC executable JIT pool", COORDINATOR)
 
     def test_page_zero_debugger_command_never_returns_stale_address(self):
         self.assertIn("const CMD_MAP_PAGE_ZERO = 3;", JIT_SCRIPT)

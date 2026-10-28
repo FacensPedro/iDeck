@@ -713,8 +713,28 @@ class SystemCoordinator: ObservableObject {
         if status == Int(ENOENT) {
             return "Execution Error: Wine prefix or runtime components are missing."
         }
+        if status == Int(EINVAL) {
+            return "Execution Error: invalid Windows launch request (code 22). Check the executable format, Steam game metadata and launch arguments. The iDeck console identifies rejected native parameters under [iDeck native launch] EINVAL or [wine-launch]."
+        }
         if status == Int(ENOMEM) {
-            return "Execution Error: the Wine ARM64EC JIT pool could not be allocated or mirrored into writable memory. Open JIT from iDeck using StikDebug with the bundled BRK script (not just Enable JIT in StikDebug), keep it attached until setup completes, and inspect [iDeck Wine JIT] logs for RX allocation, vm_remap or vm_protect failures. The native runtime retries smaller pools automatically."
+            let machCode = ideck_wine_jit_pool_failure_mach_code()
+            let machDetail = machCode == 0 ? "" : " (Mach code \(machCode))"
+            switch ideck_wine_jit_pool_failure_stage() {
+            case 1:
+                return "Execution Error: StikDebug disconnected before Wine could prepare executable memory. Request JIT from iDeck with the bundled BRK script."
+            case 2:
+                return "Execution Error: StikDebug could not allocate the Wine executable RX region, including smaller pools. Keep the debugger attached and check available virtual memory."
+            case 3:
+                return "Execution Error: Wine's RX region was allocated but failed address-range or executable-permission validation. Review [iDeck Wine JIT] native logs."
+            case 4:
+                return "Execution Error: Wine's executable RX region was allocated, but iPadOS denied its writable RW mirror\(machDetail). Check [iDeck Wine JIT] logs."
+            case 5:
+                return "Execution Error: iPadOS denied write access to the Wine JIT RW mirror\(machDetail). Check [iDeck Wine JIT] logs."
+            case 6:
+                return "Execution Error: Wine JIT memory exists, but the RX/RW addresses could not be exported to the guest environment."
+            default:
+                return "Execution Error: the Wine ARM64EC executable JIT pool could not be prepared. Check the [iDeck Wine JIT] diagnostics."
+            }
         }
         let message = status > 0 && status < 256
             ? String(cString: strerror(Int32(status))) : "unknown native error"

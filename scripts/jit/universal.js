@@ -178,34 +178,36 @@ function JIT26HandleBrk0xf00d(brkResponse) {
 }
 
 function JIT26PrepareRegion(brkResponse) {
-    let instructionResponse = send_command(`m${pc.toString(16)},4`);
-    log(`instruction at pc: ${instructionResponse}`);
-    let instrU32 = littleEndianHexToU32(instructionResponse);
-    let brkImmediate = extractBrkImmediate(instrU32);
-    
-    if (x0 == 0n && x1 == 0n) {
-        return;
-    }
-
     let jitPageAddress = x0;
-    if (x0 == 0n) {
-        let requestRXResponse = send_command(`_M${x1.toString(16)},rx`);
-        log_verbose(`requestRXResponse = ${requestRXResponse}`);
-        
-        if (!requestRXResponse || requestRXResponse.length === 0) {
-            log(`Failed to allocate RX memory`);
-            return;
+    if (x0 === 0n && x1 > 0n) {
+        const response = send_command(`_M${x1.toString(16)},rx`);
+        const address = typeof response === "string" ? response.trim().replace(/^0x/i, "") : "";
+        if (/^[0-9a-fA-F]{1,16}$/.test(address)) {
+            const candidate = BigInt("0x" + address);
+            // StikDebug's _M may return a GDB error such as E22. Never
+            // interpret it as a successful tiny address or return stale x0.
+            if (candidate >= 0x100000000n && candidate % 0x4000n === 0n) {
+                jitPageAddress = candidate;
+            }
         }
-        
-        jitPageAddress = BigInt(`0x${requestRXResponse}`);
-        log(`Allocated JIT page at address: 0x${jitPageAddress.toString(16)}`);
+        if (jitPageAddress === 0n) {
+            log(`Failed to allocate JIT RX for size 0x${x1.toString(16)} (debugger reply: ${response})`);
+        }
     }
 
-    let prepareJITPageResponse = prepare_memory_region(jitPageAddress, x1);
-    log(`prepareJITPageResponse = ${prepareJITPageResponse}`);
+    if (jitPageAddress !== 0n && x1 > 0n) {
+        try {
+            const result = prepare_memory_region(jitPageAddress, x1);
+            log_verbose(`prepare_memory_region returned ${result}`);
+        } catch (error) {
+            // Return the allocated address to the native allocator, which
+            // validates its actual permissions and can deallocate it safely.
+            log(`Failed to prepare RX memory: ${error}`);
+        }
+    }
 
-    let putX0Response = send_command(`P0=${numberToLittleEndianHexString(jitPageAddress)};thread:${tid};`);
-    log(`putX0Response = ${putX0Response}`);
+    const reply = send_command(`P0=${numberToLittleEndianHexString(jitPageAddress)};thread:${tid};`);
+    log_verbose(`JIT allocation RX=0x${jitPageAddress.toString(16)} reply=${reply}`);
 }
 
 // Madeira's ARM64EC init_syscall_frame requests command 3. Never leave x0

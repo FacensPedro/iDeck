@@ -29,3 +29,46 @@ assert.throws(() => context.littleEndianHexStringToNumber("1234567890"));
 assert.throws(() => context.numberToLittleEndianHexString(-1n));
 assert.throws(() => context.numberToLittleEndianHexString(0x10000000000000000n));
 console.log("PASS: StikDebug universal JIT script preserves full 64-bit ARM64 registers");
+
+
+const prepareStart = source.indexOf("function JIT26PrepareRegion(brkResponse) {");
+const prepareEnd = source.indexOf("// Madeira's ARM64EC init_syscall_frame", prepareStart);
+assert.ok(prepareStart >= 0 && prepareEnd > prepareStart);
+vm.runInContext(source.slice(prepareStart, prepareEnd), context, { timeout: 1000 });
+
+function executeJITRequest(allocResponse, originalAddress = 0n) {
+    const replies = [];
+    const prepared = [];
+    context.x0 = originalAddress;
+    context.x1 = 0x4000000n;
+    context.tid = "24";
+    context.send_command = command => {
+        if (command.startsWith("_M")) return allocResponse;
+        replies.push(command);
+        return "OK";
+    };
+    context.prepare_memory_region = (address, size) => {
+        prepared.push({ address, size });
+        return true;
+    };
+    context.log = () => {};
+    context.log_verbose = () => {};
+    context.JIT26PrepareRegion(null);
+    return { replies, prepared };
+}
+
+for (const response of ["E22", "E0c", "garbage", "", null, "1a00"]) {
+    const result = executeJITRequest(response);
+    assert.equal(result.replies[0], "P0=0000000000000000;thread:24;");
+    assert.equal(result.prepared.length, 0);
+}
+for (const response of ["11a000000", "0x11a000000"]) {
+    const result = executeJITRequest(response);
+    assert.equal(result.replies[0], "P0=0000001a01000000;thread:24;");
+    assert.equal(result.prepared.length, 1);
+    assert.equal(result.prepared[0].address, 0x11a000000n);
+}
+const existing = executeJITRequest("E22", 0x11b000000n);
+assert.equal(existing.prepared.length, 1);
+assert.equal(existing.prepared[0].address, 0x11b000000n);
+console.log("PASS: StikDebug invalid _M replies never produce stale Wine JIT addresses");

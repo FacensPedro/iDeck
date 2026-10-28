@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <mutex>
+#include <cstdio>
 
 #if defined(IDECK_NATIVE_MADEIRA_ENABLED) && IDECK_NATIVE_MADEIRA_ENABLED
 extern "C" void madeira_seed_prefix_if_needed(const char *prefix_path);
@@ -59,6 +60,47 @@ extern "C" int32_t ideck_runtime_prepare(const char *wine_prefix) {
     return 0;
 }
 
+static int32_t ideck_invalid_launch(const char *reason) {
+    fprintf(stderr, "[iDeck native launch] EINVAL: %s\n", reason);
+    return EINVAL;
+}
+
+// Re-quote parsed Windows parameters for Madeira's single command-line string.
+// Backslashes immediately before quotes (and at the end of quoted parameters)
+// require doubling according to Windows CRT command-line parsing rules.
+static NSString *ideck_quote_windows_argument(NSString *arg) {
+    BOOL requiresQuotes = arg.length == 0 ||
+        [arg rangeOfCharacterFromSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]].location != NSNotFound ||
+        [arg rangeOfString:@"\""].location != NSNotFound;
+    if (!requiresQuotes) return arg;
+    NSMutableString *result = [NSMutableString stringWithString:@"\""];
+    NSUInteger backslashes = 0;
+    for (NSUInteger index = 0; index < arg.length; index++) {
+        unichar ch = [arg characterAtIndex:index];
+        if (ch == '\\') {
+            backslashes++;
+            continue;
+        }
+        if (ch == '"') {
+            [result appendString:[@"" stringByPaddingToLength:backslashes * 2 + 1
+                                                   withString:@"\\"
+                                              startingAtIndex:0]];
+            [result appendString:@"\""];
+        } else {
+            [result appendString:[@"" stringByPaddingToLength:backslashes
+                                                   withString:@"\\"
+                                              startingAtIndex:0]];
+            [result appendFormat:@"%C", ch];
+        }
+        backslashes = 0;
+    }
+    [result appendString:[@"" stringByPaddingToLength:backslashes * 2
+                                           withString:@"\\"
+                                      startingAtIndex:0]];
+    [result appendString:@"\""];
+    return result;
+}
+
 static std::mutex ideck_launch_mutex;
 static bool ideck_wine_session_started = false;
 
@@ -70,15 +112,15 @@ extern "C" int32_t ideck_runtime_launch(const char *executable_path,
     if (ideck_wineprocess_running()) return EALREADY;
     if (ideck_wine_session_started) return EALREADY;
     if (!executable_path || !*executable_path || !wine_prefix || !*wine_prefix ||
-        !request_json || !*request_json) return EINVAL;
+        !request_json || !*request_json) return ideck_invalid_launch("empty executable, prefix or launch request");
     @autoreleasepool {
         NSData *json = [[NSString stringWithUTF8String:request_json] dataUsingEncoding:NSUTF8StringEncoding];
-        if (json == nil || json.length > 16384) return EINVAL;
+        if (json == nil || json.length > 16384) return ideck_invalid_launch("invalid or oversized launch JSON");
         NSDictionary *request = [NSJSONSerialization JSONObjectWithData:json options:0 error:nil];
         if (![request isKindOfClass:[NSDictionary class]] ||
-            ![request[@"version"] isEqual:@1]) return EINVAL;
+            ![request[@"version"] isEqual:@1]) return ideck_invalid_launch("missing or unsupported launch request version");
         NSArray *arguments = request[@"arguments"];
-        if (![arguments isKindOfClass:[NSArray class]] || arguments.count > 64) return EINVAL;
+        if (![arguments isKindOfClass:[NSArray class]] || arguments.count > 64) return ideck_invalid_launch("invalid arguments array or too many arguments");
         if ([request[@"is32Bit"] boolValue]) {
             // Upstream WineProcessBridge detects the target's PE32 machine
             // and starts its WoW64 path. Never attempt it with an empty i386
@@ -111,13 +153,10 @@ extern "C" int32_t ideck_runtime_launch(const char *executable_path,
         NSMutableArray<NSString *> *quoted = [NSMutableArray arrayWithCapacity:arguments.count];
         for (id arg in arguments) {
             if (![arg isKindOfClass:[NSString class]] || [arg length] >= 1024 ||
-                [arg rangeOfString:@"\""].location != NSNotFound ||
                 [arg rangeOfString:@"\n"].location != NSNotFound ||
-                [arg rangeOfString:@"\r"].location != NSNotFound) return EINVAL;
-            NSString *value = (NSString *)arg;
-            if ([value rangeOfCharacterFromSet:[NSCharacterSet whitespaceCharacterSet]].location != NSNotFound ||
-                value.length == 0) value = [NSString stringWithFormat:@"\"%@\"", value];
-            [quoted addObject:value];
+                [arg rangeOfString:@"\r"].location != NSNotFound)
+                return ideck_invalid_launch("malformed argument or control character");
+            [quoted addObject:ideck_quote_windows_argument((NSString *)arg)];
         }
         NSString *argString = [quoted componentsJoinedByString:@" "];
         if (argString.length >= 4096) return E2BIG;
@@ -128,8 +167,8 @@ extern "C" int32_t ideck_runtime_launch(const char *executable_path,
          * it upstream Madeira currently falls back to a fixed test-game ID. */
         id steamID = request[@"steamAppID"];
         id steamFolder = request[@"steamInstallDirectory"];
-        if ((steamID == nil) != (steamFolder == nil)) return EINVAL;
-        if ([request[@"isSteam"] boolValue]) {
+        if ((steamID == nil) != (steamFolder == nil)) return ideck_invalid_launch("steamAppID and steamInstallDirectory must be provided together");
+        if ([request[@"isSteam"] boolValue] && steamID == nil) {
             if (setenv("MADEIRA_DOCK_SESSION", "1", 1)) return errno;
         } else {
             unsetenv("MADEIRA_DOCK_SESSION");
@@ -137,16 +176,15 @@ extern "C" int32_t ideck_runtime_launch(const char *executable_path,
         unsetenv("MADEIRA_STEAM_APPID");
         unsetenv("MADEIRA_STEAM_APPPATH");
         unsetenv("MADEIRA_WORKDIR");
-        if ([request[@"isSteam"] boolValue] && steamID != nil) return EINVAL;
         if (steamID != nil) {
             if (![steamID isKindOfClass:[NSNumber class]] ||
-                ![steamFolder isKindOfClass:[NSString class]]) return EINVAL;
+                ![steamFolder isKindOfClass:[NSString class]]) return ideck_invalid_launch("invalid Steam app identity types");
             NSNumber *appID = (NSNumber *)steamID;
             NSString *appIDText = appID.stringValue;
             if (appID.unsignedIntValue == 0 || appIDText.length > 10 ||
                 [appIDText rangeOfCharacterFromSet:
                     [[NSCharacterSet decimalDigitCharacterSet] invertedSet]].location != NSNotFound)
-                return EINVAL;
+                return ideck_invalid_launch("invalid Steam app ID");
             NSString *canonicalFolder = [[NSURL fileURLWithPath:(NSString *)steamFolder]
                 URLByResolvingSymlinksInPath].path;
             if (![canonicalFolder hasPrefix:root] ||

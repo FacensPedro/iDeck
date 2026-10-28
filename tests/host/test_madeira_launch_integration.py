@@ -30,6 +30,16 @@ class MadeiraLaunchIntegrationTests(unittest.TestCase):
         self.assertIn('unsetenv("MADEIRA_STEAM_APPID")', NATIVE)
         self.assertIn('unsetenv("MADEIRA_STEAM_APPPATH")', NATIVE)
         self.assertIn('setenv("MADEIRA_ENV_LOCKED"', NATIVE)
+        self.assertIn('if ([request[@"isSteam"] boolValue] && steamID == nil)', NATIVE)
+        self.assertNotIn('if ([request[@"isSteam"] boolValue] && steamID != nil) return EINVAL;', NATIVE)
+
+    def test_native_launch_accepts_escaped_quoted_arguments(self):
+        self.assertIn('ideck_quote_windows_argument((NSString *)arg)', NATIVE)
+        self.assertIn(r'withString:@"\\"', NATIVE)
+        self.assertIn('ideck_invalid_launch("invalid or oversized launch JSON")', NATIVE)
+        self.assertIn('ideck_invalid_launch("invalid Steam app ID")', NATIVE)
+        self.assertIn("if status == Int(EINVAL)", COORDINATOR)
+        self.assertIn("[iDeck native launch] EINVAL", COORDINATOR)
 
     def test_do_not_disable_wine_directwrite(self):
         self.assertNotIn('setenv("WINEDLLOVERRIDES"', ENVIRONMENT)

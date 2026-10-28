@@ -8,6 +8,7 @@
 #include <initializer_list>
 #include <cstdint>
 #include <cstdlib>
+#include <atomic>
 
 namespace {
 std::mutex fex_mutex;
@@ -81,6 +82,15 @@ std::mutex wine_pool_mutex;
 uintptr_t wine_pool_rx = 0;
 uintptr_t wine_pool_rw = 0;
 size_t wine_pool_size = 0;
+std::atomic<int32_t> wine_pool_last_failure{0};
+std::atomic<int32_t> wine_pool_last_mach_code{0};
+
+void record_wine_pool_failure(int32_t stage, int32_t mach_code = 0) {
+    if (stage >= wine_pool_last_failure.load()) {
+        wine_pool_last_mach_code.store(mach_code);
+        wine_pool_last_failure.store(stage);
+    }
+}
 
 bool executable_mapping(uintptr_t rx, size_t size) {
     vm_address_t address = static_cast<vm_address_t>(rx);
@@ -127,6 +137,22 @@ bool export_pool(uintptr_t rx, uintptr_t rw, size_t size) {
 }
 #endif
 
+extern "C" int32_t ideck_wine_jit_pool_failure_stage(void) {
+#if defined(IDECK_NATIVE_MADEIRA_ENABLED) && IDECK_NATIVE_MADEIRA_ENABLED
+    return wine_pool_last_failure.load();
+#else
+    return 0;
+#endif
+}
+
+extern "C" int32_t ideck_wine_jit_pool_failure_mach_code(void) {
+#if defined(IDECK_NATIVE_MADEIRA_ENABLED) && IDECK_NATIVE_MADEIRA_ENABLED
+    return wine_pool_last_mach_code.load();
+#else
+    return 0;
+#endif
+}
+
 extern "C" bool ideck_wine_jit_pool_ready(void) {
 #if defined(IDECK_NATIVE_MADEIRA_ENABLED) && IDECK_NATIVE_MADEIRA_ENABLED
     std::lock_guard<std::mutex> lock(wine_pool_mutex);
@@ -139,8 +165,15 @@ extern "C" bool ideck_wine_jit_pool_ready(void) {
 extern "C" bool ideck_wine_jit_pool_prepare(void) {
 #if defined(IDECK_NATIVE_MADEIRA_ENABLED) && IDECK_NATIVE_MADEIRA_ENABLED
     std::lock_guard<std::mutex> lock(wine_pool_mutex);
-    if (wine_pool_rx != 0) return export_pool(wine_pool_rx, wine_pool_rw, wine_pool_size);
+    wine_pool_last_failure.store(0);
+    wine_pool_last_mach_code.store(0);
+    if (wine_pool_rx != 0) {
+        if (export_pool(wine_pool_rx, wine_pool_rw, wine_pool_size)) return true;
+        record_wine_pool_failure(6);
+        return false;
+    }
     if (!debugger_attached()) {
+        record_wine_pool_failure(1);
         fprintf(stderr, "[iDeck Wine JIT] REFUSED: StikDebug is not attached to this process. "
                         "Enabling JIT once from the app list does not keep the BRK handler attached.\n");
         return false;
@@ -157,6 +190,7 @@ extern "C" bool ideck_wine_jit_pool_prepare(void) {
         // Every jit26_prepare_region call triggers BRK #0xf00d.
         // A detached debugger here would make the call process-fatal.
         if (!debugger_attached()) {
+            record_wine_pool_failure(1);
             fprintf(stderr, "[iDeck Wine JIT] debugger detached during pool setup\n");
             return false;
         }
@@ -164,10 +198,12 @@ extern "C" bool ideck_wine_jit_pool_prepare(void) {
         void *result = jit26_prepare_region(nullptr, size);
         const uintptr_t rx = reinterpret_cast<uintptr_t>(result);
         if (rx == 0) {
+            record_wine_pool_failure(2);
             fprintf(stderr, "[iDeck Wine JIT] debugger could not allocate %zu MiB RX\n", size / MiB);
             continue;
         }
         if (!acceptable_pool(rx, size)) {
+            record_wine_pool_failure(3);
             fprintf(stderr, "[iDeck Wine JIT] rejected RX=0x%" PRIxPTR " size=%zu MiB "
                             "(non-executable or collides with Wine image/guest window)\n",
                     rx, size / MiB);
@@ -188,6 +224,7 @@ extern "C" bool ideck_wine_jit_pool_prepare(void) {
                                         static_cast<vm_address_t>(rx), FALSE,
                                         &current, &maximum, VM_INHERIT_NONE);
             if (kr != KERN_SUCCESS) {
+                record_wine_pool_failure(4, kr);
                 fprintf(stderr, "[iDeck Wine JIT] vm_remap failed size=%zu MiB "
                                 "hint=0x%lx kr=%d\n", size / MiB,
                         static_cast<unsigned long>(hint), kr);
@@ -198,6 +235,7 @@ extern "C" bool ideck_wine_jit_pool_prepare(void) {
             const bool overlapping = alias > UINTPTR_MAX - size ||
                 (alias < rx + size && alias + size > rx);
             if (overlapping) {
+                record_wine_pool_failure(4);
                 fprintf(stderr, "[iDeck Wine JIT] rejected overlapping RW alias=0x%lx\n",
                         static_cast<unsigned long>(rw));
                 vm_deallocate(mach_task_self(), rw, size);
@@ -206,6 +244,7 @@ extern "C" bool ideck_wine_jit_pool_prepare(void) {
             kr = vm_protect(mach_task_self(), rw, size, FALSE,
                             VM_PROT_READ | VM_PROT_WRITE);
             if (kr != KERN_SUCCESS) {
+                record_wine_pool_failure(5, kr);
                 fprintf(stderr, "[iDeck Wine JIT] vm_protect(RW) failed size=%zu MiB "
                                 "hint=0x%lx kr=%d\n", size / MiB,
                         static_cast<unsigned long>(hint), kr);
@@ -214,6 +253,7 @@ extern "C" bool ideck_wine_jit_pool_prepare(void) {
             }
 
             if (!export_pool(rx, alias, size)) {
+                record_wine_pool_failure(6);
                 vm_deallocate(mach_task_self(), rw, size);
                 vm_deallocate(mach_task_self(), static_cast<vm_address_t>(rx), size);
                 return false;
@@ -221,6 +261,8 @@ extern "C" bool ideck_wine_jit_pool_prepare(void) {
             wine_pool_rx = rx;
             wine_pool_rw = alias;
             wine_pool_size = size;
+            wine_pool_last_failure.store(0);
+            wine_pool_last_mach_code.store(0);
             fprintf(stderr, "[iDeck Wine JIT] ready with %zu MiB (RX/RW mirror)\n", size / MiB);
             return true;
         }
