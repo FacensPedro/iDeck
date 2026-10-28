@@ -4,7 +4,7 @@ enum WindowsLaunchProgress {
     static func stage(for status: String) -> Int? {
         switch status {
         case "Preparing game launch...": return 10
-        case "Preparing Wine prefix...": return 20
+        case "Preparing Wine prefix...", "Preparing executable...", "Preparing Windows Environment...": return 20
         case "Installing Microsoft Visual C++...": return 35
         case "Launching Steam game...", "Launching Windows app...", "Launching Steam client...": return 70
         case "Running", "Steam Running": return 90
@@ -23,6 +23,6 @@ enum WindowsLaunchProgress {
 
     static func shouldDisplay(status: String, percentage: Int) -> Bool {
         guard percentage > 0 && percentage < 100 else { return false }
-        return stage(for: status) != nil
+        return stage(for: status) != nil || status == "Preparing executable..."
     }
 }
