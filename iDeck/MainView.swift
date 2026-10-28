@@ -24,7 +24,7 @@ struct MainView: View {
         .onAppear {
             // First paint must be independent of the native Madeira runtime,
             // the external debugger and the stored Steam session.
-            print("[iDeck startup] Home view ready; Wine and Steam not initialized")
+            NSLog("[iDeck startup] Home view ready; Wine and Steam not initialized")
             UIApplication.shared.isIdleTimerDisabled = true
         }
         .onChange(of: scenePhase) { _, phase in
