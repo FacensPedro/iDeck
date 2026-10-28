@@ -19,6 +19,10 @@ bool ideck_fex_jit_ready(void);
 bool ideck_jit_debugger_attached(void);
 bool ideck_wine_jit_pool_prepare(void);
 bool ideck_wine_jit_pool_ready(void);
+// Detailed native failure stage: 0 none, 1 debugger, 2 RX allocation,
+// 3 RX validation, 4 RW remap, 5 RW protection, 6 environment export.
+int32_t ideck_wine_jit_pool_failure_stage(void);
+int32_t ideck_wine_jit_pool_failure_mach_code(void);
 bool ideck_wineserver_available(void);
 bool ideck_wineserver_initialize(const char *wine_prefix);
 bool ideck_wineserver_ready(void);
