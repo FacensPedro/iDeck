@@ -43,9 +43,10 @@ enum VisualCRuntimeBootstrap {
                                                 attributes: [.posixPermissions: 0o700])
                 defer { try? fileManager.removeItem(at: stage) }
                 var output = [CChar](repeating: 0, count: 512)
+                let capacity = output.count
                 let result = installer.path.withCString { source in
                     stage.path.withCString { destination in
-                        ideck_vcrt_extract(source, destination, &output, output.count)
+                        ideck_vcrt_extract(source, destination, &output, capacity)
                     }
                 }
                 guard result == 0, hasCompleteRuntime(in: stage) else {

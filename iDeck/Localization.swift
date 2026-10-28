@@ -121,6 +121,8 @@ enum Translations {
         "No apps installed. Tap + to install an .ipa": ["pt": "Nenhum app instalado. Toque em + para instalar um .ipa", "es": "No hay apps instaladas. Toca + para instalar un .ipa"],
 
         // Settings
+        "iDeck can download and extract the official Microsoft x64 Visual C++ Redistributable directly on this iPad before launching a Windows game. No Windows installer needs to run. The 14 x64 DLLs are verified before they are made available to Wine.": ["pt": "O iDeck pode baixar e extrair o redistribuível oficial do Microsoft Visual C++ diretamente neste iPad antes de abrir um jogo Windows. Não é necessário executar instalador Windows. As 14 DLLs x64 são verificadas antes do uso pelo Wine.", "es": "iDeck puede descargar y extraer el redistribuible oficial de Microsoft Visual C++ directamente en este iPad antes de abrir un juego de Windows. No es necesario ejecutar un instalador de Windows. Se verifican las 14 DLL x64 antes de utilizarlas con Wine."],
+        "Visual C++ extraction failed": ["pt": "Falha na extração do Visual C++", "es": "Error al extraer Visual C++"],
         "Preparing Wine and graphics...": ["pt": "Iniciando o Wine e preparando os gráficos...", "es": "Iniciando Wine y preparando los gráficos..."],
         "Install Microsoft Visual C++?": ["pt": "Instalar Microsoft Visual C++?", "es": "¿Instalar Microsoft Visual C++?"],
         "Install and play": ["pt": "Instalar e jogar", "es": "Instalar y jugar"],

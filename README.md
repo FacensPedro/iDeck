@@ -74,39 +74,27 @@ bash scripts/build_ipa.sh
 
 Without a matching kit, this mode fails rather than creating placeholder binaries. See [Precompiled Madeira runtime](docs/MADEIRA_PREBUILT_RUNTIME.md).
 
-## Automatic Microsoft Visual C++ setup
+## Automatic Microsoft Visual C++ setup on the iPad
 
-Some Windows games require Microsoft Visual C++ runtime DLLs, including `vcruntime140.dll`, `msvcp140.dll`, and `msvcp140_1.dll`.
+Some Windows games depend on Microsoft x64 C++ runtime DLLs such as `vcruntime140.dll`, `msvcp140.dll`, and optional MFC components.
 
-**On the first Windows game or EXE launch for a Wine prefix:**
+**The first time you launch a Windows game or imported EXE, iDeck can prepare the Microsoft DLLs directly on the iPad:**
 
-1. If compatible user-provided DLLs or a previously verified installation are available, iDeck skips setup.
-2. Otherwise, iDeck offers a **one-time installation confirmation** before launching the game.
-3. After you choose **Install and play**, iDeck downloads the official [Microsoft x64 Visual C++ Redistributable](https://aka.ms/vc14/vc_redist.x64.exe) **directly from Microsoft**, not from a DLL mirror or this GitHub repository.
-4. iDeck attempts to run the Microsoft installer inside the Wine prefix with `/install /quiet /norestart`, waits for the Wine installation session to end, and checks for actual x64 runtime DLLs.
-5. **Only when the installation is verified** does iDeck continue to launch the game. On future launches in that prefix, setup is skipped.
+1. iDeck checks for a complete, previously verified set of 14 Microsoft x64 DLLs in `Documents/vcruntime` or the app bundle.
+2. If missing, iDeck asks for permission to download and extract the [official Microsoft x64 Visual C++ Redistributable](https://aka.ms/vc14/vc_redist.x64.exe).
+3. On approval, iDeck downloads the official Microsoft installer over HTTPS and **extracts its embedded CAB archives locally on the iPad** using a bundled open-source CAB decoder (`libmspack`). **The Windows installer is not executed.**
+4. iDeck checks that all 14 required DLLs are present, Windows x64 PE files and contain an Authenticode certificate-table structure, then installs the files in `Documents/vcruntime`.
+5. The Madeira Wine bridge makes the DLLs available to games through the prefix, preserving its native ARM64EC exemptions. Only when the files are successfully prepared does iDeck continue the game launch. Later launches reuse the files without downloading them again.
 
-**Important limitations:** The Microsoft installer may require **WoW64**, Windows services, or other features not yet supported by this Wine build. If it fails, iDeck reports the failure rather than pretending DLLs were installed. Choose **Play without installing** to skip the setup for that launch. Downloading the installer is not the same as guaranteeing it can run on iPadOS. You must review and agree to any applicable Microsoft licensing terms before installing.
+This is a **best-effort** compatibility feature. Cabinet contents can change between Microsoft versions; some release formats might not expose the CAB data in a way this decoder recognizes. Validating the presence of a PE certificate table is **not cryptographic verification of the Authenticode signature**. The app never claims successful installation if extraction fails. You may choose **Play without installing** to proceed without this prerequisite.
 
-**No Microsoft DLLs or installers are committed to the iDeck repository or automatically bundled into the IPA.** On-device downloads are made from Microsoft at your request. Microsoft's Visual C++ licensing still governs their use and redistribution.
+**Microsoft DLLs are not bundled into the GitHub repository or IPA.** The user downloads them directly from Microsoft upon approval. Review Microsoft's [license and redistribution conditions](https://learn.microsoft.com/en-us/cpp/windows/redistributing-visual-cpp-files). The bundled CAB decoder is **libmspack (LGPL-2.1)**; see [its license and source](iDeck/ThirdParty/libmspack/UPSTREAM.md).
 
 ### Manual fallback
 
-If the automatic installer cannot run in your Wine environment, compatible DLLs you are authorized to use can be placed at:
+If extraction fails or you already have compatible DLLs that you are authorized to use, place the necessary x64 DLLs under **Files → On My iPad → iDeck → vcruntime**. Use **Settings → Windows compatibility → Prepare Visual C++ folder** to create the folder.
 
-```text
-Files/
-└── On My iPad/
-    └── iDeck/
-        └── vcruntime/
-            ├── vcruntime140.dll
-            ├── msvcp140.dll
-            └── msvcp140_1.dll
-```
-
-Use **Settings → Windows compatibility → Prepare Visual C++ folder** to create the directory, then transfer the necessary DLLs using Files or Apple Devices. These are **examples**, not a guaranteed complete set. The installer `vc_redist.x64.exe` itself is not a DLL.
-
-See the [Microsoft Visual C++ DLL guide](docs/MICROSOFT_VISUAL_CPP_DLLS.md), [official Microsoft downloads](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist), and [Microsoft redistribution terms](https://learn.microsoft.com/en-us/cpp/windows/redistributing-visual-cpp-files).
+See the [Microsoft Visual C++ DLL guide](docs/MICROSOFT_VISUAL_CPP_DLLS.md) and [official Microsoft downloads](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist).
 
 ## JIT and platform restrictions
 
