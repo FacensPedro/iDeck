@@ -246,10 +246,32 @@ struct SettingsView: View {
         .disabled(updater.isChecking)
         
         if let update = updater.availableIDeckUpdate {
-            actionButton(title: tr("Install iDeck %@", update.latest ?? ""), icon: "arrow.down.circle.fill") {
+            actionButton(title: tr("Update iDeck %@", update.latest ?? ""), icon: "arrow.down.circle.fill") {
                 updater.installIDeckUpdate()
             }
+        } else if updater.hasChecked {
+            Text(tr(updater.statuses.first(where: { $0.project.id == UpdateChecker.ideck.id })?.failed == true
+                ? "Could not check iDeck releases. Try again."
+                : "No newer iDeck IPA release is available."))
+                .font(.caption)
+                .foregroundColor(.gray)
+                .padding(.horizontal, 16)
         }
+        actionButton(title: tr("Open iDeck releases"), icon: "arrow.up.right.square") {
+            updater.openIDeckReleases()
+        }
+        if let message = updater.installHandoffMessage {
+            Text(tr(message))
+                .font(.caption)
+                .foregroundColor(.orange)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 16)
+        }
+        Text(tr("iPadOS requires a signed IPA installation through SideStore, AltStore or another compatible installer. iDeck cannot replace its own app binary. Keep the same app identifier and signing identity to preserve existing app data when supported."))
+            .font(.caption)
+            .foregroundColor(.gray)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.horizontal, 16)
     }
     
     /// iDeck shows the installed version; the other projects show the newest release that has an IPA.
