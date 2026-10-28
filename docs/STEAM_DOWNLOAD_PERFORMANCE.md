@@ -63,8 +63,9 @@ the same mismatching bytes a second time just to confirm they differ.
 Previously an entire depot had to finish before the next depot could start
 transferring. The new **bounded round-robin scheduler** allows chunks from
 different depots to be in flight simultaneously, reusing idle CDN connections
-and overlapping network, decryption and disk I/O. Its memory use is O(number
-of depots), not O(number of chunks). Progress and resumable journals still
+and overlapping network, decryption and disk I/O. Its active-work cursor uses O(number of depots) memory,
+not O(number of chunks); the separate conflict check indexes output paths.
+Progress and resumable journals still
 account for the individual completed chunks in their original depots.
 
 **File overlay safety:** Some games ship multiple depots containing the same
