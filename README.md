@@ -74,6 +74,16 @@ bash scripts/build_ipa.sh
 
 Without a matching kit, this mode fails rather than creating placeholder binaries. See [Precompiled Madeira runtime](docs/MADEIRA_PREBUILT_RUNTIME.md).
 
+## Game startup progress and Wine close controls
+
+The Windows session screen shows an initialization percentage based on actual completed iDeck stages: prefix preparation, Microsoft Visual C++ setup, native Wine process start and the first Metal-presented frame. **It is not the game's private asset-loading percentage.** Reaching 90% means Wine started; reaching 100% requires a new rendered frame. This helps distinguish no frame from slow application loading.
+
+The top-left **X** requests the same graceful Alt+F4 exit that Madeira uses, without prematurely detaching the Metal surface. If the Wine input bridge is missing, iDeck explains the problem rather than hiding a still-running process. Some iOS Wine configurations cannot safely start a second Wine session in the same app process; after a session ends, restart iDeck before opening another Windows game.
+
+Per-game settings optionally enable Wine's virtual desktop or experimental `MADEIRA_WAIT_CHILDREN=1` for launchers that spawn child processes. Those options are disabled by default. The in-app JIT debugger must remain ready; actual Windows game execution requires an on-device Madeira-native IPA.
+
+The app requests the iOS `com.apple.developer.kernel.increased-memory-limit` entitlement, but whether it is **actually granted** depends on the signing profile and device; requesting it does not bypass iPadOS memory restrictions. Full Madeira Dock client-managed Steam launch and DRM-sensitive games still require additional integration.
+
 ## Automatic Microsoft Visual C++ setup on the iPad
 
 Some Windows games depend on Microsoft x64 C++ runtime DLLs such as `vcruntime140.dll`, `msvcp140.dll`, and optional MFC components.

@@ -201,6 +201,12 @@ jobs:
           xcrun swiftc iDeck/GraphicsConfig.swift tests/host/GraphicsOverrideTests.swift -o /tmp/ideck-graphics-override-tests
           /tmp/ideck-graphics-override-tests
 
+      - name: Test Wine game startup progression and exit controls
+        run: |
+          xcrun swiftc iDeck/WindowsLaunchProgress.swift tests/host/WindowsLaunchProgressTests.swift -o /tmp/ideck-windows-progress-tests
+          /tmp/ideck-windows-progress-tests
+          python3 -m unittest discover -s tests/host -p 'test_madeira_game_session_controls.py' -v
+
       - name: Test Wine native exit diagnostics and Steam app identity
         run: |
           xcrun swiftc iDeck/WineExitDiagnostics.swift tests/host/WineExitDiagnosticsTests.swift -o /tmp/ideck-wine-exit-tests
