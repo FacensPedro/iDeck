@@ -16,6 +16,7 @@ bool ideck_fex_available(void);
 bool ideck_fex_initialize(void);
 // A live StikDebug-compatible debugger is needed until the FEX RX pool exists.
 bool ideck_fex_jit_ready(void);
+bool ideck_jit_debugger_attached(void);
 bool ideck_wine_jit_pool_prepare(void);
 bool ideck_wine_jit_pool_ready(void);
 bool ideck_wineserver_available(void);
