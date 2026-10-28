@@ -12,5 +12,6 @@
 #import "SteamDepotRegionPolicy.h"
 #import "SteamDiskIO.h"
 #import "SteamNativeCore.h"
+#import "NativeRuntime/WineLogTriage.h"
 
 #endif /* iDeck_Bridging_Header_h */
