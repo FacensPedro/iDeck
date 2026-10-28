@@ -713,6 +713,9 @@ class SystemCoordinator: ObservableObject {
         if status == Int(ENOENT) {
             return "Execution Error: Wine prefix or runtime components are missing."
         }
+        if status == Int(ENOMEM) {
+            return "Execution Error: the Wine ARM64EC executable JIT pool could not be prepared. Keep the compatible StikDebug debugger attached and check RX/RW mapping in the Wine log."
+        }
         let message = status > 0 && status < 256
             ? String(cString: strerror(Int32(status))) : "unknown native error"
         return "Execution Error: Madeira launch failed (code \(status): \(message))."
