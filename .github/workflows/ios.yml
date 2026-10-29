@@ -36,7 +36,7 @@ on:
     branches: [ "main", "feature/armv8-armv84-host-feature-probing-20261029" ]
     tags: [ "v*", "[0-9]*" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main", "feature/wine-11-4-madeira-d3d12-auto-dxvk-hud-20261029" ]
 
 permissions:
   contents: write
@@ -250,6 +250,7 @@ jobs:
         run: |
           xcrun swiftc iDeck/GraphicsConfig.swift tests/host/GraphicsOverrideTests.swift -o /tmp/ideck-graphics-override-tests
           /tmp/ideck-graphics-override-tests
+          python3 -m unittest discover -s tests/host -p 'test_wine_11_4_d3d12_dxvk_hud.py' -v
 
       - name: Test Wine game loading and safe close
         run: python3 -m unittest discover -s tests/host -p 'test_wine_startup_session.py' -v
