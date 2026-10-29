@@ -65,6 +65,7 @@ struct MainView: View {
         }
         .fullScreenCover(isPresented: Binding<Bool>(
             get: {
+                coordinator.windowsStatus == "Closing Windows session..." ||
                 coordinator.windowsStatus == "Steam Running" ||
                 coordinator.windowsStatus == "Running" ||
                 coordinator.windowsStatus == "Wine started; waiting for game..." ||
@@ -75,7 +76,12 @@ struct MainView: View {
                 coordinator.windowsStatus.hasPrefix("Visual C++") ||
                 coordinator.windowsStatus.hasPrefix("Execution Error:")
             },
-            set: { _ in coordinator.setWindowsStatus("Windows Ready") }
+            set: { presented in
+                if !presented && coordinator.windowsStatus != "Windows Ready" &&
+                   coordinator.windowsStatus != "Closing Windows session..." {
+                    coordinator.requestCloseWindowsSession()
+                }
+            }
         )) {
             GameSessionView(coordinator: coordinator)
         }

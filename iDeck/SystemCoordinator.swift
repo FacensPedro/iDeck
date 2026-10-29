@@ -57,6 +57,11 @@ class SystemCoordinator: ObservableObject {
     private var activeSteamGameID: UInt32?
     private var activeSteamPrefix: String?
     private var pendingSteamGameID: UInt32?
+    @Published private(set) var isClosingWindowsSession = false
+    @Published private(set) var windowsCloseWarning: String?
+    private var windowsCloseRequestedAt: TimeInterval?
+    private var windowsCloseWarningWasShown = false
+    private var windowsStatusBeforeClose: String?
     private var wineJITPreparationInFlight = false
     private var wineJITAttemptedDuringAttachment = false
     @Published var needsVisualCRuntimeConsent = false
@@ -369,6 +374,7 @@ class SystemCoordinator: ObservableObject {
     @objc private func dummyDisplayLinkUpdate() {}
     
     func launchSteam() {
+        guard !isClosingWindowsSession else { return }
         guard isJITEnabled && isContainerReady else { return }
         guard ideck_fex_jit_ready() &&
               (ideck_wine_jit_pool_ready() || ideck_jit_debugger_attached()) else {
@@ -524,6 +530,7 @@ class SystemCoordinator: ObservableObject {
     }
 
     func launchWindowsExecutable(at url: URL, profile: WindowsGameProfile? = nil) {
+        guard !isClosingWindowsSession else { return }
         guard isContainerReady else { return }
         refreshJITStatus()
 
@@ -641,6 +648,7 @@ class SystemCoordinator: ObservableObject {
     /// Launches a Steam game in its original installation directory, preserving
     /// relative DLL and asset paths instead of copying the executable elsewhere.
     func launchSteamGame(game: SteamAppInfo, profile: WindowsGameProfile, prefixPath: URL) {
+        guard !isClosingWindowsSession else { return }
         refreshJITStatus()
         if let pendingSteamGameID {
             setWindowsStatus(pendingSteamGameID == game.appID
@@ -758,6 +766,88 @@ class SystemCoordinator: ObservableObject {
                 }
             }
         }
+    }
+
+    // A Windows guest runs as a thread inside the iDeck process. The only
+    // safe normal shutdown is cooperative guest exit, followed by upstream
+    // WineProcessBridge calling wineserver_stop(). Killing this PID would
+    // terminate iDeck and all of its Steam library state.
+    func requestCloseWindowsSession() {
+        guard !isClosingWindowsSession else { return }
+        isClosingWindowsSession = true
+        windowsCloseWarning = nil
+        windowsCloseWarningWasShown = false
+        windowsCloseRequestedAt = ProcessInfo.processInfo.systemUptime
+        windowsStatusBeforeClose = windowsStatus
+        pendingSteamGameID = nil
+        setWindowsStatus("Closing Windows session...")
+        if ideck_wineprocess_running() {
+            if !ideck_wineprocess_request_close() {
+                SteamLog.event("[wine-close] guest keyboard unavailable; waiting for native exit")
+            } else {
+                SteamLog.event("[wine-close] Alt+F4 requested; waiting for guest and wineserver")
+            }
+        }
+        pollWindowsSessionClose()
+    }
+
+    func retryCloseWindowsSession() {
+        windowsCloseWarning = nil
+        windowsCloseWarningWasShown = false
+        windowsCloseRequestedAt = ProcessInfo.processInfo.systemUptime
+        if ideck_wineprocess_running() {
+            _ = ideck_wineprocess_request_close()
+        }
+        pollWindowsSessionClose()
+    }
+
+    func acknowledgeWindowsCloseWarning() {
+        windowsCloseWarning = nil
+    }
+
+    func cancelWindowsSessionClose() {
+        guard isClosingWindowsSession else { return }
+        isClosingWindowsSession = false
+        windowsCloseRequestedAt = nil
+        windowsCloseWarning = nil
+        windowsCloseWarningWasShown = false
+        let previousStatus = windowsStatusBeforeClose
+        windowsStatusBeforeClose = nil
+        if ideck_wineprocess_running() || ideck_wineserver_running() {
+            setWindowsStatus(previousStatus ?? "Wine started; waiting for game...")
+        } else {
+            isClosingWindowsSession = true
+            finishWindowsSessionCloseIfPossible()
+        }
+    }
+
+    func pollWindowsSessionClose() {
+        guard isClosingWindowsSession else { return }
+        if !ideck_wineprocess_running() && !ideck_wineserver_running() {
+            finishWindowsSessionCloseIfPossible()
+            return
+        }
+        let seconds = ProcessInfo.processInfo.systemUptime - (windowsCloseRequestedAt ?? 0)
+        if seconds >= 15, !windowsCloseWarningWasShown {
+            windowsCloseWarningWasShown = true
+            windowsCloseWarning = "The Windows game has not exited. iDeck cannot safely force-kill an in-process Wine thread without risking an app crash. Try closing the game from its menu or retry Alt+F4."
+            SteamLog.event("[wine-close] guest or wineserver did not exit after 15 seconds")
+        }
+    }
+
+    private func finishWindowsSessionCloseIfPossible() {
+        guard !ideck_wineprocess_running(), !ideck_wineserver_running(),
+              ideck_runtime_complete_session() else { return }
+        activeSteamGameID = nil
+        activeSteamPrefix = nil
+        pendingSteamGameID = nil
+        isClosingWindowsSession = false
+        windowsCloseRequestedAt = nil
+        windowsCloseWarning = nil
+        windowsCloseWarningWasShown = false
+        windowsStatusBeforeClose = nil
+        SteamLog.event("[wine-close] Wine and wineserver exited; returning to Steam library")
+        setWindowsStatus("Windows Ready")
     }
 
     func refreshWindowsSessionHealth() {

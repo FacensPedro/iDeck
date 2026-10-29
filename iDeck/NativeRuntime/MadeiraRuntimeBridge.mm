@@ -1,4 +1,5 @@
 #import "MadeiraRuntimeBridge.h"
+#import "RuntimeSupport.h"
 #import "../NativeRuntimeDiagnostics.h"
 #import <Foundation/Foundation.h>
 #include <cerrno>
@@ -6,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <mutex>
+#include <initializer_list>
 #include <cstdio>
 
 #if defined(IDECK_NATIVE_MADEIRA_ENABLED) && IDECK_NATIVE_MADEIRA_ENABLED
@@ -235,6 +237,24 @@ extern "C" int32_t ideck_runtime_launch(const char *executable_path,
         if (result == 0) ideck_wine_session_started = true;
         return result;
     }
+}
+
+// A Wine guest is an in-process pthread: do NOT kill(2), pthread_cancel,
+// or force wineserver_stop() while it is still executing. The pinned Madeira
+// WineProcessBridge stops wineserver itself after __wine_main finishes.
+// Re-arm the launcher only once both threads are observed quiescent.
+extern "C" bool ideck_runtime_complete_session(void) {
+    std::unique_lock<std::mutex> lock(ideck_launch_mutex, std::try_to_lock);
+    if (!lock.owns_lock() || ideck_wineprocess_running() || ideck_wineserver_running())
+        return false;
+    ideck_wine_session_started = false;
+    for (const char *key : {"MADEIRA_EXE", "MADEIRA_ARGS", "MADEIRA_WORKDIR",
+                             "MADEIRA_STEAM_APPID", "MADEIRA_STEAM_APPPATH",
+                             "MADEIRA_ENV_LOCKED", "WINESERVERSOCKET",
+                             "MADEIRA_WAIT_CHILDREN"}) unsetenv(key);
+    ideck_session_stop();
+    fprintf(stderr, "[iDeck Wine] guest and wineserver stopped; session released\\n");
+    return true;
 }
 
 // Export the public launch ABI only for a build explicitly linked against

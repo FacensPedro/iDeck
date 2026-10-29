@@ -30,9 +30,12 @@ int32_t ideck_wine_jit_pool_failure_rx_detail(void);
 bool ideck_wineserver_available(void);
 bool ideck_wineserver_initialize(const char *wine_prefix);
 bool ideck_wineserver_ready(void);
+bool ideck_wineserver_running(void);
 bool ideck_wineprocess_available(void);
 bool ideck_wineprocess_running(void);
 bool ideck_wineprocess_request_close(void);
+// Only complete after both Wine's guest thread and its wineserver have exited.
+bool ideck_runtime_complete_session(void);
 bool ideck_wineprocess_last_exit_code(int32_t *code);
 bool ideck_wineprocess_last_ntstatus(uint32_t *code);
 int32_t ideck_wineprocess_start(const char *wine_prefix);

@@ -9,6 +9,12 @@ bool ideck_wineserver_available(void) {
            dlsym(RTLD_DEFAULT, "wineserver_is_ready") != NULL;
 }
 
+bool ideck_wineserver_running(void) {
+    typedef int (*RunningFn)(void);
+    RunningFn running = (RunningFn)dlsym(RTLD_DEFAULT, "wineserver_is_running");
+    return running != NULL && running() != 0;
+}
+
 bool ideck_wineserver_ready(void) {
     typedef int (*ReadyFn)(void);
     ReadyFn ready = (ReadyFn)dlsym(RTLD_DEFAULT, "wineserver_is_ready");

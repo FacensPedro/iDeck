@@ -33,7 +33,7 @@ on:
         required: false
         default: ""
   push:
-    branches: [ "main", "fix/wine-black-screen-window-metal-and-fast-start-20261029" ]
+    branches: [ "main", "fix/graceful-wine-shutdown-and-steam-library-return-20261029" ]
     tags: [ "v*", "[0-9]*" ]
   pull_request:
     branches: [ "main" ]
@@ -273,6 +273,9 @@ jobs:
 
       - name: Test native window-level Metal display and fast Wine startup
         run: python3 -m unittest discover -s tests/host -p 'test_wine_black_screen_fast_start.py' -v
+
+      - name: Test coordinated Wine shutdown and Steam library return
+        run: python3 -m unittest discover -s tests/host -p 'test_wine_shutdown_library_return.py' -v
 
       - name: Test Steam WebSocket backpressure and graphics readiness diagnostics
         run: python3 -m unittest discover -s tests/host -p 'test_steam_game_launch_diagnostics.py' -v

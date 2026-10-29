@@ -22,19 +22,25 @@ class WineStartupSessionTests(unittest.TestCase):
         self.assertIn("Startup milestone, not the game's internal loading percentage.", VIEW)
 
     def test_close_uses_native_madeira_keyboard_queue(self):
-        self.assertIn("ideck_wineprocess_request_close()", VIEW)
+        coordinator = (ROOT / "iDeck/SystemCoordinator.swift").read_text()
+        self.assertIn("Button(action: coordinator.requestCloseWindowsSession)", VIEW)
+        self.assertIn("ideck_wineprocess_request_close()", coordinator)
         self.assertIn("ideck_wineprocess_request_close(void)", HEADER)
         self.assertIn('"winios_post_key"', BRIDGE)
         self.assertIn("post(0x12, 1)", BRIDGE)
         self.assertIn("post(0x73, 1)", BRIDGE)
         self.assertIn("post(0x73, 0)", BRIDGE)
         self.assertIn("post(0x12, 0)", BRIDGE)
-        self.assertIn("if closeRequested && !ideck_wineprocess_running()", VIEW)
-        self.assertIn("The Metal display stays attached until Wine stops.", VIEW)
+        self.assertIn("coordinator.pollWindowsSessionClose()", VIEW)
+        self.assertIn("Closing Wine and wineserver...", VIEW)
+        self.assertIn("ideck_runtime_complete_session()", coordinator)
+        self.assertIn("!ideck_wineprocess_running() && !ideck_wineserver_running()", coordinator)
 
-    def test_single_wine_session_per_app_process(self):
+    def test_wine_session_is_locked_until_previous_session_fully_exits(self):
         self.assertIn("ideck_wine_session_started", NATIVE)
         self.assertIn("if (ideck_wine_session_started) return EALREADY;", NATIVE)
+        self.assertIn("ideck_wine_session_started = false", NATIVE)
+        self.assertIn("ideck_wineprocess_running() || ideck_wineserver_running()", NATIVE)
 
     def test_steam_working_folder_is_set_for_relative_assets(self):
         self.assertIn('setenv("MADEIRA_STEAM_APPPATH", windowsFolder.UTF8String, 1)', NATIVE)
