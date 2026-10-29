@@ -33,7 +33,7 @@ on:
         required: false
         default: ""
   push:
-    branches: [ "main", "feature/madeira-xinput-hid-restart-multiple-games-20261029" ]
+    branches: [ "main", "ci/automatic-full-madeira-runtime-ipa-20261029" ]
     tags: [ "v*", "[0-9]*" ]
   pull_request:
     branches: [ "main" ]
@@ -45,11 +45,15 @@ jobs:
   build:
     name: Build iDeck IPA
     runs-on: xcode-27
-    # Native validation is required for this integration PR branch.
-    # The branch-scoped rule runs the licensed build after each PR update; release_tag remains empty.
+    # Every automatic build is native: no interface-only IPA may be published
+    # from push, PR, or tag events. A manual dispatch can still explicitly
+    # request an interface-only development build.
+    # The repository owner must approve licensed converter distribution ONCE
+    # in Settings > Secrets and variables > Actions > Variables. A missing
+    # approval is an error, not permission to upload an unusable UI-only IPA.
     env:
-      IDECK_NATIVE_BUILD: ${{ inputs.require_madeira && '1' || '0' }}
-      IDECK_ACCEPT_METAL_CONVERTER_LICENSE: ${{ inputs.accept_converter_license && '1' || '0' }}
+      IDECK_NATIVE_BUILD: ${{ github.event_name != 'workflow_dispatch' && '1' || (inputs.require_madeira && '1' || '0') }}
+      IDECK_ACCEPT_METAL_CONVERTER_LICENSE: ${{ (vars.IDECK_NATIVE_DISTRIBUTION_APPROVED == 'true' || (github.event_name == 'workflow_dispatch' && inputs.accept_converter_license)) && '1' || '0' }}
 
     steps:
       - name: Checkout
@@ -316,7 +320,14 @@ jobs:
         run: |
           set -euo pipefail
           if [[ "$CONVERTER_LICENSE_ACK" != "1" ]]; then
-            echo "::error::Native build requires reviewing the Apple Metal Shader Converter license and explicitly confirming permission to package the converter."
+            echo "::error::Automatic iDeck IPAs require an authorized native Madeira runtime. Review Apple Metal Shader Converter and combined FEX/Wine/Madeira distribution terms; then set repository variable IDECK_NATIVE_DISTRIBUTION_APPROVED=true. No interface-only IPA will be uploaded."
+            {
+              echo '## Native IPA authorization required'
+              echo 'Automatic builds must contain real FEX, Wine, DXMT and Madeira D3D12 binaries.'
+              echo 'The repository administrator must review the Apple Metal Shader Converter and third-party distribution terms.'
+              echo 'If authorized, set **Settings → Secrets and variables → Actions → Variables → IDECK_NATIVE_DISTRIBUTION_APPROVED = true**.'
+              echo 'This workflow fails closed; it will not publish an interface-only IPA as a working emulator.'
+            } >> "$GITHUB_STEP_SUMMARY"
             exit 2
           fi
 
@@ -392,6 +403,14 @@ jobs:
           grep -E "error:" build.log | sort -u | head -40 | while IFS= read -r line; do echo "::error::${line}"; done || true
           exit ${status:-0}
 
+      - name: Verify automatic builds cannot downgrade to interface-only
+        if: ${{ github.event_name != 'workflow_dispatch' }}
+        run: |
+          [[ "$IDECK_NATIVE_BUILD" == "1" ]] || {
+            echo "::error::An automatic iDeck release may not generate an interface-only IPA."
+            exit 2
+          }
+
       - name: Verify IPA archive
         run: |
           test -s iDeck.ipa
@@ -407,8 +426,11 @@ jobs:
               required = (
                   "MadeiraRuntimeManifest.plist",
                   "arm64ec-windows/xtajit64.dll",
+                  "arm64ec-windows/madeira_d3d12.dll",
                   "arm64ec-windows/d3d12.dll",
                   "arm64ec-windows/d3d12core.dll",
+                  "arm64ec-windows/xinput1_4.dll",
+                  "arm64ec-windows/xinput1_3.dll",
                   "arm64ec-windows/winemetal.dll",
                   "arm64ec-windows/d3d11.dll",
                   "arm64ec-windows/dxgi.dll",
@@ -431,6 +453,18 @@ jobs:
               flags = plistlib.loads(archive.read(prefix + "MadeiraRuntimeManifest.plist"))
               if not all(flags.get(key) is True for key in ("fexInProcess", "wineInProcess", "dxmtLinked", "d3d12Linked")):
                   raise SystemExit("Native Madeira manifest is incomplete")
+              # These PE modules must be actual compilations, not empty
+              # placeholders. Madeira FEX and Wine remain in the Mach-O.
+              for module in ("arm64ec-windows/madeira_d3d12.dll",
+                             "arm64ec-windows/d3d12.dll",
+                             "arm64ec-windows/xinput1_4.dll",
+                             "arm64ec-windows/xtajit64.dll"):
+                  data = archive.read(prefix + module)
+                  if len(data) < 1024 or data[:2] != b"MZ":
+                      raise SystemExit("Invalid native Windows PE module: " + module)
+              if archive.read(prefix + "arm64ec-windows/d3d12.dll") != archive.read(
+                      prefix + "arm64ec-windows/madeira_d3d12.dll"):
+                  raise SystemExit("D3D12 loader differs from the Madeira D3D12 frontend")
               if "${{ (github.event_name != 'workflow_dispatch' || inputs.build_wow64) && '1' || '0' }}" == "1":
                   if flags.get("wow64Enabled") is not True:
                       raise SystemExit("Native Madeira manifest does not advertise verified WoW64")
