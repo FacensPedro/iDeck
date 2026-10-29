@@ -381,7 +381,8 @@ final class DepotDownloader {
         var createdDirectories = Set<String>() // one mkdir traversal per distinct output directory
         let journalNames = Set(plans.map { "depot_\($0.depotID)_\($0.manifestGID).journal" })
         // A journal for an older manifest describes different file contents.
-        for name in (try? fm.contentsOfDirectory(atPath: journalDir.path)) ?? [] where !journalNames.contains(name) {
+        for name in (try? fm.contentsOfDirectory(atPath: journalDir.path)) ?? []
+            where !journalNames.contains(name) && name != ".ideck-owned-folder" {
             try? fm.removeItem(at: journalDir.appendingPathComponent(name))
         }
         for plan in plans {
