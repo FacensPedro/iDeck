@@ -23,9 +23,11 @@ class DirectIPAUpdaterAndClipboardTests(unittest.TestCase):
         self.assertIn('parts.queryItems = [URLQueryItem(name: "url", value: ipa.absoluteString)]', source)
         self.assertIn('["sidestore", "altstore"]', source)
         self.assertIn("func openIDeckReleases()", source)
-        self.assertIn('actionButton(title: tr("Open iDeck releases")', settings)
+        self.assertNotIn('actionButton(title: tr("Open iDeck releases")', settings)
+        self.assertNotIn('No newer iDeck IPA release is available.', settings)
+        self.assertNotIn('iPadOS requires a signed IPA installation', settings)
         self.assertIn('actionButton(title: tr("Update iDeck %@", update.latest ?? "")', settings)
-        self.assertIn("iDeck cannot replace its own app binary", settings)
+        self.assertIn("func installIDeckUpdate()", source)
 
     def test_copy_log_is_one_tap_and_bounded(self):
         view = (ROOT / "iDeck/GameSessionView.swift").read_text()
