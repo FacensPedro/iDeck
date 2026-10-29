@@ -18,7 +18,11 @@ extern "C" bool ideck_wineprocess_running(void) {
 extern "C" bool ideck_wineprocess_thread_finished(void) {
     using Finished = int (*)(void);
     auto finished = reinterpret_cast<Finished>(dlsym(RTLD_DEFAULT, "wine_process_thread_finished"));
-    return finished != nullptr && finished() != 0;
+    // An interface-only IPA has no Wine guest thread at all. It should still
+    // be able to close the error screen, but a native Wine build lacking the
+    // completion marker must never be treated as safe to restart.
+    if (finished) return finished() != 0;
+    return !ideck_wineprocess_available();
 }
 
 extern "C" int32_t ideck_wineprocess_start(const char *wine_prefix) {
