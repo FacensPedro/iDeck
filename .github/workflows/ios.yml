@@ -51,12 +51,18 @@ jobs:
     runs-on: xcode-27
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: 'latest-stable'
+
+      - name: Setup Node.js 24 for runtime tests
+        uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          package-manager-cache: false
 
       - name: Test Metal Toolchain bootstrap
         run: |
@@ -324,7 +330,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           lfs: true
 
@@ -345,7 +351,7 @@ jobs:
           fi
 
       - name: Restore incremental Xcode build intermediates
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             build/Build/Intermediates.noindex
@@ -357,7 +363,7 @@ jobs:
 
       - name: Restore previously compiled Madeira runtime
         if: ${{ env.IDECK_NATIVE_BUILD == '1' }}
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: build/native-cache
           key: madeira-kit-v1-${{ runner.os }}-${{ runner.arch }}-${{ (github.event_name != 'workflow_dispatch' || inputs.build_wow64) && 'wow64' || 'no-wow64' }}-${{ inputs.bundle_wine_mono && 'mono' || 'no-mono' }}-${{ hashFiles('scripts/madeira_native_kit.py', 'scripts/build_madeira_components.sh', 'scripts/link_madeira_native.sh', 'scripts/fetch_madeira_sources.sh', 'patches/*') }}
@@ -510,7 +516,7 @@ jobs:
 
       - name: Upload authorized runtime kit
         if: ${{ env.IDECK_NATIVE_BUILD == '1' && inputs.export_runtime_kit && env.IDECK_ACCEPT_METAL_CONVERTER_LICENSE == '1' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: iDeck-Madeira-precompiled-runtime
           path: build/native-kit-export/madeira-*.zip
@@ -519,7 +525,7 @@ jobs:
 
       - name: Upload native build diagnostics
         if: ${{ always() && env.IDECK_NATIVE_BUILD == '1' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: iDeck-native-build-diagnostics
           path: |
