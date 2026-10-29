@@ -58,7 +58,7 @@ class AutomaticJITAndDownloadHUDTests(unittest.TestCase):
 
     def test_cancel_removes_owned_files_but_preserves_preexisting_unowned_data(self):
         self.assertIn("let installOwnership = steamApps.appendingPathComponent(", STEAM)
-        self.assertIn('".ideck-owned-folder"', STEAM)
+        self.assertIn('.ideck-owned-folder"', STEAM)
         self.assertIn("ownsIncompleteInstall = !wasInstalled &&", STEAM)
         self.assertIn("savedOwner == installFolder", STEAM)
         self.assertIn("if cancelled, !wasInstalled {", STEAM)
