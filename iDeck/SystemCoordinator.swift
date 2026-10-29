@@ -811,6 +811,7 @@ class SystemCoordinator: ObservableObject {
         } else if ideck_wineserver_running() {
             setWindowsStatus("Wine started; waiting for game...")
         } else {
+            isClosingWindowsSession = true
             finishWindowsSessionCloseIfPossible()
         }
     }
