@@ -27,6 +27,7 @@ class FEXJITGuardTests(unittest.TestCase):
         self.assertIn('return &fex_initialize != nullptr;', availability)
         self.assertIn('return false;', availability)
         self.assertNotIn('dlsym(', availability)
+        self.assertNotIn('dlsym(', FEX)
 
     def test_launcher_returns_recoverable_errno_without_jit(self):
         self.assertIn("if (!ideck_fex_jit_ready()) return EPERM;", RUNTIME)
