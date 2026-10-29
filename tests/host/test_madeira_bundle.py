@@ -80,6 +80,13 @@ class MadeiraBundleTests(unittest.TestCase):
     def test_complete_static_fixture(self):
         self.assertEqual(self.inspect(), [])
 
+    def test_rejects_native_d3d12_loader_mismatch(self):
+        frontend = self.app / "arm64ec-windows/d3d12.dll"
+        data = bytearray(frontend.read_bytes())
+        data[-1] ^= 0x55
+        frontend.write_bytes(data)
+        self.assertTrue(any("D3D12 loader differs from Madeira native frontend" in e for e in self.inspect()))
+
     def test_missing_arm64ec_frontend(self):
         (self.app / "MadeiraRuntime/arm64ec-windows/d3d11.dll").unlink()
         self.assertTrue(any("missing compiled Windows PE" in error for error in self.inspect()))

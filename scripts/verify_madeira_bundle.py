@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Audit a built iOS .app before claiming that Madeira is integrated."""
 import argparse
+import hashlib
 import plistlib
 import re
 import struct
@@ -210,6 +211,18 @@ def inspect(app: Path, require_wow64: bool = False) -> list[str]:
             problem = _pe_arch_error(dll, path.startswith("arm64ec-windows/"))
             if problem:
                 errors.append(problem)
+    for directory in (app, runtime):
+        native = directory / "arm64ec-windows/madeira_d3d12.dll"
+        loader = directory / "arm64ec-windows/d3d12.dll"
+        if native.is_file() and loader.is_file():
+            def digest(path: Path) -> bytes:
+                sha = hashlib.sha256()
+                with path.open("rb") as source:
+                    for block in iter(lambda: source.read(1024 * 1024), b""):
+                        sha.update(block)
+                return sha.digest()
+            if digest(native) != digest(loader):
+                errors.append(f"D3D12 loader differs from Madeira native frontend: {loader}")
     for directory in (app, runtime):
         locale = directory / "nls" / "locale.nls"
         if not locale.is_file() or locale.stat().st_size == 0:

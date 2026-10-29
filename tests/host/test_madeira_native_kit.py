@@ -50,6 +50,7 @@ class MadeiraNativeKitTests(unittest.TestCase):
         })
         for name in kit.REQUIRED_PE + (kit.WOW64_FILES if wow64 else ()):
             data["resources/" + name] = b"MZ" + name.encode()
+        data["resources/" + kit.D3D12_LOADER] = data["resources/" + kit.D3D12_FRONTEND]
         if mono:
             data["resources/wine-mono/bin/libmono-2.0-x86.dll"] = b"MZmono"
         return data
@@ -63,6 +64,8 @@ class MadeiraNativeKitTests(unittest.TestCase):
             "platform": "iphoneos-arm64",
             "wow64": wow64,
             "wine_mono": mono,
+            "wine_version": kit.WINE_VERSION,
+            "d3d12_backend": "madeira-d3d12",
             "arm64ec_context_patch_sha256": kit.ARM64EC_CONTEXT_PATCH_SHA256,
             "arm_host_feature_patch_sha256": kit.ARM_HOST_FEATURE_PATCH_SHA256,
             "files": {
@@ -170,6 +173,31 @@ class MadeiraNativeKitTests(unittest.TestCase):
         with self.assertRaisesRegex(kit.KitError, "ARM host feature patch mismatch"):
             kit.inspect(path, False, False)
 
+    def test_rejects_missing_madeira_d3d12(self):
+        entries = self.entries()
+        del entries["resources/" + kit.D3D12_FRONTEND]
+        with self.assertRaisesRegex(kit.KitError, "Missing Windows payload"):
+            kit.inspect(self.save(entries), False, False)
+
+    def test_rejects_nonmatching_d3d12_loader(self):
+        entries = self.entries()
+        entries["resources/" + kit.D3D12_LOADER] = b"MZdifferent-loader"
+        with self.assertRaisesRegex(kit.KitError, "D3D12 frontend and d3d12.dll hashes differ"):
+            kit.inspect(self.save(entries), False, False)
+
+    def test_rejects_incorrect_wine_version(self):
+        path = self.save(self.entries())
+        with zipfile.ZipFile(path) as archive:
+            meta = json.loads(archive.read("metadata.json"))
+            entries = {name: archive.read(name) for name in archive.namelist() if name != "metadata.json"}
+        meta["wine_version"] = "11.3"
+        with zipfile.ZipFile(path, "w") as archive:
+            archive.writestr("metadata.json", json.dumps(meta))
+            for name, data in entries.items():
+                archive.writestr(name, data)
+        with self.assertRaisesRegex(kit.KitError, "Wine 11.4 version mismatch"):
+            kit.inspect(path, False, False)
+
     def test_rejects_revision_mismatch(self):
         path = self.save(self.entries(), revision="0" * 40)
         with self.assertRaisesRegex(kit.KitError, "revision/platform/options mismatch"):
@@ -188,6 +216,8 @@ class MadeiraNativeKitTests(unittest.TestCase):
     def test_export_ignores_empty_madeira_resource_placeholders(self):
         madeira = self.root / "vendor/Madeira"
         bridge = self.root / "build/madeira-native"
+        (madeira / "wine").mkdir(parents=True, exist_ok=True)
+        (madeira / "wine/VERSION").write_text("Wine version " + kit.WINE_VERSION + "\n")
         for name, path in kit.archive_paths(madeira, bridge).items():
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(
@@ -230,11 +260,15 @@ class MadeiraNativeKitTests(unittest.TestCase):
         bridge = self.root / "build/madeira-native"
         resource_root = self.root / "staged-iDeck.app"
         resource_root.mkdir()
+        (madeira / "wine").mkdir(parents=True, exist_ok=True)
+        (madeira / "wine/VERSION").write_text("Wine version " + kit.WINE_VERSION + "\n")
         for name, value in self.entries().items():
             if name.startswith("resources/"):
                 destination = resource_root / name.removeprefix("resources/")
                 destination.parent.mkdir(parents=True, exist_ok=True)
                 destination.write_bytes(value)
+        (madeira / "wine").mkdir(parents=True, exist_ok=True)
+        (madeira / "wine/VERSION").write_text("Wine version " + kit.WINE_VERSION + "\n")
         for name, path in kit.archive_paths(madeira, bridge).items():
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(
