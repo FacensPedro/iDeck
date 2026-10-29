@@ -9,6 +9,7 @@ struct SettingsView: View {
     @AppStorage("controllerLeftSensitivity") private var controllerLeftSensitivity = 1.0
     @AppStorage("controllerRightSensitivity") private var controllerRightSensitivity = 1.0
     @AppStorage("controllerDeadzone") private var controllerDeadzone = 0.10
+    @AppStorage("wineControllerAPI") private var wineControllerAPI = "XInput"
     @AppStorage("showGamePerformanceOverlay") private var showGamePerformanceOverlay = false
     @StateObject private var updater = UpdateChecker()
     @State private var isSteamSignInPresented = false
@@ -58,6 +59,16 @@ struct SettingsView: View {
                         }
 
                         settingsSection(title: tr("Controller")) {
+                            HStack {
+                                Text(tr("Windows controller API")).foregroundColor(.white)
+                                Spacer()
+                                Picker(tr("Windows controller API"), selection: $wineControllerAPI) {
+                                    ForEach(["XInput", "XInput + DirectInput", "HID", "DualSense HID", "Generic HID"], id: \.self) { api in
+                                        Text(tr(api)).tag(api)
+                                    }
+                                }
+                                .tint(.white)
+                            }.padding(.horizontal, 16)
                             HStack {
                                 Text(tr("Connected controller")).foregroundColor(.white)
                                 Spacer()

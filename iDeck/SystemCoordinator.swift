@@ -823,7 +823,8 @@ class SystemCoordinator: ObservableObject {
 
     func pollWindowsSessionClose() {
         guard isClosingWindowsSession else { return }
-        if !ideck_wineprocess_running() && !ideck_wineserver_running() {
+        if !ideck_wineprocess_running() && !ideck_wineserver_running() &&
+           ideck_wineprocess_thread_finished() {
             finishWindowsSessionCloseIfPossible()
             return
         }
@@ -837,6 +838,7 @@ class SystemCoordinator: ObservableObject {
 
     private func finishWindowsSessionCloseIfPossible() {
         guard !ideck_wineprocess_running(), !ideck_wineserver_running(),
+              ideck_wineprocess_thread_finished(),
               ideck_runtime_complete_session() else { return }
         activeSteamGameID = nil
         activeSteamPrefix = nil

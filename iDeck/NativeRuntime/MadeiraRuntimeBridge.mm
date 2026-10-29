@@ -58,7 +58,13 @@ extern "C" int32_t ideck_runtime_prepare(const char *wine_prefix) {
     // Upstream Madeira requires RX/RW pool environment exports before __wine_main.
     // Without these the first ARM64EC dispatcher faults on a non-executable PE page.
     if (!ideck_wine_jit_pool_prepare() || !ideck_wine_jit_pool_ready()) return ENOMEM;
-    if (!ideck_wineserver_initialize(wine_prefix)) return EAGAIN;
+    // HID devices must be published before wineserver loads its registry and
+    // enumerates Plug and Play devices, not after Wine has started.
+    ideck_gamepad_begin_session();
+    if (!ideck_wineserver_initialize(wine_prefix)) {
+        ideck_gamepad_end_session();
+        return EAGAIN;
+    }
     return 0;
 }
 
@@ -111,7 +117,7 @@ extern "C" int32_t ideck_runtime_launch(const char *executable_path,
                                          const char *request_json) {
     std::unique_lock<std::mutex> launch_lock(ideck_launch_mutex, std::try_to_lock);
     if (!launch_lock.owns_lock()) return EBUSY;
-    if (ideck_wineprocess_running()) return EALREADY;
+    if (ideck_wineprocess_running() || ideck_wineserver_running()) return EALREADY;
     if (ideck_wine_session_started) return EALREADY;
     if (!executable_path || !*executable_path || !wine_prefix || !*wine_prefix ||
         !request_json || !*request_json) return ideck_invalid_launch("empty executable, prefix or launch request");
@@ -245,7 +251,8 @@ extern "C" int32_t ideck_runtime_launch(const char *executable_path,
 // Re-arm the launcher only once both threads are observed quiescent.
 extern "C" bool ideck_runtime_complete_session(void) {
     std::unique_lock<std::mutex> lock(ideck_launch_mutex, std::try_to_lock);
-    if (!lock.owns_lock() || ideck_wineprocess_running() || ideck_wineserver_running())
+    if (!lock.owns_lock() || ideck_wineprocess_running() ||
+        ideck_wineserver_running() || !ideck_wineprocess_thread_finished())
         return false;
     ideck_wine_session_started = false;
     for (const char *key : {"MADEIRA_EXE", "MADEIRA_ARGS", "MADEIRA_WORKDIR",

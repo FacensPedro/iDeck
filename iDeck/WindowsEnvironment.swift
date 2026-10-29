@@ -289,6 +289,23 @@ class WindowsEnvironment {
     }
 
     func applyGameProfile(_ profile: WindowsGameProfile) {
+        let controllerMode = profile.controllerAPI == "Automatic"
+            ? (UserDefaults.standard.string(forKey: "wineControllerAPI") ?? "XInput")
+            : profile.controllerAPI
+        switch controllerMode {
+        case "HID": setenv("MADEIRA_PAD_MODE", "hid", 1)
+        case "DualSense HID": setenv("MADEIRA_PAD_MODE", "dualsense", 1)
+        case "Generic HID": setenv("MADEIRA_PAD_MODE", "generic", 1)
+        default: setenv("MADEIRA_PAD_MODE", "xinput", 1)
+        }
+        if controllerMode == "XInput + DirectInput" {
+            setenv("MADEIRA_DINPUT_PAD", "1", 1)
+        } else {
+            unsetenv("MADEIRA_DINPUT_PAD")
+        }
+        // Avoid carrying the previous game's HID identity into this launch.
+        unsetenv("MADEIRA_HIDPAD")
+        unsetenv("MADEIRA_HIDPAD_NAME")
         if profile.resolution == "Device native" {
             unsetenv("MADEIRA_SCREEN_W")
             unsetenv("MADEIRA_SCREEN_H")

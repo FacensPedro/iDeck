@@ -72,6 +72,22 @@ done
 xcrun --sdk iphoneos ar rcs "$OUT/libideck_madeira_upstream_bridges.a" "${OBJS[@]}"
 xcrun --sdk iphoneos ranlib "$OUT/libideck_madeira_upstream_bridges.a"
 
+# A native IPA must link the actual Madeira XInput/HID transport,
+# controller output and the patched Wine worker-completion marker.
+# Do not silently accept an interface bridge or an older Wine static kit.
+if ! xcrun --sdk iphoneos nm -gU "$OUT/libideck_madeira_upstream_bridges.a" | awk '
+  $NF == "_winios_gamepad_set_state" { xinput = 1 }
+  $NF == "_winios_hidpad_set_state" { hid = 1 }
+  $NF == "_madeira_pad_output_configure" { output = 1 }
+  $NF == "_madeira_pad_output_set_slot" { output_slot = 1 }
+  $NF == "_wine_process_thread_finished" { repeat_game = 1 }
+  END { exit !(xinput && hid && output && output_slot && repeat_game) }
+'; then
+  echo "ERROR: Madeira native bridge lacks XInput, HID, gamepad output or repeat-session Wine worker completion." >&2
+  exit 2
+fi
+
+
 ARCHIVES=(
   "$OUT/libideck_madeira_upstream_bridges.a"
   "$MD/FEX/build-ios/FEXCore/Source/libFEXCore.a"

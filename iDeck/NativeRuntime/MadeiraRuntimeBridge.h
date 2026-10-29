@@ -31,8 +31,11 @@ bool ideck_wineserver_available(void);
 bool ideck_wineserver_initialize(const char *wine_prefix);
 bool ideck_wineserver_ready(void);
 bool ideck_wineserver_running(void);
+void ideck_gamepad_begin_session(void);
+void ideck_gamepad_end_session(void);
 bool ideck_wineprocess_available(void);
 bool ideck_wineprocess_running(void);
+bool ideck_wineprocess_thread_finished(void);
 bool ideck_wineprocess_request_close(void);
 // Only complete after both Wine's guest thread and its wineserver have exited.
 bool ideck_runtime_complete_session(void);

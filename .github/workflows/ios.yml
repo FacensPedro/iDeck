@@ -33,7 +33,7 @@ on:
         required: false
         default: ""
   push:
-    branches: [ "main", "fix/graceful-wine-shutdown-and-steam-library-return-20261029" ]
+    branches: [ "main", "feature/madeira-xinput-hid-restart-multiple-games-20261029" ]
     tags: [ "v*", "[0-9]*" ]
   pull_request:
     branches: [ "main" ]
@@ -273,6 +273,14 @@ jobs:
 
       - name: Test native window-level Metal display and fast Wine startup
         run: python3 -m unittest discover -s tests/host -p 'test_wine_black_screen_fast_start.py' -v
+
+      - name: Test Madeira XInput/HID controller integration and repeat Wine sessions
+        run: |
+          python3 -m unittest discover -s tests/host -p 'test_madeira_xinput_hid_restart.py' -v
+          xcrun --sdk iphoneos clang++ -std=c++20 -fobjc-arc -fsyntax-only \
+            -target arm64-apple-ios18.0 \
+            -isysroot "$(xcrun --sdk iphoneos --show-sdk-path)" \
+            iDeck/NativeRuntime/DirectInputBridge.mm
 
       - name: Test coordinated Wine shutdown and Steam library return
         run: python3 -m unittest discover -s tests/host -p 'test_wine_shutdown_library_return.py' -v

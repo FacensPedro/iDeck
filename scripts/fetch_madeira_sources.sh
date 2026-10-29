@@ -136,6 +136,22 @@ grep -Fq 'brk #0x5a5a' "$ARM64EC_SOURCE" || {
   exit 2
 }
 
+# The stock Wine worker reports g_wine_running=0 before joining wineserver,
+# and wineserver_start never clears the prior session's stop flag.
+# Both make game B fail after game A ends in the same iDeck process.
+SESSION_PATCH="$ROOT/patches/madeira-repeat-wine-sessions.patch"
+if git -C "$DEST" apply --reverse --check "$SESSION_PATCH" >/dev/null 2>&1; then
+  echo "Madeira repeat-session lifecycle patch already applied."
+else
+  git -C "$DEST" apply --check "$SESSION_PATCH" || {
+    echo "ERROR: pinned Madeira source does not match the repeat-session lifecycle patch." >&2
+    exit 2
+  }
+  git -C "$DEST" apply "$SESSION_PATCH"
+fi
+grep -Fq 'int wine_process_thread_finished(void)' "$DEST/app/Madeira/WineProcessBridge.m" || exit 2
+grep -Fq '__atomic_store_n(&g_wineserver_should_stop, 0' "$DEST/app/Madeira/WineServerBridge.m" || exit 2
+
 echo "Madeira sources checked out at $REV"
 echo "Source checkout complete. Run bash scripts/build_native_runtime.sh on macOS to compile, link and package."
 echo "Read $DEST/docs/BUILDING.md for the platform toolchains and licensed prerequisites."
