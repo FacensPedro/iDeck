@@ -61,10 +61,17 @@ class MadeiraBundleTests(unittest.TestCase):
             locale = base / "nls/locale.nls"
             locale.parent.mkdir(parents=True, exist_ok=True)
             locale.write_bytes(b"locale-fixture")
+        for base in (self.app, self.app / "MadeiraRuntime"):
+            lua = base / "compat/love/lua51.dll"
+            lua.parent.mkdir(parents=True, exist_ok=True)
+            lua.write_bytes(make_64bit_pe(0x8664))
         (self.app / "prefix-template.tar.gz").write_bytes(b"\x1f\x8b" + bytes(2048))
         (self.app / "cacert.pem").write_bytes(b"-----BEGIN CERTIFICATE-----\nfixture")
         for folder in ("legal", "licenses"):
             (self.app / folder).mkdir()
+        (self.app / "licenses/LuaJIT-MIT.txt").write_text(
+            "LuaJIT MIT license fixture", encoding="utf-8"
+        )
         for base in (self.app, self.app / "MadeiraRuntime"):
             for name in ("canary_vs.dxil", "canary_ps.dxil",
                          "canary_layout_vs.dxil", "canary_layout_ps.dxil"):
