@@ -1,7 +1,7 @@
 diff --git a/app/Madeira/WineProcessBridge.m b/app/Madeira/WineProcessBridge.m
 --- a/app/Madeira/WineProcessBridge.m
 +++ b/app/Madeira/WineProcessBridge.m
-@@ -342,6 +342,10 @@
+@@ -342,4 +342,8 @@
  volatile int g_madeira_srv_fgetpath = 0;
  static pthread_t g_wine_thread;
  static volatile int g_wine_running = 0;
