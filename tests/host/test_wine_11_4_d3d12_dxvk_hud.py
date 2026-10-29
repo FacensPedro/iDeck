@@ -20,7 +20,7 @@ class Wine114NativeD3D12AndAutomaticDXVKHUDTests(unittest.TestCase):
         self.assertIn('unsetenv("MTL_HUD_ENABLED")', GRAPHICS)
         self.assertNotIn('unsetenv("DXVK_HUD")', GRAPHICS)
         self.assertNotIn('toggleRow(title: tr("DXVK HUD")', SETTINGS)
-        self.assertIn('toggleRow(title: tr("Metal diagnostics HUD")', SETTINGS)
+        self.assertNotIn('toggleRow(title: tr("Metal diagnostics HUD")', SETTINGS)
         self.assertIn('graphicsConfig.applyGraphicsEnvironment()', ENVIRONMENT)
 
     def test_wine_11_4_is_pinned_to_the_ios_arm64ec_fork(self):
