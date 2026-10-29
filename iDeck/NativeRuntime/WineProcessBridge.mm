@@ -15,6 +15,12 @@ extern "C" bool ideck_wineprocess_running(void) {
     return running != nullptr && running() != 0;
 }
 
+extern "C" bool ideck_wineprocess_thread_finished(void) {
+    using Finished = int (*)(void);
+    auto finished = reinterpret_cast<Finished>(dlsym(RTLD_DEFAULT, "wine_process_thread_finished"));
+    return finished != nullptr && finished() != 0;
+}
+
 extern "C" int32_t ideck_wineprocess_start(const char *wine_prefix) {
     if (wine_prefix == nullptr || wine_prefix[0] == '\0') return EINVAL;
     using Start = int (*)(const char *);
