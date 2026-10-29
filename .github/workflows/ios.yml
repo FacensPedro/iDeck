@@ -64,6 +64,11 @@ jobs:
           node-version: '24'
           package-manager-cache: false
 
+      - name: Verify Node.js 24 test runtime
+        run: |
+          node --version
+          node -e 'if (Number(process.versions.node.split(".")[0]) !== 24) process.exit(2)'
+
       - name: Test Metal Toolchain bootstrap
         run: |
           bash -n scripts/ensure_metal_toolchain.sh
@@ -322,11 +327,12 @@ jobs:
     runs-on: xcode-27
     outputs:
       ipa_kind: ${{ steps.detect_ipa_kind.outputs.kind }}
-    # Native validation is required for this integration PR branch.
-    # The branch-scoped rule runs the licensed build after each PR update; release_tag remains empty.
+    # Untrusted PRs build the interface only. Main and release tags build
+    # the fully native runtime only after the owner explicitly authorizes
+    # Metal Shader Converter and third-party redistribution in Actions vars.
     env:
-      IDECK_NATIVE_BUILD: ${{ inputs.require_madeira && '1' || '0' }}
-      IDECK_ACCEPT_METAL_CONVERTER_LICENSE: ${{ inputs.accept_converter_license && '1' || '0' }}
+      IDECK_NATIVE_BUILD: ${{ ((github.event_name == 'workflow_dispatch' && inputs.require_madeira) || (github.event_name == 'push' && vars.IDECK_NATIVE_DISTRIBUTION_APPROVED == 'true')) && '1' || '0' }}
+      IDECK_ACCEPT_METAL_CONVERTER_LICENSE: ${{ ((github.event_name == 'workflow_dispatch' && inputs.accept_converter_license) || (github.event_name == 'push' && vars.IDECK_NATIVE_DISTRIBUTION_APPROVED == 'true')) && '1' || '0' }}
 
     steps:
       - name: Checkout
@@ -366,7 +372,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: build/native-cache
-          key: madeira-kit-v1-${{ runner.os }}-${{ runner.arch }}-${{ (github.event_name != 'workflow_dispatch' || inputs.build_wow64) && 'wow64' || 'no-wow64' }}-${{ inputs.bundle_wine_mono && 'mono' || 'no-mono' }}-${{ hashFiles('scripts/madeira_native_kit.py', 'scripts/build_madeira_components.sh', 'scripts/link_madeira_native.sh', 'scripts/fetch_madeira_sources.sh', 'patches/*') }}
+          key: madeira-kit-v2-${{ runner.os }}-${{ runner.arch }}-${{ (github.event_name != 'workflow_dispatch' || inputs.build_wow64) && 'wow64' || 'no-wow64' }}-${{ inputs.bundle_wine_mono && 'mono' || 'no-mono' }}-${{ hashFiles('scripts/madeira_native_kit.py', 'scripts/build_madeira_components.sh', 'scripts/build_madeira_dcomp.sh', 'scripts/build_madeira_luajit.sh', 'scripts/link_madeira_native.sh', 'scripts/fetch_madeira_sources.sh', 'build/dcomp/*', 'build/wineserver/*', 'patches/*') }}
 
       - name: Locate repository or cached Madeira runtime
         if: ${{ env.IDECK_NATIVE_BUILD == '1' }}
@@ -408,12 +414,35 @@ jobs:
         if: ${{ env.IDECK_NATIVE_BUILD == '1' && steps.madeira_kit.outputs.available != 'true' }}
         run: |
           set -euo pipefail
-          HOMEBREW_NO_AUTO_UPDATE=1 brew install cmake ninja meson bison pkg-config
+          MISSING=()
+          for pair in cmake:cmake ninja:ninja meson:meson bison:bison pkg-config:pkg-config; do
+            tool="${pair%%:*}"
+            package="${pair#*:}"
+            command -v "$tool" >/dev/null 2>&1 || MISSING+=("$package")
+          done
+          if (( ${#MISSING[@]} )); then
+            HOMEBREW_NO_AUTO_UPDATE=1 brew install "${MISSING[@]}"
+          fi
           echo "$(brew --prefix bison)/bin" >> "$GITHUB_PATH"
 
       - name: Fetch pinned Madeira with FEX, Wine and DXMT
         if: ${{ env.IDECK_NATIVE_BUILD == '1' && steps.madeira_kit.outputs.available != 'true' }}
         run: bash scripts/fetch_madeira_sources.sh
+
+      - name: Restore precompiled ARM64EC, iOS LLVM, and Wine dependencies
+        if: ${{ env.IDECK_NATIVE_BUILD == '1' && steps.madeira_kit.outputs.available != 'true' }}
+        uses: actions/cache@v5
+        with:
+          path: |
+            vendor/Madeira/toolchains/llvm-mingw-20260421-ucrt-macos-universal
+            vendor/Madeira/toolchains/llvm-ios-build
+            vendor/Madeira/toolchains/gnutls-ios
+            vendor/Madeira/toolchains/ffmpeg-ios
+            vendor/Madeira/research/freetype
+            vendor/Madeira/build/freetype-ios/build
+          key: madeira-toolchains-v1-xcode27-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/prepare_madeira_toolchains.sh', 'scripts/prepare_madeira_dependencies.sh') }}
+          restore-keys: |
+            madeira-toolchains-v1-xcode27-${{ runner.os }}-${{ runner.arch }}-
 
       - name: Prepare ARM64EC and iOS LLVM toolchains
         if: ${{ env.IDECK_NATIVE_BUILD == '1' && steps.madeira_kit.outputs.available != 'true' }}
