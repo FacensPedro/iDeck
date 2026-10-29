@@ -1,6 +1,5 @@
 #include "MadeiraStaticABI.h"
 #include "MadeiraRuntimeBridge.h"
-#include <dlfcn.h>
 #include <mutex>
 #include <sys/sysctl.h>
 #include <sys/types.h>
@@ -64,15 +63,15 @@ extern "C" bool ideck_fex_initialize(void) {
         return false;
     }
 
-    using Init = bool (*)(void);
 #if defined(IDECK_NATIVE_MADEIRA_ENABLED) && IDECK_NATIVE_MADEIRA_ENABLED
+    // The native initializer must be resolved from the real linked FEX bridge.
+    using Init = bool (*)(void);
     Init init = &fex_initialize;
-#else
-    auto init = reinterpret_cast<Init>(dlsym(RTLD_DEFAULT, "fex_initialize"));
-#endif
-    if (!init) return false;
     fex_initialized = init();
     return fex_initialized;
+#else
+    return false;
+#endif
 }
 
 // Wine's PE/ARM64EC executor uses a separate JIT pool from FEXCore's internal
