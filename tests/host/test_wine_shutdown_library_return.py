@@ -55,7 +55,8 @@ class WineCloseSessionTests(unittest.TestCase):
         self.assertIn("bool ideck_wineserver_running(void)", HEADER)
         self.assertIn('"wineserver_is_running"', SERVER)
         self.assertIn("bool ideck_runtime_complete_session(void)", HEADER)
-        self.assertIn("!lock.owns_lock() || ideck_wineprocess_running() || ideck_wineserver_running()", BRIDGE)
+        self.assertIn("!lock.owns_lock() || ideck_wineprocess_running() ||", BRIDGE)
+        self.assertIn("ideck_wineserver_running() || !ideck_wineprocess_thread_finished()", BRIDGE)
         self.assertIn("ideck_wine_session_started = false", BRIDGE)
         self.assertIn("ideck_session_stop()", BRIDGE)
         self.assertIn('"MADEIRA_STEAM_APPID"', BRIDGE)
@@ -64,7 +65,9 @@ class WineCloseSessionTests(unittest.TestCase):
 
     def test_guest_controller_observation_ends_with_session(self):
         self.assertIn("func stopBridging()", INPUT)
-        self.assertIn("NotificationCenter.default.removeObserver(controllerObserver)", INPUT)
+        self.assertIn("ideck_controller_stop()", INPUT)
+        native_input = (ROOT / "iDeck/NativeRuntime/DirectInputBridge.mm").read_text(encoding="utf-8")
+        self.assertIn("[center removeObserver:observer]", native_input)
         self.assertIn("WineInputBridge.shared.stopBridging()", SESSION)
 
 
