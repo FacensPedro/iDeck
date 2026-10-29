@@ -38,6 +38,10 @@ DCOMP_BACKPORT_SHA256 = hashlib.sha256(
     (ROOT / "build/dcomp/dcomp.c").read_bytes() +
     (ROOT / "build/dcomp/dcomp.def").read_bytes()
 ).hexdigest()
+LUAJIT_BACKPORT_SHA256 = hashlib.sha256(
+    (ROOT / "build/wineserver/luajit_compat.c").read_bytes() +
+    (ROOT / "scripts/apply_madeira_luajit_backport.py").read_bytes()
+).hexdigest()
 ARM_HOST_PROFILE_MARKER = b"ARMv8.4-A user-mode feature set"
 
 
@@ -80,7 +84,7 @@ FRAMEWORKS = (
     "VideoToolbox", "CoreMedia", "CoreVideo", "CoreFoundation", "IOKit",
     "ImageIO", "GameController", "CoreHaptics",
 )
-BASIC_FOLDERS = ("aarch64-windows", "arm64ec-windows", "nls", "d3d12", "legal", "licenses")
+BASIC_FOLDERS = ("aarch64-windows", "arm64ec-windows", "nls", "d3d12", "legal", "licenses", "compat")
 BASIC_FILES = ("prefix-template.tar.gz", "cacert.pem")
 REQUIRED_PE = (
     "arm64ec-windows/xtajit64.dll", "arm64ec-windows/ntdll.dll",
@@ -128,7 +132,8 @@ def digest_file(path: Path) -> str:
 
 def check_assets(app: Path, wow64: bool, mono: bool) -> None:
     for name in BASIC_FILES + REQUIRED_PE + (
-        "nls/locale.nls", "d3d12/libmetalirconverter.dylib",
+        "nls/locale.nls", "compat/love/lua51.dll", "licenses/LuaJIT-MIT.txt",
+        "d3d12/libmetalirconverter.dylib",
         "d3d12/canary_vs.dxil", "d3d12/canary_ps.dxil",
     ) + (WOW64_FILES if wow64 else ()) + (
         ("wine-mono/bin/libmono-2.0-x86.dll",) if mono else ()
@@ -136,7 +141,7 @@ def check_assets(app: Path, wow64: bool, mono: bool) -> None:
         file = app / name
         if not file.is_file() or file.stat().st_size == 0:
             raise KitError("Missing native runtime resource: " + str(file))
-    for name in REQUIRED_PE + (WOW64_FILES if wow64 else ()):
+    for name in REQUIRED_PE + ("compat/love/lua51.dll",) + (WOW64_FILES if wow64 else ()):
         with (app / name).open("rb") as stream:
             if stream.read(2) != b"MZ":
                 raise KitError("Not a Windows PE image: " + name)
@@ -251,6 +256,7 @@ def build_kit(output: Path, madeira: Path, bridge: Path, wow64: bool, mono: bool
                 "arm_host_feature_patch_sha256": ARM_HOST_FEATURE_PATCH_SHA256,
                 "repeat_wine_session_patch_sha256": REPEAT_WINE_SESSION_PATCH_SHA256,
                 "dcomp_backport_sha256": DCOMP_BACKPORT_SHA256,
+                "luajit_backport_sha256": LUAJIT_BACKPORT_SHA256,
                 "files": hashes}
     output.parent.mkdir(parents=True, exist_ok=True)
     temporary = output.with_suffix(".zip.part")
@@ -307,6 +313,8 @@ def inspect(archive: Path, wow64: bool, mono: bool):
             raise KitError("Repeat Wine session patch mismatch; rebuild the Madeira native kit")
         if metadata.get("dcomp_backport_sha256") != DCOMP_BACKPORT_SHA256:
             raise KitError("DirectComposition ARM64EC backport mismatch; rebuild the Madeira native kit")
+        if metadata.get("luajit_backport_sha256") != LUAJIT_BACKPORT_SHA256:
+            raise KitError("LuaJIT GC64 wineserver backport mismatch; rebuild the Madeira native kit")
         files = metadata.get("files")
         if not isinstance(files, dict) or set(names) != set(files) | {"metadata.json"}:
             raise KitError("Kit file list differs from signed inventory")
