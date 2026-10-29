@@ -29,6 +29,9 @@ ARM_HOST_FEATURE_PATCH_SHA256 = hashlib.sha256(
     (Path(__file__).resolve().parents[1] /
      "patches/madeira-arm-host-feature-probe.patch").read_bytes()
 ).hexdigest()
+REPEAT_WINE_SESSION_PATCH_SHA256 = hashlib.sha256(
+    (Path(__file__).resolve().parents[1] / "patches/madeira-repeat-wine-sessions.patch").read_bytes()
+).hexdigest()
 ARM_HOST_PROFILE_MARKER = b"ARMv8.4-A user-mode feature set"
 
 
@@ -240,6 +243,7 @@ def build_kit(output: Path, madeira: Path, bridge: Path, wow64: bool, mono: bool
                 "wine_version": WINE_VERSION, "d3d12_backend": "madeira-d3d12",
                 "arm64ec_context_patch_sha256": ARM64EC_CONTEXT_PATCH_SHA256,
                 "arm_host_feature_patch_sha256": ARM_HOST_FEATURE_PATCH_SHA256,
+                "repeat_wine_session_patch_sha256": REPEAT_WINE_SESSION_PATCH_SHA256,
                 "files": hashes}
     output.parent.mkdir(parents=True, exist_ok=True)
     temporary = output.with_suffix(".zip.part")
@@ -292,6 +296,8 @@ def inspect(archive: Path, wow64: bool, mono: bool):
             raise KitError("ARM64EC Mach context patch mismatch; rebuild the Madeira native kit")
         if metadata.get("arm_host_feature_patch_sha256") != ARM_HOST_FEATURE_PATCH_SHA256:
             raise KitError("ARM host feature patch mismatch; rebuild the Madeira native kit")
+        if metadata.get("repeat_wine_session_patch_sha256") != REPEAT_WINE_SESSION_PATCH_SHA256:
+            raise KitError("Repeat Wine session patch mismatch; rebuild the Madeira native kit")
         files = metadata.get("files")
         if not isinstance(files, dict) or set(names) != set(files) | {"metadata.json"}:
             raise KitError("Kit file list differs from signed inventory")
