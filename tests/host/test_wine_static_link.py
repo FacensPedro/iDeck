@@ -39,6 +39,7 @@ int main() {
     assert(ideck_wineprocess_start(nullptr) == EINVAL);
 #ifdef IDECK_NATIVE_MADEIRA_ENABLED
     assert(ideck_wineprocess_thread_finished());
+    assert(ideck_wineprocess_available());
     assert(ideck_wineprocess_start("/prefix") == 0);
     assert(ideck_wineprocess_running());
     assert(!ideck_wineprocess_thread_finished());
