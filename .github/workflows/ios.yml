@@ -33,7 +33,7 @@ on:
         required: false
         default: ""
   push:
-    branches: [ "main" ]
+    branches: [ "main", "feature/armv8-armv84-host-feature-probing-20261029" ]
     tags: [ "v*", "[0-9]*" ]
   pull_request:
     branches: [ "main" ]
