@@ -236,6 +236,11 @@ if [[ "$REBUILD" == "1" ]]; then
     exit 2
   }
 
+  # Replace the pinned older dcomp.dll with upstream's source-level
+  # DirectComposition composition-swapchain compatibility implementation.
+  # Validate all PE exports before staging; never substitute a stub.
+  bash "$ROOT/scripts/build_madeira_dcomp.sh"
+
 fi
 
 for file in \
