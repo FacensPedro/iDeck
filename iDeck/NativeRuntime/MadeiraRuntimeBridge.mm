@@ -58,7 +58,13 @@ extern "C" int32_t ideck_runtime_prepare(const char *wine_prefix) {
     // Upstream Madeira requires RX/RW pool environment exports before __wine_main.
     // Without these the first ARM64EC dispatcher faults on a non-executable PE page.
     if (!ideck_wine_jit_pool_prepare() || !ideck_wine_jit_pool_ready()) return ENOMEM;
-    if (!ideck_wineserver_initialize(wine_prefix)) return EAGAIN;
+    // HID devices must be published before wineserver loads its registry and
+    // enumerates Plug and Play devices, not after Wine has started.
+    ideck_gamepad_begin_session();
+    if (!ideck_wineserver_initialize(wine_prefix)) {
+        ideck_gamepad_end_session();
+        return EAGAIN;
+    }
     return 0;
 }
 
