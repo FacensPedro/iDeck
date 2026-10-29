@@ -31,7 +31,12 @@ bool debugger_attached() {
 }
 
 extern "C" bool ideck_fex_available(void) {
-    return dlsym(RTLD_DEFAULT, "fex_initialize") != nullptr;
+#if defined(IDECK_NATIVE_MADEIRA_ENABLED) && IDECK_NATIVE_MADEIRA_ENABLED
+    // The native build must resolve this strong symbol during final linking.
+    return &fex_initialize != nullptr;
+#else
+    return false;
+#endif
 }
 
 extern "C" bool ideck_jit_debugger_attached(void) {
