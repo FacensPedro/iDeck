@@ -172,6 +172,22 @@ static void sample_gamepads(void) {
     }
 }
 
+static void update_sample_timer(void) {
+    BOOL hasController = NO;
+    for (int i = 0; i < IDECK_PAD_COUNT; ++i)
+        if (g_slots[i]) { hasController = YES; break; }
+    BOOL needed = g_sessionActive && g_appActive && hasController;
+    if (!needed) {
+        if (g_sampleTimer) { dispatch_source_cancel(g_sampleTimer); g_sampleTimer = nil; }
+        return;
+    }
+    if (g_sampleTimer) return;
+    g_sampleTimer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, dispatch_get_main_queue());
+    dispatch_source_set_timer(g_sampleTimer, DISPATCH_TIME_NOW, 8 * NSEC_PER_MSEC, 2 * NSEC_PER_MSEC);
+    dispatch_source_set_event_handler(g_sampleTimer, ^{ sample_gamepads(); });
+    dispatch_resume(g_sampleTimer);
+}
+
 static void refresh_controllers(void) {
     if (!g_sessionActive) return;
     NSArray<GCController *> *all = [GCController controllers];
@@ -201,6 +217,7 @@ static void refresh_controllers(void) {
         }
     }
     sample_gamepads();
+    update_sample_timer();
 }
 
 static void begin_native_gamepads(void) {
@@ -246,7 +263,7 @@ static void begin_native_gamepads(void) {
                                                    queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *n) { refresh_controllers(); }];
         g_backgroundObserver = [center addObserverForName:UIApplicationWillResignActiveNotification object:nil
                                                    queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *n) {
-            g_appActive = NO; output_active(NO); sample_gamepads();
+            g_appActive = NO; output_active(NO); sample_gamepads(); update_sample_timer();
         }];
         g_foregroundObserver = [center addObserverForName:UIApplicationDidBecomeActiveNotification object:nil
                                                    queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *n) {
@@ -255,12 +272,6 @@ static void begin_native_gamepads(void) {
         g_observing = YES;
     }
     refresh_controllers();
-    if (!g_sampleTimer) {
-        g_sampleTimer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, dispatch_get_main_queue());
-        dispatch_source_set_timer(g_sampleTimer, DISPATCH_TIME_NOW, 8 * NSEC_PER_MSEC, 2 * NSEC_PER_MSEC);
-        dispatch_source_set_event_handler(g_sampleTimer, ^{ sample_gamepads(); });
-        dispatch_resume(g_sampleTimer);
-    }
     fprintf(stderr, "[iDeck gamepad] session started; xinput=4 hid=%d output=%d\n", g_hidEnabled, g_hasOutput);
 }
 
