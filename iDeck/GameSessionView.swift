@@ -331,6 +331,7 @@ struct GameSessionView: View {
                 Spacer()
             }
         }
+        .modifier(WineGamepadEventClaim())
         .onAppear {
             WineInputBridge.shared.startBridging()
             metrics.sample(collectPerformance: showGamePerformanceOverlay)
