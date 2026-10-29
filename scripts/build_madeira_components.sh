@@ -127,6 +127,9 @@ if [[ "$REBUILD" == "1" ]]; then
     done
     exit 1
   fi
+  # Build a pinned GC64 interpreter-only LuaJIT, then compile the iOS
+  # wineserver replacement mapper into the native static archive.
+  bash "$ROOT/scripts/build_madeira_luajit.sh"
   bash "$MD/build/wineserver/build.sh"
   bash "$MD/build/win32u-unix/build.sh"
 
