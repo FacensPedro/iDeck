@@ -435,24 +435,43 @@ jobs:
         if: ${{ env.IDECK_NATIVE_BUILD == '1' && steps.madeira_kit.outputs.available != 'true' }}
         run: bash scripts/fetch_madeira_sources.sh
 
-      - name: Restore precompiled ARM64EC, iOS LLVM, and Wine dependencies
+      - name: Restore precompiled ARM64EC and iOS LLVM toolchains
+        id: native_toolchains
         if: ${{ env.IDECK_NATIVE_BUILD == '1' && steps.madeira_kit.outputs.available != 'true' }}
-        uses: actions/cache@v5
+        uses: actions/cache/restore@v5
         with:
           path: |
             vendor/Madeira/toolchains/llvm-mingw-20260421-ucrt-macos-universal
             vendor/Madeira/toolchains/llvm-ios-build
+          key: madeira-toolchains-v2-xcode27-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/prepare_madeira_toolchains.sh') }}
+          restore-keys: |
+            madeira-toolchains-v2-xcode27-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Restore compiled Wine native prerequisites
+        if: ${{ env.IDECK_NATIVE_BUILD == '1' && steps.madeira_kit.outputs.available != 'true' }}
+        uses: actions/cache@v5
+        with:
+          path: |
             vendor/Madeira/toolchains/gnutls-ios
             vendor/Madeira/toolchains/ffmpeg-ios
             vendor/Madeira/research/freetype
             vendor/Madeira/build/freetype-ios/build
-          key: madeira-toolchains-v1-xcode27-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/prepare_madeira_toolchains.sh', 'scripts/prepare_madeira_dependencies.sh') }}
-          restore-keys: |
-            madeira-toolchains-v1-xcode27-${{ runner.os }}-${{ runner.arch }}-
+          key: madeira-deps-v1-xcode27-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/prepare_madeira_dependencies.sh') }}
 
       - name: Prepare ARM64EC and iOS LLVM toolchains
         if: ${{ env.IDECK_NATIVE_BUILD == '1' && steps.madeira_kit.outputs.available != 'true' }}
         run: bash scripts/prepare_madeira_toolchains.sh
+
+      # Save the expensive public cross-toolchains immediately. A later
+      # Wine/FEX/DXMT compile failure must not force rebuilding LLVM again.
+      - name: Save compiled ARM64EC and iOS LLVM toolchains
+        if: ${{ env.IDECK_NATIVE_BUILD == '1' && steps.madeira_kit.outputs.available != 'true' && steps.native_toolchains.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v5
+        with:
+          path: |
+            vendor/Madeira/toolchains/llvm-mingw-20260421-ucrt-macos-universal
+            vendor/Madeira/toolchains/llvm-ios-build
+          key: ${{ steps.native_toolchains.outputs.cache-primary-key }}
 
       - name: Build and package iDeck.ipa
         env:
