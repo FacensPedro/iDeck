@@ -60,11 +60,8 @@ private final class GameRuntimeMetrics: ObservableObject {
 
 struct GameSessionView: View {
     @ObservedObject var coordinator: SystemCoordinator
-    @Environment(\.presentationMode) var presentationMode
     @StateObject private var metrics = GameRuntimeMetrics()
     @AppStorage("showGamePerformanceOverlay") private var showGamePerformanceOverlay = false
-    @State private var showActiveWineAlert = false
-    @State private var closeRequested = false
     @State private var recentWineLogFinding: String?
     @State private var logCopyMessage: String?
     @State private var isCopyingWineLog = false
@@ -178,22 +175,15 @@ struct GameSessionView: View {
 
             VStack {
                 HStack(alignment: .top) {
-                    Button(action: {
-                        if ideck_wineprocess_running() {
-                            closeRequested = ideck_wineprocess_request_close()
-                            showActiveWineAlert = true
-                        } else {
-                            coordinator.setWindowsStatus("Windows Ready")
-                            presentationMode.wrappedValue.dismiss()
-                        }
-                    }) {
+                    Button(action: coordinator.requestCloseWindowsSession) {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 30))
                             .foregroundColor(.white.opacity(0.85))
                             .frame(width: 44, height: 44)
                             .padding(8)
                     }
-                    .accessibilityLabel("Close Wine session")
+                    .disabled(coordinator.isClosingWindowsSession)
+                    .accessibilityLabel("Close Wine and return to Steam library")
                     Spacer()
                     if hasWineProblem && wineLogURL != nil {
                         Button(action: copyWineLog) {
@@ -347,19 +337,21 @@ struct GameSessionView: View {
                 SteamLog.event("[steam-start] first Metal frame detected after Wine startup")
                 coordinator.setWindowsStatus("Running")
             }
+            coordinator.pollWindowsSessionClose()
             coordinator.refreshWindowsSessionHealth()
-            if closeRequested && !ideck_wineprocess_running() {
-                closeRequested = false
-                coordinator.setWindowsStatus("Windows Ready")
-                presentationMode.wrappedValue.dismiss()
-            }
         }
-        .alert("Close Wine session", isPresented: $showActiveWineAlert) {
-            Button("OK", role: .cancel) {}
+        .onDisappear {
+            WineInputBridge.shared.stopBridging()
+        }
+        .alert("Wine did not close", isPresented: Binding(
+            get: { coordinator.windowsCloseWarning != nil },
+            set: { if !$0 { coordinator.acknowledgeWindowsCloseWarning() } }
+        )) {
+            Button("Retry Close") { coordinator.retryCloseWindowsSession() }
+            Button("Keep Waiting") { coordinator.acknowledgeWindowsCloseWarning() }
+            Button("Return to Game", role: .cancel) { coordinator.cancelWindowsSessionClose() }
         } message: {
-            Text(closeRequested
-                ? "A Windows close request (Alt+F4) was sent. Save and confirm the exit inside the game. The Metal display stays attached until Wine stops."
-                : "The Wine keyboard queue is not available. Close the game using its own menu. The display stays attached while Wine runs; if it is frozen, close iDeck from the app switcher.")
+            Text(coordinator.windowsCloseWarning ?? "")
         }
     }
 }
