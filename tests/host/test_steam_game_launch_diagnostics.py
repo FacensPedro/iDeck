@@ -48,7 +48,7 @@ class SteamWebSocketBackpressureTests(unittest.TestCase):
         self.assertIn("previous.generation > viewport.generation", renderer)
         self.assertIn("fileprivate static func detachViewport(_ viewport: UIView)", renderer)
         self.assertIn("window.addSubview(host)", renderer)
-        self.assertIn("override class var layerClass: AnyClass { return CAMetalLayer.self }", renderer)
+        self.assertIn("override class var layerClass: AnyClass { CAMetalLayer.self }", renderer)
         self.assertNotIn("private final class MadeiraMetalView: MTKView", renderer)
         self.assertNotIn("view.drawableSize = target", renderer)
         runtime = (ROOT / "iDeck/NativeRuntime/MadeiraRuntimeBridge.mm").read_text(encoding="utf-8")
