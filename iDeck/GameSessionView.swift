@@ -218,6 +218,17 @@ struct GameSessionView: View {
                         .background(.black.opacity(0.8), in: RoundedRectangle(cornerRadius: 8))
                         .padding(.horizontal, 12)
                 }
+                if coordinator.isClosingWindowsSession {
+                    HStack(spacing: 10) {
+                        ProgressView()
+                        Text("Closing Wine and wineserver...")
+                            .font(.subheadline.weight(.medium))
+                    }
+                    .foregroundColor(.white)
+                    .padding(12)
+                    .background(.black.opacity(0.8), in: RoundedRectangle(cornerRadius: 10))
+                    .padding(.horizontal, 14)
+                }
                 if let loading = gameLoading {
                     VStack(alignment: .leading, spacing: 7) {
                         HStack {
