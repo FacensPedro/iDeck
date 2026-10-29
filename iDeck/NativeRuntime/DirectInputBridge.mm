@@ -52,6 +52,7 @@ static dispatch_source_t g_sampleTimer;
 static BOOL g_sessionActive = NO;
 static BOOL g_appActive = YES;
 static BOOL g_hidEnabled = NO;
+static BOOL g_xinputEnabled = YES;
 static BOOL g_hidXInput = NO;
 static BOOL g_hasOutput = NO;
 static BOOL g_observing = NO;
@@ -120,6 +121,11 @@ static uint16_t buttons_for_pad(GCExtendedGamepad *pad) {
 
 static void sample_gamepads(void) {
     if (!g_sessionActive) return;
+    if (!g_xinputEnabled) {
+        for (int i = 0; i < IDECK_PAD_COUNT; ++i) publish_pad(i, NULL);
+        publish_hid(NULL);
+        return;
+    }
     for (int i = 0; i < IDECK_PAD_COUNT; ++i) {
         GCController *controller = g_slots[i];
         GCExtendedGamepad *pad = controller.extendedGamepad;
@@ -176,7 +182,7 @@ static void update_sample_timer(void) {
     BOOL hasController = NO;
     for (int i = 0; i < IDECK_PAD_COUNT; ++i)
         if (g_slots[i]) { hasController = YES; break; }
-    BOOL needed = g_sessionActive && g_appActive && hasController;
+    BOOL needed = g_sessionActive && g_appActive && g_xinputEnabled && hasController;
     if (!needed) {
         if (g_sampleTimer) { dispatch_source_cancel(g_sampleTimer); g_sampleTimer = nil; }
         return;
@@ -233,7 +239,8 @@ static void begin_native_gamepads(void) {
                   !strcmp(getenv("MADEIRA_HIDPAD_XINPUT"), "1");
     unsetenv("MADEIRA_HIDPAD");
     unsetenv("MADEIRA_HIDPAD_NAME");
-    if (enabled && !strcmp(enabled, "0")) g_hidEnabled = NO;
+    g_xinputEnabled = !enabled || strcmp(enabled, "0") != 0;
+    if (!g_xinputEnabled) g_hidEnabled = NO;
     if (g_hidEnabled) {
         GCController *first = nil;
         for (GCController *controller in [GCController controllers]) {
@@ -300,6 +307,7 @@ static void stop_native_gamepads(void) {
     }
     publish_hid(NULL);
     g_hidEnabled = NO;
+    g_xinputEnabled = YES;
     g_hidXInput = NO;
     g_hasOutput = NO;
     unsetenv("MADEIRA_HIDPAD");
