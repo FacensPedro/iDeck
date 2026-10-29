@@ -35,6 +35,9 @@ class WineBlackScreenAndFastStartupTests(unittest.TestCase):
         self.assertIn("winios_display_mode_changed", RENDERER)
         self.assertIn("let toolbar = min(84.0, max(64.0", RENDERER)
         self.assertIn("host.frame = positioned", RENDERER)
+        self.assertIn('"winios_set_compositor_frame"', RENDERER)
+        self.assertIn('"winios_set_desktop_rect"', RENDERER)
+        self.assertIn('"winios_compositor_set_hidden"', RENDERER)
 
     def test_missing_native_renderer_fails_fast_instead_of_waiting_on_black_screen(self):
         self.assertIn("guard WindowsRendererView.isNativeDisplayLinked else {", COORDINATOR)
