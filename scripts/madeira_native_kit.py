@@ -13,6 +13,10 @@ from pathlib import Path, PurePosixPath
 
 ROOT = Path(__file__).resolve().parents[1]
 REVISION = os.environ.get("IDECK_MADEIRA_REV", "fd9f2f3d0434a4116e4c3351f286a0fc376b4e36")
+WINE_VERSION = "11.4"
+D3D12_FRONTEND = "arm64ec-windows/madeira_d3d12.dll"
+D3D12_LOADER = "arm64ec-windows/d3d12.dll"
+D3D12_CORE = "arm64ec-windows/d3d12core.dll"
 # Prebuilt kits must contain the compiled ARM64EC Mach slow-context fix.
 # Hash the EXACT native overlay. A previous binary with the same upstream
 # Madeira commit cannot be mistaken for a patched native runtime.
@@ -73,7 +77,7 @@ REQUIRED_PE = (
     "arm64ec-windows/xtajit64.dll", "arm64ec-windows/ntdll.dll",
     "arm64ec-windows/winemetal.dll", "arm64ec-windows/d3d11.dll",
     "arm64ec-windows/dxgi.dll", "arm64ec-windows/d3d12.dll",
-    "arm64ec-windows/d3d12core.dll", "aarch64-windows/winemetal.dll",
+    "arm64ec-windows/d3d12core.dll", D3D12_FRONTEND, "aarch64-windows/winemetal.dll",
     "arm64ec-windows/dcomp.dll",
     "arm64ec-windows/ktmw32.dll",
     "arm64ec-windows/faultrep.dll",
@@ -127,6 +131,11 @@ def check_assets(app: Path, wow64: bool, mono: bool) -> None:
         with (app / name).open("rb") as stream:
             if stream.read(2) != b"MZ":
                 raise KitError("Not a Windows PE image: " + name)
+    # Madeira's build-pe.sh copies the exact native frontend to the standard
+    # d3d12.dll name. The copied loader must not be silently replaced by
+    # an unrelated Wine or older D3D12 binary in a cached runtime.
+    if digest_file(app / D3D12_FRONTEND) != digest_file(app / D3D12_LOADER):
+        raise KitError("D3D12 frontend differs from madeira-d3d12.dll")
     if b"-----BEGIN CERTIFICATE-----" not in (app / "cacert.pem").read_bytes():
         raise KitError("Invalid bundled TLS trust roots")
     with (app / "prefix-template.tar.gz").open("rb") as stream:
@@ -212,6 +221,9 @@ def build_kit(output: Path, madeira: Path, bridge: Path, wow64: bool, mono: bool
     rev = subprocess.check_output(["git", "-C", str(madeira), "rev-parse", "HEAD"], text=True).strip()
     if rev != REVISION:
         raise KitError(f"Madeira revision differs: expected {REVISION}, got {rev}")
+    wine_version_file = madeira / "wine/VERSION"
+    if not wine_version_file.is_file() or wine_version_file.read_text(encoding="utf-8").strip() != "Wine version " + WINE_VERSION:
+        raise KitError("Madeira native kit requires the pinned Wine 11.4 ARM64EC/iOS source")
     native_ntdll = madeira / "app/Madeira/libntdll_unix.a"
     if not has_arm64ec_mach_return(native_ntdll):
         raise KitError("ARM64EC Mach return opcode missing from compiled Wine ntdll Unix archive")
@@ -225,6 +237,7 @@ def build_kit(output: Path, madeira: Path, bridge: Path, wow64: bool, mono: bool
               for name, path in sorted(entries.items())}
     metadata = {"schema": 1, "madeira_revision": REVISION, "platform": "iphoneos-arm64",
                 "wow64": wow64, "wine_mono": mono,
+                "wine_version": WINE_VERSION, "d3d12_backend": "madeira-d3d12",
                 "arm64ec_context_patch_sha256": ARM64EC_CONTEXT_PATCH_SHA256,
                 "arm_host_feature_patch_sha256": ARM_HOST_FEATURE_PATCH_SHA256,
                 "files": hashes}
@@ -271,6 +284,10 @@ def inspect(archive: Path, wow64: bool, mono: bool):
            metadata.get("platform") != "iphoneos-arm64" or \
            metadata.get("wow64") is not wow64 or metadata.get("wine_mono") is not mono:
             raise KitError("Kit revision/platform/options mismatch; compile a matching native kit")
+        if metadata.get("wine_version") != WINE_VERSION:
+            raise KitError("Wine 11.4 version mismatch; rebuild the Madeira native kit")
+        if metadata.get("d3d12_backend") != "madeira-d3d12":
+            raise KitError("Native madeira-d3d12 backend mismatch; rebuild the Madeira native kit")
         if metadata.get("arm64ec_context_patch_sha256") != ARM64EC_CONTEXT_PATCH_SHA256:
             raise KitError("ARM64EC Mach context patch mismatch; rebuild the Madeira native kit")
         if metadata.get("arm_host_feature_patch_sha256") != ARM_HOST_FEATURE_PATCH_SHA256:
@@ -284,6 +301,8 @@ def inspect(archive: Path, wow64: bool, mono: bool):
         for name in BASIC_FILES + REQUIRED_PE + ("d3d12/libmetalirconverter.dylib",):
             if "resources/" + name not in files:
                 raise KitError("Missing Windows payload: " + name)
+        if files["resources/" + D3D12_FRONTEND]["sha256"] != files["resources/" + D3D12_LOADER]["sha256"]:
+            raise KitError("Native D3D12 frontend and d3d12.dll hashes differ")
         if wow64:
             for name in WOW64_FILES:
                 if "resources/" + name not in files:
