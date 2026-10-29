@@ -42,6 +42,8 @@ class MadeiraNativeKitTests(unittest.TestCase):
             "resources/nls/locale.nls": b"locale",
             "resources/legal/COPYING": b"license",
             "resources/licenses/NOTICE": b"notice",
+            "resources/licenses/LuaJIT-MIT.txt": b"MIT LuaJIT license",
+            "resources/compat/love/lua51.dll": b"MZ GC64 LuaJIT",
             "resources/d3d12/libmetalirconverter.dylib": b"dummy-not-production",
             "resources/d3d12/canary_vs.dxil": b"dxil",
             "resources/d3d12/canary_ps.dxil": b"dxil",
@@ -69,6 +71,8 @@ class MadeiraNativeKitTests(unittest.TestCase):
             "arm64ec_context_patch_sha256": kit.ARM64EC_CONTEXT_PATCH_SHA256,
             "arm_host_feature_patch_sha256": kit.ARM_HOST_FEATURE_PATCH_SHA256,
             "repeat_wine_session_patch_sha256": kit.REPEAT_WINE_SESSION_PATCH_SHA256,
+            "dcomp_backport_sha256": kit.DCOMP_BACKPORT_SHA256,
+            "luajit_backport_sha256": kit.LUAJIT_BACKPORT_SHA256,
             "files": {
                 name: {
                     "sha256": hashlib.sha256(data).hexdigest(),
