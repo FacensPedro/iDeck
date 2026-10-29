@@ -28,6 +28,12 @@ for component in FEX wine dxmt; do
   [[ -e "$MD/$component/.git" ]] || { echo "ERROR: unpublished or missing Madeira $component submodule. Check upstream refs." >&2; exit 2; }
 done
 
+[[ -s "$MD/wine/VERSION" ]] &&
+[[ "$(tr -d '\r\n' < "$MD/wine/VERSION")" == "Wine version 11.4" ]] || {
+  echo "ERROR: Madeira's pinned Wine 11.4 iOS/ARM64EC fork is required." >&2
+  exit 2
+}
+
 bash "$ROOT/scripts/ensure_metal_toolchain.sh"
 
 # Validate the exact DXMT shader sources before the expensive Wine/FEX build.
@@ -225,6 +231,10 @@ if [[ "$REBUILD" == "1" ]]; then
     [[ -s "$D3D/$name" ]] || { echo "ERROR: D3D12 output missing: $name" >&2; exit 2; }
     cp "$D3D/$name" "$MD/app/Madeira/arm64ec-windows/$name"
   done
+  cmp -s "$D3D/madeira_d3d12.dll" "$D3D/d3d12.dll" || {
+    echo "ERROR: d3d12.dll is not the compiled madeira-d3d12 frontend." >&2
+    exit 2
+  }
 
 fi
 
@@ -243,6 +253,7 @@ for file in \
   "$MD/app/Madeira/arm64ec-windows/d3d10core.dll" \
   "$MD/app/Madeira/aarch64-windows/winemetal.dll" \
   "$MD/app/Madeira/prefix-template.tar.gz" \
+  "$MD/app/Madeira/arm64ec-windows/madeira_d3d12.dll" \
   "$MD/app/Madeira/arm64ec-windows/d3d12.dll" \
   "$MD/app/Madeira/arm64ec-windows/d3d12core.dll" \
   "$MD/app/Madeira/arm64ec-windows/winemetal.dll"; do

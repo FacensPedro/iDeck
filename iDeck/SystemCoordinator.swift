@@ -410,7 +410,7 @@ class SystemCoordinator: ObservableObject {
         }
     }
     
-    private func withPreparedMetalDisplay(expectedStatus: String, remainingChecks: Int = 100, perform: @escaping () -> Void) {
+    private func withPreparedMetalDisplay(expectedStatus: String, remainingChecks: Int = 80, perform: @escaping () -> Void) {
         if !Thread.isMainThread {
             DispatchQueue.main.async { [weak self] in
                 self?.withPreparedMetalDisplay(expectedStatus: expectedStatus, remainingChecks: remainingChecks, perform: perform)
@@ -418,6 +418,11 @@ class SystemCoordinator: ObservableObject {
             return
         }
         guard windowsStatus == expectedStatus else { return }
+        guard WindowsRendererView.isNativeDisplayLinked else {
+            pendingSteamGameID = nil
+            setWindowsStatus("Execution Error: this IPA has no linked Madeira Metal display backend. Install a Madeira-native build, not an interface-only IPA.")
+            return
+        }
         if WindowsRendererView.isReadyForFrames {
             perform()
             return
@@ -427,7 +432,7 @@ class SystemCoordinator: ObservableObject {
             setWindowsStatus("Execution Error: Metal display surface did not become ready. Wine was not started.")
             return
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
             self?.withPreparedMetalDisplay(expectedStatus: expectedStatus,
                                            remainingChecks: remainingChecks - 1,
                                            perform: perform)

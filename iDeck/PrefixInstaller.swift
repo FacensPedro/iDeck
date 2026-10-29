@@ -50,7 +50,7 @@ class PrefixInstaller: ObservableObject {
         }
 
         if let bundled = Bundle.main.url(forResource: "prefix-template", withExtension: "tar.gz") {
-            DispatchQueue.global(qos: .utility).async { [weak self] in
+            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
                 guard let self else { return }
                 do {
                     try TarGzExtractor.extract(

@@ -3,6 +3,7 @@ import Darwin
 
 class WindowsEnvironment {
     private var winePrefixPath: String = ""
+    private var steamRegistryInitializedPrefixes = Set<String>()
     let graphicsConfig = GraphicsConfig()
     let audioManager = AudioManager()
     let steamManager = SteamManager()
@@ -18,6 +19,7 @@ class WindowsEnvironment {
             "arm64ec-windows/gdi32.dll",
             "arm64ec-windows/d3d11.dll",
             "arm64ec-windows/dxgi.dll",
+            "arm64ec-windows/madeira_d3d12.dll",
             "arm64ec-windows/d3d12.dll",
             "arm64ec-windows/d3d12core.dll",
             "arm64ec-windows/winemetal.dll",
@@ -113,6 +115,7 @@ class WindowsEnvironment {
             "arm64ec-windows/gdi32.dll": "Wine gdi32",
             "arm64ec-windows/d3d11.dll": "DXMT D3D11",
             "arm64ec-windows/dxgi.dll": "DXMT DXGI",
+            "arm64ec-windows/madeira_d3d12.dll": "Madeira native D3D12 frontend",
             "arm64ec-windows/d3d12.dll": "D3D12 frontend",
             "arm64ec-windows/d3d12core.dll": "D3D12 core",
             "arm64ec-windows/winemetal.dll": "WineMetal ARM64EC",
@@ -178,7 +181,14 @@ class WindowsEnvironment {
         
         _ = audioManager.configureAudioSession()
         graphicsConfig.applyGraphicsEnvironment()
-        steamManager.applySteamRegistryFixes(prefixPath: prefix)
+        // This reads and may rewrite user.reg. Do it only on the first
+        // configuration of each existing prefix, not before every game.
+        if !steamRegistryInitializedPrefixes.contains(prefix) {
+            if FileManager.default.fileExists(atPath: prefix + "/user.reg") {
+                steamManager.applySteamRegistryFixes(prefixPath: prefix)
+                steamRegistryInitializedPrefixes.insert(prefix)
+            }
+        }
     }
     
     func installAndRunSteam(jitEnabler: JITEnabler, completion: @escaping (Bool) -> Void) {

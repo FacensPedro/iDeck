@@ -43,6 +43,24 @@ for dir in FEX wine dxmt; do
   }
 done
 
+# Madeira's Wine fork already contains the 11.4 iOS/ARM64EC port.
+# Never substitute vanilla Wine, since the Mach, PE/Unix and winemetal
+# integration depends on the exact pinned Madeira submodule commit.
+WINE_VERSION_FILE="$DEST/wine/VERSION"
+if [[ ! -s "$WINE_VERSION_FILE" ]] ||
+   [[ "$(tr -d '\r\n' < "$WINE_VERSION_FILE")" != "Wine version 11.4" ]]; then
+  echo "ERROR: pinned Madeira Wine must be version 11.4 (ARM64EC/iOS fork)." >&2
+  exit 2
+fi
+for source in madeira-d3d12/src/pe/madeira_d3d12.c \
+              madeira-d3d12/src/pe/d3d12core.c \
+              build/madeira-d3d12/build-pe.sh; do
+  [[ -s "$DEST/$source" ]] || {
+    echo "ERROR: pinned Madeira native D3D12 source is missing: $source" >&2
+    exit 2
+  }
+done
+
 # Pinned willfaust/dxmt invokes a private four-argument Metal atomic intrinsic.
 # Metal Toolchain 27B47 requires five arguments, and the old call fails to compile.
 # Apply the equivalent public Metal atomic operation used by upstream DXMT.
