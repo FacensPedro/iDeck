@@ -36,9 +36,15 @@ if check_metal; then
   exit 0
 fi
 
-cat "$WORK_DIR/probe.log" >&2
-echo "Installing the optional Xcode Metal Toolchain..." >&2
-xcodebuild -downloadComponent metalToolchain
+# A missing optional Metal compiler is recoverable. Do not forward its
+# expected 'error: cannot execute tool metal' into the Actions annotation
+# stream when the subsequent Xcode component download succeeds.
+echo "Metal compiler is not ready; installing the optional Xcode Metal Toolchain..." >&2
+if ! xcodebuild -downloadComponent metalToolchain; then
+  cat "$WORK_DIR/probe.log" >&2
+  echo "ERROR: failed to download the Xcode Metal Toolchain component." >&2
+  exit 1
+fi
 xcrun --kill-cache
 
 if ! check_metal; then

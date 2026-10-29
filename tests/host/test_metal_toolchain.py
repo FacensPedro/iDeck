@@ -62,6 +62,8 @@ class MetalToolchainTests(unittest.TestCase):
         result, calls = self.check_case()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(calls, ["-downloadComponent metalToolchain"])
+        self.assertNotIn("metal toolchain missing", result.stderr)
+        self.assertIn("installing the optional Xcode Metal Toolchain", result.stderr)
 
     def test_failed_download_stops_build(self):
         result, calls = self.check_case(download_fails=True)

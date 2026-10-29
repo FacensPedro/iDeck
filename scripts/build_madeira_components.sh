@@ -34,6 +34,13 @@ done
   exit 2
 }
 
+# Wine configure requires GNU Bison >= 3.0. macOS ships Bison 2.3;
+# source the preflight so the modern parser stays first on PATH for all
+# later nested Wine/FEX/DXMT build scripts, including local builds.
+if [[ "$REBUILD" == "1" ]]; then
+  source "$ROOT/scripts/ensure_madeira_bison.sh"
+fi
+
 bash "$ROOT/scripts/ensure_metal_toolchain.sh"
 
 # Validate the exact DXMT shader sources before the expensive Wine/FEX build.
