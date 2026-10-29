@@ -77,7 +77,10 @@ struct MainView: View {
                 coordinator.windowsStatus.hasPrefix("Execution Error:")
             },
             set: { presented in
-                if !presented { coordinator.requestCloseWindowsSession() }
+                if !presented && coordinator.windowsStatus != "Windows Ready" &&
+                   coordinator.windowsStatus != "Closing Windows session..." {
+                    coordinator.requestCloseWindowsSession()
+                }
             }
         )) {
             GameSessionView(coordinator: coordinator)
