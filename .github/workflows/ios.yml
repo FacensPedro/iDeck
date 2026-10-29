@@ -123,6 +123,11 @@ jobs:
       - name: Test app cold-start isolation and crash-recovery entry
         run: python3 -m unittest discover -s tests/host -p 'test_launch_startup_isolation.py' -v
 
+      - name: Test GNU Bison Wine build preflight
+        run: |
+          bash -n scripts/ensure_madeira_bison.sh
+          python3 -m unittest discover -s tests/host -p 'test_madeira_bison_preflight.py' -v
+
       - name: Test FEX iOS allocator archive preparation
         run: |
           bash -n scripts/build_fex_ios_allocator.sh
@@ -421,7 +426,7 @@ jobs:
         run: |
           set -euo pipefail
           MISSING=()
-          for pair in cmake:cmake ninja:ninja meson:meson bison:bison pkg-config:pkg-config; do
+          for pair in cmake:cmake ninja:ninja meson:meson pkg-config:pkg-config; do
             tool="${pair%%:*}"
             package="${pair#*:}"
             command -v "$tool" >/dev/null 2>&1 || MISSING+=("$package")
@@ -429,7 +434,17 @@ jobs:
           if (( ${#MISSING[@]} )); then
             HOMEBREW_NO_AUTO_UPDATE=1 brew install "${MISSING[@]}"
           fi
-          echo "$(brew --prefix bison)/bin" >> "$GITHUB_PATH"
+          # The system bison exists on macOS but is 2.3 (not Wine-compatible).
+          # This step tests the version, installs Homebrew Bison 3+, and
+          # persists its bin directory to PATH for all later Actions steps.
+          bash scripts/ensure_madeira_bison.sh
+
+      - name: Verify Wine parser prerequisites before compiling LLVM
+        if: ${{ env.IDECK_NATIVE_BUILD == '1' && steps.madeira_kit.outputs.available != 'true' }}
+        run: |
+          set -euo pipefail
+          bash scripts/ensure_madeira_bison.sh
+          bison --version | head -n 1
 
       - name: Fetch pinned Madeira with FEX, Wine and DXMT
         if: ${{ env.IDECK_NATIVE_BUILD == '1' && steps.madeira_kit.outputs.available != 'true' }}
