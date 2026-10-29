@@ -50,12 +50,11 @@ class SteamIPRoutingTests(unittest.TestCase):
         self.assertIn("let attempts = attemptsPerChunk", DEPOT)
 
     def test_jit_pool_retries_are_bounded_and_debugger_protected(self):
-        self.assertIn("384ULL * MiB", FEX)
-        self.assertIn("256ULL * MiB", FEX)
-        self.assertIn("192ULL * MiB", FEX)
-        self.assertIn("128ULL * MiB", FEX)
-        self.assertIn("96ULL * MiB", FEX)
-        self.assertIn("64ULL * MiB", FEX)
+        self.assertIn("constexpr size_t allowed[] = {384, 256, 192, 128, 96, 64}", FEX)
+        self.assertIn('sysctlbyname("hw.memsize"', FEX)
+        self.assertIn("if (candidate <= preferred) sizes.push_back(candidate * MiB);", FEX)
+        self.assertIn("for (size_t size : wine_pool_candidates())", FEX)
+        self.assertIn('getenv("IDECK_WINE_JIT_MIB")', FEX)
         self.assertIn('if (!debugger_attached())', FEX)
         self.assertIn('vm_remap(mach_task_self()', FEX)
         self.assertIn("vm_deallocate(mach_task_self()", FEX)

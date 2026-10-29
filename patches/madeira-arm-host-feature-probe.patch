@@ -1,0 +1,153 @@
+diff --git a/app/Madeira/FEXBridge.mm b/app/Madeira/FEXBridge.mm
+--- a/app/Madeira/FEXBridge.mm
++++ b/app/Madeira/FEXBridge.mm
+@@ -22,6 +22,7 @@
+ #include <FEXCore/Utils/DualMap.h>
+ #include <FEXCore/Utils/LogManager.h>
+ 
++#include "iDeckARMHostFeatures.h"
+ #include <mach/mach.h>
+ #include <mach/vm_map.h>
+ #include <sys/mman.h>
+@@ -427,27 +428,32 @@
+         return false;
+     }
+ 
+-    // Step 5: Create HostFeatures for Apple A15 (iPhone 13 Pro)
+-    fex_log("  Creating HostFeatures...");
+-    FEXCore::HostFeatures Features{};
+-    Features.DCacheLineSize = 64;
+-    Features.ICacheLineSize = 64;
+-    Features.SupportsCacheMaintenanceOps = true;
+-    Features.SupportsAES = true;
+-    Features.SupportsCRC = true;
+-    Features.SupportsAtomics = true;  // ARMv8.1 LSE
+-    Features.SupportsRCPC = true;     // ARMv8.3 RCPC
+-    Features.SupportsTSOImm9 = true;  // RCPC2
+-    Features.SupportsSHA = true;
+-    Features.SupportsPMULL_128Bit = true;
+-    Features.SupportsFCMA = true;
+-    Features.SupportsFlagM = true;
+-    Features.SupportsFlagM2 = true;
+-    Features.SupportsAVX = false;     // No SVE on A15
+-    Features.SupportsSVE128 = false;
+-    Features.SupportsSVE256 = false;
+-    // A15 has 6 performance + 2 efficiency cores
+-    Features.CPUMIDRs.resize(8, 0x611F0250); // A15 Firestorm MIDR (approximate)
++    // Discover the actual Apple ARM user-mode instructions at runtime.
++    // Never force A15-only features or a fabricated CPU topology on other devices.
++    const IDeckARMHostProfile Host = ideck_arm_probe_system();
++    fex_log("  ARM profile: %s (%u logical CPUs), FlagM=%d DotProd=%d RCPC2=%d",
++            Host.armv84_user_profile ? "ARMv8.4-A user-mode feature set" :
++                                       "ARMv8-A compatible / partial extensions",
++            Host.logical_cores, Host.flagm, Host.dotprod, Host.rcpc2);
++    FEXCore::HostFeatures Features{};
++    Features.DCacheLineSize = 64;
++    Features.ICacheLineSize = 64;
++    Features.SupportsCacheMaintenanceOps = true;
++    Features.SupportsAES = Host.aes;
++    Features.SupportsCRC = Host.crc;
++    Features.SupportsAtomics = Host.lse;
++    Features.SupportsRCPC = Host.rcpc;
++    Features.SupportsTSOImm9 = Host.rcpc2;
++    Features.SupportsSHA = Host.sha1 && Host.sha256;
++    Features.SupportsPMULL_128Bit = Host.pmull;
++    Features.SupportsFCMA = Host.fcma;
++    Features.SupportsFlagM = Host.flagm;
++    Features.SupportsFlagM2 = Host.flagm2;
++    Features.SupportsAVX = false;
++    Features.SupportsSVE128 = false;
++    Features.SupportsSVE256 = false;
++    // An unknown MIDR is safer than spoofing an Apple A15/Firestorm model.
++    Features.CPUMIDRs.resize(Host.logical_cores, 0);
+ 
+     fex_log("Creating FEXCore context...");
+ 
+diff --git a/app/Madeira/iDeckARMHostFeatures.h b/app/Madeira/iDeckARMHostFeatures.h
+new file mode 100644
+--- /dev/null
++++ b/app/Madeira/iDeckARMHostFeatures.h
+@@ -0,0 +1,83 @@
++#ifndef IDECK_MADEIRA_ARM_HOST_FEATURES_H
++#define IDECK_MADEIRA_ARM_HOST_FEATURES_H
++
++#include <stdbool.h>
++#include <stddef.h>
++#include <stdint.h>
++#include <string.h>
++#if defined(__APPLE__)
++#include <sys/sysctl.h>
++#endif
++
++typedef int (*IDeckARMFeatureReader)(const char *key, void *value, size_t *size);
++
++typedef struct {
++    bool aes;
++    bool crc;
++    bool lse;
++    bool rcpc;
++    bool rcpc2;
++    bool sha1;
++    bool sha256;
++    bool pmull;
++    bool fcma;
++    bool flagm;
++    bool flagm2;
++    bool dotprod;
++    bool fhm;
++    bool fp16;
++    bool dit;
++    bool lse2;
++    bool armv84_user_profile;
++    unsigned logical_cores;
++} IDeckARMHostProfile;
++
++static inline bool ideck_arm_query_flag(IDeckARMFeatureReader reader, const char *key) {
++    int value = 0;
++    size_t size = sizeof(value);
++    return reader && reader(key, &value, &size) == 0 &&
++           size == sizeof(value) && value == 1;
++}
++
++static inline IDeckARMHostProfile ideck_arm_probe(IDeckARMFeatureReader reader) {
++    IDeckARMHostProfile p = {0};
++    p.logical_cores = 1;
++    if (!reader) return p;
++    p.aes = ideck_arm_query_flag(reader, "hw.optional.arm.FEAT_AES");
++    p.crc = ideck_arm_query_flag(reader, "hw.optional.armv8_crc32");
++    p.lse = ideck_arm_query_flag(reader, "hw.optional.arm.FEAT_LSE");
++    p.rcpc = ideck_arm_query_flag(reader, "hw.optional.arm.FEAT_LRCPC");
++    p.rcpc2 = p.rcpc && ideck_arm_query_flag(reader, "hw.optional.arm.FEAT_LRCPC2");
++    p.sha1 = ideck_arm_query_flag(reader, "hw.optional.arm.FEAT_SHA1");
++    p.sha256 = ideck_arm_query_flag(reader, "hw.optional.arm.FEAT_SHA256");
++    p.pmull = ideck_arm_query_flag(reader, "hw.optional.arm.FEAT_PMULL");
++    p.fcma = ideck_arm_query_flag(reader, "hw.optional.arm.FEAT_FCMA");
++    p.flagm = ideck_arm_query_flag(reader, "hw.optional.arm.FEAT_FlagM");
++    p.flagm2 = p.flagm && ideck_arm_query_flag(reader, "hw.optional.arm.FEAT_FlagM2");
++    p.dotprod = ideck_arm_query_flag(reader, "hw.optional.arm.FEAT_DotProd");
++    p.fp16 = ideck_arm_query_flag(reader, "hw.optional.arm.FEAT_FP16");
++    p.fhm = ideck_arm_query_flag(reader, "hw.optional.arm.FEAT_FHM");
++    p.dit = ideck_arm_query_flag(reader, "hw.optional.arm.FEAT_DIT");
++    p.lse2 = ideck_arm_query_flag(reader, "hw.optional.arm.FEAT_LSE2");
++    // This is a user-mode capability profile, not proof of full architectural
++    // conformance (privileged IDST, translation-table features, etc.).
++    p.armv84_user_profile = p.flagm && p.rcpc2 && p.dotprod &&
++                            p.dit && p.lse2 && (!p.fp16 || p.fhm);
++    int cores = 0;
++    size_t length = sizeof(cores);
++    if (reader("hw.ncpu", &cores, &length) == 0 &&
++        length == sizeof(cores) && cores >= 1 && cores <= 64)
++        p.logical_cores = (unsigned)cores;
++    return p;
++}
++
++#if defined(__APPLE__)
++static inline int ideck_arm_system_sysctl(const char *key, void *value, size_t *size) {
++    return sysctlbyname(key, value, size, NULL, 0);
++}
++static inline IDeckARMHostProfile ideck_arm_probe_system(void) {
++    return ideck_arm_probe(ideck_arm_system_sysctl);
++}
++#endif
++
++#endif

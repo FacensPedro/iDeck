@@ -31,7 +31,8 @@ class MadeiraNativeKitTests(unittest.TestCase):
     def entries(self, wow64=False, mono=False):
         data = {
             "archives/" + name: b"!<arch>\n" + name.encode() + (
-                kit.ARM64EC_MACH_RETURN_BYTES if name == "libntdll_unix.a" else b""
+                kit.ARM64EC_MACH_RETURN_BYTES if name == "libntdll_unix.a" else
+                kit.ARM_HOST_PROFILE_MARKER if name == kit.ARCHIVES[0] else b""
             )
             for name in kit.ARCHIVES
         }
@@ -63,6 +64,7 @@ class MadeiraNativeKitTests(unittest.TestCase):
             "wow64": wow64,
             "wine_mono": mono,
             "arm64ec_context_patch_sha256": kit.ARM64EC_CONTEXT_PATCH_SHA256,
+            "arm_host_feature_patch_sha256": kit.ARM_HOST_FEATURE_PATCH_SHA256,
             "files": {
                 name: {
                     "sha256": hashlib.sha256(data).hexdigest(),
@@ -148,6 +150,26 @@ class MadeiraNativeKitTests(unittest.TestCase):
         with self.assertRaisesRegex(kit.KitError, "ARM64EC Mach context patch mismatch"):
             kit.inspect(path, False, False)
 
+    def test_rejects_old_fex_host_probe_kit(self):
+        entries = self.entries()
+        entries["archives/" + kit.ARCHIVES[0]] = b"!<arch>\\nlegacy-Apple-A15"
+        path = self.save(entries)
+        with self.assertRaisesRegex(kit.KitError, "ARM host feature probe missing"):
+            kit.install(path, self.root / "legacy-fex", False, False)
+
+    def test_rejects_wrong_arm_host_patch_hash(self):
+        path = self.save(self.entries())
+        with zipfile.ZipFile(path) as archive:
+            metadata = json.loads(archive.read("metadata.json"))
+            files = {name: archive.read(name) for name in archive.namelist() if name != "metadata.json"}
+        metadata["arm_host_feature_patch_sha256"] = "0" * 64
+        with zipfile.ZipFile(path, "w") as archive:
+            archive.writestr("metadata.json", json.dumps(metadata))
+            for name, data in files.items():
+                archive.writestr(name, data)
+        with self.assertRaisesRegex(kit.KitError, "ARM host feature patch mismatch"):
+            kit.inspect(path, False, False)
+
     def test_rejects_revision_mismatch(self):
         path = self.save(self.entries(), revision="0" * 40)
         with self.assertRaisesRegex(kit.KitError, "revision/platform/options mismatch"):
@@ -170,7 +192,8 @@ class MadeiraNativeKitTests(unittest.TestCase):
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(
                 b"!<arch>\n" + name.encode() +
-                (kit.ARM64EC_MACH_RETURN_BYTES if name == "libntdll_unix.a" else b"")
+                (kit.ARM64EC_MACH_RETURN_BYTES if name == "libntdll_unix.a" else
+                 kit.ARM_HOST_PROFILE_MARKER if name == kit.ARCHIVES[0] else b"")
             )
 
         for wow64 in (False, True):
@@ -216,7 +239,8 @@ class MadeiraNativeKitTests(unittest.TestCase):
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(
                 b"!<arch>\n" + name.encode() +
-                (kit.ARM64EC_MACH_RETURN_BYTES if name == "libntdll_unix.a" else b"")
+                (kit.ARM64EC_MACH_RETURN_BYTES if name == "libntdll_unix.a" else
+                 kit.ARM_HOST_PROFILE_MARKER if name == kit.ARCHIVES[0] else b"")
             )
         with mock.patch.object(kit.subprocess, "check_output", return_value=kit.REVISION + "\n"):
             output = self.root / "built.zip"
