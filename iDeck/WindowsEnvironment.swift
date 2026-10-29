@@ -3,6 +3,7 @@ import Darwin
 
 class WindowsEnvironment {
     private var winePrefixPath: String = ""
+    private var steamRegistryInitializedPrefixes = Set<String>()
     let graphicsConfig = GraphicsConfig()
     let audioManager = AudioManager()
     let steamManager = SteamManager()
@@ -180,7 +181,14 @@ class WindowsEnvironment {
         
         _ = audioManager.configureAudioSession()
         graphicsConfig.applyGraphicsEnvironment()
-        steamManager.applySteamRegistryFixes(prefixPath: prefix)
+        // This reads and may rewrite user.reg. Do it only on the first
+        // configuration of each existing prefix, not before every game.
+        if !steamRegistryInitializedPrefixes.contains(prefix) {
+            if FileManager.default.fileExists(atPath: prefix + "/user.reg") {
+                steamManager.applySteamRegistryFixes(prefixPath: prefix)
+                steamRegistryInitializedPrefixes.insert(prefix)
+            }
+        }
     }
     
     func installAndRunSteam(jitEnabler: JITEnabler, completion: @escaping (Bool) -> Void) {
