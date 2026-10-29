@@ -319,6 +319,12 @@ jobs:
       - name: Test automated GitHub Release activation and runtime safety
         run: python3 -m unittest discover -s tests/host -p 'test_automatic_ipa_release.py' -v
 
+      - name: Test Node.js 24, Madeira LuaJIT/DirectComposition, and graphics source backports
+        run: |
+          python3 -m unittest discover -s tests/host -p 'test_madeira_vulkan_gl_luajit_backports.py' -v
+          bash -n scripts/build_madeira_dcomp.sh
+          bash -n scripts/build_madeira_luajit.sh
+
       - name: Test fast direct IPA packaging
         run: python3 -m unittest discover -s tests/host -p 'test_fast_ipa_packaging.py' -v
 
