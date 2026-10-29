@@ -81,6 +81,9 @@ struct WindowsRendererView: UIViewRepresentable {
 
     private typealias SetMetalLayer = @convention(c) (UnsafeMutableRawPointer?) -> Void
     private typealias DisplayModeChanged = @convention(c) (Int32, Int32) -> Void
+    private typealias SetCompositorFrame = @convention(c) (Double, Double, Double, Double) -> Void
+    private typealias SetDesktopRect = @convention(c) (Double, Double, Double, Double, Int32) -> Void
+    private typealias ShowCompositor = @convention(c) (Int32) -> Int32
 
     fileprivate static func attachViewport(_ viewport: MadeiraMetalViewport) {
         guard isNativeDisplayLinked, let window = viewport.window else { return }
@@ -92,6 +95,11 @@ struct WindowsRendererView: UIViewRepresentable {
             lastGuestSize = nil
         }
         activeViewport = viewport
+        if let symbol = dlsym(UnsafeMutableRawPointer(bitPattern: -2),
+                              "winios_compositor_set_hidden") {
+            let show = unsafeBitCast(symbol, to: ShowCompositor.self)
+            _ = show(0)
+        }
         let host = MadeiraWindowMetalHost.shared
         guard host.metalLayer.device != nil else { return }
         if host.superview !== window {
@@ -133,6 +141,21 @@ struct WindowsRendererView: UIViewRepresentable {
                                 width: frame.width, height: max(1, frame.height - toolbar))
         if host.frame != positioned {
             host.frame = positioned
+            // Madeira's GDI/Win32 compositor is a separate window-level
+            // surface. Without these coordinates Wine desktop/UI windows can
+            // render outside the guest viewport while DXMT frames are visible.
+            if let symbol = dlsym(UnsafeMutableRawPointer(bitPattern: -2),
+                                  "winios_set_compositor_frame") {
+                let setFrame = unsafeBitCast(symbol, to: SetCompositorFrame.self)
+                setFrame(Double(frame.minX), Double(frame.minY),
+                         Double(frame.width), Double(frame.height))
+            }
+            if let symbol = dlsym(UnsafeMutableRawPointer(bitPattern: -2),
+                                  "winios_set_desktop_rect") {
+                let setDesktop = unsafeBitCast(symbol, to: SetDesktopRect.self)
+                setDesktop(0, Double(toolbar), Double(positioned.width),
+                           Double(positioned.height), 1)
+            }
         }
         // Do NOT write host.metalLayer.drawableSize here. Upstream DXMT owns
         // the drawable dimensions; a second writer causes black frames.
@@ -145,6 +168,11 @@ struct WindowsRendererView: UIViewRepresentable {
         // Keep the persistent layer object alive for DXMT's cached
         // swapchain pointer, but remove its window overlay on dismissal.
         MadeiraWindowMetalHost.shared.removeFromSuperview()
+        if let symbol = dlsym(UnsafeMutableRawPointer(bitPattern: -2),
+                              "winios_compositor_set_hidden") {
+            let hide = unsafeBitCast(symbol, to: ShowCompositor.self)
+            _ = hide(1)
+        }
     }
 
     func makeUIView(context: Context) -> UIView {
