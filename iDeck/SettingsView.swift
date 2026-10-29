@@ -9,6 +9,7 @@ struct SettingsView: View {
     @AppStorage("controllerLeftSensitivity") private var controllerLeftSensitivity = 1.0
     @AppStorage("controllerRightSensitivity") private var controllerRightSensitivity = 1.0
     @AppStorage("controllerDeadzone") private var controllerDeadzone = 0.10
+    @AppStorage("showGamePerformanceOverlay") private var showGamePerformanceOverlay = false
     @StateObject private var updater = UpdateChecker()
     @State private var isSteamSignInPresented = false
     @AppStorage(AppLanguage.storageKey) private var appLanguage = AppLanguage.system.rawValue
@@ -82,6 +83,7 @@ struct SettingsView: View {
                             toggleRow(title: tr("MetalFX Upscaling"), isOn: $coordinator.isMetalFXEnabled)
                             toggleRow(title: tr("Hold Display at Maximum Rate"), isOn: $coordinator.isMaxRefreshRateEnabled)
                             toggleRow(title: tr("DXVK HUD"), isOn: $coordinator.isHUDEnabled)
+                            toggleRow(title: tr("Show FPS, CPU & GPU overlay"), isOn: $showGamePerformanceOverlay)
                             toggleRow(title: tr("D3DMetal Rendering"), isOn: $coordinator.isD3DMetalEnabled)
                             Text(tr("Graphics changes apply when you launch the next game."))
                                 .font(.caption)
@@ -155,13 +157,6 @@ struct SettingsView: View {
                     Spacer()
                     Text(coordinator.isStikDebugAttached ? tr("Attached") : tr("Detached"))
                         .foregroundColor(coordinator.isStikDebugAttached ? .green : .orange)
-                }
-                .font(.caption)
-                HStack {
-                    Text(tr("Wine JIT pool")).foregroundColor(.white)
-                    Spacer()
-                    Text(coordinator.isWineJITPrepared ? tr("Prepared") : tr("Not prepared"))
-                        .foregroundColor(coordinator.isWineJITPrepared ? .green : .orange)
                 }
                 .font(.caption)
             }
@@ -249,16 +244,6 @@ struct SettingsView: View {
             actionButton(title: tr("Update iDeck %@", update.latest ?? ""), icon: "arrow.down.circle.fill") {
                 updater.installIDeckUpdate()
             }
-        } else if updater.hasChecked {
-            Text(tr(updater.statuses.first(where: { $0.project.id == UpdateChecker.ideck.id })?.failed == true
-                ? "Could not check iDeck releases. Try again."
-                : "No newer iDeck IPA release is available."))
-                .font(.caption)
-                .foregroundColor(.gray)
-                .padding(.horizontal, 16)
-        }
-        actionButton(title: tr("Open iDeck releases"), icon: "arrow.up.right.square") {
-            updater.openIDeckReleases()
         }
         if let message = updater.installHandoffMessage {
             Text(tr(message))
@@ -267,11 +252,6 @@ struct SettingsView: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, 16)
         }
-        Text(tr("iPadOS requires a signed IPA installation through SideStore, AltStore or another compatible installer. iDeck cannot replace its own app binary. Keep the same app identifier and signing identity to preserve existing app data when supported."))
-            .font(.caption)
-            .foregroundColor(.gray)
-            .fixedSize(horizontal: false, vertical: true)
-            .padding(.horizontal, 16)
     }
     
     /// iDeck shows the installed version; the other projects show the newest release that has an IPA.
