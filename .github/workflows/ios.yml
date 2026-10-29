@@ -33,10 +33,10 @@ on:
         required: false
         default: ""
   push:
-    branches: [ "main", "feature/armv8-armv84-host-feature-probing-20261029" ]
+    branches: [ "main", "feature/wine-11-4-madeira-d3d12-auto-dxvk-hud-20261029" ]
     tags: [ "v*", "[0-9]*" ]
   pull_request:
-    branches: [ "main", "feature/wine-11-4-madeira-d3d12-auto-dxvk-hud-20261029" ]
+    branches: [ "main" ]
 
 permissions:
   contents: write
