@@ -58,6 +58,13 @@ for path in aarch64-windows/d3d11.dll aarch64-windows/dxgi.dll \
   }
 done
 
+# The native ARM64EC D3D12 frontend must be identical to the standard
+# d3d12.dll entry point that Windows games resolve through Wine.
+cmp -s "$APP/arm64ec-windows/madeira_d3d12.dll" "$APP/arm64ec-windows/d3d12.dll" || {
+  echo "ERROR: bundled D3D12 is not the Madeira native D3D12 frontend." >&2
+  exit 2
+}
+
 # Windows-side IPA signers enumerate bundle entries through APIs that cannot
 # reliably inspect Unix symlinks. Package physical directories in the native
 # runtime mirror, preserving the original top-level paths used by Madeira.
