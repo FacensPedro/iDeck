@@ -10,7 +10,7 @@ diff --git a/app/Madeira/WineProcessBridge.m b/app/Madeira/WineProcessBridge.m
 +static int g_wine_thread_finished = 1;
 +int wine_process_thread_finished(void) { return __atomic_load_n(&g_wine_thread_finished, __ATOMIC_ACQUIRE); }
  /* madeira-bcd: the server's per-launch switches (fd_ios.c, request_ios.c; ntdll's
-@@ -2077,6 +2081,7 @@
+@@ -2077,5 +2081,6 @@
              *(void **)(tsd_base + 275 * 8) = NULL;
          }
      }
@@ -28,21 +28,21 @@ diff --git a/app/Madeira/WineProcessBridge.m b/app/Madeira/WineProcessBridge.m
 +    }
  
      if (g_prefix_path) free(g_prefix_path);
-@@ -2091,7 +2100,8 @@
+@@ -2091,5 +2100,6 @@
      LOG("Starting Wine process with prefix: %{public}s", prefix_path);
  
      g_wine_running = 1;
 +    __atomic_store_n(&g_wine_thread_finished, 0, __ATOMIC_RELEASE);
  
      // Create socketpair to bypass broken iOS UDS accept()
-@@ -2100,6 +2110,7 @@
+@@ -2100,5 +2110,6 @@
      if (socketpair(AF_UNIX, SOCK_STREAM, 0, pair) == -1) {
          LOG("socketpair failed: %{public}s", strerror(errno));
          g_wine_running = 0;
 +        __atomic_store_n(&g_wine_thread_finished, 1, __ATOMIC_RELEASE);
          return -1;
      }
-@@ -2130,6 +2141,7 @@
+@@ -2130,5 +2141,6 @@
          close(pair[0]);
          close(pair[1]);
          g_wine_running = 0;
@@ -52,7 +52,7 @@ diff --git a/app/Madeira/WineProcessBridge.m b/app/Madeira/WineProcessBridge.m
 diff --git a/app/Madeira/WineServerBridge.m b/app/Madeira/WineServerBridge.m
 --- a/app/Madeira/WineServerBridge.m
 +++ b/app/Madeira/WineServerBridge.m
-@@ -154,6 +154,9 @@
+@@ -154,5 +154,8 @@
      {
          extern int wineserver_ready;
          __atomic_store_n(&wineserver_ready, 0, __ATOMIC_RELEASE);
