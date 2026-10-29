@@ -88,6 +88,9 @@ struct WindowsRendererView: UIViewRepresentable {
            previous.window != nil && previous.generation > viewport.generation {
             return
         }
+        if activeViewport !== viewport {
+            lastGuestSize = nil
+        }
         activeViewport = viewport
         let host = MadeiraWindowMetalHost.shared
         guard host.metalLayer.device != nil else { return }
@@ -138,6 +141,7 @@ struct WindowsRendererView: UIViewRepresentable {
     fileprivate static func detachViewport(_ viewport: UIView) {
         guard activeViewport === viewport else { return }
         activeViewport = nil
+        lastGuestSize = nil
         // Keep the persistent layer object alive for DXMT's cached
         // swapchain pointer, but remove its window overlay on dismissal.
         MadeiraWindowMetalHost.shared.removeFromSuperview()
