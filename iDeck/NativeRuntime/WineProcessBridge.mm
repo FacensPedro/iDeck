@@ -6,8 +6,11 @@
 #include <climits>
 
 extern "C" bool ideck_wineprocess_available(void) {
-    return dlsym(RTLD_DEFAULT, "wine_process_start") != nullptr &&
-           dlsym(RTLD_DEFAULT, "wine_process_is_running") != nullptr;
+#if defined(IDECK_NATIVE_MADEIRA_ENABLED) && IDECK_NATIVE_MADEIRA_ENABLED
+    return &wine_process_start != nullptr && &wine_process_is_running != nullptr;
+#else
+    return false;
+#endif
 }
 
 extern "C" bool ideck_wineprocess_running(void) {
