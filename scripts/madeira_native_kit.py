@@ -32,6 +32,12 @@ ARM_HOST_FEATURE_PATCH_SHA256 = hashlib.sha256(
 REPEAT_WINE_SESSION_PATCH_SHA256 = hashlib.sha256(
     (Path(__file__).resolve().parents[1] / "patches/madeira-repeat-wine-sessions.patch").read_bytes()
 ).hexdigest()
+# A native kit compiled before the new PE DirectComposition backport is not
+# interchangeable with one containing the corrected composition swapchains.
+DCOMP_BACKPORT_SHA256 = hashlib.sha256(
+    (ROOT / "build/dcomp/dcomp.c").read_bytes() +
+    (ROOT / "build/dcomp/dcomp.def").read_bytes()
+).hexdigest()
 ARM_HOST_PROFILE_MARKER = b"ARMv8.4-A user-mode feature set"
 
 
@@ -244,6 +250,7 @@ def build_kit(output: Path, madeira: Path, bridge: Path, wow64: bool, mono: bool
                 "arm64ec_context_patch_sha256": ARM64EC_CONTEXT_PATCH_SHA256,
                 "arm_host_feature_patch_sha256": ARM_HOST_FEATURE_PATCH_SHA256,
                 "repeat_wine_session_patch_sha256": REPEAT_WINE_SESSION_PATCH_SHA256,
+                "dcomp_backport_sha256": DCOMP_BACKPORT_SHA256,
                 "files": hashes}
     output.parent.mkdir(parents=True, exist_ok=True)
     temporary = output.with_suffix(".zip.part")
@@ -298,6 +305,8 @@ def inspect(archive: Path, wow64: bool, mono: bool):
             raise KitError("ARM host feature patch mismatch; rebuild the Madeira native kit")
         if metadata.get("repeat_wine_session_patch_sha256") != REPEAT_WINE_SESSION_PATCH_SHA256:
             raise KitError("Repeat Wine session patch mismatch; rebuild the Madeira native kit")
+        if metadata.get("dcomp_backport_sha256") != DCOMP_BACKPORT_SHA256:
+            raise KitError("DirectComposition ARM64EC backport mismatch; rebuild the Madeira native kit")
         files = metadata.get("files")
         if not isinstance(files, dict) or set(names) != set(files) | {"metadata.json"}:
             raise KitError("Kit file list differs from signed inventory")
