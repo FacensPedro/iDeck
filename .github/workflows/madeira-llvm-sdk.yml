@@ -1,0 +1,84 @@
+name: Madeira LLVM iOS SDK preflight
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/madeira-llvm-sdk.yml
+      - scripts/llvm_ios_sdk.py
+      - scripts/prepare_madeira_toolchains.sh
+      - scripts/verify_dxmt_llvm.sh
+      - tests/host/test_llvm_ios_sdk.py
+
+permissions:
+  contents: read
+
+jobs:
+  llvm-ios-sdk:
+    name: Build and validate real LLVM 15 iPhoneOS SDK
+    runs-on: xcode-27
+    timeout-minutes: 120
+    steps:
+      - name: Checkout iDeck
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Select Xcode with iPhoneOS SDK
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Validate SDK contract with host tests
+        run: python3 -m unittest discover -s tests/host -p test_llvm_ios_sdk.py -v
+
+      - name: Install public build prerequisites
+        run: |
+          set -euo pipefail
+          missing=()
+          for tool in cmake ninja; do
+            command -v "$tool" >/dev/null 2>&1 || missing+=("$tool")
+          done
+          if (( ${#missing[@]} )); then
+            HOMEBREW_NO_AUTO_UPDATE=1 brew install "${missing[@]}"
+          fi
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-version
+
+      - name: Fetch exact Madeira revision and published submodules
+        run: bash scripts/fetch_madeira_sources.sh
+
+      - name: Restore public LLVM and ARM64EC cross-toolchains
+        id: restore
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            vendor/Madeira/toolchains/llvm-mingw-20260421-ucrt-macos-universal
+            vendor/Madeira/toolchains/llvm-ios-build
+          key: madeira-llvm15-ios-v3-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/prepare_madeira_toolchains.sh', 'scripts/llvm_ios_sdk.py') }}
+
+      - name: Compile and verify complete real LLVM SDK for iPhoneOS
+        run: |
+          set -euo pipefail
+          bash scripts/prepare_madeira_toolchains.sh
+          bash scripts/verify_dxmt_llvm.sh
+          python3 scripts/llvm_ios_sdk.py check \
+            --build vendor/Madeira/toolchains/llvm-ios-build \
+            --ref llvmorg-15.0.7
+          echo 'Verified actual LLVM 15 generated headers and iOS archives.'
+
+      - name: Cache verified public cross-toolchains
+        if: ${{ steps.restore.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v5
+        with:
+          path: |
+            vendor/Madeira/toolchains/llvm-mingw-20260421-ucrt-macos-universal
+            vendor/Madeira/toolchains/llvm-ios-build
+          key: madeira-llvm15-ios-v3-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/prepare_madeira_toolchains.sh', 'scripts/llvm_ios_sdk.py') }}
+
+      - name: Record verified SDK revision
+        if: success()
+        run: |
+          echo 'LLVM 15 SDK build and cross-compile checks passed on macOS/iPhoneOS.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'No IPA, converter library, or application binary is redistributed by this workflow.' >> "$GITHUB_STEP_SUMMARY"
