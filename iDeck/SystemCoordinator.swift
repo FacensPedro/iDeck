@@ -139,7 +139,9 @@ class SystemCoordinator: ObservableObject {
         // Repeated MAP_JIT probes can race with FEX memory initialization and
         // do not establish that StikDebug's BRK handler is ready.
         let detected = ideck_process_has_jit_permission() || debuggerAttached
-        let wineReady = ideck_wine_jit_pool_ready()
+        // The native prepare function owns the pool mutex while issuing BRK
+        // requests. Do not block SwiftUI refreshes waiting for that mutex.
+        let wineReady = wineJITPreparationInFlight ? isWineJITPrepared : ideck_wine_jit_pool_ready()
         let update = {
             if self.isJITEnabled != detected { self.isJITEnabled = detected }
             if self.isStikDebugAttached != debuggerAttached { self.isStikDebugAttached = debuggerAttached }
