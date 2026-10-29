@@ -152,6 +152,10 @@ fi
 grep -Fq 'int wine_process_thread_finished(void)' "$DEST/app/Madeira/WineProcessBridge.m" || exit 2
 grep -Fq '__atomic_store_n(&g_wineserver_should_stop, 0' "$DEST/app/Madeira/WineServerBridge.m" || exit 2
 
+# Apply a scoped source backport only to this pinned Wine ABI. It preserves
+# all existing iDeck Mach/FEX/repeated-session patches and rejects drift.
+python3 "$ROOT/scripts/apply_madeira_luajit_backport.py" --madeira "$DEST"
+
 echo "Madeira sources checked out at $REV"
 echo "Source checkout complete. Run bash scripts/build_native_runtime.sh on macOS to compile, link and package."
 echo "Read $DEST/docs/BUILDING.md for the platform toolchains and licensed prerequisites."
