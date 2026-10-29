@@ -23,6 +23,7 @@ SYMBOLS = (
     "madeira_seed_prefix_if_needed",
     "madeira_get_present_count",
     "madeira_d3d12_canary_run",
+    "madeira_luajit_compat_fd",
 )
 PE_FILES = (
     "aarch64-windows/d3d11.dll",
@@ -223,6 +224,15 @@ def inspect(app: Path, require_wow64: bool = False) -> list[str]:
                 return sha.digest()
             if digest(native) != digest(loader):
                 errors.append(f"D3D12 loader differs from Madeira native frontend: {loader}")
+    for directory in (app, runtime):
+        lua = directory / "compat" / "love" / "lua51.dll"
+        if not lua.is_file() or lua.stat().st_size < 1024:
+            errors.append(f"missing GC64 LuaJIT x64 compatibility DLL: {lua}")
+        elif lua.read_bytes()[:2] != b"MZ":
+            errors.append(f"invalid GC64 LuaJIT PE image: {lua}")
+    license_file = app / "licenses" / "LuaJIT-MIT.txt"
+    if not license_file.is_file() or not license_file.stat().st_size:
+        errors.append(f"missing LuaJIT license notice: {license_file}")
     for directory in (app, runtime):
         locale = directory / "nls" / "locale.nls"
         if not locale.is_file() or locale.stat().st_size == 0:

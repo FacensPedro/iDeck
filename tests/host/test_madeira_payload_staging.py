@@ -43,6 +43,12 @@ class MadeiraPayloadStagingTests(unittest.TestCase):
         for folder in ("legal", "licenses"):
             (self.source / folder).mkdir()
             (self.source / folder / "NOTICE.txt").write_text("Madeira notice", encoding="utf-8")
+        compat = self.source / "compat" / "love"
+        compat.mkdir(parents=True)
+        (compat / "lua51.dll").write_bytes(b"MZ" + bytes(128))
+        (self.source / "licenses" / "LuaJIT-MIT.txt").write_text(
+            "LuaJIT MIT license fixture", encoding="utf-8",
+        )
         (self.source / "nls").mkdir()
         (self.source / "nls" / "locale.nls").write_bytes(b"nls-data")
         (self.source / "prefix-template.tar.gz").write_bytes(
@@ -96,6 +102,10 @@ class MadeiraPayloadStagingTests(unittest.TestCase):
                 self.assertEqual(
                     (canonical / name).read_bytes(), (mirror / name).read_bytes()
                 )
+        self.assertEqual(
+            (self.app / "compat/love/lua51.dll").read_bytes(),
+            (self.app / "MadeiraRuntime/compat/love/lua51.dll").read_bytes(),
+        )
         canonical_converter = self.app / "d3d12" / "libmetalirconverter.dylib"
         mirror_converter = (
             self.app / "MadeiraRuntime" / "d3d12" / "libmetalirconverter.dylib"

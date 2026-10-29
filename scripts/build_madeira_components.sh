@@ -127,6 +127,9 @@ if [[ "$REBUILD" == "1" ]]; then
     done
     exit 1
   fi
+  # Build a pinned GC64 interpreter-only LuaJIT, then compile the iOS
+  # wineserver replacement mapper into the native static archive.
+  bash "$ROOT/scripts/build_madeira_luajit.sh"
   bash "$MD/build/wineserver/build.sh"
   bash "$MD/build/win32u-unix/build.sh"
 
@@ -235,6 +238,11 @@ if [[ "$REBUILD" == "1" ]]; then
     echo "ERROR: d3d12.dll is not the compiled madeira-d3d12 frontend." >&2
     exit 2
   }
+
+  # Replace the pinned older dcomp.dll with upstream's source-level
+  # DirectComposition composition-swapchain compatibility implementation.
+  # Validate all PE exports before staging; never substitute a stub.
+  bash "$ROOT/scripts/build_madeira_dcomp.sh"
 
 fi
 

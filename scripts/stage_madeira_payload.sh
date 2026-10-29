@@ -93,6 +93,24 @@ elif [[ "${IDECK_BUILD_WOW64:-0}" == "1" ]]; then
   exit 2
 fi
 
+# The patched wineserver substitutes only incompatible low-address x64
+# LuaJIT binaries, and looks this up under WINEDLLPATH/compat/love.
+[[ -s "$SOURCE/compat/love/lua51.dll" ]] || {
+  echo "ERROR: GC64 LuaJIT compatibility DLL missing from native runtime" >&2
+  exit 2
+}
+[[ "$(head -c 2 "$SOURCE/compat/love/lua51.dll")" == "MZ" ]] || {
+  echo "ERROR: bundled LuaJIT is not a Windows PE" >&2
+  exit 2
+}
+mkdir -p "$APP/compat/love" "$RUNTIME/compat/love"
+cp "$SOURCE/compat/love/lua51.dll" "$APP/compat/love/lua51.dll"
+cp "$SOURCE/compat/love/lua51.dll" "$RUNTIME/compat/love/lua51.dll"
+[[ -s "$SOURCE/licenses/LuaJIT-MIT.txt" ]] || {
+  echo "ERROR: missing LuaJIT MIT license notice" >&2
+  exit 2
+}
+
 # Official Microsoft VC++ libraries are not included in Madeira's git checkout.
 # When the owner supplies an authorized, complete distribution, stage it in
 # the exact location read by the upstream WineProcessBridge. No fake DLLs.
