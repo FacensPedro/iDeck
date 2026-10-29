@@ -7,7 +7,9 @@ cd "$(dirname "$0")/.."
 SDK_VERSION="$(xcrun --sdk iphoneos --show-sdk-version)"
 [[ "${SDK_VERSION%%.*}" -ge 27 ]] || { echo "ERROR: iDeck requires the iOS 27 SDK or newer." >&2; exit 2; }
 BUILD_DIR="build"
-rm -rf "$BUILD_DIR/Build" "$BUILD_DIR/Logs" Payload iDeck.ipa
+# Keep restored Xcode intermediates and products; the ephemeral Actions runner
+# starts clean unless its exact-revision cache was restored.
+rm -rf "$BUILD_DIR/Logs" "$BUILD_DIR/Staging" Payload iDeck.ipa
 mkdir -p "$BUILD_DIR"
 
 EXTRA_XCODE_SETTINGS=()
@@ -80,7 +82,7 @@ if [[ "${IDECK_REQUIRE_MADEIRA:-0}" == "1" ]]; then
   )
 fi
 
-xcodebuild clean build \
+xcodebuild build \
   -project iDeck.xcodeproj \
   -scheme iDeck \
   -configuration "$CONFIGURATION" \
@@ -90,8 +92,16 @@ xcodebuild clean build \
   CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO \
   ${EXTRA_XCODE_SETTINGS[@]+"${EXTRA_XCODE_SETTINGS[@]}"}
 
-APP="$BUILD_DIR/Build/Products/$CONFIGURATION-iphoneos/iDeck.app"
-[ -d "$APP" ] || { echo "error: $APP not found" >&2; exit 1; }
+COMPILED_APP="$BUILD_DIR/Build/Products/$CONFIGURATION-iphoneos/iDeck.app"
+[ -d "$COMPILED_APP" ] || { echo "error: $COMPILED_APP not found" >&2; exit 1; }
+APP="$COMPILED_APP"
+if [[ "${IDECK_REQUIRE_MADEIRA:-0}" == "1" ]]; then
+  # Stage licensed native payload into a separate app copy, never into
+  # Xcode's cached product. That keeps incremental relinks trustworthy.
+  APP="$BUILD_DIR/Staging/iDeck.app"
+  mkdir -p "$BUILD_DIR/Staging"
+  ditto "$COMPILED_APP" "$APP"
+fi
 for bundle in "$APP" "$APP/PlugIns/VPNExtension.appex"; do
   MINIMUM_OS="$(/usr/libexec/PlistBuddy -c 'Print :MinimumOSVersion' "$bundle/Info.plist")"
   [[ "$MINIMUM_OS" == "26.0" ]] || { echo "ERROR: incorrect minimum OS in $bundle: $MINIMUM_OS" >&2; exit 2; }
@@ -125,9 +135,10 @@ else
   python3 scripts/verify_madeira_bundle.py --app "$APP"
 fi
 
-mkdir -p Payload
-cp -R "$APP" Payload/
-zip -qry iDeck.ipa Payload
+# Stream the app directly into a valid IPA, with fast compression and
+# symlink/executable-bit preservation; do not duplicate the native app as
+# a temporary Payload tree or recompress PNG/ZIP/GZ assets.
+python3 scripts/package_ipa.py --app "$APP" --output iDeck.ipa
 if [[ "${IDECK_REQUIRE_MADEIRA:-0}" == "1" ]]; then
   python3 - <<'PY'
 import stat
@@ -144,5 +155,4 @@ with zipfile.ZipFile("iDeck.ipa") as archive:
     print("Native IPA runtime contains no Unix symlinks")
 PY
 fi
-rm -rf Payload
 echo "Created $(pwd)/iDeck.ipa"
