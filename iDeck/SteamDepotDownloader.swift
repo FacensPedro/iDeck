@@ -62,15 +62,15 @@ final class DepotDownloader {
         // re-check thermal and Low Power Mode changes during the transfer.
         if process.isLowPowerModeEnabled { return 2 }
         switch process.thermalState {
-        case .nominal: return min(16, max(12, process.activeProcessorCount * 2))
-        case .fair: return min(8, max(4, process.activeProcessorCount))
-        case .serious: return 3
+        case .nominal: return min(24, max(16, process.activeProcessorCount * 3))
+        case .fair: return min(12, max(6, process.activeProcessorCount * 2))
+        case .serious: return 4
         case .critical: return 1
         @unknown default: return 4
         }
     }
     private let attemptsPerChunk = 5
-    private let hostPoolSize = 8
+    private let hostPoolSize = 12
 
 
     private nonisolated static let http: URLSession = {
@@ -80,7 +80,7 @@ final class DepotDownloader {
         config.timeoutIntervalForRequest = 30
         config.timeoutIntervalForResource = 300
         // No bandwidth throttle is applied. This is a connection safety limit.
-        config.httpMaximumConnectionsPerHost = 16
+        config.httpMaximumConnectionsPerHost = 24
         return URLSession(configuration: config)
     }()
 
@@ -381,7 +381,8 @@ final class DepotDownloader {
         var createdDirectories = Set<String>() // one mkdir traversal per distinct output directory
         let journalNames = Set(plans.map { "depot_\($0.depotID)_\($0.manifestGID).journal" })
         // A journal for an older manifest describes different file contents.
-        for name in (try? fm.contentsOfDirectory(atPath: journalDir.path)) ?? [] where !journalNames.contains(name) {
+        for name in (try? fm.contentsOfDirectory(atPath: journalDir.path)) ?? []
+            where !journalNames.contains(name) && name != ".ideck-owned-folder" {
             try? fm.removeItem(at: journalDir.appendingPathComponent(name))
         }
         for plan in plans {
@@ -504,7 +505,7 @@ final class DepotDownloader {
         state.checkDone = 0
         report(state)
         let isExternal = checks.contains { $0.path.contains("/LiveFiles/") || $0.path.contains("/External/") }
-        let readers = isExternal ? 2 : 5
+        let readers = isExternal ? 3 : min(8, max(5, ProcessInfo.processInfo.activeProcessorCount))
         let journals = try plans.indices.map { try JournalWriter(url: prepared.journals[$0]) }
         defer { journals.forEach { $0.close() } }
         var verified: [Set<UInt64>] = plans.map { _ in [] }

@@ -5006,6 +5006,9 @@ final class SteamOwnedGamesModel: ObservableObject {
         let drive = prefixPath.appendingPathComponent("drive_c", isDirectory: true)
         let steamApps = SteamInstallPaths.steamApps(drive: drive)
         let wasInstalled = isInstalled(appID: appID, prefixPath: prefixPath)
+        let installOwnership = steamApps.appendingPathComponent(
+            "downloading/\(appID)/.ideck-owned-folder", isDirectory: false)
+        var ownsIncompleteInstall = false
         do {
             try Task.checkCancellation()
             guard let app = try await fetcher.fetchInstallInfo(
@@ -5022,6 +5025,20 @@ final class SteamOwnedGamesModel: ObservableObject {
             guard app.installableOnWindows else {
                 throw SteamError.depotNotFound(appID)
             }
+            // Only claim ownership of a directory that did not exist before
+            // this install. Retain the marker across failed/resumed downloads
+            // so cancelling a later retry can remove the incomplete game.
+            let savedOwner = try? String(contentsOf: installOwnership, encoding: .utf8)
+            ownsIncompleteInstall = !wasInstalled &&
+                (savedOwner == installFolder ||
+                 (!installFolderAlreadyExisted && installFolder != nil))
+            if ownsIncompleteInstall && !installFolderAlreadyExisted,
+               let installFolder {
+                try FileManager.default.createDirectory(
+                    at: installOwnership.deletingLastPathComponent(),
+                    withIntermediateDirectories: true)
+                try installFolder.write(to: installOwnership, atomically: true, encoding: .utf8)
+            }
             try FileManager.default.createDirectory(at: steamApps, withIntermediateDirectories: true)
             _ = try await downloader.install(
                 app,
@@ -5037,10 +5054,12 @@ final class SteamOwnedGamesModel: ObservableObject {
         } catch {
             let cancelled = Task.isCancelled || error is CancellationError
             if cancelled, !wasInstalled {
-                if !installFolderAlreadyExisted, let installFolder {
+                if ownsIncompleteInstall, let installFolder {
                     SteamInstallFiles.delete(appID: Int(appID), folderName: installFolder,
                                              steamApps: steamApps)
                 } else {
+                    // This directory predated iDeck's ownership marker.
+                    // Never remove potentially unrelated user files.
                     try? FileManager.default.removeItem(at:
                         steamApps.appendingPathComponent("downloading/\(appID)", isDirectory: true))
                 }

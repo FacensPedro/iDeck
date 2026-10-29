@@ -90,6 +90,9 @@ jobs:
           xcrun swiftc iDeck/WineLogClipboard.swift tests/host/WineLogClipboardTests.swift -o /tmp/ideck-wine-log-clipboard-tests
           /tmp/ideck-wine-log-clipboard-tests
 
+      - name: Test automatic Wine JIT, Steam cancellation, and in-game performance overlay
+        run: python3 -m unittest discover -s tests/host -p 'test_automatic_jit_download_hud.py' -v
+
       - name: Test automatic Windows runtime settings
         run: python3 -m unittest discover -s tests/host -p 'test_windows_compatibility_localization.py' -v
 
