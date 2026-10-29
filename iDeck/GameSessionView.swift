@@ -21,11 +21,11 @@ private final class GameRuntimeMetrics: ObservableObject {
     private var previousFrames: UInt64?
     private typealias PresentCount = @convention(c) () -> UInt64
 
-    func sample() {
+    func sample(collectPerformance: Bool = false) {
         let uptime = ProcessInfo.processInfo.systemUptime
         secondsSinceLaunch = max(0, uptime - startedAt)
         var usage = rusage()
-        if getrusage(RUSAGE_SELF, &usage) == 0 {
+        if collectPerformance && getrusage(RUSAGE_SELF, &usage) == 0 {
             let consumed = Double(usage.ru_utime.tv_sec) + Double(usage.ru_utime.tv_usec) / 1_000_000 +
                 Double(usage.ru_stime.tv_sec) + Double(usage.ru_stime.tv_usec) / 1_000_000
             if let oldTime = previousUptime, let oldCPU = previousCPU, uptime > oldTime {
@@ -51,7 +51,7 @@ private final class GameRuntimeMetrics: ObservableObject {
             presentCounterAvailable = false
             fps = "N/D"
         }
-        if let device = metalDevice {
+        if collectPerformance, let device = metalDevice {
             gpuMemory = "\(device.currentAllocatedSize / (1024 * 1024)) MB"
         }
         previousUptime = uptime
@@ -62,6 +62,7 @@ struct GameSessionView: View {
     @ObservedObject var coordinator: SystemCoordinator
     @Environment(\.presentationMode) var presentationMode
     @StateObject private var metrics = GameRuntimeMetrics()
+    @AppStorage("showGamePerformanceOverlay") private var showGamePerformanceOverlay = false
     @State private var showActiveWineAlert = false
     @State private var closeRequested = false
     @State private var recentWineLogFinding: String?
@@ -90,6 +91,17 @@ struct GameSessionView: View {
         }
         return nil
     }
+    private var hasWineProblem: Bool {
+        let status = coordinator.windowsStatus
+        if status.hasPrefix("Execution Error") { return true }
+        if status == "Running" &&
+            (!WindowsRendererView.isNativeDisplayLinked || !metrics.presentCounterAvailable) {
+            return true
+        }
+        return (status == "Running" || status == "Wine started; waiting for game...") &&
+               metrics.secondsSinceLaunch >= 20 && !metrics.receivedNewFrames
+    }
+
     private var wineLogURL: URL? {
         guard let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
             return nil
@@ -183,7 +195,7 @@ struct GameSessionView: View {
                     }
                     .accessibilityLabel("Close Wine session")
                     Spacer()
-                    if wineLogURL != nil {
+                    if hasWineProblem && wineLogURL != nil {
                         Button(action: copyWineLog) {
                             Image(systemName: "doc.on.doc.fill")
                                 .font(.system(size: 20, weight: .medium))
@@ -193,11 +205,13 @@ struct GameSessionView: View {
                         .disabled(isCopyingWineLog)
                         .accessibilityLabel(tr("Copy Wine log"))
                     }
-                    if coordinator.isHUDEnabled {
+                    if showGamePerformanceOverlay &&
+                        coordinator.windowsStatus == "Running" &&
+                        metrics.receivedNewFrames {
                         VStack(alignment: .trailing, spacing: 3) {
                             Text("FPS: \(metrics.fps)  CPU: \(metrics.cpu)")
-                            Text("Metal: \(metrics.gpuMemory)  GPU %: N/D")
-                            Text("GPU % não é disponibilizada por APIs públicas do iPadOS.")
+                            Text("GPU memory (Metal): \(metrics.gpuMemory)")
+                            Text("GPU utilization: N/A on iPadOS")
                                 .font(.system(size: 9))
                         }
                         .font(.system(size: 12, design: .monospaced))
@@ -318,14 +332,14 @@ struct GameSessionView: View {
         }
         .onAppear {
             WineInputBridge.shared.startBridging()
-            metrics.sample()
+            metrics.sample(collectPerformance: showGamePerformanceOverlay)
             updateRecentWineLogFinding()
         }
         .onChange(of: coordinator.windowsStatus) { _, _ in
             updateRecentWineLogFinding()
         }
         .onReceive(tick) { _ in
-            metrics.sample()
+            metrics.sample(collectPerformance: showGamePerformanceOverlay)
             if coordinator.windowsStatus == "Wine started; waiting for game..." &&
                metrics.receivedNewFrames {
                 // The loader thread being alive is insufficient. Require a
