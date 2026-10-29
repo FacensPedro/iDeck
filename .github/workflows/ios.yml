@@ -33,7 +33,7 @@ on:
         required: false
         default: ""
   push:
-    branches: [ "main", "feature/madeira-xinput-hid-restart-multiple-games-20261029" ]
+    branches: [ "main", "feature/madeira-xinput-hid-restart-multiple-games-20261029", "fix/native-runtime-link-and-llvm-sdk-20261029" ]
     tags: [ "v*", "[0-9]*" ]
   pull_request:
     branches: [ "main" ]
@@ -73,6 +73,12 @@ jobs:
         run: |
           bash -n scripts/ensure_metal_toolchain.sh
           python3 -m unittest discover -s tests/host -p 'test_metal_toolchain.py' -v
+
+      - name: Test native Wine static ABI and missing-symbol rejection
+        run: python3 -m unittest discover -s tests/host -p 'test_wine_static_link.py' -v
+
+      - name: Test complete LLVM SDK cache restoration
+        run: python3 -m unittest discover -s tests/host -p 'test_llvm_ios_sdk.py' -v
 
       - name: Verify iPhoneOS LLVM linker system libraries
         run: |
@@ -458,7 +464,7 @@ jobs:
           path: |
             vendor/Madeira/toolchains/llvm-mingw-20260421-ucrt-macos-universal
             vendor/Madeira/toolchains/llvm-ios-build
-          key: madeira-toolchains-v2-xcode27-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/prepare_madeira_toolchains.sh') }}
+          key: madeira-toolchains-v2-xcode27-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/prepare_madeira_toolchains.sh', 'scripts/llvm_ios_sdk.py') }}
           restore-keys: |
             madeira-toolchains-v2-xcode27-${{ runner.os }}-${{ runner.arch }}-
 

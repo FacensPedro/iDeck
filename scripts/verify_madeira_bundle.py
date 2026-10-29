@@ -16,6 +16,15 @@ SYMBOLS = (
     "wineserver_is_ready",
     "wine_process_start",
     "wine_process_is_running",
+    "wine_process_thread_finished",
+    "wine_process_exit_code",
+    "wine_crash_exit_status",
+    "wineserver_is_running",
+    "winios_post_key",
+    "winios_gamepad_set_state",
+    "winios_hidpad_set_state",
+    "madeira_pad_output_configure",
+    "madeira_pad_output_set_slot",
     "madeira_display_set_layer",
     "macdrv_functions",
     "winios_screen_size",
@@ -289,12 +298,19 @@ def inspect(app: Path, require_wow64: bool = False) -> list[str]:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--app", required=True, type=Path)
+    parser.add_argument("--app", type=Path)
+    parser.add_argument("--linker-flags", action="store_true",
+                        help="retain and export required native entry points")
     parser.add_argument("--require", action="store_true",
                         help="fail if native runtime is absent; never produce a false-ready IPA")
     parser.add_argument("--require-wow64", action="store_true",
                         help="require a complete i386/ARM64 WoW64 payload")
     options = parser.parse_args()
+    if options.linker_flags:
+        print("-Wl,-export_dynamic " + " ".join(f"-Wl,-u,_{name}" for name in SYMBOLS))
+        return 0
+    if options.app is None:
+        parser.error("--app is required unless --linker-flags is used")
     app = options.app
     manifest = app / "MadeiraRuntimeManifest.plist"
     if manifest.exists():

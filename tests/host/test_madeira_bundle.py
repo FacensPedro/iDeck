@@ -161,6 +161,21 @@ class MadeiraBundleTests(unittest.TestCase):
         self.symbols.remove("wineserver_is_ready")
         self.assertIn("native symbol not linked/exported: wineserver_is_ready", self.inspect())
 
+    def test_required_input_and_shutdown_symbols_cannot_be_missing(self):
+        for symbol in ("wine_process_thread_finished", "winios_post_key",
+                       "winios_gamepad_set_state", "winios_hidpad_set_state"):
+            with self.subTest(symbol=symbol):
+                self.symbols = [name for name in bundle.SYMBOLS if name != symbol]
+                self.assertIn(f"native symbol not linked/exported: {symbol}", self.inspect())
+
+    def test_link_flags_retain_every_required_symbol(self):
+        import sys
+        result = subprocess.run([sys.executable, str(ROOT / "scripts/verify_madeira_bundle.py"),
+                                 "--linker-flags"], check=True, text=True, capture_output=True)
+        flags = result.stdout.split()
+        self.assertIn("-Wl,-export_dynamic", flags)
+        self.assertEqual(set(flags[1:]), {f"-Wl,-u,_{name}" for name in bundle.SYMBOLS})
+
     def test_missing_prefix_entrypoint(self):
         self.symbols.remove("madeira_seed_prefix_if_needed")
         self.assertIn("native symbol not linked/exported: madeira_seed_prefix_if_needed", self.inspect())
