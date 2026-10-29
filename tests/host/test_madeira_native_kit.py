@@ -68,6 +68,7 @@ class MadeiraNativeKitTests(unittest.TestCase):
             "d3d12_backend": "madeira-d3d12",
             "arm64ec_context_patch_sha256": kit.ARM64EC_CONTEXT_PATCH_SHA256,
             "arm_host_feature_patch_sha256": kit.ARM_HOST_FEATURE_PATCH_SHA256,
+            "repeat_wine_session_patch_sha256": kit.REPEAT_WINE_SESSION_PATCH_SHA256,
             "files": {
                 name: {
                     "sha256": hashlib.sha256(data).hexdigest(),
