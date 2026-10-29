@@ -1,5 +1,63 @@
 # Status do runtime Madeira no iDeck
 
+## Diagnóstico reprodutível — Etapa 0 (29/10/2026)
+
+**Status: Etapa 0 verificada em macOS/Xcode. Etapa 1 não iniciada nesta
+auditoria; insumos de desenvolvimento estão ausentes no clone limpo.**
+Esta seção descreve **resultados medidos**, não a compatibilidade
+de um aplicativo Windows em iPhone ou iPad.
+
+Execução macOS:
+[GitHub Actions #40969996677](https://github.com/FacensPedro/iDeck/actions/runs/40969996677),
+artefato
+[`ideck-madeira-stage0-diagnostics`](https://github.com/FacensPedro/iDeck/actions/runs/40969996677/artifacts/12939289828).
+Fonte reproduzível:
+`bash scripts/diagnose_madeira_stage0.sh`, no workflow
+`.github/workflows/madeira-stage0.yml`. Os logs contêm o fetch, a
+revisão e o status dos submódulos, a lista de pré-requisitos e a saída
+integral do verificador.
+
+| Comando/verificação | Resultado observado |
+|---|---|
+| `bash scripts/fetch_madeira_sources.sh` | **PASSOU**. Madeira em `fd9f2f3d0434a4116e4c3351f286a0fc376b4e36`, incluindo fontes FEX, Wine 11.4, DXMT, bridges e `docs/BUILDING.md`. |
+| Xcode/SDK do runner | **DISPONÍVEL**. macOS arm64, Xcode 27.2, `xcodebuild`, `xcrun` e SDK `iphoneos`. |
+| Ferramentas do runner | `git`, `cmake`, `ninja`, `clang` disponíveis; **`meson` e `llvm-config` ausentes**. `/usr/bin/bison` existe, mas é GNU Bison **2.3**, incompatível com a configuração Wine 11.4, que exige >= 3.0. |
+| Prérequisitos na árvore Madeira | **Ausentes:** `toolchains/llvm-mingw-20260421-ucrt-macos-universal/bin/arm64ec-w64-mingw32-clang`, `toolchains/llvm-ios-build/include/llvm/Config/llvm-config.h`, `toolchains/gnutls-ios/include/gnutls/gnutls.h` e `toolchains/ffmpeg-ios/include/libavcodec/avcodec.h`. São dependências geráveis/instaláveis; não há placeholders. |
+| Conversor Metal no checkout upstream | `app/Madeira/d3d12/libmetalirconverter.dylib` **estava presente na árvore do Madeira**. É proprietário; sua presença não autoriza cópia para um IPA nem redistribuição. |
+| `IDECK_REQUIRE_MADEIRA=0 bash scripts/build_ipa.sh` | **PASSOU**. `iDeck.ipa` de interface criado sem ativar a flag nativa. |
+| `python3 scripts/verify_madeira_bundle.py --app build/Build/Products/Release-iphoneos/iDeck.app --require` | **FALHOU como esperado**. Relatou falta de `fex_initialize`, `wineserver_start`, `wine_process_start`, `ideck_madeira_launch_v1`, bibliotecas Windows, Wine prefix, LuaJIT, shaders, certificados e demais assets. O verificador não foi afrouxado. |
+| Mesmo verificador sem `--require` | **PASSOU apenas como interface**; nenhum `MadeiraRuntimeManifest.plist` foi criado. |
+| Aplicativo Windows e dispositivo real | **NÃO TESTADOS**. Nenhum frame Metal, inicialização de guest ou encerramento Windows foi comprovado neste teste. |
+
+O documento upstream `vendor/Madeira/docs/BUILDING.md` do commit fixado
+registra historicamente os forks como não publicados; nesta auditoria,
+os commits fixados dos repositórios públicos `willfaust/FEX`,
+`willfaust/wine`, `willfaust/dxmt` e `willfaust/rpmalloc` puderam
+ser consultados, e o fetch recursivo passou no runner.
+
+**Bloqueio para Etapa 1:** instalar/preparar Meson, GNU Bison >= 3,
+LLVM-MinGW ARM64EC fixado com SHA-256, o SDK LLVM iOS com cabeçalhos
+completos e as dependências GnuTLS/FFmpeg antes de compilar o runtime.
+O script `scripts/prepare_madeira_toolchains.sh` e os builders existentes
+são o caminho de preparação, mas a auditoria **não** os executou
+nem declara esses artefatos gerados. Também não permite usar
+`IDECK_NATIVE_MADEIRA_ENABLED=1` no build padrão.
+
+Um build nativo anterior, em
+[GitHub Actions #40960844086](https://github.com/FacensPedro/iDeck/actions/runs/40960844086),
+chegou a gerar FEXCore e `xtajit64.dll`, mas falhou depois por
+cabeçalhos LLVM ausentes ao compilar componentes do Wine/DXMT. Essa
+evidência anterior **não** demonstra que o build nativo completo,
+o IPA assinado ou o lançamento em hardware estejam funcionando.
+A PR #91 separada propõe corrigir esses includes e a vinculação
+estática; ela não foi incorporada como parte desta Etapa 0.
+
+**Distribuição:** nenhum Metal Shader Converter, runtime Wine/FEX/DXMT,
+IPA nativo ou DLL proprietária foi publicado pela auditoria. A
+revisão das licenças e a autorização explícita continuam obrigatórias.
+
+---
+
 ## Análise baseada no código upstream
 
 Fonte: https://github.com/willfaust/Madeira, projeto com dependências nativas FEX, Wine ARM64EC, DXMT, Metal e D3D12. O iDeck atualmente tem **pontes e verificações**, mas não contém os binários do emulador nem um launcher operacional no IPA distribuído.
