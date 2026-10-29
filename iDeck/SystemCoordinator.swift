@@ -61,6 +61,7 @@ class SystemCoordinator: ObservableObject {
     @Published private(set) var windowsCloseWarning: String?
     private var windowsCloseRequestedAt: TimeInterval?
     private var windowsCloseWarningWasShown = false
+    private var windowsStatusBeforeClose: String?
     private var wineJITPreparationInFlight = false
     private var wineJITAttemptedDuringAttachment = false
     @Published var needsVisualCRuntimeConsent = false
@@ -373,6 +374,7 @@ class SystemCoordinator: ObservableObject {
     @objc private func dummyDisplayLinkUpdate() {}
     
     func launchSteam() {
+        guard !isClosingWindowsSession else { return }
         guard isJITEnabled && isContainerReady else { return }
         guard ideck_fex_jit_ready() &&
               (ideck_wine_jit_pool_ready() || ideck_jit_debugger_attached()) else {
@@ -528,6 +530,7 @@ class SystemCoordinator: ObservableObject {
     }
 
     func launchWindowsExecutable(at url: URL, profile: WindowsGameProfile? = nil) {
+        guard !isClosingWindowsSession else { return }
         guard isContainerReady else { return }
         refreshJITStatus()
 
@@ -645,6 +648,7 @@ class SystemCoordinator: ObservableObject {
     /// Launches a Steam game in its original installation directory, preserving
     /// relative DLL and asset paths instead of copying the executable elsewhere.
     func launchSteamGame(game: SteamAppInfo, profile: WindowsGameProfile, prefixPath: URL) {
+        guard !isClosingWindowsSession else { return }
         refreshJITStatus()
         if let pendingSteamGameID {
             setWindowsStatus(pendingSteamGameID == game.appID
@@ -774,6 +778,7 @@ class SystemCoordinator: ObservableObject {
         windowsCloseWarning = nil
         windowsCloseWarningWasShown = false
         windowsCloseRequestedAt = ProcessInfo.processInfo.systemUptime
+        windowsStatusBeforeClose = windowsStatus
         pendingSteamGameID = nil
         setWindowsStatus("Closing Windows session...")
         if ideck_wineprocess_running() {
@@ -806,10 +811,10 @@ class SystemCoordinator: ObservableObject {
         windowsCloseRequestedAt = nil
         windowsCloseWarning = nil
         windowsCloseWarningWasShown = false
-        if ideck_wineprocess_running() {
-            setWindowsStatus("Running")
-        } else if ideck_wineserver_running() {
-            setWindowsStatus("Wine started; waiting for game...")
+        let previousStatus = windowsStatusBeforeClose
+        windowsStatusBeforeClose = nil
+        if ideck_wineprocess_running() || ideck_wineserver_running() {
+            setWindowsStatus(previousStatus ?? "Wine started; waiting for game...")
         } else {
             isClosingWindowsSession = true
             finishWindowsSessionCloseIfPossible()
@@ -840,6 +845,7 @@ class SystemCoordinator: ObservableObject {
         windowsCloseRequestedAt = nil
         windowsCloseWarning = nil
         windowsCloseWarningWasShown = false
+        windowsStatusBeforeClose = nil
         SteamLog.event("[wine-close] Wine and wineserver exited; returning to Steam library")
         setWindowsStatus("Windows Ready")
     }
