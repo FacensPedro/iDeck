@@ -231,7 +231,8 @@ static void begin_native_gamepads(void) {
     }
     const char *output = getenv("MADEIRA_PAD_OUTPUT");
     BOOL allowOutput = !output || (strcmp(output, "0") && strcmp(output, "off"));
-    BOOL xinputOutput = allowOutput && (!output || strcmp(output, "hid") != 0);
+    BOOL xinputOutput = allowOutput && (!output || strcmp(output, "hid") != 0) &&
+                        !(enabled && !strcmp(enabled, "0"));
     BOOL hidOutput = allowOutput && (!output || strcmp(output, "xinput") != 0);
     g_hasOutput = allowOutput;
     output_config(xinputOutput ? 1 : 0, (g_hidEnabled && hidOutput) ? 1 : 0);
