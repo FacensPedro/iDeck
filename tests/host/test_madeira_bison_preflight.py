@@ -39,6 +39,7 @@ class WineBisonPreflightTests(unittest.TestCase):
         self.executable(self.executables / "brew", """
 printf '%s\\n' "$*" >> "$FAKE_BREW_LOG"
 if [[ "$1" == "--prefix" && "$2" == "bison" ]]; then
+  if [[ "${FAKE_BREW_PREFIX_MISSING:-0}" == "1" && ! -x "$FAKE_BREW_PREFIX/bin/bison" ]]; then exit 1; fi
   printf '%s\\n' "$FAKE_BREW_PREFIX"
 elif [[ "$1" == "install" && "$2" == "bison" ]]; then
   mkdir -p "$FAKE_BREW_PREFIX/bin"
@@ -64,6 +65,15 @@ fi
         self.assertIn("3.8.2", result.stdout)
         self.assertIn("install bison", self.brew_log.read_text())
         self.assertIn(str(self.brew_prefix / "bin"), self.github_path.read_text())
+
+    def test_homebrew_prefix_may_fail_until_formula_is_installed(self):
+        self.executable(self.executables / "bison", 'echo "bison (GNU Bison) 2.3"\\n')
+        self.environment["FAKE_BREW_PREFIX_MISSING"] = "1"
+        self.make_brew("3.8.2")
+        result = self.invoke()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("3.8.2", result.stdout)
+        self.assertIn("install bison", self.brew_log.read_text())
 
     def test_existing_compatible_bison_does_not_trigger_homebrew(self):
         self.executable(self.executables / "bison", 'echo "bison (GNU Bison) 3.0.0"\n')
