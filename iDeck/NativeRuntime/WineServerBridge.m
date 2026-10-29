@@ -6,8 +6,11 @@
 #include <errno.h>
 
 bool ideck_wineserver_available(void) {
-    return dlsym(RTLD_DEFAULT, "wineserver_start") != NULL &&
-           dlsym(RTLD_DEFAULT, "wineserver_is_ready") != NULL;
+#if defined(IDECK_NATIVE_MADEIRA_ENABLED) && IDECK_NATIVE_MADEIRA_ENABLED
+    return &wineserver_start != NULL && &wineserver_is_ready != NULL;
+#else
+    return false;
+#endif
 }
 
 bool ideck_wineserver_running(void) {
