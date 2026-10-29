@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <mutex>
+#include <initializer_list>
 #include <cstdio>
 
 #if defined(IDECK_NATIVE_MADEIRA_ENABLED) && IDECK_NATIVE_MADEIRA_ENABLED
