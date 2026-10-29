@@ -57,6 +57,8 @@ class SystemCoordinator: ObservableObject {
     private var activeSteamGameID: UInt32?
     private var activeSteamPrefix: String?
     private var pendingSteamGameID: UInt32?
+    private var wineJITPreparationInFlight = false
+    private var wineJITAttemptedDuringAttachment = false
     @Published var needsVisualCRuntimeConsent = false
     private var visualCRuntimeConsentAction: (() -> Void)?
     private var visualCRuntimeSkipAction: (() -> Void)?
@@ -142,6 +144,31 @@ class SystemCoordinator: ObservableObject {
             if self.isJITEnabled != detected { self.isJITEnabled = detected }
             if self.isStikDebugAttached != debuggerAttached { self.isStikDebugAttached = debuggerAttached }
             if self.isWineJITPrepared != wineReady { self.isWineJITPrepared = wineReady }
+            // Wine's RX/RW pool must be allocated while StikDebug is actively
+            // servicing the Madeira BRK protocol. A persisted JIT entitlement
+            // alone does not authorize safely entering jit26_prepare_region.
+            if !debuggerAttached {
+                self.wineJITAttemptedDuringAttachment = false
+            } else if detected && !wineReady &&
+                      !self.wineJITPreparationInFlight &&
+                      !self.wineJITAttemptedDuringAttachment {
+                let native = ideck_native_capabilities()
+                if native.fex_linked && native.launcher_linked {
+                    self.wineJITAttemptedDuringAttachment = true
+                    self.wineJITPreparationInFlight = true
+                    DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                        let prepared = ideck_wine_jit_pool_prepare()
+                        DispatchQueue.main.async {
+                            guard let self else { return }
+                            self.wineJITPreparationInFlight = false
+                            self.isWineJITPrepared = prepared && ideck_wine_jit_pool_ready()
+                            if !prepared {
+                                SteamLog.event("[iDeck Wine JIT] automatic preparation failed; see native JIT diagnostics")
+                            }
+                        }
+                    }
+                }
+            }
             if !detected && (self.currentStatus == "JIT confirmed via StikDebug" || self.currentStatus == "Ready") {
                 self.currentStatus = "JIT not detected. Enable it in StikDebug and return to iDeck."
             }
