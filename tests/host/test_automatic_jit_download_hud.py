@@ -1,0 +1,72 @@
+import unittest
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+SETTINGS = (ROOT / "iDeck/SettingsView.swift").read_text(encoding="utf-8")
+COORDINATOR = (ROOT / "iDeck/SystemCoordinator.swift").read_text(encoding="utf-8")
+SESSION = (ROOT / "iDeck/GameSessionView.swift").read_text(encoding="utf-8")
+STEAM = (ROOT / "iDeck/SteamManager.swift").read_text(encoding="utf-8")
+DEPOT = (ROOT / "iDeck/SteamDepotDownloader.swift").read_text(encoding="utf-8")
+
+
+class AutomaticJITAndDownloadHUDTests(unittest.TestCase):
+    def test_wine_jit_auto_prepare_only_with_live_debugger_and_real_runtime(self):
+        self.assertIn("wineJITPreparationInFlight", COORDINATOR)
+        self.assertIn("wineJITAttemptedDuringAttachment", COORDINATOR)
+        self.assertIn("else if detected && !wineReady", COORDINATOR)
+        self.assertIn("if native.fex_linked && native.launcher_linked", COORDINATOR)
+        self.assertIn("let prepared = ideck_wine_jit_pool_prepare()", COORDINATOR)
+        self.assertIn("if !debuggerAttached {", COORDINATOR)
+        self.assertIn("DispatchQueue.global(qos: .userInitiated)", COORDINATOR)
+        self.assertIn("wineJITPreparationInFlight ? isWineJITPrepared", COORDINATOR)
+        self.assertNotIn('Text(tr("Wine JIT pool"))', SETTINGS)
+
+    def test_updates_settings_hide_unnecessary_release_messages(self):
+        self.assertIn('actionButton(title: tr("Update iDeck %@", update.latest ?? "")', SETTINGS)
+        for literal in (
+            'actionButton(title: tr("Open iDeck releases")',
+            "No newer iDeck IPA release is available.",
+            "iPadOS requires a signed IPA installation",
+        ):
+            self.assertNotIn(literal, SETTINGS)
+
+    def test_overlay_defaults_off_and_never_claims_gpu_utilization(self):
+        self.assertIn('@AppStorage("showGamePerformanceOverlay") private var showGamePerformanceOverlay = false', SETTINGS)
+        self.assertIn('@AppStorage("showGamePerformanceOverlay") private var showGamePerformanceOverlay = false', SESSION)
+        self.assertIn('coordinator.windowsStatus == "Running"', SESSION)
+        self.assertIn("metrics.receivedNewFrames", SESSION)
+        self.assertIn("if showGamePerformanceOverlay &&", SESSION)
+        self.assertIn('Text("FPS:', SESSION)
+        self.assertIn('Text("GPU memory (Metal):', SESSION)
+        self.assertIn('Text("GPU utilization: N/A on iPadOS")', SESSION)
+        self.assertIn("if collectPerformance && getrusage(", SESSION)
+
+    def test_log_copy_is_only_offered_when_session_has_problems(self):
+        self.assertIn("private var hasWineProblem: Bool", SESSION)
+        self.assertIn("if hasWineProblem && wineLogURL != nil", SESSION)
+        self.assertIn('status.hasPrefix("Execution Error")', SESSION)
+        self.assertIn("metrics.secondsSinceLaunch >= 20 && !metrics.receivedNewFrames", SESSION)
+
+    def test_faster_chunks_still_respect_thermal_and_low_power_modes(self):
+        self.assertIn("if process.isLowPowerModeEnabled { return 2 }", DEPOT)
+        self.assertIn("case .critical: return 1", DEPOT)
+        self.assertIn("case .nominal: return min(24, max(16, process.activeProcessorCount * 3))", DEPOT)
+        self.assertIn("config.httpMaximumConnectionsPerHost = 24", DEPOT)
+        self.assertIn("let readers = isExternal ? 3 : min(8", DEPOT)
+        self.assertIn("try await withThrowingTaskGroup", DEPOT)
+        self.assertIn("SteamChunkScheduler.batches(paths:", DEPOT)
+
+    def test_cancel_removes_owned_files_but_preserves_preexisting_unowned_data(self):
+        self.assertIn("let installOwnership = steamApps.appendingPathComponent(", STEAM)
+        self.assertIn('".ideck-owned-folder"', STEAM)
+        self.assertIn("ownsIncompleteInstall = !wasInstalled &&", STEAM)
+        self.assertIn("savedOwner == installFolder", STEAM)
+        self.assertIn("if cancelled, !wasInstalled {", STEAM)
+        self.assertIn("if ownsIncompleteInstall, let installFolder {", STEAM)
+        self.assertIn("SteamInstallFiles.delete(appID: Int(appID), folderName: installFolder,", STEAM)
+        self.assertIn('name != ".ideck-owned-folder"', DEPOT)
+        self.assertIn("task.cancel()", STEAM)
+
+
+if __name__ == "__main__":
+    unittest.main()
