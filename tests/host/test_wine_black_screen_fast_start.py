@@ -15,7 +15,7 @@ class WineBlackScreenAndFastStartupTests(unittest.TestCase):
     def test_surface_is_window_hosted_and_persists_across_view_teardown(self):
         self.assertIn("final class MadeiraWindowMetalHost: UIView", RENDERER)
         self.assertIn("static let shared = MadeiraWindowMetalHost(", RENDERER)
-        self.assertIn("override class var layerClass: AnyClass { return CAMetalLayer.self }", RENDERER)
+        self.assertIn("override class var layerClass: AnyClass { CAMetalLayer.self }", RENDERER)
         self.assertIn("window.addSubview(host)", RENDERER)
         self.assertIn("host.removeFromSuperview()", RENDERER)
         self.assertIn("MadeiraWindowMetalHost.shared.removeFromSuperview()", RENDERER)
