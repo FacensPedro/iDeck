@@ -33,7 +33,7 @@ on:
         required: false
         default: ""
   push:
-    branches: [ "main", "feature/wine-11-4-madeira-d3d12-auto-dxvk-hud-20261029" ]
+    branches: [ "main", "fix/wine-black-screen-window-metal-and-fast-start-20261029" ]
     tags: [ "v*", "[0-9]*" ]
   pull_request:
     branches: [ "main" ]
@@ -270,6 +270,9 @@ jobs:
         run: |
           xcrun swiftc iDeck/WindowsLaunchArguments.swift tests/host/WindowsLaunchArgumentsTests.swift -o /tmp/ideck-launch-args-tests
           /tmp/ideck-launch-args-tests
+
+      - name: Test native window-level Metal display and fast Wine startup
+        run: python3 -m unittest discover -s tests/host -p 'test_wine_black_screen_fast_start.py' -v
 
       - name: Test Steam WebSocket backpressure and graphics readiness diagnostics
         run: python3 -m unittest discover -s tests/host -p 'test_steam_game_launch_diagnostics.py' -v
