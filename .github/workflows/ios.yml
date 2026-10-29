@@ -189,6 +189,9 @@ jobs:
             -o /tmp/ideck-steam-disk-tests
           /tmp/ideck-steam-disk-tests
 
+      - name: Test automatic fully native IPA requirements
+        run: python3 -m unittest discover -s tests/host -p 'test_automatic_native_ipa.py' -v
+
       - name: Test reusable Madeira kit validation and shell build
         run: |
           python3 -m unittest discover -s tests/host -p 'test_madeira_native_kit.py' -v
