@@ -20,6 +20,7 @@ int wine_process_is_running(void);
 int wine_process_thread_finished(void);
 int wine_process_exit_code(void);
 int wine_crash_exit_status(uint32_t *status);
+void winios_post_key(int vk, int down);
 
 #ifdef __cplusplus
 }
