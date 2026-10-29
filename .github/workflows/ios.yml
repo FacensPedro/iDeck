@@ -305,6 +305,9 @@ jobs:
           xcrun swiftc iDeck/GuestContainerStore.swift tests/host/GuestContainerStoreTests.swift -o /tmp/ideck-container-tests
           /tmp/ideck-container-tests
 
+      - name: Test automated GitHub Release activation and runtime safety
+        run: python3 -m unittest discover -s tests/host -p 'test_automatic_ipa_release.py' -v
+
       - name: Test fast direct IPA packaging
         run: python3 -m unittest discover -s tests/host -p 'test_fast_ipa_packaging.py' -v
 
