@@ -52,8 +52,19 @@ class LLVMCacheTests(unittest.TestCase):
         sdk.stage(self.source, self.build, self.ref)
         with self.assertRaisesRegex(ValueError, 'revision mismatch'):
             sdk.validate(self.build, 'llvmorg-16.0.0')
-        (self.build / 'include/llvm/IR/Intrinsics.inc').unlink()
-        with self.assertRaisesRegex(ValueError, 'Intrinsics.inc'):
+        for name in ('llvm/IR/IntrinsicEnums.inc', 'llvm/IR/IntrinsicImpl.inc'):
+            header = self.build / 'include' / name
+            header.unlink()
+            with self.assertRaisesRegex(ValueError, name.rsplit('/', 1)[-1]):
+                sdk.validate(self.build, self.ref)
+            self.write(header, 'generated header')
+
+    def test_obsolete_intrinsics_filename_cannot_replace_llvm15_outputs(self):
+        self.assertNotIn('llvm/IR/Intrinsics.inc', sdk.GENERATED)
+        sdk.stage(self.source, self.build, self.ref)
+        self.write(self.build / 'include/llvm/IR/Intrinsics.inc', 'obsolete name')
+        (self.build / 'include/llvm/IR/IntrinsicEnums.inc').unlink()
+        with self.assertRaisesRegex(ValueError, 'IntrinsicEnums.inc'):
             sdk.validate(self.build, self.ref)
 
     def test_source_missing_cannot_claim_valid_sdk(self):
