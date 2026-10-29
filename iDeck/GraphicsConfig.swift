@@ -16,11 +16,15 @@ class GraphicsConfig {
     var useD3DMetal: Bool = false
     
     func applyGraphicsEnvironment() {
+        // DXVK reads DXVK_HUD only when its D3D9/D3D10/D3D11
+        // implementation is loaded by the Windows game. DXMT and the
+        // Madeira native D3D12-to-Metal renderer ignore this variable.
+        // Keep the overlay automatic without forcing the Metal driver HUD
+        // on every game, and respect an explicit external DXVK_HUD choice.
+        setenv("DXVK_HUD", "devinfo,fps", 0)
         if isHUDEnabled {
-            setenv("DXVK_HUD", "1", 1)
             setenv("MTL_HUD_ENABLED", "1", 1)
         } else {
-            unsetenv("DXVK_HUD")
             unsetenv("MTL_HUD_ENABLED")
         }
         
