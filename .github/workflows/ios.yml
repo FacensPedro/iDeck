@@ -311,6 +311,8 @@ jobs:
   build:
     name: Build iDeck IPA
     runs-on: xcode-27
+    outputs:
+      ipa_kind: ${{ steps.detect_ipa_kind.outputs.kind }}
     # Native validation is required for this integration PR branch.
     # The branch-scoped rule runs the licensed build after each PR update; release_tag remains empty.
     env:
@@ -535,6 +537,31 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+      - name: Identify verified IPA runtime
+        id: detect_ipa_kind
+        run: |
+          python3 - <<'PY'
+          import os
+          import plistlib
+          from zipfile import ZipFile
+
+          with ZipFile("iDeck.ipa") as archive:
+              manifest_path = "Payload/iDeck.app/MadeiraRuntimeManifest.plist"
+              if manifest_path not in archive.namelist():
+                  kind = "interface"
+              else:
+                  info = plistlib.loads(archive.read(manifest_path))
+                  required = ("fexInProcess", "wineInProcess", "dxmtLinked", "d3d12Linked")
+                  if not all(info.get(field) is True for field in required):
+                      raise SystemExit("Incomplete Madeira native manifest; release refused")
+                  kind = "native"
+          if os.environ["IDECK_NATIVE_BUILD"] == "1" and kind != "native":
+              raise SystemExit("Native runtime requested but the packaged IPA is interface-only")
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write(f"kind={kind}\n")
+          print(f"Verified IPA runtime: {kind}")
+          PY
+
       - name: Upload IPA directly (no outer ZIP)
         id: ipa_artifact
         uses: actions/upload-artifact@v7
@@ -561,9 +588,12 @@ jobs:
           echo 'An IPA is internally a ZIP-formatted iOS app package. The new artifact removes only the extra GitHub ZIP wrapper.' >> "$GITHUB_STEP_SUMMARY"
 
   release:
-    name: Publish verified native iDeck release
+    name: Publish verified iDeck IPA release
     needs: [checks, build]
-    if: ${{ needs.checks.result == 'success' && needs.build.result == 'success' && (startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && inputs.release_tag != '')) && (github.event_name != 'workflow_dispatch' || inputs.require_madeira) }}
+    # Publishing must never run for PRs (including untrusted forks). On main,
+    # every successful build is an explicitly labeled CI prerelease. Versioned
+    # tags and manual release_tag requests require a real native runtime.
+    if: ${{ needs.checks.result == 'success' && needs.build.result == 'success' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')))) }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -574,17 +604,70 @@ jobs:
           name: iDeck.ipa
 
       - name: Verify IPA before release
+        env:
+          EXPECTED_KIND: ${{ needs.build.outputs.ipa_kind }}
         run: |
+          set -euo pipefail
           test -s iDeck.ipa
           unzip -tq iDeck.ipa
+          python3 - <<'PY'
+          import os
+          import plistlib
+          from zipfile import ZipFile
+
+          kind = os.environ["EXPECTED_KIND"]
+          if kind not in ("native", "interface"):
+              raise SystemExit(f"Missing or invalid verified IPA kind: {kind!r}")
+          with ZipFile("iDeck.ipa") as archive:
+              manifest = "Payload/iDeck.app/MadeiraRuntimeManifest.plist"
+              has_manifest = manifest in archive.namelist()
+              if has_manifest != (kind == "native"):
+                  raise SystemExit("IPA native manifest does not match the verified build")
+              if has_manifest:
+                  info = plistlib.loads(archive.read(manifest))
+                  for field in ("fexInProcess", "wineInProcess", "dxmtLinked", "d3d12Linked"):
+                      if info.get(field) is not True:
+                          raise SystemExit(f"Invalid native runtime declaration: {field}")
+          print(f"Release artifact verified: {kind}")
+          PY
 
       - name: Publish release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ inputs.release_tag || github.ref_name }}
+          GH_REPO: ${{ github.repository }}
+          KIND: ${{ needs.build.outputs.ipa_kind }}
+          TAG: ${{ (github.event_name == 'workflow_dispatch' && inputs.release_tag) || (startsWith(github.ref, 'refs/tags/') && github.ref_name) || format('ideck-ci-{0}-{1}', github.run_id, github.run_attempt) }}
+          AUTO_TAG: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.release_tag == '') }}
         run: |
+          set -euo pipefail
+          [[ "$KIND" == "native" || "$KIND" == "interface" ]] || {
+            echo "::error::The IPA type was not verified."
+            exit 2
+          }
+          if [[ "$AUTO_TAG" != "true" && "$KIND" != "native" ]]; then
+            echo "::error::Versioned releases require verified Wine/FEX/DXMT/D3D12; this IPA contains only the interface. Request a native build with an authorized converter."
+            exit 2
+          fi
+
+          if [[ "$KIND" == "native" ]]; then
+            TITLE="iDeck $TAG — Native Madeira"
+            NOTES="Verified native IPA with FEX, Wine, DXMT and Madeira D3D12. Device/JIT compatibility and signing still require validation."
+          else
+            TITLE="iDeck $TAG — Interface Only (No Windows Games)"
+            NOTES="CI prerelease of the iDeck interface only. This IPA does NOT include Wine, FEX, DXMT or D3D12 and cannot run Windows games."
+          fi
+
           if gh release view "$TAG" >/dev/null 2>&1; then
+            if [[ "$AUTO_TAG" != "true" && "$KIND" != "native" ]]; then
+              echo "::error::Refusing to overwrite an existing versioned release with an interface-only IPA."
+              exit 2
+            fi
             gh release upload "$TAG" iDeck.ipa --clobber
           else
-            gh release create "$TAG" iDeck.ipa --target "${{ github.sha }}" --title "iDeck $TAG" --generate-notes
+            OPTIONS=(--target "$GITHUB_SHA" --title "$TITLE" --notes "$NOTES")
+            if [[ "$AUTO_TAG" == "true" || "$KIND" != "native" ]]; then
+              OPTIONS+=(--prerelease --latest=false)
+            fi
+            gh release create "$TAG" iDeck.ipa "${OPTIONS[@]}"
           fi
+          echo "Published $KIND IPA under GitHub Release $TAG" >> "$GITHUB_STEP_SUMMARY"
