@@ -74,10 +74,13 @@ extern "C" bool ideck_wineprocess_last_ntstatus(uint32_t *code) {
 }
 
 extern "C" bool ideck_wineprocess_request_close(void) {
-    using PostKey = void (*)(unsigned int, int);
     if (!ideck_wineprocess_running()) return false;
-    auto post = reinterpret_cast<PostKey>(dlsym(RTLD_DEFAULT, "winios_post_key"));
-    if (post == nullptr) return false;
+#if defined(IDECK_NATIVE_MADEIRA_ENABLED) && IDECK_NATIVE_MADEIRA_ENABLED
+    // Use the pinned Winios ABI. A missing key bridge is a link failure.
+    void (*post)(int, int) = &winios_post_key;
+#else
+    return false;
+#endif
     post(0x12, 1);
     post(0x73, 1);
     // Do not block the UI; key-up is emitted shortly afterwards.
