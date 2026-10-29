@@ -11,7 +11,7 @@ JOBS="${IDECK_LLVM_JOBS:-4}"
 
 [[ "$(uname -s)" == "Darwin" ]] || { echo 'ERROR: macOS runner required.' >&2; exit 2; }
 [[ -d "$MD" ]] || { echo "ERROR: Madeira checkout missing: $MD" >&2; exit 2; }
-for tool in git curl shasum tar cmake ninja xcrun xcodebuild; do
+for tool in git curl shasum tar cmake ninja xcrun xcodebuild python3; do
   command -v "$tool" >/dev/null 2>&1 || { echo "ERROR: missing $tool" >&2; exit 2; }
 done
 [[ "$JOBS" =~ ^[1-9][0-9]*$ ]] || { echo 'ERROR: IDECK_LLVM_JOBS must be a positive integer.' >&2; exit 2; }
@@ -38,8 +38,8 @@ LLVM_HOST="$TOOLCHAINS/llvm-host-build"
 LLVM_IOS="$TOOLCHAINS/llvm-ios-build"
 LLVM_CONFIG="$LLVM_IOS/include/llvm/Config/llvm-config.h"
 
-if [[ -f "$LLVM_CONFIG" ]] && compgen -G "$LLVM_IOS/lib/*.a" >/dev/null; then
-  echo 'LLVM iOS headers and static libraries already present.'
+if python3 "$ROOT/scripts/llvm_ios_sdk.py" check --build "$LLVM_IOS" --ref "$LLVM_REF"; then
+  echo 'Complete cached LLVM iOS SDK is ready.'
   exit 0
 fi
 
@@ -50,6 +50,16 @@ if [[ ! -d "$LLVM_SRC/.git" ]]; then
 else
   git -C "$LLVM_SRC" fetch --depth 1 origin "$LLVM_REF"
   git -C "$LLVM_SRC" checkout --detach FETCH_HEAD
+fi
+
+# Old caches contain generated headers and libraries, but omit the source
+# headers consumed by DXMT. Repair those caches without recompiling LLVM.
+if [[ "$LLVM_REF" == "llvmorg-15.0.7" && ! -f "$LLVM_IOS/ideck-sdk.json" ]]; then
+  if python3 "$ROOT/scripts/llvm_ios_sdk.py" stage --source "$LLVM_SRC/llvm" \
+      --build "$LLVM_IOS" --ref "$LLVM_REF"; then
+    echo 'Repaired cached LLVM iOS SDK with source headers.'
+    exit 0
+  fi
 fi
 
 cmake -S "$LLVM_SRC/llvm" -B "$LLVM_HOST" -G Ninja \
@@ -91,4 +101,6 @@ cmake --build "$LLVM_IOS" --parallel "$JOBS" --target "${LLVM_STATIC_ARCHIVES[@]
 
 [[ -f "$LLVM_CONFIG" ]] || { echo "ERROR: LLVM generated header missing: $LLVM_CONFIG" >&2; exit 1; }
 compgen -G "$LLVM_IOS/lib/*.a" >/dev/null || { echo 'ERROR: no iOS LLVM archives were built.' >&2; exit 1; }
+python3 "$ROOT/scripts/llvm_ios_sdk.py" stage --source "$LLVM_SRC/llvm" \
+  --build "$LLVM_IOS" --ref "$LLVM_REF"
 printf 'LLVM iOS toolchain ready: %s\n' "$LLVM_IOS"

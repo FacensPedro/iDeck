@@ -10,10 +10,6 @@ for tool in xcrun xcodebuild cmake ninja meson python3; do
   command -v "$tool" >/dev/null || { echo "ERROR: $tool is required by Madeira." >&2; exit 2; }
 done
 
-for toolchain in "$MD/toolchains/llvm-mingw-20260421-ucrt-macos-universal/bin/arm64ec-w64-mingw32-clang" \
-                 "$MD/toolchains/llvm-ios-build/lib"; do
-  [[ -e "$toolchain" ]] || { echo "ERROR: missing required Madeira toolchain: $toolchain" >&2; exit 2; }
-done
 
 if ! xcrun --sdk iphoneos --find clang >/dev/null 2>&1; then
   echo "ERROR: iPhoneOS SDK is not installed in Xcode." >&2
@@ -40,6 +36,9 @@ done
 if [[ "$REBUILD" == "1" ]]; then
   source "$ROOT/scripts/ensure_madeira_bison.sh"
 fi
+
+bash "$ROOT/scripts/prepare_madeira_toolchains.sh"
+bash "$ROOT/scripts/verify_dxmt_llvm.sh"
 
 bash "$ROOT/scripts/ensure_metal_toolchain.sh"
 
@@ -165,15 +164,16 @@ if [[ "$REBUILD" == "1" ]]; then
     exit 1
   fi
   COMBINED="$MD/build/dxmt-ios/libdxmt_combined.a"
-  if [[ ! -s "$COMBINED" ]]; then
+  (
     LLVM_LIBS=("$MD/toolchains/llvm-ios-build/lib/"*.a)
     DXMT_OBJS=("$MD/build/dxmt-ios/obj/"*.o)
     [[ -s "${LLVM_LIBS[0]}" && -s "${DXMT_OBJS[0]}" ]] || {
       echo "ERROR: cross-built iOS LLVM static archives or DXMT objects are missing." >&2
       exit 2
     }
-    xcrun --sdk iphoneos libtool -static -o "$COMBINED" "${DXMT_OBJS[@]}" "${LLVM_LIBS[@]}"
-  fi
+    xcrun --sdk iphoneos libtool -static -o "$COMBINED.new" "${DXMT_OBJS[@]}" "${LLVM_LIBS[@]}"
+    mv "$COMBINED.new" "$COMBINED"
+  )
   cp "$COMBINED" "$MD/app/Madeira/libdxmt_combined.a"
 
   # Meson links the Wine CRT and import libraries for each PE architecture.

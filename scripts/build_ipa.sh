@@ -76,6 +76,9 @@ if [[ "${IDECK_REQUIRE_MADEIRA:-0}" == "1" ]]; then
   fi
   NATIVE_LINK_FLAGS="$(cat "$BUILD_DIR/madeira-native/link-flags.txt")"
   [[ -n "$NATIVE_LINK_FLAGS" ]] || { echo "ERROR: empty Madeira link flags" >&2; exit 2; }
+  # Apply to both source builds and imported kits: dlsym entry points must
+  # survive Release dead stripping and be visible in the dynamic symbol table.
+  NATIVE_LINK_FLAGS+=" $(python3 scripts/verify_madeira_bundle.py --linker-flags)"
   EXTRA_XCODE_SETTINGS+=(
     "IDECK_NATIVE_CFLAGS=-DIDECK_NATIVE_MADEIRA_ENABLED=1"
     "IDECK_NATIVE_LINK_FLAGS=$NATIVE_LINK_FLAGS"
