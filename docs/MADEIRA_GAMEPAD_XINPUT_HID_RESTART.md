@@ -126,3 +126,33 @@ disconnect, all four XInput slots, HID-only player 1 with DirectInput
 and the reported PS5 identity, supported haptics and player LEDs,
 background/foreground input release, a full Wine shutdown, and **two
 different Steam games in sequence** without terminating the iDeck app.
+
+## Touchscreen virtual XInput controller (per-game)
+
+The profile now persists `touchControlPreset` with built-in values
+`xbox`, `minimal` and `off` (legacy profiles default to `xbox`).
+The GameSessionView draws a virtual left stick zone, D-pad and Xbox face
+buttons without requiring a physical gamepad. Every press/release and
+thumbstick movement is submitted through the existing
+`DirectInputBridge.mm` into Madeira's `winios_gamepad_set_state`
+(and `winios_hidpad_set_state` where the session selects HID).
+No replacement XInput implementation or parallel emulation transport
+is installed.
+
+The virtual device uses the first free of the original four XInput
+slots: connected physical `GCController` devices are never overwritten.
+The native sampling timer stays active while a touch device is enabled.
+When a game closes, goes into background or the overlay disappears,
+button and analog state is released; Wine session completion still
+unpublishes all four slots, cancels rumble and removes system observers.
+The UI host reserves a bottom touch interaction band so the separate,
+window-level `CAMetalLayer` cannot intercept on-screen button gestures.
+When `off` is chosen, it does not reserve that band.
+
+The subsequent surface-scaling integration uses the same monitor
+transform for touch mapping and compositing; the native input bridge
+does not report a rendered first frame or working game by itself.
+The host regression checks ensure slot transport, guest session cleanup,
+preset persistence and visible touch control wiring. Real guest XInput
+events, analog sensitivity, onscreen ergonomics and device touchscreen
+performance remain **NOT RUN** until tested with a signed Madeira-native IPA.
