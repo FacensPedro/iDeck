@@ -151,7 +151,7 @@ struct GameSessionView: View {
         case 5:
             recentWineLogFinding = "Last Wine log indicates a missing or incompatible DLL."
         case 6:
-            recentWineLogFinding = "A 32-bit Windows program could not reserve its WoW64 address window. iPadOS virtual address space is insufficient for the current Madeira memory policy."
+            recentWineLogFinding = "A 32-bit Windows program could not reserve its WoW64 address window. The iOS device's virtual address space is insufficient for the current Madeira memory policy."
         case 7:
             recentWineLogFinding = "Wine/FEX encountered an unhandled native ARM64EC exception (x18 handler) and terminated with NTSTATUS 0xC000001D. This is a runtime compatibility failure, not proof of a missing game DLL."
         default:
