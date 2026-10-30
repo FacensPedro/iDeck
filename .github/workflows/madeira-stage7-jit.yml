@@ -1,0 +1,98 @@
+name: Madeira Stage 7 - StikDebug JIT and W^X diagnostics
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [feature/madeira-device-jit-stage7-20261030]
+    paths:
+      - .github/workflows/madeira-stage7-jit.yml
+      - iDeck/NativeRuntime/FEXRuntime.cpp
+      - iDeck/NativeRuntime/JITRegionPolicy.h
+      - iDeck/NativeRuntime/MadeiraRuntimeBridge.h
+      - iDeck/SettingsView.swift
+      - tests/host/test_madeira_jit_stage7.py
+      - tests/host/JITRegionPolicyTests.cpp
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/madeira-stage7-jit.yml
+      - iDeck/NativeRuntime/FEXRuntime.cpp
+      - iDeck/NativeRuntime/JITRegionPolicy.h
+      - iDeck/NativeRuntime/MadeiraRuntimeBridge.h
+      - iDeck/SettingsView.swift
+      - tests/host/test_madeira_jit_stage7.py
+      - tests/host/JITRegionPolicyTests.cpp
+
+permissions:
+  contents: read
+
+concurrency:
+  group: madeira-stage7-jit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  host:
+    name: Verify W^X policy and nonblocking JIT diagnostic state
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout iDeck
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Exercise executable memory policy and fail-closed state
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests/host -p 'test_madeira_jit_stage7.py' -v
+          python3 -m unittest discover -s tests/host -p 'test_fex_jit_guard.py' -v
+          python3 -m unittest discover -s tests/host -p 'test_auto_wine_jit_pool.py' -v
+          python3 -m unittest discover -s tests/host -p 'test_madeira_ui_jit_upstream.py' -v
+
+  ios:
+    name: Compile real iPhoneOS arm64 JIT bridge and C ABI
+    needs: host
+    runs-on: xcode-27
+    timeout-minutes: 30
+    steps:
+      - name: Checkout iDeck
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Select iPhoneOS compiler
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Compile native JIT source with real Madeira FEX flag
+        run: |
+          set -euo pipefail
+          SDK="$(xcrun --sdk iphoneos --show-sdk-path)"
+          mkdir -p build/Stage7
+          xcrun --sdk iphoneos clang++ \
+            -arch arm64 -std=c++20 -O2 \
+            -isysroot "$SDK" -miphoneos-version-min=18.0 \
+            -DIDECK_NATIVE_MADEIRA_ENABLED=1 \
+            -c iDeck/NativeRuntime/FEXRuntime.cpp \
+            -o build/Stage7/FEXRuntime-arm64.o
+          test "$(xcrun lipo -archs build/Stage7/FEXRuntime-arm64.o)" = arm64
+          xcrun nm -gU build/Stage7/FEXRuntime-arm64.o | grep -q _ideck_jit_snapshot
+          xcrun nm -gU build/Stage7/FEXRuntime-arm64.o | grep -q _ideck_wine_jit_pool_prepare
+          echo 'Compiled the actual iPhoneOS arm64 native JIT, W^X checks and C snapshot interface.' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload compiled JIT object for link diagnostics
+        if: success()
+        uses: actions/upload-artifact@v7
+        with:
+          name: Madeira-Stage7-iPhoneOS-JIT-object
+          path: build/Stage7/FEXRuntime-arm64.o
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Record on-device JIT validation still needed
+        if: success()
+        run: |
+          echo 'Stage 7 source tests and real iPhoneOS compilation passed.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'NOT RUN: StikDebug BRK protocol, Wine RX/RW pool mappings on physical iPad, x86-64 guest execution and safe detached failure.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Perform docs/MADEIRA_DEVICE_ACCEPTANCE.md phase 7 and collect iDeck Settings > Copy JIT diagnostics from an actual device.' >> "$GITHUB_STEP_SUMMARY"
