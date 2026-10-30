@@ -442,8 +442,15 @@ class SystemCoordinator: ObservableObject {
                 self.windowsEnvironment.installAndRunSteam(jitEnabler: self.jitEnabler) { result in
                     DispatchQueue.main.async {
                         guard self.windowsStatus == "Launching Steam client..." else { return }
-                        self.setWindowsStatus(result && ideck_wineprocess_running()
-                            ? "Steam Running" : "Execution Error: Windows Steam client failed to start.")
+                        // The Windows Steam loader may report success before
+                        // the Steam window draws a single Metal frame. Use the
+                        // same first-frame gate as Steam games and direct EXEs.
+                        let loaderAlive = result && ideck_wineprocess_running()
+                        if loaderAlive {
+                            SteamLog.event("[steam-start] Steam client Wine thread started; awaiting Metal first frame")
+                        }
+                        self.setWindowsStatus(loaderAlive
+                            ? "Wine started; waiting for game..." : "Execution Error: Windows Steam client failed to start.")
                     }
                 }
             }
