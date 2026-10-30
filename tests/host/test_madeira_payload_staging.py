@@ -63,6 +63,30 @@ class MadeiraPayloadStagingTests(unittest.TestCase):
                      "canary_layout_vs.dxil", "canary_layout_ps.dxil"):
             (converter / name).write_bytes(b"DXIL-test")
 
+    def test_d3d11_stages_without_redistributing_converter_or_d3d12(self):
+        environment = dict(os.environ)
+        environment.update({
+            "IDECK_MADEIRA_APP_ROOT": str(self.source),
+            "IDECK_MADEIRA_GRAPHICS": "d3d11",
+            "IDECK_BUILD_WOW64": "0",
+            "IDECK_ACCEPT_METAL_CONVERTER_LICENSE": "0",
+        })
+        environment.pop("IDECK_CODESIGN_IDENTITY", None)
+        subprocess.run(
+            ["bash", str(STAGER), str(self.app)],
+            env=environment, check=True, text=True, capture_output=True,
+        )
+        self.assertFalse((self.app / "d3d12").exists())
+        self.assertFalse((self.app / "MadeiraRuntime/d3d12").exists())
+        for folder in ("aarch64-windows", "arm64ec-windows"):
+            for name in ("d3d12.dll", "d3d12core.dll", "madeira_d3d12.dll"):
+                self.assertFalse((self.app / folder / name).exists())
+                self.assertFalse((self.app / "MadeiraRuntime" / folder / name).exists())
+        for name in ("d3d11.dll", "dxgi.dll", "winemetal.dll"):
+            self.assertTrue((self.app / "arm64ec-windows" / name).is_file())
+            self.assertTrue((self.app / "MadeiraRuntime/arm64ec-windows" / name).is_file())
+        self.assertTrue((self.source / "d3d12/libmetalirconverter.dylib").is_file())
+
     def test_vcruntime_requires_all_supplied_files(self):
         source = self.source / "x86_64-vcruntime"
         source.mkdir()
