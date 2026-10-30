@@ -290,6 +290,9 @@ struct WindowsWorkspaceView: View {
     @State private var selectedSteamGame: SelectedSteamGame?
     @State private var installMessage: String?
     @State private var isShowingInstallResult = false
+    @State private var pendingSteamCompatibilityLaunch: (game: SteamAppInfo, profile: WindowsGameProfile, prefixPath: URL)?
+    @State private var steamCompatibilityMessage = ""
+    @State private var showingSteamCompatibilityWarning = false
     @Environment(\.openURL) private var openURL
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -454,6 +457,21 @@ struct WindowsWorkspaceView: View {
         } message: {
             Text(installMessage ?? tr("Operation completed."))
         }
+        .alert(tr("Steam compatibility warning"), isPresented: $showingSteamCompatibilityWarning) {
+            Button(tr("Continue launching")) {
+                if let pending = pendingSteamCompatibilityLaunch {
+                    coordinator.launchSteamGame(
+                        game: pending.game, profile: pending.profile, prefixPath: pending.prefixPath)
+                }
+                pendingSteamCompatibilityLaunch = nil
+            }
+            Button(tr("Cancel"), role: .cancel) {
+                pendingSteamCompatibilityLaunch = nil
+            }
+        } message: {
+            Text(tr(steamCompatibilityMessage))
+        }
+
         .onAppear {
             resolvePrefixPath()
             appManager.refreshInstalledApps()
@@ -944,6 +962,13 @@ struct WindowsWorkspaceView: View {
             return
         }
         let profile = windowsLibrary.profile(for: "steam:\(game.appID)", title: game.name)
+        if MadeiraBundleIdentity.isNative,
+           let warning = coordinator.steamLaunchWarning(game: game, prefixPath: prefixPath) {
+            steamCompatibilityMessage = warning
+            pendingSteamCompatibilityLaunch = (game: game, profile: profile, prefixPath: prefixPath)
+            showingSteamCompatibilityWarning = true
+            return
+        }
         coordinator.launchSteamGame(game: game, profile: profile, prefixPath: prefixPath)
         if coordinator.windowsStatus.hasPrefix("Cannot launch") || coordinator.windowsStatus.hasPrefix("Madeira runtime missing") {
             installMessage = trStatus(coordinator.windowsStatus)

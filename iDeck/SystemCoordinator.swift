@@ -1019,8 +1019,36 @@ class SystemCoordinator: ObservableObject {
         return "Execution Error: Madeira launch failed (code \(status): \(message))."
     }
 
+    /// Reads only metadata already available to iDeck and filenames inside
+    /// the installed game. This does not connect to Steam or block an EXE.
+    func steamLaunchWarning(game: SteamAppInfo, prefixPath: URL) -> String? {
+        let drive = prefixPath.appendingPathComponent("drive_c", isDirectory: true)
+        let steamApps = SteamInstallPaths.steamApps(drive: drive)
+        guard SteamInstallFiles.buildID(appID: Int(game.appID), steamApps: steamApps) != nil else {
+            return nil
+        }
+        let name = SteamInstallFiles.installDirectoryName(
+            appID: Int(game.appID), steamApps: steamApps) ??
+            SteamInstallFiles.safeFolderName(game.installDir)
+        let directory = SteamInstallPaths.common(drive: drive)
+            .appendingPathComponent(name, isDirectory: true)
+        guard let selected = steamExecutable(game: game, directory: directory) else {
+            return nil
+        }
+        let manager = FileManager.default
+        let rootNames = (try? manager.contentsOfDirectory(atPath: directory.path)) ?? []
+        let workNames = selected.workingDirectory.path == directory.path ? [] :
+            ((try? manager.contentsOfDirectory(atPath: selected.workingDirectory.path)) ?? [])
+        let finding = SteamLaunchCompatibility.classify(
+            executable: selected.url.lastPathComponent,
+            launchType: selected.type,
+            localEntries: Array((rootNames + workNames).prefix(1024)))
+        SteamLog.event("[steam-compat] app=\(game.appID) source=\(selected.source) class=\(finding.kind.rawValue)")
+        return finding.warning
+    }
+
     private func steamExecutable(game: SteamAppInfo, directory: URL)
-        -> (url: URL, arguments: String, workingDirectory: URL, source: String)? {
+        -> (url: URL, arguments: String, workingDirectory: URL, source: String, type: String)? {
         let fm = FileManager.default
         let root = directory.resolvingSymlinksInPath().standardizedFileURL
 
@@ -1060,7 +1088,7 @@ class SystemCoordinator: ObservableObject {
                 workdir = executable.deletingLastPathComponent()
             }
             return (executable, option.arguments, workdir,
-                    "steam-config-\(option.index ?? 0)")
+                    "steam-config-\(option.index ?? 0)", option.type)
         }
 
         let blockedNames = Set([
@@ -1106,7 +1134,7 @@ class SystemCoordinator: ObservableObject {
                 : $0.score > $1.score
         }).first, best.score > -100 else { return nil }
         SteamLog.event("[steam-start] app=\(game.appID) using executable fallback; Steam metadata did not resolve")
-        return (best.url, "", best.url.deletingLastPathComponent(), "installed-files")
+        return (best.url, "", best.url.deletingLastPathComponent(), "installed-files", "")
     }
 
     /// Loads and starts a guest .app inside this process (see LiveContainerHook).

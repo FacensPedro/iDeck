@@ -20,6 +20,43 @@ import Glibc
 // Dock starts the game through, understands: a game is "installed" for Dock
 // once its record says so, and the record is written last.
 
+/// Conservative, offline compatibility hint based only on Steam PICS launch
+/// options and filenames already installed in the same game folder.
+enum SteamLaunchCompatibility {
+    enum Kind: String { case direct, launcherChild, steamClient, antiCheat }
+
+    struct Finding {
+        let kind: Kind
+        let warning: String?
+    }
+
+    static func classify(executable: String, launchType: String = "",
+                         localEntries: [String] = []) -> Finding {
+        let name = executable.replacingOccurrences(of: "\\", with: "/")
+            .split(separator: "/").last.map { String($0).lowercased() } ?? ""
+        let files = Set(localEntries.prefix(1024).map { $0.lowercased() })
+        let antiCheatFiles: Set<String> = [
+            "easyanticheat", "easyanticheat_eos", "easyanticheat_eos_setup.exe",
+            "easyanticheat.exe", "beservice.exe", "battleye",
+            "bedaisy.sys", "vgk.sys", "eac_launcher.exe", "eaanticheat.gameservicelauncher.exe"
+        ]
+        if antiCheatFiles.contains(name) || !files.isDisjoint(with: antiCheatFiles) {
+            return Finding(kind: .antiCheat,
+                           warning: "Known kernel anti-cheat components are not supported by Wine on iOS.")
+        }
+        let kind = launchType.lowercased()
+        if kind.contains("launcher") || name.contains("launcher") {
+            return Finding(kind: .launcherChild,
+                           warning: "This Steam launcher may start another game process. Enable child processes only if needed.")
+        }
+        if name == "steam.exe" || files.contains("steamclient.dll") {
+            return Finding(kind: .steamClient,
+                           warning: "This game may require the Windows Steam client or Steam DRM.")
+        }
+        return Finding(kind: .direct, warning: nil)
+    }
+}
+
 enum SteamInstallPaths {
     /// The library folder, relative to drive_c (the value `DockGame.library` has).
     static let libraryRelative = "Program Files (x86)/Steam/steamapps"
