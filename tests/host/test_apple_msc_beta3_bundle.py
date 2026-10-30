@@ -34,7 +34,6 @@ class AppleMSCBundleTests(unittest.TestCase):
             "package_sha256": msc.PACKAGE_SHA256,
             "converter": "Apple Metal Shader Converter 4.0 beta 3",
             "architecture": "arm64",
-            "platform": "iOS",
             "device_execution_verified": False,
             "platform": "iOS",
             "minimum_ios": "13.0.0",
@@ -55,7 +54,7 @@ class AppleMSCBundleTests(unittest.TestCase):
         self.pack()
 
     def pack(self):
-        with zipfile.ZipFile(self.ipa, "w") as archive:
+        with zipfile.ZipFile(self.ipa, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=1) as archive:
             archive.writestr(
                 "Payload/iDeck.app/MadeiraRuntimeManifest.plist",
                 plistlib.dumps({"graphicsBackend": "d3d12", "d3d12Linked": True}),
