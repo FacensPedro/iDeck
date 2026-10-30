@@ -349,6 +349,7 @@ jobs:
     runs-on: xcode-27
     outputs:
       ipa_kind: ${{ steps.detect_ipa_kind.outputs.kind }}
+      ipa_artifact_url: ${{ steps.ipa_artifact.outputs.artifact-url }}
     # Untrusted PRs build the interface only. Main and release tags build
     # the fully native runtime only after the owner explicitly authorizes
     # Metal Shader Converter and third-party redistribution in Actions vars.
@@ -677,12 +678,12 @@ jobs:
           echo 'An IPA is internally a ZIP-formatted iOS app package. The new artifact removes only the extra GitHub ZIP wrapper.' >> "$GITHUB_STEP_SUMMARY"
 
   release:
-    name: Publish verified iDeck IPA release
+    name: ${{ github.event_name == 'pull_request' && 'Verify PR iDeck IPA preview' || 'Publish verified iDeck IPA release' }}
     needs: [checks, build]
-    # Publishing must never run for PRs (including untrusted forks). On main,
-    # every successful build is an explicitly labeled CI prerelease. Versioned
-    # tags and manual release_tag requests require a real native runtime.
-    if: ${{ needs.checks.result == 'success' && needs.build.result == 'success' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')))) }}
+    # Every PR gets a final, read-only IPA verification and an artifact link.
+    # Only main, version tags, or manual release requests may publish a
+    # GitHub Release; PR content never gets to execute the release command.
+    if: ${{ needs.checks.result == 'success' && needs.build.result == 'success' && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')))) }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -720,7 +721,32 @@ jobs:
           print(f"Release artifact verified: {kind}")
           PY
 
+      - name: Provide verified IPA to pull request
+        if: ${{ github.event_name == 'pull_request' }}
+        env:
+          IPA_URL: ${{ needs.build.outputs.ipa_artifact_url }}
+          IPA_KIND: ${{ needs.build.outputs.ipa_kind }}
+        run: |
+          set -euo pipefail
+          [[ "$IPA_URL" == https://github.com/*/actions/runs/*/artifacts/* ]] || {
+            echo "::error::The verified IPA artifact download URL was not provided by the build job."
+            exit 2
+          }
+          [[ "$IPA_KIND" == "interface" || "$IPA_KIND" == "native" ]] || {
+            echo "::error::The IPA kind was not verified."
+            exit 2
+          }
+          echo '## Pull request IPA verified — available for download' >> "$GITHUB_STEP_SUMMARY"
+          echo "Download: [iDeck.ipa (direct artifact)]($IPA_URL)" >> "$GITHUB_STEP_SUMMARY"
+          if [[ "$IPA_KIND" == "interface" ]]; then
+            echo '**Interface-only IPA:** this PR build does not contain FEX, Wine, DXMT or D3D12 and cannot run Windows games.' >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo '**Native Madeira IPA:** bundle verification passed, but device signing, JIT and Windows game execution remain unverified.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+          echo 'A pull request does not create a public GitHub Release.' >> "$GITHUB_STEP_SUMMARY"
+
       - name: Publish release
+        if: ${{ github.event_name != 'pull_request' }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}

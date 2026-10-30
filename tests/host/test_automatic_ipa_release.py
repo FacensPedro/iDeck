@@ -8,7 +8,8 @@ WORKFLOW = (ROOT / ".github/workflows/ios.yml").read_text(encoding="utf-8")
 class AutomaticIPAReleaseTests(unittest.TestCase):
     def test_release_runs_after_main_build_and_tests(self):
         release = WORKFLOW.split("\n  release:\n", 1)[1]
-        self.assertIn("name: Publish verified iDeck IPA release", release)
+        self.assertIn("Verify PR iDeck IPA preview", release)
+        self.assertIn("Publish verified iDeck IPA release", release)
         self.assertIn("needs: [checks, build]", release)
         self.assertIn("needs.checks.result == 'success'", release)
         self.assertIn("needs.build.result == 'success'", release)
@@ -16,14 +17,31 @@ class AutomaticIPAReleaseTests(unittest.TestCase):
         self.assertIn("startsWith(github.ref, 'refs/tags/')", release)
         self.assertIn("github.event_name == 'workflow_dispatch'", release)
         self.assertNotIn("github.event_name != 'workflow_dispatch' || inputs.require_madeira", release)
-        self.assertNotIn("github.event_name == 'pull_request' ||", release)
+        self.assertIn("github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'", release)
 
-    def test_release_does_not_run_for_pull_request_events(self):
+    def test_pr_final_job_runs_but_cannot_publish_a_github_release(self):
         release = WORKFLOW.split("\n  release:\n", 1)[1]
         self.assertIn("github.event_name == 'workflow_dispatch'", release)
         self.assertIn("github.event_name == 'push'", release)
-        self.assertNotIn("github.event_name == 'pull_request'", release)
+        self.assertIn("github.event_name == 'pull_request'", release)
         self.assertIn("permissions:\n      contents: write", release)
+        self.assertIn("if: ${{ github.event_name == 'pull_request' }}", release)
+        self.assertIn("if: ${{ github.event_name != 'pull_request' }}", release)
+        self.assertIn("name: Provide verified IPA to pull request", release)
+        self.assertIn("A pull request does not create a public GitHub Release.", release)
+        self.assertIn("needs.build.outputs.ipa_artifact_url", release)
+        self.assertIn('test -s iDeck.ipa', release)
+        self.assertIn('unzip -tq iDeck.ipa', release)
+
+    def test_pr_artifact_url_is_output_from_successful_build_only(self):
+        build = WORKFLOW.split("\n  build:\n", 1)[1].split("\n  release:\n", 1)[0]
+        release = WORKFLOW.split("\n  release:\n", 1)[1]
+        self.assertIn("ipa_artifact_url: ${{ steps.ipa_artifact.outputs.artifact-url }}", build)
+        self.assertIn("id: ipa_artifact", build)
+        self.assertIn("archive: false", build)
+        self.assertIn('[[ "$IPA_URL" == https://github.com/*/actions/runs/*/artifacts/* ]]', release)
+        self.assertIn('[[ "$IPA_KIND" == "interface" || "$IPA_KIND" == "native" ]]', release)
+        self.assertIn('A pull request does not create a public GitHub Release.', release)
 
     def test_exact_ipa_build_kind_is_exposed_by_packaged_file(self):
         build = WORKFLOW.split("\n  build:\n", 1)[1].split("\n  release:\n", 1)[0]
