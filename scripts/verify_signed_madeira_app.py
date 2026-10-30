@@ -40,13 +40,19 @@ def team_id(path: Path) -> str:
 
 def verify(app: Path) -> None:
     binary = app / "iDeck"
+    info = app / "Info.plist"
     manifest = app / "MadeiraRuntimeManifest.plist"
     profile = app / "embedded.mobileprovision"
     converter = app / "d3d12/libmetalirconverter.dylib"
     mirror = app / "MadeiraRuntime/d3d12/libmetalirconverter.dylib"
-    for file in (binary, manifest, profile, converter, mirror):
+    for file in (binary, info, manifest, profile, converter, mirror):
         if not file.is_file() or not file.stat().st_size:
             raise ValueError(f"missing signed native app input: {file}")
+
+    with info.open("rb") as stream:
+        bundle_id = plistlib.load(stream).get("CFBundleIdentifier")
+    if not isinstance(bundle_id, str) or not bundle_id:
+        raise ValueError("signed app has no CFBundleIdentifier")
 
     with manifest.open("rb") as stream:
         metadata = plistlib.load(stream)
@@ -70,6 +76,13 @@ def verify(app: Path) -> None:
             raise ValueError(f"provisioning profile does not authorize: {entitlement}")
     if authorized.get("com.apple.developer.team-identifier") != app_team:
         raise ValueError("signing identity does not match the provisioning team")
+    allowed_id = authorized.get("application-identifier")
+    exact_id = f"{app_team}.{bundle_id}"
+    if allowed_id not in (exact_id, f"{app_team}.*"):
+        raise ValueError(f"provisioning profile does not authorize app ID: {bundle_id}")
+    signed_id = signed.get("application-identifier")
+    if signed_id != exact_id:
+        raise ValueError(f"signature does not identify the expected app ID: {bundle_id}")
     if not profile_data.get("ExpirationDate"):
         raise ValueError("provisioning profile expiration not available")
     from datetime import datetime, timezone
