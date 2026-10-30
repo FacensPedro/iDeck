@@ -276,7 +276,11 @@ final class DepotDownloader {
         // Completed installs report the actual logical file sizes in the
         // Windows game directory, rather than cumulative compressed chunks.
         // In particular, duplicate/shared depot paths cannot inflate size.
-        state.installedBytes = SteamInstallFiles.logicalInstalledSize(at: installURL) ?? state.installedBytes
+        if let actualSize = await Task.detached(priority: .utility, operation: {
+            SteamInstallFiles.logicalInstalledSize(at: installURL)
+        }).value {
+            state.installedBytes = actualSize
+        }
         report(state)
         let installed = plans.map { plan in
             AppManifestWriter.InstalledDepot(depotID: Int(plan.depotID), manifestGID: plan.manifestGID,
