@@ -46,3 +46,31 @@ An exit code of zero indicates the Wine main process ended normally; this is not
 7. For launchers that spawn another process and exit, inspect upstream Madeira's `MADEIRA_WAIT_CHILDREN` option and potential hangs. Do not enable it for every title.
 
 The exact cause of an individual iPadOS failure still requires the Wine stderr/device logs or the specific game process crash report. No claim of complete Windows emulation or Steam game compatibility is made solely on successful compilation.
+
+## Offline Steam launch risk classification
+
+Before launching an installed Windows game, the iDeck Steam view now
+checks its cached PICS `config.launch` entry, the resolved selected
+Windows executable name and **only** the names already present in the
+installed game or selected working directory. The classifier does not
+fetch Steam data or require a Steam account during host tests.
+
+- **Direct EXE**: no risk inferred; no warning, no blocking. A copy of
+  `steam_api64.dll` by itself is NOT interpreted as DRM.
+- **Launcher**: an explicit launcher `type` or executable name suggests
+  the first process may spawn a child. The UI offers a short warning,
+  without silently enabling `MADEIRA_WAIT_CHILDREN=1` for this game.
+- **Windows Steam client/DRM**: a direct `steam.exe` selection or nearby
+  `steamclient.dll` suggests an extra dependency. The warning does not
+  claim that DRM will fail or that Steam is emulated in iDeck.
+- **Known kernel anti-cheat**: exact common BattlEye/EAC/EA/Vanguard
+  component filenames or directories produce a fixed unsupported
+  anti-cheat warning. An anti-cheat-looking substring by itself is
+  not sufficient to classify a game.
+
+The warning is shown **before** the actual Windows launch, with
+Continue and Cancel. It is advisory and does not reject unrelated
+executables or claim individual game compatibility. iDeck's normal
+Steam AppID, relative working directory and launch arguments remain
+unchanged. Signed IPA, Steam DRM and anti-cheat behavior on physical
+iOS hardware are still **NOT RUN**.
