@@ -8,10 +8,10 @@ GRAPHICS="${IDECK_MADEIRA_GRAPHICS:-d3d12}"
 [[ "$GRAPHICS" == "d3d11" || "$GRAPHICS" == "d3d12" ]] || {
   echo "ERROR: unsupported Madeira graphics profile: $GRAPHICS" >&2; exit 2;
 }
-if [[ "$GRAPHICS" == "d3d11" && "${IDECK_BUILD_WOW64:-0}" != "0" ]]; then
-  echo "ERROR: D3D11 x86-64-only profile forbids WoW64." >&2
+[[ "${IDECK_BUILD_WOW64:-0}" == "0" || "${IDECK_BUILD_WOW64:-0}" == "1" ]] || {
+  echo "ERROR: IDECK_BUILD_WOW64 must be 0 or 1." >&2
   exit 2
-fi
+}
 
 [[ -d "$APP" ]] || { echo "ERROR: missing iDeck.app: $APP" >&2; exit 2; }
 [[ -d "$SOURCE" ]] || { echo "ERROR: Madeira compiled resources missing: $SOURCE" >&2; exit 2; }
@@ -46,10 +46,12 @@ if [[ "$GRAPHICS" == "d3d11" ]]; then
       rm -f "$APP/$folder/$module"
     done
   done
-  for module in xtajit.dll wow64.dll wow64win.dll; do
-    rm -f "$APP/aarch64-windows/$module"
-  done
-  rm -rf "$APP/i386-windows" "$RUNTIME/i386-windows"
+  if [[ "${IDECK_BUILD_WOW64:-0}" == "0" ]]; then
+    for module in xtajit.dll wow64.dll wow64win.dll; do
+      rm -f "$APP/aarch64-windows/$module"
+    done
+    rm -rf "$APP/i386-windows" "$RUNTIME/i386-windows"
+  fi
   rm -rf "$APP/d3d12" "$RUNTIME/d3d12"
 fi
 
@@ -175,6 +177,13 @@ for name in NOTICE.txt METAL-SHADER-CONVERTER-AGREEMENT.txt LICENSE-metal-shader
   cp "$SOURCE/d3d12/$name" "$APP/d3d12/$name"
   cp "$SOURCE/d3d12/$name" "$RUNTIME/d3d12/$name"
 done
+if [[ "${IDECK_MSC_REQUIRE_BETA3:-0}" == "1" ]]; then
+  for name in METAL-SHADER-CONVERTER-4.0-BETA-3-LICENSE.rtf apple-msc-4.0-beta-3-provenance.json; do
+    [[ -s "$SOURCE/d3d12/$name" ]] || { echo "ERROR: audited Apple 4.0 beta 3 converter notice missing: $name" >&2; exit 2; }
+    cp "$SOURCE/d3d12/$name" "$APP/d3d12/$name"
+    cp "$SOURCE/d3d12/$name" "$RUNTIME/d3d12/$name"
+  done
+fi
 
 [[ "${IDECK_ACCEPT_METAL_CONVERTER_LICENSE:-0}" == "1" ]] || {
   echo "ERROR: Metal Shader Converter redistribution rights not confirmed." >&2
