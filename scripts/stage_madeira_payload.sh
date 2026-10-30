@@ -8,6 +8,10 @@ GRAPHICS="${IDECK_MADEIRA_GRAPHICS:-d3d12}"
 [[ "$GRAPHICS" == "d3d11" || "$GRAPHICS" == "d3d12" ]] || {
   echo "ERROR: unsupported Madeira graphics profile: $GRAPHICS" >&2; exit 2;
 }
+if [[ "$GRAPHICS" == "d3d11" && "${IDECK_BUILD_WOW64:-0}" != "0" ]]; then
+  echo "ERROR: D3D11 x86-64-only profile forbids WoW64." >&2
+  exit 2
+fi
 
 [[ -d "$APP" ]] || { echo "ERROR: missing iDeck.app: $APP" >&2; exit 2; }
 [[ -d "$SOURCE" ]] || { echo "ERROR: Madeira compiled resources missing: $SOURCE" >&2; exit 2; }
@@ -42,7 +46,11 @@ if [[ "$GRAPHICS" == "d3d11" ]]; then
       rm -f "$APP/$folder/$module"
     done
   done
-  rm -rf "$APP/d3d12" "$APP/MadeiraRuntime/d3d12"
+  for module in xtajit.dll wow64.dll wow64win.dll; do
+    rm -f "$APP/aarch64-windows/$module"
+  done
+  rm -rf "$APP/i386-windows" "$RUNTIME/i386-windows"
+  rm -rf "$APP/d3d12" "$RUNTIME/d3d12"
 fi
 
 [[ -s "$SOURCE/prefix-template.tar.gz" ]] || {
@@ -94,7 +102,7 @@ done
   echo "ERROR: Wine locale.nls is missing" >&2; exit 2;
 }
 
-if [[ -s "$SOURCE/i386-windows/ntdll.dll" ]]; then
+if [[ "${IDECK_BUILD_WOW64:-0}" == "1" && -s "$SOURCE/i386-windows/ntdll.dll" ]]; then
   for name in ntdll.dll kernel32.dll user32.dll d3d11.dll dxgi.dll; do
     [[ -s "$SOURCE/i386-windows/$name" ]] || {
       echo "ERROR: incomplete i386 Wine farm: $name" >&2; exit 2;
