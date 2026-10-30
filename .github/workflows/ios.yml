@@ -234,6 +234,9 @@ jobs:
             -o /tmp/ideck-steam-disk-tests
           /tmp/ideck-steam-disk-tests
 
+      - name: Test native dispatch WoW64, D3D11 kit cache and D3D12 license gates
+        run: python3 -m unittest discover -s tests/host -p 'test_actions_native_dispatch_matrix.py' -v
+
       - name: Test reusable Madeira kit validation and shell build
         run: |
           python3 -m unittest discover -s tests/host -p 'test_madeira_native_kit.py' -v
