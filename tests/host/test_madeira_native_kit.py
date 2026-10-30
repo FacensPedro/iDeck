@@ -77,7 +77,7 @@ class MadeiraNativeKitTests(unittest.TestCase):
             "wine_mono": mono,
             "graphics": graphics,
             "wine_version": kit.WINE_VERSION,
-            "d3d12_backend": "madeira-d3d12",
+            "d3d12_backend": "madeira-d3d12" if graphics == "d3d12" else "disabled",
             "arm64ec_context_patch_sha256": kit.ARM64EC_CONTEXT_PATCH_SHA256,
             "arm_host_feature_patch_sha256": kit.ARM_HOST_FEATURE_PATCH_SHA256,
             "repeat_wine_session_patch_sha256": kit.REPEAT_WINE_SESSION_PATCH_SHA256,
