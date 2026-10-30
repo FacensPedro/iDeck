@@ -50,6 +50,35 @@ O status de aprovação desta fase deve ser derivado do job macOS
 `Compile real FEXCore arm64 and xtajit64 ARM64EC` na revisão exata.
 Os testes host confirmam os *gates*, não substituem esse job.
 
+### Fase 4: Wine ARM64EC, Unix libraries e wineserver
+
+A fase 3 passou no job de compilação real
+[GitHub Actions #40999473834](https://github.com/FacensPedro/iDeck/actions/runs/40999473834):
+FEXCore arm64, allocator iOS e xtajit64.dll ARM64EC, com auditoria
+do CMake e recibo de hashes SHA-256.
+
+Na **fase 4**, `.github/workflows/madeira-wine-stage4.yml` invoca
+`IDECK_MADEIRA_STOP_AFTER=wine IDECK_MADEIRA_GRAPHICS=d3d11
+IDECK_BUILD_WOW64=0 bash scripts/build_madeira_components.sh`.
+Isso recompila o FEX e executa o Wine a partir do commit público
+pinned 11.4, com LLVM ARM64EC e as bibliotecas iPhoneOS da fase 2,
+sem acionar shaders Metal/DXMT ou empacotar um IPA.
+
+O `scripts/verify_madeira_wine_stage4.py` exige `ntdll.dll`
+ARM64EC, arquivos estáticos `libntdll_unix.a`,
+`libwineserver.a` e `libwin32u_unix.a` para iPhoneOS arm64, além de
+confirmar o build/configuração ARM64EC, os cabeçalhos Wine gerados para
+ambos os builds, a receita de wineserver compilado das fontes
+e os artefatos FEX já exigidos na fase 3. O arquivo
+`wine-stage4-receipt.json` relaciona os artefatos com SHA-256 e
+identifica explicitamente os testes ainda não realizados no dispositivo.
+
+A fase 4 **só está concluída** quando o job macOS
+`Compile real Wine ARM64EC PE and iPhoneOS Unix/wineserver archives`
+passar integralmente. Os testes host de CMake, checklists ou mocks não
+provam um Wine executável no iPad. Inicialização do wineserver, execução
+do guest e encerramento seguro exigem validação física nas fases 7–9.
+
 ### Fases 3–5: pontos de parada independentes
 
 Com as toolchains previamente verificadas, em runner Xcode/macos:
