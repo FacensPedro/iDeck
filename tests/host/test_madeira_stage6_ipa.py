@@ -28,7 +28,7 @@ class MadeiraStage6IPATests(unittest.TestCase):
         for relative in stage.IPA_PAYLOADS:
             path = self.app / relative.lstrip("/")
             path.parent.mkdir(parents=True, exist_ok=True)
-            data = (relative + "\n").encode("utf-8") * 128
+            data = (relative + "\n").encode("utf-8") * 512
             if relative == "Info.plist":
                 data = plistlib.dumps({"CFBundleIdentifier": "com.ideck.ideck"})
             elif relative == "PlugIns/VPNExtension.appex/Info.plist":
