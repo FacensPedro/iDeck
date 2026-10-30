@@ -41,12 +41,14 @@ python3 -c 'import json,sys;print(json.dumps(sys.argv[1:]))' ${FLAGS[@]+"${FLAGS
         build = (ROOT / "scripts/build_ipa.sh").read_text(encoding="utf-8")
         self.assertNotIn("WOW64_FLAGS[@]", build)
 
-    def test_native_build_defaults_to_wow64_and_allows_explicit_opt_out(self):
+    def test_legacy_native_keeps_wow64_default_but_d3d11_is_x64_only(self):
         ipa = (ROOT / "scripts/build_ipa.sh").read_text(encoding="utf-8")
         native = (ROOT / "scripts/build_native_runtime.sh").read_text(encoding="utf-8")
         components = (ROOT / "scripts/build_madeira_components.sh").read_text(encoding="utf-8")
-        for source in (ipa, native):
-            self.assertIn('export IDECK_BUILD_WOW64="${IDECK_BUILD_WOW64:-1}"', source)
+        self.assertIn('export IDECK_BUILD_WOW64="${IDECK_BUILD_WOW64:-1}"', native)
+        self.assertIn('export IDECK_MADEIRA_GRAPHICS="${IDECK_MADEIRA_GRAPHICS:-d3d12}"', ipa)
+        self.assertIn('IDECK_BUILD_WOW64:-$([[ "$IDECK_MADEIRA_GRAPHICS" == "d3d11" ]] && echo 0 || echo 1)', ipa)
+        self.assertIn('D3D11-first profile currently supports x86-64 only', ipa)
         self.assertIn('bash "$MD/build/fex-wow64/build.sh"', components)
         self.assertIn('bash "$MD/build/wine-i386/build.sh"', components)
 
@@ -57,7 +59,7 @@ python3 -c 'import json,sys;print(json.dumps(sys.argv[1:]))' ${FLAGS[@]+"${FLAGS
             source,
         )
         self.assertIn(
-            'python3 scripts/verify_madeira_bundle.py --app "$APP" --require\n',
+            'python3 scripts/verify_madeira_bundle.py --app "$APP" --require --graphics "$IDECK_MADEIRA_GRAPHICS"\n',
             source,
         )
 
