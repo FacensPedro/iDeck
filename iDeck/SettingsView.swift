@@ -144,6 +144,17 @@ struct SettingsView: View {
         .preferredColorScheme(.dark)
     }
     
+    private var shouldShowJITDiagnostics: Bool {
+        // The snapshot is a read-only try-lock probe; reading it does not
+        // allocate executable memory or trigger the StikDebug BRK handler.
+        let snapshot = ideck_jit_snapshot()
+        return !coordinator.isJITEnabled ||
+               (!coordinator.isStikDebugAttached && !coordinator.isWineJITPrepared) ||
+               snapshot.wine_failure_stage != 0 ||
+               snapshot.wine_failure_rx_detail != 0 ||
+               snapshot.wine_failure_mach_code != 0
+    }
+
     private var statusRow: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 10) {
@@ -162,28 +173,30 @@ struct SettingsView: View {
                 }
                 Spacer(minLength: 0)
             }
-            Button {
-                copyJITDiagnostics()
-            } label: {
-                HStack {
-                    Image(systemName: "doc.on.doc")
-                    Text(tr("Copy JIT diagnostics"))
-                    Spacer()
-                    if jitDiagnosticsCopied {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundColor(.green)
+            if shouldShowJITDiagnostics {
+                Button {
+                    copyJITDiagnostics()
+                } label: {
+                    HStack {
+                        Image(systemName: "doc.on.doc")
+                        Text(tr("Copy JIT diagnostics"))
+                        Spacer()
+                        if jitDiagnosticsCopied {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(.green)
+                        }
                     }
+                    .font(.subheadline)
+                    .foregroundColor(.white)
+                    .padding(.vertical, 10)
                 }
-                .font(.subheadline)
-                .foregroundColor(.white)
-                .padding(.vertical, 10)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(tr("Copy JIT diagnostics"))
-            if jitDiagnosticsCopied {
-                Text(tr("JIT diagnostics copied to clipboard"))
-                    .font(.caption)
-                    .foregroundColor(.green)
+                .buttonStyle(.plain)
+                .accessibilityLabel(tr("Copy JIT diagnostics"))
+                if jitDiagnosticsCopied {
+                    Text(tr("JIT diagnostics copied to clipboard"))
+                        .font(.caption)
+                        .foregroundColor(.green)
+                }
             }
             if coordinator.isJITEnabled {
                 HStack {
@@ -303,18 +316,8 @@ struct SettingsView: View {
         }
         .disabled(updater.isChecking)
         
-        if let update = updater.availableIDeckUpdate {
-            actionButton(title: tr("Update iDeck %@", update.latest ?? ""), icon: "arrow.down.circle.fill") {
-                updater.installIDeckUpdate()
-            }
-        }
-        if let message = updater.installHandoffMessage {
-            Text(tr(message))
-                .font(.caption)
-                .foregroundColor(.orange)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.horizontal, 16)
-        }
+        // No in-app iDeck update action: users install signed IPAs through
+        // their chosen installer. The version list remains read-only.
     }
     
     /// iDeck shows the installed version; the other projects show the newest release that has an IPA.

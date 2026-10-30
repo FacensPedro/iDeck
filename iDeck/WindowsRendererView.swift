@@ -157,24 +157,34 @@ struct WindowsRendererView: UIViewRepresentable {
                                 width: frame.width, height: max(1, frame.height - toolbar))
         if host.frame != positioned {
             host.frame = positioned
-            // Madeira's GDI/Win32 compositor is a separate window-level
-            // surface. Without these coordinates Wine desktop/UI windows can
-            // render outside the guest viewport while DXMT frames are visible.
-            if let symbol = dlsym(UnsafeMutableRawPointer(bitPattern: -2),
-                                  "winios_set_compositor_frame") {
-                let setFrame = unsafeBitCast(symbol, to: SetCompositorFrame.self)
-                setFrame(Double(frame.minX), Double(frame.minY),
-                         Double(frame.width), Double(frame.height))
-            }
-            if let symbol = dlsym(UnsafeMutableRawPointer(bitPattern: -2),
-                                  "winios_set_desktop_rect") {
-                let setDesktop = unsafeBitCast(symbol, to: SetDesktopRect.self)
-                setDesktop(0, Double(toolbar), Double(positioned.width),
-                           Double(positioned.height), 1)
-            }
+        }
+        // The Wine compositor can initialize AFTER this SwiftUI view has
+        // reached its final size. A one-time frame-change guard leaves GDI
+        // windows black because no desktop rectangle is ever published.
+        // This refresh is also invoked while a Windows guest is launching.
+        if let symbol = dlsym(UnsafeMutableRawPointer(bitPattern: -2),
+                              "winios_set_compositor_frame") {
+            let setFrame = unsafeBitCast(symbol, to: SetCompositorFrame.self)
+            setFrame(Double(frame.minX), Double(frame.minY),
+                     Double(frame.width), Double(frame.height))
+        }
+        if let symbol = dlsym(UnsafeMutableRawPointer(bitPattern: -2),
+                              "winios_set_desktop_rect") {
+            let setDesktop = unsafeBitCast(symbol, to: SetDesktopRect.self)
+            setDesktop(0, Double(toolbar), Double(positioned.width),
+                       Double(positioned.height), 1)
         }
         // Do NOT write host.metalLayer.drawableSize here. Upstream DXMT owns
         // the drawable dimensions; a second writer causes black frames.
+    }
+
+    // Re-publish native display state after Wine, its compositor and the
+    // requested guest monitor are initialized. This never recreates the
+    // CAMetalLayer or overwrites DXMT's live drawable dimensions.
+    static func refreshNativeDisplay() {
+        guard let viewport = activeViewport, viewport.window != nil else { return }
+        attachViewport(viewport)
+        layoutViewport(viewport)
     }
 
     fileprivate static func detachViewport(_ viewport: UIView) {

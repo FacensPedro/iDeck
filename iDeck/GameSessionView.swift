@@ -185,8 +185,26 @@ struct GameSessionView: View {
                             .padding(8)
                     }
                     .disabled(coordinator.isClosingWindowsSession)
-                    .accessibilityLabel("Close Wine and return to Steam library")
-                    Spacer()
+                    .accessibilityLabel(tr("Close Wine and return to Steam library"))
+                    // The Metal layer sits directly over the SwiftUI content
+                    // outside this top strip. Keep first-frame failures and
+                    // shutdown progress VISIBLE even when the drawable is black.
+                    if coordinator.isClosingWindowsSession {
+                        Text(tr("Closing Wine and wineserver..."))
+                            .foregroundColor(.white)
+                            .font(.caption.weight(.semibold))
+                            .lineLimit(2)
+                    } else if !metrics.receivedNewFrames &&
+                              (coordinator.windowsStatus == "Wine started; waiting for game..." ||
+                               coordinator.windowsStatus == "Running") {
+                        Text(tr(metrics.secondsSinceLaunch >= 20
+                            ? "No Windows game frame detected. Check the Wine log."
+                            : "Waiting for the first Windows game frame..."))
+                            .foregroundColor(metrics.secondsSinceLaunch >= 20 ? .yellow : .white)
+                            .font(.caption2.weight(.semibold))
+                            .lineLimit(2)
+                    }
+                    Spacer(minLength: 4)
                     if hasWineProblem && wineLogURL != nil {
                         Button(action: copyWineLog) {
                             Image(systemName: "doc.on.doc.fill")
@@ -227,7 +245,7 @@ struct GameSessionView: View {
                 if coordinator.isClosingWindowsSession {
                     HStack(spacing: 10) {
                         ProgressView()
-                        Text("Closing Wine and wineserver...")
+                        Text(tr("Closing Wine and wineserver..."))
                             .font(.subheadline.weight(.medium))
                     }
                     .foregroundColor(.white)
@@ -347,6 +365,16 @@ struct GameSessionView: View {
             updateRecentWineLogFinding()
         }
         .onReceive(tick) { _ in
+            // Wine's GDI compositor may come online after SwiftUI has already
+            // laid out the persistent Metal layer. Re-publish the exact
+            // viewport each second until the first native frame arrives.
+            if coordinator.windowsStatus == "Launching Steam game..." ||
+               coordinator.windowsStatus == "Launching Steam client..." ||
+               coordinator.windowsStatus == "Launching Windows app..." ||
+               coordinator.windowsStatus == "Wine started; waiting for game..." ||
+               coordinator.windowsStatus == "Running" {
+                WindowsRendererView.refreshNativeDisplay()
+            }
             metrics.sample(collectPerformance: showGamePerformanceOverlay)
             if coordinator.windowsStatus == "Wine started; waiting for game..." &&
                metrics.receivedNewFrames {
@@ -361,15 +389,15 @@ struct GameSessionView: View {
         .onDisappear {
             WineInputBridge.shared.stopBridging()
         }
-        .alert("Wine did not close", isPresented: Binding(
+        .alert(tr("Wine did not close"), isPresented: Binding(
             get: { coordinator.windowsCloseWarning != nil },
             set: { if !$0 { coordinator.acknowledgeWindowsCloseWarning() } }
         )) {
-            Button("Retry Close") { coordinator.retryCloseWindowsSession() }
-            Button("Keep Waiting") { coordinator.acknowledgeWindowsCloseWarning() }
-            Button("Return to Game", role: .cancel) { coordinator.cancelWindowsSessionClose() }
+            Button(tr("Retry Close")) { coordinator.retryCloseWindowsSession() }
+            Button(tr("Keep Waiting")) { coordinator.acknowledgeWindowsCloseWarning() }
+            Button(tr("Return to Game"), role: .cancel) { coordinator.cancelWindowsSessionClose() }
         } message: {
-            Text(coordinator.windowsCloseWarning ?? "")
+            Text(tr(coordinator.windowsCloseWarning ?? ""))
         }
     }
 }
