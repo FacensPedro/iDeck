@@ -4,6 +4,15 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MD="${IDECK_MADEIRA_ROOT:-$ROOT/vendor/Madeira}"
 REBUILD="${IDECK_MADEIRA_REBUILD:-1}"
+STOP_AFTER="${IDECK_MADEIRA_STOP_AFTER:-all}"
+[[ "$STOP_AFTER" == "fex" || "$STOP_AFTER" == "wine" || "$STOP_AFTER" == "all" ]] || {
+  echo "ERROR: IDECK_MADEIRA_STOP_AFTER must be fex, wine or all." >&2
+  exit 2
+}
+if [[ "$STOP_AFTER" != "all" && "$REBUILD" != "1" ]]; then
+  echo "ERROR: partial native build stages require IDECK_MADEIRA_REBUILD=1." >&2
+  exit 2
+fi
 GRAPHICS="${IDECK_MADEIRA_GRAPHICS:-d3d12}"
 [[ "$GRAPHICS" == "d3d11" || "$GRAPHICS" == "d3d12" ]] || {
   echo "ERROR: IDECK_MADEIRA_GRAPHICS must be d3d11 or d3d12." >&2; exit 2;
@@ -51,9 +60,10 @@ fi
 bash "$ROOT/scripts/prepare_madeira_toolchains.sh"
 bash "$ROOT/scripts/verify_dxmt_llvm.sh"
 
+if [[ "$STOP_AFTER" == "all" ]]; then
 bash "$ROOT/scripts/ensure_metal_toolchain.sh"
 
-# Validate the exact DXMT shader sources before the expensive Wine/FEX build.
+# Validate the exact DXMT shader sources only when DXMT is being built.
 DXMT_PREFLIGHT_DIR="$(mktemp -d "${TMPDIR:-/tmp}/ideck-dxmt-shaders.XXXXXXXX")"
 for shader in air_msad air_samplepos air_tessellation; do
   if ! xcrun --sdk macosx metal -std=metal3.1 --target=air64-apple-macos14.0 \
@@ -69,6 +79,7 @@ for shader in air_msad air_samplepos air_tessellation; do
   fi
 done
 rm -rf "$DXMT_PREFLIGHT_DIR"
+fi
 
 if [[ "$REBUILD" == "1" ]]; then
   bash "$ROOT/scripts/prepare_madeira_dependencies.sh" "$MD"
@@ -105,6 +116,16 @@ if [[ "$REBUILD" == "1" ]]; then
   bash "$MD/build/fex-ios/build.sh"
   bash "$ROOT/scripts/build_fex_ios_allocator.sh"
   bash "$MD/build/fex-arm64ec/build.sh"
+  if [[ "$STOP_AFTER" == "fex" ]]; then
+    for file in "$MD/FEX/build-ios/FEXCore/Source/libFEXCore.a" \
+                "$MD/FEX/build-ios/FEXCore/Source/libFEXCore_Base.a" \
+                "$MD/FEX/build-ios/FEXCore/Source/libJemallocLibs.a" \
+                "$MD/app/Madeira/arm64ec-windows/xtajit64.dll"; do
+      [[ -s "$file" ]] || { echo "ERROR: required FEX output not compiled: $file" >&2; exit 2; }
+    done
+    echo "PASS: public FEX iPhoneOS ARM64 and ARM64EC JIT artifacts compiled; Wine/DXMT not yet validated."
+    exit 0
+  fi
   bash "$MD/build/wine-pe/build-ntdll.sh"
   [[ -s "$MD/app/Madeira/arm64ec-windows/ntdll.dll" ]] || {
     echo "ERROR: Wine ARM64EC ntdll.dll was not generated." >&2; exit 2;
@@ -149,6 +170,17 @@ if [[ "$REBUILD" == "1" ]]; then
   bash "$ROOT/scripts/build_madeira_luajit.sh"
   bash "$MD/build/wineserver/build.sh"
   bash "$MD/build/win32u-unix/build.sh"
+  if [[ "$STOP_AFTER" == "wine" ]]; then
+    for file in "$MD/app/Madeira/libntdll_unix.a" \
+                "$MD/app/Madeira/libwineserver.a" \
+                "$MD/app/Madeira/libwin32u_unix.a" \
+                "$MD/app/Madeira/arm64ec-windows/ntdll.dll" \
+                "$MD/app/Madeira/arm64ec-windows/xtajit64.dll"; do
+      [[ -s "$file" ]] || { echo "ERROR: required Wine ARM64EC output not compiled: $file" >&2; exit 2; }
+    done
+    echo "PASS: public FEX and Wine Unix/wineserver/ARM64EC artifacts compiled; DXMT not yet validated."
+    exit 0
+  fi
 
   # airconv_context.cpp embeds AIR bitcode through these generated headers.
   # Match DXMT's Meson recipe: Metal -> AIR -> C array, without metallib.
