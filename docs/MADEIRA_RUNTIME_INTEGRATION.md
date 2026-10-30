@@ -46,6 +46,41 @@ A Etapa 0 possui uma execução macOS aprovada, documentada abaixo. As Etapas
   Shader Converter. Antes de qualquer distribuição, é necessária
   confirmação separada dos direitos de licença e assinatura correta.
 
+### Ordem obrigatória para assinatura e aceitação física
+
+1. Num Mac com Xcode e SDK iPhoneOS compatíveis, compilar os componentes
+   nativos fixados, conferir todos os símbolos do executável via `nm` e
+   verificar `build/Staging/iDeck.app` usando
+   `python3 scripts/verify_madeira_bundle.py --app build/Staging/iDeck.app --require --require-wow64`.
+   **O modo estrito modifica o manifesto do bundle:** usá-lo só **antes**
+   da assinatura. Uma falha invalida a candidatura à assinatura.
+2. Somente após o responsável confirmar os termos do Apple Metal Shader
+   Converter, e dispor de certificado e perfis de provisionamento próprios,
+   assinar os binários Mach-O e as duas cópias do converter, a extensão
+   VPN e finalmente o aplicativo com o mesmo Team ID. Não alterar os
+   arquivos após a assinatura.
+3. Com o **app já assinado**, executar
+   `python3 scripts/verify_signed_madeira_app.py --app /caminho/iDeck.app`.
+   Este verificador é somente de leitura: confere assinatura, Team ID,
+   provisionamento, validade do perfil, IDs do app e entitlements
+   concedidos, sem regravar o manifesto. É propositalmente separado do
+   verificador estrito.
+4. Instalar o app assinado em um iPhone/iPad físico autorizado, com a
+   versão correta do iOS, conferir os entitlements efetivos no runtime,
+   ativar um depurador JIT compatível e iniciar um aplicativo Windows
+   conhecido e permitido dentro do prefixo Wine. Conferir que o
+   wineserver e o guest são threads no mesmo processo, sem `fork`.
+5. Registrar evidência real e datada: log da abertura do EXE,
+   `wine_process_is_running`, contador de presents com incremento,
+   primeira imagem visível na tela Metal, áudio audível, entrada
+   funcional, código/status de saída e encerramento das threads.
+   É obrigatório não confundir o primeiro frame da interface SwiftUI
+   com um frame do guest Windows.
+6. Declarar PASS apenas se todos os registros acima forem reais e
+   reproduzíveis num aparelho identificado pelo modelo e versão do
+   sistema. A ausência de hardware, provisionamento ou direitos de
+   redistribuição significa **PENDENTE**, nunca aprovação simulada.
+
 **Situação dos critérios:** nenhum `IDECK_REQUIRE_MADEIRA=1` final foi
 aprovado nesta revisão; não há observações verificadas de abertura,
 primeiro frame, áudio ou encerramento de um app Windows num dispositivo
