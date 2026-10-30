@@ -61,6 +61,7 @@ private final class GameRuntimeMetrics: ObservableObject {
 
 struct GameSessionView: View {
     @ObservedObject var coordinator: SystemCoordinator
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @StateObject private var metrics = GameRuntimeMetrics()
     @AppStorage("showGamePerformanceOverlay") private var showGamePerformanceOverlay = false
     @State private var recentWineLogFinding: String?
@@ -201,9 +202,13 @@ struct GameSessionView: View {
                         metrics.receivedNewFrames {
                         VStack(alignment: .trailing, spacing: 3) {
                             Text("FPS: \(metrics.fps)  CPU: \(metrics.cpu)")
-                            Text("GPU memory (Metal): \(metrics.gpuMemory)")
-                            Text("GPU utilization: N/A on iPadOS")
-                                .font(.system(size: 9))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
+                            if horizontalSizeClass != .compact {
+                                Text("GPU memory (Metal): \(metrics.gpuMemory)")
+                                Text("GPU utilization: unavailable on iOS")
+                                    .font(.system(size: 9))
+                            }
                         }
                         .font(.system(size: 12, design: .monospaced))
                         .foregroundColor(.white)
