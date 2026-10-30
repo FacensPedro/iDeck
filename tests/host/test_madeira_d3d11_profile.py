@@ -107,7 +107,12 @@ class MadeiraD3D11ProfileTests(unittest.TestCase):
         self.assertTrue(any("D3D12 payload directory" in error for error in self.inspect()))
 
     def test_linker_flags_exclude_only_optional_canary(self):
-        self.assertNotIn("madeira_d3d12_canary_run", module.D3D12_SYMBOLS[:0])
+        command = ["python3", str(ROOT / "scripts/verify_madeira_bundle.py"),
+                   "--linker-flags", "--graphics", "d3d11"]
+        flags = subprocess.run(command, capture_output=True, text=True, check=True).stdout
+        self.assertNotIn("-Wl,-u,_madeira_d3d12_canary_run", flags)
+        self.assertIn("-Wl,-u,_madeira_get_present_count", flags)
+        self.assertIn("-Wl,-u,_fex_initialize", flags)
         self.assertEqual(module.D3D12_SYMBOLS, ("madeira_d3d12_canary_run",))
         self.assertIn("madeira_get_present_count", module.SYMBOLS)
 
