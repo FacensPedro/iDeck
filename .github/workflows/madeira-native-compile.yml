@@ -1,15 +1,10 @@
 name: Madeira D3D11 native compilation and strict IPA verification
 
+# Native components belong to phases 2–6. Do not block the phase-1
+# D3D11-only source/profile PR or burn macOS runner minutes on every commit.
+# A maintainer must explicitly trigger the expensive source build.
 on:
   workflow_dispatch:
-  push:
-    branches: [feature/madeira-d3d11-only-stage1-20261029]
-    paths:
-      - .github/workflows/madeira-native-compile.yml
-  pull_request:
-    branches: [main]
-    paths:
-      - .github/workflows/madeira-native-compile.yml
 
 permissions:
   contents: read
