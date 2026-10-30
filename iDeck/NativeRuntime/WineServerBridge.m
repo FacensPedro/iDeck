@@ -4,6 +4,7 @@
 #include <dlfcn.h>
 #include <unistd.h>
 #include <errno.h>
+#include <dispatch/dispatch.h>
 
 bool ideck_wineserver_available(void) {
 #if defined(IDECK_NATIVE_MADEIRA_ENABLED) && IDECK_NATIVE_MADEIRA_ENABLED
@@ -57,4 +58,37 @@ bool ideck_wineserver_initialize(const char *wine_prefix) {
         }
         return false;
     }
+}
+
+// The native Wine startup initializes its wineserver BEFORE spawning the
+// Windows guest. A failed socketpair/pthread_create can leave an orphaned
+// wineserver even though the Wine guest never began. Only that idle server
+// may be stopped from iDeck; an active guest owns its own shutdown path.
+static BOOL g_ideck_idle_server_stop_pending = NO;
+
+bool ideck_wineserver_stop_if_idle(void) {
+    if (ideck_wineprocess_running() || !ideck_wineprocess_thread_finished() ||
+        !ideck_wineserver_running()) return false;
+
+    @synchronized ([NSProcessInfo processInfo]) {
+        if (g_ideck_idle_server_stop_pending) return true;
+        g_ideck_idle_server_stop_pending = YES;
+    }
+
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+        if (!ideck_wineprocess_running() && ideck_wineprocess_thread_finished() &&
+            ideck_wineserver_running()) {
+#if defined(IDECK_NATIVE_MADEIRA_ENABLED) && IDECK_NATIVE_MADEIRA_ENABLED
+            wineserver_stop();
+#else
+            typedef void (*StopFn)(void);
+            StopFn stop = (StopFn)dlsym(RTLD_DEFAULT, "wineserver_stop");
+            if (stop != NULL) stop();
+#endif
+        }
+        @synchronized ([NSProcessInfo processInfo]) {
+            g_ideck_idle_server_stop_pending = NO;
+        }
+    });
+    return true;
 }
