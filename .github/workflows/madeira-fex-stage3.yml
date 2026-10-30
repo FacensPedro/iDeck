@@ -1,0 +1,176 @@
+name: Madeira Stage 3 - Native FEX ARM64 and ARM64EC
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [feature/madeira-fex-stage3-20261030]
+    paths:
+      - .github/workflows/madeira-fex-stage3.yml
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/madeira-fex-stage3.yml
+      - scripts/build_madeira_components.sh
+      - scripts/build_fex_ios_allocator.sh
+      - scripts/verify_madeira_fex_stage3.py
+      - scripts/verify_madeira_component_outputs.py
+      - tests/host/test_madeira_fex_stage3.py
+
+permissions:
+  contents: read
+
+concurrency:
+  group: madeira-stage3-fex-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  host:
+    name: Validate standalone FEX build and JIT ABI gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout public iDeck source
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Test native FEX stage, ARM64EC output verifier and JIT configuration
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests/host -p 'test_madeira_fex_stage3.py' -v
+          python3 -m unittest discover -s tests/host -p 'test_madeira_component_outputs.py' -v
+          python3 -m unittest discover -s tests/host -p 'test_madeira_component_stages.py' -v
+          bash -n scripts/build_madeira_components.sh
+          bash -n scripts/build_fex_ios_allocator.sh
+
+  fex:
+    name: Compile real FEXCore arm64 and xtajit64 ARM64EC
+    needs: host
+    runs-on: xcode-27
+    timeout-minutes: 300
+    env:
+      IDECK_MADEIRA_GRAPHICS: d3d11
+      IDECK_BUILD_WOW64: '0'
+      IDECK_MADEIRA_STOP_AFTER: fex
+      IDECK_MADEIRA_REBUILD: '1'
+      IDECK_ACCEPT_METAL_CONVERTER_LICENSE: '0'
+      IDECK_LLVM_JOBS: '3'
+      IDECK_LLVM_REF: llvmorg-15.0.7
+      IDECK_PREBUILT_MODE: off
+      IDECK_MADEIRA_REV: fd9f2f3d0434a4116e4c3351f286a0fc376b4e36
+    steps:
+      - name: Checkout pinned public iDeck source
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Select iPhoneOS SDK
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Install public compiler prerequisites
+        run: |
+          set -euo pipefail
+          packages=()
+          for tool in cmake ninja meson pkg-config; do
+            command -v "$tool" >/dev/null 2>&1 || packages+=("$tool")
+          done
+          if (( ${#packages[@]} )); then
+            HOMEBREW_NO_AUTO_UPDATE=1 brew install "${packages[@]}"
+          fi
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-version
+          df -h .
+
+      - name: Checkout published Madeira and exact FEX submodule revision
+        run: |
+          set -euo pipefail
+          bash scripts/fetch_madeira_sources.sh
+          python3 scripts/verify_madeira_sources.py \
+            --root vendor/Madeira --revision "$IDECK_MADEIRA_REV"
+
+      - name: Restore stage 2 LLVM ARM64EC toolchains by exact source key
+        id: llvm
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            vendor/Madeira/toolchains/llvm-mingw-20260421-ucrt-macos-universal
+            vendor/Madeira/toolchains/llvm-ios-build
+          key: madeira-llvm15-ios-v3-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/prepare_madeira_toolchains.sh', 'scripts/llvm_ios_sdk.py') }}
+
+      - name: Require genuine phase 2 toolchains
+        run: |
+          set -euo pipefail
+          bash scripts/prepare_madeira_toolchains.sh
+          bash scripts/verify_madeira_toolchains.sh
+
+      - name: Save verified stage 2 compiler cache on this branch
+        if: ${{ steps.llvm.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v5
+        with:
+          path: |
+            vendor/Madeira/toolchains/llvm-mingw-20260421-ucrt-macos-universal
+            vendor/Madeira/toolchains/llvm-ios-build
+          key: ${{ steps.llvm.outputs.cache-primary-key }}
+
+      - name: Compile real public FEX iPhoneOS and ARM64EC module
+        run: |
+          set -euo pipefail
+          bash scripts/build_madeira_components.sh 2>&1 | tee fex-stage3-build.log
+
+      - name: Validate actual FEX JIT CMake flags and compiled architecture
+        run: |
+          set -euo pipefail
+          python3 scripts/verify_madeira_fex_stage3.py \
+            --root vendor/Madeira \
+            --revision "$IDECK_MADEIRA_REV" \
+            --receipt fex-stage3-receipt.json
+          test -s fex-stage3-receipt.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          receipt = json.loads(Path("fex-stage3-receipt.json").read_text())
+          if receipt["stage"] != 3 or receipt["profile"] != "d3d11-x86_64-only":
+              raise SystemExit("FEX Stage 3: invalid or mislabelled build receipt")
+          if not receipt["validated"] or len(receipt["artifact_hashes"]) != 4:
+              raise SystemExit("FEX Stage 3: compiled artifacts not fully verified")
+          print("Genuine FEX ARM64/ARM64EC outputs and SHA-256 receipt verified.")
+          PY
+
+      - name: Publish FEX archives and ARM64EC DLL, not an IPA
+        uses: actions/upload-artifact@v7
+        with:
+          name: Madeira-Stage3-FEX-arm64-arm64ec
+          path: |
+            vendor/Madeira/FEX/build-ios/FEXCore/Source/libFEXCore.a
+            vendor/Madeira/FEX/build-ios/FEXCore/Source/libFEXCore_Base.a
+            vendor/Madeira/FEX/build-ios/FEXCore/Source/libJemallocLibs.a
+            vendor/Madeira/app/Madeira/arm64ec-windows/xtajit64.dll
+            fex-stage3-receipt.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload diagnostics even after native compiler failure
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: Madeira-Stage3-FEX-diagnostics
+          path: |
+            fex-stage3-build.log
+            vendor/Madeira/FEX/build-ios/CMakeFiles/CMakeConfigureLog.yaml
+            vendor/Madeira/FEX/build-ios/CMakeFiles/CMakeOutput.log
+            vendor/Madeira/FEX/build-ios/CMakeFiles/CMakeError.log
+            vendor/Madeira/FEX/build-arm64ec/CMakeFiles/CMakeConfigureLog.yaml
+            vendor/Madeira/FEX/build-arm64ec/CMakeFiles/CMakeOutput.log
+            vendor/Madeira/FEX/build-arm64ec/CMakeFiles/CMakeError.log
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Record exactly what phase 3 proves
+        if: success()
+        run: |
+          echo '### Madeira stage 3: FEX source compilation passed' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Pinned public FEXCore arm64 static archives, iOS allocator and ARM64EC PE xtajit64.dll compiled and passed architecture/JIT-option checks.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'SHA-256 receipt and public-source revisions are included in the FEX artifact.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'No Apple Metal Shader Converter, D3D12 IPA or Microsoft DLLs distributed by this FEX-only artifact.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'NOT validated: iPad StikDebug attachment, executable RX/RW JIT mapping, Windows guest execution and first game frame.' >> "$GITHUB_STEP_SUMMARY"
