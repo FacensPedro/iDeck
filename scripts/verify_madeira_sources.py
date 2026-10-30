@@ -23,7 +23,7 @@ def git(path: Path, *args: str) -> str:
     result = subprocess.run(command, text=True, capture_output=True, check=False)
     if result.returncode != 0:
         raise ValueError(f"git command failed ({' '.join(args)}): {result.stderr.strip()}")
-    return result.stdout.strip()
+    return result.stdout.rstrip("\n")
 
 
 def expected_gitlink(root: Path, path: str) -> str:
