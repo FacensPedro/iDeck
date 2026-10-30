@@ -29,9 +29,25 @@ if [[ "${IDECK_REQUIRE_MADEIRA:-0}" == "1" ]]; then
     }
   fi
   export IDECK_BUILD_WOW64="${IDECK_BUILD_WOW64:-$([[ "$IDECK_MADEIRA_GRAPHICS" == "d3d11" ]] && echo 0 || echo 1)}"
-  if [[ "$IDECK_MADEIRA_GRAPHICS" == "d3d11" && "$IDECK_BUILD_WOW64" != "0" ]]; then
-    echo "ERROR: D3D11-first profile currently supports x86-64 only; set IDECK_BUILD_WOW64=0." >&2
+  [[ "$IDECK_BUILD_WOW64" == "0" || "$IDECK_BUILD_WOW64" == "1" ]] || {
+    echo "ERROR: IDECK_BUILD_WOW64 must be 0 or 1." >&2
     exit 2
+  }
+  if [[ -n "${IDECK_MSC_PKG:-}" ]]; then
+    [[ "$IDECK_MADEIRA_GRAPHICS" == "d3d12" ]] || {
+      echo "ERROR: Apple Metal Shader Converter package is for an explicitly selected D3D12 build." >&2
+      exit 2
+    }
+    export IDECK_PREBUILT_MODE=off
+    export IDECK_MSC_REQUIRE_BETA3=1
+    MSC_ROOT="${IDECK_MADEIRA_ROOT:-$(pwd)/vendor/Madeira}"
+    if [[ ! -f "$MSC_ROOT/app/Madeira/FEXBridge.mm" ]]; then
+      bash scripts/fetch_madeira_sources.sh
+    fi
+    python3 scripts/prepare_apple_msc_beta3.py \
+      --pkg "$IDECK_MSC_PKG" \
+      --destination "$MSC_ROOT/app/Madeira/d3d12" \
+      --acknowledge-license
   fi
   KIT_FLAGS=()
   if [[ "$IDECK_BUILD_WOW64" == "1" ]]; then KIT_FLAGS+=(--wow64); fi
