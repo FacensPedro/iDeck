@@ -145,7 +145,6 @@ FLAGS=( -lz -lc++ -lsqlite3 -llzma
   -framework AudioToolbox -framework VideoToolbox -framework CoreMedia
   -framework CoreVideo -framework CoreFoundation -framework IOKit
   -framework ImageIO -framework GameController -framework CoreHaptics
-  -framework Security
 )
 FLAGS+=(-force_load "${ARCHIVES[0]}" -force_load "${ARCHIVES[11]}")
 for index in "${!ARCHIVES[@]}"; do
