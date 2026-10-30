@@ -26,7 +26,11 @@ IDeckNativeCapabilities ideck_native_capabilities(void) {
     capabilities.wine_linked = ideck_symbol("wineserver_start") &&
                                ideck_symbol("wine_process_start");
     capabilities.dxmt_linked = ideck_symbol("madeira_get_present_count");
+#if defined(IDECK_MADEIRA_D3D12_ENABLED) && IDECK_MADEIRA_D3D12_ENABLED
     capabilities.d3d12_linked = ideck_symbol("madeira_d3d12_canary_run");
+#else
+    capabilities.d3d12_linked = false;
+#endif
     capabilities.launcher_linked = ideck_symbol("ideck_madeira_launch_v1");
     return capabilities;
 }
