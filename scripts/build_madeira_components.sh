@@ -53,7 +53,7 @@ done
 # Wine configure requires GNU Bison >= 3.0. macOS ships Bison 2.3;
 # source the preflight so the modern parser stays first on PATH for all
 # later nested Wine/FEX/DXMT build scripts, including local builds.
-if [[ "$REBUILD" == "1" ]]; then
+if [[ "$REBUILD" == "1" && "$STOP_AFTER" != "fex" ]]; then
   source "$ROOT/scripts/ensure_madeira_bison.sh"
 fi
 
