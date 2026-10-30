@@ -23,6 +23,11 @@ struct SteamDownloadProgress: Equatable, Sendable {
     var checkTotal: UInt64 = 0
     var checkDone: UInt64 = 0
     var reusedBytes: UInt64 = 0
+    /// Decompressed, authenticated game bytes completed on device. This is
+    /// NOT the CDN-compressed reuse counter and does not count sparse
+    /// ftruncate reservations as installed content.
+    var installedBytes: UInt64 = 0
+    var totalInstalledBytes: UInt64 = 0
 
     var checkFraction: Double {
         checkTotal > 0 ? min(1, Double(checkDone) / Double(checkTotal)) : 0
@@ -185,6 +190,8 @@ final class DepotDownloader {
         }.value
         state.totalBytes = prepared.totalBytes
         state.doneBytes = prepared.doneBytes
+        state.installedBytes = prepared.installedBytes
+        state.totalInstalledBytes = prepared.totalUncompressed
         state.phase = .downloading
         report(state)
         SteamLog.event("[steam-depot] install begin app=\(app.appID) depots=\(plans.count) files=\(prepared.fileCount) resume=\(prepared.doneBytes > 0 ? 1 : 0)")
@@ -247,6 +254,7 @@ final class DepotDownloader {
                     inFlight -= 1
                     journals[depotIndex].append(key)
                     state.doneBytes += bytes
+                    state.installedBytes += written
                     actualWrittenBytes &+= written
                     let now = Date()
                     if now.timeIntervalSince(lastReport) >= 0.25 {
@@ -265,6 +273,10 @@ final class DepotDownloader {
 
         // 4. Install record. Sizes come from the manifests; no tree walk.
         state.phase = .finishing
+        // Completed installs report the actual logical file sizes in the
+        // Windows game directory, rather than cumulative compressed chunks.
+        // In particular, duplicate/shared depot paths cannot inflate size.
+        state.installedBytes = SteamInstallFiles.logicalInstalledSize(at: installURL) ?? state.installedBytes
         report(state)
         let installed = plans.map { plan in
             AppManifestWriter.InstalledDepot(depotID: Int(plan.depotID), manifestGID: plan.manifestGID,
@@ -370,6 +382,7 @@ final class DepotDownloader {
         var totalBytes: UInt64 = 0
         var doneBytes: UInt64 = 0
         var totalUncompressed: UInt64 = 0
+        var installedBytes: UInt64 = 0
         var remainingUncompressed: UInt64 = 0
         var fileCount = 0
     }
@@ -431,6 +444,7 @@ final class DepotDownloader {
                        chunk.offset <= priorSize,
                        UInt64(chunk.uncompressedSize) <= priorSize - chunk.offset {
                         result.doneBytes += UInt64(chunk.compressedSize)
+                        result.installedBytes += UInt64(chunk.uncompressedSize)
                     } else {
                         pending.append(item)
                         pendingBytes += UInt64(chunk.uncompressedSize)
@@ -533,6 +547,7 @@ final class DepotDownloader {
                         let count = UInt64(chunk.compressedSize)
                         state.doneBytes += count
                         state.reusedBytes += count
+                        state.installedBytes += UInt64(chunk.uncompressedSize)
                     }
                 }
                 let now = Date()
