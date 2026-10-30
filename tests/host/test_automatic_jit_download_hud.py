@@ -38,7 +38,8 @@ class AutomaticJITAndDownloadHUDTests(unittest.TestCase):
         self.assertIn("if showGamePerformanceOverlay &&", SESSION)
         self.assertIn('Text("FPS:', SESSION)
         self.assertIn('Text("GPU memory (Metal):', SESSION)
-        self.assertIn('Text("GPU utilization: N/A on iPadOS")', SESSION)
+        self.assertIn('Text("GPU utilization: unavailable on iOS")', SESSION)
+        self.assertIn("if horizontalSizeClass != .compact {", SESSION)
         self.assertIn("if collectPerformance && getrusage(", SESSION)
 
     def test_log_copy_is_only_offered_when_session_has_problems(self):
