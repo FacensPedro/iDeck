@@ -18,6 +18,10 @@ SPECIAL = {
     "xinput": {"xinput1_3.dll", "xinput1_4.dll", "xinput9_1_0.dll"},
     "directinput": {"dinput8.dll"},
     "xaudio": {"xaudio2_7.dll", "xaudio2_9.dll"},
+    "opengl": {"opengl32.dll"},
+    "media_foundation": {"mfplat.dll", "mfreadwrite.dll", "mf.dll"},
+    "windows_media": {"wmvcore.dll", "msvfw32.dll"},
+    "visual_cpp_legacy": {"msvcr100.dll", "msvcp100.dll", "msvcr110.dll", "msvcp110.dll", "msvcp120.dll"},
 }
 
 
@@ -65,6 +69,7 @@ def inspect(path: Path) -> dict:
             raise ValueError("PE imported DLL name points outside mapped file sections")
 
         imports = []
+        delay_imports = []
         if optional_size >= data_dir + 16:
             directory_count = struct.unpack_from("<I", optional, data_dir - 4)[0]
             if directory_count > 1:
@@ -82,17 +87,37 @@ def inspect(path: Path) -> dict:
                         if not name or len(name) >= 256:
                             raise ValueError("invalid DLL import name")
                         imports.append(name.decode("ascii", errors="replace").lower())
+        if optional_size >= data_dir + 8 * 14:
+            directory_count = struct.unpack_from("<I", optional, data_dir - 4)[0]
+            if directory_count > 13:
+                delay_rva, delay_size = struct.unpack_from("<II", optional, data_dir + 8 * 13)
+                if delay_rva and delay_size:
+                    for index in range(min(MODULE_CAP, delay_size // 32)):
+                        source.seek(resolve(delay_rva + index * 32, 32))
+                        descriptor = source.read(32)
+                        if descriptor == bytes(32):
+                            break
+                        attributes, dll_name = struct.unpack_from("<II", descriptor)
+                        if not attributes & 1:
+                            raise ValueError("unsupported VA-based PE delay import descriptor")
+                        source.seek(resolve(dll_name, 1))
+                        raw_name = source.read(256).split(b"\0", 1)[0]
+                        if not raw_name or len(raw_name) >= 256:
+                            raise ValueError("invalid delay-loaded DLL import name")
+                        delay_imports.append(raw_name.decode("ascii", errors="replace").lower())
     imports = sorted(set(imports))
-    features = {feature: any(dll in group for dll in imports) for feature, group in SPECIAL.items()}
+    delay_imports = sorted(set(delay_imports))
+    features = {feature: any(dll in group for dll in imports + delay_imports) for feature, group in SPECIAL.items()}
     return {
         "guest_architecture": arch,
         "requires_wow64": arch == "x86",
         "imports": imports,
+        "delay_imports": delay_imports,
         "possible_runtime_requirements": features,
         "graphics_profile_hint": "d3d12" if features["d3d12"] else "d3d11" if features["d3d11"] else "unknown",
         "may_use_dynamic_loadlibrary": True,
         "execution_verified": False,
-        "explanation": "Static imports are hints, not proof that a game launches, renders or uses a specific API.",
+        "explanation": "Static and delay-loaded imports are hints, not proof that a game launches, renders or uses a specific API.",
     }
 
 
