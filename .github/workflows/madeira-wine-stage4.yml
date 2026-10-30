@@ -1,0 +1,200 @@
+name: Madeira Stage 4 - Native Wine ARM64EC and iPhoneOS Unix archives
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [feature/madeira-wine-stage4-20261030]
+    paths:
+      - .github/workflows/madeira-wine-stage4.yml
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/madeira-wine-stage4.yml
+      - scripts/build_madeira_components.sh
+      - scripts/verify_madeira_wine_stage4.py
+      - tests/host/test_madeira_wine_stage4.py
+
+permissions:
+  contents: read
+
+concurrency:
+  group: madeira-stage4-wine-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  host:
+    name: Check real Wine 11.4 build gates and no-stub verification
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout iDeck
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Validate Stage 4 Wine build recipe and output verifier
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests/host -p 'test_madeira_wine_stage4.py' -v
+          python3 -m unittest discover -s tests/host -p 'test_madeira_component_outputs.py' -v
+          python3 -m unittest discover -s tests/host -p 'test_madeira_component_stages.py' -v
+          python3 -m unittest discover -s tests/host -p 'test_madeira_fex_stage3.py' -v
+          bash -n scripts/build_madeira_components.sh
+          bash -n scripts/prepare_madeira_dependencies.sh
+
+  wine:
+    name: Compile real Wine ARM64EC PE and iPhoneOS Unix/wineserver archives
+    needs: host
+    if: github.event_name != 'pull_request'
+    runs-on: xcode-27
+    timeout-minutes: 300
+    env:
+      IDECK_MADEIRA_GRAPHICS: d3d11
+      IDECK_BUILD_WOW64: '0'
+      IDECK_MADEIRA_STOP_AFTER: wine
+      IDECK_MADEIRA_REBUILD: '1'
+      IDECK_ACCEPT_METAL_CONVERTER_LICENSE: '0'
+      IDECK_LLVM_JOBS: '3'
+      IDECK_LLVM_REF: llvmorg-15.0.7
+      IDECK_PREBUILT_MODE: off
+      IDECK_MADEIRA_REV: fd9f2f3d0434a4116e4c3351f286a0fc376b4e36
+    steps:
+      - name: Checkout pinned public iDeck source
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Select iPhoneOS SDK
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Install public compiler prerequisites
+        run: |
+          set -euo pipefail
+          packages=()
+          for tool in cmake ninja meson pkg-config; do
+            command -v "$tool" >/dev/null 2>&1 || packages+=("$tool")
+          done
+          if (( ${#packages[@]} )); then
+            HOMEBREW_NO_AUTO_UPDATE=1 brew install "${packages[@]}"
+          fi
+          bash scripts/ensure_madeira_bison.sh
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-version
+          df -h .
+
+      - name: Fetch published Madeira Wine 11.4 fork and source backports
+        run: |
+          set -euo pipefail
+          bash scripts/fetch_madeira_sources.sh
+          python3 scripts/verify_madeira_sources.py \
+            --root vendor/Madeira --revision "$IDECK_MADEIRA_REV"
+
+      - name: Restore tested phase-2 LLVM and ARM64EC compilers
+        id: llvm
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            vendor/Madeira/toolchains/llvm-mingw-20260421-ucrt-macos-universal
+            vendor/Madeira/toolchains/llvm-ios-build
+          key: madeira-llvm15-ios-v3-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/prepare_madeira_toolchains.sh', 'scripts/llvm_ios_sdk.py') }}
+
+      - name: Require genuine iPhoneOS and ARM64EC compilers
+        run: |
+          set -euo pipefail
+          bash scripts/prepare_madeira_toolchains.sh
+          bash scripts/verify_madeira_toolchains.sh
+
+      - name: Save proven public cross-compiler cache if rebuilt
+        if: ${{ steps.llvm.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v5
+        with:
+          path: |
+            vendor/Madeira/toolchains/llvm-mingw-20260421-ucrt-macos-universal
+            vendor/Madeira/toolchains/llvm-ios-build
+          key: ${{ steps.llvm.outputs.cache-primary-key }}
+
+      - name: Restore pinned Wine crypto media and font dependencies
+        id: deps
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            vendor/Madeira/toolchains/gnutls-ios
+            vendor/Madeira/toolchains/ffmpeg-ios
+            vendor/Madeira/build/freetype-ios/build
+            vendor/Madeira/research/freetype
+          key: madeira-ios-deps-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/prepare_madeira_dependencies.sh') }}
+
+      - name: Verify real Wine Unix prerequisites
+        run: |
+          set -euo pipefail
+          bash scripts/prepare_madeira_dependencies.sh vendor/Madeira
+          bash scripts/verify_madeira_toolchains.sh --require-deps
+
+      - name: Compile pinned public FEX and Wine ARM64EC without DXMT
+        run: |
+          set -euo pipefail
+          bash scripts/build_madeira_components.sh 2>&1 | tee wine-stage4-build.log
+
+      - name: Verify real ARM64EC PE, Unix archives, source wineserver and SHA-256
+        run: |
+          set -euo pipefail
+          python3 scripts/verify_madeira_wine_stage4.py \
+            --root vendor/Madeira \
+            --revision "$IDECK_MADEIRA_REV" \
+            --receipt wine-stage4-receipt.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          receipt = json.loads(Path("wine-stage4-receipt.json").read_text(encoding="utf-8"))
+          if receipt.get("stage") != 4 or not receipt.get("validated"):
+              raise SystemExit("Wine stage 4 receipt not a verified native build")
+          if receipt.get("profile") != "d3d11-x86_64-only":
+              raise SystemExit("Wine stage 4 used an unexpected profile")
+          if len(receipt.get("artifact_hashes", {})) != 8:
+              raise SystemExit("Wine stage 4 did not provide all eight real native outputs")
+          print("Real Wine 11.4 ARM64EC PE, arm64 iOS archives and FEX cross-build verified.")
+          PY
+
+      - name: Publish verified FEX and Wine source-built native artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: Madeira-Stage4-Wine-ARM64EC-native
+          path: |
+            vendor/Madeira/FEX/build-ios/FEXCore/Source/libFEXCore.a
+            vendor/Madeira/FEX/build-ios/FEXCore/Source/libFEXCore_Base.a
+            vendor/Madeira/FEX/build-ios/FEXCore/Source/libJemallocLibs.a
+            vendor/Madeira/app/Madeira/arm64ec-windows/xtajit64.dll
+            vendor/Madeira/app/Madeira/arm64ec-windows/ntdll.dll
+            vendor/Madeira/app/Madeira/libntdll_unix.a
+            vendor/Madeira/app/Madeira/libwineserver.a
+            vendor/Madeira/app/Madeira/libwin32u_unix.a
+            wine-stage4-receipt.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Publish compiler diagnostics even when build fails
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: Madeira-Stage4-Wine-diagnostics
+          path: |
+            wine-stage4-build.log
+            vendor/Madeira/wine/build-arm64ec/config.log
+            vendor/Madeira/build/ntdll-unix/build-ideck.log
+            vendor/Madeira/build/ntdll-unix/obj/*.err
+            vendor/Madeira/build/wineserver/obj/err-*.txt
+            vendor/Madeira/wine/build-macos/config.log
+            vendor/Madeira/FEX/build-ios/CMakeFiles/CMakeConfigureLog.yaml
+            vendor/Madeira/FEX/build-arm64ec/CMakeFiles/CMakeConfigureLog.yaml
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Record scope of verified Wine stage
+        if: success()
+        run: |
+          echo '### Madeira Stage 4: native Wine 11.4 ARM64EC compilation passed' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Verified real Wine ARM64EC ntdll.dll, iPhoneOS arm64 Unix/wineserver libraries and FEX artifacts; SHA-256 receipt published.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'This job does not package an IPA or fetch Apple Metal Shader Converter/D3D12.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'NOT validated: running the Wine guest, live iPad JIT, graphics, audio or safe shutdown on device.' >> "$GITHUB_STEP_SUMMARY"
