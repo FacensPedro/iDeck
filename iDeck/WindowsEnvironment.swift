@@ -344,6 +344,7 @@ class WindowsEnvironment {
     }
 
     func applyGameProfile(_ profile: WindowsGameProfile) {
+        setenv("IDECK_DISPLAY_SCALING", RuntimeConfiguration.SurfaceMode(saved: profile.surfaceScaling).rawValue, 1)
         let controllerMode = profile.controllerAPI == "Automatic"
             ? (UserDefaults.standard.string(forKey: "wineControllerAPI") ?? "XInput")
             : profile.controllerAPI

@@ -67,3 +67,35 @@ native-backend readiness, and startup scheduling. The iOS Build compiles
 the interface and checks static bundling invariants. Verify a native
 IPA on an iPad by launching both a DXMT/D3D11 game and a GDI/desktop
 window, confirming visible frames and correct input before merging.
+
+## Geometry and input contract for virtual monitor modes
+
+The iDeck game profile now persists a display scaling choice (Fit, Fill,
+Stretch, Aspect). The renderer reads the live virtual monitor dimensions
+from Madeira's `winios_screen_size` export, and uses the saved
+`IDECK_DISPLAY_SCALING` mode to compute one `RuntimeConfiguration.surfaceRect`.
+This rectangle sizes the persistent `UIWindow` Metal layer and informs
+`winios_set_desktop_rect` for GDI/desktop compositing; the compositor's
+hosting frame stays the full view. The same pure mathematical transform is
+available as `RuntimeConfiguration.guestPoint` and through
+`WindowsRendererView.guestPoint(fromWindow:)` for on-screen input.
+
+- Fit preserves the guest monitor's ratio and letterboxes.
+- Fill preserves that ratio while cropping the excess.
+- Stretch occupies the full guest area without preserving the ratio.
+- Aspect preserves the actual Metal swapchain drawable ratio, using the
+  guest monitor dimensions until a real drawable size exists.
+
+The code does not force or rewrite `CAMetalLayer.drawableSize` after
+native registration: DXMT/WineMetal owns it. The layer observes drawable
+size changes and requests a layout refresh on the main thread. The
+runtime monitor may change through `ChangeDisplaySettings`; reading
+`winios_screen_size` rather than a static launch-time `MADEIRA_SCREEN_W/H`
+avoids stale aspect ratio and misaligned touch coordinates.
+
+The geometry is validated in the Swift host tests with compact and
+regular-sized views. Actual guest mouse/touch event delivery and device
+presentation are **NOT RUN** until the input integration and real signed
+Madeira-native IPA are tested on an iPhone/iPad. The PR's interface-only
+IPA must not claim hardware frame output.
+

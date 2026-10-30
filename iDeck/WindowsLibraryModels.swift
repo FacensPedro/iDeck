@@ -8,6 +8,7 @@ struct WindowsGameProfile: Codable, Equatable, Identifiable {
     var title: String
     var arguments: String = ""
     var resolution: String = "960x540"
+    var surfaceScaling: String = "fit"
     var graphicsAPI: String = "Automatic"
     var controllerAPI: String = "Automatic"
     var metalFXEnabled: Bool = false
@@ -18,14 +19,15 @@ struct WindowsGameProfile: Codable, Equatable, Identifiable {
     var updatedAt: Date = Date()
 
     private enum CodingKeys: String, CodingKey {
-        case id, title, arguments, resolution, graphicsAPI, controllerAPI, metalFXEnabled, fpsLimit, avxEnabled, keepChildProcessesRunning, artworkFilename, updatedAt
+        case id, title, arguments, resolution, surfaceScaling, graphicsAPI, controllerAPI, metalFXEnabled, fpsLimit, avxEnabled, keepChildProcessesRunning, artworkFilename, updatedAt
     }
 
-    init(id: String, title: String, arguments: String = "", resolution: String = "960x540", graphicsAPI: String = "Automatic", controllerAPI: String = "Automatic", metalFXEnabled: Bool = false, fpsLimit: String = "30", avxEnabled: Bool = false, keepChildProcessesRunning: Bool = false, artworkFilename: String? = nil, updatedAt: Date = Date()) {
+    init(id: String, title: String, arguments: String = "", resolution: String = "960x540", surfaceScaling: String = "fit", graphicsAPI: String = "Automatic", controllerAPI: String = "Automatic", metalFXEnabled: Bool = false, fpsLimit: String = "30", avxEnabled: Bool = false, keepChildProcessesRunning: Bool = false, artworkFilename: String? = nil, updatedAt: Date = Date()) {
         self.id = id
         self.title = title
         self.arguments = arguments
         self.resolution = resolution
+        self.surfaceScaling = ["fit", "fill", "stretch", "aspect"].contains(surfaceScaling) ? surfaceScaling : "fit"
         self.graphicsAPI = graphicsAPI
         self.controllerAPI = controllerAPI
         self.metalFXEnabled = metalFXEnabled
@@ -42,6 +44,10 @@ struct WindowsGameProfile: Codable, Equatable, Identifiable {
         title = try values.decode(String.self, forKey: .title)
         arguments = try values.decodeIfPresent(String.self, forKey: .arguments) ?? ""
         resolution = try values.decodeIfPresent(String.self, forKey: .resolution) ?? "960x540"
+        surfaceScaling = {
+            let saved = (try? values.decodeIfPresent(String.self, forKey: .surfaceScaling)) ?? "fit"
+            return ["fit", "fill", "stretch", "aspect"].contains(saved) ? saved : "fit"
+        }()
         graphicsAPI = try values.decodeIfPresent(String.self, forKey: .graphicsAPI) ?? "Automatic"
         controllerAPI = try values.decodeIfPresent(String.self, forKey: .controllerAPI) ?? "Automatic"
         metalFXEnabled = try values.decodeIfPresent(Bool.self, forKey: .metalFXEnabled) ?? false
