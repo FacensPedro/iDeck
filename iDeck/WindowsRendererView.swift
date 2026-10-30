@@ -55,6 +55,8 @@ struct WindowsRendererView: UIViewRepresentable {
     private static var nextGeneration = 0
     private static var layerRegistered = false
     private static var lastGuestSize: CGSize?
+    private static var drawableObservation: NSKeyValueObservation?
+    private static var currentSurface: (guest: CGSize, drawable: CGSize, bounds: CGRect, mode: RuntimeConfiguration.SurfaceMode)?
 
     static var isNativeDisplayLinked: Bool {
         dlsym(UnsafeMutableRawPointer(bitPattern: -2), "madeira_display_set_layer") != nil &&
@@ -78,11 +80,36 @@ struct WindowsRendererView: UIViewRepresentable {
         return CGSize(width: width, height: height)
     }
 
+    private typealias ScreenSize = @convention(c) (UnsafeMutablePointer<Int32>?, UnsafeMutablePointer<Int32>?) -> Void
     private typealias SetMetalLayer = @convention(c) (UnsafeMutableRawPointer?) -> Void
     private typealias DisplayModeChanged = @convention(c) (Int32, Int32) -> Void
     private typealias SetCompositorFrame = @convention(c) (Double, Double, Double, Double) -> Void
     private typealias SetDesktopRect = @convention(c) (Double, Double, Double, Double, Int32) -> Void
     private typealias ShowCompositor = @convention(c) (Int32) -> Int32
+
+    private static var currentGuestSize: CGSize {
+        if let symbol = dlsym(UnsafeMutableRawPointer(bitPattern: -2),
+                              "winios_screen_size") {
+            let read = unsafeBitCast(symbol, to: ScreenSize.self)
+            var width: Int32 = 0
+            var height: Int32 = 0
+            read(&width, &height)
+            if (320...7680).contains(Int(width)), (240...4320).contains(Int(height)) {
+                return CGSize(width: Int(width), height: Int(height))
+            }
+        }
+        return requestedSize ?? CGSize(width: 960, height: 540)
+    }
+
+    // Shared geometric mapping, also used by touch overlays. Returns guest
+    // monitor coordinates from the physical active UIWindow's coordinate space.
+    static func guestPoint(fromWindow point: CGPoint) -> CGPoint? {
+        guard let surface = currentSurface else { return nil }
+        return RuntimeConfiguration.guestPoint(point, guest: surface.guest,
+            drawable: surface.drawable, bounds: surface.bounds, mode: surface.mode)
+    }
+
+
 
     fileprivate static func attachViewport(_ viewport: MadeiraMetalViewport) {
         guard isNativeDisplayLinked, let window = viewport.window else { return }
@@ -122,6 +149,10 @@ struct WindowsRendererView: UIViewRepresentable {
             let setter = unsafeBitCast(symbol, to: SetMetalLayer.self)
             setter(Unmanaged.passUnretained(host.metalLayer).toOpaque())
             layerRegistered = true
+            // Follow swapchain resize without overwriting drawableSize.
+            drawableObservation = host.metalLayer.observe(\.drawableSize, options: [.new]) { _, _ in
+                DispatchQueue.main.async { refreshNativeDisplay() }
+            }
             NSLog("[iDeck Metal] registered persistent UIWindow-hosted CAMetalLayer")
         }
         // Prime the guest monitor once per launch, never on every SwiftUI
@@ -153,8 +184,15 @@ struct WindowsRendererView: UIViewRepresentable {
         // session toolbar's top strip so Close, diagnostics and the optional
         // FPS overlay stay visible and accessible during gameplay.
         let toolbar = min(84.0, max(64.0, frame.height * 0.10))
-        let positioned = CGRect(x: frame.minX, y: frame.minY + toolbar,
-                                width: frame.width, height: max(1, frame.height - toolbar))
+        let bounds = CGRect(x: frame.minX, y: frame.minY + toolbar,
+                            width: frame.width, height: max(1, frame.height - toolbar))
+        let guest = currentGuestSize
+        let mode = RuntimeConfiguration.SurfaceMode(
+            saved: getenv("IDECK_DISPLAY_SCALING").map { String(cString: $0) } ?? "fit")
+        let drawable = host.metalLayer.drawableSize
+        let positioned = RuntimeConfiguration.surfaceRect(
+            guest: guest, drawable: drawable, bounds: bounds, mode: mode)
+        currentSurface = (guest: guest, drawable: drawable, bounds: bounds, mode: mode)
         if host.frame != positioned {
             host.frame = positioned
         }
@@ -171,8 +209,9 @@ struct WindowsRendererView: UIViewRepresentable {
         if let symbol = dlsym(UnsafeMutableRawPointer(bitPattern: -2),
                               "winios_set_desktop_rect") {
             let setDesktop = unsafeBitCast(symbol, to: SetDesktopRect.self)
-            setDesktop(0, Double(toolbar), Double(positioned.width),
-                       Double(positioned.height), 1)
+            setDesktop(Double(positioned.minX - frame.minX),
+                       Double(positioned.minY - frame.minY),
+                       Double(positioned.width), Double(positioned.height), 1)
         }
         // Do NOT write host.metalLayer.drawableSize here. Upstream DXMT owns
         // the drawable dimensions; a second writer causes black frames.
@@ -191,6 +230,7 @@ struct WindowsRendererView: UIViewRepresentable {
         guard activeViewport === viewport else { return }
         activeViewport = nil
         lastGuestSize = nil
+        currentSurface = nil
         // Keep the persistent layer object alive for DXMT's cached
         // swapchain pointer, but remove its window overlay on dismissal.
         MadeiraWindowMetalHost.shared.removeFromSuperview()
