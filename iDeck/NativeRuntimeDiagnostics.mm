@@ -1,4 +1,5 @@
 #import "NativeRuntimeDiagnostics.h"
+#include "NativeRuntime/WindowsPEMachine.h"
 #import <Foundation/Foundation.h>
 #import <Metal/Metal.h>
 #include <dlfcn.h>
@@ -35,32 +36,12 @@ IDeckNativeCapabilities ideck_native_capabilities(void) {
     return capabilities;
 }
 
+uint16_t ideck_native_pe_machine(const char *path) {
+    return ideck_pe_machine_from_file(path);
+}
+
 bool ideck_native_validate_pe(const char *path) {
-    if (!path || !path[0]) return false;
-    FILE *file = fopen(path, "rb");
-    if (!file) return false;
-    unsigned char dos[64] = {};
-    bool valid = fread(dos, 1, sizeof(dos), file) == sizeof(dos);
-    if (valid) {
-        valid = dos[0] == 'M' && dos[1] == 'Z';
-    }
-    if (valid) {
-        uint32_t offset = (uint32_t)dos[0x3c] |
-                          ((uint32_t)dos[0x3d] << 8) |
-                          ((uint32_t)dos[0x3e] << 16) |
-                          ((uint32_t)dos[0x3f] << 24);
-        valid = offset >= 64 && offset <= 64 * 1024 * 1024;
-        if (valid && fseek(file, (long)offset, SEEK_SET) == 0) {
-            unsigned char pe[4] = {};
-            valid = fread(pe, 1, 4, file) == 4 &&
-                    pe[0] == 'P' && pe[1] == 'E' &&
-                    pe[2] == 0 && pe[3] == 0;
-        } else {
-            valid = false;
-        }
-    }
-    fclose(file);
-    return valid;
+    return ideck_native_pe_machine(path) != 0;
 }
 
 bool ideck_process_has_jit_permission(void) {
