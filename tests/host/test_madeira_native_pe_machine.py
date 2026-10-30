@@ -83,6 +83,22 @@ class NativePEMachineTests(unittest.TestCase):
         self.assertIn("let needsWoW64 = actualMachine == 0x014c", SWIFT.read_text())
         self.assertIn("name.hasPrefix(\"i386-windows/\")", SWIFT.read_text())
 
+    def test_native_build_defaults_wow64_on_both_graphics_backends(self):
+        for script in ("scripts/build_ipa.sh", "scripts/build_native_runtime.sh"):
+            source = (ROOT / script).read_text()
+            self.assertIn('IDECK_BUILD_WOW64="${IDECK_BUILD_WOW64:-1}"', source)
+        self.assertIn('IDECK_BUILD_WOW64 must be 0 or 1',
+                      (ROOT / "scripts/build_ipa.sh").read_text())
+
+    def test_session_releases_input_and_waits_for_guest_readiness(self):
+        wine = (ROOT / "iDeck/NativeRuntime/WineProcessBridge.mm").read_text()
+        bridge = BRIDGE.read_text()
+        self.assertIn("for (unsigned int attempt = 0; attempt < 50; ++attempt)", wine)
+        self.assertIn("if (ideck_wineprocess_running()) return 0;", wine)
+        self.assertIn("ideck_gamepad_end_session();\n    ideck_session_stop();", bridge)
+        self.assertIn("ideck_wineprocess_thread_finished()", bridge)
+
+
 
 if __name__ == "__main__":
     unittest.main()
