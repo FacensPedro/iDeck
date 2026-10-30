@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       native_profile:
-        description: "Optional costly source-build profile; D3D12 only checks PE, never bundles proprietary Apple files"
+        description: "Select public Windows guest probes alone or an opt-in source build (never uploads proprietary Apple converter)"
         type: choice
-        options: [tests-only, d3d11-wow64, d3d12-guest-pe, d3d12-wow64-guest-pe]
+        options: [tests-only, guest-probes-only, d3d11-wow64, d3d12-guest-pe, d3d12-wow64-guest-pe]
         default: tests-only
   push:
     branches: [feature/madeira-device-acceptance-d3d12-wow64-20261030]
@@ -155,6 +155,8 @@ jobs:
           set -euo pipefail
           bash scripts/prepare_madeira_toolchains.sh
           bash scripts/verify_madeira_toolchains.sh
+      # In guest-probes-only, no FEX/Wine/DXMT/D3D12 native runtime is built.
+      # Only cross-compiled original Windows EXE test programs are published.
       - name: Restore public Wine dependencies
         uses: actions/cache/restore@v5
         with:
@@ -211,7 +213,7 @@ jobs:
           print("NOT TESTED: Apple converter, IPA signing, iPad guest launch, or real rendering.")
           PY
           fi
-      - name: Build Windows guest and D3D11 first-frame probes for actual iPad execution
+      - name: Compile original PE32/x64 guest D3D11 D3D12 PCM controller and touch test programs
         run: |
           set -euo pipefail
           bash scripts/build_madeira_device_probes.sh
