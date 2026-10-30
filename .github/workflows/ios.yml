@@ -651,7 +651,6 @@ jobs:
 
       - name: Prepare authorized compiled runtime export
         if: ${{ env.IDECK_NATIVE_BUILD == '1' && env.IDECK_MADEIRA_GRAPHICS == 'd3d12' && inputs.export_runtime_kit && env.IDECK_ACCEPT_METAL_CONVERTER_LICENSE == '1' }}
-        env:
         run: |
           set -euo pipefail
           OPTIONS=(--graphics "$IDECK_MADEIRA_GRAPHICS")
