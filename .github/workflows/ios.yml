@@ -379,6 +379,7 @@ jobs:
     # the fully native runtime only after the owner explicitly authorizes
     # Metal Shader Converter and third-party redistribution in Actions vars.
     env:
+      IDECK_REQUIRE_IPHONE_DUO_SDK: '1'
       IDECK_NATIVE_BUILD: ${{ ((github.event_name == 'workflow_dispatch' && inputs.require_madeira) || (github.event_name == 'push' && vars.IDECK_NATIVE_DISTRIBUTION_APPROVED == 'true')) && '1' || '0' }}
       IDECK_MADEIRA_GRAPHICS: ${{ github.event_name == 'workflow_dispatch' && inputs.graphics_profile || 'd3d12' }}
       IDECK_ACCEPT_METAL_CONVERTER_LICENSE: ${{ (((github.event_name == 'workflow_dispatch' && inputs.accept_converter_license) || (github.event_name == 'push' && vars.IDECK_NATIVE_DISTRIBUTION_APPROVED == 'true')) && (github.event_name != 'workflow_dispatch' || inputs.graphics_profile == 'd3d12')) && '1' || '0' }}
