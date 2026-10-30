@@ -1,5 +1,79 @@
 # Status do runtime Madeira no iDeck
 
+## Fase 1 aprovada — perfil D3D11 estrito e fontes públicas (29/10/2026)
+
+**Escopo desta fase:** permitir selecionar e auditar uma cadeia
+`FEX + Wine ARM64EC + DXMT/D3D11` sem redistribuir o Apple Metal Shader
+Converter e sem prometer a execução de jogos antes das etapas de compilação,
+vinculação e testes físicos. A API do perfil D3D12 original permanece
+disponível somente quando selecionada explicitamente e autorizada.
+
+### Seleção do backend
+
+- `IDECK_REQUIRE_MADEIRA=0`: interface apenas; não ativa símbolos nativos.
+- `IDECK_REQUIRE_MADEIRA=1 IDECK_MADEIRA_GRAPHICS=d3d11`: modo
+  **x86-64/ARM64EC**, sem D3D12, sem `libmetalirconverter.dylib`, sem
+  WoW64 (`IDECK_BUILD_WOW64=0`) e sem kit pré-compilado do backend antigo.
+- `IDECK_REQUIRE_MADEIRA=1 IDECK_MADEIRA_GRAPHICS=d3d12`: modo legado,
+  que continua exigindo `IDECK_ACCEPT_METAL_CONVERTER_LICENSE=1`.
+  Essa variável NÃO concede direitos; use-a somente quando o titular
+  confirmar que a licença aplicável permite a distribuição prevista.
+- Em `workflow_dispatch` do GitHub Actions, selecione
+  `require_madeira=true`, `graphics_profile=d3d11`,
+  `build_wow64=false` e `accept_converter_license=false`.
+  Builds comuns de pull request continuam sendo de interface.
+
+O build de fase 1 que deverá ser executado **após concluir as toolchains e
+compilações nativas** da fase 2 em diante é:
+
+```bash
+IDECK_REQUIRE_MADEIRA=1 \
+IDECK_MADEIRA_GRAPHICS=d3d11 \
+IDECK_BUILD_WOW64=0 \
+IDECK_PREBUILT_MODE=off \
+IDECK_CONFIGURATION=Debug \
+bash scripts/build_ipa.sh
+```
+
+**Gate estrito para o bundle D3D11 (somente após Xcode construir o .app):**
+
+```bash
+python3 scripts/verify_madeira_bundle.py \
+  --app build/Staging/iDeck.app --graphics d3d11 --require
+```
+
+O verificador exige símbolos e DLLs reais FEX, Wine e DXMT (inclusive
+arquitetura ARM64EC), o certificado de CA, o prefixo Wine e as licenças.
+Rejeita DLLs D3D12, diretórios `d3d12/` e qualquer
+`libmetalirconverter.dylib` incluída no bundle. O manifesto escreve
+`graphicsBackend=d3d11` e `d3d12Linked=false`; o iDeck só aceita
+o runtime nativo quando esse manifesto e os símbolos correspondem ao perfil.
+
+**Submódulos públicos:** o script `fetch_madeira_sources.sh` agora chama
+`verify_madeira_sources.py` depois do clone recursivo e exige SHA exato
+para a revisão Madeira, os gitlinks FEX/Wine/DXMT/madeira-dock e o rpmalloc
+aninhado. Gitlinks ausentes, alterados ou URLs privadas devem falhar; não
+se admite substituir esses forks por fontes upstream genéricas. O workflow
+`.github/workflows/madeira-public-sources.yml` verifica o checkout do zero,
+sem usar credenciais ou forks privados. As revisões fixadas são verificadas,
+não atualizadas automaticamente para o `main` do Madeira.
+
+**Compatibilidade:** kits antigos continuam pertencendo ao perfil D3D12.
+Até existir um esquema de kit separado e auditado para D3D11, a opção
+`IDECK_PREBUILT_MODE=off` é obrigatória. A verificação de assinatura
+`verify_signed_madeira_app.py` também respeita `graphicsBackend`.
+Não se deve executar `verify_madeira_bundle.py` *depois* de assinar, pois
+ele regrava o manifesto; assinatura e entitlements permanecem para a fase 7.
+
+**Limite conhecido:** as alterações de fase 1 são de seleção, diagnóstico,
+fontes e verificação. Elas NÃO provam compilação de LLVM, FEX, Wine ou
+DXMT em um runner limpo, ligação final com `nm`, IPA nativo funcional,
+JIT operante, primeiro frame Metal, áudio nem encerramento de um
+aplicativo Windows no iPad. O primeiro `IDECK_REQUIRE_MADEIRA=1` só
+será considerado aprovado quando as fases seguintes fornecerem evidências.
+
+---
+
 ## Revisão de integração nativa — branch `feature/madeira-runtime` (29/10/2026)
 
 **Esta revisão não comprova que um programa Windows funcione em iPhone/iPad.**
