@@ -200,8 +200,10 @@ cp "$APP/d3d12/libmetalirconverter.dylib" "$RUNTIME/d3d12/libmetalirconverter.dy
 # Dynamic code must be signed by the same signing workflow as the host IPA.
 # An ad hoc signature alone is not a distribution/developer identity.
 if [[ -n "${IDECK_CODESIGN_IDENTITY:-}" ]]; then
-  codesign --force --sign "$IDECK_CODESIGN_IDENTITY" --timestamp=none \
-    "$APP/d3d12/libmetalirconverter.dylib"
+  for library in "$APP/d3d12/libmetalirconverter.dylib" \
+                 "$RUNTIME/d3d12/libmetalirconverter.dylib"; do
+    codesign --force --sign "$IDECK_CODESIGN_IDENTITY" --timestamp=none "$library"
+  done
 fi
 else
   if find "$APP" -type f -name 'libmetalirconverter.dylib' -print -quit | grep -q .; then
