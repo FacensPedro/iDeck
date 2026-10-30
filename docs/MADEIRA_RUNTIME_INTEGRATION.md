@@ -1,5 +1,83 @@
 # Status do runtime Madeira no iDeck
 
+## Fases 2–11 — gates nativos e dispositivo (30/10/2026)
+
+**A implementação de um gate não prova que ele passou.** A fonte da verdade
+sobre o build é o resultado da execução GitHub Actions na revisão exata; a fonte
+da verdade sobre o iPad é o procedimento de
+[aceitação em dispositivo](MADEIRA_DEVICE_ACCEPTANCE.md).
+
+### Fase 2: LLVM e dependências iPhoneOS reproduzíveis
+
+- Workflow: `.github/workflows/madeira-stage2-toolchains.yml`, que usa
+  somente componentes públicos; **não** distribui Apple Metal Shader Converter.
+- `bash scripts/prepare_madeira_toolchains.sh` gera ou recupera LLVM 15 e
+  llvm-mingw ARM64EC fixado. O script `verify_madeira_toolchains.sh` verifica
+  o COFF ARM64EC compilado na hora (`IMAGE_FILE_MACHINE_ARM64EC=0xA641`),
+  arquivos `libLLVM*.a` reais para arm64 e headers de LLVM.
+- `bash scripts/prepare_madeira_dependencies.sh vendor/Madeira` recompila
+  conforme necessário GnuTLS, GMP, Nettle, FFmpeg e FreeType. Após isso,
+  `bash scripts/verify_madeira_toolchains.sh --require-deps` verifica
+  a existência, arquitetura arm64 e headers dos componentes.
+- Os caches de toolchain mantêm chaves versionadas. Um cache inválido
+  **falha ou é reconstruído**, nunca pode ser tratado como sucesso apenas
+  porque `actions/cache` encontrou arquivos. Dependências demasiado
+  grandes não são enviadas ao cache.
+- A fase 2 só é aprovada com o job completo em runner macOS/Xcode;
+  testes host e uma execução LLVM anterior **não** substituem esse gate.
+
+### Fases 3–5: pontos de parada independentes
+
+Com as toolchains previamente verificadas, em runner Xcode/macos:
+
+```bash
+IDECK_MADEIRA_GRAPHICS=d3d11 IDECK_BUILD_WOW64=0 \
+  IDECK_MADEIRA_STOP_AFTER=fex bash scripts/build_madeira_components.sh
+
+IDECK_MADEIRA_GRAPHICS=d3d11 IDECK_BUILD_WOW64=0 \
+  IDECK_MADEIRA_STOP_AFTER=wine bash scripts/build_madeira_components.sh
+
+IDECK_MADEIRA_GRAPHICS=d3d11 IDECK_BUILD_WOW64=0 \
+  IDECK_MADEIRA_STOP_AFTER=all bash scripts/build_madeira_components.sh
+```
+
+- **FEX:** requer FEXCore e allocator reais, além do `xtajit64.dll`.
+- **Wine:** requer `libntdll_unix.a`, `libwineserver.a`,
+  `libwin32u_unix.a` e ntdll ARM64EC efetivamente compilados.
+- **DXMT:** requer `libdxmt_combined.a`, `winemetal.dll`, `d3d11.dll`
+  e `dxgi.dll` entre os artefatos completos.
+- O padrão `IDECK_MADEIRA_STOP_AFTER=all` mantém o build completo.
+  Os pontos de parada não são aceitáveis como IPA nativo final.
+
+### Fase 6: link e empacotamento estrito
+
+`IDECK_MADEIRA_GRAPHICS=d3d11 IDECK_REQUIRE_MADEIRA=1` obriga
+`build_ipa.sh` a gerar **um IPA realmente nativo** ou falhar. Somente
+aprovar após `nm`, `verify_madeira_bundle.py --graphics d3d11 --require`,
+auditoria de licenças e integridade do IPA passarem. A opção
+`build_native_runtime.sh` agora escolhe D3D11/x86-64 sem WoW64 e
+`IDECK_PREBUILT_MODE=off` por padrão. Uma tag D3D11 não pode incluir
+`libmetalirconverter.dylib` nem DLLs D3D12.
+
+### Fases 7–11: verificação assinada e teste físico
+
+Há verificações de assinatura/entitlements, JIT ao vivo, ciclo de vida do
+Wine, primeiro frame, áudio, controles, repetição de sessões e conformidade.
+O documento `docs/MADEIRA_DEVICE_ACCEPTANCE.md` lista evidências exigidas.
+Essas fases **não podem ser aprovadas** sem um IPA nativo corretamente
+assinado e execução real em iPad compatível. O CI não acessa StikDebug no
+dispositivo e não pode provar um frame nem áudio efetivamente apresentados.
+
+### D3D12 e WoW64 posteriores
+
+D3D12 fica **desativado por padrão**: a licença aplicável ao conversor
+da Apple precisa ser analisada antes de qualquer redistribuição. Marcar uma
+variável de ambiente não concede permissão. WoW64 usa fontes Wine/FEX
+diferentes e só pode ser considerado compatível após um teste real PE32.
+Não se usam DLLs Microsoft sem os direitos de distribuição aplicáveis.
+
+---
+
 ## Fase 1 aprovada — perfil D3D11 estrito e fontes públicas (29/10/2026)
 
 **Escopo desta fase:** permitir selecionar e auditar uma cadeia
