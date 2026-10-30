@@ -186,6 +186,7 @@ jobs:
         run: |
           python3 -m unittest discover -s tests/host -p 'test_madeira_bundle.py' -v
           python3 -m unittest discover -s tests/host -p 'test_signed_madeira_app.py' -v
+          python3 -m unittest discover -s tests/host -p 'test_madeira_security_entitlements.py' -v
 
       - name: Verify Windows-compatible native payload staging
         run: |
