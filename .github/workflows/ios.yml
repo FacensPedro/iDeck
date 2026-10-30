@@ -314,6 +314,7 @@ jobs:
         run: |
           xcrun swiftc iDeck/SteamKeyValues.swift iDeck/SteamInstall.swift tests/host/SteamInstallLaunchPathTests.swift -o /tmp/ideck-steam-launch-path-tests
           /tmp/ideck-steam-launch-path-tests
+          python3 -m unittest discover -s tests/host -p 'test_steam_install_progress_size.py' -v
 
       - name: Test Windows launch arguments and path escaping
         run: |
