@@ -234,6 +234,9 @@ jobs:
             -o /tmp/ideck-steam-disk-tests
           /tmp/ideck-steam-disk-tests
 
+      - name: Test honest IPA runtime identity and fail-fast Windows launch
+        run: python3 -m unittest discover -s tests/host -p 'test_ideck_runtime_profile.py' -v
+
       - name: Test reusable Madeira kit validation and shell build
         run: |
           python3 -m unittest discover -s tests/host -p 'test_madeira_native_kit.py' -v
@@ -705,6 +708,20 @@ jobs:
                   if backend == "d3d11" and any("libmetalirconverter.dylib" in name for name in archive.namelist()):
                       raise SystemExit("D3D11 IPA unexpectedly contains Apple's converter")
                   kind = "native"
+              profile_file = "Payload/iDeck.app/iDeckRuntimeProfile.plist"
+              if profile_file not in archive.namelist():
+                  raise SystemExit("Packaged iDeck IPA lacks runtime profile identity")
+              profile = plistlib.loads(archive.read(profile_file))
+              if profile.get("runtimeKind") != ("madeira-native" if kind == "native" else "interface-only") or \
+                 profile.get("graphicsBackend") != backend:
+                  raise SystemExit("Packaged runtime profile differs from verified native manifest")
+              if kind == "native":
+                  if profile.get("wow64Enabled") is not info.get("wow64Enabled") or \
+                     profile.get("metalShaderConverterBundled") is not (backend == "d3d12"):
+                      raise SystemExit("Packaged native runtime feature flags are dishonest")
+              elif any(profile.get(field) is not False for field in (
+                  "wow64Enabled", "wineMonoBundled", "metalShaderConverterBundled")):
+                  raise SystemExit("Interface-only IPA falsely advertises native features")
           if os.environ["IDECK_NATIVE_BUILD"] == "1" and kind != "native":
               raise SystemExit("Native runtime requested but the packaged IPA is interface-only")
           if kind == "native" and backend != os.environ["IDECK_MADEIRA_GRAPHICS"]:
