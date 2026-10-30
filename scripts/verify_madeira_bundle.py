@@ -307,7 +307,16 @@ def inspect(app: Path, require_wow64: bool = False, graphics: str = "d3d12") -> 
             errors.append(f"missing or empty iOS shader converter dependency: {converter}")
 
     if graphics == "d3d11":
+        if require_wow64:
+            errors.append("D3D11 x86-64-only profile does not support --require-wow64")
         for directory in (app, runtime):
+            wow64_dir = directory / "i386-windows"
+            if wow64_dir.exists() or wow64_dir.is_symlink():
+                errors.append(f"D3D11 x86-64-only profile must not bundle WoW64: {wow64_dir}")
+            for module in ("xtajit.dll", "wow64.dll", "wow64win.dll"):
+                wow64_host = directory / "aarch64-windows" / module
+                if wow64_host.exists() or wow64_host.is_symlink():
+                    errors.append(f"D3D11 x86-64-only profile must not bundle WoW64: {wow64_host}")
             for name in D3D12_PROHIBITED:
                 asset = directory / name
                 if asset.exists() or asset.is_symlink():
