@@ -101,7 +101,7 @@ def inspect(path: Path) -> dict:
                         if not attributes & 1:
                             raise ValueError("unsupported VA-based PE delay import descriptor")
                         source.seek(resolve(dll_name, 1))
-                        raw_name = source.read(256).split(b"\\0", 1)[0]
+                        raw_name = source.read(256).split(b"\0", 1)[0]
                         if not raw_name or len(raw_name) >= 256:
                             raise ValueError("invalid delay-loaded DLL import name")
                         delay_imports.append(raw_name.decode("ascii", errors="replace").lower())
