@@ -17,6 +17,7 @@ on:
       - tests/host/test_apple_msc_beta3_bundle.py
       - scripts/verify_madeira_device_acceptance.py
       - scripts/inspect_windows_game_pe.py
+      - tests/host/test_madeira_pe_delay_imports.py
       - tests/host/test_apple_msc_beta3.py
       - tests/host/test_madeira_device_acceptance.py
       - scripts/build_madeira_device_probes.sh
@@ -63,6 +64,7 @@ jobs:
           set -euo pipefail
           python3 -m unittest discover -s tests/host -p 'test_apple_msc_beta3.py' -v
           python3 -m unittest discover -s tests/host -p 'test_apple_msc_beta3_bundle.py' -v
+          python3 -m unittest discover -s tests/host -p 'test_madeira_pe_delay_imports.py' -v
           python3 -m unittest discover -s tests/host -p 'test_madeira_device_acceptance.py' -v
           python3 -m unittest discover -s tests/host -p 'test_madeira_d3d11_profile.py' -v
           python3 -m unittest discover -s tests/host -p 'test_madeira_payload_staging.py' -v
