@@ -197,6 +197,7 @@ jobs:
           python3 -m unittest discover -s tests/host -p 'test_madeira_component_stages.py' -v
           python3 -m unittest discover -s tests/host -p 'test_madeira_component_outputs.py' -v
           python3 -m unittest discover -s tests/host -p 'test_madeira_wine_stage4.py' -v
+          python3 -m unittest discover -s tests/host -p 'test_madeira_dxmt_stage5.py' -v
 
       - name: Test native bundle and signed-app validation
         run: |

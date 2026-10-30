@@ -79,6 +79,39 @@ passar integralmente. Os testes host de CMake, checklists ou mocks não
 provam um Wine executável no iPad. Inicialização do wineserver, execução
 do guest e encerramento seguro exigem validação física nas fases 7–9.
 
+### Fase 5: DXMT/D3D11 compilado sem o conversor proprietário
+
+Pré-requisitos já aprovados em compilação macOS:
+- **Fase 2** — [workflow #40994092326](https://github.com/FacensPedro/iDeck/actions/runs/40994092326), LLVM 15, ARM64EC e dependências públicas.
+- **Fase 3** — [workflow #40999473834](https://github.com/FacensPedro/iDeck/actions/runs/40999473834), bibliotecas FEXCore ARM64 e `xtajit64.dll`.
+- **Fase 4** — [workflow #41002933976](https://github.com/FacensPedro/iDeck/actions/runs/41002933976), Wine 11.4 ARM64EC, `ntdll.dll`, `libntdll_unix.a`, `libwineserver.a` e `libwin32u_unix.a`. A PR #100 permanece dependência de integração enquanto não estiver mesclada na `main`.
+
+O workflow `.github/workflows/madeira-dxmt-stage5.yml` executa
+`IDECK_MADEIRA_GRAPHICS=d3d11 IDECK_BUILD_WOW64=0
+IDECK_MADEIRA_STOP_AFTER=dxmt bash scripts/build_madeira_components.sh`.
+FEX e Wine são compilados das fontes fixadas e validados antes de chegar
+aos shaders Metal do DXMT; após a cópia dos módulos gráficos, a execução
+**para antes** da compilação WoW64, D3D12, DirectComposition opcional
+e do empacotamento do IPA.
+
+O verificador `scripts/verify_madeira_dxmt_stage5.py` só aprova se:
+- `libdxmt_combined.a` for um arquivo de objetos real para iPhoneOS ARM64;
+- `d3d11.dll`, `dxgi.dll`, `d3d10core.dll` e `winemetal.dll`
+  existirem em **ambas** as famílias PE `aarch64-windows` e `arm64ec-windows`
+  com a máquina correta e metadados CHPE quando aplicável;
+- os arquivos de configuração Meson/Ninja PE reais e os intermediários
+  AIR/cabeçalhos gerados de `air_msad`, `air_samplepos` e
+  `air_tessellation` estiverem presentes;
+- o recibo `dxmt-stage5-receipt.json` incluir os hashes SHA-256 dos
+  **nove** produtos gráficos, sem afirmar execução no dispositivo.
+
+Uma aprovação exige que o **job macOS de compilação DXMT** passe,
+não apenas o job de testes host. **Não foi validado** neste estágio
+o link final do IPA, a primeira imagem apresentada pelo jogo,
+o JIT StikDebug, os controles ou o áudio no iPad.
+O perfil D3D11 continua dispensando o Apple Metal Shader Converter
+e os arquivos proprietários D3D12.
+
 ### Fases 3–5: pontos de parada independentes
 
 Com as toolchains previamente verificadas, em runner Xcode/macos:
