@@ -3,6 +3,32 @@
 #include <dxgi.h>
 #include <cstdio>
 
+static void write_guest_frame_receipt(const char *api, unsigned int frames,
+                                      unsigned long hresult, int status) {
+    char directory[MAX_PATH] = {};
+    char filename[MAX_PATH] = {};
+    DWORD used = GetTempPathA(MAX_PATH, directory);
+    if (!used || used >= MAX_PATH ||
+        std::snprintf(filename, sizeof(filename),
+            "%sideck-guest-%s-frame.log", directory, api) >= (int)sizeof(filename))
+        return;
+    FILE *file = std::fopen(filename, "wb");
+    if (!file) return;
+    if (status == 0 && frames > 0) {
+        if (api[4] == '1') {
+            std::fprintf(file, "ideck-d3d11-frame-probe: presents=%u hr=0x%08lx\r\n",
+                         frames, hresult);
+        } else {
+            std::fprintf(file, "ideck-d3d12-frame-probe: presents=%u hr=0x%08lx exit=%d\r\n",
+                         frames, hresult, status);
+        }
+    } else {
+        std::fprintf(file, "ideck-%s-frame-failure: presents=%u hr=0x%08lx exit=%d\r\n",
+                     api, frames, hresult, status);
+    }
+    std::fclose(file);
+}
+
 static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM word, LPARAM longword) {
     if (message == WM_DESTROY) {
         PostQuitMessage(0);
@@ -80,6 +106,9 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
         Sleep(16);
     }
 
+    write_guest_frame_receipt("d3d11", (unsigned int)frames,
+                             (unsigned long)result,
+                             SUCCEEDED(result) && frames == 180 ? 0 : 15);
     std::printf("ideck-d3d11-frame-probe: presents=%d hr=0x%08lx\n",
                 frames, (unsigned long)result);
     std::fflush(stdout);

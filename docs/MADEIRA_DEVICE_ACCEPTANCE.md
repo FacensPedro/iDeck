@@ -5,6 +5,12 @@ on iOS. Use the exact unsigned D3D11 IPA that passes the native GitHub Actions
 workflow, then sign and install it with an authorized method. Never redistribute
 Apple's Metal Shader Converter or Microsoft VC++ DLLs without permission.
 
+For reproducible physical iPad Windows guest tests covering **PE32/WoW64,
+D3D11, D3D12, PCM audio, XInput, touch and second-launch stability**, use
+[MADEIRA_GUEST_DEVICE_PROBES.md](MADEIRA_GUEST_DEVICE_PROBES.md). That suite
+builds original Windows test executables and audits their guest-produced
+receipts, but does not automatically certify hardware execution.
+
 ## Requirements
 
 - iPad mini A17 Pro, record the *actual* iPadOS build number displayed in Settings.

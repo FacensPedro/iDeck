@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       native_profile:
-        description: "Optional costly source-build profile; D3D12 only checks PE, never bundles proprietary Apple files"
+        description: "Select public Windows guest probes alone or an opt-in source build (never uploads proprietary Apple converter)"
         type: choice
-        options: [tests-only, d3d11-wow64, d3d12-guest-pe, d3d12-wow64-guest-pe]
+        options: [tests-only, guest-probes-only, d3d11-wow64, d3d12-guest-pe, d3d12-wow64-guest-pe]
         default: tests-only
   push:
     branches: [feature/madeira-device-acceptance-d3d12-wow64-20261030]
@@ -33,6 +33,11 @@ on:
   pull_request:
     branches: [main]
     paths:
+      - tests/device/ideck_guest_audio_input_probe.c
+      - tests/device/ideck_d3d12_frame_probe.cpp
+      - scripts/build_madeira_device_probes.sh
+      - scripts/verify_madeira_guest_probe_results.py
+      - tests/host/test_madeira_guest_probe_results.py
       - iDeck/NativeRuntime/WindowsPEMachine.h
       - iDeck/NativeRuntimeDiagnostics.mm
       - iDeck/NativeRuntimeDiagnostics.h
@@ -78,6 +83,7 @@ jobs:
           python3 -m unittest discover -s tests/host -p 'test_madeira_native_pe_machine.py' -v
           python3 -m unittest discover -s tests/host -p 'test_wine_shutdown_library_return.py' -v
           python3 -m unittest discover -s tests/host -p 'test_madeira_device_acceptance.py' -v
+          python3 -m unittest discover -s tests/host -p 'test_madeira_guest_probe_results.py' -v
           python3 -m unittest discover -s tests/host -p 'test_madeira_d3d11_profile.py' -v
           python3 -m unittest discover -s tests/host -p 'test_madeira_payload_staging.py' -v
           python3 -m unittest discover -s tests/host -p 'test_madeira_component_stages.py' -v
@@ -149,6 +155,8 @@ jobs:
           set -euo pipefail
           bash scripts/prepare_madeira_toolchains.sh
           bash scripts/verify_madeira_toolchains.sh
+      # In guest-probes-only, no FEX/Wine/DXMT/D3D12 native runtime is built.
+      # Only cross-compiled original Windows EXE test programs are published.
       - name: Restore public Wine dependencies
         uses: actions/cache/restore@v5
         with:
@@ -205,16 +213,16 @@ jobs:
           print("NOT TESTED: Apple converter, IPA signing, iPad guest launch, or real rendering.")
           PY
           fi
-      - name: Build Windows guest and D3D11 first-frame probes for actual iPad execution
+      - name: Compile original PE32/x64 guest D3D11 D3D12 PCM controller and touch test programs
         run: |
           set -euo pipefail
           bash scripts/build_madeira_device_probes.sh
 
-      - name: Publish original Windows guest and D3D11 probe executables
+      - name: Publish original Windows guest graphics, audio and input probe executables
         if: success()
         uses: actions/upload-artifact@v7
         with:
-          name: Madeira-original-PE32-x64-guest-probes
+          name: Madeira-PE32-x64-graphics-audio-input-probes
           path: |
             build/madeira-device-probes/*.exe
             build/madeira-device-probes/*.json
