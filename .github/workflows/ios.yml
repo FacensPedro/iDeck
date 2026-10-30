@@ -344,6 +344,9 @@ jobs:
       - name: Test native window-level Metal display and fast Wine startup
         run: python3 -m unittest discover -s tests/host -p 'test_wine_black_screen_fast_start.py' -v
 
+      - name: Test Wine XInput lifecycle on view dismissal and backgrounding
+        run: python3 -m unittest discover -s tests/host -p 'test_wine_gamepad_view_lifecycle.py' -v
+
       - name: Test on-screen XInput/HID controller presets, native slots and cleanup
         run: python3 -m unittest discover -s tests/host -p 'test_madeira_touch_virtual_controller.py' -v
 

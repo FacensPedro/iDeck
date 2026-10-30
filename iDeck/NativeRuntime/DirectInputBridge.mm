@@ -295,7 +295,13 @@ static void begin_native_gamepads(void) {
                                                    queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *n) { refresh_controllers(); }];
         g_backgroundObserver = [center addObserverForName:UIApplicationWillResignActiveNotification object:nil
                                                    queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *n) {
-            g_appActive = NO; output_active(NO); sample_gamepads(); update_sample_timer();
+            g_appActive = NO;
+            // The finger-up may never be delivered when iOS backgrounds a
+            // game. Discard held virtual buttons/sticks before foreground.
+            g_touchState = {};
+            output_active(NO);
+            sample_gamepads();
+            update_sample_timer();
         }];
         g_foregroundObserver = [center addObserverForName:UIApplicationDidBecomeActiveNotification object:nil
                                                    queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *n) {
@@ -387,8 +393,12 @@ extern "C" void ideck_controller_start(void) {
     else dispatch_async(dispatch_get_main_queue(), ^{ [GCController startWirelessControllerDiscoveryWithCompletionHandler:nil]; });
 }
 
-extern "C" void ideck_controller_stop(void) {
-    ideck_gamepad_end_session();
+extern "C" void ideck_controller_stop_discovery(void) {
     if (NSThread.isMainThread) [GCController stopWirelessControllerDiscovery];
     else dispatch_async(dispatch_get_main_queue(), ^{ [GCController stopWirelessControllerDiscovery]; });
+}
+
+extern "C" void ideck_controller_stop(void) {
+    ideck_gamepad_end_session();
+    ideck_controller_stop_discovery();
 }
