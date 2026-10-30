@@ -61,6 +61,7 @@ class SystemCoordinator: ObservableObject {
     @Published private(set) var windowsCloseWarning: String?
     private var windowsCloseRequestedAt: TimeInterval?
     private var windowsCloseWarningWasShown = false
+    private var windowsCloseAttempts = 0
     private var windowsStatusBeforeClose: String?
     private var wineJITPreparationInFlight = false
     private var wineJITAttemptedDuringAttachment = false
@@ -778,6 +779,7 @@ class SystemCoordinator: ObservableObject {
         windowsCloseWarning = nil
         windowsCloseWarningWasShown = false
         windowsCloseRequestedAt = ProcessInfo.processInfo.systemUptime
+        windowsCloseAttempts = 0
         windowsStatusBeforeClose = windowsStatus
         pendingSteamGameID = nil
         setWindowsStatus("Closing Windows session...")
@@ -795,6 +797,7 @@ class SystemCoordinator: ObservableObject {
         windowsCloseWarning = nil
         windowsCloseWarningWasShown = false
         windowsCloseRequestedAt = ProcessInfo.processInfo.systemUptime
+        windowsCloseAttempts = 0
         if ideck_wineprocess_running() {
             _ = ideck_wineprocess_request_close()
         }
@@ -809,6 +812,7 @@ class SystemCoordinator: ObservableObject {
         guard isClosingWindowsSession else { return }
         isClosingWindowsSession = false
         windowsCloseRequestedAt = nil
+        windowsCloseAttempts = 0
         windowsCloseWarning = nil
         windowsCloseWarningWasShown = false
         let previousStatus = windowsStatusBeforeClose
@@ -829,6 +833,16 @@ class SystemCoordinator: ObservableObject {
             return
         }
         let seconds = ProcessInfo.processInfo.systemUptime - (windowsCloseRequestedAt ?? 0)
+        // Some games drop the first Alt+F4 while creating their window, and
+        // launchers can transfer focus to a child process. Retry normal,
+        // cooperative close at most three times; never cancel/kick the Wine
+        // pthread or kill the iDeck host process.
+        if ideck_wineprocess_running() && windowsCloseAttempts < 3 &&
+           seconds >= Double((windowsCloseAttempts + 1) * 4) {
+            windowsCloseAttempts += 1
+            let delivered = ideck_wineprocess_request_close()
+            SteamLog.event("[wine-close] retry=\(windowsCloseAttempts) alt-f4=\(delivered)")
+        }
         if seconds >= 15, !windowsCloseWarningWasShown {
             windowsCloseWarningWasShown = true
             windowsCloseWarning = "The Windows game has not exited. iDeck cannot safely force-kill an in-process Wine thread without risking an app crash. Try closing the game from its menu or retry Alt+F4."
