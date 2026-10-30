@@ -97,7 +97,14 @@ class MadeiraDeviceAndCompatibilityTests(unittest.TestCase):
         wanted = device.template("d3d12", True, True)
         self.assertIn("d3d12_guest_first_frame", wanted["checks"])
         self.assertIn("wow64_i386_guest_launch", wanted["checks"])
+        self.assertIn("wow64_i386_d3d11_first_frame", wanted["checks"])
         self.assertIn("dotnet_mono_runtime", wanted["checks"])
+
+    def test_wow64_cannot_pass_without_i386_guest_frame_recording(self):
+        self.report["profile"]["wow64"] = True
+        errors, receipt = device.validate(self.report, self.root)
+        self.assertTrue(any("wow64_i386_d3d11_first_frame" in issue for issue in errors))
+        self.assertFalse(receipt["ready_for_human_review"])
 
     def test_zip_escape_or_symlink_evidence_cannot_escape_root(self):
         self.report["checks"]["jit_attached"]["evidence_file"] = "../outside.txt"

@@ -17,7 +17,8 @@ CHECKS = {
     "phase11": ("cold_start_after_reboot", "repeat_sessions", "release_test_report"),
 }
 OPTIONAL_CHECKS = {
-    "wow64": ("wow64_i386_guest_launch", "wow64_guest_shutdown"),
+    "wow64": ("wow64_i386_guest_launch", "wow64_guest_shutdown",
+              "wow64_i386_d3d11_first_frame"),
     "d3d12": ("d3d12_guest_first_frame", "d3d12_shader_conversion"),
     "compatibility": ("vcruntime_imports", "dotnet_mono_runtime", "controller_hid_path"),
 }
@@ -138,7 +139,8 @@ def validate(report: dict, base: Path) -> tuple[list[str], dict]:
             if digest(proof) != sha:
                 errors.append(f"{name}: evidence file SHA-256 mismatch")
                 continue
-            if name in ("guest_first_frame", "guest_subsequent_frames", "d3d12_guest_first_frame"):
+            if name in ("guest_first_frame", "guest_subsequent_frames", "d3d12_guest_first_frame",
+                        "wow64_i386_d3d11_first_frame"):
                 with proof.open("rb") as stream:
                     first = stream.read(12)
                 if not (first.startswith(b"\x89PNG\r\n\x1a\n")
@@ -160,6 +162,7 @@ def validate(report: dict, base: Path) -> tuple[list[str], dict]:
         "device_compatibility_proven_automatically": False,
         "required_manual_review": [
             "The image is a guest-generated frame rather than the Wine splash screen",
+            "For WoW64, the visible i386 D3D11 probe ran via Wine/FEX, not an x64 fallback",
             "Audio was heard and inputs controlled the actual Windows guest",
             "StikDebug BRK handling and protected RX/RW mappings actually worked",
             "Guest and wineserver exited cleanly and launched a second time",

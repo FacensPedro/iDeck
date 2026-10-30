@@ -64,6 +64,33 @@ be signed in the final signed app as required by Apple; unsigned CI
 artifacts do not prove runtime `dlopen` works. Use
 `scripts/verify_signed_madeira_app.py` after signing.
 
+The strict bundle audit now checks the actual iPhoneOS ARM64 Mach-O header and
+`LC_BUILD_VERSION` in **both** staged copies and the owner-provided source,
+requires the exact audited 30,189,152-byte beta-3 library, and cross-checks
+the embedded RTF license and SDK/minimum-iOS provenance. A self-consistent JSON
+hash for a non-Mach-O file is never sufficient. These checks verify package
+integrity, not legal permission or runtime Metal behavior.
+
+#### Combined D3D12 + WoW64 profile
+
+On the owner's Mac, with the exact legal Apple 4.0 beta 3 installer and Xcode:
+
+```bash
+IDECK_REQUIRE_MADEIRA=1 \
+IDECK_MADEIRA_GRAPHICS=d3d12 \
+IDECK_BUILD_WOW64=1 \
+IDECK_PREBUILT_MODE=off \
+IDECK_ACCEPT_METAL_CONVERTER_LICENSE=1 \
+IDECK_MSC_PKG="/private/path/Metal_Shader_Converter_4.0_beta_3.pkg" \
+bash scripts/build_ipa.sh
+```
+
+This requests real FEX/Wine PE32 host modules, native ARM64EC D3D12 frontends
+and an unsigned converter-bearing iOS IPA. On a signed extracted app, run
+`python3 scripts/verify_signed_madeira_app.py --app PATH_TO_SIGNED_iDeck.app`
+on macOS. A build or valid signature does **not** prove 32-bit execution on the
+iPad or a D3D12 first frame.
+
 ### Public-source D3D12 guest validation
 
 The manual GitHub workflow
@@ -71,7 +98,11 @@ The manual GitHub workflow
 `d3d12-guest-pe`, compiles the upstream ARM64EC
 `madeira_d3d12.dll`, `d3d12.dll` and `d3d12core.dll` without
 a proprietary Apple runtime, then rejects any incorrect PE architecture.
-It deliberately **does not output a D3D12 IPA**. The in-app D3D12
+It deliberately **does not output a D3D12 IPA**.
+The additional `d3d12-wow64-guest-pe` manual workflow compiles public D3D12
+frontends together with the complete Wine/FEX i386/ARM64 WoW64 host farm,
+and audits PE32 and ARM64 host machines. It does not use or publish Apple's
+converter and never produces a D3D12 IPA. The in-app D3D12
 shader converter and visible cube require a separate signed-device run
 with an authorized iOS converter.
 
@@ -128,7 +159,7 @@ Win32 startup probes and one D3D11 graphics probe:
   compiled EXE proves nothing about guest startup.
 - `tests/device/ideck_d3d11_frame_probe.cpp`: a real
   `D3D11CreateDeviceAndSwapChain` + `ClearRenderTargetView` +
-  `Present` path with alternating red/blue frames. A screen capture
+  `Present` path in **both x64 and i386** with alternating red/blue frames. A screen capture
   from the physical iPad should show both colors **from the guest**,
   not the Wine splash screen or an iDeck placeholder.
 - `scripts/build_madeira_device_probes.sh` builds these via
@@ -138,6 +169,10 @@ Win32 startup probes and one D3D11 graphics probe:
 ```bash
 bash scripts/build_madeira_device_probes.sh
 ```
+
+For the WoW64 profile, the acceptance auditor additionally requires a real
+PNG/JPEG/MP4 capture of `ideck-d3d11-frame-probe-x86.exe` rendering on an
+iPad. A PE32 process-start log alone does not prove that 32-bit D3D11 works.
 
 The manual GitHub optional-profile build publishes the executables as
 an artifact for local transfer onto the iPad (no proprietary game files).

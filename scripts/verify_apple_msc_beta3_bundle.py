@@ -8,10 +8,11 @@ import sys
 import zipfile
 from pathlib import Path
 
-from prepare_apple_msc_beta3 import PACKAGE_SHA256, LIBRARY_NAME, LICENSE_NAME, PROVENANCE_NAME
+from prepare_apple_msc_beta3 import (PACKAGE_SHA256, LIBRARY_NAME, LICENSE_NAME, PROVENANCE_NAME, ios_macho_details)
 
 RELATIVE = "d3d12/" + LIBRARY_NAME
 REQUIRED = (LIBRARY_NAME, LICENSE_NAME, PROVENANCE_NAME)
+EXPECTED_IOS_LIBRARY_BYTES = 30_189_152
 
 
 def digest(data: bytes) -> str:
@@ -38,11 +39,23 @@ def verify(source: Path, app: Path, ipa: Path | None = None) -> list[str]:
             errors.append("Apple converter is not the iOS ARM64 dylib")
         if receipt.get("device_execution_verified") is not False:
             errors.append("converter receipt falsely claims iPad execution")
+        if receipt.get("library_bytes") != EXPECTED_IOS_LIBRARY_BYTES:
+            errors.append("Apple 4.0 beta 3 dylib has an unexpected recorded size")
         for directory in paths:
-            library = (directory / LIBRARY_NAME).read_bytes()
+            library_path = directory / LIBRARY_NAME
+            library = library_path.read_bytes()
             license_data = (directory / LICENSE_NAME).read_bytes()
-            if len(library) < 10_000_000:
-                errors.append(f"implausibly small Apple converter library at {directory}")
+            if len(library) != EXPECTED_IOS_LIBRARY_BYTES:
+                errors.append(f"wrong Apple beta 3 iOS dylib byte length at {directory}")
+            try:
+                details = ios_macho_details(library_path)
+                for key in ("platform", "minimum_ios", "sdk"):
+                    if receipt.get(key) != details.get(key):
+                        errors.append(f"Apple converter Mach-O {key} differs from provenance at {directory}")
+            except (OSError, ValueError) as exc:
+                errors.append(f"invalid iPhoneOS ARM64 Apple converter Mach-O at {directory}: {exc}")
+            if not license_data.startswith(b"{\\rtf"):
+                errors.append(f"Apple converter license is not an RTF document at {directory}")
             if digest(library) != receipt.get("library_sha256"):
                 errors.append(f"Apple converter does not match audited library: {directory}")
             if digest(license_data) != receipt.get("license_sha256"):

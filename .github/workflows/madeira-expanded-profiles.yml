@@ -6,7 +6,7 @@ on:
       native_profile:
         description: "Optional costly source-build profile; D3D12 only checks PE, never bundles proprietary Apple files"
         type: choice
-        options: [tests-only, d3d11-wow64, d3d12-guest-pe]
+        options: [tests-only, d3d11-wow64, d3d12-guest-pe, d3d12-wow64-guest-pe]
         default: tests-only
   push:
     branches: [feature/madeira-device-acceptance-d3d12-wow64-20261030]
@@ -85,7 +85,7 @@ jobs:
           PY
 
   optional_native:
-    name: Compile manually selected WoW64 IPA or proprietary-free D3D12 PE
+    name: Compile opt-in WoW64 IPA or public D3D12 and D3D12+WoW64 Windows frontends
     needs: host
     if: github.event_name == 'workflow_dispatch' && inputs.native_profile != 'tests-only'
     runs-on: xcode-27
@@ -96,9 +96,9 @@ jobs:
       IDECK_ACCEPT_METAL_CONVERTER_LICENSE: '0'
       IDECK_LLVM_JOBS: '3'
       IDECK_LLVM_REF: llvmorg-15.0.7
-      IDECK_BUILD_WOW64: ${{ inputs.native_profile == 'd3d11-wow64' && '1' || '0' }}
-      IDECK_MADEIRA_GRAPHICS: d3d11
-      IDECK_MADEIRA_STOP_AFTER: ${{ inputs.native_profile == 'd3d11-wow64' && 'all' || 'dxmt' }}
+      IDECK_BUILD_WOW64: ${{ (inputs.native_profile == 'd3d11-wow64' || inputs.native_profile == 'd3d12-wow64-guest-pe') && '1' || '0' }}
+      IDECK_MADEIRA_GRAPHICS: ${{ startsWith(inputs.native_profile, 'd3d12-') && 'd3d12' || 'd3d11' }}
+      IDECK_MADEIRA_STOP_AFTER: ${{ (inputs.native_profile == 'd3d11-wow64' || inputs.native_profile == 'd3d12-wow64-guest-pe') && 'all' || 'dxmt' }}
       IDECK_REQUIRE_MADEIRA: '1'
       IDECK_CONFIGURATION: Debug
     steps:
@@ -153,11 +153,13 @@ jobs:
           unzip -tq iDeck.ipa
           test -s iDeck.ipa
       - name: Compile only public ARM64EC D3D12 frontends without a proprietary library
-        if: inputs.native_profile == 'd3d12-guest-pe'
+        if: inputs.native_profile == 'd3d12-guest-pe' || inputs.native_profile == 'd3d12-wow64-guest-pe'
         run: |
           set -euo pipefail
           bash scripts/build_madeira_components.sh 2>&1 | tee optional-wine-build.log
-          bash vendor/Madeira/build/madeira-d3d12/build-pe.sh
+          if [[ "${{ inputs.native_profile }}" == "d3d12-guest-pe" ]]; then
+            bash vendor/Madeira/build/madeira-d3d12/build-pe.sh
+          fi
           python3 - <<'PY'
           import sys
           from pathlib import Path
@@ -170,6 +172,25 @@ jobs:
                   raise SystemExit(error)
           print("PASS: real public ARM64EC D3D12 PE files; no iOS converter, no IPA.")
           PY
+          if [[ "${{ inputs.native_profile }}" == "d3d12-wow64-guest-pe" ]]; then
+            python3 - <<'PY'
+          import sys
+          from pathlib import Path
+          sys.path.insert(0, "scripts")
+          from verify_madeira_bundle import _pe32_error, _pe_arch_error
+          root = Path("vendor/Madeira/app/Madeira")
+          for name in ("ntdll.dll", "kernel32.dll", "user32.dll", "d3d11.dll", "dxgi.dll"):
+              target = root / "i386-windows" / name
+              if not target.is_file() or (error := _pe32_error(target)):
+                  raise SystemExit(f"Invalid compiled PE32 WoW64 module {name}: {error if target.is_file() else 'missing'}")
+          for name in ("xtajit.dll", "wow64.dll", "wow64win.dll"):
+              target = root / "aarch64-windows" / name
+              if not target.is_file() or (error := _pe_arch_error(target, False)):
+                  raise SystemExit(f"Invalid ARM64 WoW64 host {name}: {error if target.is_file() else 'missing'}")
+          print("PASS: public WoW64 i386 PE and ARM64 host modules alongside D3D12 guest frontends.")
+          print("NOT TESTED: Apple converter, IPA signing, iPad guest launch, or real rendering.")
+          PY
+          fi
       - name: Build Windows guest and D3D11 first-frame probes for actual iPad execution
         run: |
           set -euo pipefail
