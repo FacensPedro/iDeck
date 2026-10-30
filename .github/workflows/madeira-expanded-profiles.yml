@@ -1,0 +1,206 @@
+name: Madeira optional D3D12, WoW64 and device acceptance gates
+
+on:
+  workflow_dispatch:
+    inputs:
+      native_profile:
+        description: "Optional costly source-build profile; D3D12 only checks PE, never bundles proprietary Apple files"
+        type: choice
+        options: [tests-only, d3d11-wow64, d3d12-guest-pe]
+        default: tests-only
+  push:
+    branches: [feature/madeira-device-acceptance-d3d12-wow64-20261030]
+    paths:
+      - .github/workflows/madeira-expanded-profiles.yml
+      - scripts/prepare_apple_msc_beta3.py
+      - scripts/verify_madeira_device_acceptance.py
+      - scripts/inspect_windows_game_pe.py
+      - tests/host/test_apple_msc_beta3.py
+      - tests/host/test_madeira_device_acceptance.py
+      - scripts/build_madeira_device_probes.sh
+      - tests/device/ideck_guest_smoke.c
+      - tests/device/ideck_d3d11_frame_probe.cpp
+      - scripts/verify_madeira_bundle.py
+      - scripts/stage_madeira_payload.sh
+      - scripts/build_ipa.sh
+      - scripts/build_native_runtime.sh
+      - tests/host/test_madeira_d3d11_profile.py
+      - tests/host/test_madeira_payload_staging.py
+      - tests/host/test_madeira_component_stages.py
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/madeira-expanded-profiles.yml
+      - scripts/prepare_apple_msc_beta3.py
+      - scripts/verify_madeira_device_acceptance.py
+      - scripts/inspect_windows_game_pe.py
+      - scripts/verify_madeira_bundle.py
+      - scripts/stage_madeira_payload.sh
+      - tests/host/test_apple_msc_beta3.py
+      - tests/host/test_madeira_device_acceptance.py
+
+permissions:
+  contents: read
+
+concurrency:
+  group: madeira-expanded-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  host:
+    name: Verify Apple MSC package safety, opt-in WoW64 and Stage 8-11 evidence
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Exercise package inspector, PE classifier and device proof auditor
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests/host -p 'test_apple_msc_beta3.py' -v
+          python3 -m unittest discover -s tests/host -p 'test_madeira_device_acceptance.py' -v
+          python3 -m unittest discover -s tests/host -p 'test_madeira_d3d11_profile.py' -v
+          python3 -m unittest discover -s tests/host -p 'test_madeira_payload_staging.py' -v
+          python3 -m unittest discover -s tests/host -p 'test_madeira_component_stages.py' -v
+          python3 -m unittest discover -s tests/host -p 'test_madeira_bundle.py' -v
+          python3 -m unittest discover -s tests/host -p 'test_madeira_legal_notices.py' -v
+          bash -n scripts/build_madeira_components.sh
+          bash -n scripts/build_native_runtime.sh
+          bash -n scripts/build_ipa.sh
+          bash -n scripts/stage_madeira_payload.sh
+          bash -n scripts/build_madeira_device_probes.sh
+          python3 scripts/verify_madeira_device_acceptance.py --write-template /tmp/madeira-stage8-11-NOT-RUN.json --graphics d3d12 --wow64
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path("/tmp/madeira-stage8-11-NOT-RUN.json").read_text())
+          assert report["checks"]["d3d12_guest_first_frame"]["status"] == "NOT RUN"
+          assert report["checks"]["wow64_i386_guest_launch"]["status"] == "NOT RUN"
+          print("PASS: no fake D3D12/WoW64 device acceptance evidence.")
+          PY
+
+  optional_native:
+    name: Compile manually selected WoW64 IPA or proprietary-free D3D12 PE
+    needs: host
+    if: github.event_name == 'workflow_dispatch' && inputs.native_profile != 'tests-only'
+    runs-on: xcode-27
+    timeout-minutes: 300
+    env:
+      IDECK_MADEIRA_REBUILD: '1'
+      IDECK_PREBUILT_MODE: off
+      IDECK_ACCEPT_METAL_CONVERTER_LICENSE: '0'
+      IDECK_LLVM_JOBS: '3'
+      IDECK_LLVM_REF: llvmorg-15.0.7
+      IDECK_BUILD_WOW64: ${{ inputs.native_profile == 'd3d11-wow64' && '1' || '0' }}
+      IDECK_MADEIRA_GRAPHICS: d3d11
+      IDECK_MADEIRA_STOP_AFTER: ${{ inputs.native_profile == 'd3d11-wow64' && 'all' || 'dxmt' }}
+      IDECK_REQUIRE_MADEIRA: '1'
+      IDECK_CONFIGURATION: Debug
+    steps:
+      - name: Checkout iDeck
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Prepare Xcode and public compilers
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+      - name: Install required public tools
+        run: |
+          set -euo pipefail
+          missing=()
+          for tool in cmake ninja meson pkg-config; do
+            command -v "$tool" >/dev/null || missing+=("$tool")
+          done
+          if (( ${#missing[@]} )); then
+            HOMEBREW_NO_AUTO_UPDATE=1 brew install "${missing[@]}"
+          fi
+          bash scripts/ensure_madeira_bison.sh
+          bash scripts/ensure_metal_toolchain.sh
+          bash scripts/fetch_madeira_sources.sh
+      - name: Restore audited LLVM 15 and ARM64EC compilers
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            vendor/Madeira/toolchains/llvm-mingw-20260421-ucrt-macos-universal
+            vendor/Madeira/toolchains/llvm-ios-build
+          key: madeira-llvm15-ios-v3-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/prepare_madeira_toolchains.sh', 'scripts/llvm_ios_sdk.py') }}
+      - name: Prepare and verify genuine public toolchains
+        run: |
+          set -euo pipefail
+          bash scripts/prepare_madeira_toolchains.sh
+          bash scripts/verify_madeira_toolchains.sh
+      - name: Restore public Wine dependencies
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            vendor/Madeira/toolchains/gnutls-ios
+            vendor/Madeira/toolchains/ffmpeg-ios
+            vendor/Madeira/build/freetype-ios/build
+            vendor/Madeira/research/freetype
+          key: madeira-ios-deps-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/prepare_madeira_dependencies.sh') }}
+      - name: Build opt-in real x86 WoW64 D3D11 native IPA
+        if: inputs.native_profile == 'd3d11-wow64'
+        run: |
+          set -euo pipefail
+          bash scripts/build_ipa.sh 2>&1 | tee optional-wine-build.log
+          python3 scripts/verify_madeira_bundle.py --app build/Staging/iDeck.app --require --require-wow64 --graphics d3d11
+          unzip -tq iDeck.ipa
+          test -s iDeck.ipa
+      - name: Compile only public ARM64EC D3D12 frontends without a proprietary library
+        if: inputs.native_profile == 'd3d12-guest-pe'
+        run: |
+          set -euo pipefail
+          bash scripts/build_madeira_components.sh 2>&1 | tee optional-wine-build.log
+          bash vendor/Madeira/build/madeira-d3d12/build-pe.sh
+          python3 - <<'PY'
+          import sys
+          from pathlib import Path
+          sys.path.insert(0, "scripts")
+          from verify_madeira_component_outputs import verify_pe
+          root = Path("vendor/Madeira/build/madeira-d3d12/out-pe")
+          for name in ("madeira_d3d12.dll", "d3d12.dll", "d3d12core.dll"):
+              error = verify_pe(root / name)
+              if error:
+                  raise SystemExit(error)
+          print("PASS: real public ARM64EC D3D12 PE files; no iOS converter, no IPA.")
+          PY
+      - name: Build Windows guest and D3D11 first-frame probes for actual iPad execution
+        run: |
+          set -euo pipefail
+          bash scripts/build_madeira_device_probes.sh
+
+      - name: Publish original Windows guest and D3D11 probe executables
+        if: success()
+        uses: actions/upload-artifact@v7
+        with:
+          name: Madeira-original-PE32-x64-guest-probes
+          path: |
+            build/madeira-device-probes/*.exe
+            build/madeira-device-probes/*.json
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Publish verified optional WoW64 IPA directly
+        if: success() && inputs.native_profile == 'd3d11-wow64'
+        uses: actions/upload-artifact@v7
+        with:
+          name: iDeck-D3D11-WoW64-unsigned.ipa
+          path: iDeck.ipa
+          archive: false
+          retention-days: 7
+          if-no-files-found: error
+      - name: Publish opt-in build diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: Madeira-optional-profile-diagnostics
+          path: |
+            optional-wine-build.log
+            vendor/Madeira/build/wine-i386/build.log
+            vendor/Madeira/wine/build-i386/madeira-i386-build.log
+            vendor/Madeira/build/madeira-d3d12/out-pe/*.err
+          retention-days: 7
+          if-no-files-found: warn

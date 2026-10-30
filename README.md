@@ -182,6 +182,7 @@ For more detail, read [Game startup and black-screen diagnostics](docs/IDECK_GAM
 - [Game startup diagnostics](docs/IDECK_GAME_STARTUP_DIAGNOSTICS.md)
 - [Madeira vs. iDeck Windows runtime differences](docs/WINE_RUNTIME_GAP_ANALYSIS.md)
 - [Madeira integration status](docs/MADEIRA_RUNTIME_INTEGRATION.md)
+- [Optional D3D12 MSC 4.0 Beta 3, WoW64 and on-device acceptance](docs/MADEIRA_EXPANDED_PROFILES.md)
 - [Native Madeira build](docs/IDECK_MADEIRA_NATIVE_BUILD.md)
 - [Native linking and verification](docs/MADEIRA_NATIVE_LINKING.md)
 - [Native runtime modules](docs/NATIVE_RUNTIME_MODULES.md)

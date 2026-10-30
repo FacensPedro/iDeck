@@ -40,7 +40,9 @@ class MadeiraComponentStageTests(unittest.TestCase):
         source = COMPONENTS.read_text()
         self.assertIn('if [[ "$GRAPHICS" == "d3d12" ]]; then', source)
         self.assertIn('bash "$MD/build/madeira-d3d12/build-pe.sh"', source)
-        self.assertIn('D3D11 x86-64-only build forbids WoW64', source)
+        self.assertIn('IDECK_BUILD_WOW64 must be 0 or 1', source)
+        self.assertIn('bash "$MD/build/fex-wow64/build.sh"', source)
+        self.assertIn('bash "$MD/build/wine-i386/build.sh"', source)
 
 
 if __name__ == "__main__":

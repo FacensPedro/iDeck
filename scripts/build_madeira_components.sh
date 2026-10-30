@@ -17,13 +17,11 @@ GRAPHICS="${IDECK_MADEIRA_GRAPHICS:-d3d12}"
 [[ "$GRAPHICS" == "d3d11" || "$GRAPHICS" == "d3d12" ]] || {
   echo "ERROR: IDECK_MADEIRA_GRAPHICS must be d3d11 or d3d12." >&2; exit 2;
 }
-if [[ "$GRAPHICS" == "d3d11" ]]; then
-  [[ "${IDECK_BUILD_WOW64:-0}" == "0" ]] || {
-    echo "ERROR: D3D11 x86-64-only build forbids WoW64." >&2
-    exit 2
-  }
-  export IDECK_BUILD_WOW64=0
-fi
+[[ "${IDECK_BUILD_WOW64:-0}" == "0" || "${IDECK_BUILD_WOW64:-0}" == "1" ]] || {
+  echo "ERROR: IDECK_BUILD_WOW64 must be 0 or 1." >&2
+  exit 2
+}
+export IDECK_BUILD_WOW64="${IDECK_BUILD_WOW64:-0}"
 
 [[ "$(uname -s)" == "Darwin" ]] || { echo "ERROR: iOS native toolchains require macOS." >&2; exit 2; }
 for tool in xcrun xcodebuild cmake ninja meson python3; do

@@ -1,5 +1,10 @@
 # Status do runtime Madeira no iDeck
 
+## Perfis experimentais D3D12 4.0 Beta 3, WoW64 e fases 8–11
+
+Consulte [MADEIRA_EXPANDED_PROFILES.md](MADEIRA_EXPANDED_PROFILES.md) para importar localmente o pacote Apple validado por SHA-256 e Mach-O, habilitar opcionalmente o WoW64 no D3D11, inspecionar os imports de jogos e reunir evidências reais do iPad nas fases 8–11. Não confunda testes de CI ou um arquivo IPA com execução comprovada em dispositivo. O conversor proprietário não deve ser incluído no repositório.
+
+
 ## Fases 2–11 — gates nativos e dispositivo (30/10/2026)
 
 **A implementação de um gate não prova que ele passou.** A fonte da verdade

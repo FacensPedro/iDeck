@@ -125,9 +125,9 @@ class MadeiraD3D11ProfileTests(unittest.TestCase):
                     self.assertTrue(any("must not bundle WoW64" in err for err in self.inspect()))
                     path.unlink()
 
-    def test_d3d11_rejects_require_wow64(self):
+    def test_d3d11_requires_real_i386_pe_and_host_modules_for_wow64(self):
         self.assertTrue(any(
-            "does not support --require-wow64" in err
+            "missing WoW64 i386 library" in err
             for err in self.inspect(require_wow64=True)
         ))
 

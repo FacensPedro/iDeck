@@ -296,6 +296,30 @@ def inspect(app: Path, require_wow64: bool = False, graphics: str = "d3d12") -> 
     for folder in ("legal", "licenses"):
         if not (app / folder).is_dir():
             errors.append(f"missing Madeira license directory: {app / folder}")
+    if graphics == "d3d12":
+        provenance_name = "d3d12/apple-msc-4.0-beta-3-provenance.json"
+        license_name = "d3d12/METAL-SHADER-CONVERTER-4.0-BETA-3-LICENSE.rtf"
+        if any((root / provenance_name).exists() for root in (app, runtime)):
+            import json
+            from prepare_apple_msc_beta3 import PACKAGE_SHA256, ios_macho_details
+            for root in (app, runtime):
+                provenance = root / provenance_name
+                license = root / license_name
+                library = root / "d3d12/libmetalirconverter.dylib"
+                if not provenance.is_file() or not license.is_file():
+                    errors.append(f"Metal Shader Converter beta 3 provenance or license missing: {root}")
+                    continue
+                try:
+                    record = json.loads(provenance.read_text(encoding="utf-8"))
+                    if record.get("package_sha256") != PACKAGE_SHA256 or record.get("architecture") != "arm64":
+                        errors.append(f"wrong Apple Metal Shader Converter beta 3 provenance: {provenance}")
+                    if record.get("library_sha256") != hashlib.sha256(library.read_bytes()).hexdigest():
+                        errors.append(f"Apple Metal Shader Converter dylib differs from validated package: {library}")
+                    if record.get("license_sha256") != hashlib.sha256(license.read_bytes()).hexdigest():
+                        errors.append(f"Apple Metal Shader Converter license differs from validated package: {license}")
+                    ios_macho_details(library)
+                except (OSError, ValueError, KeyError, TypeError) as exc:
+                    errors.append(f"unverifiable Apple Metal Shader Converter beta 3: {exc}")
     for directory in (app, runtime) if graphics == "d3d12" else ():
         for name in ("canary_vs.dxil", "canary_ps.dxil",
                      "canary_layout_vs.dxil", "canary_layout_ps.dxil"):
@@ -307,16 +331,15 @@ def inspect(app: Path, require_wow64: bool = False, graphics: str = "d3d12") -> 
             errors.append(f"missing or empty iOS shader converter dependency: {converter}")
 
     if graphics == "d3d11":
-        if require_wow64:
-            errors.append("D3D11 x86-64-only profile does not support --require-wow64")
         for directory in (app, runtime):
-            wow64_dir = directory / "i386-windows"
-            if wow64_dir.exists() or wow64_dir.is_symlink():
-                errors.append(f"D3D11 x86-64-only profile must not bundle WoW64: {wow64_dir}")
-            for module in ("xtajit.dll", "wow64.dll", "wow64win.dll"):
-                wow64_host = directory / "aarch64-windows" / module
-                if wow64_host.exists() or wow64_host.is_symlink():
-                    errors.append(f"D3D11 x86-64-only profile must not bundle WoW64: {wow64_host}")
+            if not require_wow64:
+                wow64_dir = directory / "i386-windows"
+                if wow64_dir.exists() or wow64_dir.is_symlink():
+                    errors.append(f"D3D11 x86-64-only profile must not bundle WoW64: {wow64_dir}")
+                for module in ("xtajit.dll", "wow64.dll", "wow64win.dll"):
+                    wow64_host = directory / "aarch64-windows" / module
+                    if wow64_host.exists() or wow64_host.is_symlink():
+                        errors.append(f"D3D11 x86-64-only profile must not bundle WoW64: {wow64_host}")
             for name in D3D12_PROHIBITED:
                 asset = directory / name
                 if asset.exists() or asset.is_symlink():

@@ -193,6 +193,8 @@ jobs:
           python3 -m unittest discover -s tests/host -p 'test_verify_madeira_sources.py' -v
           python3 -m unittest discover -s tests/host -p 'test_madeira_d3d11_profile.py' -v
           python3 -m unittest discover -s tests/host -p 'test_madeira_payload_staging.py' -v
+          python3 -m unittest discover -s tests/host -p 'test_apple_msc_beta3.py' -v
+          python3 -m unittest discover -s tests/host -p 'test_madeira_device_acceptance.py' -v
           python3 -m unittest discover -s tests/host -p 'test_madeira_legal_notices.py' -v
           python3 -m unittest discover -s tests/host -p 'test_madeira_toolchain_gate.py' -v
           python3 -m unittest discover -s tests/host -p 'test_madeira_component_stages.py' -v
