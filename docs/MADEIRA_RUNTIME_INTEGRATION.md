@@ -26,6 +26,30 @@ da verdade sobre o iPad é o procedimento de
 - A fase 2 só é aprovada com o job completo em runner macOS/Xcode;
   testes host e uma execução LLVM anterior **não** substituem esse gate.
 
+### Fase 3: compilação FEX isolada em iPhoneOS
+
+O workflow `.github/workflows/madeira-fex-stage3.yml` realiza um build
+**somente FEX** a partir da revisão Madeira já fixada, com LLVM/iPhoneOS e
+llvm-mingw ARM64EC públicos e verificados. Execute manualmente pelo
+`workflow_dispatch` após a integração da PR, ou consulte o run disparado
+pela branch de desenvolvimento. Ele publica as três bibliotecas estáticas
+FEXCore/Jemalloc e o executável PE `xtajit64.dll` como artefatos de build,
+**sem** publicar um IPA de interface como se fosse um emulador.
+
+O script `build_madeira_components.sh` recebe
+`IDECK_MADEIRA_STOP_AFTER=fex IDECK_MADEIRA_GRAPHICS=d3d11
+IDECK_BUILD_WOW64=0`, dispensando dependências que só serão necessárias
+à etapa do Wine (Bison, GnuTLS, FFmpeg, FreeType). A checagem final
+`verify_madeira_fex_stage3.py` exige as bibliotecas Mach-O arm64
+compiladas, o PE ARM64EC válido e a configuração de montagem
+`-DFEX_IOS_HOST=1`, inclusive no assembler do módulo Windows.
+Ela grava um recibo com hashes SHA-256 de cada artefato, deixando explícito
+que **não** executou instruções Windows nem validou a memória JIT em iPad.
+
+O status de aprovação desta fase deve ser derivado do job macOS
+`Compile real FEXCore arm64 and xtajit64 ARM64EC` na revisão exata.
+Os testes host confirmam os *gates*, não substituem esse job.
+
 ### Fases 3–5: pontos de parada independentes
 
 Com as toolchains previamente verificadas, em runner Xcode/macos:
