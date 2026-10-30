@@ -1,4 +1,5 @@
 import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -59,10 +60,11 @@ class MadeiraStage7JITTests(unittest.TestCase):
         self.assertIn("jit26_prepare_region(nullptr, size)", CPP)
 
     def test_portable_policy_compiles_and_executes(self):
-        compiler = "c++"
         source = ROOT / "tests/host/JITRegionPolicyTests.cpp"
-        self.assertTrue(source.exists())
-        subprocess.run(["bash", "-n", str(ROOT / "scripts/build_madeira_components.sh")], check=True)
+        with tempfile.TemporaryDirectory() as directory:
+            binary = Path(directory) / "ideck-jit-region-policy-tests"
+            subprocess.run(["c++", "-std=c++20", "-O2", str(source), "-o", str(binary)], check=True)
+            subprocess.run([str(binary)], check=True)
 
 
 if __name__ == "__main__":
