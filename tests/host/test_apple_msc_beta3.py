@@ -35,6 +35,10 @@ def package(path: Path, library: bytes, license_text=b"APPLE SOFTWARE LICENSE AG
     license_compressed = bz2.compress(license_text)
     payload = gzip.compress(
         cpio(msc.IOS_LIBRARY, library) +
+        b"".join(
+            cpio("./usr/local/include/" + name, ("SDK header: " + name).encode() * 8)
+            for name in msc.REQUIRED_HEADERS
+        ) +
         cpio("TRAILER!!!", b""),
         compresslevel=1,
     )
@@ -71,9 +75,9 @@ class AppleMSC4Beta3PackageTests(unittest.TestCase):
         self.out = self.root / "d3d12"
         package(self.pkg, macho())
 
-    def prepare(self, accept=True):
+    def prepare(self, accept=True, headers_destination=None):
         with patch.object(msc, "PACKAGE_SHA256", msc.digest(self.pkg)):
-            return msc.prepare(self.pkg, self.out, accept)
+            return msc.prepare(self.pkg, self.out, accept, headers_destination)
 
     def test_audited_ios_arm64_library_license_and_receipt_are_staged(self):
         receipt = self.prepare()
@@ -87,6 +91,16 @@ class AppleMSC4Beta3PackageTests(unittest.TestCase):
         self.assertTrue((self.out / msc.PROVENANCE_NAME).is_file())
         self.assertFalse((self.out / "metal-shaderconverter").exists())
         self.assertFalse((self.out / "Apple.pkg").exists())
+
+    def test_d3d12_sources_use_exact_same_beta3_headers_as_ios_library(self):
+        include = self.root / "third_party" / "include"
+        receipt = self.prepare(headers_destination=include)
+        self.assertEqual(set(receipt["headers_sha256"]), set(msc.REQUIRED_HEADERS))
+        for name in msc.REQUIRED_HEADERS:
+            header = include / name
+            self.assertTrue(header.is_file())
+            self.assertEqual(msc.digest(header), receipt["headers_sha256"][name])
+        self.assertFalse((self.out / "metal_irconverter").exists())
 
     def test_requires_explicit_apple_license_acceptance(self):
         with self.assertRaisesRegex(ValueError, "acknowledge-license"):
