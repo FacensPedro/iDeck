@@ -62,14 +62,11 @@ if [[ "${IDECK_REQUIRE_MADEIRA:-0}" == "1" ]]; then
       --headers-destination "$MSC_ROOT/madeira-d3d12/third_party/metal-shader-converter/include" \
       --acknowledge-license
   fi
-  KIT_FLAGS=()
+  KIT_FLAGS=(--graphics "$IDECK_MADEIRA_GRAPHICS")
   if [[ "$IDECK_BUILD_WOW64" == "1" ]]; then KIT_FLAGS+=(--wow64); fi
   if [[ "${IDECK_BUNDLE_WINE_MONO:-0}" == "1" ]]; then KIT_FLAGS+=(--mono); fi
-  # Existing prebuilt kits include D3D12 and are never valid D3D11 inputs.
-  KIT_MODE="${IDECK_PREBUILT_MODE:-$([[ "$IDECK_MADEIRA_GRAPHICS" == "d3d11" ]] && echo off || echo prefer)}"
-  if [[ "$IDECK_MADEIRA_GRAPHICS" == "d3d11" && "$KIT_MODE" != "off" ]]; then
-    echo "ERROR: D3D11 builds must compile from pinned sources; D3D12 kits are incompatible." >&2; exit 2
-  fi
+  # Both graphics profiles have distinct, strictly validated native kit formats.
+  KIT_MODE="${IDECK_PREBUILT_MODE:-prefer}"
   [[ "$KIT_MODE" == "prefer" || "$KIT_MODE" == "only" || "$KIT_MODE" == "off" ]] || {
     echo "ERROR: IDECK_PREBUILT_MODE must be prefer, only or off." >&2
     exit 2
@@ -104,7 +101,7 @@ if [[ "${IDECK_REQUIRE_MADEIRA:-0}" == "1" ]]; then
   if [[ -n "$KIT_ARCHIVE" ]]; then
     python3 scripts/madeira_native_kit.py install --archive "$KIT_ARCHIVE" ${KIT_FLAGS[@]+"${KIT_FLAGS[@]}"}
     NATIVE_ASSET_SOURCE="$(pwd)/build/madeira-prebuilt/resources"
-    echo "Using precompiled Madeira FEX/Wine/DXMT/WineMetal/D3D12: $KIT_ARCHIVE"
+    echo "Using verified Madeira native runtime profile=$IDECK_MADEIRA_GRAPHICS: $KIT_ARCHIVE"
   else
     if [[ "$KIT_MODE" == "only" ]]; then
       echo "ERROR: no matching prebuilt Madeira kit. Build once with IDECK_PREBUILT_MODE=off IDECK_PREBUILT_EXPORT=1." >&2
@@ -113,7 +110,7 @@ if [[ "${IDECK_REQUIRE_MADEIRA:-0}" == "1" ]]; then
     bash scripts/build_madeira_components.sh
     bash scripts/link_madeira_native.sh
     NATIVE_ASSET_SOURCE="${IDECK_MADEIRA_ROOT:-$(pwd)/vendor/Madeira}/app/Madeira"
-    if [[ "$IDECK_MADEIRA_GRAPHICS" == "d3d12" && "${IDECK_PREBUILT_EXPORT:-0}" == "1" ]]; then EXPORT_NATIVE_KIT=1; fi
+    if [[ "${IDECK_PREBUILT_EXPORT:-0}" == "1" ]]; then EXPORT_NATIVE_KIT=1; fi
   fi
   NATIVE_LINK_FLAGS="$(cat "$BUILD_DIR/madeira-native/link-flags.txt")"
   [[ -n "$NATIVE_LINK_FLAGS" ]] || { echo "ERROR: empty Madeira link flags" >&2; exit 2; }
