@@ -13,6 +13,8 @@ on:
     paths:
       - .github/workflows/madeira-expanded-profiles.yml
       - scripts/prepare_apple_msc_beta3.py
+      - scripts/verify_apple_msc_beta3_bundle.py
+      - tests/host/test_apple_msc_beta3_bundle.py
       - scripts/verify_madeira_device_acceptance.py
       - scripts/inspect_windows_game_pe.py
       - tests/host/test_apple_msc_beta3.py
@@ -60,6 +62,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m unittest discover -s tests/host -p 'test_apple_msc_beta3.py' -v
+          python3 -m unittest discover -s tests/host -p 'test_apple_msc_beta3_bundle.py' -v
           python3 -m unittest discover -s tests/host -p 'test_madeira_device_acceptance.py' -v
           python3 -m unittest discover -s tests/host -p 'test_madeira_d3d11_profile.py' -v
           python3 -m unittest discover -s tests/host -p 'test_madeira_payload_staging.py' -v
