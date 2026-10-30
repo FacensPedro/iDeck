@@ -31,6 +31,26 @@ class MadeiraSteamClientFirstFrameTests(unittest.TestCase):
         self.assertLess(RENDERER.index('setter(Unmanaged.passUnretained(host.metalLayer).toOpaque())'),
                         RENDERER.index('layerRegistered = true'))
 
+    def test_present_counter_baseline_is_taken_before_first_timer_sample(self):
+        start = SESSION.index("private final class GameRuntimeMetrics:")
+        end = SESSION.index("struct GameSessionView: View", start)
+        metrics = SESSION[start:end]
+        self.assertIn("init() {", metrics)
+        init_start = metrics.index("    init() {")
+        init_end = metrics.index("    func sample(", init_start)
+        self.assertIn('"madeira_get_present_count"', metrics[init_start:init_end])
+        self.assertIn("baselineFrames = unsafeBitCast(pointer, to: PresentCount.self)()", metrics[init_start:init_end])
+        self.assertIn("count > baselineFrames", metrics)
+        self.assertIn("if firstFrameAt == nil", metrics)
+
+    def test_duplicate_steam_game_requests_do_not_mark_running_without_a_new_frame(self):
+        start = COORDINATOR.index("func launchSteamGame(")
+        end = COORDINATOR.index("guard !previousWineSessionStillFinishing()", start)
+        source = COORDINATOR[start:end]
+        self.assertIn('if windowsStatus != "Running" {', source)
+        self.assertIn('setWindowsStatus("Wine started; waiting for game...")', source)
+        self.assertNotIn('setWindowsStatus("Running")', source)
+
     def test_only_counter_advance_promotes_wine_to_running(self):
         self.assertIn('metrics.receivedNewFrames', SESSION)
         self.assertIn('coordinator.windowsStatus == "Wine started; waiting for game..."', SESSION)
