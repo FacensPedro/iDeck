@@ -22,7 +22,7 @@ on:
         description: "Bundle WoW64 (i386 FEX and Wine) in the native IPA (enabled by default; disable only for 64-bit-only builds)"
         type: boolean
         required: false
-        default: false
+        default: true
       bundle_wine_mono:
         description: "Include Wine Mono for compatible .NET Framework applications"
         type: boolean
@@ -234,6 +234,9 @@ jobs:
             -o /tmp/ideck-steam-disk-tests
           /tmp/ideck-steam-disk-tests
 
+      - name: Test native dispatch WoW64, D3D11 kit cache and D3D12 license gates
+        run: python3 -m unittest discover -s tests/host -p 'test_actions_native_dispatch_matrix.py' -v
+
       - name: Test reusable Madeira kit validation and shell build
         run: |
           python3 -m unittest discover -s tests/host -p 'test_madeira_native_kit.py' -v
@@ -385,6 +388,8 @@ jobs:
     env:
       IDECK_REQUIRE_IPHONE_DUO_SDK: '1'
       IDECK_NATIVE_BUILD: ${{ ((github.event_name == 'workflow_dispatch' && inputs.require_madeira) || (github.event_name == 'push' && vars.IDECK_NATIVE_DISTRIBUTION_APPROVED == 'true')) && '1' || '0' }}
+      IDECK_BUILD_WOW64: ${{ ((github.event_name == 'workflow_dispatch' && inputs.require_madeira && inputs.build_wow64) || (github.event_name == 'push' && vars.IDECK_NATIVE_DISTRIBUTION_APPROVED == 'true')) && '1' || '0' }}
+      IDECK_BUNDLE_WINE_MONO: ${{ github.event_name == 'workflow_dispatch' && inputs.require_madeira && inputs.bundle_wine_mono && '1' || '0' }}
       IDECK_MADEIRA_GRAPHICS: ${{ github.event_name == 'workflow_dispatch' && inputs.graphics_profile || 'd3d12' }}
       IDECK_ACCEPT_METAL_CONVERTER_LICENSE: ${{ (((github.event_name == 'workflow_dispatch' && inputs.accept_converter_license) || (github.event_name == 'push' && vars.IDECK_NATIVE_DISTRIBUTION_APPROVED == 'true')) && (github.event_name != 'workflow_dispatch' || inputs.graphics_profile == 'd3d12')) && '1' || '0' }}
 
@@ -422,26 +427,19 @@ jobs:
             ideck-xcode-v3-${{ runner.os }}-${{ runner.arch }}-${{ env.IDECK_NATIVE_BUILD }}-${{ env.IDECK_MADEIRA_GRAPHICS }}-
 
       - name: Restore previously compiled Madeira runtime
-        if: ${{ env.IDECK_NATIVE_BUILD == '1' && env.IDECK_MADEIRA_GRAPHICS == 'd3d12' }}
+        id: madeira_cache
+        if: ${{ env.IDECK_NATIVE_BUILD == '1' }}
         uses: actions/cache@v5
         with:
           path: build/native-cache
-          key: madeira-kit-v2-${{ runner.os }}-${{ runner.arch }}-${{ (github.event_name != 'workflow_dispatch' || inputs.build_wow64) && 'wow64' || 'no-wow64' }}-${{ inputs.bundle_wine_mono && 'mono' || 'no-mono' }}-${{ hashFiles('scripts/madeira_native_kit.py', 'scripts/build_madeira_components.sh', 'scripts/build_madeira_dcomp.sh', 'scripts/build_madeira_luajit.sh', 'scripts/link_madeira_native.sh', 'scripts/fetch_madeira_sources.sh', 'build/dcomp/*', 'build/wineserver/*', 'patches/*') }}
+          key: madeira-kit-v3-${{ runner.os }}-${{ runner.arch }}-${{ env.IDECK_MADEIRA_GRAPHICS }}-${{ env.IDECK_BUILD_WOW64 == '1' && 'wow64' || 'no-wow64' }}-${{ env.IDECK_BUNDLE_WINE_MONO == '1' && 'mono' || 'no-mono' }}-${{ hashFiles('scripts/madeira_native_kit.py', 'scripts/build_madeira_components.sh', 'scripts/build_madeira_dcomp.sh', 'scripts/build_madeira_luajit.sh', 'scripts/link_madeira_native.sh', 'scripts/fetch_madeira_sources.sh', 'build/dcomp/*', 'build/wineserver/*', 'patches/*') }}
 
       - name: Locate repository or cached Madeira runtime
         if: ${{ env.IDECK_NATIVE_BUILD == '1' }}
         id: madeira_kit
-        env:
-          IDECK_BUILD_WOW64: ${{ (github.event_name != 'workflow_dispatch' || inputs.build_wow64) && '1' || '0' }}
-          IDECK_BUNDLE_WINE_MONO: ${{ inputs.bundle_wine_mono && '1' || '0' }}
         run: |
           set -euo pipefail
-          if [[ "$IDECK_MADEIRA_GRAPHICS" == "d3d11" ]]; then
-            echo "available=false" >> "$GITHUB_OUTPUT"
-            echo 'D3D11-only native builds require the pinned public source tree.'
-            exit 0
-          fi
-          OPTIONS=()
+          OPTIONS=(--graphics "$IDECK_MADEIRA_GRAPHICS")
           if [[ "$IDECK_BUILD_WOW64" == "1" ]]; then OPTIONS+=(--wow64); fi
           if [[ "$IDECK_BUNDLE_WINE_MONO" == "1" ]]; then OPTIONS+=(--mono); fi
           SOURCE="$(python3 scripts/madeira_native_kit.py path ${OPTIONS[@]+"${OPTIONS[@]}"})"
@@ -454,7 +452,7 @@ jobs:
               break
             fi
             if [[ -s "$ARCHIVE" ]]; then
-              echo "Discarding stale runtime kit lacking the ARM64EC Mach context restore: $ARCHIVE"
+              echo "Discarding stale or incompatible native kit for $IDECK_MADEIRA_GRAPHICS: $ARCHIVE"
             fi
           done
           if [[ -n "$FOUND" ]]; then
@@ -540,10 +538,8 @@ jobs:
         env:
           IDECK_REQUIRE_MADEIRA: ${{ env.IDECK_NATIVE_BUILD }}
           IDECK_ACCEPT_METAL_CONVERTER_LICENSE: ${{ env.IDECK_ACCEPT_METAL_CONVERTER_LICENSE }}
-          IDECK_BUILD_WOW64: ${{ (github.event_name != 'workflow_dispatch' || inputs.build_wow64) && '1' || '0' }}
-          IDECK_BUNDLE_WINE_MONO: ${{ inputs.bundle_wine_mono && '1' || '0' }}
-          IDECK_PREBUILT_EXPORT: ${{ env.IDECK_MADEIRA_GRAPHICS == 'd3d11' && '0' || '1' }}
-          IDECK_PREBUILT_MODE: ${{ env.IDECK_MADEIRA_GRAPHICS == 'd3d11' && 'off' || 'prefer' }}
+          IDECK_PREBUILT_EXPORT: ${{ env.IDECK_NATIVE_BUILD == '1' && '1' || '0' }}
+          IDECK_PREBUILT_MODE: prefer
           IDECK_MADEIRA_GRAPHICS: ${{ env.IDECK_MADEIRA_GRAPHICS }}
           IDECK_CONFIGURATION: ${{ env.IDECK_NATIVE_BUILD == '1' && 'Debug' || 'Release' }}
         run: |
@@ -607,7 +603,7 @@ jobs:
                             (item.startswith(prefix) and any(item.endswith("/" + name) for name in forbidden))]
                   if leaked:
                       raise SystemExit("D3D11 IPA contains forbidden D3D12 assets: " + ", ".join(leaked))
-              if "${{ (github.event_name != 'workflow_dispatch' || inputs.build_wow64) && '1' || '0' }}" == "1":
+              if os.environ["IDECK_BUILD_WOW64"] == "1":
                   if flags.get("wow64Enabled") is not True:
                       raise SystemExit("Native Madeira manifest does not advertise verified WoW64")
                   required_wow64 = (
@@ -630,11 +626,9 @@ jobs:
       - name: Prepare authorized compiled runtime export
         if: ${{ env.IDECK_NATIVE_BUILD == '1' && env.IDECK_MADEIRA_GRAPHICS == 'd3d12' && inputs.export_runtime_kit && env.IDECK_ACCEPT_METAL_CONVERTER_LICENSE == '1' }}
         env:
-          IDECK_BUILD_WOW64: ${{ (github.event_name != 'workflow_dispatch' || inputs.build_wow64) && '1' || '0' }}
-          IDECK_BUNDLE_WINE_MONO: ${{ inputs.bundle_wine_mono && '1' || '0' }}
         run: |
           set -euo pipefail
-          OPTIONS=()
+          OPTIONS=(--graphics "$IDECK_MADEIRA_GRAPHICS")
           if [[ "$IDECK_BUILD_WOW64" == "1" ]]; then OPTIONS+=(--wow64); fi
           if [[ "$IDECK_BUNDLE_WINE_MONO" == "1" ]]; then OPTIONS+=(--mono); fi
           REPO_KIT="$(python3 scripts/madeira_native_kit.py path ${OPTIONS[@]+"${OPTIONS[@]}"})"
@@ -726,10 +720,15 @@ jobs:
 
       - name: Show IPA download instructions
         if: success()
+        env:
+          NATIVE_CACHE_HIT: ${{ steps.madeira_cache.outputs.cache-hit || 'false' }}
+          NATIVE_KIT_FOUND: ${{ steps.madeira_kit.outputs.available || 'false' }}
         run: |
+          echo "Native runtime: $IDECK_NATIVE_BUILD; graphics: $IDECK_MADEIRA_GRAPHICS; WoW64: $IDECK_BUILD_WOW64; Wine Mono: $IDECK_BUNDLE_WINE_MONO; converter license: $IDECK_ACCEPT_METAL_CONVERTER_LICENSE; kit cache: $NATIVE_CACHE_HIT; verified kit: $NATIVE_KIT_FOUND" >> "$GITHUB_STEP_SUMMARY"
           if [[ "${{ env.IDECK_NATIVE_BUILD == '1' && '1' || '0' }}" == "1" ]]; then
             echo '## iDeck Madeira native IPA: static checks passed' >> "$GITHUB_STEP_SUMMARY"
             echo 'The native payload passed build verification, but game execution, JIT and device signing are not verified.' >> "$GITHUB_STEP_SUMMARY"
+            echo "Kit: ${NATIVE_KIT_FOUND}; Actions cache: ${NATIVE_CACHE_HIT}; WoW64: ${IDECK_BUILD_WOW64}; Mono: ${IDECK_BUNDLE_WINE_MONO}; converter license acknowledged: ${IDECK_ACCEPT_METAL_CONVERTER_LICENSE}" >> "$GITHUB_STEP_SUMMARY"
             echo "Selected graphics backend: $IDECK_MADEIRA_GRAPHICS" >> "$GITHUB_STEP_SUMMARY"
             echo 'Download **iDeck.ipa** directly under Artifacts; the file is not wrapped in another ZIP.' >> "$GITHUB_STEP_SUMMARY"
           else

@@ -47,7 +47,7 @@ python3 -c 'import json,sys;print(json.dumps(sys.argv[1:]))' ${FLAGS[@]+"${FLAGS
         components = (ROOT / "scripts/build_madeira_components.sh").read_text(encoding="utf-8")
         self.assertIn('export IDECK_BUILD_WOW64="${IDECK_BUILD_WOW64:-1}"', native)
         self.assertIn('export IDECK_MADEIRA_GRAPHICS="${IDECK_MADEIRA_GRAPHICS:-d3d11}"', native)
-        self.assertIn('export IDECK_PREBUILT_MODE=off', native)
+        self.assertIn('export IDECK_PREBUILT_MODE="${IDECK_PREBUILT_MODE:-prefer}"', native)
         self.assertIn('D3D12 requires confirmed rights', native)
         self.assertIn('export IDECK_MADEIRA_GRAPHICS="${IDECK_MADEIRA_GRAPHICS:-d3d12}"', ipa)
         self.assertIn('export IDECK_BUILD_WOW64="${IDECK_BUILD_WOW64:-1}"', ipa)

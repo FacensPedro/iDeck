@@ -84,13 +84,14 @@ FRAMEWORKS = (
     "VideoToolbox", "CoreMedia", "CoreVideo", "CoreFoundation", "IOKit",
     "ImageIO", "GameController", "CoreHaptics",
 )
-BASIC_FOLDERS = ("aarch64-windows", "arm64ec-windows", "nls", "d3d12", "legal", "licenses", "compat")
+BASIC_FOLDERS = ("aarch64-windows", "arm64ec-windows", "nls", "legal", "licenses", "compat")
+D3D12_FOLDERS = ("d3d12",)
+D3D12_FILES = ("d3d12/libmetalirconverter.dylib", "d3d12/canary_vs.dxil", "d3d12/canary_ps.dxil")
 BASIC_FILES = ("prefix-template.tar.gz", "cacert.pem")
 REQUIRED_PE = (
     "arm64ec-windows/xtajit64.dll", "arm64ec-windows/ntdll.dll",
     "arm64ec-windows/winemetal.dll", "arm64ec-windows/d3d11.dll",
-    "arm64ec-windows/dxgi.dll", "arm64ec-windows/d3d12.dll",
-    "arm64ec-windows/d3d12core.dll", D3D12_FRONTEND, "aarch64-windows/winemetal.dll",
+    "arm64ec-windows/dxgi.dll", "aarch64-windows/winemetal.dll",
     "arm64ec-windows/dcomp.dll",
     "arm64ec-windows/ktmw32.dll",
     "arm64ec-windows/faultrep.dll",
@@ -99,6 +100,7 @@ REQUIRED_PE = (
     "arm64ec-windows/d3dcompiler_47.dll",
     "arm64ec-windows/dinput8.dll",
 )
+D3D12_PE = (D3D12_FRONTEND, D3D12_LOADER, D3D12_CORE)
 WOW64_FILES = (
     "i386-windows/ntdll.dll", "i386-windows/kernel32.dll",
     "i386-windows/user32.dll", "i386-windows/d3d11.dll",
@@ -117,9 +119,12 @@ def flavor(wow64: bool, mono: bool) -> str:
     return "-".join(v for v, enabled in (("wow64", wow64), ("mono", mono)) if enabled) or "base"
 
 
-def default_path(wow64: bool, mono: bool, cache: bool) -> Path:
+def default_path(wow64: bool, mono: bool, cache: bool, graphics: str = "d3d12") -> Path:
+    if graphics not in ("d3d11", "d3d12"):
+        raise KitError("Unsupported native runtime graphics profile")
     folder = ROOT / ("build/native-cache" if cache else "runtime/prebuilt/ios-arm64")
-    return folder / ("madeira-" + flavor(wow64, mono) + ".zip")
+    suffix = "-d3d11" if graphics == "d3d11" else ""
+    return folder / ("madeira-" + flavor(wow64, mono) + suffix + ".zip")
 
 
 def digest_file(path: Path) -> str:
@@ -130,32 +135,38 @@ def digest_file(path: Path) -> str:
     return sha.hexdigest()
 
 
-def check_assets(app: Path, wow64: bool, mono: bool) -> None:
-    for name in BASIC_FILES + REQUIRED_PE + (
+def check_assets(app: Path, wow64: bool, mono: bool, graphics: str = "d3d12") -> None:
+    if graphics not in ("d3d11", "d3d12"):
+        raise KitError("Unsupported native runtime graphics profile")
+    pe = REQUIRED_PE + (D3D12_PE if graphics == "d3d12" else ())
+    for name in BASIC_FILES + pe + (
         "nls/locale.nls", "compat/love/lua51.dll", "licenses/LuaJIT-MIT.txt",
-        "d3d12/libmetalirconverter.dylib",
-        "d3d12/canary_vs.dxil", "d3d12/canary_ps.dxil",
-    ) + (WOW64_FILES if wow64 else ()) + (
+    ) + (D3D12_FILES if graphics == "d3d12" else ()) + (WOW64_FILES if wow64 else ()) + (
         ("wine-mono/bin/libmono-2.0-x86.dll",) if mono else ()
     ):
         file = app / name
         if not file.is_file() or file.stat().st_size == 0:
             raise KitError("Missing native runtime resource: " + str(file))
-    for name in REQUIRED_PE + ("compat/love/lua51.dll",) + (WOW64_FILES if wow64 else ()):
+    for name in pe + ("compat/love/lua51.dll",) + (WOW64_FILES if wow64 else ()):
         with (app / name).open("rb") as stream:
             if stream.read(2) != b"MZ":
                 raise KitError("Not a Windows PE image: " + name)
     # Madeira's build-pe.sh copies the exact native frontend to the standard
     # d3d12.dll name. The copied loader must not be silently replaced by
     # an unrelated Wine or older D3D12 binary in a cached runtime.
-    if digest_file(app / D3D12_FRONTEND) != digest_file(app / D3D12_LOADER):
-        raise KitError("D3D12 frontend differs from madeira-d3d12.dll")
+    if graphics == "d3d12":
+        if digest_file(app / D3D12_FRONTEND) != digest_file(app / D3D12_LOADER):
+            raise KitError("D3D12 frontend differs from madeira-d3d12.dll")
+    else:
+        for item in D3D12_PE + D3D12_FILES + ("aarch64-windows/d3d12.dll",):
+            if (app / item).exists():
+                raise KitError("D3D11 runtime kit must not include D3D12 assets: " + item)
     if b"-----BEGIN CERTIFICATE-----" not in (app / "cacert.pem").read_bytes():
         raise KitError("Invalid bundled TLS trust roots")
     with (app / "prefix-template.tar.gz").open("rb") as stream:
         if stream.read(2) != b"\x1f\x8b":
             raise KitError("Invalid Wine prefix-template header")
-    for name in BASIC_FOLDERS + (("i386-windows",) if wow64 else ()) + (
+    for name in BASIC_FOLDERS + (D3D12_FOLDERS if graphics == "d3d12" else ()) + (("i386-windows",) if wow64 else ()) + (
         ("wine-mono",) if mono else ()
     ):
         if not (app / name).is_dir():
@@ -179,13 +190,13 @@ def archive_paths(madeira: Path, bridge: Path) -> dict[str, Path]:
 
 
 def collect(madeira: Path, bridge: Path, wow64: bool, mono: bool,
-            resource_root: Path | None = None) -> dict[str, Path]:
+            resource_root: Path | None = None, graphics: str = "d3d12") -> dict[str, Path]:
     app = resource_root or madeira / "app/Madeira"
-    check_assets(app, wow64, mono)
+    check_assets(app, wow64, mono, graphics)
     entries = {"archives/" + name: path for name, path in archive_paths(madeira, bridge).items()}
     for name in BASIC_FILES:
         entries["resources/" + name] = app / name
-    folders = BASIC_FOLDERS + (("i386-windows",) if wow64 else ()) + (
+    folders = BASIC_FOLDERS + (D3D12_FOLDERS if graphics == "d3d12" else ()) + (("i386-windows",) if wow64 else ()) + (
         ("wine-mono",) if mono else ()
     )
     for name in folders:
@@ -231,7 +242,7 @@ def has_arm64ec_mach_return(path: Path) -> bool:
 
 
 def build_kit(output: Path, madeira: Path, bridge: Path, wow64: bool, mono: bool,
-              resource_root: Path | None = None) -> None:
+              resource_root: Path | None = None, graphics: str = "d3d12") -> None:
     rev = subprocess.check_output(["git", "-C", str(madeira), "rev-parse", "HEAD"], text=True).strip()
     if rev != REVISION:
         raise KitError(f"Madeira revision differs: expected {REVISION}, got {rev}")
@@ -243,15 +254,15 @@ def build_kit(output: Path, madeira: Path, bridge: Path, wow64: bool, mono: bool
         raise KitError("ARM64EC Mach return opcode missing from compiled Wine ntdll Unix archive")
     if not has_arm_host_feature_probe(bridge / ARCHIVES[0]):
         raise KitError("ARM host feature probe missing from compiled FEX bridge archive")
-    entries = collect(madeira, bridge, wow64, mono, resource_root)
+    entries = collect(madeira, bridge, wow64, mono, resource_root, graphics)
     total = sum(path.stat().st_size for path in entries.values())
     if total > MAX_TOTAL:
         raise KitError("Native runtime exceeds the allowed kit size")
     hashes = {name: {"sha256": digest_file(path), "size": path.stat().st_size}
               for name, path in sorted(entries.items())}
     metadata = {"schema": 1, "madeira_revision": REVISION, "platform": "iphoneos-arm64",
-                "wow64": wow64, "wine_mono": mono,
-                "wine_version": WINE_VERSION, "d3d12_backend": "madeira-d3d12",
+                "wow64": wow64, "wine_mono": mono, "graphics": graphics,
+                "wine_version": WINE_VERSION, "d3d12_backend": "madeira-d3d12" if graphics == "d3d12" else "disabled",
                 "arm64ec_context_patch_sha256": ARM64EC_CONTEXT_PATCH_SHA256,
                 "arm_host_feature_patch_sha256": ARM_HOST_FEATURE_PATCH_SHA256,
                 "repeat_wine_session_patch_sha256": REPEAT_WINE_SESSION_PATCH_SHA256,
@@ -281,7 +292,7 @@ def validate_name(name: str) -> None:
         raise KitError("Noncanonical kit path: " + name)
 
 
-def inspect(archive: Path, wow64: bool, mono: bool):
+def inspect(archive: Path, wow64: bool, mono: bool, graphics: str = "d3d12"):
     if not archive.is_file():
         raise KitError("Native kit not found: " + str(archive))
     try:
@@ -301,10 +312,13 @@ def inspect(archive: Path, wow64: bool, mono: bool):
            metadata.get("platform") != "iphoneos-arm64" or \
            metadata.get("wow64") is not wow64 or metadata.get("wine_mono") is not mono:
             raise KitError("Kit revision/platform/options mismatch; compile a matching native kit")
+        if graphics not in ("d3d11", "d3d12") or metadata.get("graphics", "d3d12") != graphics:
+            raise KitError("Native kit graphics backend mismatch")
         if metadata.get("wine_version") != WINE_VERSION:
             raise KitError("Wine 11.4 version mismatch; rebuild the Madeira native kit")
-        if metadata.get("d3d12_backend") != "madeira-d3d12":
-            raise KitError("Native madeira-d3d12 backend mismatch; rebuild the Madeira native kit")
+        expected_backend = "madeira-d3d12" if graphics == "d3d12" else "disabled"
+        if metadata.get("d3d12_backend") != expected_backend:
+            raise KitError("Native graphics backend metadata mismatch; rebuild the Madeira native kit")
         if metadata.get("arm64ec_context_patch_sha256") != ARM64EC_CONTEXT_PATCH_SHA256:
             raise KitError("ARM64EC Mach context patch mismatch; rebuild the Madeira native kit")
         if metadata.get("arm_host_feature_patch_sha256") != ARM_HOST_FEATURE_PATCH_SHA256:
@@ -321,11 +335,16 @@ def inspect(archive: Path, wow64: bool, mono: bool):
         for name in ARCHIVES:
             if "archives/" + name not in files:
                 raise KitError("Missing native ARM64 link archive: " + name)
-        for name in BASIC_FILES + REQUIRED_PE + ("d3d12/libmetalirconverter.dylib",):
+        for name in BASIC_FILES + REQUIRED_PE + (D3D12_PE + D3D12_FILES if graphics == "d3d12" else ()):
             if "resources/" + name not in files:
                 raise KitError("Missing Windows payload: " + name)
-        if files["resources/" + D3D12_FRONTEND]["sha256"] != files["resources/" + D3D12_LOADER]["sha256"]:
-            raise KitError("Native D3D12 frontend and d3d12.dll hashes differ")
+        if graphics == "d3d12":
+            if files["resources/" + D3D12_FRONTEND]["sha256"] != files["resources/" + D3D12_LOADER]["sha256"]:
+                raise KitError("Native D3D12 frontend and d3d12.dll hashes differ")
+        elif any(name.startswith("resources/d3d12/") or
+                 name in ("resources/" + item for item in D3D12_PE + ("aarch64-windows/d3d12.dll",))
+                 for name in files):
+            raise KitError("D3D11 native kit includes forbidden D3D12 content")
         if wow64:
             for name in WOW64_FILES:
                 if "resources/" + name not in files:
@@ -371,8 +390,8 @@ def link_flags(archive_root: Path) -> str:
     return " ".join(flags) + "\n"
 
 
-def install(archive: Path, output: Path, wow64: bool, mono: bool) -> None:
-    bundle, metadata = inspect(archive, wow64, mono)
+def install(archive: Path, output: Path, wow64: bool, mono: bool, graphics: str = "d3d12") -> None:
+    bundle, metadata = inspect(archive, wow64, mono, graphics)
     output.parent.mkdir(parents=True, exist_ok=True)
     temp = Path(tempfile.mkdtemp(prefix=".madeira-kit-", dir=output.parent))
     try:
@@ -386,7 +405,7 @@ def install(archive: Path, output: Path, wow64: bool, mono: bool) -> None:
                     dst.write(data)
             if digest.hexdigest() != info["sha256"]:
                 raise KitError("Runtime kit SHA-256 mismatch: " + name)
-        check_assets(temp / "resources", wow64, mono)
+        check_assets(temp / "resources", wow64, mono, graphics)
         if not has_arm64ec_mach_return(temp / "archives/libntdll_unix.a"):
             raise KitError("ARM64EC Mach return opcode missing from extracted Wine archive")
         if not has_arm_host_feature_probe(temp / "archives" / ARCHIVES[0]):
@@ -410,6 +429,7 @@ def main() -> int:
     parser.add_argument("action", choices=("create", "install", "inspect", "path"))
     parser.add_argument("--wow64", action="store_true")
     parser.add_argument("--mono", action="store_true")
+    parser.add_argument("--graphics", choices=("d3d11", "d3d12"), default="d3d12")
     parser.add_argument("--cache", action="store_true")
     parser.add_argument("--archive", type=Path)
     parser.add_argument("--output", type=Path, default=ROOT / "build/madeira-prebuilt")
@@ -417,22 +437,22 @@ def main() -> int:
     parser.add_argument("--bridge", type=Path, default=ROOT / "build/madeira-native")
     parser.add_argument("--resource-root", type=Path)
     args = parser.parse_args()
-    archive = args.archive or default_path(args.wow64, args.mono, args.cache)
+    archive = args.archive or default_path(args.wow64, args.mono, args.cache, args.graphics)
     try:
         if args.action == "path":
             print(archive)
         elif args.action == "create":
-            if os.environ.get("IDECK_ACCEPT_METAL_CONVERTER_LICENSE") != "1":
+            if args.graphics == "d3d12" and os.environ.get("IDECK_ACCEPT_METAL_CONVERTER_LICENSE") != "1":
                 raise KitError("Explicit Metal Shader Converter redistribution permission required")
-            build_kit(archive, args.madeira, args.bridge, args.wow64, args.mono, args.resource_root)
+            build_kit(archive, args.madeira, args.bridge, args.wow64, args.mono, args.resource_root, args.graphics)
         elif args.action == "inspect":
-            bundle, _ = inspect(archive, args.wow64, args.mono)
+            bundle, _ = inspect(archive, args.wow64, args.mono, args.graphics)
             bundle.close()
             print("Matching Madeira native kit:", archive)
         else:
-            if os.environ.get("IDECK_ACCEPT_METAL_CONVERTER_LICENSE") != "1":
+            if args.graphics == "d3d12" and os.environ.get("IDECK_ACCEPT_METAL_CONVERTER_LICENSE") != "1":
                 raise KitError("Explicit Metal Shader Converter redistribution permission required")
-            install(archive, args.output, args.wow64, args.mono)
+            install(archive, args.output, args.wow64, args.mono, args.graphics)
         return 0
     except (KitError, OSError, ValueError, KeyError, zipfile.BadZipFile,
             json.JSONDecodeError, subprocess.CalledProcessError) as exc:

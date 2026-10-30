@@ -28,7 +28,7 @@ class MadeiraNativeKitTests(unittest.TestCase):
         kit.ROOT = self.original_root
         self.temp.cleanup()
 
-    def entries(self, wow64=False, mono=False):
+    def entries(self, wow64=False, mono=False, graphics="d3d12"):
         data = {
             "archives/" + name: b"!<arch>\n" + name.encode() + (
                 kit.ARM64EC_MACH_RETURN_BYTES if name == "libntdll_unix.a" else
@@ -50,15 +50,24 @@ class MadeiraNativeKitTests(unittest.TestCase):
             "resources/d3d12/canary_layout_vs.dxil": b"dxil",
             "resources/d3d12/canary_layout_ps.dxil": b"dxil",
         })
-        for name in kit.REQUIRED_PE + (kit.WOW64_FILES if wow64 else ()):
+        for name in kit.REQUIRED_PE + (kit.D3D12_PE if graphics == "d3d12" else ()) + (
+            kit.WOW64_FILES if wow64 else ()
+        ):
             data["resources/" + name] = b"MZ" + name.encode()
-        data["resources/" + kit.D3D12_LOADER] = data["resources/" + kit.D3D12_FRONTEND]
+        if graphics == "d3d12":
+            data["resources/" + kit.D3D12_LOADER] = data["resources/" + kit.D3D12_FRONTEND]
         if mono:
             data["resources/wine-mono/bin/libmono-2.0-x86.dll"] = b"MZmono"
+        if graphics == "d3d11":
+            data = {
+                name: value for name, value in data.items()
+                if not name.startswith("resources/d3d12/") and
+                name.removeprefix("resources/") not in kit.D3D12_PE
+            }
         return data
 
     def save(self, entries, wow64=False, mono=False, extras=None,
-             corrupt=None, revision=None):
+             corrupt=None, revision=None, graphics="d3d12"):
         path = self.root / "kit.zip"
         manifest = {
             "schema": 1,
@@ -66,8 +75,9 @@ class MadeiraNativeKitTests(unittest.TestCase):
             "platform": "iphoneos-arm64",
             "wow64": wow64,
             "wine_mono": mono,
+            "graphics": graphics,
             "wine_version": kit.WINE_VERSION,
-            "d3d12_backend": "madeira-d3d12",
+            "d3d12_backend": "madeira-d3d12" if graphics == "d3d12" else "disabled",
             "arm64ec_context_patch_sha256": kit.ARM64EC_CONTEXT_PATCH_SHA256,
             "arm_host_feature_patch_sha256": kit.ARM_HOST_FEATURE_PATCH_SHA256,
             "repeat_wine_session_patch_sha256": kit.REPEAT_WINE_SESSION_PATCH_SHA256,
@@ -99,6 +109,33 @@ class MadeiraNativeKitTests(unittest.TestCase):
             kit.default_path(True, False, False),
             self.root / "runtime/prebuilt/ios-arm64/madeira-wow64.zip",
         )
+        self.assertEqual(kit.default_path(True, False, True, "d3d11"),
+                         self.root / "build/native-cache/madeira-wow64-d3d11.zip")
+
+    def test_public_d3d11_kit_requires_no_converter_and_cannot_be_reused_for_d3d12(self):
+        entries = self.entries(wow64=True, graphics="d3d11")
+        path = self.save(entries, wow64=True, graphics="d3d11")
+        archive, metadata = kit.inspect(path, True, False, "d3d11")
+        archive.close()
+        self.assertEqual(metadata["graphics"], "d3d11")
+        dest = self.root / "d3d11-native"
+        kit.install(path, dest, True, False, "d3d11")
+        self.assertTrue((dest / "resources/i386-windows/ntdll.dll").is_file())
+        self.assertFalse((dest / "resources/d3d12").exists())
+        with self.assertRaisesRegex(kit.KitError, "graphics backend mismatch"):
+            kit.inspect(path, True, False, "d3d12")
+
+    def test_d3d11_kit_rejects_proprietary_converter_and_d3d12_pe(self):
+        entries = self.entries(graphics="d3d11")
+        entries["resources/d3d12/libmetalirconverter.dylib"] = b"unlicensed"
+        path = self.save(entries, graphics="d3d11")
+        with self.assertRaisesRegex(kit.KitError, "forbidden D3D12"):
+            kit.inspect(path, False, False, "d3d11")
+        entries.pop("resources/d3d12/libmetalirconverter.dylib")
+        entries["resources/arm64ec-windows/d3d12.dll"] = b"MZbad"
+        path = self.save(entries, graphics="d3d11")
+        with self.assertRaisesRegex(kit.KitError, "forbidden D3D12"):
+            kit.inspect(path, False, False, "d3d11")
 
     def test_unpack_validates_files_and_generates_relocatable_linker_flags(self):
         path = self.save(self.entries())

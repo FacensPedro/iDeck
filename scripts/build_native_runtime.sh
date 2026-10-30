@@ -28,7 +28,7 @@ if [[ "$IDECK_MADEIRA_GRAPHICS" == "d3d11" ]]; then
     echo "ERROR: IDECK_BUILD_WOW64 must be 0 or 1." >&2
     exit 2
   }
-  export IDECK_PREBUILT_MODE=off
+  export IDECK_PREBUILT_MODE="${IDECK_PREBUILT_MODE:-prefer}"
 else
   export IDECK_BUILD_WOW64="${IDECK_BUILD_WOW64:-1}"
   [[ "${IDECK_ACCEPT_METAL_CONVERTER_LICENSE:-0}" == "1" ]] || {
@@ -36,7 +36,7 @@ else
     exit 2
   }
 fi
-KIT_ARGS=()
+KIT_ARGS=(--graphics "$IDECK_MADEIRA_GRAPHICS")
 if [[ "$IDECK_BUILD_WOW64" == "1" ]]; then KIT_ARGS+=(--wow64); fi
 if [[ "${IDECK_BUNDLE_WINE_MONO:-0}" == "1" ]]; then KIT_ARGS+=(--mono); fi
 REPO_KIT="$(python3 scripts/madeira_native_kit.py path ${KIT_ARGS[@]+"${KIT_ARGS[@]}"})"

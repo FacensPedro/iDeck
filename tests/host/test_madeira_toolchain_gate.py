@@ -45,7 +45,8 @@ class MadeiraToolchainGateTests(unittest.TestCase):
     def test_d3d11_native_builder_never_reuses_old_d3d12_kits(self):
         source = NATIVE.read_text()
         self.assertIn('export IDECK_MADEIRA_GRAPHICS="${IDECK_MADEIRA_GRAPHICS:-d3d11}"', source)
-        self.assertIn('export IDECK_PREBUILT_MODE=off', source)
+        self.assertIn('export IDECK_PREBUILT_MODE="${IDECK_PREBUILT_MODE:-prefer}"', source)
+        self.assertIn('KIT_ARGS=(--graphics "$IDECK_MADEIRA_GRAPHICS")', source)
         self.assertIn('export IDECK_BUILD_WOW64="${IDECK_BUILD_WOW64:-1}"', source)
         self.assertIn('D3D12 requires confirmed rights', source)
 

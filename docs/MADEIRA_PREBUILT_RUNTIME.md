@@ -11,9 +11,13 @@ esteja efetivamente integrado ou funcional no iPad.
 
 ## Usar o cache automático do GitHub Actions
 
-Abra Actions → iOS Build → Run workflow, selecione a branch e ative
-`require_madeira`. Depois de verificar as condições legais, confirme
-separadamente a licença do Apple Metal Shader Converter.
+Abra Actions → iOS Build → Run workflow e selecione a branch:
+`require_madeira=on`, `graphics_profile=d3d11`,
+`build_wow64=on`, `bundle_wine_mono=off`,
+`accept_converter_license=off`, `export_runtime_kit=off`, `release_tag` vazio.
+O perfil D3D11 é público e **não requer o Metal Shader Converter**.
+Somente o perfil D3D12 exige confirmação explícita das condições da Apple;
+sem isso, a compilação falha com exit 2.
 
 Na primeira execução sem pacote pronto, o workflow compila o runtime e
 gera um arquivo em `build/native-cache/`. O `actions/cache` persiste
@@ -21,8 +25,15 @@ esse arquivo; nas execuções futuras com as mesmas opções e a mesma versão
 dos scripts, o build reutiliza o pacote sem executar o checkout do Madeira,
 a instalação do LLVM/Meson ou a compilação das bibliotecas.
 
+O cache D3D11 e o cache D3D12 são separados e vinculados às opções
+WoW64/Mono e aos hashes dos scripts e patches nativos. O verificador do kit
+impede usar um pacote D3D12 no perfil D3D11 e rejeita o conversor e os
+módulos PE D3D12 no kit público. A primeira execução compila os componentes
+nativos; uma segunda execução com as mesmas opções pode reutilizar o kit
+desde que o cache tenha sido salvo e sua inspeção seja aprovada.
+
 O cache pode ser removido ou expirar e possui limitações de capacidade,
-escopo de branch e armazenamento. Para persistência, use Git LFS.
+escopo de branch e armazenamento. Para persistência autorizada, use Git LFS.
 
 ### Exportar um kit compilado pelo próprio GitHub Actions
 
@@ -38,7 +49,7 @@ e se o licenciamento permite esse compartilhamento.
 
 ## Armazenar permanentemente no próprio repositório
 
-WoW64 é habilitado por padrão nas compilações nativas. O kit `madeira-base.zip` agora é destinado apenas à opção explícita `IDECK_BUILD_WOW64=0`. O nome do pacote deve corresponder aos binários efetivamente compilados.
+WoW64 é habilitado por padrão nas compilações nativas. Para D3D12, o kit `madeira-base.zip` é destinado à opção `IDECK_BUILD_WOW64=0`. Para D3D11, os pacotes usam o sufixo `-d3d11` e não incluem o Metal Shader Converter. O nome do pacote deve corresponder aos binários efetivamente compilados.
 
 Depois de uma compilação nativa bem-sucedida no Mac, os arquivos podem ter
 estes nomes:
@@ -49,6 +60,9 @@ estes nomes:
 | Somente 64 bits (`IDECK_BUILD_WOW64=0`) | `madeira-base.zip` |
 | Somente 64 bits + Wine Mono | `madeira-mono.zip` |
 | WoW64 + Wine Mono | `madeira-wow64-mono.zip` |
+| D3D11 com WoW64 (padrão do Actions) | `madeira-wow64-d3d11.zip` |
+| D3D11 somente 64 bits | `madeira-base-d3d11.zip` |
+| D3D11 com WoW64 e Mono | `madeira-wow64-mono-d3d11.zip` |
 
 **Somente se todas as licenças autorizarem a redistribuição** do conteúdo
 (inclusive o Apple Metal Shader Converter), coloque um pacote compilado
