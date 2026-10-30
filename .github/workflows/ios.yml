@@ -324,6 +324,9 @@ jobs:
           xcrun swiftc iDeck/WindowsLaunchArguments.swift tests/host/WindowsLaunchArgumentsTests.swift -o /tmp/ideck-launch-args-tests
           /tmp/ideck-launch-args-tests
 
+      - name: Test live Madeira virtual monitor, four surface scaling modes and touch mapping
+        run: python3 -m unittest discover -s tests/host -p 'test_madeira_surface_scaling.py' -v
+
       - name: Test native window-level Metal display and fast Wine startup
         run: python3 -m unittest discover -s tests/host -p 'test_wine_black_screen_fast_start.py' -v
 
