@@ -33,6 +33,11 @@ on:
   pull_request:
     branches: [main]
     paths:
+      - tests/device/ideck_guest_audio_input_probe.c
+      - tests/device/ideck_d3d12_frame_probe.cpp
+      - scripts/build_madeira_device_probes.sh
+      - scripts/verify_madeira_guest_probe_results.py
+      - tests/host/test_madeira_guest_probe_results.py
       - iDeck/NativeRuntime/WindowsPEMachine.h
       - iDeck/NativeRuntimeDiagnostics.mm
       - iDeck/NativeRuntimeDiagnostics.h
@@ -78,6 +83,7 @@ jobs:
           python3 -m unittest discover -s tests/host -p 'test_madeira_native_pe_machine.py' -v
           python3 -m unittest discover -s tests/host -p 'test_wine_shutdown_library_return.py' -v
           python3 -m unittest discover -s tests/host -p 'test_madeira_device_acceptance.py' -v
+          python3 -m unittest discover -s tests/host -p 'test_madeira_guest_probe_results.py' -v
           python3 -m unittest discover -s tests/host -p 'test_madeira_d3d11_profile.py' -v
           python3 -m unittest discover -s tests/host -p 'test_madeira_payload_staging.py' -v
           python3 -m unittest discover -s tests/host -p 'test_madeira_component_stages.py' -v
@@ -210,11 +216,11 @@ jobs:
           set -euo pipefail
           bash scripts/build_madeira_device_probes.sh
 
-      - name: Publish original Windows guest and D3D11 probe executables
+      - name: Publish original Windows guest graphics, audio and input probe executables
         if: success()
         uses: actions/upload-artifact@v7
         with:
-          name: Madeira-original-PE32-x64-guest-probes
+          name: Madeira-PE32-x64-graphics-audio-input-probes
           path: |
             build/madeira-device-probes/*.exe
             build/madeira-device-probes/*.json
