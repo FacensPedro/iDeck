@@ -11,6 +11,33 @@
 #include <cstdio>
 
 #if defined(IDECK_NATIVE_MADEIRA_ENABLED) && IDECK_NATIVE_MADEIRA_ENABLED
+#import <Security/SecTask.h>
+
+// The binary's requested entitlements are not proof that the installed
+// signature actually grants them. Validate what iOS reports for this task.
+static bool ideck_required_memory_entitlements_granted(void) {
+    SecTaskRef task = SecTaskCreateFromSelf(kCFAllocatorDefault);
+    if (!task) return false;
+    const CFStringRef names[] = {
+        CFSTR("com.apple.developer.kernel.increased-memory-limit"),
+        CFSTR("com.apple.developer.kernel.extended-virtual-addressing"),
+    };
+    bool granted = true;
+    for (CFStringRef name : names) {
+        CFTypeRef value = SecTaskCopyValueForEntitlement(task, name, nullptr);
+        if (value != kCFBooleanTrue) {
+            granted = false;
+            fprintf(stderr, "[iDeck Madeira] Required signed memory entitlement not granted: %s\\n",
+                    CFStringGetCStringPtr(name, kCFStringEncodingUTF8) ?: "(unknown)");
+        }
+        if (value) CFRelease(value);
+    }
+    CFRelease(task);
+    return granted;
+}
+#endif
+
+#if defined(IDECK_NATIVE_MADEIRA_ENABLED) && IDECK_NATIVE_MADEIRA_ENABLED
 extern "C" void madeira_seed_prefix_if_needed(const char *prefix_path);
 #endif
 
@@ -43,6 +70,9 @@ extern "C" int32_t ideck_runtime_prepare(const char *wine_prefix) {
     }
 #else
     return ENOSYS;
+#endif
+#if defined(IDECK_NATIVE_MADEIRA_ENABLED) && IDECK_NATIVE_MADEIRA_ENABLED
+    if (!ideck_required_memory_entitlements_granted()) return EPERM;
 #endif
     if (!ideck_metal_available() || !ideck_fex_available() ||
         !ideck_wineserver_available() || !ideck_wineprocess_available() ||
