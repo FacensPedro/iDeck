@@ -23,7 +23,7 @@ export IDECK_MADEIRA_GRAPHICS="${IDECK_MADEIRA_GRAPHICS:-d3d11}"
   exit 2
 }
 if [[ "$IDECK_MADEIRA_GRAPHICS" == "d3d11" ]]; then
-  export IDECK_BUILD_WOW64="${IDECK_BUILD_WOW64:-0}"
+  export IDECK_BUILD_WOW64="${IDECK_BUILD_WOW64:-1}"
   [[ "$IDECK_BUILD_WOW64" == "0" || "$IDECK_BUILD_WOW64" == "1" ]] || {
     echo "ERROR: IDECK_BUILD_WOW64 must be 0 or 1." >&2
     exit 2
