@@ -376,6 +376,7 @@ class SystemCoordinator: ObservableObject {
     
     func launchSteam() {
         guard !isClosingWindowsSession else { return }
+        guard !previousWineSessionStillFinishing() else { return }
         guard MadeiraBundleIdentity.isNative else {
             setWindowsStatus(MadeiraBundleIdentity.missingRuntimeMessage)
             return
@@ -536,6 +537,7 @@ class SystemCoordinator: ObservableObject {
 
     func launchWindowsExecutable(at url: URL, profile: WindowsGameProfile? = nil) {
         guard !isClosingWindowsSession else { return }
+        guard !previousWineSessionStillFinishing() else { return }
         guard MadeiraBundleIdentity.isNative else {
             setWindowsStatus(MadeiraBundleIdentity.missingRuntimeMessage)
             return
@@ -681,6 +683,7 @@ class SystemCoordinator: ObservableObject {
             setWindowsStatus("Running")
             return
         }
+        guard !previousWineSessionStillFinishing() else { return }
         activeSteamGameID = nil
         activeSteamPrefix = nil
 
@@ -782,6 +785,30 @@ class SystemCoordinator: ObservableObject {
                 }
             }
         }
+    }
+
+    // Wine is hosted in a thread of the iDeck process; native state may
+    // remain live for some time after the guest's running flag becomes false.
+    // Reject a new launch before any prefix/JIT/Metal preparation until the
+    // pinned Wine worker and the in-app wineserver have both exited.
+    private func previousWineSessionStillFinishing() -> Bool {
+        let stillBusy = !ideck_wineprocess_running() &&
+            (ideck_wineserver_running() || !ideck_wineprocess_thread_finished())
+        if stillBusy {
+            setWindowsStatus("Cannot start another Windows game: the previous Wine session or wineserver is still shutting down. Retry after it finishes.")
+            SteamLog.event("[wine-session] blocked second launch: worker/server still active")
+            return true
+        }
+        if !ideck_wineprocess_running() {
+            // The previous guest may have exited normally without the user
+            // pressing Close. Re-arm native session state before the next
+            // launch only after both worker and wineserver are quiescent.
+            guard ideck_runtime_complete_session() else {
+                setWindowsStatus("Cannot start another Windows game: native Wine session cleanup is still in progress.")
+                return true
+            }
+        }
+        return false
     }
 
     // A Windows guest runs as a thread inside the iDeck process. The only

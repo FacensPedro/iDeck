@@ -307,6 +307,9 @@ jobs:
           /tmp/ideck-graphics-override-tests
           python3 -m unittest discover -s tests/host -p 'test_wine_11_4_d3d12_dxvk_hud.py' -v
 
+      - name: Verify no second Wine launch before guest and wineserver exit
+        run: python3 -m unittest discover -s tests/host -p 'test_madeira_second_launch_close_contract.py' -v
+
       - name: Test Wine game loading and safe close
         run: python3 -m unittest discover -s tests/host -p 'test_wine_startup_session.py' -v
 
