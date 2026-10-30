@@ -14,7 +14,7 @@ def make_pe(path: Path, is_64: bool, delayed: str, regular: str):
     data = bytearray(2048)
     data[:2] = b"MZ"
     struct.pack_into("<I", data, 0x3C, 0x80)
-    data[0x80:0x84] = b"PE\\0\\0"
+    data[0x80:0x84] = b"PE\0\0"
     optional_size = 240 if is_64 else 224
     struct.pack_into("<HH", data, 0x84, 0x8664 if is_64 else 0x14C, 1)
     struct.pack_into("<H", data, 0x94, optional_size)
@@ -28,8 +28,8 @@ def make_pe(path: Path, is_64: bool, delayed: str, regular: str):
     struct.pack_into("<IIII", data, section + 8, 0x400, 0x1000, 0x400, 0x200)
     struct.pack_into("<I", data, 0x300 + 12, 0x11C0)
     struct.pack_into("<II", data, 0x340, 1, 0x11E0)
-    data[0x3C0:0x3C0 + len(regular) + 1] = regular.encode() + b"\\0"
-    data[0x3E0:0x3E0 + len(delayed) + 1] = delayed.encode() + b"\\0"
+    data[0x3C0:0x3C0 + len(regular) + 1] = regular.encode() + b"\0"
+    data[0x3E0:0x3E0 + len(delayed) + 1] = delayed.encode() + b"\0"
     path.write_bytes(data)
 
 
@@ -60,7 +60,7 @@ class DelayedImportsTests(unittest.TestCase):
             data = bytearray(file.read_bytes())
             struct.pack_into("<I", data, 0x340, 0)
             file.write_bytes(data)
-            with self.assertRaises(ValueError):
+            with self.assertRaisesRegex(ValueError, "VA-based PE delay import descriptor"):
                 module.inspect(file)
 
 
