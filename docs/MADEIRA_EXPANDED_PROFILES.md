@@ -37,12 +37,13 @@ On a macOS machine with Xcode and legally obtained package:
 python3 scripts/prepare_apple_msc_beta3.py \
   --pkg "/private/path/Metal_Shader_Converter_4.0_beta_3.pkg" \
   --destination vendor/Madeira/app/Madeira/d3d12 \
+  --headers-destination vendor/Madeira/madeira-d3d12/third_party/metal-shader-converter/include \
   --acknowledge-license
 ```
 
 The helper extracts only the iOS library, original embedded license
 and a JSON provenance record, verifies the exact package SHA-256,
-confirms Mach-O ARM64/iOS, and never installs or executes the macOS
+confirms Mach-O ARM64/iOS, installs matching headers into the local Madeira include tree, and never installs or executes the macOS
 installer. It does not rewrite or redistribute Apple's files via GitHub.
 
 For an owner-authorized local D3D12 IPA build:
