@@ -66,7 +66,8 @@ A Etapa 0 possui uma execução macOS aprovada, documentada abaixo. As Etapas
    concedidos, sem regravar o manifesto. É propositalmente separado do
    verificador estrito.
 4. Instalar o app assinado em um iPhone/iPad físico autorizado, com a
-   versão correta do iOS, conferir os entitlements efetivos no runtime,
+   versão correta do iOS, confirmar os entitlements no app assinado e
+   validar as permissões de memória pela inicialização real do pool JIT;
    ativar um depurador JIT compatível e iniciar um aplicativo Windows
    conhecido e permitido dentro do prefixo Wine. Conferir que o
    wineserver e o guest são threads no mesmo processo, sem `fork`.
