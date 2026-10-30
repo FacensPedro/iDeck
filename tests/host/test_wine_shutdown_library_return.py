@@ -45,9 +45,9 @@ class WineCloseSessionTests(unittest.TestCase):
         self.assertIn("seconds >= 15", COORDINATOR)
         self.assertIn("func retryCloseWindowsSession()", COORDINATOR)
         self.assertIn("func cancelWindowsSessionClose()", COORDINATOR)
-        self.assertIn('Button("Retry Close")', SESSION)
-        self.assertIn('Button("Keep Waiting")', SESSION)
-        self.assertIn('Button("Return to Game"', SESSION)
+        self.assertIn('Button(tr("Retry Close"))', SESSION)
+        self.assertIn('Button(tr("Keep Waiting"))', SESSION)
+        self.assertIn('Button(tr("Return to Game")', SESSION)
         for symbol in ("pthread_cancel(", "kill(getpid(", "\n    wineserver_stop();"):
             self.assertNotIn(symbol, BRIDGE)
 
