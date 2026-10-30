@@ -111,6 +111,30 @@ class MadeiraDeviceAndCompatibilityTests(unittest.TestCase):
         errors, _ = device.validate(self.report, self.root)
         self.assertTrue(any("jit_attached" in error for error in errors))
 
+    def test_in_root_evidence_symlink_cannot_be_used_as_proof(self):
+        target = self.root / "guest_first_launch.txt"
+        link = self.root / "alias-to-evidence.txt"
+        link.symlink_to(target)
+        self.report["checks"]["guest_first_launch"]["evidence_file"] = link.name
+        errors, _ = device.validate(self.report, self.root)
+        self.assertTrue(any("guest_first_launch" in issue and "symbolic link" in issue
+                            for issue in errors))
+
+    def test_symlinked_subdirectory_cannot_be_used_as_proof(self):
+        (self.root / "real-proofs").mkdir()
+        target = self.root / "real-proofs" / "sample.txt"
+        data = b"DEVICE EVIDENCE\\n" + bytes(500)
+        target.write_bytes(data)
+        (self.root / "shortcut").symlink_to(self.root / "real-proofs", target_is_directory=True)
+        self.report["checks"]["guest_first_launch"] = {
+            "status": "PASS",
+            "evidence_file": "shortcut/sample.txt",
+            "sha256": hashlib.sha256(data).hexdigest(),
+        }
+        errors, _ = device.validate(self.report, self.root)
+        self.assertTrue(any("guest_first_launch" in issue and "symbolic link" in issue
+                            for issue in errors))
+
     def test_fake_signed_ipa_hash_is_rejected(self):
         self.report["build"]["signed_ipa_sha256"] = "0" * 64
         errors, _ = device.validate(self.report, self.root)
