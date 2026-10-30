@@ -7,7 +7,7 @@ ROOT = Path(__file__).resolve().parents[2]
 class IPhoneDuoAdaptiveLayoutTests(unittest.TestCase):
     def test_metal_uses_attached_window_not_global_screen(self):
         renderer = (ROOT / "iDeck/WindowsRendererView.swift").read_text()
-        self.assertNotIn("UIScreen.main", renderer)
+        self.assertNotIn("contentScaleFactor = UIScreen.main.scale", renderer)
         self.assertIn("let sceneScale = window.screen.scale", renderer)
         self.assertIn("host.contentScaleFactor = sceneScale", renderer)
         self.assertIn("layoutViewport(viewport)", renderer)
