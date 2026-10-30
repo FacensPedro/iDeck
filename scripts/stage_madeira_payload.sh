@@ -4,6 +4,14 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP="${1:?Usage: stage_madeira_payload.sh /path/to/iDeck.app}"
 SOURCE="${IDECK_MADEIRA_APP_ROOT:-$ROOT/vendor/Madeira/app/Madeira}"
+GRAPHICS="${IDECK_MADEIRA_GRAPHICS:-d3d12}"
+[[ "$GRAPHICS" == "d3d11" || "$GRAPHICS" == "d3d12" ]] || {
+  echo "ERROR: unsupported Madeira graphics profile: $GRAPHICS" >&2; exit 2;
+}
+if [[ "$GRAPHICS" == "d3d11" && "${IDECK_BUILD_WOW64:-0}" != "0" ]]; then
+  echo "ERROR: D3D11 x86-64-only profile forbids WoW64." >&2
+  exit 2
+fi
 
 [[ -d "$APP" ]] || { echo "ERROR: missing iDeck.app: $APP" >&2; exit 2; }
 [[ -d "$SOURCE" ]] || { echo "ERROR: Madeira compiled resources missing: $SOURCE" >&2; exit 2; }
@@ -30,6 +38,21 @@ for folder in aarch64-windows arm64ec-windows nls; do
   cp -R "$SOURCE/$folder" "$APP/$folder"
 done
 
+# Source Wine farms may contain D3D12 DLLs even on clean checkouts.
+# Remove them only from staging, never from the pinned source checkout.
+if [[ "$GRAPHICS" == "d3d11" ]]; then
+  for folder in aarch64-windows arm64ec-windows; do
+    for module in madeira_d3d12.dll d3d12.dll d3d12core.dll; do
+      rm -f "$APP/$folder/$module"
+    done
+  done
+  for module in xtajit.dll wow64.dll wow64win.dll; do
+    rm -f "$APP/aarch64-windows/$module"
+  done
+  rm -rf "$APP/i386-windows" "$RUNTIME/i386-windows"
+  rm -rf "$APP/d3d12" "$RUNTIME/d3d12"
+fi
+
 [[ -s "$SOURCE/prefix-template.tar.gz" ]] || {
   echo "ERROR: missing Wine prefix-template.tar.gz" >&2; exit 2;
 }
@@ -44,10 +67,9 @@ for path in aarch64-windows/d3d11.dll aarch64-windows/dxgi.dll \
             arm64ec-windows/kernel32.dll arm64ec-windows/kernelbase.dll \
             arm64ec-windows/user32.dll arm64ec-windows/gdi32.dll \
             arm64ec-windows/ws2_32.dll arm64ec-windows/d3d9.dll \
-            arm64ec-windows/vulkan-1.dll arm64ec-windows/madeira_d3d12.dll \
+            arm64ec-windows/vulkan-1.dll \
             arm64ec-windows/d3d11.dll arm64ec-windows/dxgi.dll \
             arm64ec-windows/d3d10core.dll \
-            arm64ec-windows/d3d12.dll arm64ec-windows/d3d12core.dll \
             arm64ec-windows/xtajit64.dll arm64ec-windows/winemetal.dll \
             arm64ec-windows/dcomp.dll arm64ec-windows/ktmw32.dll arm64ec-windows/faultrep.dll arm64ec-windows/xaudio2_7.dll \
             arm64ec-windows/d3dx11_43.dll arm64ec-windows/d3dcompiler_47.dll arm64ec-windows/dinput8.dll; do
@@ -58,12 +80,17 @@ for path in aarch64-windows/d3d11.dll aarch64-windows/dxgi.dll \
   }
 done
 
-# The native ARM64EC D3D12 frontend must be identical to the standard
-# d3d12.dll entry point that Windows games resolve through Wine.
-cmp -s "$APP/arm64ec-windows/madeira_d3d12.dll" "$APP/arm64ec-windows/d3d12.dll" || {
-  echo "ERROR: bundled D3D12 is not the Madeira native D3D12 frontend." >&2
-  exit 2
-}
+if [[ "$GRAPHICS" == "d3d12" ]]; then
+  for module in madeira_d3d12.dll d3d12.dll d3d12core.dll; do
+    [[ -s "$APP/arm64ec-windows/$module" ]] || {
+      echo "ERROR: missing native D3D12 frontend: $module" >&2; exit 2;
+    }
+  done
+  cmp -s "$APP/arm64ec-windows/madeira_d3d12.dll" "$APP/arm64ec-windows/d3d12.dll" || {
+    echo "ERROR: bundled D3D12 is not the Madeira native D3D12 frontend." >&2
+    exit 2
+  }
+fi
 
 # Windows-side IPA signers enumerate bundle entries through APIs that cannot
 # reliably inspect Unix symlinks. Package physical directories in the native
@@ -75,7 +102,7 @@ done
   echo "ERROR: Wine locale.nls is missing" >&2; exit 2;
 }
 
-if [[ -s "$SOURCE/i386-windows/ntdll.dll" ]]; then
+if [[ "${IDECK_BUILD_WOW64:-0}" == "1" && -s "$SOURCE/i386-windows/ntdll.dll" ]]; then
   for name in ntdll.dll kernel32.dll user32.dll d3d11.dll dxgi.dll; do
     [[ -s "$SOURCE/i386-windows/$name" ]] || {
       echo "ERROR: incomplete i386 Wine farm: $name" >&2; exit 2;
@@ -134,6 +161,7 @@ else
   echo "WARNING: Microsoft VC++ runtime absent; games needing it may fail."
 fi
 
+if [[ "$GRAPHICS" == "d3d12" ]]; then
 mkdir -p "$APP/d3d12" "$RUNTIME/d3d12"
 for name in canary_vs.dxil canary_ps.dxil canary_layout_vs.dxil canary_layout_ps.dxil; do
   [[ -s "$SOURCE/d3d12/$name" ]] || {
@@ -166,6 +194,12 @@ if [[ -n "${IDECK_CODESIGN_IDENTITY:-}" ]]; then
   codesign --force --sign "$IDECK_CODESIGN_IDENTITY" --timestamp=none \
     "$APP/d3d12/libmetalirconverter.dylib"
 fi
+else
+  if find "$APP" -type f -name 'libmetalirconverter.dylib' -print -quit | grep -q .; then
+    echo "ERROR: Apple Metal Shader Converter leaked into a D3D11 IPA." >&2
+    exit 2
+  fi
+fi
 
 if [[ "${IDECK_BUNDLE_WINE_MONO:-0}" == "1" ]]; then
   if [[ -s "$SOURCE/wine-mono/bin/libmono-2.0-x86.dll" ]]; then
@@ -183,5 +217,5 @@ if [[ "${IDECK_BUNDLE_WINE_MONO:-0}" == "1" ]]; then
   }
 fi
 
-echo "Madeira Wine/DXMT/D3D12 resources staged under iDeck.app."
+echo "Madeira Wine/DXMT resources staged under iDeck.app (graphics: $GRAPHICS)."
 echo "Native libraries must also be linked and the final app must be signed and device-tested."

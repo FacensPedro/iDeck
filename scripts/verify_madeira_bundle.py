@@ -34,6 +34,18 @@ SYMBOLS = (
     "madeira_d3d12_canary_run",
     "madeira_luajit_compat_fd",
 )
+D3D12_SYMBOLS = ("madeira_d3d12_canary_run",)
+D3D12_PE_FILES = (
+    "arm64ec-windows/madeira_d3d12.dll",
+    "arm64ec-windows/d3d12.dll",
+    "arm64ec-windows/d3d12core.dll",
+)
+D3D12_PROHIBITED = D3D12_PE_FILES + (
+    "aarch64-windows/madeira_d3d12.dll",
+    "aarch64-windows/d3d12.dll",
+    "aarch64-windows/d3d12core.dll",
+    "d3d12/libmetalirconverter.dylib",
+)
 PE_FILES = (
     "aarch64-windows/d3d11.dll",
     "aarch64-windows/dxgi.dll",
@@ -182,7 +194,9 @@ def _pe32_error(dll: Path) -> str | None:
     return None
 
 
-def inspect(app: Path, require_wow64: bool = False) -> list[str]:
+def inspect(app: Path, require_wow64: bool = False, graphics: str = "d3d12") -> list[str]:
+    if graphics not in ("d3d11", "d3d12"):
+        raise ValueError(f"invalid Madeira graphics profile: {graphics}")
     errors = []
     executable = app / "iDeck"
     if not executable.is_file():
@@ -206,13 +220,19 @@ def inspect(app: Path, require_wow64: bool = False) -> list[str]:
             ))
         except (OSError, subprocess.CalledProcessError) as exc:
             errors.append(f"unable to inspect linked arm64 symbols in {image}: {exc}")
+    required_symbols = SYMBOLS if graphics == "d3d12" else tuple(
+        name for name in SYMBOLS if name not in D3D12_SYMBOLS
+    )
     errors.extend(
         f"native symbol not linked/exported: {name}"
-        for name in SYMBOLS if name not in exported
+        for name in required_symbols if name not in exported
     )
 
     runtime = app / "MadeiraRuntime"
-    for path in PE_FILES:
+    required_pe = PE_FILES if graphics == "d3d12" else tuple(
+        name for name in PE_FILES if name not in D3D12_PE_FILES
+    )
+    for path in required_pe:
         for directory in (app, runtime):
             dll = directory / path
             if not dll.is_file() or dll.stat().st_size < 1024:
@@ -221,7 +241,7 @@ def inspect(app: Path, require_wow64: bool = False) -> list[str]:
             problem = _pe_arch_error(dll, path.startswith("arm64ec-windows/"))
             if problem:
                 errors.append(problem)
-    for directory in (app, runtime):
+    for directory in (app, runtime) if graphics == "d3d12" else ():
         native = directory / "arm64ec-windows/madeira_d3d12.dll"
         loader = directory / "arm64ec-windows/d3d12.dll"
         if native.is_file() and loader.is_file():
@@ -276,7 +296,7 @@ def inspect(app: Path, require_wow64: bool = False) -> list[str]:
     for folder in ("legal", "licenses"):
         if not (app / folder).is_dir():
             errors.append(f"missing Madeira license directory: {app / folder}")
-    for directory in (app, runtime):
+    for directory in (app, runtime) if graphics == "d3d12" else ():
         for name in ("canary_vs.dxil", "canary_ps.dxil",
                      "canary_layout_vs.dxil", "canary_layout_ps.dxil"):
             fixture = directory / "d3d12" / name
@@ -286,6 +306,25 @@ def inspect(app: Path, require_wow64: bool = False) -> list[str]:
         if not converter.is_file() or converter.stat().st_size < 1024:
             errors.append(f"missing or empty iOS shader converter dependency: {converter}")
 
+    if graphics == "d3d11":
+        if require_wow64:
+            errors.append("D3D11 x86-64-only profile does not support --require-wow64")
+        for directory in (app, runtime):
+            wow64_dir = directory / "i386-windows"
+            if wow64_dir.exists() or wow64_dir.is_symlink():
+                errors.append(f"D3D11 x86-64-only profile must not bundle WoW64: {wow64_dir}")
+            for module in ("xtajit.dll", "wow64.dll", "wow64win.dll"):
+                wow64_host = directory / "aarch64-windows" / module
+                if wow64_host.exists() or wow64_host.is_symlink():
+                    errors.append(f"D3D11 x86-64-only profile must not bundle WoW64: {wow64_host}")
+            for name in D3D12_PROHIBITED:
+                asset = directory / name
+                if asset.exists() or asset.is_symlink():
+                    errors.append(f"D3D11 profile must not bundle D3D12 or Apple converter: {asset}")
+            if (directory / "d3d12").exists() or (directory / "d3d12").is_symlink():
+                errors.append(f"D3D11 profile contains a D3D12 payload directory: {directory / 'd3d12'}")
+        for item in app.rglob("libmetalirconverter.dylib"):
+            errors.append(f"D3D11 profile must not redistribute the Apple converter: {item}")
     prefix = app / "prefix-template.tar.gz"
     if not prefix.is_file() or prefix.stat().st_size < 1024:
         errors.append(f"missing Madeira Wine prefix template: {prefix}")
@@ -301,13 +340,18 @@ def main() -> int:
     parser.add_argument("--app", type=Path)
     parser.add_argument("--linker-flags", action="store_true",
                         help="retain and export required native entry points")
+    parser.add_argument("--graphics", choices=("d3d11", "d3d12"), default="d3d12",
+                        help="strict native graphics profile; d3d11 forbids D3D12 and Apple converter")
     parser.add_argument("--require", action="store_true",
                         help="fail if native runtime is absent; never produce a false-ready IPA")
     parser.add_argument("--require-wow64", action="store_true",
                         help="require a complete i386/ARM64 WoW64 payload")
     options = parser.parse_args()
     if options.linker_flags:
-        print("-Wl,-export_dynamic " + " ".join(f"-Wl,-u,_{name}" for name in SYMBOLS))
+        symbols = SYMBOLS if options.graphics == "d3d12" else tuple(
+            name for name in SYMBOLS if name not in D3D12_SYMBOLS
+        )
+        print("-Wl,-export_dynamic " + " ".join(f"-Wl,-u,_{name}" for name in symbols))
         return 0
     if options.app is None:
         parser.error("--app is required unless --linker-flags is used")
@@ -316,7 +360,7 @@ def main() -> int:
     if manifest.exists():
         manifest.unlink()
 
-    errors = inspect(app, require_wow64=options.require_wow64)
+    errors = inspect(app, require_wow64=options.require_wow64, graphics=options.graphics)
     if errors:
         for error in errors:
             print(f"Madeira check: {error}", file=sys.stderr)
@@ -332,7 +376,8 @@ def main() -> int:
             "fexInProcess": True,
             "wineInProcess": True,
             "dxmtLinked": True,
-            "d3d12Linked": True,
+            "d3d12Linked": options.graphics == "d3d12",
+            "graphicsBackend": options.graphics,
             "wow64Enabled": (app / "i386-windows/ntdll.dll").is_file(),
         }, handle)
     print("Native payload and symbols found. Device integration testing is still required.")

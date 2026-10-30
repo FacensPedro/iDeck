@@ -18,17 +18,29 @@ NATIVE_ASSET_SOURCE=""
 EXPORT_NATIVE_KIT=0
 if [[ "${IDECK_REQUIRE_MADEIRA:-0}" == "1" ]]; then
   CONFIGURATION="${IDECK_CONFIGURATION:-Debug}"
-  [[ "${IDECK_ACCEPT_METAL_CONVERTER_LICENSE:-0}" == "1" ]] || {
-    echo "ERROR: Native build requires explicit Metal Shader Converter license/redistribution confirmation." >&2
-    exit 2
+  export IDECK_MADEIRA_GRAPHICS="${IDECK_MADEIRA_GRAPHICS:-d3d12}"
+  [[ "$IDECK_MADEIRA_GRAPHICS" == "d3d11" || "$IDECK_MADEIRA_GRAPHICS" == "d3d12" ]] || {
+    echo "ERROR: IDECK_MADEIRA_GRAPHICS must be d3d11 or d3d12." >&2; exit 2;
   }
-  # A Madeira-native IPA includes both Win64 and WoW64 by default.
-  # Set IDECK_BUILD_WOW64=0 only for a deliberately 64-bit-only variant.
-  export IDECK_BUILD_WOW64="${IDECK_BUILD_WOW64:-1}"
+  if [[ "$IDECK_MADEIRA_GRAPHICS" == "d3d12" ]]; then
+    [[ "${IDECK_ACCEPT_METAL_CONVERTER_LICENSE:-0}" == "1" ]] || {
+      echo "ERROR: Native D3D12 build requires explicit converter distribution permission." >&2
+      exit 2
+    }
+  fi
+  export IDECK_BUILD_WOW64="${IDECK_BUILD_WOW64:-$([[ "$IDECK_MADEIRA_GRAPHICS" == "d3d11" ]] && echo 0 || echo 1)}"
+  if [[ "$IDECK_MADEIRA_GRAPHICS" == "d3d11" && "$IDECK_BUILD_WOW64" != "0" ]]; then
+    echo "ERROR: D3D11-first profile currently supports x86-64 only; set IDECK_BUILD_WOW64=0." >&2
+    exit 2
+  fi
   KIT_FLAGS=()
   if [[ "$IDECK_BUILD_WOW64" == "1" ]]; then KIT_FLAGS+=(--wow64); fi
   if [[ "${IDECK_BUNDLE_WINE_MONO:-0}" == "1" ]]; then KIT_FLAGS+=(--mono); fi
-  KIT_MODE="${IDECK_PREBUILT_MODE:-prefer}"
+  # Existing prebuilt kits include D3D12 and are never valid D3D11 inputs.
+  KIT_MODE="${IDECK_PREBUILT_MODE:-$([[ "$IDECK_MADEIRA_GRAPHICS" == "d3d11" ]] && echo off || echo prefer)}"
+  if [[ "$IDECK_MADEIRA_GRAPHICS" == "d3d11" && "$KIT_MODE" != "off" ]]; then
+    echo "ERROR: D3D11 builds must compile from pinned sources; D3D12 kits are incompatible." >&2; exit 2
+  fi
   [[ "$KIT_MODE" == "prefer" || "$KIT_MODE" == "only" || "$KIT_MODE" == "off" ]] || {
     echo "ERROR: IDECK_PREBUILT_MODE must be prefer, only or off." >&2
     exit 2
@@ -72,15 +84,15 @@ if [[ "${IDECK_REQUIRE_MADEIRA:-0}" == "1" ]]; then
     bash scripts/build_madeira_components.sh
     bash scripts/link_madeira_native.sh
     NATIVE_ASSET_SOURCE="${IDECK_MADEIRA_ROOT:-$(pwd)/vendor/Madeira}/app/Madeira"
-    if [[ "${IDECK_PREBUILT_EXPORT:-0}" == "1" ]]; then EXPORT_NATIVE_KIT=1; fi
+    if [[ "$IDECK_MADEIRA_GRAPHICS" == "d3d12" && "${IDECK_PREBUILT_EXPORT:-0}" == "1" ]]; then EXPORT_NATIVE_KIT=1; fi
   fi
   NATIVE_LINK_FLAGS="$(cat "$BUILD_DIR/madeira-native/link-flags.txt")"
   [[ -n "$NATIVE_LINK_FLAGS" ]] || { echo "ERROR: empty Madeira link flags" >&2; exit 2; }
   # Apply to both source builds and imported kits: dlsym entry points must
   # survive Release dead stripping and be visible in the dynamic symbol table.
-  NATIVE_LINK_FLAGS+=" $(python3 scripts/verify_madeira_bundle.py --linker-flags)"
+  NATIVE_LINK_FLAGS+=" $(python3 scripts/verify_madeira_bundle.py --linker-flags --graphics "$IDECK_MADEIRA_GRAPHICS")"
   EXTRA_XCODE_SETTINGS+=(
-    "IDECK_NATIVE_CFLAGS=-DIDECK_NATIVE_MADEIRA_ENABLED=1"
+    "IDECK_NATIVE_CFLAGS=-DIDECK_NATIVE_MADEIRA_ENABLED=1 -DIDECK_MADEIRA_D3D12_ENABLED=$([[ "$IDECK_MADEIRA_GRAPHICS" == "d3d12" ]] && echo 1 || echo 0)"
     "IDECK_NATIVE_LINK_FLAGS=$NATIVE_LINK_FLAGS"
   )
 fi
@@ -127,10 +139,11 @@ if [ "${IDECK_REQUIRE_MADEIRA:-0}" = "1" ]; then
   IDECK_MADEIRA_APP_ROOT="$NATIVE_ASSET_SOURCE" \
     bash scripts/stage_madeira_payload.sh "$APP"
   if [[ "${IDECK_BUILD_WOW64:-0}" == "1" ]]; then
-    python3 scripts/verify_madeira_bundle.py --app "$APP" --require --require-wow64
+    python3 scripts/verify_madeira_bundle.py --app "$APP" --require --require-wow64 --graphics "$IDECK_MADEIRA_GRAPHICS"
   else
-    python3 scripts/verify_madeira_bundle.py --app "$APP" --require
+    python3 scripts/verify_madeira_bundle.py --app "$APP" --require --graphics "$IDECK_MADEIRA_GRAPHICS"
   fi
+  python3 scripts/verify_madeira_legal_notices.py --app "$APP" --graphics "$IDECK_MADEIRA_GRAPHICS"
   if [[ "$EXPORT_NATIVE_KIT" == "1" ]]; then
     python3 scripts/madeira_native_kit.py create --cache --resource-root "$APP" ${KIT_FLAGS[@]+"${KIT_FLAGS[@]}"}
   fi

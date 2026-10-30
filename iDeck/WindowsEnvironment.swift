@@ -8,9 +8,26 @@ class WindowsEnvironment {
     let audioManager = AudioManager()
     let steamManager = SteamManager()
     
+    private var nativeGraphicsBackend: String? {
+        let manifestURL = Bundle.main.bundleURL.appendingPathComponent("MadeiraRuntimeManifest.plist")
+        guard let data = try? Data(contentsOf: manifestURL),
+              let plist = try? PropertyListSerialization.propertyList(
+                from: data, options: [], format: nil) as? [String: Any],
+              plist["fexInProcess"] as? Bool == true,
+              plist["wineInProcess"] as? Bool == true,
+              plist["dxmtLinked"] as? Bool == true,
+              let backend = plist["graphicsBackend"] as? String,
+              backend == "d3d11" || backend == "d3d12",
+              plist["d3d12Linked"] as? Bool == (backend == "d3d12") else {
+            return nil
+        }
+        return backend
+    }
+
     func hasRuntime(in prefix: String) -> Bool {
-        guard PrefixInstaller.isPrefixInstalled(at: URL(fileURLWithPath: prefix)) else { return false }
-        let assets = [
+        guard PrefixInstaller.isPrefixInstalled(at: URL(fileURLWithPath: prefix)),
+              let backend = nativeGraphicsBackend else { return false }
+        var assets = [
             "arm64ec-windows/xtajit64.dll",
             "arm64ec-windows/ntdll.dll",
             "arm64ec-windows/kernel32.dll",
@@ -19,9 +36,6 @@ class WindowsEnvironment {
             "arm64ec-windows/gdi32.dll",
             "arm64ec-windows/d3d11.dll",
             "arm64ec-windows/dxgi.dll",
-            "arm64ec-windows/madeira_d3d12.dll",
-            "arm64ec-windows/d3d12.dll",
-            "arm64ec-windows/d3d12core.dll",
             "arm64ec-windows/winemetal.dll",
             "arm64ec-windows/dcomp.dll",
             "compat/love/lua51.dll",
@@ -35,19 +49,21 @@ class WindowsEnvironment {
             "aarch64-windows/dxgi.dll",
             "aarch64-windows/winemetal.dll",
             "nls/locale.nls",
-            "d3d12/libmetalirconverter.dylib",
-            "d3d12/canary_vs.dxil",
-            "d3d12/canary_ps.dxil",
             "cacert.pem",
             "prefix-template.tar.gz"
         ]
+        if backend == "d3d12" {
+            assets += ["arm64ec-windows/madeira_d3d12.dll", "arm64ec-windows/d3d12.dll",
+                       "arm64ec-windows/d3d12core.dll", "d3d12/libmetalirconverter.dylib",
+                       "d3d12/canary_vs.dxil", "d3d12/canary_ps.dxil"]
+        }
         guard assets.allSatisfy({
             FileManager.default.fileExists(atPath: Bundle.main.bundleURL.appendingPathComponent($0).path)
         }) else { return false }
         // A missing plist is not evidence that the native runtime is absent.
         // Actual linker symbols and native capabilities determine readiness.
         // This still correctly rejects placeholder bridge-only builds.
-        let requiredSymbols = [
+        var requiredSymbols = [
             "fex_initialize",
             "wineserver_start",
             "wine_process_start",
@@ -57,12 +73,13 @@ class WindowsEnvironment {
             "winios_screen_size",
             "winios_display_mode_changed",
             "madeira_get_present_count",
-            "madeira_d3d12_canary_run",
             "ideck_madeira_launch_v1"
         ]
+        if backend == "d3d12" { requiredSymbols.append("madeira_d3d12_canary_run") }
         let native = ideck_native_capabilities()
         guard native.metal_available, native.fex_linked, native.wine_linked,
-              native.dxmt_linked, native.d3d12_linked, native.launcher_linked else {
+              native.dxmt_linked, native.launcher_linked,
+              (backend == "d3d11" || native.d3d12_linked) else {
             return false
         }
         return requiredSymbols.allSatisfy { name in
@@ -104,10 +121,12 @@ class WindowsEnvironment {
 
     func missingRuntimeComponents(in prefix: String) -> [String] {
         var missing: [String] = []
+        let backend = nativeGraphicsBackend
+        if backend == nil { missing.append("Verified Madeira graphics manifest") }
         if !PrefixInstaller.isPrefixInstalled(at: URL(fileURLWithPath: prefix)) {
             missing.append("Wine prefix")
         }
-        let assets = [
+        var assets = [
             "arm64ec-windows/xtajit64.dll": "FEX ARM64EC",
             "arm64ec-windows/ntdll.dll": "Wine ARM64EC ntdll",
             "arm64ec-windows/kernel32.dll": "Wine kernel32",
@@ -116,9 +135,6 @@ class WindowsEnvironment {
             "arm64ec-windows/gdi32.dll": "Wine gdi32",
             "arm64ec-windows/d3d11.dll": "DXMT D3D11",
             "arm64ec-windows/dxgi.dll": "DXMT DXGI",
-            "arm64ec-windows/madeira_d3d12.dll": "Madeira native D3D12 frontend",
-            "arm64ec-windows/d3d12.dll": "D3D12 frontend",
-            "arm64ec-windows/d3d12core.dll": "D3D12 core",
             "arm64ec-windows/winemetal.dll": "WineMetal ARM64EC",
             "arm64ec-windows/dcomp.dll": "Wine DirectComposition",
             "compat/love/lua51.dll": "LuaJIT GC64 compatibility",
@@ -132,12 +148,17 @@ class WindowsEnvironment {
             "aarch64-windows/dxgi.dll": "Wine DXGI ARM64",
             "aarch64-windows/winemetal.dll": "WineMetal ARM64",
             "nls/locale.nls": "Wine locale data",
-            "d3d12/libmetalirconverter.dylib": "Metal shader converter",
-            "d3d12/canary_vs.dxil": "D3D12 vertex shader fixture",
-            "d3d12/canary_ps.dxil": "D3D12 pixel shader fixture",
             "cacert.pem": "Wine HTTPS certificate trust store",
             "prefix-template.tar.gz": "Wine prefix template"
         ]
+        if backend == "d3d12" {
+            assets["arm64ec-windows/madeira_d3d12.dll"] = "Madeira native D3D12 frontend"
+            assets["arm64ec-windows/d3d12.dll"] = "D3D12 frontend"
+            assets["arm64ec-windows/d3d12core.dll"] = "D3D12 core"
+            assets["d3d12/libmetalirconverter.dylib"] = "Metal shader converter"
+            assets["d3d12/canary_vs.dxil"] = "D3D12 vertex shader fixture"
+            assets["d3d12/canary_ps.dxil"] = "D3D12 pixel shader fixture"
+        }
         for (relativePath, label) in assets {
             if !FileManager.default.fileExists(
                 atPath: Bundle.main.bundleURL.appendingPathComponent(relativePath).path
@@ -149,7 +170,7 @@ class WindowsEnvironment {
         if !native.fex_linked { missing.append("FEX") }
         if !native.wine_linked { missing.append("Wine ARM64EC / wineserver") }
         if !native.dxmt_linked { missing.append("DXMT") }
-        if !native.d3d12_linked { missing.append("D3D12") }
+        if backend == "d3d12" && !native.d3d12_linked { missing.append("D3D12") }
         if !native.launcher_linked { missing.append("Madeira native launcher") }
         for (name, label) in [
             ("madeira_display_set_layer", "Metal display bridge"),

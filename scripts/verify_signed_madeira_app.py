@@ -45,7 +45,7 @@ def verify(app: Path) -> None:
     profile = app / "embedded.mobileprovision"
     converter = app / "d3d12/libmetalirconverter.dylib"
     mirror = app / "MadeiraRuntime/d3d12/libmetalirconverter.dylib"
-    for file in (binary, info, manifest, profile, converter, mirror):
+    for file in (binary, info, manifest, profile):
         if not file.is_file() or not file.stat().st_size:
             raise ValueError(f"missing signed native app input: {file}")
 
@@ -56,9 +56,18 @@ def verify(app: Path) -> None:
 
     with manifest.open("rb") as stream:
         metadata = plistlib.load(stream)
-    for key in ("fexInProcess", "wineInProcess", "dxmtLinked", "d3d12Linked"):
+    for key in ("fexInProcess", "wineInProcess", "dxmtLinked"):
         if metadata.get(key) is not True:
             raise ValueError(f"native bundle manifest does not prove {key}")
+    backend = metadata.get("graphicsBackend")
+    if backend not in ("d3d11", "d3d12") or metadata.get("d3d12Linked") is not (backend == "d3d12"):
+        raise ValueError("native bundle graphics profile is incomplete or dishonest")
+    if backend == "d3d12":
+        for file in (converter, mirror):
+            if not file.is_file() or not file.stat().st_size:
+                raise ValueError(f"missing signed native app input: {file}")
+    elif any(p.name == "libmetalirconverter.dylib" for p in app.rglob("*")):
+        raise ValueError("D3D11 signed IPA contains proprietary Metal Shader Converter")
     command("codesign", "--verify", "--deep", "--strict", "--verbose=2", str(app))
     app_team = team_id(app)
 
@@ -92,10 +101,11 @@ def verify(app: Path) -> None:
     if expiration <= datetime.now(timezone.utc):
         raise ValueError("provisioning profile has expired")
 
-    for dylib in (converter, mirror):
-        command("codesign", "--verify", "--strict", "--verbose=2", str(dylib))
-        if team_id(dylib) != app_team:
-            raise ValueError(f"dylib was signed with another team: {dylib}")
+    if backend == "d3d12":
+        for dylib in (converter, mirror):
+            command("codesign", "--verify", "--strict", "--verbose=2", str(dylib))
+            if team_id(dylib) != app_team:
+                raise ValueError(f"dylib was signed with another team: {dylib}")
 
     print("PASS: native app code signature, provisioning and entitlements verified.")
     print("NOT VERIFIED: Windows guest process, first frame, audio, and device shutdown.")

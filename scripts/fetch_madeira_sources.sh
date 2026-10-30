@@ -15,6 +15,7 @@ git -C "$DEST" fetch origin "$REV"
 git -C "$DEST" checkout --detach "$REV"
 git -C "$DEST" submodule sync --recursive
 git -C "$DEST" submodule update --init --recursive
+python3 "$ROOT/scripts/verify_madeira_sources.py" --root "$DEST" --revision "$REV"
 
 # The pinned Madeira script says it builds the ARM64EC PE ntdll, but
 # `make -C dlls/ntdll` also links the host ntdll.so. That Unix target

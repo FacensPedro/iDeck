@@ -46,7 +46,10 @@ extern "C" int32_t ideck_runtime_prepare(const char *wine_prefix) {
 #endif
     if (!ideck_metal_available() || !ideck_fex_available() ||
         !ideck_wineserver_available() || !ideck_wineprocess_available() ||
-        !ideck_dxmt_available() || !ideck_d3d12_available()) return ENOSYS;
+        !ideck_dxmt_available()) return ENOSYS;
+#if defined(IDECK_MADEIRA_D3D12_ENABLED) && IDECK_MADEIRA_D3D12_ENABLED
+    if (!ideck_d3d12_available()) return ENOSYS;
+#endif
     // CS_DEBUGGED alone can remain set after the JIT debugger detaches.
     // Never enter upstream BRK #0xf00d without a live debugger or FEX pool.
     if (!ideck_fex_jit_ready()) return EPERM;

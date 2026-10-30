@@ -37,6 +37,7 @@ class SignedMadeiraAppTests(unittest.TestCase):
         self.manifest = {
             "fexInProcess": True, "wineInProcess": True,
             "dxmtLinked": True, "d3d12Linked": True,
+            "graphicsBackend": "d3d12",
         }
         for rel in (
             "iDeck", "embedded.mobileprovision",
@@ -83,6 +84,21 @@ class SignedMadeiraAppTests(unittest.TestCase):
             for file in self.app.rglob("*") if file.is_file()
         }
         self.assertEqual(before, after)
+
+    def test_signed_d3d11_does_not_require_or_bundle_apple_converter(self):
+        self.manifest["graphicsBackend"] = "d3d11"
+        self.manifest["d3d12Linked"] = False
+        self.write_manifest()
+        (self.app / "d3d12/libmetalirconverter.dylib").unlink()
+        (self.app / "MadeiraRuntime/d3d12/libmetalirconverter.dylib").unlink()
+        self.run_check()
+
+    def test_d3d11_rejects_converter_leak(self):
+        self.manifest["graphicsBackend"] = "d3d11"
+        self.manifest["d3d12Linked"] = False
+        self.write_manifest()
+        with self.assertRaisesRegex(ValueError, "proprietary Metal Shader Converter"):
+            self.run_check()
 
     def test_missing_signed_entitlement_is_rejected(self):
         self.entitlements.pop(module.REQUIRED_ENTITLEMENTS[1])

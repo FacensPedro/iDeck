@@ -5,6 +5,10 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MD="${IDECK_MADEIRA_ROOT:-$ROOT/vendor/Madeira}"
 OUT="$ROOT/build/madeira-native"
 APP="$MD/app/Madeira"
+GRAPHICS="${IDECK_MADEIRA_GRAPHICS:-d3d12}"
+[[ "$GRAPHICS" == "d3d11" || "$GRAPHICS" == "d3d12" ]] || {
+  echo "ERROR: unsupported Madeira graphics profile: $GRAPHICS" >&2; exit 2;
+}
 SDK="$(xcrun --sdk iphoneos --show-sdk-path)"
 
 [[ "$(uname -s)" == "Darwin" ]] || { echo "ERROR: use a Mac with Xcode" >&2; exit 2; }
@@ -26,7 +30,6 @@ INCLUDES=(
   "-I$FEX/build-ios/include"
   "-I$FEX/build-ios/FEXCore/Source"
   "-I$FEX"
-  "-I$MD/madeira-d3d12/third_party/metal-shader-converter/include"
 )
 
 SOURCES=(
@@ -120,10 +123,10 @@ for file in "${ARCHIVES[@]}"; do
   [[ " $archs " == *" arm64 "* ]] || { echo "ERROR: archive does not contain arm64: $file ($archs)" >&2; exit 2; }
 done
 
-# The D3D12 diagnostic ABI must be provided by the single DXMT archive.
-# Checking now prevents an invalid duplicate or a missing symbol from reaching
-# the much slower Xcode link. nm -gU reports defined external Mach-O symbols.
-if ! xcrun --sdk iphoneos nm -gU "$APP/libdxmt_combined.a" | awk '
+# The optional D3D12 diagnostic ABI must be provided by the single DXMT archive
+# when that graphics profile is requested. It is not required for D3D11.
+if [[ "$GRAPHICS" == "d3d12" ]] &&
+   ! xcrun --sdk iphoneos nm -gU "$APP/libdxmt_combined.a" | awk '
   $NF == "_madeira_d3d12_canary_run" { seen_run = 1 }
   $NF == "_madeira_d3d12_canary_run_log" { seen_run_log = 1 }
   END { if (!(seen_run && seen_run_log)) exit 1 }
