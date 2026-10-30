@@ -20,6 +20,10 @@ void ideck_metal_swapchain_destroy(void *swapchain);
 bool ideck_metal_shader_library_available(void *metal_device);
 void ideck_controller_start(void);
 void ideck_controller_stop(void);
+void ideck_touch_gamepad_set_enabled(int enabled);
+void ideck_touch_gamepad_set_state(uint16_t buttons, int16_t lx, int16_t ly,
+                                   int16_t rx, int16_t ry,
+                                   uint8_t left_trigger, uint8_t right_trigger);
 bool ideck_audio_session_activate(void);
 void ideck_runtime_report_error(int32_t code, const char *message);
 int32_t ideck_runtime_last_error(void);
