@@ -10,6 +10,7 @@ struct WindowsGameProfile: Codable, Equatable, Identifiable {
     var resolution: String = "960x540"
     var graphicsAPI: String = "Automatic"
     var controllerAPI: String = "Automatic"
+    var touchControlPreset: String = "xbox"
     var metalFXEnabled: Bool = false
     var fpsLimit: String = "30"
     var avxEnabled: Bool = false
@@ -18,16 +19,17 @@ struct WindowsGameProfile: Codable, Equatable, Identifiable {
     var updatedAt: Date = Date()
 
     private enum CodingKeys: String, CodingKey {
-        case id, title, arguments, resolution, graphicsAPI, controllerAPI, metalFXEnabled, fpsLimit, avxEnabled, keepChildProcessesRunning, artworkFilename, updatedAt
+        case id, title, arguments, resolution, graphicsAPI, controllerAPI, touchControlPreset, metalFXEnabled, fpsLimit, avxEnabled, keepChildProcessesRunning, artworkFilename, updatedAt
     }
 
-    init(id: String, title: String, arguments: String = "", resolution: String = "960x540", graphicsAPI: String = "Automatic", controllerAPI: String = "Automatic", metalFXEnabled: Bool = false, fpsLimit: String = "30", avxEnabled: Bool = false, keepChildProcessesRunning: Bool = false, artworkFilename: String? = nil, updatedAt: Date = Date()) {
+    init(id: String, title: String, arguments: String = "", resolution: String = "960x540", graphicsAPI: String = "Automatic", controllerAPI: String = "Automatic", touchControlPreset: String = "xbox", metalFXEnabled: Bool = false, fpsLimit: String = "30", avxEnabled: Bool = false, keepChildProcessesRunning: Bool = false, artworkFilename: String? = nil, updatedAt: Date = Date()) {
         self.id = id
         self.title = title
         self.arguments = arguments
         self.resolution = resolution
         self.graphicsAPI = graphicsAPI
         self.controllerAPI = controllerAPI
+        self.touchControlPreset = ["xbox", "minimal", "off"].contains(touchControlPreset) ? touchControlPreset : "xbox"
         self.metalFXEnabled = metalFXEnabled
         self.fpsLimit = fpsLimit
         self.avxEnabled = avxEnabled
@@ -44,6 +46,8 @@ struct WindowsGameProfile: Codable, Equatable, Identifiable {
         resolution = try values.decodeIfPresent(String.self, forKey: .resolution) ?? "960x540"
         graphicsAPI = try values.decodeIfPresent(String.self, forKey: .graphicsAPI) ?? "Automatic"
         controllerAPI = try values.decodeIfPresent(String.self, forKey: .controllerAPI) ?? "Automatic"
+        let savedTouchPreset = try values.decodeIfPresent(String.self, forKey: .touchControlPreset) ?? "xbox"
+        touchControlPreset = ["xbox", "minimal", "off"].contains(savedTouchPreset) ? savedTouchPreset : "xbox"
         metalFXEnabled = try values.decodeIfPresent(Bool.self, forKey: .metalFXEnabled) ?? false
         fpsLimit = try values.decodeIfPresent(String.self, forKey: .fpsLimit) ?? "30"
         avxEnabled = try values.decodeIfPresent(Bool.self, forKey: .avxEnabled) ?? false
