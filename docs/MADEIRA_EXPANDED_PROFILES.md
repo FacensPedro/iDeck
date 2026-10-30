@@ -115,6 +115,35 @@ It marks whether a PE32 game **needs WoW64**, but its hints cannot
 detect delay-loaded libraries, anti-cheat, OS calls, actual performance
 or runtime compatibility. It never installs or runs the EXE.
 
+## Original Windows guest probes for phases 8–9
+
+The repository includes source code for two deterministic, noncommercial
+Win32 startup probes and one D3D11 graphics probe:
+
+- `tests/device/ideck_guest_smoke.c`: builds x86/PE32 and x64/PE32+.
+  A real Windows guest process records its bitness and PID into
+  `%TEMP%\\ideck-guest-smoke-32.log` or `...64.log`, then exits zero.
+  The app must actually run the EXE under Wine; the presence of the
+  compiled EXE proves nothing about guest startup.
+- `tests/device/ideck_d3d11_frame_probe.cpp`: a real
+  `D3D11CreateDeviceAndSwapChain` + `ClearRenderTargetView` +
+  `Present` path with alternating red/blue frames. A screen capture
+  from the physical iPad should show both colors **from the guest**,
+  not the Wine splash screen or an iDeck placeholder.
+- `scripts/build_madeira_device_probes.sh` builds these via
+  the exact llvm-mingw x86-64 and i686 compilers installed by the
+  Madeira toolchain scripts and inspects their actual PE machines/imports.
+
+```bash
+bash scripts/build_madeira_device_probes.sh
+```
+
+The manual GitHub optional-profile build publishes the executables as
+an artifact for local transfer onto the iPad (no proprietary game files).
+For D3D12, the upstream Madeira test farm also includes
+`d3d12-cube-x64.exe` and related public-source shader tests, which
+still need to be compiled and launched in the signed D3D12 IPA.
+
 ## Stages 8–11: real iPad evidence, not simulated PASS
 
 Create a local evidence checklist (all fields are initially NOT RUN):
