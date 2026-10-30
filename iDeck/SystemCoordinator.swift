@@ -376,6 +376,10 @@ class SystemCoordinator: ObservableObject {
     
     func launchSteam() {
         guard !isClosingWindowsSession else { return }
+        guard MadeiraBundleIdentity.isNative else {
+            setWindowsStatus(MadeiraBundleIdentity.missingRuntimeMessage)
+            return
+        }
         guard isJITEnabled && isContainerReady else { return }
         guard ideck_fex_jit_ready() &&
               (ideck_wine_jit_pool_ready() || ideck_jit_debugger_attached()) else {
@@ -532,6 +536,10 @@ class SystemCoordinator: ObservableObject {
 
     func launchWindowsExecutable(at url: URL, profile: WindowsGameProfile? = nil) {
         guard !isClosingWindowsSession else { return }
+        guard MadeiraBundleIdentity.isNative else {
+            setWindowsStatus(MadeiraBundleIdentity.missingRuntimeMessage)
+            return
+        }
         guard isContainerReady else { return }
         refreshJITStatus()
 
@@ -653,6 +661,10 @@ class SystemCoordinator: ObservableObject {
     /// relative DLL and asset paths instead of copying the executable elsewhere.
     func launchSteamGame(game: SteamAppInfo, profile: WindowsGameProfile, prefixPath: URL) {
         guard !isClosingWindowsSession else { return }
+        guard MadeiraBundleIdentity.isNative else {
+            setWindowsStatus(MadeiraBundleIdentity.missingRuntimeMessage)
+            return
+        }
         refreshJITStatus()
         if let pendingSteamGameID {
             setWindowsStatus(pendingSteamGameID == game.appID
