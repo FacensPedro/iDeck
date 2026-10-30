@@ -20,9 +20,6 @@ on:
       - scripts/build_madeira_device_probes.sh
       - tests/device/ideck_guest_smoke.c
       - tests/device/ideck_d3d11_frame_probe.cpp
-      - scripts/build_madeira_device_probes.sh
-      - tests/device/ideck_guest_smoke.c
-      - tests/device/ideck_d3d11_frame_probe.cpp
       - scripts/verify_madeira_bundle.py
       - scripts/stage_madeira_payload.sh
       - scripts/build_ipa.sh
