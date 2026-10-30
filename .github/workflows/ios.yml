@@ -353,6 +353,7 @@ jobs:
       - name: Test Node.js 24, Madeira LuaJIT/DirectComposition, and graphics source backports
         run: |
           python3 -m unittest discover -s tests/host -p 'test_madeira_vulkan_gl_luajit_backports.py' -v
+          python3 -m unittest discover -s tests/host -p 'test_madeira_wow64_import_closure.py' -v
           bash -n scripts/build_madeira_dcomp.sh
           bash -n scripts/build_madeira_luajit.sh
 
