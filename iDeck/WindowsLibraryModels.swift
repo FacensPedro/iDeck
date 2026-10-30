@@ -27,7 +27,7 @@ struct WindowsGameProfile: Codable, Equatable, Identifiable {
         self.title = title
         self.arguments = arguments
         self.resolution = resolution
-        self.surfaceScaling = RuntimeConfiguration.SurfaceMode(saved: surfaceScaling).rawValue
+        self.surfaceScaling = ["fit", "fill", "stretch", "aspect"].contains(surfaceScaling) ? surfaceScaling : "fit"
         self.graphicsAPI = graphicsAPI
         self.controllerAPI = controllerAPI
         self.metalFXEnabled = metalFXEnabled
@@ -44,8 +44,10 @@ struct WindowsGameProfile: Codable, Equatable, Identifiable {
         title = try values.decode(String.self, forKey: .title)
         arguments = try values.decodeIfPresent(String.self, forKey: .arguments) ?? ""
         resolution = try values.decodeIfPresent(String.self, forKey: .resolution) ?? "960x540"
-        surfaceScaling = RuntimeConfiguration.SurfaceMode(saved:
-            try values.decodeIfPresent(String.self, forKey: .surfaceScaling) ?? "fit").rawValue
+        surfaceScaling = {
+            let saved = (try? values.decodeIfPresent(String.self, forKey: .surfaceScaling)) ?? "fit"
+            return ["fit", "fill", "stretch", "aspect"].contains(saved) ? saved : "fit"
+        }()
         graphicsAPI = try values.decodeIfPresent(String.self, forKey: .graphicsAPI) ?? "Automatic"
         controllerAPI = try values.decodeIfPresent(String.self, forKey: .controllerAPI) ?? "Automatic"
         metalFXEnabled = try values.decodeIfPresent(Bool.self, forKey: .metalFXEnabled) ?? false
