@@ -21,6 +21,14 @@ LICENSE_RESOURCE = ("Resources", "English.lproj", "License.rtf")
 LIBRARY_NAME = "libmetalirconverter.dylib"
 LICENSE_NAME = "METAL-SHADER-CONVERTER-4.0-BETA-3-LICENSE.rtf"
 PROVENANCE_NAME = "apple-msc-4.0-beta-3-provenance.json"
+HEADER_PREFIX = "./usr/local/include/"
+HEADER_FAMILIES = ("metal_irconverter/", "metal_irconverter_runtime/", "metal_irconverter_ext/")
+REQUIRED_HEADERS = (
+    "metal_irconverter/metal_irconverter.h",
+    "metal_irconverter_runtime/metal_irconverter_runtime.h",
+    "metal_irconverter_runtime/ir_tessellator_tables.h",
+    "metal_irconverter_ext/Metal_HLSL.inc",
+)
 
 
 def digest(path: Path) -> str:
@@ -100,12 +108,13 @@ def copy_exact(source, target, length: int):
         remaining -= len(data)
 
 
-def extract_ios_library(pkg: Path, toc, start: int, destination: Path):
+def extract_ios_library(pkg: Path, toc, start: int, destination: Path, headers: Path | None = None):
     payload = member(toc, ("MetalShaderConverter.pkg", "Payload"))
     off, length = int(payload.findtext("offset")), int(payload.findtext("length"))
     if length > 100_000_000 or off < 0:
         raise ValueError("unexpected compressed package payload")
     found = False
+    extracted_headers = set()
     with pkg.open("rb") as raw:
         raw.seek(start + off)
         with gzip.GzipFile(fileobj=io.BufferedReader(Window(raw, length))) as stream:
@@ -128,10 +137,33 @@ def extract_ios_library(pkg: Path, toc, start: int, destination: Path):
                     with destination.open("wb") as out:
                         copy_exact(stream, out, data_length)
                     found = True
+                elif headers is not None and name.startswith(HEADER_PREFIX):
+                    relative = name[len(HEADER_PREFIX):]
+                    if (
+                        relative in REQUIRED_HEADERS or
+                        any(relative.startswith(group) for group in HEADER_FAMILIES)
+                    ):
+                        from pathlib import PurePosixPath
+                        parts = PurePosixPath(relative).parts
+                        if (
+                            ".." in parts or len(parts) != 2 or
+                            not relative.endswith((".h", ".inc", ".txt")) or
+                            data_length > 4_000_000
+                        ):
+                            raise ValueError("unsafe or unsupported converter SDK header: " + name)
+                        target = headers.joinpath(*parts)
+                        target.parent.mkdir(parents=True, exist_ok=True)
+                        with target.open("wb") as output:
+                            copy_exact(stream, output, data_length)
+                        extracted_headers.add(relative)
+                    else:
+                        copy_exact(stream, None, data_length)
                 else:
                     copy_exact(stream, None, data_length)
     if not found:
         raise ValueError("Apple iOS ARM64 converter library missing from package")
+    if headers is not None and not set(REQUIRED_HEADERS).issubset(extracted_headers):
+        raise ValueError("Apple package is missing required 4.0 beta 3 converter SDK headers")
 
 
 def ios_macho_details(path: Path) -> dict:
@@ -164,7 +196,8 @@ def ios_macho_details(path: Path) -> dict:
     return build
 
 
-def prepare(pkg: Path, destination: Path, acknowledge_license: bool) -> dict:
+def prepare(pkg: Path, destination: Path, acknowledge_license: bool,
+            headers_destination: Path | None = None) -> dict:
     if not acknowledge_license:
         raise ValueError("read Apple's embedded License.rtf and explicitly pass --acknowledge-license")
     if not pkg.is_file():
@@ -181,7 +214,8 @@ def prepare(pkg: Path, destination: Path, acknowledge_license: bool) -> dict:
     destination.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="ideck-msc-") as temporary:
         library = Path(temporary) / LIBRARY_NAME
-        extract_ios_library(pkg, toc, start, library)
+        headers = Path(temporary) / "include" if headers_destination is not None else None
+        extract_ios_library(pkg, toc, start, library, headers)
         details = ios_macho_details(library)
         result = {
             "converter": "Apple Metal Shader Converter 4.0 beta 3",
@@ -189,6 +223,10 @@ def prepare(pkg: Path, destination: Path, acknowledge_license: bool) -> dict:
             "library_sha256": digest(library),
             "library_bytes": library.stat().st_size,
             "license_sha256": hashlib.sha256(license_bytes).hexdigest(),
+            "headers_sha256": {
+                file.relative_to(headers).as_posix(): digest(file)
+                for file in sorted(headers.rglob("*")) if file.is_file()
+            } if headers is not None else {},
             "architecture": "arm64",
             **details,
             "runtime_shader_conversion": True,
@@ -201,6 +239,14 @@ def prepare(pkg: Path, destination: Path, acknowledge_license: bool) -> dict:
         shutil.copyfile(library, destination / LIBRARY_NAME)
         shutil.copyfile(tmp_license, destination / LICENSE_NAME)
         shutil.copyfile(tmp_receipt, destination / PROVENANCE_NAME)
+        if headers is not None:
+            headers_destination.mkdir(parents=True, exist_ok=True)
+            for file in headers.rglob("*"):
+                if not file.is_file():
+                    continue
+                target = headers_destination / file.relative_to(headers)
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(file, target)
     return result
 
 
@@ -208,10 +254,12 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--pkg", type=Path, required=True)
     parser.add_argument("--destination", type=Path, required=True)
+    parser.add_argument("--headers-destination", type=Path, required=True)
     parser.add_argument("--acknowledge-license", action="store_true")
     args = parser.parse_args()
     try:
-        receipt = prepare(args.pkg, args.destination, args.acknowledge_license)
+        receipt = prepare(args.pkg, args.destination, args.acknowledge_license,
+                          args.headers_destination)
     except (OSError, ValueError, OverflowError, EOFError, gzip.BadGzipFile) as exc:
         print("ERROR: Metal Shader Converter package preparation failed: " + str(exc), file=sys.stderr)
         return 2
