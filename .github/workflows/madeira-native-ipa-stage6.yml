@@ -1,0 +1,221 @@
+name: Madeira Stage 6 - Linked D3D11 native iDeck IPA
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [feature/madeira-native-ipa-stage6-20261030]
+    paths:
+      - .github/workflows/madeira-native-ipa-stage6.yml
+      - scripts/verify_madeira_stage6_ipa.py
+      - tests/host/test_madeira_stage6_ipa.py
+      - scripts/build_ipa.sh
+      - scripts/link_madeira_native.sh
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/madeira-native-ipa-stage6.yml
+      - scripts/build_ipa.sh
+      - scripts/link_madeira_native.sh
+      - scripts/verify_madeira_stage6_ipa.py
+      - tests/host/test_madeira_stage6_ipa.py
+
+permissions:
+  contents: read
+
+concurrency:
+  group: madeira-stage6-native-ipa-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  host:
+    name: Audit IPA, Mach-O exports and D3D11 source packaging gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout pinned iDeck source
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Run Stage 6 native IPA and earlier source verification regression tests
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests/host -p 'test_madeira_stage6_ipa.py' -v
+          python3 -m unittest discover -s tests/host -p 'test_madeira_dxmt_stage5.py' -v
+          python3 -m unittest discover -s tests/host -p 'test_madeira_wine_stage4.py' -v
+          python3 -m unittest discover -s tests/host -p 'test_madeira_fex_stage3.py' -v
+          python3 -m unittest discover -s tests/host -p 'test_madeira_component_outputs.py' -v
+          bash -n scripts/build_ipa.sh
+          bash -n scripts/link_madeira_native.sh
+          bash -n scripts/build_madeira_components.sh
+
+  native:
+    name: Build actual linked FEX Wine DXMT unsigned D3D11 IPA
+    needs: host
+    if: github.event_name != 'pull_request'
+    runs-on: xcode-27
+    timeout-minutes: 300
+    env:
+      IDECK_MADEIRA_GRAPHICS: d3d11
+      IDECK_BUILD_WOW64: '0'
+      IDECK_REQUIRE_MADEIRA: '1'
+      IDECK_MADEIRA_REBUILD: '1'
+      IDECK_MADEIRA_STOP_AFTER: all
+      IDECK_ACCEPT_METAL_CONVERTER_LICENSE: '0'
+      IDECK_PREBUILT_MODE: off
+      IDECK_PREBUILT_EXPORT: '0'
+      IDECK_CONFIGURATION: Debug
+      IDECK_LLVM_JOBS: '3'
+      IDECK_LLVM_REF: llvmorg-15.0.7
+      IDECK_MADEIRA_REV: fd9f2f3d0434a4116e4c3351f286a0fc376b4e36
+    steps:
+      - name: Checkout exact public iDeck revision
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Install matching Xcode iPhoneOS SDK
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Install public native and Metal build prerequisites
+        run: |
+          set -euo pipefail
+          missing=()
+          for tool in cmake ninja meson pkg-config; do
+            command -v "$tool" >/dev/null 2>&1 || missing+=("$tool")
+          done
+          if (( ${#missing[@]} )); then
+            HOMEBREW_NO_AUTO_UPDATE=1 brew install "${missing[@]}"
+          fi
+          bash scripts/ensure_madeira_bison.sh
+          bash scripts/ensure_metal_toolchain.sh
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-version
+
+      - name: Fetch exact published Madeira Wine FEX DXMT sources with audited overlays
+        run: |
+          set -euo pipefail
+          bash scripts/fetch_madeira_sources.sh
+          python3 scripts/verify_madeira_sources.py \
+            --root vendor/Madeira --revision "$IDECK_MADEIRA_REV"
+
+      - name: Restore verified public LLVM and ARM64EC compiler cache
+        id: llvm
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            vendor/Madeira/toolchains/llvm-mingw-20260421-ucrt-macos-universal
+            vendor/Madeira/toolchains/llvm-ios-build
+          key: madeira-llvm15-ios-v3-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/prepare_madeira_toolchains.sh', 'scripts/llvm_ios_sdk.py') }}
+
+      - name: Validate real source-built LLVM/iPhoneOS and ARM64EC
+        run: |
+          set -euo pipefail
+          bash scripts/prepare_madeira_toolchains.sh
+          bash scripts/verify_madeira_toolchains.sh
+
+      - name: Save verified compiler inputs if built from source
+        if: ${{ steps.llvm.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v5
+        with:
+          path: |
+            vendor/Madeira/toolchains/llvm-mingw-20260421-ucrt-macos-universal
+            vendor/Madeira/toolchains/llvm-ios-build
+          key: ${{ steps.llvm.outputs.cache-primary-key }}
+
+      - name: Restore phase-2 Wine crypto audio and FreeType dependencies
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            vendor/Madeira/toolchains/gnutls-ios
+            vendor/Madeira/toolchains/ffmpeg-ios
+            vendor/Madeira/build/freetype-ios/build
+            vendor/Madeira/research/freetype
+          key: madeira-ios-deps-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/prepare_madeira_dependencies.sh') }}
+
+      - name: Compile and link full source-built FEX Wine DXMT into iDeck.app
+        run: |
+          set -euo pipefail
+          bash scripts/build_ipa.sh 2>&1 | tee stage6-native-build.log
+
+      - name: Verify every earlier real compiled stage on same Xcode job
+        run: |
+          set -euo pipefail
+          bash scripts/verify_madeira_toolchains.sh --require-deps
+          python3 scripts/verify_madeira_fex_stage3.py --root vendor/Madeira --revision "$IDECK_MADEIRA_REV" --receipt stage3-receipt.json
+          python3 scripts/verify_madeira_wine_stage4.py --root vendor/Madeira --revision "$IDECK_MADEIRA_REV" --receipt stage4-receipt.json
+          python3 scripts/verify_madeira_dxmt_stage5.py --root vendor/Madeira --revision "$IDECK_MADEIRA_REV" --receipt stage5-receipt.json
+          test -s build/madeira-native/libideck_madeira_upstream_bridges.a
+          test -s build/madeira-native/link-flags.txt
+          test -s build/Staging/iDeck.app/MadeiraRuntimeManifest.plist
+          python3 scripts/verify_madeira_bundle.py --app build/Staging/iDeck.app --require --graphics d3d11
+          python3 scripts/verify_madeira_legal_notices.py --app build/Staging/iDeck.app --graphics d3d11
+
+      - name: Audit actual packaged IPA Mach-O symbols, payload parity and licenses
+        run: |
+          set -euo pipefail
+          test -s iDeck.ipa
+          unzip -tq iDeck.ipa
+          python3 scripts/verify_madeira_stage6_ipa.py \
+            --app build/Staging/iDeck.app \
+            --ipa iDeck.ipa \
+            --receipt stage6-receipt.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          for stage in (3, 4, 5, 6):
+              receipt = json.loads(Path(f"stage{stage}-receipt.json").read_text(encoding="utf-8"))
+              if receipt.get("stage") != stage or receipt.get("validated") is not True:
+                  raise SystemExit(f"Stage {stage} did not yield a verified source-built output")
+          print("Stages 3–6 verified in the same actual iOS source build.")
+          PY
+
+      - name: Publish real unsigned iDeck IPA as a direct unwrapped file
+        uses: actions/upload-artifact@v7
+        with:
+          name: iDeck-Madeira-Stage6-D3D11-native.ipa
+          path: iDeck.ipa
+          archive: false
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Publish compiled provenance and SHA-256 receipts
+        uses: actions/upload-artifact@v7
+        with:
+          name: Madeira-Stage6-native-provenance
+          path: |
+            stage3-receipt.json
+            stage4-receipt.json
+            stage5-receipt.json
+            stage6-receipt.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Publish build diagnostics even on failure
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: Madeira-Stage6-compiler-diagnostics
+          path: |
+            stage6-native-build.log
+            vendor/Madeira/wine/build-arm64ec/config.log
+            vendor/Madeira/build/ntdll-unix/build-ideck.log
+            vendor/Madeira/build/ntdll-unix/obj/*.err
+            vendor/Madeira/build/wineserver/obj/err-*.txt
+            vendor/Madeira/build/dxmt-ios/build-ideck.log
+            vendor/Madeira/build/dxmt-ios/obj/*.err
+            vendor/Madeira/dxmt/build-arm64ec/meson-logs/meson-log.txt
+            vendor/Madeira/dxmt/build-pe/meson-logs/meson-log.txt
+            vendor/Madeira/FEX/build-ios/CMakeFiles/CMakeConfigureLog.yaml
+            vendor/Madeira/FEX/build-arm64ec/CMakeFiles/CMakeConfigureLog.yaml
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Record honest device limitations
+        if: success()
+        run: |
+          echo '### Stage 6: genuine unsigned native D3D11 iDeck IPA passed' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Compiled FEX, Wine ARM64EC and DXMT/D3D11 from pinned source, linked Mach-O exports, staged Windows DLLs and verified final IPA bytes and legal notices.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'No D3D12 converter or WoW64 guest modules were distributed by this x86-64 profile.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Device JIT, Wine process launch, first frame and audio are not tested by CI and require stages 7–11.' >> "$GITHUB_STEP_SUMMARY"

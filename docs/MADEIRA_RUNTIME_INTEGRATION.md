@@ -79,6 +79,80 @@ passar integralmente. Os testes host de CMake, checklists ou mocks não
 provam um Wine executável no iPad. Inicialização do wineserver, execução
 do guest e encerramento seguro exigem validação física nas fases 7–9.
 
+### Fase 5: DXMT/D3D11 compilado sem o conversor proprietário
+
+Pré-requisitos já aprovados em compilação macOS:
+- **Fase 2** — [workflow #40994092326](https://github.com/FacensPedro/iDeck/actions/runs/40994092326), LLVM 15, ARM64EC e dependências públicas.
+- **Fase 3** — [workflow #40999473834](https://github.com/FacensPedro/iDeck/actions/runs/40999473834), bibliotecas FEXCore ARM64 e `xtajit64.dll`.
+- **Fase 4** — [workflow #41002933976](https://github.com/FacensPedro/iDeck/actions/runs/41002933976), Wine 11.4 ARM64EC, `ntdll.dll`, `libntdll_unix.a`, `libwineserver.a` e `libwin32u_unix.a`. A PR #100 permanece dependência de integração enquanto não estiver mesclada na `main`.
+
+O workflow `.github/workflows/madeira-dxmt-stage5.yml` executa
+`IDECK_MADEIRA_GRAPHICS=d3d11 IDECK_BUILD_WOW64=0
+IDECK_MADEIRA_STOP_AFTER=dxmt bash scripts/build_madeira_components.sh`.
+FEX e Wine são compilados das fontes fixadas e validados antes de chegar
+aos shaders Metal do DXMT; após a cópia dos módulos gráficos, a execução
+**para antes** da compilação WoW64, D3D12, DirectComposition opcional
+e do empacotamento do IPA.
+
+O verificador `scripts/verify_madeira_dxmt_stage5.py` só aprova se:
+- `libdxmt_combined.a` for um arquivo de objetos real para iPhoneOS ARM64;
+- `d3d11.dll`, `dxgi.dll`, `d3d10core.dll` e `winemetal.dll`
+  existirem em **ambas** as famílias PE `aarch64-windows` e `arm64ec-windows`
+  com a máquina correta e metadados CHPE quando aplicável;
+- os arquivos de configuração Meson/Ninja PE reais e os intermediários
+  AIR/cabeçalhos gerados de `air_msad`, `air_samplepos` e
+  `air_tessellation` estiverem presentes;
+- o recibo `dxmt-stage5-receipt.json` incluir os hashes SHA-256 dos
+  **nove** produtos gráficos, sem afirmar execução no dispositivo.
+
+Uma aprovação exige que o **job macOS de compilação DXMT** passe,
+não apenas o job de testes host. **Não foi validado** neste estágio
+o link final do IPA, a primeira imagem apresentada pelo jogo,
+o JIT StikDebug, os controles ou o áudio no iPad.
+O perfil D3D11 continua dispensando o Apple Metal Shader Converter
+e os arquivos proprietários D3D12.
+
+### Fase 6: vincular o runtime nativo e entregar o IPA D3D11
+
+As fases 2–5 foram aprovadas com compilação real nas execuções
+[#40994092326](https://github.com/FacensPedro/iDeck/actions/runs/40994092326),
+[#40999473834](https://github.com/FacensPedro/iDeck/actions/runs/40999473834),
+[#41002933976](https://github.com/FacensPedro/iDeck/actions/runs/41002933976)
+e [#41006350413](https://github.com/FacensPedro/iDeck/actions/runs/41006350413),
+respectivamente. O resultado da fase 5 inclui `libdxmt_combined.a`
+e quatro DLLs DXMT/D3D11 em cada arquitetura PE ARM64/ARM64EC.
+
+A fase 6 utiliza `.github/workflows/madeira-native-ipa-stage6.yml`
+para executar do zero `bash scripts/build_ipa.sh` com
+`IDECK_REQUIRE_MADEIRA=1`, `IDECK_MADEIRA_REBUILD=1`,
+`IDECK_MADEIRA_GRAPHICS=d3d11`, `IDECK_BUILD_WOW64=0` e
+`IDECK_PREBUILT_MODE=off`. Isso recompila os componentes a partir
+das fontes fixadas e compila `libideck_madeira_upstream_bridges.a`
+com `link_madeira_native.sh`, forçando o vínculo das bibliotecas
+DXMT e preservando símbolos FEX/Wine usados por `dlsym`.
+
+A aprovação exige **um job macOS completo na revisão exata**:
+- o Xcode deve vincular o app ARM64 real ao FEX, Wine e DXMT;
+- os validadores anteriores das fases 3, 4 e 5 devem aprovar os mesmos
+  artefatos compilados nesse job;
+- `verify_madeira_bundle.py --require --graphics d3d11` deve
+  confirmar a integridade dos módulos PE e símbolos Mach-O exportados;
+- `verify_madeira_legal_notices.py` deve exigir os avisos de licença
+  do código distribuído;
+- `verify_madeira_stage6_ipa.py` deve confirmar os símbolos no
+  executável/dylib compilado, os bytes idênticos no ZIP e app
+  de staging, manifest D3D11, IDs do app/extensão VPN e ausência de
+  arquivos WoW64, D3D12 e Apple Metal Shader Converter;
+- o workflow deve publicar `iDeck.ipa` **diretamente**, sem ZIP
+  intermediário, juntamente com os recibos SHA-256.
+
+O artefato é **IPA não assinado**: instalação depende de assinatura e
+dispositivo iOS compatível. A existência do IPA ou dos símbolos nativos
+não demonstra execução do JIT ou de jogos: StikDebug, RX/RW, inicialização
+do wineserver, primeiro quadro, áudio e controles pertencem às fases
+7–11. O uso e redistribuição de componentes são sujeitos às obrigações
+GPL/LGPL/MIT e às permissões legais correspondentes.
+
 ### Fases 3–5: pontos de parada independentes
 
 Com as toolchains previamente verificadas, em runner Xcode/macos:

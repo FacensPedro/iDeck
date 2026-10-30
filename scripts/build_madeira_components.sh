@@ -5,8 +5,8 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MD="${IDECK_MADEIRA_ROOT:-$ROOT/vendor/Madeira}"
 REBUILD="${IDECK_MADEIRA_REBUILD:-1}"
 STOP_AFTER="${IDECK_MADEIRA_STOP_AFTER:-all}"
-[[ "$STOP_AFTER" == "fex" || "$STOP_AFTER" == "wine" || "$STOP_AFTER" == "all" ]] || {
-  echo "ERROR: IDECK_MADEIRA_STOP_AFTER must be fex, wine or all." >&2
+[[ "$STOP_AFTER" == "fex" || "$STOP_AFTER" == "wine" || "$STOP_AFTER" == "dxmt" || "$STOP_AFTER" == "all" ]] || {
+  echo "ERROR: IDECK_MADEIRA_STOP_AFTER must be fex, wine, dxmt or all." >&2
   exit 2
 }
 if [[ "$STOP_AFTER" != "all" && "$REBUILD" != "1" ]]; then
@@ -64,7 +64,7 @@ else
   bash "$ROOT/scripts/verify_dxmt_llvm.sh"
 fi
 
-if [[ "$STOP_AFTER" == "all" ]]; then
+if [[ "$STOP_AFTER" == "all" || "$STOP_AFTER" == "dxmt" ]]; then
 bash "$ROOT/scripts/ensure_metal_toolchain.sh"
 
 # Validate the exact DXMT shader sources only when DXMT is being built.
@@ -281,6 +281,13 @@ if [[ "$REBUILD" == "1" ]]; then
     }
     cp "$src" "$MD/app/Madeira/arm64ec-windows/${module##*/}"
   done
+
+  if [[ "$STOP_AFTER" == "dxmt" ]]; then
+    python3 "$ROOT/scripts/verify_madeira_component_outputs.py" --root "$MD" --stage dxmt
+    python3 "$ROOT/scripts/verify_madeira_dxmt_stage5.py" --root "$MD" --revision "${IDECK_MADEIRA_REV:-fd9f2f3d0434a4116e4c3351f286a0fc376b4e36}"
+    echo "PASS: full iOS DXMT and ARM64/ARM64EC D3D11 frontends compiled; D3D12, WoW64 and packaging not attempted."
+    exit 0
+  fi
 
   if [[ "${IDECK_BUILD_WOW64:-1}" == "1" ]]; then
     # Upstream's i386 Wine farm and the distinct FEX WOW64 translator.
