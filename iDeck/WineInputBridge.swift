@@ -9,6 +9,9 @@ final class WineInputBridge {
     }
 
     func stopBridging() {
+        // Stop wireless discovery on view dismissal without unplugging
+        // devices still assigned to the in-process Wine guest.
+        ideck_controller_stop_discovery()
         // The SwiftUI session view can disappear on rotation, navigation
         // or backgrounding while the guest and its wineserver still run.
         // controller_stop also removes native XInput/HID devices; only the
