@@ -797,8 +797,18 @@ class SystemCoordinator: ObservableObject {
         if stillBusy {
             setWindowsStatus("Cannot start another Windows game: the previous Wine session or wineserver is still shutting down. Retry after it finishes.")
             SteamLog.event("[wine-session] blocked second launch: worker/server still active")
+            return true
         }
-        return stillBusy
+        if !ideck_wineprocess_running() {
+            // The previous guest may have exited normally without the user
+            // pressing Close. Re-arm native session state before the next
+            // launch only after both worker and wineserver are quiescent.
+            guard ideck_runtime_complete_session() else {
+                setWindowsStatus("Cannot start another Windows game: native Wine session cleanup is still in progress.")
+                return true
+            }
+        }
+        return false
     }
 
     // A Windows guest runs as a thread inside the iDeck process. The only
