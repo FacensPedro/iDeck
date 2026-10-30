@@ -19,6 +19,7 @@ void *ideck_metal_swapchain_create(void *metal_layer);
 void ideck_metal_swapchain_destroy(void *swapchain);
 bool ideck_metal_shader_library_available(void *metal_device);
 void ideck_controller_start(void);
+void ideck_controller_stop_discovery(void);
 void ideck_controller_stop(void);
 void ideck_touch_gamepad_set_enabled(int enabled);
 void ideck_touch_gamepad_set_state(uint16_t buttons, int16_t lx, int16_t ly,
