@@ -157,6 +157,12 @@ grep -Fq '__atomic_store_n(&g_wineserver_should_stop, 0' "$DEST/app/Madeira/Wine
 # all existing iDeck Mach/FEX/repeated-session patches and rejects drift.
 python3 "$ROOT/scripts/apply_madeira_luajit_backport.py" --madeira "$DEST"
 
+# The published i386 Wine farm checks its import closure with
+# echo | grep -q under pipefail. grep can close early and cause an EPIPE,
+# falsely reporting existing DLLs as missing. Apply an exact, idempotent
+# source overlay without modifying the public pinned Madeira revision.
+python3 "$ROOT/scripts/patch_madeira_wow64_import_closure.py" --madeira "$DEST"
+
 echo "Madeira sources checked out at $REV"
 echo "Source checkout complete. Run bash scripts/build_native_runtime.sh on macOS to compile, link and package."
 echo "Read $DEST/docs/BUILDING.md for the platform toolchains and licensed prerequisites."
