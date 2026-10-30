@@ -199,11 +199,42 @@ bool executable_mapping(uintptr_t rx, size_t size) {
             wine_pool_last_rx_detail.store(7);
             return false;
         }
-        if ((info.protection & VM_PROT_EXECUTE) == 0) {
+        if ((info.protection & VM_PROT_EXECUTE) == 0 || (info.protection & VM_PROT_WRITE) != 0) {
             wine_pool_last_rx_detail.store(8);
             fprintf(stderr, "[iDeck Wine JIT] RX page lacks VM_PROT_EXECUTE at 0x%" PRIxPTR
                             " protection=0x%x max=0x%x\n", cursor,
                     info.protection, info.max_protection);
+            return false;
+        }
+        cursor = std::min(end, static_cast<uintptr_t>(address + region_size));
+    }
+    return true;
+}
+
+bool writable_mapping(uintptr_t rw, size_t size) {
+    if (rw == 0 || size == 0 || rw > UINTPTR_MAX - size) return false;
+    const uintptr_t end = rw + size;
+    uintptr_t cursor = rw;
+    while (cursor < end) {
+        vm_address_t address = static_cast<vm_address_t>(cursor);
+        vm_size_t region_size = 0;
+        vm_region_basic_info_data_64_t info {};
+        mach_msg_type_number_t count = VM_REGION_BASIC_INFO_COUNT_64;
+        mach_port_t object = MACH_PORT_NULL;
+        kern_return_t status = vm_region_64(mach_task_self(), &address, &region_size,
+                                            VM_REGION_BASIC_INFO_64,
+                                            reinterpret_cast<vm_region_info_t>(&info),
+                                            &count, &object);
+        if (object != MACH_PORT_NULL) mach_port_deallocate(mach_task_self(), object);
+        if (status != KERN_SUCCESS || address > cursor || region_size == 0 ||
+            address > UINTPTR_MAX - region_size || address + region_size <= cursor) {
+            return false;
+        }
+        if ((info.protection & (VM_PROT_READ | VM_PROT_WRITE)) !=
+                (VM_PROT_READ | VM_PROT_WRITE) ||
+            (info.protection & VM_PROT_EXECUTE) != 0) {
+            fprintf(stderr, "[iDeck Wine JIT] RW alias is not strict writable/non-executable (protection=0x%x)\n",
+                    info.protection);
             return false;
         }
         cursor = std::min(end, static_cast<uintptr_t>(address + region_size));
@@ -386,6 +417,13 @@ extern "C" bool ideck_wine_jit_pool_prepare(void) {
                 continue;
             }
 
+            if (!writable_mapping(alias, size)) {
+                record_wine_pool_failure(5);
+                fprintf(stderr, "[iDeck Wine JIT] rejected RW alias with incomplete permissions or executable pages\n");
+                vm_deallocate(mach_task_self(), rw, size);
+                continue;
+            }
+
             if (!export_pool(rx, alias, size)) {
                 record_wine_pool_failure(6);
                 vm_deallocate(mach_task_self(), rw, size);
@@ -411,4 +449,38 @@ extern "C" bool ideck_wine_jit_pool_prepare(void) {
 #else
     return false;
 #endif
+}
+
+extern "C" IDeckJITSnapshot ideck_jit_snapshot(void) {
+    IDeckJITSnapshot state {};
+    state.debugger_attached = debugger_attached();
+
+    if (fex_mutex.try_lock()) {
+        state.fex_initialized = fex_initialized;
+        fex_mutex.unlock();
+    } else {
+        state.fex_state_busy = true;
+    }
+
+#if defined(IDECK_NATIVE_MADEIRA_ENABLED) && IDECK_NATIVE_MADEIRA_ENABLED
+    state.wine_failure_stage = wine_pool_last_failure.load();
+    state.wine_failure_rx_detail = wine_pool_last_rx_detail.load();
+    state.wine_failure_mach_code = wine_pool_last_mach_code.load();
+    if (wine_pool_mutex.try_lock()) {
+        state.wine_pool_prepared = wine_pool_rx != 0 && wine_pool_rw != 0 && wine_pool_size != 0;
+        if (state.wine_pool_prepared) {
+            state.wine_pool_mib = static_cast<uint32_t>(wine_pool_size / (1024 * 1024));
+            const bool distinct = wine_pool_rx <= UINTPTR_MAX - wine_pool_size &&
+                wine_pool_rw <= UINTPTR_MAX - wine_pool_size &&
+                (wine_pool_rw >= wine_pool_rx + wine_pool_size ||
+                 wine_pool_rx >= wine_pool_rw + wine_pool_size);
+            state.rx_executable = distinct && executable_mapping(wine_pool_rx, wine_pool_size);
+            state.rw_writable = distinct && writable_mapping(wine_pool_rw, wine_pool_size);
+        }
+        wine_pool_mutex.unlock();
+    } else {
+        state.wine_state_busy = true;
+    }
+#endif
+    return state;
 }
