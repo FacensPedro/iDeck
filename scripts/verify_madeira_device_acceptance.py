@@ -101,10 +101,14 @@ def validate(report: dict, base: Path) -> tuple[list[str], dict]:
     else:
         try:
             file = safe_file(base, signed)
-            if not file.name.endswith(".ipa") or file.stat().st_size < 4096:
-                errors.append("signed IPA is invalid or implausibly small")
-            elif digest(file) != build.get("signed_ipa_sha256"):
-                errors.append("signed IPA hash differs from the recorded device build")
+            if not file.name.endswith(".ipa") or file.stat().st_size < 4096 or not zipfile.is_zipfile(file):
+                errors.append("signed IPA is invalid, not a ZIP or implausibly small")
+            else:
+                with zipfile.ZipFile(file, "r") as ipa:
+                    if "Payload/iDeck.app/Info.plist" not in ipa.namelist():
+                        errors.append("signed IPA is missing the iDeck app payload")
+                if digest(file) != build.get("signed_ipa_sha256"):
+                    errors.append("signed IPA hash differs from the recorded device build")
         except (OSError, ValueError) as exc:
             errors.append(f"signed IPA evidence is unavailable: {exc}")
 
