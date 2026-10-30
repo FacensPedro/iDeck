@@ -183,7 +183,7 @@ PROFILE_ARGS=()
 if [[ "${IDECK_REQUIRE_MADEIRA:-0}" == "1" ]]; then
   PROFILE_ARGS+=(--require-native --expected-graphics "$IDECK_MADEIRA_GRAPHICS")
 fi
-python3 scripts/stamp_ideck_runtime_profile.py --app "$APP" "${PROFILE_ARGS[@]}"
+python3 scripts/stamp_ideck_runtime_profile.py --app "$APP" ${PROFILE_ARGS[@]+"${PROFILE_ARGS[@]}"}
 
 # Stream the app directly into a valid IPA, with fast compression and
 # symlink/executable-bit preservation; do not duplicate the native app as
