@@ -171,6 +171,17 @@ struct GameSessionView: View {
             }
             .ignoresSafeArea(edges: .bottom)
 
+            if let preset = coordinator.activeWindowsProfile?.touchControlPreset,
+               preset != "off", !coordinator.isClosingWindowsSession {
+                VStack {
+                    Spacer()
+                    IDeckTouchGamepadOverlay(preset: preset)
+                        .padding(.horizontal, 12)
+                        .padding(.bottom, 18)
+                }
+                .transition(.opacity)
+            }
+
             VStack {
                 HStack(alignment: .top) {
                     Button(action: coordinator.requestCloseWindowsSession) {
@@ -395,5 +406,123 @@ struct GameSessionView: View {
         } message: {
             Text(tr(coordinator.windowsCloseWarning ?? ""))
         }
+    }
+}
+
+private struct IDeckVirtualGamepadState {
+    var buttons: UInt16 = 0
+    var lx: Int16 = 0
+    var ly: Int16 = 0
+    var rx: Int16 = 0
+    var ry: Int16 = 0
+    var leftTrigger: UInt8 = 0
+    var rightTrigger: UInt8 = 0
+}
+
+private struct IDeckTouchGamepadOverlay: View {
+    let preset: String
+    @State private var pad = IDeckVirtualGamepadState()
+
+    private func publish() {
+        ideck_touch_gamepad_set_state(pad.buttons, pad.lx, pad.ly, pad.rx, pad.ry,
+                                     pad.leftTrigger, pad.rightTrigger)
+    }
+
+    private func setButton(_ bit: UInt16, pressed: Bool) {
+        if pressed { pad.buttons |= bit }
+        else { pad.buttons &= ~bit }
+        publish()
+    }
+
+    private func control(_ label: String, bit: UInt16) -> some View {
+        Text(label)
+            .font(.caption.bold())
+            .foregroundColor(.white)
+            .frame(width: 43, height: 43)
+            .background(Color.blue.opacity(pad.buttons & bit == 0 ? 0.35 : 0.8),
+                        in: Circle())
+            .contentShape(Circle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { _ in
+                        if pad.buttons & bit == 0 { setButton(bit, pressed: true) }
+                    }
+                    .onEnded { _ in setButton(bit, pressed: false) }
+            )
+    }
+
+    private func analog(_ right: Bool) -> some View {
+        GeometryReader { geometry in
+            let width = geometry.size.width
+            let height = geometry.size.height
+            let x = CGFloat(right ? pad.rx : pad.lx) / 32767.0
+            let y = -CGFloat(right ? pad.ry : pad.ly) / 32767.0
+            ZStack {
+                Circle().stroke(Color.white.opacity(0.5), lineWidth: 2)
+                Circle().fill(Color.white.opacity(0.65))
+                    .frame(width: 29, height: 29)
+                    .offset(x: x * width * 0.3, y: y * height * 0.3)
+            }
+            .contentShape(Circle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { value in
+                        let dx = (value.location.x - width / 2) / max(1, width * 0.35)
+                        let dy = (height / 2 - value.location.y) / max(1, height * 0.35)
+                        let axisX = Int16((min(1, max(-1, dx)) * 32767).rounded())
+                        let axisY = Int16((min(1, max(-1, dy)) * 32767).rounded())
+                        if right { pad.rx = axisX; pad.ry = axisY }
+                        else { pad.lx = axisX; pad.ly = axisY }
+                        publish()
+                    }
+                    .onEnded { _ in
+                        if right { pad.rx = 0; pad.ry = 0 }
+                        else { pad.lx = 0; pad.ly = 0 }
+                        publish()
+                    }
+            )
+        }
+        .frame(width: 98, height: 98)
+    }
+
+    var body: some View {
+        HStack(alignment: .bottom, spacing: 8) {
+            if preset == "xbox" {
+                analog(false)
+                VStack(spacing: 5) {
+                    control("↑", bit: 0x0001)
+                    HStack(spacing: 4) {
+                        control("←", bit: 0x0004)
+                        control("→", bit: 0x0008)
+                    }
+                    control("↓", bit: 0x0002)
+                }
+            }
+            Spacer(minLength: 0)
+            VStack(spacing: 5) {
+                HStack(spacing: 6) {
+                    control("LB", bit: 0x0100)
+                    control("Start", bit: 0x0010)
+                }
+                HStack(spacing: 4) {
+                    control("Y", bit: 0x8000)
+                    control("X", bit: 0x4000)
+                }
+                HStack(spacing: 4) {
+                    control("B", bit: 0x2000)
+                    control("A", bit: 0x1000)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .onAppear {
+            ideck_touch_gamepad_set_enabled(1)
+            publish()
+        }
+        .onDisappear {
+            ideck_touch_gamepad_set_enabled(0)
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(tr("Touch controls"))
     }
 }

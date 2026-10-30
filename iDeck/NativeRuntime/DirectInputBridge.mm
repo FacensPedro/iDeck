@@ -56,6 +56,8 @@ static BOOL g_xinputEnabled = YES;
 static BOOL g_hidXInput = NO;
 static BOOL g_hasOutput = NO;
 static BOOL g_observing = NO;
+static BOOL g_touchEnabled = NO;
+static IDeckGamepad g_touchState = {};
 
 static void *pad_symbol(const char *name) {
     return dlsym(RTLD_DEFAULT, name);
@@ -126,12 +128,35 @@ static void sample_gamepads(void) {
         publish_hid(NULL);
         return;
     }
+    int virtualSlot = -1;
+    if (g_touchEnabled && g_appActive) {
+        for (int i = 0; i < IDECK_PAD_COUNT; ++i)
+            if (!g_slots[i]) { virtualSlot = i; break; }
+    }
     for (int i = 0; i < IDECK_PAD_COUNT; ++i) {
         GCController *controller = g_slots[i];
         GCExtendedGamepad *pad = controller.extendedGamepad;
         if (!pad) {
-            publish_pad(i, NULL);
-            if (i == 0 && g_hidEnabled) publish_hid(NULL);
+            if (i == virtualSlot) {
+                IDeckGamepad state = g_touchState;
+                state.connected = 1;
+                publish_pad(i, &state);
+                if (i == 0 && g_hidEnabled) {
+                    IDeckHIDPad hid = {};
+                    hid.connected = 1;
+                    hid.battery = 0xff;
+                    hid.buttons = state.buttons;
+                    hid.left_trigger = state.left_trigger;
+                    hid.right_trigger = state.right_trigger;
+                    hid.lx = state.lx; hid.ly = state.ly;
+                    hid.rx = state.rx; hid.ry = state.ry;
+                    publish_hid(&hid);
+                    if (!g_hidXInput) publish_pad(i, NULL);
+                }
+            } else {
+                publish_pad(i, NULL);
+                if (i == 0 && g_hidEnabled) publish_hid(NULL);
+            }
             continue;
         }
         IDeckGamepad state = {};
@@ -182,7 +207,7 @@ static void update_sample_timer(void) {
     BOOL hasController = NO;
     for (int i = 0; i < IDECK_PAD_COUNT; ++i)
         if (g_slots[i]) { hasController = YES; break; }
-    BOOL needed = g_sessionActive && g_appActive && g_xinputEnabled && hasController;
+    BOOL needed = g_sessionActive && g_appActive && g_xinputEnabled && (hasController || g_touchEnabled);
     if (!needed) {
         if (g_sampleTimer) { dispatch_source_cancel(g_sampleTimer); g_sampleTimer = nil; }
         return;
@@ -306,6 +331,8 @@ static void stop_native_gamepads(void) {
         g_slots[i] = nil;
     }
     publish_hid(NULL);
+    g_touchState = {};
+    g_touchEnabled = NO;
     g_hidEnabled = NO;
     g_xinputEnabled = YES;
     g_hidXInput = NO;
@@ -318,6 +345,41 @@ static void stop_native_gamepads(void) {
 extern "C" void ideck_gamepad_end_session(void) {
     if (NSThread.isMainThread) stop_native_gamepads();
     else dispatch_sync(dispatch_get_main_queue(), ^{ stop_native_gamepads(); });
+}
+
+extern "C" void ideck_touch_gamepad_set_enabled(int enabled) {
+    dispatch_block_t apply = ^{
+        g_touchEnabled = enabled != 0;
+        if (!g_touchEnabled) g_touchState = {};
+        if (g_sessionActive) {
+            sample_gamepads();
+            update_sample_timer();
+        }
+    };
+    if (NSThread.isMainThread) apply();
+    else dispatch_async(dispatch_get_main_queue(), apply);
+}
+
+extern "C" void ideck_touch_gamepad_set_state(uint16_t buttons,
+                                               int16_t lx, int16_t ly,
+                                               int16_t rx, int16_t ry,
+                                               uint8_t left_trigger,
+                                               uint8_t right_trigger) {
+    dispatch_block_t apply = ^{
+        if (!g_touchEnabled) return;
+        g_touchState.buttons = buttons;
+        g_touchState.lx = lx;
+        g_touchState.ly = ly;
+        g_touchState.rx = rx;
+        g_touchState.ry = ry;
+        g_touchState.left_trigger = left_trigger;
+        g_touchState.right_trigger = right_trigger;
+        g_touchState.connected = 1;
+        ++g_touchState.packet;
+        if (g_sessionActive) sample_gamepads();
+    };
+    if (NSThread.isMainThread) apply();
+    else dispatch_async(dispatch_get_main_queue(), apply);
 }
 
 extern "C" void ideck_controller_start(void) {
