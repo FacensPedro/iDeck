@@ -688,6 +688,10 @@ struct WindowsWorkspaceView: View {
     }
 
     private func displayedSize(for game: SteamAppInfo) -> UInt64 {
+        if steamLibrary.installedApps.contains(game.appID),
+           let actual = steamLibrary.installedSizes[game.appID] {
+            return actual
+        }
         if steamLibrary.installedApps.contains(game.appID), let prefixPath {
             let steamApps = SteamInstallPaths.steamApps(
                 drive: prefixPath.appendingPathComponent("drive_c", isDirectory: true))
@@ -785,13 +789,13 @@ struct WindowsWorkspaceView: View {
                    ? tr("Checking existing files %d%%", Int(((progress?.checkFraction ?? 0) * 100).rounded()))
                  : progress?.phase == .finishing
                    ? tr("Finishing installation...")
-                   : tr("Downloading %d%%", Int(((progress?.fraction ?? 0) * 100).rounded())))
+                   : tr("Installing %d%%", Int(((progress?.fraction ?? 0) * 100).rounded())))
                 .font(.caption)
                 .foregroundColor(.white)
                 .lineLimit(1)
-            if let progress, progress.reusedBytes > 0 {
-                Text(tr("Already on device: %@", ByteCountFormatter.string(
-                    fromByteCount: Int64(clamping: progress.reusedBytes), countStyle: .file)))
+            if let progress, progress.installedBytes > 0 {
+                Text(tr("Installed: %@", ByteCountFormatter.string(
+                    fromByteCount: Int64(clamping: progress.installedBytes), countStyle: .file)))
                     .font(.caption2)
                     .foregroundColor(.green)
             }
@@ -1595,12 +1599,12 @@ private struct SteamProgramDetailsView: View {
             Text(progress?.phase == .preparing ? tr("Preparing download...") :
                  progress?.phase == .checking ? tr("Checking existing files %d%%", Int(((progress?.checkFraction ?? 0) * 100).rounded())) :
                  progress?.phase == .finishing ? tr("Finishing installation...") :
-                 tr("Downloading %d%%", Int(((progress?.fraction ?? 0) * 100).rounded())))
+                 tr("Installing %d%%", Int(((progress?.fraction ?? 0) * 100).rounded())))
                 .font(.caption)
                 .foregroundColor(.white)
-            if let progress, progress.reusedBytes > 0 {
-                Text(tr("Already on device: %@", ByteCountFormatter.string(
-                    fromByteCount: Int64(clamping: progress.reusedBytes), countStyle: .file)))
+            if let progress, progress.installedBytes > 0 {
+                Text(tr("Installed: %@", ByteCountFormatter.string(
+                    fromByteCount: Int64(clamping: progress.installedBytes), countStyle: .file)))
                     .font(.caption2)
                     .foregroundColor(.green)
             }
