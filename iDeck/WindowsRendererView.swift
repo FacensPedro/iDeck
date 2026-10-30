@@ -184,8 +184,14 @@ struct WindowsRendererView: UIViewRepresentable {
         // session toolbar's top strip so Close, diagnostics and the optional
         // FPS overlay stay visible and accessible during gameplay.
         let toolbar = min(84.0, max(64.0, frame.height * 0.10))
+        // Touchscreen controls are rendered by SwiftUI below the UIWindow
+        // CAMetalLayer. Keep a real interaction band unobscured by Metal.
+        let touchEnabled = getenv("IDECK_TOUCH_CONTROLS_ACTIVE").map {
+            String(cString: $0) == "1"
+        } ?? false
+        let controlsHeight = touchEnabled ? min(190.0, max(160.0, frame.height * 0.38)) : 0
         let bounds = CGRect(x: frame.minX, y: frame.minY + toolbar,
-                            width: frame.width, height: max(1, frame.height - toolbar))
+                            width: frame.width, height: max(1, frame.height - toolbar - controlsHeight))
         let guest = currentGuestSize
         let mode = RuntimeConfiguration.SurfaceMode(
             saved: getenv("IDECK_DISPLAY_SCALING").map { String(cString: $0) } ?? "fit")
