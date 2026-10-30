@@ -1,6 +1,56 @@
 import Foundation
 import Darwin
 
+enum MadeiraBundleIdentity {
+    static let missingRuntimeMessage = "This iDeck IPA contains only the interface. Download iDeck.ipa from an iOS Build Run workflow with Require Madeira runtime enabled."
+
+    static var nativeManifest: [String: Any]? {
+        let file = Bundle.main.bundleURL.appendingPathComponent("MadeiraRuntimeManifest.plist")
+        guard let data = try? Data(contentsOf: file),
+              let plist = try? PropertyListSerialization.propertyList(
+                from: data, format: nil) as? [String: Any],
+              plist["fexInProcess"] as? Bool == true,
+              plist["wineInProcess"] as? Bool == true,
+              plist["dxmtLinked"] as? Bool == true,
+              let graphics = plist["graphicsBackend"] as? String,
+              graphics == "d3d11" || graphics == "d3d12",
+              plist["d3d12Linked"] as? Bool == (graphics == "d3d12") else {
+            return nil
+        }
+        return plist
+    }
+
+    static var isNative: Bool { nativeManifest != nil }
+
+    static var profile: [String: Any] {
+        let path = Bundle.main.bundleURL.appendingPathComponent("iDeckRuntimeProfile.plist")
+        guard let data = try? Data(contentsOf: path),
+              let value = try? PropertyListSerialization.propertyList(
+                  from: data, format: nil) as? [String: Any],
+              value["profileSchema"] as? Int == 1,
+              let manifest = nativeManifest,
+              value["runtimeKind"] as? String == "madeira-native",
+              value["graphicsBackend"] as? String == manifest["graphicsBackend"] as? String,
+              value["wow64Enabled"] as? Bool == manifest["wow64Enabled"] as? Bool else {
+            if let manifest = nativeManifest {
+                return [
+                    "runtimeKind": "madeira-native",
+                    "graphicsBackend": manifest["graphicsBackend"] ?? "none",
+                    "wow64Enabled": manifest["wow64Enabled"] ?? false,
+                    "wineMonoBundled": false,
+                    "metalShaderConverterBundled": manifest["d3d12Linked"] ?? false
+                ]
+            }
+            return [
+                "runtimeKind": "interface-only", "graphicsBackend": "none",
+                "wow64Enabled": false, "wineMonoBundled": false,
+                "metalShaderConverterBundled": false
+            ]
+        }
+        return value
+    }
+}
+
 class WindowsEnvironment {
     private var winePrefixPath: String = ""
     private var steamRegistryInitializedPrefixes = Set<String>()
@@ -9,19 +59,7 @@ class WindowsEnvironment {
     let steamManager = SteamManager()
     
     private var nativeGraphicsBackend: String? {
-        let manifestURL = Bundle.main.bundleURL.appendingPathComponent("MadeiraRuntimeManifest.plist")
-        guard let data = try? Data(contentsOf: manifestURL),
-              let plist = try? PropertyListSerialization.propertyList(
-                from: data, options: [], format: nil) as? [String: Any],
-              plist["fexInProcess"] as? Bool == true,
-              plist["wineInProcess"] as? Bool == true,
-              plist["dxmtLinked"] as? Bool == true,
-              let backend = plist["graphicsBackend"] as? String,
-              backend == "d3d11" || backend == "d3d12",
-              plist["d3d12Linked"] as? Bool == (backend == "d3d12") else {
-            return nil
-        }
-        return backend
+        MadeiraBundleIdentity.nativeManifest?["graphicsBackend"] as? String
     }
 
     func hasRuntime(in prefix: String) -> Bool {
