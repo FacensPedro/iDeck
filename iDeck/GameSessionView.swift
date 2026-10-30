@@ -166,11 +166,7 @@ struct GameSessionView: View {
             Color.black.ignoresSafeArea()
 
             GeometryReader { geometry in
-                let requested = WindowsRendererView.requestedSize
-                let fitted = RuntimeConfiguration.fittedSize(content: requested ?? geometry.size, available: geometry.size)
                 WindowsRendererView()
-                    .frame(width: fitted.width, height: fitted.height)
-                    .clipped()
                     .frame(width: geometry.size.width, height: geometry.size.height)
             }
             .ignoresSafeArea(edges: .bottom)
