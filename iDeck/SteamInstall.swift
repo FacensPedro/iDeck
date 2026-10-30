@@ -3,6 +3,11 @@
 // Madeira Converter Exception: see LICENSE-EXCEPTION.md
 
 import Foundation
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#endif
 
 // Where Madeira's own Steam downloads live, and how one is read and removed
 // (docs/STEAM_LIBRARY.md). Foundation only, so tests/host/check-steam-library.py
@@ -57,27 +62,28 @@ enum SteamInstallFiles {
     /// external folders, journals or Steam app manifests.
     nonisolated static func logicalInstalledSize(at folder: URL) -> UInt64? {
         let fm = FileManager.default
-        guard let root = try? folder.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey]),
-              root.isDirectory == true, root.isSymbolicLink != true else { return nil }
+        var root = stat()
+        guard lstat(folder.path, &root) == 0,
+              (root.st_mode & mode_t(S_IFMT)) == mode_t(S_IFDIR) else { return nil }
         var hadError = false
         guard let files = fm.enumerator(
             at: folder,
-            includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey],
+            includingPropertiesForKeys: nil,
             options: [],
             errorHandler: { _, _ in hadError = true; return false }
         ) else { return nil }
         var bytes: UInt64 = 0
         for case let url as URL in files {
-            guard let item = try? url.resourceValues(forKeys: [
-                .isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey
-            ]) else { hadError = true; break }
-            if item.isSymbolicLink == true {
+            var item = stat()
+            guard lstat(url.path, &item) == 0 else { hadError = true; break }
+            let type = item.st_mode & mode_t(S_IFMT)
+            if type == mode_t(S_IFLNK) {
                 files.skipDescendants()
                 continue
             }
-            guard item.isRegularFile == true else { continue }
-            guard let size = item.fileSize, size >= 0 else { hadError = true; break }
-            let (sum, overflow) = bytes.addingReportingOverflow(UInt64(size))
+            guard type == mode_t(S_IFREG) else { continue }
+            guard item.st_size >= 0 else { hadError = true; break }
+            let (sum, overflow) = bytes.addingReportingOverflow(UInt64(item.st_size))
             if overflow { return nil }
             bytes = sum
         }
