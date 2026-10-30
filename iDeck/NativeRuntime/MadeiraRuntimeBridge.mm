@@ -263,7 +263,7 @@ extern "C" bool ideck_runtime_complete_session(void) {
                              "MADEIRA_ENV_LOCKED", "WINESERVERSOCKET",
                              "MADEIRA_WAIT_CHILDREN"}) unsetenv(key);
     ideck_session_stop();
-    fprintf(stderr, "[iDeck Wine] guest and wineserver stopped; session released\\n");
+    fprintf(stderr, "[iDeck Wine] guest and wineserver stopped; session released\n");
     return true;
 }
 
