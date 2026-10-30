@@ -20,7 +20,7 @@ class WineGamepadViewLifecycleTests(unittest.TestCase):
         self.assertIn("WineInputBridge.shared.stopBridging()", SESSION)
 
     def test_stop_wireless_discovery_does_not_disconnect_live_wine_devices(self):
-        stop = INPUT.split("func stopBridging()", 1)[1].split("\\n    }", 1)[0]
+        stop = INPUT.split("func stopBridging()", 1)[1].split("\n    }", 1)[0]
         self.assertIn("ideck_controller_stop_discovery()", stop)
         self.assertLess(stop.index("ideck_controller_stop_discovery()"),
                         stop.index("guard !ideck_wineprocess_running()"))
