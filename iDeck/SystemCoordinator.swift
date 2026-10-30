@@ -71,7 +71,32 @@ class SystemCoordinator: ObservableObject {
     private var visualCRuntimeSkipAction: (() -> Void)?
     private var bypassVisualCRuntimeForPrefix: String?
 
+    private static let supportedWineJITPoolMiB: Set<Int> = [64, 96, 128, 192, 256, 384]
+
+    private static func exportWineJITPreference(_ sizeMiB: Int) {
+        if supportedWineJITPoolMiB.contains(sizeMiB) {
+            setenv("IDECK_WINE_JIT_MIB", String(sizeMiB), 1)
+        } else {
+            unsetenv("IDECK_WINE_JIT_MIB")
+        }
+    }
+
+    // The native FEXRuntime reads IDECK_WINE_JIT_MIB only when preparing
+    // the RX/RW pool; no mapped executable memory can be resized from UI.
+    @discardableResult
+    func updateWineJITPoolPreference(_ sizeMiB: Int) -> Bool {
+        guard sizeMiB == 0 || Self.supportedWineJITPoolMiB.contains(sizeMiB) else {
+            return false
+        }
+        guard !wineJITPreparationInFlight && !ideck_wine_jit_pool_ready() else {
+            return false
+        }
+        Self.exportWineJITPreference(sizeMiB)
+        return true
+    }
+
     init() {
+        Self.exportWineJITPreference(UserDefaults.standard.integer(forKey: "wineJITPoolMiB"))
         // Keep app startup free of native Wine/JIT probes and Keychain reads.
         // In particular, a CS_DEBUGGED flag left behind by StikDebug or a
         // previous Wine crash must not be used to initialize FEX on app open.

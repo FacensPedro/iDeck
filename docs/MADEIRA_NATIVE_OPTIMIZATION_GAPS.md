@@ -58,3 +58,26 @@ their own tests, source licenses, assets and iPadOS permission review.
   Wine's redirected stderr starts are not necessarily captured in it.
 - Do not remove Apple JIT, memory or signing checks for throughput; those
   checks prevent unhandled `BRK` crashes and invalid executable memory.
+
+## Wine JIT pool preference and Wine Mono contents
+
+Settings now offers only the native-supported `IDECK_WINE_JIT_MIB` values
+64, 96, 128, 192, 256 and 384 MiB, plus Automatic. The persisted preference
+is exported at application initialization before any FEX/Wine BRK allocation.
+The setter rejects unsupported sizes and refuses to update a pool already
+prepared or being prepared; Settings explains that a restart of iDeck is
+required. The existing FEXRuntime `wine_pool_candidates()` handles its own
+validated fallback list. This is not a JIT entitlement or debugger bypass;
+the StikDebug `universal.js` flow remains mandatory where required.
+
+The IPA runtime identity from the native manifest and bundled files also
+reports whether Wine Mono is actually present. If the run omitted Mono,
+Settings does not attempt an asynchronous Mono downloader and explains
+that a **new manual iOS Build workflow** with `bundle_wine_mono` enabled
+must produce a different native IPA. The authorized Microsoft VC++ CAB
+download/extraction remains unchanged; no Microsoft or proprietary
+libraries are committed.
+
+Host tests verify the supported sizes, native read, UI selection and
+Mono reporting. Pool allocation, execution of .NET guests and real JIT
+debugger behavior on physical iPhone/iPad remain **NOT RUN**.

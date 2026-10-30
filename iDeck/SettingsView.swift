@@ -10,6 +10,8 @@ struct SettingsView: View {
     @AppStorage("controllerRightSensitivity") private var controllerRightSensitivity = 1.0
     @AppStorage("controllerDeadzone") private var controllerDeadzone = 0.10
     @AppStorage("wineControllerAPI") private var wineControllerAPI = "XInput"
+    @AppStorage("wineJITPoolMiB") private var wineJITPoolMiB = 0
+    @State private var winePoolChangeRequiresRestart = false
     @AppStorage("showGamePerformanceOverlay") private var showGamePerformanceOverlay = false
     @StateObject private var updater = UpdateChecker()
     @State private var isSteamSignInPresented = false
@@ -29,6 +31,29 @@ struct SettingsView: View {
                         
                         settingsSection(title: tr("JIT & Debugging")) {
                             statusRow
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack {
+                                    Text(tr("Wine JIT pool"))
+                                        .foregroundColor(.white)
+                                    Spacer()
+                                    Picker(tr("Wine JIT pool"), selection: $wineJITPoolMiB) {
+                                        Text(tr("Automatic")).tag(0)
+                                        ForEach([64, 96, 128, 192, 256, 384], id: \.self) { size in
+                                            Text("\(size) MiB").tag(size)
+                                        }
+                                    }
+                                    .tint(.white)
+                                }
+                                Text(tr("Wine JIT pool size is selected before allocation and cannot change while mapped."))
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                                if winePoolChangeRequiresRestart {
+                                    Text(tr("Restart iDeck before the new Wine JIT pool size can take effect."))
+                                        .font(.caption)
+                                        .foregroundColor(.orange)
+                                }
+                            }
+                            .padding(16)
                         }
                         
                         settingsSection(title: tr("Steam")) {
@@ -132,6 +157,12 @@ struct SettingsView: View {
                                     Spacer()
                                     Text(tr((runtime["wineMonoBundled"] as? Bool ?? false) ? "Bundled" : "Not bundled"))
                                 }
+                                if runtime["wineMonoBundled"] as? Bool != true {
+                                    Text(tr("Wine Mono is not included. Run iOS Build with Require Madeira runtime and Wine Mono enabled to create a different signed IPA."))
+                                        .font(.caption)
+                                        .foregroundColor(.gray)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
                                 HStack {
                                     Text("Metal Shader Converter")
                                     Spacer()
@@ -177,6 +208,9 @@ struct SettingsView: View {
             inputManager.refreshControllers()
             coordinator.refreshJITStatus()
             await updater.check()
+        }
+        .onChange(of: wineJITPoolMiB) { _, selected in
+            winePoolChangeRequiresRestart = !coordinator.updateWineJITPoolPreference(selected)
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
