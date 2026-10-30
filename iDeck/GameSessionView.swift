@@ -22,6 +22,18 @@ private final class GameRuntimeMetrics: ObservableObject {
     private var previousFrames: UInt64?
     private typealias PresentCount = @convention(c) () -> UInt64
 
+    init() {
+        // Capture the in-process present counter when the game session view
+        // is created, not at the first one-second timer sample. Otherwise
+        // the first and only guest frame can become the baseline and never
+        // be acknowledged. Previous Wine sessions may have left a nonzero
+        // counter, so do not interpret a raw nonzero count as this game's frame.
+        if let pointer = dlsym(UnsafeMutableRawPointer(bitPattern: -2),
+                               "madeira_get_present_count") {
+            baselineFrames = unsafeBitCast(pointer, to: PresentCount.self)()
+        }
+    }
+
     func sample(collectPerformance: Bool = false) {
         let uptime = ProcessInfo.processInfo.systemUptime
         secondsSinceLaunch = max(0, uptime - startedAt)

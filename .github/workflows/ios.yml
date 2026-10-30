@@ -79,6 +79,9 @@ jobs:
           bash -n scripts/ensure_metal_toolchain.sh
           python3 -m unittest discover -s tests/host -p 'test_metal_toolchain.py' -v
 
+      - name: Test Windows Steam client first-frame readiness and native CAMetalLayer registration
+        run: python3 -m unittest discover -s tests/host -p 'test_madeira_steam_client_first_frame.py' -v
+
       - name: Test Madeira first-frame, safe Wine close and localized controls
         run: python3 -m unittest discover -s tests/host -p 'test_madeira_black_screen_close_i18n.py' -v
 

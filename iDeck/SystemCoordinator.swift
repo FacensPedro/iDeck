@@ -442,8 +442,15 @@ class SystemCoordinator: ObservableObject {
                 self.windowsEnvironment.installAndRunSteam(jitEnabler: self.jitEnabler) { result in
                     DispatchQueue.main.async {
                         guard self.windowsStatus == "Launching Steam client..." else { return }
-                        self.setWindowsStatus(result && ideck_wineprocess_running()
-                            ? "Steam Running" : "Execution Error: Windows Steam client failed to start.")
+                        // The Windows Steam loader may report success before
+                        // the Steam window draws a single Metal frame. Use the
+                        // same first-frame gate as Steam games and direct EXEs.
+                        let loaderAlive = result && ideck_wineprocess_running()
+                        if loaderAlive {
+                            SteamLog.event("[steam-start] Steam client Wine thread started; awaiting Metal first frame")
+                        }
+                        self.setWindowsStatus(loaderAlive
+                            ? "Wine started; waiting for game..." : "Execution Error: Windows Steam client failed to start.")
                     }
                 }
             }
@@ -709,7 +716,12 @@ class SystemCoordinator: ObservableObject {
                 setWindowsStatus("Cannot launch: Wine is already running a different or unverified session. Exit that Wine session before launching this game.")
                 return
             }
-            setWindowsStatus("Running")
+            // A duplicate launch request is not a new Metal present.
+            // Preserve actual first-frame readiness instead of replacing
+            // "waiting for game" with a false-positive Running state.
+            if windowsStatus != "Running" {
+                setWindowsStatus("Wine started; waiting for game...")
+            }
             return
         }
         guard !previousWineSessionStillFinishing() else { return }

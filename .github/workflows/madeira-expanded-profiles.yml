@@ -47,6 +47,10 @@ on:
       - iDeck/WineInputBridge.swift
       - tests/host/test_wine_gamepad_view_lifecycle.py
       - iDeck/WindowsEnvironment.swift
+      - iDeck/WindowsRendererView.swift
+      - iDeck/SystemCoordinator.swift
+      - iDeck/GameSessionView.swift
+      - tests/host/test_madeira_steam_client_first_frame.py
       - tests/host/test_madeira_native_pe_machine.py
       - tests/host/test_wine_shutdown_library_return.py
       - scripts/build_native_runtime.sh
@@ -85,6 +89,7 @@ jobs:
           python3 -m unittest discover -s tests/host -p 'test_madeira_pe_delay_imports.py' -v
           python3 -m unittest discover -s tests/host -p 'test_madeira_native_pe_machine.py' -v
           python3 -m unittest discover -s tests/host -p 'test_wine_shutdown_library_return.py' -v
+          python3 -m unittest discover -s tests/host -p 'test_madeira_steam_client_first_frame.py' -v
           python3 -m unittest discover -s tests/host -p 'test_wine_gamepad_view_lifecycle.py' -v
           python3 -m unittest discover -s tests/host -p 'test_madeira_device_acceptance.py' -v
           python3 -m unittest discover -s tests/host -p 'test_madeira_guest_probe_results.py' -v
