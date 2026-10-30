@@ -54,7 +54,7 @@ def verify(source: Path, app: Path, ipa: Path | None = None) -> list[str]:
                         errors.append(f"Apple converter Mach-O {key} differs from provenance at {directory}")
             except (OSError, ValueError) as exc:
                 errors.append(f"invalid iPhoneOS ARM64 Apple converter Mach-O at {directory}: {exc}")
-            if not license_data.startswith(b"{\\\\rtf"):
+            if not license_data.startswith(b"{\\rtf"):
                 errors.append(f"Apple converter license is not an RTF document at {directory}")
             if digest(library) != receipt.get("library_sha256"):
                 errors.append(f"Apple converter does not match audited library: {directory}")
