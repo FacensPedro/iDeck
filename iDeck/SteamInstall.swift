@@ -51,6 +51,39 @@ enum SteamInstallFiles {
         return size
     }
 
+    /// Actual logical game-file size. Steam manifests and CDN compressed
+    /// chunk totals are estimates, not a measurement of installed files.
+    /// Only traverse the game's own directory: never count symlink targets,
+    /// external folders, journals or Steam app manifests.
+    nonisolated static func logicalInstalledSize(at folder: URL) -> UInt64? {
+        let fm = FileManager.default
+        guard let root = try? folder.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey]),
+              root.isDirectory == true, root.isSymbolicLink != true else { return nil }
+        var hadError = false
+        guard let files = fm.enumerator(
+            at: folder,
+            includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey],
+            options: [],
+            errorHandler: { _, _ in hadError = true; return false }
+        ) else { return nil }
+        var bytes: UInt64 = 0
+        for case let url as URL in files {
+            guard let item = try? url.resourceValues(forKeys: [
+                .isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey
+            ]) else { hadError = true; break }
+            if item.isSymbolicLink == true {
+                files.skipDescendants()
+                continue
+            }
+            guard item.isRegularFile == true else { continue }
+            guard let size = item.fileSize, size >= 0 else { hadError = true; break }
+            let (sum, overflow) = bytes.addingReportingOverflow(UInt64(size))
+            if overflow { return nil }
+            bytes = sum
+        }
+        return hadError ? nil : bytes
+    }
+
     /// Removes an app's install: its folder under `common`, its record, its
     /// resume journal and the records of the apps that own its shared depots
     /// (those describe the same folder). Only paths strictly inside
