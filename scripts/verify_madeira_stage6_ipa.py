@@ -82,7 +82,7 @@ def symbols_and_architecture(app: Path) -> list[str]:
         except (OSError, subprocess.CalledProcessError) as exc:
             errors.append(f"cannot inspect compiled native Mach-O image {image}: {exc}")
             continue
-        exports.update(re.findall(r"(?m)^.*\\s_([A-Za-z][A-Za-z0-9_]*)\\s*$", nm))
+        exports.update(re.findall(r"(?m)^.*\s_([A-Za-z][A-Za-z0-9_]*)\s*$", nm))
     errors.extend(
         f"FEX/Wine/DXMT native symbol absent from linked iDeck Mach-O: {symbol}"
         for symbol in REQUIRED_SYMBOLS if symbol not in exports
