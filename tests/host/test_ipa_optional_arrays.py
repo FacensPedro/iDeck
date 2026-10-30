@@ -41,17 +41,16 @@ python3 -c 'import json,sys;print(json.dumps(sys.argv[1:]))' ${FLAGS[@]+"${FLAGS
         build = (ROOT / "scripts/build_ipa.sh").read_text(encoding="utf-8")
         self.assertNotIn("WOW64_FLAGS[@]", build)
 
-    def test_legacy_native_keeps_wow64_default_and_d3d11_supports_opt_in_i386(self):
+    def test_native_d3d11_and_d3d12_default_to_wow64_with_explicit_disable(self):
         ipa = (ROOT / "scripts/build_ipa.sh").read_text(encoding="utf-8")
         native = (ROOT / "scripts/build_native_runtime.sh").read_text(encoding="utf-8")
         components = (ROOT / "scripts/build_madeira_components.sh").read_text(encoding="utf-8")
         self.assertIn('export IDECK_BUILD_WOW64="${IDECK_BUILD_WOW64:-1}"', native)
         self.assertIn('export IDECK_MADEIRA_GRAPHICS="${IDECK_MADEIRA_GRAPHICS:-d3d11}"', native)
-        self.assertIn('export IDECK_BUILD_WOW64="${IDECK_BUILD_WOW64:-0}"', native)
         self.assertIn('export IDECK_PREBUILT_MODE=off', native)
         self.assertIn('D3D12 requires confirmed rights', native)
         self.assertIn('export IDECK_MADEIRA_GRAPHICS="${IDECK_MADEIRA_GRAPHICS:-d3d12}"', ipa)
-        self.assertIn('IDECK_BUILD_WOW64:-$([[ "$IDECK_MADEIRA_GRAPHICS" == "d3d11" ]] && echo 0 || echo 1)', ipa)
+        self.assertIn('export IDECK_BUILD_WOW64="${IDECK_BUILD_WOW64:-1}"', ipa)
         self.assertIn('IDECK_BUILD_WOW64 must be 0 or 1', ipa)
         self.assertIn('IDECK_BUILD_WOW64 must be 0 or 1', native)
         self.assertIn('export IDECK_BUILD_WOW64="${IDECK_BUILD_WOW64:-0}"', components)

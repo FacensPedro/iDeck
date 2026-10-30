@@ -53,7 +53,12 @@ class SteamWebSocketBackpressureTests(unittest.TestCase):
         self.assertNotIn("view.drawableSize = target", renderer)
         runtime = (ROOT / "iDeck/NativeRuntime/MadeiraRuntimeBridge.mm").read_text(encoding="utf-8")
         environment = (ROOT / "iDeck/WindowsEnvironment.swift").read_text(encoding="utf-8")
-        self.assertIn("Self.isPE32WindowsExecutable(binary)", environment)
+        self.assertIn("let actualMachine = binary.path.withCString", environment)
+        self.assertIn("ideck_native_pe_machine($0)", environment)
+        self.assertIn("let needsWoW64 = actualMachine == 0x014c", environment)
+        self.assertIn("guard !needsWoW64 || hasWoW64Runtime() else", environment)
+        self.assertIn("uint16_t guestMachine = ideck_native_pe_machine", runtime)
+        self.assertIn("if (guestMachine == 0x014c)", runtime)
         self.assertIn('@"i386-windows/ntdll.dll"', runtime)
         self.assertIn('coordinator.windowsStatus == "Launching Windows app..."', main)
 
