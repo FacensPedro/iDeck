@@ -55,6 +55,7 @@ class SystemCoordinator: ObservableObject {
     private var steamSignInLoaded = false
     private var nativeHostConfigured = false
     private var activeSteamGameID: UInt32?
+    @Published private(set) var activeWindowsProfile: WindowsGameProfile?
     private var activeSteamPrefix: String?
     private var pendingSteamGameID: UInt32?
     @Published private(set) var isClosingWindowsSession = false
@@ -406,7 +407,9 @@ class SystemCoordinator: ObservableObject {
                 return
             }
             self.windowsEnvironment.configureWine(prefix: mountPath)
-            self.windowsEnvironment.applyGameProfile(WindowsGameProfile(id: "steam", title: "Steam"))
+            let steamProfile = WindowsGameProfile(id: "steam", title: "Steam")
+            self.activeWindowsProfile = steamProfile
+            self.windowsEnvironment.applyGameProfile(steamProfile)
             self.setWindowsStatus("Launching Steam client...")
             self.withPreparedMetalDisplay(expectedStatus: "Launching Steam client...") { [weak self] in
                 guard let self else { return }
@@ -611,6 +614,7 @@ class SystemCoordinator: ObservableObject {
                     var effectiveProfile = profile ?? WindowsGameProfile(id: destination.path, title: destination.deletingPathExtension().lastPathComponent)
                     if self.isMetalFXEnabled { effectiveProfile.metalFXEnabled = true }
                     self.windowsEnvironment.applyGameProfile(effectiveProfile)
+                    self.activeWindowsProfile = effectiveProfile
                     self.setWindowsStatus("Launching Windows app...")
                     self.withPreparedMetalDisplay(expectedStatus: "Launching Windows app...") { [weak self] in
                         guard let self else { return }
@@ -743,6 +747,7 @@ class SystemCoordinator: ObservableObject {
         var effectiveProfile = profile
         if isMetalFXEnabled { effectiveProfile.metalFXEnabled = true }
         windowsEnvironment.applyGameProfile(effectiveProfile)
+        activeWindowsProfile = effectiveProfile
         pendingSteamGameID = game.appID
         setWindowsStatus("Launching Steam game...")
         withPreparedMetalDisplay(expectedStatus: "Launching Steam game...") { [weak self] in
@@ -879,6 +884,7 @@ class SystemCoordinator: ObservableObject {
         activeSteamGameID = nil
         activeSteamPrefix = nil
         pendingSteamGameID = nil
+        activeWindowsProfile = nil
         isClosingWindowsSession = false
         windowsCloseRequestedAt = nil
         windowsCloseWarning = nil
