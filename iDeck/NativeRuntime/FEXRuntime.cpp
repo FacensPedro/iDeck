@@ -1,5 +1,6 @@
 #include "MadeiraStaticABI.h"
 #include "MadeiraRuntimeBridge.h"
+#include "JITRegionPolicy.h"
 #include <mutex>
 #include <sys/sysctl.h>
 #include <sys/types.h>
@@ -199,7 +200,7 @@ bool executable_mapping(uintptr_t rx, size_t size) {
             wine_pool_last_rx_detail.store(7);
             return false;
         }
-        if ((info.protection & VM_PROT_EXECUTE) == 0 || (info.protection & VM_PROT_WRITE) != 0) {
+        if (!ideck::jit::executable_only(info.protection, VM_PROT_EXECUTE, VM_PROT_WRITE)) {
             wine_pool_last_rx_detail.store(8);
             fprintf(stderr, "[iDeck Wine JIT] RX page lacks VM_PROT_EXECUTE at 0x%" PRIxPTR
                             " protection=0x%x max=0x%x\n", cursor,
@@ -230,9 +231,8 @@ bool writable_mapping(uintptr_t rw, size_t size) {
             address > UINTPTR_MAX - region_size || address + region_size <= cursor) {
             return false;
         }
-        if ((info.protection & (VM_PROT_READ | VM_PROT_WRITE)) !=
-                (VM_PROT_READ | VM_PROT_WRITE) ||
-            (info.protection & VM_PROT_EXECUTE) != 0) {
+        if (!ideck::jit::writable_only(info.protection, VM_PROT_READ,
+                                        VM_PROT_WRITE, VM_PROT_EXECUTE)) {
             fprintf(stderr, "[iDeck Wine JIT] RW alias is not strict writable/non-executable (protection=0x%x)\n",
                     info.protection);
             return false;
@@ -470,10 +470,8 @@ extern "C" IDeckJITSnapshot ideck_jit_snapshot(void) {
         state.wine_pool_prepared = wine_pool_rx != 0 && wine_pool_rw != 0 && wine_pool_size != 0;
         if (state.wine_pool_prepared) {
             state.wine_pool_mib = static_cast<uint32_t>(wine_pool_size / (1024 * 1024));
-            const bool distinct = wine_pool_rx <= UINTPTR_MAX - wine_pool_size &&
-                wine_pool_rw <= UINTPTR_MAX - wine_pool_size &&
-                (wine_pool_rw >= wine_pool_rx + wine_pool_size ||
-                 wine_pool_rx >= wine_pool_rw + wine_pool_size);
+            const bool distinct = ideck::jit::disjoint(wine_pool_rx, wine_pool_rw,
+                                                         wine_pool_size);
             state.rx_executable = distinct && executable_mapping(wine_pool_rx, wine_pool_size);
             state.rw_writable = distinct && writable_mapping(wine_pool_rw, wine_pool_size);
         }
