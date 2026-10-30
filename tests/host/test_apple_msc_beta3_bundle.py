@@ -28,7 +28,7 @@ class AppleMSCBundleTests(unittest.TestCase):
         self.ipa = self.root / "iDeck.ipa"
         header = struct.pack("<IiiIIIII", 0xFEEDFACF, 0x0100000C, 0, 6, 1, 24, 0, 0)
         build = struct.pack("<IIIIII", 0x32, 24, 2, 13 << 16, (26 << 16) | (4 << 8), 0)
-        library = (header + build).ljust(msc.EXPECTED_IOS_LIBRARY_BYTES, b"\\0")
+        library = (header + build).ljust(msc.EXPECTED_IOS_LIBRARY_BYTES, b"\0")
         license_data = b"{\\rtf1 APPLE SOFTWARE LICENSE AGREEMENT}" * 200
         receipt = {
             "package_sha256": msc.PACKAGE_SHA256,
