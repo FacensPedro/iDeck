@@ -40,7 +40,12 @@ D3D12_PE_FILES = (
     "arm64ec-windows/d3d12.dll",
     "arm64ec-windows/d3d12core.dll",
 )
-D3D12_PROHIBITED = D3D12_PE_FILES + ("d3d12/libmetalirconverter.dylib",)
+D3D12_PROHIBITED = D3D12_PE_FILES + (
+    "aarch64-windows/madeira_d3d12.dll",
+    "aarch64-windows/d3d12.dll",
+    "aarch64-windows/d3d12core.dll",
+    "d3d12/libmetalirconverter.dylib",
+)
 PE_FILES = (
     "aarch64-windows/d3d11.dll",
     "aarch64-windows/dxgi.dll",
@@ -307,8 +312,10 @@ def inspect(app: Path, require_wow64: bool = False, graphics: str = "d3d12") -> 
                 asset = directory / name
                 if asset.exists() or asset.is_symlink():
                     errors.append(f"D3D11 profile must not bundle D3D12 or Apple converter: {asset}")
-            if (directory / "d3d12").exists():
+            if (directory / "d3d12").exists() or (directory / "d3d12").is_symlink():
                 errors.append(f"D3D11 profile contains a D3D12 payload directory: {directory / 'd3d12'}")
+        for item in app.rglob("libmetalirconverter.dylib"):
+            errors.append(f"D3D11 profile must not redistribute the Apple converter: {item}")
     prefix = app / "prefix-template.tar.gz"
     if not prefix.is_file() or prefix.stat().st_size < 1024:
         errors.append(f"missing Madeira Wine prefix template: {prefix}")
