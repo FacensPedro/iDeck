@@ -8,8 +8,7 @@ import Darwin
 // hierarchy. Unlike an MTKView owned by UIViewRepresentable, this raw UIKit
 // host belongs directly to UIWindow and survives view replacement/rotation.
 private final class MadeiraWindowMetalHost: UIView {
-    static let shared = MadeiraWindowMetalHost(
-        frame: CGRect(x: 0, y: 0, width: 800, height: 600))
+    static let shared = MadeiraWindowMetalHost(frame: .zero)
 
     override class var layerClass: AnyClass { CAMetalLayer.self }
 
@@ -20,14 +19,14 @@ private final class MadeiraWindowMetalHost: UIView {
         isUserInteractionEnabled = false
         backgroundColor = .black
         isOpaque = true
-        contentScaleFactor = UIScreen.main.scale
+        contentScaleFactor = 1
         metalLayer.device = MTLCreateSystemDefaultDevice()
         metalLayer.pixelFormat = .bgra8Unorm
         metalLayer.framebufferOnly = true
         metalLayer.isOpaque = true
-        // A nonzero seed avoids a drawable allocation race. DXMT/Winemetal
-        // owns drawableSize from here on, including guest mode changes.
-        metalLayer.drawableSize = CGSize(width: 800, height: 600)
+        // The window-specific drawable dimensions are seeded only when the
+        // viewport attaches. DXMT/Winemetal owns all subsequent mode changes.
+        metalLayer.drawableSize = CGSize(width: 2, height: 2)
     }
 
     required init?(coder: NSCoder) { nil }
@@ -107,6 +106,16 @@ struct WindowsRendererView: UIViewRepresentable {
             window.addSubview(host)
         }
         layoutViewport(viewport)
+        // On iPhone Duo the window can migrate between the outer and inner
+        // displays while the same native Wine session remains active.
+        // Seed the initial drawable from the attached scene, not the global
+        // main screen. Never overwrite drawableSize after native registration.
+        if !layerRegistered {
+            let scale = host.contentScaleFactor
+            host.metalLayer.drawableSize = CGSize(
+                width: max(2, (host.bounds.width * scale).rounded()),
+                height: max(2, (host.bounds.height * scale).rounded()))
+        }
         if !layerRegistered,
            let symbol = dlsym(UnsafeMutableRawPointer(bitPattern: -2),
                               "madeira_display_set_layer") {
@@ -131,6 +140,13 @@ struct WindowsRendererView: UIViewRepresentable {
               let window = viewport.window else { return }
         let host = MadeiraWindowMetalHost.shared
         guard host.superview === window else { return }
+        // Read scale from this scene's actual window: UIScreen.main is
+        // ambiguous on the iPhone Duo's two displays and in external scenes.
+        let sceneScale = window.screen.scale
+        if sceneScale.isFinite && sceneScale > 0 &&
+           host.contentScaleFactor != sceneScale {
+            host.contentScaleFactor = sceneScale
+        }
         let frame = viewport.convert(viewport.bounds, to: window)
         guard frame.width >= 2 && frame.height >= 2 else { return }
         // The raw surface sits above the SwiftUI hierarchy. Reserve the
