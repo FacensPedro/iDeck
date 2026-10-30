@@ -18,6 +18,8 @@ jobs:
     env:
       IDECK_BUILD_WOW64: '0'
       IDECK_MADEIRA_REBUILD: '1'
+      IDECK_REQUIRE_MADEIRA: '1'
+      IDECK_ACCEPT_METAL_CONVERTER_LICENSE: '0'
     steps:
       - name: Checkout native iDeck sources
         uses: actions/checkout@v5
