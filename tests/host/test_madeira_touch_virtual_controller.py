@@ -51,8 +51,7 @@ class MadeiraTouchVirtualControllerTests(unittest.TestCase):
                       "zero_vibration(i)", "publish_hid(NULL)",
                       "g_touchState = {}", "g_touchEnabled = NO"):
             self.assertIn(token, release)
-        self.assertIn("!g_appActive", native if "!g_appActive" in native else
-                      "!" + "g_appActive")
+        self.assertIn("g_touchEnabled && g_appActive", native)
 
     def test_metal_does_not_steal_on_screen_controller_touches(self):
         renderer = (ROOT / "iDeck/WindowsRendererView.swift").read_text()
