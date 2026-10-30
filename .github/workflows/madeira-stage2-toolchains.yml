@@ -1,0 +1,165 @@
+name: Madeira Stage 2 - Reproducible iPhoneOS toolchains
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [feature/madeira-native-stage2-11-hardening-20261030]
+    paths:
+      - .github/workflows/madeira-stage2-toolchains.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: madeira-stage2-toolchains-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  toolchains:
+    name: Compile and audit pinned ARM64EC LLVM GnuTLS FFmpeg FreeType
+    runs-on: xcode-27
+    timeout-minutes: 300
+    env:
+      IDECK_MADEIRA_GRAPHICS: d3d11
+      IDECK_ACCEPT_METAL_CONVERTER_LICENSE: '0'
+      IDECK_BUILD_WOW64: '0'
+      IDECK_LLVM_JOBS: '3'
+      IDECK_LLVM_REF: llvmorg-15.0.7
+    steps:
+      - name: Checkout public iDeck
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Select Xcode iPhoneOS SDK
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Install public compiler prerequisites
+        run: |
+          set -euo pipefail
+          tools=()
+          for tool in cmake ninja pkg-config meson; do
+            command -v "$tool" >/dev/null 2>&1 || tools+=("$tool")
+          done
+          if (( ${#tools[@]} )); then
+            HOMEBREW_NO_AUTO_UPDATE=1 brew install "${tools[@]}"
+          fi
+          xcrun --sdk iphoneos --show-sdk-version
+          xcodebuild -version
+          df -h .
+
+      - name: Run stage 2 host and shell regression tests
+        run: |
+          python3 -m unittest discover -s tests/host -p 'test_madeira_toolchain_gate.py' -v
+          python3 -m unittest discover -s tests/host -p 'test_llvm_ios_sdk.py' -v
+          bash -n scripts/prepare_madeira_toolchains.sh
+          bash -n scripts/prepare_madeira_dependencies.sh
+          bash -n scripts/verify_madeira_toolchains.sh
+
+      - name: Fetch pinned public Madeira source tree
+        run: bash scripts/fetch_madeira_sources.sh
+
+      - name: Restore trusted cross-built LLVM and ARM64EC toolchain cache
+        id: llvm
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            vendor/Madeira/toolchains/llvm-mingw-20260421-ucrt-macos-universal
+            vendor/Madeira/toolchains/llvm-ios-build
+          key: madeira-llvm15-ios-v3-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/prepare_madeira_toolchains.sh', 'scripts/llvm_ios_sdk.py') }}
+
+      - name: Build or validate full LLVM and ARM64EC toolchains
+        run: |
+          set -euo pipefail
+          bash scripts/prepare_madeira_toolchains.sh
+          bash scripts/verify_madeira_toolchains.sh
+          df -h .
+
+      - name: Cache verified LLVM and ARM64EC compiler only
+        if: ${{ steps.llvm.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v5
+        with:
+          path: |
+            vendor/Madeira/toolchains/llvm-mingw-20260421-ucrt-macos-universal
+            vendor/Madeira/toolchains/llvm-ios-build
+          key: ${{ steps.llvm.outputs.cache-primary-key }}
+
+      - name: Restore published source iOS dependency cache
+        id: deps
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            vendor/Madeira/toolchains/gnutls-ios
+            vendor/Madeira/toolchains/ffmpeg-ios
+            vendor/Madeira/build/freetype-ios/build
+            vendor/Madeira/research/freetype
+          key: madeira-ios-deps-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/prepare_madeira_dependencies.sh') }}
+
+      - name: Build GnuTLS FFmpeg and FreeType for iPhoneOS from source
+        run: |
+          set -euo pipefail
+          bash scripts/prepare_madeira_dependencies.sh vendor/Madeira
+          bash scripts/verify_madeira_toolchains.sh --require-deps
+          df -h .
+
+      - name: Limit dependency cache size to avoid exhausting repository quota
+        id: cache_budget
+        if: ${{ steps.deps.outputs.cache-hit != 'true' }}
+        run: |
+          python3 - <<'PY'
+          import os
+          import subprocess
+          from pathlib import Path
+
+          paths = [
+              "vendor/Madeira/toolchains/gnutls-ios",
+              "vendor/Madeira/toolchains/ffmpeg-ios",
+              "vendor/Madeira/build/freetype-ios/build",
+              "vendor/Madeira/research/freetype",
+          ]
+          blocks = 0
+          for path in paths:
+              if not Path(path).exists():
+                  continue
+              value = subprocess.check_output(["du", "-sk", path], text=True).split()[0]
+              blocks += int(value)
+          cache = blocks < 4 * 1024 * 1024
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write(f"cache={'true' if cache else 'false'}\n")
+          print(f"Validated iPhoneOS dependency cache: {blocks / 1024:.1f} MiB; save={cache}")
+          PY
+
+      - name: Save verified iPhoneOS dependency archives
+        if: ${{ steps.deps.outputs.cache-hit != 'true' && steps.cache_budget.outputs.cache == 'true' }}
+        uses: actions/cache/save@v5
+        with:
+          path: |
+            vendor/Madeira/toolchains/gnutls-ios
+            vendor/Madeira/toolchains/ffmpeg-ios
+            vendor/Madeira/build/freetype-ios/build
+            vendor/Madeira/research/freetype
+          key: ${{ steps.deps.outputs.cache-primary-key }}
+
+      - name: Record real build provenance and limitations
+        run: |
+          set -euo pipefail
+          echo '## Stage 2: pinned public native toolchains' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Real llvm-mingw ARM64EC COFF, LLVM 15 iPhoneOS arm64 archives and GnuTLS/FFmpeg/FreeType iPhoneOS arm64 archives passed architecture checks.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'This workflow does not compile Wine/FEX/DXMT into iDeck, build an IPA, sign an IPA or verify execution on a device.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'No Apple Metal Shader Converter library or Microsoft VC++ DLL was fetched or redistributed.' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload build diagnostics for errors
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: Madeira-Stage2-toolchain-errors
+          path: |
+            vendor/Madeira/build/gnutls-ios/obj/*-configure.log
+            vendor/Madeira/build/gnutls-ios/obj/*-make.log
+            vendor/Madeira/build/ffmpeg/obj/build/ffbuild/config.log
+            vendor/Madeira/build/freetype-ios/build/CMakeFiles/CMakeConfigureLog.yaml
+            vendor/Madeira/toolchains/llvm-ios-build/CMakeFiles/CMakeConfigureLog.yaml
+          if-no-files-found: warn
+          retention-days: 7

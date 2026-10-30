@@ -70,8 +70,8 @@ jobs:
         run: |
           set -euo pipefail
           bash scripts/prepare_madeira_toolchains.sh
-          bash scripts/verify_dxmt_llvm.sh
-          echo 'LLVM 15 iPhoneOS headers and static archives verified.' >> "$GITHUB_STEP_SUMMARY"
+          bash scripts/verify_madeira_toolchains.sh
+          echo 'LLVM 15 iPhoneOS archives and ARM64EC compiler real-architecture checks passed.' >> "$GITHUB_STEP_SUMMARY"
 
       - name: Save cross toolchain before building FEX, Wine and DXMT
         if: ${{ steps.toolchain.outputs.cache-hit != 'true' }}
@@ -86,6 +86,11 @@ jobs:
         run: |
           set -o pipefail
           bash scripts/build_ipa.sh 2>&1 | tee native-build.log
+
+      - name: Verify compiled Wine FEX DXMT dependency toolchains
+        run: |
+          set -euo pipefail
+          bash scripts/verify_madeira_toolchains.sh --require-deps
 
       - name: Verify strict native D3D11 app and linked symbols
         run: |

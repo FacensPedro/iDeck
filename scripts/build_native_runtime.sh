@@ -17,7 +17,25 @@ for tool in xcodebuild xcrun python3; do
   command -v "$tool" >/dev/null || { echo "Missing build dependency: $tool" >&2; exit 2; }
 done
 
-export IDECK_BUILD_WOW64="${IDECK_BUILD_WOW64:-1}"
+export IDECK_MADEIRA_GRAPHICS="${IDECK_MADEIRA_GRAPHICS:-d3d11}"
+[[ "$IDECK_MADEIRA_GRAPHICS" == "d3d11" || "$IDECK_MADEIRA_GRAPHICS" == "d3d12" ]] || {
+  echo "ERROR: unsupported native graphics profile: $IDECK_MADEIRA_GRAPHICS" >&2
+  exit 2
+}
+if [[ "$IDECK_MADEIRA_GRAPHICS" == "d3d11" ]]; then
+  export IDECK_BUILD_WOW64="${IDECK_BUILD_WOW64:-0}"
+  [[ "$IDECK_BUILD_WOW64" == "0" ]] || {
+    echo "ERROR: D3D11-first profile is x86-64 only; WoW64 is not enabled." >&2
+    exit 2
+  }
+  export IDECK_PREBUILT_MODE=off
+else
+  export IDECK_BUILD_WOW64="${IDECK_BUILD_WOW64:-1}"
+  [[ "${IDECK_ACCEPT_METAL_CONVERTER_LICENSE:-0}" == "1" ]] || {
+    echo "ERROR: D3D12 requires confirmed rights for the Apple Metal Shader Converter." >&2
+    exit 2
+  }
+fi
 KIT_ARGS=()
 if [[ "$IDECK_BUILD_WOW64" == "1" ]]; then KIT_ARGS+=(--wow64); fi
 if [[ "${IDECK_BUNDLE_WINE_MONO:-0}" == "1" ]]; then KIT_ARGS+=(--mono); fi
