@@ -306,6 +306,7 @@ class WindowsEnvironment {
     }
 
     func applyGameProfile(_ profile: WindowsGameProfile) {
+        setenv("IDECK_TOUCH_CONTROLS_ACTIVE", profile.touchControlPreset == "off" ? "0" : "1", 1)
         let controllerMode = profile.controllerAPI == "Automatic"
             ? (UserDefaults.standard.string(forKey: "wineControllerAPI") ?? "XInput")
             : profile.controllerAPI
