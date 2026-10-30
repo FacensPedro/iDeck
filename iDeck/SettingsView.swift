@@ -107,6 +107,48 @@ struct SettingsView: View {
                             updatesContent
                         }
                         
+                        settingsSection(title: tr("Windows runtime")) {
+                            let runtime = MadeiraBundleIdentity.profile
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack {
+                                    Text(tr("IPA runtime"))
+                                    Spacer()
+                                    Text(tr(MadeiraBundleIdentity.isNative
+                                        ? "Madeira-native" : "Interface-only"))
+                                        .foregroundColor(MadeiraBundleIdentity.isNative ? .green : .orange)
+                                }
+                                HStack {
+                                    Text(tr("Graphics backend"))
+                                    Spacer()
+                                    Text((runtime["graphicsBackend"] as? String ?? "none").uppercased())
+                                }
+                                HStack {
+                                    Text("WoW64")
+                                    Spacer()
+                                    Text(tr((runtime["wow64Enabled"] as? Bool ?? false) ? "Bundled" : "Not bundled"))
+                                }
+                                HStack {
+                                    Text("Wine Mono")
+                                    Spacer()
+                                    Text(tr((runtime["wineMonoBundled"] as? Bool ?? false) ? "Bundled" : "Not bundled"))
+                                }
+                                HStack {
+                                    Text("Metal Shader Converter")
+                                    Spacer()
+                                    Text(tr((runtime["metalShaderConverterBundled"] as? Bool ?? false) ? "Bundled" : "Not bundled"))
+                                }
+                                if !MadeiraBundleIdentity.isNative {
+                                    Text(tr(MadeiraBundleIdentity.missingRuntimeMessage))
+                                        .font(.caption)
+                                        .foregroundColor(.orange)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                            }
+                            .font(.caption)
+                            .foregroundColor(.white)
+                            .padding(16)
+                        }
+
                         settingsSection(title: tr("LiveContainer")) {
                             toggleRow(title: tr("Inject Guest Hooks"), isOn: $coordinator.isGuestHooksEnabled)
                         }
