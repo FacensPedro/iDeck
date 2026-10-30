@@ -47,6 +47,7 @@ if [[ "${IDECK_REQUIRE_MADEIRA:-0}" == "1" ]]; then
     python3 scripts/prepare_apple_msc_beta3.py \
       --pkg "$IDECK_MSC_PKG" \
       --destination "$MSC_ROOT/app/Madeira/d3d12" \
+      --headers-destination "$MSC_ROOT/madeira-d3d12/third_party/metal-shader-converter/include" \
       --acknowledge-license
   fi
   KIT_FLAGS=()
