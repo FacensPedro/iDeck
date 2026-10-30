@@ -63,11 +63,11 @@ class MadeiraD3D11ProfileTests(unittest.TestCase):
         (self.app / "licenses/LuaJIT-MIT.txt").write_text("MIT")
         self.symbols = [name for name in module.SYMBOLS if name not in module.D3D12_SYMBOLS]
 
-    def inspect(self, graphics="d3d11"):
+    def inspect(self, graphics="d3d11", require_wow64=False):
         output = "\n".join(f"00000000 T _{name}" for name in self.symbols)
         nm = subprocess.CompletedProcess([], 0, stdout=output, stderr="")
         with patch.object(module.subprocess, "run", return_value=nm):
-            return module.inspect(self.app, graphics=graphics)
+            return module.inspect(self.app, graphics=graphics, require_wow64=require_wow64)
 
     def test_strict_d3d11_accepts_complete_fex_wine_dxmt_without_converter(self):
         self.assertEqual(self.inspect(), [])
@@ -105,6 +105,31 @@ class MadeiraD3D11ProfileTests(unittest.TestCase):
     def test_d3d11_fails_if_d3d12_payload_directory_exists(self):
         (self.app / "MadeiraRuntime/d3d12").mkdir()
         self.assertTrue(any("D3D12 payload directory" in error for error in self.inspect()))
+
+    def test_d3d11_rejects_wow64_pe_tree(self):
+        for relative in ("i386-windows", "MadeiraRuntime/i386-windows"):
+            with self.subTest(path=relative):
+                directory = self.app / relative
+                directory.mkdir()
+                (directory / "ntdll.dll").write_bytes(pe(0x8664))
+                self.assertTrue(any("must not bundle WoW64" in err for err in self.inspect()))
+                (directory / "ntdll.dll").unlink()
+                directory.rmdir()
+
+    def test_d3d11_rejects_wow64_host_modules(self):
+        for root in (self.app, self.app / "MadeiraRuntime"):
+            for name in ("xtajit.dll", "wow64.dll", "wow64win.dll"):
+                with self.subTest(name=name, root=root.name):
+                    path = root / "aarch64-windows" / name
+                    path.write_bytes(pe(0xAA64))
+                    self.assertTrue(any("must not bundle WoW64" in err for err in self.inspect()))
+                    path.unlink()
+
+    def test_d3d11_rejects_require_wow64(self):
+        self.assertTrue(any(
+            "does not support --require-wow64" in err
+            for err in self.inspect(require_wow64=True)
+        ))
 
     def test_linker_flags_exclude_only_optional_canary(self):
         command = ["python3", str(ROOT / "scripts/verify_madeira_bundle.py"),
