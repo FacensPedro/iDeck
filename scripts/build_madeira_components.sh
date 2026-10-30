@@ -4,6 +4,10 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MD="${IDECK_MADEIRA_ROOT:-$ROOT/vendor/Madeira}"
 REBUILD="${IDECK_MADEIRA_REBUILD:-1}"
+GRAPHICS="${IDECK_MADEIRA_GRAPHICS:-d3d12}"
+[[ "$GRAPHICS" == "d3d11" || "$GRAPHICS" == "d3d12" ]] || {
+  echo "ERROR: IDECK_MADEIRA_GRAPHICS must be d3d11 or d3d12." >&2; exit 2;
+}
 
 [[ "$(uname -s)" == "Darwin" ]] || { echo "ERROR: iOS native toolchains require macOS." >&2; exit 2; }
 for tool in xcrun xcodebuild cmake ninja meson python3; do
@@ -235,16 +239,18 @@ if [[ "$REBUILD" == "1" ]]; then
     bash "$MD/build/wine-i386/build.sh"
   fi
 
-  bash "$MD/build/madeira-d3d12/build-pe.sh"
-  D3D="$MD/build/madeira-d3d12/out-pe"
-  for name in madeira_d3d12.dll d3d12.dll d3d12core.dll; do
-    [[ -s "$D3D/$name" ]] || { echo "ERROR: D3D12 output missing: $name" >&2; exit 2; }
-    cp "$D3D/$name" "$MD/app/Madeira/arm64ec-windows/$name"
-  done
-  cmp -s "$D3D/madeira_d3d12.dll" "$D3D/d3d12.dll" || {
-    echo "ERROR: d3d12.dll is not the compiled madeira-d3d12 frontend." >&2
-    exit 2
-  }
+  if [[ "$GRAPHICS" == "d3d12" ]]; then
+    bash "$MD/build/madeira-d3d12/build-pe.sh"
+    D3D="$MD/build/madeira-d3d12/out-pe"
+    for name in madeira_d3d12.dll d3d12.dll d3d12core.dll; do
+      [[ -s "$D3D/$name" ]] || { echo "ERROR: D3D12 output missing: $name" >&2; exit 2; }
+      cp "$D3D/$name" "$MD/app/Madeira/arm64ec-windows/$name"
+    done
+    cmp -s "$D3D/madeira_d3d12.dll" "$D3D/d3d12.dll" || {
+      echo "ERROR: d3d12.dll is not the compiled madeira-d3d12 frontend." >&2
+      exit 2
+    }
+  fi
 
   # Replace the pinned older dcomp.dll with upstream's source-level
   # DirectComposition composition-swapchain compatibility implementation.
@@ -268,12 +274,17 @@ for file in \
   "$MD/app/Madeira/arm64ec-windows/d3d10core.dll" \
   "$MD/app/Madeira/aarch64-windows/winemetal.dll" \
   "$MD/app/Madeira/prefix-template.tar.gz" \
-  "$MD/app/Madeira/arm64ec-windows/madeira_d3d12.dll" \
-  "$MD/app/Madeira/arm64ec-windows/d3d12.dll" \
-  "$MD/app/Madeira/arm64ec-windows/d3d12core.dll" \
   "$MD/app/Madeira/arm64ec-windows/winemetal.dll"; do
   [[ -s "$file" ]] || { echo "ERROR: missing compiled native/PE component: $file" >&2; exit 2; }
 done
+
+if [[ "$GRAPHICS" == "d3d12" ]]; then
+  for name in madeira_d3d12.dll d3d12.dll d3d12core.dll; do
+    [[ -s "$MD/app/Madeira/arm64ec-windows/$name" ]] || {
+      echo "ERROR: D3D12 build output missing: $name" >&2; exit 2;
+    }
+  done
+fi
 
 if [[ "${IDECK_BUILD_WOW64:-1}" == "1" ]]; then
   for name in aarch64-windows/xtajit.dll aarch64-windows/wow64.dll \
@@ -286,5 +297,5 @@ if [[ "${IDECK_BUILD_WOW64:-1}" == "1" ]]; then
   done
 fi
 
-echo "Madeira FEX/Wine ARM64EC/DXMT/D3D12 native inputs are present."
+echo "Madeira FEX/Wine ARM64EC/DXMT native inputs are present (graphics: $GRAPHICS)."
 echo "Next: build the upstream host bridge and link the iDeck app."
