@@ -46,7 +46,7 @@ class MadeiraToolchainGateTests(unittest.TestCase):
         source = NATIVE.read_text()
         self.assertIn('export IDECK_MADEIRA_GRAPHICS="${IDECK_MADEIRA_GRAPHICS:-d3d11}"', source)
         self.assertIn('export IDECK_PREBUILT_MODE=off', source)
-        self.assertIn('export IDECK_BUILD_WOW64="${IDECK_BUILD_WOW64:-0}"', source)
+        self.assertIn('export IDECK_BUILD_WOW64="${IDECK_BUILD_WOW64:-1}"', source)
         self.assertIn('D3D12 requires confirmed rights', source)
 
     def test_architecture_gate_refuses_to_run_without_macos(self):

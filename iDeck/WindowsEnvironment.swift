@@ -115,6 +115,9 @@ class WindowsEnvironment {
                 return false
             }
             defer { try? handle.close() }
+            if name.hasPrefix("i386-windows/") {
+                return file.path.withCString { ideck_native_pe_machine($0) == 0x014c }
+            }
             return (try? handle.read(upToCount: 2)) == Data([0x4d, 0x5a])
         }
     }
@@ -254,27 +257,9 @@ class WindowsEnvironment {
     }
     
     private static func isPE32WindowsExecutable(_ url: URL) -> Bool {
-        guard let handle = try? FileHandle(forReadingFrom: url) else { return false }
-        defer { try? handle.close() }
-        do {
-            guard let dos = try handle.read(upToCount: 64), dos.count == 64,
-                  dos[0] == 0x4d, dos[1] == 0x5a else { return false }
-            let offset = UInt64(dos[0x3c]) | (UInt64(dos[0x3d]) << 8) |
-                         (UInt64(dos[0x3e]) << 16) | (UInt64(dos[0x3f]) << 24)
-            guard offset >= 64 && offset < 64 * 1024 * 1024 else { return false }
-            try handle.seek(toOffset: offset)
-            guard let pe = try handle.read(upToCount: 26), pe.count == 26,
-                  pe[0] == 0x50, pe[1] == 0x45, pe[2] == 0, pe[3] == 0 else {
-                return false
-            }
-            let machine = UInt16(pe[4]) | (UInt16(pe[5]) << 8)
-            let optionalMagic = UInt16(pe[24]) | (UInt16(pe[25]) << 8)
-            return machine == 0x014c && optionalMagic == 0x010b
-        } catch {
-            return false
-        }
+        url.path.withCString { ideck_native_pe_machine($0) == 0x014c }
     }
-
+    
     func execute(binary: URL, arguments: String = "", is32Bit: Bool = false, isSteam: Bool = false,
                  steamAppID: UInt32? = nil, steamInstallDirectory: URL? = nil,
                  steamWorkingDirectory: URL? = nil,
@@ -287,7 +272,16 @@ class WindowsEnvironment {
             return
         }
 
-        let needsWoW64 = is32Bit || Self.isPE32WindowsExecutable(binary)
+        let actualMachine = binary.path.withCString { ideck_native_pe_machine($0) }
+        guard actualMachine == 0x014c || actualMachine == 0x8664 else {
+            SteamLog.event("[wine-launch] unsupported or truncated PE image")
+            completion(Int(EINVAL))
+            return
+        }
+        let needsWoW64 = actualMachine == 0x014c
+        if is32Bit && !needsWoW64 {
+            SteamLog.event("[wine-launch] correcting stale PE32 flag for x64 executable")
+        }
         guard !needsWoW64 || hasWoW64Runtime() else {
             SteamLog.event("[wine-launch] rejected PE32 i386 executable: complete WoW64 runtime is missing")
             completion(Int(ENOTSUP))

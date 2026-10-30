@@ -33,6 +33,16 @@ on:
   pull_request:
     branches: [main]
     paths:
+      - iDeck/NativeRuntime/WindowsPEMachine.h
+      - iDeck/NativeRuntimeDiagnostics.mm
+      - iDeck/NativeRuntimeDiagnostics.h
+      - iDeck/NativeRuntime/MadeiraRuntimeBridge.mm
+      - iDeck/NativeRuntime/WineProcessBridge.mm
+      - iDeck/WindowsEnvironment.swift
+      - tests/host/test_madeira_native_pe_machine.py
+      - tests/host/test_wine_shutdown_library_return.py
+      - scripts/build_native_runtime.sh
+      - scripts/build_ipa.sh
       - .github/workflows/madeira-expanded-profiles.yml
       - scripts/prepare_apple_msc_beta3.py
       - scripts/verify_madeira_device_acceptance.py
@@ -65,6 +75,8 @@ jobs:
           python3 -m unittest discover -s tests/host -p 'test_apple_msc_beta3.py' -v
           python3 -m unittest discover -s tests/host -p 'test_apple_msc_beta3_bundle.py' -v
           python3 -m unittest discover -s tests/host -p 'test_madeira_pe_delay_imports.py' -v
+          python3 -m unittest discover -s tests/host -p 'test_madeira_native_pe_machine.py' -v
+          python3 -m unittest discover -s tests/host -p 'test_wine_shutdown_library_return.py' -v
           python3 -m unittest discover -s tests/host -p 'test_madeira_device_acceptance.py' -v
           python3 -m unittest discover -s tests/host -p 'test_madeira_d3d11_profile.py' -v
           python3 -m unittest discover -s tests/host -p 'test_madeira_payload_staging.py' -v

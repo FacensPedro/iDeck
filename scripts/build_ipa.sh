@@ -28,7 +28,9 @@ if [[ "${IDECK_REQUIRE_MADEIRA:-0}" == "1" ]]; then
       exit 2
     }
   fi
-  export IDECK_BUILD_WOW64="${IDECK_BUILD_WOW64:-$([[ "$IDECK_MADEIRA_GRAPHICS" == "d3d11" ]] && echo 0 || echo 1)}"
+  # Full Wine/FEX i386 support is the default for native IPA builds.
+  # Explicit IDECK_BUILD_WOW64=0 retains the smaller x64-only profile.
+  export IDECK_BUILD_WOW64="${IDECK_BUILD_WOW64:-1}"
   [[ "$IDECK_BUILD_WOW64" == "0" || "$IDECK_BUILD_WOW64" == "1" ]] || {
     echo "ERROR: IDECK_BUILD_WOW64 must be 0 or 1." >&2
     exit 2

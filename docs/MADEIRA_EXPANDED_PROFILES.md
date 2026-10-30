@@ -180,6 +180,34 @@ For D3D12, the upstream Madeira test farm also includes
 `d3d12-cube-x64.exe` and related public-source shader tests, which
 still need to be compiled and launched in the signed D3D12 IPA.
 
+## Native executable dispatch and session lifecycle hardening
+
+The iDeck host now inspects the **actual** PE32/PE32+ COFF machine,
+optional-header magic, file bounds and DOS/NT signatures in a shared native
+validator before launching a Windows guest. The JSON `is32Bit` hint is not
+trusted to select a backend; x86 executables always require a complete i386
+Wine farm and FEX WoW64 DLLs, even if the caller supplied an incorrect hint.
+This prevents a PE32 installer being handed to the x64 path. On iOS, the
+Swift launcher and the native Madeira entry point use the same validator.
+
+Native D3D11 and D3D12 builds default to `IDECK_BUILD_WOW64=1`. For the
+lighter intentionally x64-only runtime, explicitly set
+`IDECK_BUILD_WOW64=0`; the D3D11 strict bundle verifier continues to
+reject accidental WoW64 assets in that case. Building full WoW64 is more
+expensive than a no-WoW64 source build.
+
+Wine guest startup checks for the asynchronously running guest thread for up
+to 500 ms instead of declaring failure from a single immediate poll.
+After **both** Wine and wineserver threads have actually stopped, iDeck
+releases the gamepad session and clears the inherited Steam dock state.
+
+CI checks the native PE inspector as C and C++, and exercises valid x86/x64
+headers and malformed/unsupported machines. These are host-level tests,
+not evidence of a launched Windows guest or on-device rendering. Signed
+IPA installation, two successful guest sessions, first frames, audio,
+input, legal attribution and reboot-cycle stability remain subject to the
+physical-device evidence gate described below.
+
 ## Stages 8–11: real iPad evidence, not simulated PASS
 
 Create a local evidence checklist (all fields are initially NOT RUN):

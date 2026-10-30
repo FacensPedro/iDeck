@@ -58,10 +58,16 @@ def template(graphics: str, wow64: bool, compatibility: bool) -> dict:
 
 
 def safe_file(base: Path, name: str) -> Path:
-    if not name or Path(name).is_absolute():
-        raise ValueError("evidence path must be a relative file")
-    target = (base / name).resolve()
-    if not target.is_relative_to(base.resolve()) or target.is_symlink() or not target.is_file():
+    if not name or Path(name).is_absolute() or ".." in Path(name).parts:
+        raise ValueError("evidence path must be a relative file without parent traversal")
+    candidate = base
+    for segment in Path(name).parts:
+        candidate = candidate / segment
+        if candidate.is_symlink():
+            raise ValueError("evidence cannot contain a symbolic link")
+    root = base.resolve()
+    target = candidate.resolve()
+    if not target.is_relative_to(root) or not target.is_file():
         raise ValueError("evidence file must be a real file inside evidence root")
     return target
 

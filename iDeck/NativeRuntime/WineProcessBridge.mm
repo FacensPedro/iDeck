@@ -4,6 +4,7 @@
 #include <dlfcn.h>
 #include <cerrno>
 #include <climits>
+#include <unistd.h>
 
 extern "C" bool ideck_wineprocess_available(void) {
 #if defined(IDECK_NATIVE_MADEIRA_ENABLED) && IDECK_NATIVE_MADEIRA_ENABLED
@@ -48,7 +49,14 @@ extern "C" int32_t ideck_wineprocess_start(const char *wine_prefix) {
     if (start == nullptr) return ENOSYS;
     int result = start(wine_prefix);
     if (result != 0) return EIO;
-    return ideck_wineprocess_running() ? 0 : EAGAIN;
+    // Madeira may publish the Wine guest pthread asynchronously. A single
+    // immediate is_running() check can falsely report failure before the
+    // thread has entered its Wine main loop. Never start a second thread.
+    for (unsigned int attempt = 0; attempt < 50; ++attempt) {
+        if (ideck_wineprocess_running()) return 0;
+        usleep(10000);
+    }
+    return EAGAIN;
 }
 
 extern "C" bool ideck_wineprocess_last_exit_code(int32_t *code) {
