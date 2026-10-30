@@ -175,6 +175,9 @@ jobs:
             -o /tmp/ideck-memory-manager-tests
           /tmp/ideck-memory-manager-tests
 
+      - name: Test Wine JIT pool preference and Wine Mono native bundle indicators
+        run: python3 -m unittest discover -s tests/host -p 'test_wine_jit_pool_settings.py' -v
+
       - name: Test live debugger guard for FEX JIT
         run: |
           xcrun clang++ -std=c++20 -O2 -pthread \
