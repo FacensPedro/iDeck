@@ -262,7 +262,7 @@ def build_kit(output: Path, madeira: Path, bridge: Path, wow64: bool, mono: bool
               for name, path in sorted(entries.items())}
     metadata = {"schema": 1, "madeira_revision": REVISION, "platform": "iphoneos-arm64",
                 "wow64": wow64, "wine_mono": mono, "graphics": graphics,
-                "wine_version": WINE_VERSION, "d3d12_backend": "madeira-d3d12",
+                "wine_version": WINE_VERSION, "d3d12_backend": "madeira-d3d12" if graphics == "d3d12" else "disabled",
                 "arm64ec_context_patch_sha256": ARM64EC_CONTEXT_PATCH_SHA256,
                 "arm_host_feature_patch_sha256": ARM_HOST_FEATURE_PATCH_SHA256,
                 "repeat_wine_session_patch_sha256": REPEAT_WINE_SESSION_PATCH_SHA256,
@@ -316,8 +316,9 @@ def inspect(archive: Path, wow64: bool, mono: bool, graphics: str = "d3d12"):
             raise KitError("Native kit graphics backend mismatch")
         if metadata.get("wine_version") != WINE_VERSION:
             raise KitError("Wine 11.4 version mismatch; rebuild the Madeira native kit")
-        if metadata.get("d3d12_backend") != "madeira-d3d12":
-            raise KitError("Native madeira-d3d12 backend mismatch; rebuild the Madeira native kit")
+        expected_backend = "madeira-d3d12" if graphics == "d3d12" else "disabled"
+        if metadata.get("d3d12_backend") != expected_backend:
+            raise KitError("Native graphics backend metadata mismatch; rebuild the Madeira native kit")
         if metadata.get("arm64ec_context_patch_sha256") != ARM64EC_CONTEXT_PATCH_SHA256:
             raise KitError("ARM64EC Mach context patch mismatch; rebuild the Madeira native kit")
         if metadata.get("arm_host_feature_patch_sha256") != ARM_HOST_FEATURE_PATCH_SHA256:
