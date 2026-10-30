@@ -43,6 +43,21 @@ class MadeiraBlackScreenCloseAndLocalizationTests(unittest.TestCase):
         self.assertNotIn("kill(getpid()", coordinator)
         self.assertNotIn("pthread_cancel(", coordinator)
 
+    def test_orphan_wineserver_can_only_be_stopped_after_guest_finished(self):
+        server = (ROOT / "iDeck/NativeRuntime/WineServerBridge.m").read_text()
+        coordinator = (ROOT / "iDeck/SystemCoordinator.swift").read_text()
+        native = (ROOT / "iDeck/NativeRuntime/MadeiraStaticABI.h").read_text()
+        self.assertIn("void wineserver_stop(void);", native)
+        self.assertIn("bool ideck_wineserver_stop_if_idle(void)", server)
+        self.assertIn("!ideck_wineprocess_thread_finished()", server)
+        self.assertIn("ideck_wineprocess_running()", server)
+        self.assertIn("dispatch_async(dispatch_get_global_queue(", server)
+        self.assertIn("wineserver_stop();", server)
+        self.assertIn("ideck_wineserver_stop_if_idle()", coordinator)
+        self.assertIn("!ideck_wineprocess_running() && ideck_wineprocess_thread_finished()", coordinator)
+        self.assertNotIn("pthread_cancel(", server)
+        self.assertNotIn("kill(getpid()", server)
+
     def test_all_requested_portuguese_and_spanish_ui_strings_exist(self):
         source = (ROOT / "iDeck/Localization.swift").read_text()
         for key in (

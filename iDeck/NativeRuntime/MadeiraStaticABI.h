@@ -15,6 +15,7 @@ bool fex_initialize(void);
 int wineserver_start(const char *prefix_path);
 int wineserver_is_running(void);
 int wineserver_is_ready(void);
+void wineserver_stop(void);
 int wine_process_start(const char *prefix_path);
 int wine_process_is_running(void);
 int wine_process_thread_finished(void);

@@ -830,6 +830,13 @@ class SystemCoordinator: ObservableObject {
 
     func pollWindowsSessionClose() {
         guard isClosingWindowsSession else { return }
+        if !ideck_wineprocess_running() && ideck_wineprocess_thread_finished() &&
+           ideck_wineserver_running() {
+            // The guest may have failed before its thread was created,
+            // leaving an orphan wineserver. Stop only that idle server on
+            // a background queue, not the Wine worker or the iDeck process.
+            _ = ideck_wineserver_stop_if_idle()
+        }
         if !ideck_wineprocess_running() && !ideck_wineserver_running() &&
            ideck_wineprocess_thread_finished() {
             finishWindowsSessionCloseIfPossible()
