@@ -16,7 +16,7 @@ permissions:
 
 concurrency:
   group: madeira-native-d3d11-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: true
 
 jobs:
   compile:
