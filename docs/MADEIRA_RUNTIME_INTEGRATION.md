@@ -1,5 +1,23 @@
 # Status do runtime Madeira no iDeck
 
+## Identidade verificada do IPA e falha imediata
+
+Após a verificação do bundle, `scripts/stamp_ideck_runtime_profile.py`
+escreve `iDeckRuntimeProfile.plist` no aplicativo que será empacotado. Esse
+arquivo registra o tipo real (`interface-only` ou `madeira-native`),
+o backend gráfico, e a presença de WoW64, Wine Mono e conversor Metal no
+bundle. Não é um sinal de que jogos foram executados. O indicador nativo só
+é escrito depois de `verify_madeira_bundle.py --require` aprovar o runtime.
+
+Ajustes mostra essas informações sem confundir o IPA de interface com o
+compilado pelo Madeira. A tentativa de iniciar um executável Windows, um
+jogo Steam ou o cliente Windows Steam é rejeitada imediatamente quando falta
+um manifesto nativo válido, **antes** de pedir JIT, instalar dependências ou
+esperar por uma janela Metal preta. A interface orienta baixar
+`iDeck.ipa` do Actions → iOS Build → Run workflow com `require_madeira`
+ativado. Um IPA de PR segue sendo interface-only; nenhuma verificação
+de assinatura ou JIT de aparelho é marcada PASS nesse fluxo.
+
 ## Perfis experimentais D3D12 4.0 Beta 3, WoW64 e fases 8–11
 
 Consulte [MADEIRA_EXPANDED_PROFILES.md](MADEIRA_EXPANDED_PROFILES.md) para importar localmente o pacote Apple validado por SHA-256 e Mach-O, habilitar opcionalmente o WoW64 no D3D11, inspecionar os imports de jogos e reunir evidências reais do iPad nas fases 8–11. Não confunda testes de CI ou um arquivo IPA com execução comprovada em dispositivo. O conversor proprietário não deve ser incluído no repositório.

@@ -177,6 +177,14 @@ else
   python3 scripts/verify_madeira_bundle.py --app "$APP"
 fi
 
+# Stamp the observed IPA profile only after the strict native bundle
+# verifier passes; a PR/interface build cannot claim a native Wine runtime.
+PROFILE_ARGS=()
+if [[ "${IDECK_REQUIRE_MADEIRA:-0}" == "1" ]]; then
+  PROFILE_ARGS+=(--require-native --expected-graphics "$IDECK_MADEIRA_GRAPHICS")
+fi
+python3 scripts/stamp_ideck_runtime_profile.py --app "$APP" ${PROFILE_ARGS[@]+"${PROFILE_ARGS[@]}"}
+
 # Stream the app directly into a valid IPA, with fast compression and
 # symlink/executable-bit preservation; do not duplicate the native app as
 # a temporary Payload tree or recompress PNG/ZIP/GZ assets.
