@@ -46,6 +46,41 @@ Personal Team will be allowed to use them.
 4. Repeat with StikDebug detached. A safe refusal (EPERM or another explicit
    failure) is expected; a fabricated pass, hang, or unhandled BRK is a bug.
 
+### Stage 7 — collecting non-destructive JIT evidence
+
+After enabling JIT using iDeck's Settings button (which opens StikDebug
+with the bundled `universal.js` for the **current running process**),
+return to the still-open iDeck, enter **Settings → JIT & Debugging →
+Copy JIT diagnostics**, and paste the snapshot into a private test report.
+The action reads native state; **it does not call the BRK JIT allocator**
+or execute guest instructions. The report omits raw executable addresses.
+
+Interpret the snapshot conservatively:
+
+- `CS_DEBUGGED permission: true` means only a code-signing bit was observed;
+  it does **not** prove the debugger or its BRK handler is attached.
+- `Live debugger attached: true` means `P_TRACED` is present for this
+  process, not that the compatible StikDebug script is servicing BRK.
+- `FEX initialized: true` means the native FEX initializer returned success,
+  not that a Windows program ran.
+- `Wine pool prepared: true` with `Wine RX executable and non-writable:
+  true` and `Wine RW writable and non-executable: true` confirms the
+  current mapping permissions were checked by the app. The RX/RW regions
+  must not overlap; a W^X violation fails the native preparation step.
+- `FEX initialization in progress` or `Wine pool inspection busy` means
+  the snapshot intentionally did not block a concurrent initialization.
+  Repeat after the attempt finishes; never interpret unknown as ready.
+- Failure stage and Mach error identify the JIT setup step that failed;
+  use the `[iDeck Wine JIT]` and `[iDeck JIT]` logs for the complete
+  diagnosis.
+
+Run the **attached** and **detached** cases separately, retain exact app
+and iPadOS versions, and mark the test `NOT RUN` unless the observations
+actually occurred on the signed installed app. Even a clean snapshot
+cannot prove that the interpreter ran a guest x86-64 instruction, and
+the CI's iPhoneOS compilation of the Stage 7 JIT bridge is not an
+on-device execution result.
+
 ## Phase 8 — guest launch and repeated sessions
 
 1. Install a legally sourced, minimal Windows x86-64 EXE into a valid Wine
