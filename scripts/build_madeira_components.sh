@@ -53,12 +53,16 @@ done
 # Wine configure requires GNU Bison >= 3.0. macOS ships Bison 2.3;
 # source the preflight so the modern parser stays first on PATH for all
 # later nested Wine/FEX/DXMT build scripts, including local builds.
-if [[ "$REBUILD" == "1" ]]; then
+if [[ "$REBUILD" == "1" && "$STOP_AFTER" != "fex" ]]; then
   source "$ROOT/scripts/ensure_madeira_bison.sh"
 fi
 
 bash "$ROOT/scripts/prepare_madeira_toolchains.sh"
-bash "$ROOT/scripts/verify_dxmt_llvm.sh"
+if [[ "$STOP_AFTER" == "fex" ]]; then
+  bash "$ROOT/scripts/verify_madeira_toolchains.sh"
+else
+  bash "$ROOT/scripts/verify_dxmt_llvm.sh"
+fi
 
 if [[ "$STOP_AFTER" == "all" ]]; then
 bash "$ROOT/scripts/ensure_metal_toolchain.sh"
@@ -82,7 +86,12 @@ rm -rf "$DXMT_PREFLIGHT_DIR"
 fi
 
 if [[ "$REBUILD" == "1" ]]; then
-  bash "$ROOT/scripts/prepare_madeira_dependencies.sh" "$MD"
+  # Phase 3 builds FEX in isolation. GnuTLS, FFmpeg and FreeType are Wine
+  # dependencies and must not cause an unrelated FEX JIT build to fail.
+  # Full Wine/DXMT builds retain the exact dependency preparation path.
+  if [[ "$STOP_AFTER" != "fex" ]]; then
+    bash "$ROOT/scripts/prepare_madeira_dependencies.sh" "$MD"
+  fi
 
   # FEX defaults TUNE_CPU to "native" and probes Linux /proc/cpuinfo.
   # A macOS runner building for iOS has no /proc/cpuinfo, so the FEX CPU
