@@ -26,7 +26,12 @@ class WineStartupSessionTests(unittest.TestCase):
         self.assertIn("Button(action: coordinator.requestCloseWindowsSession)", VIEW)
         self.assertIn("ideck_wineprocess_request_close()", coordinator)
         self.assertIn("ideck_wineprocess_request_close(void)", HEADER)
-        self.assertIn('"winios_post_key"', BRIDGE)
+        self.assertIn("&winios_post_key", BRIDGE)
+        self.assertIn("void winios_post_key(int vk, int down);",
+                      (ROOT / "iDeck/NativeRuntime/MadeiraStaticABI.h").read_text())
+        close = BRIDGE.split('extern "C" bool ideck_wineprocess_request_close(void)', 1)[1]
+        self.assertIn("#if defined(IDECK_NATIVE_MADEIRA_ENABLED)", close)
+        self.assertNotIn("dlsym(", close)
         self.assertIn("post(0x12, 1)", BRIDGE)
         self.assertIn("post(0x73, 1)", BRIDGE)
         self.assertIn("post(0x73, 0)", BRIDGE)
