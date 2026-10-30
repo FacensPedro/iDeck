@@ -716,7 +716,12 @@ class SystemCoordinator: ObservableObject {
                 setWindowsStatus("Cannot launch: Wine is already running a different or unverified session. Exit that Wine session before launching this game.")
                 return
             }
-            setWindowsStatus("Running")
+            // A duplicate launch request is not a new Metal present.
+            // Preserve actual first-frame readiness instead of replacing
+            // "waiting for game" with a false-positive Running state.
+            if windowsStatus != "Running" {
+                setWindowsStatus("Wine started; waiting for game...")
+            }
             return
         }
         guard !previousWineSessionStillFinishing() else { return }
