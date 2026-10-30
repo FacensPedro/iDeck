@@ -1,0 +1,46 @@
+name: Madeira published source pins
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/madeira-public-sources.yml
+      - scripts/fetch_madeira_sources.sh
+      - scripts/verify_madeira_sources.py
+      - tests/host/test_verify_madeira_sources.py
+      - patches/**
+      - scripts/apply_madeira_luajit_backport.py
+
+permissions:
+  contents: read
+
+concurrency:
+  group: madeira-public-sources-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  verify:
+    name: Verify exact public FEX, Wine, DXMT and nested rpmalloc gitlinks
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout iDeck source and expected patch set
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Test pinned source verification contract
+        run: python3 -m unittest discover -s tests/host -p 'test_verify_madeira_sources.py' -v
+
+      - name: Fetch pinned public Madeira and all recursive forks
+        run: |
+          set -euo pipefail
+          bash scripts/fetch_madeira_sources.sh
+          python3 scripts/verify_madeira_sources.py --root vendor/Madeira
+          git -C vendor/Madeira submodule status --recursive
+
+      - name: Record verified source revision
+        run: |
+          echo 'Verified pinned public Madeira source checkout and its recursive FEX/Wine/DXMT/rpmalloc gitlinks.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'This source-only job does NOT compile or redistribute Wine, FEX, D3D12, or Apple Metal Shader Converter.' >> "$GITHUB_STEP_SUMMARY"
