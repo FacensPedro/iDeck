@@ -50,9 +50,12 @@ class MadeiraNativeKitTests(unittest.TestCase):
             "resources/d3d12/canary_layout_vs.dxil": b"dxil",
             "resources/d3d12/canary_layout_ps.dxil": b"dxil",
         })
-        for name in kit.REQUIRED_PE + (kit.WOW64_FILES if wow64 else ()):
+        for name in kit.REQUIRED_PE + (kit.D3D12_PE if graphics == "d3d12" else ()) + (
+            kit.WOW64_FILES if wow64 else ()
+        ):
             data["resources/" + name] = b"MZ" + name.encode()
-        data["resources/" + kit.D3D12_LOADER] = data["resources/" + kit.D3D12_FRONTEND]
+        if graphics == "d3d12":
+            data["resources/" + kit.D3D12_LOADER] = data["resources/" + kit.D3D12_FRONTEND]
         if mono:
             data["resources/wine-mono/bin/libmono-2.0-x86.dll"] = b"MZmono"
         if graphics == "d3d11":
