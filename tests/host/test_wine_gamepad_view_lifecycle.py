@@ -19,6 +19,22 @@ class WineGamepadViewLifecycleTests(unittest.TestCase):
             self.assertIn(check, guard)
         self.assertIn("WineInputBridge.shared.stopBridging()", SESSION)
 
+    def test_stop_wireless_discovery_does_not_disconnect_live_wine_devices(self):
+        stop = INPUT.split("func stopBridging()", 1)[1].split("\\n    }", 1)[0]
+        self.assertIn("ideck_controller_stop_discovery()", stop)
+        self.assertLess(stop.index("ideck_controller_stop_discovery()"),
+                        stop.index("guard !ideck_wineprocess_running()"))
+        api = (ROOT / "iDeck/NativeRuntime/RuntimeSupport.h").read_text()
+        self.assertIn("void ideck_controller_stop_discovery(void);", api)
+        method = PAD.split('extern "C" void ideck_controller_stop_discovery(void)', 1)[1].split(
+            'extern "C" void ideck_controller_stop(void)', 1
+        )[0]
+        self.assertIn("[GCController stopWirelessControllerDiscovery]", method)
+        self.assertNotIn("ideck_gamepad_end_session()", method)
+        self.assertIn("ideck_gamepad_end_session()", PAD.split(
+            'extern "C" void ideck_controller_stop(void)', 1
+        )[1])
+
     def test_native_session_still_cleans_up_gamepads_after_wine_and_server_exit(self):
         cleanup = NATIVE.split('extern "C" bool ideck_runtime_complete_session(void)', 1)[1]
         self.assertIn("ideck_wineprocess_running()", cleanup)
