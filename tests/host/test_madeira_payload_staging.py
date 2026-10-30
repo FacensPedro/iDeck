@@ -101,7 +101,31 @@ class MadeiraPayloadStagingTests(unittest.TestCase):
             self.assertTrue((self.app / "MadeiraRuntime/arm64ec-windows" / name).is_file())
         self.assertTrue((self.source / "d3d12/libmetalirconverter.dylib").is_file())
 
-    def test_d3d11_rejects_explicit_wow64_option(self):
+    def test_d3d11_opt_in_wow64_requires_full_i386_farm_and_stages_it(self):
+        i386 = self.source / "i386-windows"
+        i386.mkdir()
+        for name in ("ntdll.dll", "kernel32.dll", "user32.dll", "d3d11.dll", "dxgi.dll"):
+            (i386 / name).write_bytes(b"MZ" + bytes(128))
+        for name in ("xtajit.dll", "wow64.dll", "wow64win.dll"):
+            (self.source / "aarch64-windows" / name).write_bytes(b"MZ" + bytes(128))
+        env = dict(os.environ)
+        env.update({
+            "IDECK_MADEIRA_APP_ROOT": str(self.source),
+            "IDECK_MADEIRA_GRAPHICS": "d3d11",
+            "IDECK_BUILD_WOW64": "1",
+            "IDECK_ACCEPT_METAL_CONVERTER_LICENSE": "0",
+        })
+        result = subprocess.run(
+            ["bash", str(STAGER), str(self.app)],
+            env=env, capture_output=True, text=True, check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        for prefix in (self.app, self.app / "MadeiraRuntime"):
+            self.assertTrue((prefix / "i386-windows/ntdll.dll").is_file())
+            self.assertTrue((prefix / "aarch64-windows/xtajit.dll").is_file())
+            self.assertFalse((prefix / "d3d12").exists())
+
+    def test_d3d11_opt_in_wow64_rejects_missing_i386_farm(self):
         env = dict(os.environ)
         env.update({
             "IDECK_MADEIRA_APP_ROOT": str(self.source),
@@ -114,7 +138,7 @@ class MadeiraPayloadStagingTests(unittest.TestCase):
             env=env, capture_output=True, text=True, check=False,
         )
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("forbids WoW64", result.stderr)
+        self.assertIn("requested WoW64", result.stderr)
 
     def test_vcruntime_requires_all_supplied_files(self):
         source = self.source / "x86_64-vcruntime"
