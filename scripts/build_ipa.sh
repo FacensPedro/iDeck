@@ -143,6 +143,7 @@ if [ "${IDECK_REQUIRE_MADEIRA:-0}" = "1" ]; then
   else
     python3 scripts/verify_madeira_bundle.py --app "$APP" --require --graphics "$IDECK_MADEIRA_GRAPHICS"
   fi
+  python3 scripts/verify_madeira_legal_notices.py --app "$APP" --graphics "$IDECK_MADEIRA_GRAPHICS"
   if [[ "$EXPORT_NATIVE_KIT" == "1" ]]; then
     python3 scripts/madeira_native_kit.py create --cache --resource-root "$APP" ${KIT_FLAGS[@]+"${KIT_FLAGS[@]}"}
   fi
