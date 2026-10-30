@@ -4982,7 +4982,9 @@ final class SteamOwnedGamesModel: ObservableObject {
                 }
                 return sizes
             }.value
-            guard let self, self.installedSizeScanGeneration == generation else { return }
+            guard let self,
+                  self.installedSizeScanGeneration == generation,
+                  self.installedApps == appIDs else { return }
             self.installedSizes = measured
         }
     }
