@@ -45,6 +45,7 @@ jobs:
   fex:
     name: Compile real FEXCore arm64 and xtajit64 ARM64EC
     needs: host
+    if: github.event_name != 'pull_request'
     runs-on: xcode-27
     timeout-minutes: 300
     env:
