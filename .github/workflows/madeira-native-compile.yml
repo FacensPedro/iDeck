@@ -106,7 +106,7 @@ jobs:
                   capture_output=True, text=True, check=True,
               )
               exports.update(re.findall(
-                  r"(?m)^.*\\s_([A-Za-z][A-Za-z0-9_]*)\\s*$", result.stdout
+                  r"(?m)^.*\s_([A-Za-z][A-Za-z0-9_]*)\s*$", result.stdout
               ))
           required = (
               "ideck_madeira_launch_v1",
