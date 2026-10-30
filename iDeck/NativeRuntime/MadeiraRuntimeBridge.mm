@@ -275,8 +275,9 @@ extern "C" bool ideck_runtime_complete_session(void) {
     ideck_wine_session_started = false;
     for (const char *key : {"MADEIRA_EXE", "MADEIRA_ARGS", "MADEIRA_WORKDIR",
                              "MADEIRA_STEAM_APPID", "MADEIRA_STEAM_APPPATH",
-                             "MADEIRA_ENV_LOCKED", "WINESERVERSOCKET",
+                             "MADEIRA_DOCK_SESSION", "MADEIRA_ENV_LOCKED", "WINESERVERSOCKET",
                              "MADEIRA_WAIT_CHILDREN"}) unsetenv(key);
+    ideck_gamepad_end_session();
     ideck_session_stop();
     fprintf(stderr, "[iDeck Wine] guest and wineserver stopped; session released\n");
     return true;
