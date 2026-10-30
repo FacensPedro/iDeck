@@ -36,11 +36,11 @@ The Xcode project currently targets **iOS/iPadOS 26.0** as its minimum OS versio
 1. Open [Actions → iOS Build](https://github.com/FacensPedro/iDeck/actions/workflows/ios.yml).
 2. Choose the branch and select **Run workflow**.
 3. For an interface-only build, disable **Require Madeira runtime**.
-4. For an experimental Windows runtime, enable **Require Madeira runtime**. **WoW64 is selected by default** for 32-bit Windows programs; leave it enabled. Select **Wine Mono** if needed for compatible .NET apps.
-5. Review the Apple Metal Shader Converter license. Confirm the license option only if you have the necessary rights to use and distribute the component.
-6. After the workflow finishes successfully, confirm which artifact it produced:
-   - `iDeck-interface-only` — app interface only; **cannot execute Windows games**.
-   - `iDeck-Madeira-native` — includes the native runtime, subject to device validation.
+4. On **Run workflow**, the defaults request **Require Madeira runtime = on**, **Native renderer = d3d11**, **Build WoW64 = on**, **Wine Mono = off**, **Metal Shader Converter = off**, **Export runtime kit = off** and an empty release tag.
+5. Enable the converter license option **only** when selecting the optional D3D12 profile and only after confirming the necessary rights. Unlicensed D3D12 compilation is rejected.
+6. Download the exact `iDeck.ipa` artifact from that manual native run, not the IPA of a pull request or an ordinary push without owner-approved native distribution. PRs build an **interface-only** IPA and cannot run Windows games. A successful native build still requires code signing, JIT and on-device validation.
+
+The public D3D11 FEX/Wine/DXMT kit is cached under its **own graphics/WoW64/Mono** key. A compatible second manual build can restore it instead of rebuilding the native components. A D3D11 kit must not contain the proprietary Metal Shader Converter or any D3D12 PE modules; D3D12 kits use an independent key and retain explicit license checks. See [precompiled native runtime](docs/MADEIRA_PREBUILT_RUNTIME.md).
 
 Automatic push and pull-request builds may produce only the interface-only IPA. Build success in Xcode does not necessarily mean final IPA packaging succeeded.
 
