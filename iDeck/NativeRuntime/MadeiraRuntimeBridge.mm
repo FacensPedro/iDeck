@@ -132,21 +132,6 @@ extern "C" int32_t ideck_runtime_launch(const char *executable_path,
             ![request[@"version"] isEqual:@1]) return ideck_invalid_launch("missing or unsupported launch request version");
         NSArray *arguments = request[@"arguments"];
         if (![arguments isKindOfClass:[NSArray class]] || arguments.count > 64) return ideck_invalid_launch("invalid arguments array or too many arguments");
-        if ([request[@"is32Bit"] boolValue]) {
-            // Upstream WineProcessBridge detects the target's PE32 machine
-            // and starts its WoW64 path. Never attempt it with an empty i386
-            // farm, or the guest can fail after reserving its address window.
-            NSString *bundlePath = NSBundle.mainBundle.bundlePath;
-            for (NSString *name in @[ @"i386-windows/ntdll.dll",
-                                      @"i386-windows/kernel32.dll",
-                                      @"aarch64-windows/xtajit.dll",
-                                      @"aarch64-windows/wow64.dll",
-                                      @"aarch64-windows/wow64win.dll" ]) {
-                if (![[NSFileManager defaultManager] fileExistsAtPath:
-                      [bundlePath stringByAppendingPathComponent:name]]) return ENOTSUP;
-            }
-        }
-
         NSString *prefix = [[NSString stringWithUTF8String:wine_prefix] stringByStandardizingPath];
         NSString *executable = [[NSString stringWithUTF8String:executable_path] stringByStandardizingPath];
         NSString *drive = [prefix stringByAppendingPathComponent:@"drive_c"];
@@ -156,6 +141,36 @@ extern "C" int32_t ideck_runtime_launch(const char *executable_path,
         if (![canonicalExecutable hasPrefix:root] ||
             ![[canonicalExecutable.pathExtension lowercaseString] isEqualToString:@"exe"] ||
             !ideck_native_validate_pe(canonicalExecutable.fileSystemRepresentation)) return EACCES;
+
+        uint16_t guestMachine = ideck_native_pe_machine(canonicalExecutable.fileSystemRepresentation);
+        if (guestMachine != 0x014c && guestMachine != 0x8664) {
+            return ideck_invalid_launch("unsupported or corrupted Windows PE32/PE32+ executable");
+        }
+        if (guestMachine == 0x014c) {
+            // Never trust the is32Bit JSON hint: imported games can bypass
+            // the Swift launcher, but the actual PE32 image still requires
+            // i386 Wine plus FEX WoW64 host modules.
+            NSString *bundlePath = NSBundle.mainBundle.bundlePath;
+            NSFileManager *manager = NSFileManager.defaultManager;
+            for (NSString *name in @[ @"i386-windows/ntdll.dll",
+                                      @"i386-windows/kernel32.dll",
+                                      @"i386-windows/user32.dll",
+                                      @"i386-windows/d3d11.dll",
+                                      @"i386-windows/dxgi.dll" ]) {
+                NSString *path = [bundlePath stringByAppendingPathComponent:name];
+                if (ideck_native_pe_machine(path.fileSystemRepresentation) != 0x014c)
+                    return ENOTSUP;
+            }
+            for (NSString *name in @[ @"aarch64-windows/xtajit.dll",
+                                      @"aarch64-windows/wow64.dll",
+                                      @"aarch64-windows/wow64win.dll" ]) {
+                NSString *path = [bundlePath stringByAppendingPathComponent:name];
+                NSDictionary *attributes = [manager attributesOfItemAtPath:path error:nil];
+                if (!attributes || [attributes fileSize] < 1024) return ENOTSUP;
+            }
+        } else if ([request[@"is32Bit"] boolValue]) {
+            return ideck_invalid_launch("x64 Windows executable incorrectly marked as PE32");
+        }
 
         NSString *relative = [canonicalExecutable substringFromIndex:root.length];
         if (relative.length == 0 || relative.length >= 480) return ENAMETOOLONG;
