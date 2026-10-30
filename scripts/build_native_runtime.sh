@@ -24,8 +24,8 @@ export IDECK_MADEIRA_GRAPHICS="${IDECK_MADEIRA_GRAPHICS:-d3d11}"
 }
 if [[ "$IDECK_MADEIRA_GRAPHICS" == "d3d11" ]]; then
   export IDECK_BUILD_WOW64="${IDECK_BUILD_WOW64:-0}"
-  [[ "$IDECK_BUILD_WOW64" == "0" ]] || {
-    echo "ERROR: D3D11-first profile is x86-64 only; WoW64 is not enabled." >&2
+  [[ "$IDECK_BUILD_WOW64" == "0" || "$IDECK_BUILD_WOW64" == "1" ]] || {
+    echo "ERROR: IDECK_BUILD_WOW64 must be 0 or 1." >&2
     exit 2
   }
   export IDECK_PREBUILT_MODE=off
