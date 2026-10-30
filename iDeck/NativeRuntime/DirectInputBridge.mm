@@ -393,8 +393,12 @@ extern "C" void ideck_controller_start(void) {
     else dispatch_async(dispatch_get_main_queue(), ^{ [GCController startWirelessControllerDiscoveryWithCompletionHandler:nil]; });
 }
 
-extern "C" void ideck_controller_stop(void) {
-    ideck_gamepad_end_session();
+extern "C" void ideck_controller_stop_discovery(void) {
     if (NSThread.isMainThread) [GCController stopWirelessControllerDiscovery];
     else dispatch_async(dispatch_get_main_queue(), ^{ [GCController stopWirelessControllerDiscovery]; });
+}
+
+extern "C" void ideck_controller_stop(void) {
+    ideck_gamepad_end_session();
+    ideck_controller_stop_discovery();
 }
