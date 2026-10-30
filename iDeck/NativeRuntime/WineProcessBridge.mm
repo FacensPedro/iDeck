@@ -6,8 +6,11 @@
 #include <climits>
 
 extern "C" bool ideck_wineprocess_available(void) {
-    return dlsym(RTLD_DEFAULT, "wine_process_start") != nullptr &&
-           dlsym(RTLD_DEFAULT, "wine_process_is_running") != nullptr;
+#if defined(IDECK_NATIVE_MADEIRA_ENABLED) && IDECK_NATIVE_MADEIRA_ENABLED
+    return &wine_process_start != nullptr && &wine_process_is_running != nullptr;
+#else
+    return false;
+#endif
 }
 
 extern "C" bool ideck_wineprocess_running(void) {
@@ -71,10 +74,10 @@ extern "C" bool ideck_wineprocess_last_ntstatus(uint32_t *code) {
 }
 
 extern "C" bool ideck_wineprocess_request_close(void) {
-    using PostKey = void (*)(unsigned int, int);
+#if defined(IDECK_NATIVE_MADEIRA_ENABLED) && IDECK_NATIVE_MADEIRA_ENABLED
     if (!ideck_wineprocess_running()) return false;
-    auto post = reinterpret_cast<PostKey>(dlsym(RTLD_DEFAULT, "winios_post_key"));
-    if (post == nullptr) return false;
+    // Use the pinned Winios ABI. A missing key bridge is a link failure.
+    void (*post)(int, int) = &winios_post_key;
     post(0x12, 1);
     post(0x73, 1);
     // Do not block the UI; key-up is emitted shortly afterwards.
@@ -84,4 +87,7 @@ extern "C" bool ideck_wineprocess_request_close(void) {
         post(0x12, 0);
     });
     return true;
+#else
+    return false;
+#endif
 }

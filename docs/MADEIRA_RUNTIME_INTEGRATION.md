@@ -1,5 +1,95 @@
 # Status do runtime Madeira no iDeck
 
+## Revisão de integração nativa — branch `feature/madeira-runtime` (29/10/2026)
+
+**Esta revisão não comprova que um programa Windows funcione em iPhone/iPad.**
+A Etapa 0 possui uma execução macOS aprovada, documentada abaixo. As Etapas
+1–7 continuam dependentes das provas de compilação, assinatura e dispositivo.
+
+- **SDK LLVM 15 (correção de contrato):** o validador de
+  `scripts/llvm_ios_sdk.py` agora exige os arquivos realmente emitidos
+  por TableGen (`llvm/IR/IntrinsicEnums.inc` e
+  `llvm/IR/IntrinsicImpl.inc`), em lugar do arquivo inexistente
+  `llvm/IR/Intrinsics.inc`. Os testes continuam rejeitando cabeçalhos,
+  arquivos estáticos e revisões incompletos. A validação do compilador
+  iPhoneOS é feita por `scripts/verify_dxmt_llvm.sh`.
+- **Verificação independente macOS:** o workflow
+  `.github/workflows/madeira-llvm-sdk.yml` prepara as toolchains
+  públicas, compila LLVM para iOS, executa os testes e valida os
+  cabeçalhos e archives reais. Um resultado de interface **não**
+  substitui uma execução aprovada desse workflow.
+- **FEX e Wine (fortalecimento das bridges):** quando
+  `IDECK_NATIVE_MADEIRA_ENABLED=1`, a disponibilidade passa a
+  depender de referências reais a `fex_initialize`,
+  `wineserver_start`, `wineserver_is_ready`,
+  `wine_process_start` e `wine_process_is_running`.
+  A inicialização FEX não usa fallback por `dlsym`; o encerramento
+  de Wine usa diretamente `winios_post_key(int,int)`, conforme
+  o header upstream. O IPA de interface não anuncia estas APIs.
+- **Compilação nativa sem redistribuição:** o workflow
+  `.github/workflows/madeira-native-compile.yml` tenta compilar
+  as dependências públicas FEX, Wine ARM64EC, DXMT e D3D12 em runner
+  macOS, preparar as bridges reais e vincular um executável iOS
+  **não assinado** para conferir os símbolos por `nm`.
+  Não publica IPA, DLLs, converter proprietário ou kit pré-compilado.
+  A aprovação de execução e vinculação deve ser consultada nos
+  resultados da própria execução, não inferida da presença do script.
+- **Memória:** `iDeck/iDeck.entitlements` solicita agora
+  `com.apple.developer.kernel.extended-virtual-addressing` além de
+  `increased-memory-limit`. A concessão efetiva das duas permissões
+  no app **assinado** não foi verificada; não há declaração de
+  autorização de provisionamento. As verificações funcionais do
+  pool RX/RW do Wine e do depurador JIT continuam obrigatórias.
+- **Licenças e segurança:** `verify_madeira_bundle.py` não foi
+  afrouxado; `IDECK_REQUIRE_MADEIRA=1` continua sendo necessário
+  para habilitar o runtime no IPA. Não houve redistribuição do Metal
+  Shader Converter. Antes de qualquer distribuição, é necessária
+  confirmação separada dos direitos de licença e assinatura correta.
+
+### Ordem obrigatória para assinatura e aceitação física
+
+1. Num Mac com Xcode e SDK iPhoneOS compatíveis, compilar os componentes
+   nativos fixados, conferir todos os símbolos do executável via `nm` e
+   verificar `build/Staging/iDeck.app` usando
+   `python3 scripts/verify_madeira_bundle.py --app build/Staging/iDeck.app --require --require-wow64`.
+   **O modo estrito modifica o manifesto do bundle:** usá-lo só **antes**
+   da assinatura. Uma falha invalida a candidatura à assinatura.
+2. Somente após o responsável confirmar os termos do Apple Metal Shader
+   Converter, e dispor de certificado e perfis de provisionamento próprios,
+   assinar os binários Mach-O e as duas cópias do converter, a extensão
+   VPN e finalmente o aplicativo com o mesmo Team ID. Não alterar os
+   arquivos após a assinatura.
+3. Com o **app já assinado**, executar
+   `python3 scripts/verify_signed_madeira_app.py --app /caminho/iDeck.app`.
+   Este verificador é somente de leitura: confere assinatura, Team ID,
+   provisionamento, validade do perfil, IDs do app e entitlements
+   concedidos, sem regravar o manifesto. É propositalmente separado do
+   verificador estrito.
+4. Instalar o app assinado em um iPhone/iPad físico autorizado, com a
+   versão correta do iOS, confirmar os entitlements no app assinado e
+   validar as permissões de memória pela inicialização real do pool JIT;
+   ativar um depurador JIT compatível e iniciar um aplicativo Windows
+   conhecido e permitido dentro do prefixo Wine. Conferir que o
+   wineserver e o guest são threads no mesmo processo, sem `fork`.
+5. Registrar evidência real e datada: log da abertura do EXE,
+   `wine_process_is_running`, contador de presents com incremento,
+   primeira imagem visível na tela Metal, áudio audível, entrada
+   funcional, código/status de saída e encerramento das threads.
+   É obrigatório não confundir o primeiro frame da interface SwiftUI
+   com um frame do guest Windows.
+6. Declarar PASS apenas se todos os registros acima forem reais e
+   reproduzíveis num aparelho identificado pelo modelo e versão do
+   sistema. A ausência de hardware, provisionamento ou direitos de
+   redistribuição significa **PENDENTE**, nunca aprovação simulada.
+
+**Situação dos critérios:** nenhum `IDECK_REQUIRE_MADEIRA=1` final foi
+aprovado nesta revisão; não há observações verificadas de abertura,
+primeiro frame, áudio ou encerramento de um app Windows num dispositivo
+real. A etapa de vinculação sem assets não substitui
+`verify_madeira_bundle.py --app <app> --require`.
+
+---
+
 ## Diagnóstico reprodutível — Etapa 0 (29/10/2026)
 
 **Status: Etapa 0 verificada em macOS/Xcode. Etapa 1 não iniciada nesta

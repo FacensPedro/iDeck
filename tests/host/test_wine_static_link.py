@@ -9,6 +9,22 @@ NATIVE = ROOT / 'iDeck/NativeRuntime'
 
 
 class WineStaticLinkTests(unittest.TestCase):
+    def test_native_close_uses_real_winios_key_abi(self):
+        source = (NATIVE / 'WineProcessBridge.mm').read_text()
+        abi = (NATIVE / 'MadeiraStaticABI.h').read_text()
+        self.assertIn('void winios_post_key(int vk, int down);', abi)
+        close = source.split('extern "C" bool ideck_wineprocess_request_close(void)', 1)[1]
+        self.assertIn('&winios_post_key', close)
+        self.assertNotIn('dlsym(', close)
+        self.assertIn('return false;', close)
+
+    def test_availability_requires_linked_native_wineserver(self):
+        server = (NATIVE / 'WineServerBridge.m').read_text()
+        fn = server.split('bool ideck_wineserver_available(void)', 1)[1].split('\n}', 1)[0]
+        self.assertIn('&wineserver_start', fn)
+        self.assertIn('&wineserver_is_ready', fn)
+        self.assertNotIn('dlsym(', fn)
+
     def test_native_bridge_calls_linked_implementation_and_requires_it(self):
         compiler = shutil.which('c++')
         self.assertIsNotNone(compiler, 'C++ compiler required')
@@ -39,6 +55,7 @@ int main() {
     assert(ideck_wineprocess_start(nullptr) == EINVAL);
 #ifdef IDECK_NATIVE_MADEIRA_ENABLED
     assert(ideck_wineprocess_thread_finished());
+    assert(ideck_wineprocess_available());
     assert(ideck_wineprocess_start("/prefix") == 0);
     assert(ideck_wineprocess_running());
     assert(!ideck_wineprocess_thread_finished());

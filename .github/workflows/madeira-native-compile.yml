@@ -1,0 +1,135 @@
+name: Madeira native components and static link (no distribution)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [feature/madeira-runtime]
+    paths:
+      - .github/workflows/madeira-native-compile.yml
+
+permissions:
+  contents: read
+
+jobs:
+  compile:
+    name: Compile FEX, Wine ARM64EC, DXMT, D3D12 and link iDeck
+    runs-on: xcode-27
+    timeout-minutes: 300
+    env:
+      IDECK_BUILD_WOW64: '0'
+      IDECK_MADEIRA_REBUILD: '1'
+      IDECK_REQUIRE_MADEIRA: '1'
+      IDECK_ACCEPT_METAL_CONVERTER_LICENSE: '0'
+    steps:
+      - name: Checkout native iDeck sources
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Select Xcode and iPhoneOS SDK
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Install public build prerequisites
+        run: |
+          set -euo pipefail
+          missing=()
+          for tool in cmake ninja meson pkg-config; do
+            command -v "$tool" >/dev/null 2>&1 || missing+=("$tool")
+          done
+          if (( ${#missing[@]} )); then
+            HOMEBREW_NO_AUTO_UPDATE=1 brew install "${missing[@]}"
+          fi
+          bash scripts/ensure_madeira_bison.sh
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-version
+
+      - name: Fetch pinned Madeira with complete submodules and patches
+        run: bash scripts/fetch_madeira_sources.sh
+
+      - name: Restore public LLVM ARM64EC toolchain cache
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            vendor/Madeira/toolchains/llvm-mingw-20260421-ucrt-macos-universal
+            vendor/Madeira/toolchains/llvm-ios-build
+          key: madeira-llvm15-ios-v3-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/prepare_madeira_toolchains.sh', 'scripts/llvm_ios_sdk.py') }}
+
+      - name: Verify real LLVM iOS SDK and compiler headers
+        run: |
+          set -euo pipefail
+          bash scripts/prepare_madeira_toolchains.sh
+          bash scripts/verify_dxmt_llvm.sh
+
+      - name: Compile FEX, Wine, DXMT and Madeira D3D12 from pinned sources
+        run: |
+          set -euo pipefail
+          bash scripts/build_madeira_components.sh
+
+      - name: Compile and audit static Madeira bridges
+        run: |
+          set -euo pipefail
+          bash scripts/link_madeira_native.sh
+          test -s build/madeira-native/libideck_madeira_upstream_bridges.a
+          test -s build/madeira-native/link-flags.txt
+
+      - name: Link unsigned native iDeck Mach-O without distributing converter
+        run: |
+          set -euo pipefail
+          native_link_flags="$(cat build/madeira-native/link-flags.txt)"
+          native_link_flags+=" $(python3 scripts/verify_madeira_bundle.py --linker-flags)"
+          xcodebuild build \
+            -project iDeck.xcodeproj \
+            -scheme iDeck \
+            -configuration Debug \
+            -sdk iphoneos \
+            -destination generic/platform=iOS \
+            -derivedDataPath build \
+            CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO \
+            'IDECK_NATIVE_CFLAGS=-DIDECK_NATIVE_MADEIRA_ENABLED=1' \
+            "IDECK_NATIVE_LINK_FLAGS=$native_link_flags"
+          APP=build/Build/Products/Debug-iphoneos/iDeck.app
+          test -s "$APP/iDeck"
+          python3 - "$APP" <<'PY'
+          import re
+          import subprocess
+          import sys
+          from pathlib import Path
+
+          app = Path(sys.argv[1])
+          images = [app / "iDeck"]
+          if (app / "iDeck.debug.dylib").is_file():
+              images.append(app / "iDeck.debug.dylib")
+          exports = set()
+          for path in images:
+              result = subprocess.run(
+                  ["xcrun", "nm", "-arch", "arm64", "-gU", str(path)],
+                  capture_output=True, text=True, check=True,
+              )
+              exports.update(re.findall(
+                  r"(?m)^.*\s_([A-Za-z][A-Za-z0-9_]*)\s*$", result.stdout
+              ))
+          required = (
+              "ideck_madeira_launch_v1",
+              "fex_initialize",
+              "wineserver_start",
+              "wineserver_is_ready",
+              "wine_process_start",
+              "wine_process_is_running",
+              "winios_post_key",
+              "madeira_get_present_count",
+              "madeira_d3d12_canary_run",
+          )
+          missing = sorted(set(required) - exports)
+          if missing:
+              raise SystemExit("Missing linked native entry points: " + ", ".join(missing))
+          print("Native Mach-O exports verified against real linked sources.")
+          PY
+
+      - name: State limitations explicitly
+        if: success()
+        run: |
+          echo 'Real native FEX/Wine/DXMT/D3D12 sources compiled and linked on macOS.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'This is an unsigned build: no IPA, Metal Shader Converter, native bundle or licensed DLLs were distributed.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Signing, strict staged-bundle verification, JIT and on-device test are NOT verified.' >> "$GITHUB_STEP_SUMMARY"

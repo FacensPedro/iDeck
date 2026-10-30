@@ -12,7 +12,7 @@ HEADERS = (
     'llvm/ADT/Optional.h', 'llvm/ADT/SmallVector.h',
 )
 GENERATED = ('llvm/Config/llvm-config.h', 'llvm/Config/abi-breaking.h',
-             'llvm/IR/Intrinsics.inc')
+             'llvm/IR/IntrinsicEnums.inc', 'llvm/IR/IntrinsicImpl.inc')
 ARCHIVES = ('LLVMCore', 'LLVMSupport', 'LLVMBitReader', 'LLVMBitWriter')
 MARKER = 'ideck-sdk.json'
 

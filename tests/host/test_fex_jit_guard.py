@@ -22,6 +22,13 @@ class FEXJITGuardTests(unittest.TestCase):
         call = FEX.index("fex_initialized = init()", start)
         self.assertLess(guard, call)
 
+    def test_native_fex_availability_requires_static_linkage(self):
+        availability = FEX.split('extern "C" bool ideck_fex_available(void) {', 1)[1].split('\n}', 1)[0]
+        self.assertIn('return &fex_initialize != nullptr;', availability)
+        self.assertIn('return false;', availability)
+        self.assertNotIn('dlsym(', availability)
+        self.assertNotIn('dlsym(', FEX)
+
     def test_launcher_returns_recoverable_errno_without_jit(self):
         self.assertIn("if (!ideck_fex_jit_ready()) return EPERM;", RUNTIME)
         self.assertIn("if (!ideck_wine_jit_pool_ready() && !ideck_jit_debugger_attached()) return EPERM;", RUNTIME)

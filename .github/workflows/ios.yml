@@ -74,8 +74,10 @@ jobs:
           bash -n scripts/ensure_metal_toolchain.sh
           python3 -m unittest discover -s tests/host -p 'test_metal_toolchain.py' -v
 
-      - name: Test native Wine static ABI and missing-symbol rejection
-        run: python3 -m unittest discover -s tests/host -p 'test_wine_static_link.py' -v
+      - name: Test native Wine and graphics static ABI and missing-symbol rejection
+        run: |
+          python3 -m unittest discover -s tests/host -p 'test_wine_static_link.py' -v
+          python3 -m unittest discover -s tests/host -p 'test_madeira_graphics_static_link.py' -v
 
       - name: Test complete LLVM SDK cache restoration
         run: python3 -m unittest discover -s tests/host -p 'test_llvm_ios_sdk.py' -v
@@ -180,8 +182,11 @@ jobs:
       - name: Validate Xcode project source references
         run: python3 -m unittest discover -s tests/host -p 'test_xcode_project.py' -v
 
-      - name: Test native bundle verifier
-        run: python3 -m unittest discover -s tests/host -p 'test_madeira_bundle.py' -v
+      - name: Test native bundle and signed-app validation
+        run: |
+          python3 -m unittest discover -s tests/host -p 'test_madeira_bundle.py' -v
+          python3 -m unittest discover -s tests/host -p 'test_signed_madeira_app.py' -v
+          python3 -m unittest discover -s tests/host -p 'test_madeira_security_entitlements.py' -v
 
       - name: Verify Windows-compatible native payload staging
         run: |
