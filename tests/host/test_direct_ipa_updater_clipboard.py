@@ -26,7 +26,7 @@ class DirectIPAUpdaterAndClipboardTests(unittest.TestCase):
         self.assertNotIn('actionButton(title: tr("Open iDeck releases")', settings)
         self.assertNotIn('No newer iDeck IPA release is available.', settings)
         self.assertNotIn('iPadOS requires a signed IPA installation', settings)
-        self.assertIn('actionButton(title: tr("Update iDeck %@", update.latest ?? "")', settings)
+        self.assertNotIn('actionButton(title: tr("Update iDeck %@", update.latest ?? "")', settings)
         self.assertIn("func installIDeckUpdate()", source)
 
     def test_copy_log_is_one_tap_and_bounded(self):
