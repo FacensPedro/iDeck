@@ -182,8 +182,10 @@ jobs:
       - name: Validate Xcode project source references
         run: python3 -m unittest discover -s tests/host -p 'test_xcode_project.py' -v
 
-      - name: Test native bundle verifier
-        run: python3 -m unittest discover -s tests/host -p 'test_madeira_bundle.py' -v
+      - name: Test native bundle and signed-app validation
+        run: |
+          python3 -m unittest discover -s tests/host -p 'test_madeira_bundle.py' -v
+          python3 -m unittest discover -s tests/host -p 'test_signed_madeira_app.py' -v
 
       - name: Verify Windows-compatible native payload staging
         run: |
