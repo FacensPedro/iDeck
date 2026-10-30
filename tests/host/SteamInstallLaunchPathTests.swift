@@ -44,6 +44,33 @@ struct SteamInstallLaunchPathTests {
         try manager.createSymbolicLink(at: directoryAlias, withDestinationURL: binaryDir)
         assert(check("Alias/SampleGame.exe", executable: true) == nil)
 
+        // Installed-size accounting reads the actual game files, not the
+        // compressed Steam CDN journal or an unrelated symlink destination.
+        let installFolder = root.appendingPathComponent("InstalledGame", isDirectory: true)
+        let contentFolder = installFolder.appendingPathComponent("Content", isDirectory: true)
+        try manager.createDirectory(at: contentFolder, withIntermediateDirectories: true)
+        try Data(repeating: 0x42, count: 8192).write(
+            to: contentFolder.appendingPathComponent("base.dat"))
+        try Data(repeating: 0x51, count: 2048).write(
+            to: installFolder.appendingPathComponent("game.exe"))
+        let externalLink = contentFolder.appendingPathComponent("external.dat")
+        try manager.createSymbolicLink(at: externalLink, withDestinationURL: outside)
+        let nestedAlias = installFolder.appendingPathComponent("Alias")
+        try manager.createSymbolicLink(at: nestedAlias, withDestinationURL: contentFolder)
+        assert(SteamInstallFiles.logicalInstalledSize(at: installFolder) == 10_240)
+        assert(SteamInstallFiles.logicalInstalledSize(at: externalLink) == nil)
+        assert(SteamInstallFiles.logicalInstalledSize(
+            at: installFolder.appendingPathComponent("Missing")) == nil)
+        // A file can contain several GiB of logical game data, independent
+        // of its compressed CDN transfer size or APFS physical allocation.
+        let large = installFolder.appendingPathComponent("large-game.data")
+        assert(manager.createFile(atPath: large.path, contents: Data()))
+        let handle = try FileHandle(forWritingTo: large)
+        handle.truncateFile(atOffset: 4 * 1024 * 1024 * 1024)
+        handle.closeFile()
+        assert(SteamInstallFiles.logicalInstalledSize(at: installFolder) ==
+            4 * 1024 * 1024 * 1024 + 10_240)
+
         print("PASS: Steam launch executable and workingdir paths are case-insensitive, bounded and sandbox-safe")
     }
 }

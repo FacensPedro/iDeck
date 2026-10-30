@@ -3,6 +3,11 @@
 // Madeira Converter Exception: see LICENSE-EXCEPTION.md
 
 import Foundation
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#endif
 
 // Where Madeira's own Steam downloads live, and how one is read and removed
 // (docs/STEAM_LIBRARY.md). Foundation only, so tests/host/check-steam-library.py
@@ -49,6 +54,43 @@ enum SteamInstallFiles {
         guard let state = record(appID: appID, steamApps: steamApps),
               let size = state["SizeOnDisk"]?.string.flatMap({ Int64($0) }), size > 0 else { return nil }
         return size
+    }
+
+    /// Actual logical game-file size. Steam manifests and CDN compressed
+    /// chunk totals are estimates, not a measurement of installed files.
+    /// Only traverse the game's own directory: never count symlink targets,
+    /// external folders, journals or Steam app manifests.
+    nonisolated static func logicalInstalledSize(at folder: URL) -> UInt64? {
+        let fm = FileManager.default
+        var root = stat()
+        guard lstat(folder.path, &root) == 0,
+              (root.st_mode & mode_t(S_IFMT)) == mode_t(S_IFDIR) else { return nil }
+        // Explicit directory traversal avoids platform differences in
+        // DirectoryEnumerator's handling of directory symlinks. Never visit
+        // a target reached through a symbolic link.
+        var directories = [folder]
+        var bytes: UInt64 = 0
+        while let current = directories.popLast() {
+            guard let names = try? fm.contentsOfDirectory(atPath: current.path) else {
+                return nil
+            }
+            for name in names {
+                let entry = current.appendingPathComponent(name)
+                var item = stat()
+                guard lstat(entry.path, &item) == 0 else { return nil }
+                let type = item.st_mode & mode_t(S_IFMT)
+                if type == mode_t(S_IFDIR) {
+                    directories.append(entry)
+                } else if type == mode_t(S_IFREG) {
+                    guard item.st_size >= 0 else { return nil }
+                    let (sum, overflow) = bytes.addingReportingOverflow(UInt64(item.st_size))
+                    if overflow { return nil }
+                    bytes = sum
+                }
+                // Symbolic links and all special file types are omitted.
+            }
+        }
+        return bytes
     }
 
     /// Removes an app's install: its folder under `common`, its record, its

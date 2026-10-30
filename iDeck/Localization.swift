@@ -86,7 +86,7 @@ enum Translations {
             "es": "Los registros pueden contener información personal o de cuenta. Revísalos antes de compartir."
         ],
         "Checking existing files %d%%": ["pt": "Verificando arquivos existentes %d%%", "es": "Verificando archivos existentes %d%%"],
-        "Already on device: %@": ["pt": "Já está no dispositivo: %@", "es": "Ya está en el dispositivo: %@"],
+        "Installed: %@": ["pt": "Instalado: %@", "es": "Instalado: %@"],
         "Reconnect JIT debugger": ["pt": "Reconectar depurador JIT", "es": "Reconectar depurador JIT"],
         "Debugger connection": ["pt": "Conexão do depurador", "es": "Conexión del depurador"],
         "Attached": ["pt": "Conectado", "es": "Conectado"],
@@ -146,7 +146,7 @@ enum Translations {
         "Installed": ["pt": "Instalado", "es": "Instalado"],
         "Windows games": ["pt": "Jogos para Windows", "es": "Juegos para Windows"],
         "Not available for Windows": ["pt": "Não disponível para Windows", "es": "No disponible para Windows"],
-        "Downloading %d%%": ["pt": "Baixando %d%%", "es": "Descargando %d%%"],
+        "Installing %d%%": ["pt": "Instalando %d%%", "es": "Instalando %d%%"],
         "Approx. download size: %@": ["pt": "Tamanho aproximado do download: %@", "es": "Tamaño aproximado de descarga: %@"],
         "Check your Steam account and refresh the library.": ["pt": "Confira sua conta Steam e atualize a biblioteca.", "es": "Comprueba tu cuenta de Steam y actualiza la biblioteca."],
         "Importing Executable...": ["pt": "Importando executável...", "es": "Importando ejecutable..."],

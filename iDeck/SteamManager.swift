@@ -4726,6 +4726,8 @@ final class SteamOwnedGamesModel: ObservableObject {
     @Published private(set) var downloadProgress: [UInt32: SteamDownloadProgress] = [:]
     @Published private(set) var downloadErrors: [UInt32: String] = [:]
     @Published private(set) var installedApps: Set<UInt32> = []
+    @Published private(set) var installedSizes: [UInt32: UInt64] = [:]
+    private var installedSizeScanGeneration = 0
     @Published private(set) var availableDLC: [UInt32: [UInt32]] = [:]
     @Published private(set) var dlcMetadata: [UInt32: SteamAppInfo] = [:]
     @Published private(set) var installedDLC: [UInt32: Set<UInt32>] = [:]
@@ -4962,6 +4964,29 @@ final class SteamOwnedGamesModel: ObservableObject {
             guard filename.hasPrefix("appmanifest_"), filename.hasSuffix(".acf") else { return nil }
             return UInt32(filename.dropFirst("appmanifest_".count).dropLast(4))
         })
+        installedSizes = installedSizes.filter { installedApps.contains($0.key) }
+        installedSizeScanGeneration += 1
+        let generation = installedSizeScanGeneration
+        let appIDs = installedApps
+        Task { [weak self] in
+            let measured = await Task.detached(priority: .utility) {
+                var sizes: [UInt32: UInt64] = [:]
+                for id in appIDs {
+                    guard let folder = SteamInstallFiles.installDirectoryName(
+                        appID: Int(id), steamApps: steamApps) else { continue }
+                    let location = steamApps.appendingPathComponent("common", isDirectory: true)
+                        .appendingPathComponent(folder, isDirectory: true)
+                    if let bytes = SteamInstallFiles.logicalInstalledSize(at: location) {
+                        sizes[id] = bytes
+                    }
+                }
+                return sizes
+            }.value
+            guard let self,
+                  self.installedSizeScanGeneration == generation,
+                  self.installedApps == appIDs else { return }
+            self.installedSizes = measured
+        }
     }
 
     func isInstalled(appID: UInt32, prefixPath: URL) -> Bool {
@@ -4980,6 +5005,7 @@ final class SteamOwnedGamesModel: ObservableObject {
         let steamApps = SteamInstallPaths.steamApps(drive: drive)
         SteamInstallFiles.delete(appID: Int(appID), folderName: app.installDir, steamApps: steamApps)
         installedApps.remove(appID)
+        installedSizes.removeValue(forKey: appID)
         downloadProgress.removeValue(forKey: appID)
         installingApps.remove(appID)
         downloadErrors.removeValue(forKey: appID)
@@ -5050,6 +5076,9 @@ final class SteamOwnedGamesModel: ObservableObject {
             )
             try Task.checkCancellation()
             installedApps.insert(appID)
+            if let measuredSize = downloadProgress[appID]?.installedBytes {
+                installedSizes[appID] = measuredSize
+            }
             downloadErrors[appID] = nil
         } catch {
             let cancelled = Task.isCancelled || error is CancellationError
@@ -5112,6 +5141,9 @@ final class SteamOwnedGamesModel: ObservableObject {
                 progress: { [weak self] progress in self?.downloadProgress[appID] = progress })
             try Task.checkCancellation()
             installedApps.insert(appID)
+            if let measuredSize = downloadProgress[appID]?.installedBytes {
+                installedSizes[appID] = measuredSize
+            }
             refreshInstalledDLC(appID: appID, prefixPath: prefixPath)
         } catch {
             if Task.isCancelled || error is CancellationError {
@@ -5136,6 +5168,8 @@ final class SteamOwnedGamesModel: ObservableObject {
         lastAccountName = nil
         availableDLC.removeAll()
         installedDLC.removeAll()
+        installedSizes.removeAll()
+        installedSizeScanGeneration += 1
         dlcMetadata.removeAll()
         games = []
         errorMessage = nil
