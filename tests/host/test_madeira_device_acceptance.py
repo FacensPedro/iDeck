@@ -83,6 +83,26 @@ class MadeiraDeviceAndCompatibilityTests(unittest.TestCase):
         self.assertFalse(receipt["device_compatibility_proven_automatically"])
         self.assertEqual(receipt["integrity_verified"], receipt["required"])
 
+    def test_iphone_duo_uses_generic_ios_metadata_with_manual_review(self):
+        self.report["device"] = {
+            "model": "iPhone Duo",
+            "os_build": "27.1-test-fixture",
+            "signing_team": "example",
+        }
+        errors, receipt = device.validate(self.report, self.root)
+        self.assertEqual(errors, [])
+        self.assertTrue(receipt["ready_for_human_review"])
+        self.assertFalse(receipt["device_compatibility_proven_automatically"])
+
+    def test_iphone_duo_without_ios_build_is_rejected(self):
+        self.report["device"] = {
+            "model": "iPhone Duo",
+            "os_build": "",
+            "signing_team": "example",
+        }
+        errors, _ = device.validate(self.report, self.root)
+        self.assertTrue(any("iOS/iPadOS build" in issue for issue in errors))
+
     def test_not_run_or_missing_proof_rejects_device_acceptance(self):
         self.report["checks"]["guest_first_launch"]["status"] = "NOT RUN"
         errors, _ = device.validate(self.report, self.root)

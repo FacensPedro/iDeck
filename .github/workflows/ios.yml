@@ -188,6 +188,9 @@ jobs:
       - name: Validate Xcode project source references
         run: python3 -m unittest discover -s tests/host -p 'test_xcode_project.py' -v
 
+      - name: Verify iPhone Duo Metal scenes, compact UI and stage acceptance
+        run: python3 -m unittest discover -s tests/host -p 'test_iphone_duo_layout.py' -v
+
       - name: Verify D3D11-only source, strict bundle and payload tests
         run: |
           python3 -m unittest discover -s tests/host -p 'test_verify_madeira_sources.py' -v
@@ -376,6 +379,7 @@ jobs:
     # the fully native runtime only after the owner explicitly authorizes
     # Metal Shader Converter and third-party redistribution in Actions vars.
     env:
+      IDECK_REQUIRE_IPHONE_DUO_SDK: '1'
       IDECK_NATIVE_BUILD: ${{ ((github.event_name == 'workflow_dispatch' && inputs.require_madeira) || (github.event_name == 'push' && vars.IDECK_NATIVE_DISTRIBUTION_APPROVED == 'true')) && '1' || '0' }}
       IDECK_MADEIRA_GRAPHICS: ${{ github.event_name == 'workflow_dispatch' && inputs.graphics_profile || 'd3d12' }}
       IDECK_ACCEPT_METAL_CONVERTER_LICENSE: ${{ (((github.event_name == 'workflow_dispatch' && inputs.accept_converter_license) || (github.event_name == 'push' && vars.IDECK_NATIVE_DISTRIBUTION_APPROVED == 'true')) && (github.event_name != 'workflow_dispatch' || inputs.graphics_profile == 'd3d12')) && '1' || '0' }}

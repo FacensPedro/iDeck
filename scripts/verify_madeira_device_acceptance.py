@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify integrity of real signed-iPad evidence, not emulate Windows runtime PASS."""
+"""Verify integrity of real signed-iOS-device evidence, not emulate Windows runtime PASS."""
 import argparse
 import hashlib
 import json
@@ -49,7 +49,7 @@ def template(graphics: str, wow64: bool, compatibility: bool) -> dict:
         "profile": {"graphics": graphics, "wow64": wow64, "compatibility": compatibility},
         "build": {"commit": "", "actions_run_url": "",
                   "unsigned_ipa_sha256": "", "signed_ipa_sha256": ""},
-        "device": {"model": "", "ipad_os_build": "", "signing_team": ""},
+        "device": {"model": "", "os_build": "", "signing_team": ""},
         "signed_ipa": "",
         "corresponding_source_url": "",
         "checks": {name: {"status": "NOT RUN", "evidence_file": "", "sha256": ""}
@@ -94,8 +94,9 @@ def validate(report: dict, base: Path) -> tuple[list[str], dict]:
         value = build.get(field, "")
         if not isinstance(value, str) or not SHA_PATTERN.fullmatch(value):
             errors.append(f"missing verified {field} identifier")
-    if not device.get("model") or not device.get("ipad_os_build"):
-        errors.append("missing actual iPad model or iPadOS build")
+    device_os_build = device.get("os_build") or device.get("ipad_os_build")
+    if not device.get("model") or not device_os_build:
+        errors.append("missing actual iPhone/iPad model or iOS/iPadOS build")
     if not device.get("signing_team"):
         errors.append("missing actual signing team identifier")
     source = report.get("corresponding_source_url", "")
@@ -152,7 +153,7 @@ def validate(report: dict, base: Path) -> tuple[list[str], dict]:
                 if not (first.startswith(b"\x89PNG\r\n\x1a\n")
                         or first.startswith(b"\xff\xd8\xff")
                         or first[4:8] == b"ftyp"):
-                    errors.append(f"{name}: attach a PNG, JPEG or MP4 captured on the iPad")
+                    errors.append(f"{name}: attach a PNG, JPEG or MP4 captured on the iOS device")
                     continue
             verified[name] = {"sha256": sha, "bytes": proof.stat().st_size}
         except (OSError, ValueError) as exc:

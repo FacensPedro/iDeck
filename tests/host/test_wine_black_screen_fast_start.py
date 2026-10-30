@@ -29,8 +29,11 @@ class WineBlackScreenAndFastStartupTests(unittest.TestCase):
         self.assertIn("isUserInteractionEnabled = false", RENDERER)
 
     def test_renderer_does_not_fight_guest_drawable_size(self):
-        self.assertIn("metalLayer.drawableSize = CGSize(width: 800, height: 600)", RENDERER)
-        self.assertEqual(RENDERER.count("metalLayer.drawableSize ="), 1)
+        self.assertIn("metalLayer.drawableSize = CGSize(width: 2, height: 2)", RENDERER)
+        self.assertIn("if !layerRegistered {", RENDERER)
+        self.assertIn("host.metalLayer.drawableSize = CGSize(", RENDERER)
+        self.assertEqual(RENDERER.count("host.metalLayer.drawableSize ="), 1)
+        self.assertIn("Do NOT write host.metalLayer.drawableSize here", RENDERER)
         self.assertIn("lastGuestSize = nil", RENDERER)
         self.assertIn("winios_display_mode_changed", RENDERER)
         self.assertIn("let toolbar = min(84.0, max(64.0", RENDERER)
