@@ -21,6 +21,9 @@ int wine_process_thread_finished(void);
 int wine_process_exit_code(void);
 int wine_crash_exit_status(uint32_t *status);
 void winios_post_key(int vk, int down);
+uint64_t madeira_get_present_count(void);
+int madeira_d3d12_canary_run(const char *fixture_dir, const char *dylib_path,
+                             void (*sink)(const char *));
 
 #ifdef __cplusplus
 }
