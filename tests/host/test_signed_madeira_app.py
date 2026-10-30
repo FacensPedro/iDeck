@@ -21,10 +21,14 @@ class SignedMadeiraAppTests(unittest.TestCase):
         self.addCleanup(self.tmp.cleanup)
         self.app = Path(self.tmp.name) / "iDeck.app"
         self.app.mkdir()
-        self.entitlements = dict.fromkeys(module.REQUIRED_ENTITLEMENTS, True)
+        self.entitlements = {
+            **dict.fromkeys(module.REQUIRED_ENTITLEMENTS, True),
+            "application-identifier": "MYTEAMID.com.ideck.ideck",
+        }
         self.profile_entitlements = {
             **self.entitlements,
             "com.apple.developer.team-identifier": "MYTEAMID",
+            "application-identifier": "MYTEAMID.com.ideck.ideck",
         }
         self.profile = {
             "Entitlements": self.profile_entitlements,
@@ -42,6 +46,8 @@ class SignedMadeiraAppTests(unittest.TestCase):
             file = self.app / rel
             file.parent.mkdir(parents=True, exist_ok=True)
             file.write_bytes(b"REAL SIGNATURE TEST INPUT")
+        with (self.app / "Info.plist").open("wb") as stream:
+            plistlib.dump({"CFBundleIdentifier": "com.ideck.ideck"}, stream)
         self.write_manifest()
 
     def write_manifest(self):
@@ -86,6 +92,16 @@ class SignedMadeiraAppTests(unittest.TestCase):
     def test_entitlement_not_authorized_by_profile_is_rejected(self):
         self.profile_entitlements.pop(module.REQUIRED_ENTITLEMENTS[0])
         with self.assertRaisesRegex(ValueError, "does not authorize"):
+            self.run_check()
+
+    def test_wrong_signed_app_identifier_is_rejected(self):
+        self.entitlements["application-identifier"] = "MYTEAMID.other.app"
+        with self.assertRaisesRegex(ValueError, "signature does not identify"):
+            self.run_check()
+
+    def test_wrong_provisioned_app_identifier_is_rejected(self):
+        self.profile_entitlements["application-identifier"] = "MYTEAMID.other.app"
+        with self.assertRaisesRegex(ValueError, "does not authorize app ID"):
             self.run_check()
 
     def test_expired_profile_is_rejected(self):
