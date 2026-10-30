@@ -13,6 +13,7 @@ struct SettingsView: View {
     @AppStorage("showGamePerformanceOverlay") private var showGamePerformanceOverlay = false
     @StateObject private var updater = UpdateChecker()
     @State private var isSteamSignInPresented = false
+    @State private var jitDiagnosticsCopied = false
     @AppStorage(AppLanguage.storageKey) private var appLanguage = AppLanguage.system.rawValue
     
     var body: some View {
@@ -161,6 +162,29 @@ struct SettingsView: View {
                 }
                 Spacer(minLength: 0)
             }
+            Button {
+                copyJITDiagnostics()
+            } label: {
+                HStack {
+                    Image(systemName: "doc.on.doc")
+                    Text(tr("Copy JIT diagnostics"))
+                    Spacer()
+                    if jitDiagnosticsCopied {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(.green)
+                    }
+                }
+                .font(.subheadline)
+                .foregroundColor(.white)
+                .padding(.vertical, 10)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(tr("Copy JIT diagnostics"))
+            if jitDiagnosticsCopied {
+                Text(tr("JIT diagnostics copied to clipboard"))
+                    .font(.caption)
+                    .foregroundColor(.green)
+            }
             if coordinator.isJITEnabled {
                 HStack {
                     Text(tr("Debugger connection")).foregroundColor(.white)
@@ -209,6 +233,35 @@ struct SettingsView: View {
         .padding(.bottom, 2)
     }
     
+    private func copyJITDiagnostics() {
+        let snapshot = ideck_jit_snapshot()
+        let jitPermission = ideck_process_has_jit_permission()
+        let wineValidated = snapshot.wine_pool_prepared &&
+            snapshot.rx_executable && snapshot.rw_writable
+        let values = [
+            "iDeck Madeira Stage 7 — on-device JIT snapshot",
+            "iPadOS version: \(UIDevice.current.systemVersion)",
+            "App version: \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown")",
+            "CS_DEBUGGED permission: \(jitPermission)",
+            "Live debugger attached: \(snapshot.debugger_attached)",
+            "FEX initialized: \(snapshot.fex_initialized)",
+            "FEX initialization in progress: \(snapshot.fex_state_busy)",
+            "Wine pool prepared: \(snapshot.wine_pool_prepared)",
+            "Wine pool inspection busy: \(snapshot.wine_state_busy)",
+            "Wine RX executable and non-writable: \(snapshot.rx_executable)",
+            "Wine RW writable and non-executable: \(snapshot.rw_writable)",
+            "Wine pool mapping validated: \(wineValidated)",
+            "Wine pool size MiB: \(snapshot.wine_pool_mib)",
+            "Wine failure stage: \(snapshot.wine_failure_stage)",
+            "Wine RX failure detail: \(snapshot.wine_failure_rx_detail)",
+            "Wine Mach error: \(snapshot.wine_failure_mach_code)",
+            "JIT guest code execution: NOT TESTED by this snapshot",
+            "StikDebug BRK handler compatibility: NOT PROVEN by debugger attachment"
+        ]
+        UIPasteboard.general.string = values.joined(separator: "\n")
+        jitDiagnosticsCopied = true
+    }
+
     private var languagePicker: some View {
         HStack {
             Text(tr("Language"))
