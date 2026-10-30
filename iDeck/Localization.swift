@@ -55,6 +55,20 @@ func trStatus(_ status: String) -> String {
 
 enum Translations {
     static let table: [String: [String: String]] = [
+
+        "Closing Wine and wineserver...": ["pt": "Encerrando o Wine e o servidor Wine...", "es": "Cerrando Wine y el servidor de Wine..."],
+        "Closing Windows session...": ["pt": "Encerrando a sessão Windows...", "es": "Cerrando la sesión de Windows..."],
+        "Wine did not close": ["pt": "O Wine não foi encerrado", "es": "Wine no se ha cerrado"],
+        "Retry Close": ["pt": "Tentar encerrar novamente", "es": "Reintentar el cierre"],
+        "Keep Waiting": ["pt": "Continuar aguardando", "es": "Seguir esperando"],
+        "Return to Game": ["pt": "Voltar ao jogo", "es": "Volver al juego"],
+        "Close Wine and return to Steam library": ["pt": "Encerrar o Wine e voltar à biblioteca Steam", "es": "Cerrar Wine y volver a la biblioteca de Steam"],
+        "The Windows game has not exited. iDeck cannot safely force-kill an in-process Wine thread without risking an app crash. Try closing the game from its menu or retry Alt+F4.": ["pt": "O jogo Windows não foi encerrado. O iDeck não pode interromper à força uma thread do Wine sem risco de travar o aplicativo. Tente sair pelo menu do jogo ou repetir Alt+F4.", "es": "El juego de Windows no se ha cerrado. iDeck no puede detener por la fuerza un hilo de Wine sin riesgo de bloquear la aplicación. Intenta salir desde el menú del juego o repetir Alt+F4."],
+        "Copy JIT diagnostics": ["pt": "Copiar diagnóstico do JIT", "es": "Copiar diagnóstico de JIT"],
+        "JIT diagnostics copied to clipboard": ["pt": "Diagnóstico do JIT copiado para a área de transferência", "es": "Diagnóstico de JIT copiado al portapapeles"],
+        "Keep child game processes running (experimental)": ["pt": "Manter os processos filhos do jogo em execução (experimental)", "es": "Mantener en ejecución los procesos secundarios del juego (experimental)"],
+        "Use only when a launcher exits after starting its game. This may keep Wine running after the game ends.": ["pt": "Use apenas se o inicializador fechar após abrir o jogo. Isso pode manter o Wine em execução mesmo depois do fim do jogo.", "es": "Úsalo solo si el iniciador se cierra después de abrir el juego. Esto puede mantener Wine en ejecución incluso después de terminar el juego."],
+
         "Share Wine log": ["pt": "Compartilhar log do Wine", "es": "Compartir registro de Wine"],
         "Wine started, but no game frame was detected. The selected executable may require Steam, a different working folder or missing runtime DLLs.": ["pt": "O Wine iniciou, mas nenhum quadro do jogo foi detectado. O executável pode precisar do cliente Steam, de outra pasta de trabalho ou de DLLs ausentes.", "es": "Wine se inició, pero no se detectaron fotogramas del juego. El ejecutable puede necesitar Steam, otra carpeta de trabajo o DLL faltantes."],
         "Wine is still active. Check its log before closing the session.": ["pt": "O Wine continua ativo. Consulte o log antes de encerrar a sessão.", "es": "Wine sigue activo. Consulta el registro antes de cerrar la sesión."],
