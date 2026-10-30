@@ -459,8 +459,8 @@ private struct IDeckTouchGamepadOverlay: View {
         GeometryReader { geometry in
             let width = geometry.size.width
             let height = geometry.size.height
-            let x = Double(right ? pad.rx : pad.lx) / 32767.0
-            let y = -Double(right ? pad.ry : pad.ly) / 32767.0
+            let x = CGFloat(right ? pad.rx : pad.lx) / 32767.0
+            let y = -CGFloat(right ? pad.ry : pad.ly) / 32767.0
             ZStack {
                 Circle().stroke(Color.white.opacity(0.5), lineWidth: 2)
                 Circle().fill(Color.white.opacity(0.65))
