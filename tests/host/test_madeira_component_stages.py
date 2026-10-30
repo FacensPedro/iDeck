@@ -27,9 +27,9 @@ class MadeiraComponentStageTests(unittest.TestCase):
     def test_graphics_build_must_not_run_before_fex_or_wine_gate(self):
         source = COMPONENTS.read_text()
         fex_start = source.index('bash "$MD/build/fex-arm64ec/build.sh"')
-        fex_gate = source.index('if [[ "$STOP_AFTER" == "fex" ]]')
+        fex_gate = source.index('if [[ "$STOP_AFTER" == "fex" ]]', fex_start)
         wine_start = source.index('bash "$MD/build/wineserver/build.sh"')
-        wine_gate = source.index('if [[ "$STOP_AFTER" == "wine" ]]')
+        wine_gate = source.index('if [[ "$STOP_AFTER" == "wine" ]]', wine_start)
         dxmt_build = source.index('bash "$MD/build/dxmt-ios/build.sh"')
         self.assertLess(fex_start, fex_gate)
         self.assertLess(fex_gate, wine_start)
