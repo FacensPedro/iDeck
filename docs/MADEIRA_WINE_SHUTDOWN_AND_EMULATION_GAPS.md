@@ -73,3 +73,32 @@ guaranteed per-game process isolation does not yet exist.
 This is a scoped lifecycle improvement, not a claim that iDeck has
 all Madeira features or can safely force-kill arbitrary hung
 in-process Windows games.
+
+## Second launch gate after a natural Wine exit
+
+A normal guest can exit without the user pressing the Close button. The
+iDeck coordinator now checks before opening Steam, an EXE or another Steam
+game whether the previous guest thread has actually completed and whether
+the pinned in-process wineserver is still running. If either is active,
+launch is refused **before** JIT/prefix/Metal preparation. When both are
+quiescent, it invokes `ideck_runtime_complete_session()` to release the
+native launch gate and all per-game `MADEIRA_*` environment values, even if
+the app never entered the explicit Closing state. A failure to acquire
+that native release gate also blocks relaunch, rather than overlapping two
+Wine threads in the same iDeck process.
+
+The pinned Madeira `WineProcessBridge.m` supplies
+`wine_process_thread_finished` through the pinned restart patch.
+Its only existing supported guest close interface for iDeck is the
+normal Windows Alt+F4 key queue. A search of the pinned upstream found no
+`wine_process_abort`, `wine_process_request_close` or equivalent
+cooperative emergency shutdown that can be called safely while the guest
+thread continues executing. Therefore this PR does **not** add a fake
+force-kill option, detach the active Metal layer, call `pthread_cancel`,
+or stop wineserver while Wine still runs. Games that ignore Alt+F4 remain
+a documented limitation and require a separate upstream-safe abort API.
+
+The host regression verifies gate order and native release invariants, not
+two actual Windows processes on an iOS device. Two genuine guest launches
+and a stuck-game recovery remain **NOT RUN** until exercised with a
+signed Madeira-native IPA and the JIT debugger on real hardware.
