@@ -8,6 +8,11 @@ on:
         type: boolean
         required: false
         default: true
+      graphics_profile:
+        description: "Native renderer: D3D11-only does not redistribute the Apple Metal Shader Converter"
+        type: choice
+        options: [d3d11, d3d12]
+        default: d3d11
       accept_converter_license:
         description: "I have reviewed the Metal Shader Converter terms and have permission to package the converter in this IPA"
         type: boolean
@@ -17,7 +22,7 @@ on:
         description: "Bundle WoW64 (i386 FEX and Wine) in the native IPA (enabled by default; disable only for 64-bit-only builds)"
         type: boolean
         required: false
-        default: true
+        default: false
       bundle_wine_mono:
         description: "Include Wine Mono for compatible .NET Framework applications"
         type: boolean
@@ -181,6 +186,12 @@ jobs:
 
       - name: Validate Xcode project source references
         run: python3 -m unittest discover -s tests/host -p 'test_xcode_project.py' -v
+
+      - name: Verify D3D11-only source, strict bundle and payload tests
+        run: |
+          python3 -m unittest discover -s tests/host -p 'test_verify_madeira_sources.py' -v
+          python3 -m unittest discover -s tests/host -p 'test_madeira_d3d11_profile.py' -v
+          python3 -m unittest discover -s tests/host -p 'test_madeira_payload_staging.py' -v
 
       - name: Test native bundle and signed-app validation
         run: |
@@ -350,12 +361,14 @@ jobs:
     outputs:
       ipa_kind: ${{ steps.detect_ipa_kind.outputs.kind }}
       ipa_artifact_url: ${{ steps.ipa_artifact.outputs.artifact-url }}
+      graphics_backend: ${{ steps.detect_ipa_kind.outputs.graphics_backend }}
     # Untrusted PRs build the interface only. Main and release tags build
     # the fully native runtime only after the owner explicitly authorizes
     # Metal Shader Converter and third-party redistribution in Actions vars.
     env:
       IDECK_NATIVE_BUILD: ${{ ((github.event_name == 'workflow_dispatch' && inputs.require_madeira) || (github.event_name == 'push' && vars.IDECK_NATIVE_DISTRIBUTION_APPROVED == 'true')) && '1' || '0' }}
-      IDECK_ACCEPT_METAL_CONVERTER_LICENSE: ${{ ((github.event_name == 'workflow_dispatch' && inputs.accept_converter_license) || (github.event_name == 'push' && vars.IDECK_NATIVE_DISTRIBUTION_APPROVED == 'true')) && '1' || '0' }}
+      IDECK_MADEIRA_GRAPHICS: ${{ github.event_name == 'workflow_dispatch' && inputs.graphics_profile || 'd3d12' }}
+      IDECK_ACCEPT_METAL_CONVERTER_LICENSE: ${{ (((github.event_name == 'workflow_dispatch' && inputs.accept_converter_license) || (github.event_name == 'push' && vars.IDECK_NATIVE_DISTRIBUTION_APPROVED == 'true')) && (github.event_name != 'workflow_dispatch' || inputs.graphics_profile == 'd3d12')) && '1' || '0' }}
 
     steps:
       - name: Checkout
@@ -374,7 +387,7 @@ jobs:
           CONVERTER_LICENSE_ACK: ${{ env.IDECK_ACCEPT_METAL_CONVERTER_LICENSE }}
         run: |
           set -euo pipefail
-          if [[ "$CONVERTER_LICENSE_ACK" != "1" ]]; then
+          if [[ "$IDECK_MADEIRA_GRAPHICS" == "d3d12" && "$CONVERTER_LICENSE_ACK" != "1" ]]; then
             echo "::error::Native build requires reviewing the Apple Metal Shader Converter license and explicitly confirming permission to package the converter."
             exit 2
           fi
@@ -386,12 +399,12 @@ jobs:
             build/Build/Intermediates.noindex
             build/Build/Products
             build/ModuleCache.noindex
-          key: ideck-xcode-v2-${{ runner.os }}-${{ runner.arch }}-${{ env.IDECK_NATIVE_BUILD }}-${{ hashFiles('iDeck.xcodeproj/project.pbxproj', 'iDeck/**/*.swift', 'iDeck/**/*.m', 'iDeck/**/*.mm', 'iDeck/**/*.c', 'iDeck/**/*.cpp', 'iDeck/**/*.h', 'scripts/link_madeira_native.sh', 'patches/**') }}
+          key: ideck-xcode-v3-${{ runner.os }}-${{ runner.arch }}-${{ env.IDECK_NATIVE_BUILD }}-${{ env.IDECK_MADEIRA_GRAPHICS }}-${{ hashFiles('iDeck.xcodeproj/project.pbxproj', 'iDeck/**/*.swift', 'iDeck/**/*.m', 'iDeck/**/*.mm', 'iDeck/**/*.c', 'iDeck/**/*.cpp', 'iDeck/**/*.h', 'scripts/link_madeira_native.sh', 'patches/**') }}
           restore-keys: |
-            ideck-xcode-v2-${{ runner.os }}-${{ runner.arch }}-${{ env.IDECK_NATIVE_BUILD }}-
+            ideck-xcode-v3-${{ runner.os }}-${{ runner.arch }}-${{ env.IDECK_NATIVE_BUILD }}-${{ env.IDECK_MADEIRA_GRAPHICS }}-
 
       - name: Restore previously compiled Madeira runtime
-        if: ${{ env.IDECK_NATIVE_BUILD == '1' }}
+        if: ${{ env.IDECK_NATIVE_BUILD == '1' && env.IDECK_MADEIRA_GRAPHICS == 'd3d12' }}
         uses: actions/cache@v5
         with:
           path: build/native-cache
@@ -405,6 +418,11 @@ jobs:
           IDECK_BUNDLE_WINE_MONO: ${{ inputs.bundle_wine_mono && '1' || '0' }}
         run: |
           set -euo pipefail
+          if [[ "$IDECK_MADEIRA_GRAPHICS" == "d3d11" ]]; then
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo 'D3D11-only native builds require the pinned public source tree.'
+            exit 0
+          fi
           OPTIONS=()
           if [[ "$IDECK_BUILD_WOW64" == "1" ]]; then OPTIONS+=(--wow64); fi
           if [[ "$IDECK_BUNDLE_WINE_MONO" == "1" ]]; then OPTIONS+=(--mono); fi
@@ -506,7 +524,9 @@ jobs:
           IDECK_ACCEPT_METAL_CONVERTER_LICENSE: ${{ env.IDECK_ACCEPT_METAL_CONVERTER_LICENSE }}
           IDECK_BUILD_WOW64: ${{ (github.event_name != 'workflow_dispatch' || inputs.build_wow64) && '1' || '0' }}
           IDECK_BUNDLE_WINE_MONO: ${{ inputs.bundle_wine_mono && '1' || '0' }}
-          IDECK_PREBUILT_EXPORT: '1'
+          IDECK_PREBUILT_EXPORT: ${{ env.IDECK_MADEIRA_GRAPHICS == 'd3d11' && '0' || '1' }}
+          IDECK_PREBUILT_MODE: ${{ env.IDECK_MADEIRA_GRAPHICS == 'd3d11' && 'off' || 'prefer' }}
+          IDECK_MADEIRA_GRAPHICS: ${{ env.IDECK_MADEIRA_GRAPHICS }}
           IDECK_CONFIGURATION: ${{ env.IDECK_NATIVE_BUILD == '1' && 'Debug' || 'Release' }}
         run: |
           set -o pipefail
