@@ -17,6 +17,12 @@ on:
       - scripts/inspect_windows_game_pe.py
       - tests/host/test_apple_msc_beta3.py
       - tests/host/test_madeira_device_acceptance.py
+      - scripts/build_madeira_device_probes.sh
+      - tests/device/ideck_guest_smoke.c
+      - tests/device/ideck_d3d11_frame_probe.cpp
+      - scripts/build_madeira_device_probes.sh
+      - tests/device/ideck_guest_smoke.c
+      - tests/device/ideck_d3d11_frame_probe.cpp
       - scripts/verify_madeira_bundle.py
       - scripts/stage_madeira_payload.sh
       - scripts/build_ipa.sh
@@ -67,6 +73,7 @@ jobs:
           bash -n scripts/build_native_runtime.sh
           bash -n scripts/build_ipa.sh
           bash -n scripts/stage_madeira_payload.sh
+          bash -n scripts/build_madeira_device_probes.sh
           python3 scripts/verify_madeira_device_acceptance.py --write-template /tmp/madeira-stage8-11-NOT-RUN.json --graphics d3d12 --wow64
           python3 - <<'PY'
           import json
@@ -163,6 +170,22 @@ jobs:
                   raise SystemExit(error)
           print("PASS: real public ARM64EC D3D12 PE files; no iOS converter, no IPA.")
           PY
+      - name: Build Windows guest and D3D11 first-frame probes for actual iPad execution
+        run: |
+          set -euo pipefail
+          bash scripts/build_madeira_device_probes.sh
+
+      - name: Publish original Windows guest and D3D11 probe executables
+        if: success()
+        uses: actions/upload-artifact@v7
+        with:
+          name: Madeira-original-PE32-x64-guest-probes
+          path: |
+            build/madeira-device-probes/*.exe
+            build/madeira-device-probes/*.json
+          retention-days: 7
+          if-no-files-found: error
+
       - name: Publish verified optional WoW64 IPA directly
         if: success() && inputs.native_profile == 'd3d11-wow64'
         uses: actions/upload-artifact@v7
