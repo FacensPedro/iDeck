@@ -90,7 +90,7 @@ class MadeiraD3D11ProfileTests(unittest.TestCase):
 
     def test_d3d11_fails_if_converter_exists_anywhere_in_app(self):
         nested = self.app / "Resources/Unused/libmetalirconverter.dylib"
-        nested.parent.mkdir()
+        nested.parent.mkdir(parents=True)
         nested.write_bytes(b"proprietary")
         self.assertTrue(any("Apple converter" in error for error in self.inspect()))
 
