@@ -22,7 +22,7 @@ class AutomaticJITAndDownloadHUDTests(unittest.TestCase):
         self.assertNotIn('Text(tr("Wine JIT pool"))', SETTINGS)
 
     def test_updates_settings_hide_unnecessary_release_messages(self):
-        self.assertIn('actionButton(title: tr("Update iDeck %@", update.latest ?? "")', SETTINGS)
+        self.assertNotIn('actionButton(title: tr("Update iDeck %@", update.latest ?? "")', SETTINGS)
         for literal in (
             'actionButton(title: tr("Open iDeck releases")',
             "No newer iDeck IPA release is available.",
