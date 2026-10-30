@@ -65,29 +65,32 @@ enum SteamInstallFiles {
         var root = stat()
         guard lstat(folder.path, &root) == 0,
               (root.st_mode & mode_t(S_IFMT)) == mode_t(S_IFDIR) else { return nil }
-        var hadError = false
-        guard let files = fm.enumerator(
-            at: folder,
-            includingPropertiesForKeys: nil,
-            options: [],
-            errorHandler: { _, _ in hadError = true; return false }
-        ) else { return nil }
+        // Explicit directory traversal avoids platform differences in
+        // DirectoryEnumerator's handling of directory symlinks. Never visit
+        // a target reached through a symbolic link.
+        var directories = [folder]
         var bytes: UInt64 = 0
-        for case let url as URL in files {
-            var item = stat()
-            guard lstat(url.path, &item) == 0 else { hadError = true; break }
-            let type = item.st_mode & mode_t(S_IFMT)
-            if type == mode_t(S_IFLNK) {
-                files.skipDescendants()
-                continue
+        while let current = directories.popLast() {
+            guard let names = try? fm.contentsOfDirectory(atPath: current.path) else {
+                return nil
             }
-            guard type == mode_t(S_IFREG) else { continue }
-            guard item.st_size >= 0 else { hadError = true; break }
-            let (sum, overflow) = bytes.addingReportingOverflow(UInt64(item.st_size))
-            if overflow { return nil }
-            bytes = sum
+            for name in names {
+                let entry = current.appendingPathComponent(name)
+                var item = stat()
+                guard lstat(entry.path, &item) == 0 else { return nil }
+                let type = item.st_mode & mode_t(S_IFMT)
+                if type == mode_t(S_IFDIR) {
+                    directories.append(entry)
+                } else if type == mode_t(S_IFREG) {
+                    guard item.st_size >= 0 else { return nil }
+                    let (sum, overflow) = bytes.addingReportingOverflow(UInt64(item.st_size))
+                    if overflow { return nil }
+                    bytes = sum
+                }
+                // Symbolic links and all special file types are omitted.
+            }
         }
-        return hadError ? nil : bytes
+        return bytes
     }
 
     /// Removes an app's install: its folder under `common`, its record, its
