@@ -159,7 +159,7 @@ struct WindowsRendererView: UIViewRepresentable {
         let touchEnabled = getenv("IDECK_TOUCH_CONTROLS_ACTIVE").map {
             String(cString: $0) == "1"
         } ?? false
-        let controlsHeight = touchEnabled ? min(180.0, max(112.0, frame.height * 0.29)) : 0
+        let controlsHeight = touchEnabled ? min(190.0, max(160.0, frame.height * 0.38)) : 0
         let positioned = CGRect(x: frame.minX, y: frame.minY + toolbar,
                                 width: frame.width,
                                 height: max(1, frame.height - toolbar - controlsHeight))
