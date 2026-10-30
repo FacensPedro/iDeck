@@ -6,6 +6,16 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 SDK_VERSION="$(xcrun --sdk iphoneos --show-sdk-version)"
 [[ "${SDK_VERSION%%.*}" -ge 27 ]] || { echo "ERROR: iDeck requires the iOS 27 SDK or newer." >&2; exit 2; }
+if [[ "${IDECK_REQUIRE_IPHONE_DUO_SDK:-0}" == "1" ]]; then
+  SDK_MAJOR="${SDK_VERSION%%.*}"
+  SDK_MINOR="${SDK_VERSION#*.}"
+  [[ "$SDK_MINOR" == "$SDK_VERSION" ]] && SDK_MINOR=0
+  SDK_MINOR="${SDK_MINOR%%.*}"
+  if (( SDK_MAJOR < 27 || (SDK_MAJOR == 27 && SDK_MINOR < 1) )); then
+    echo "ERROR: iPhone Duo full-display layout requires Xcode with the iOS 27.1 SDK or newer." >&2
+    exit 2
+  fi
+fi
 BUILD_DIR="build"
 # Keep restored Xcode intermediates and products; the ephemeral Actions runner
 # starts clean unless its exact-revision cache was restored.
