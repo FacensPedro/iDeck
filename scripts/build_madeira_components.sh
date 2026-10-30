@@ -123,6 +123,7 @@ if [[ "$REBUILD" == "1" ]]; then
                 "$MD/app/Madeira/arm64ec-windows/xtajit64.dll"; do
       [[ -s "$file" ]] || { echo "ERROR: required FEX output not compiled: $file" >&2; exit 2; }
     done
+    python3 "$ROOT/scripts/verify_madeira_component_outputs.py" --root "$MD" --stage fex
     echo "PASS: public FEX iPhoneOS ARM64 and ARM64EC JIT artifacts compiled; Wine/DXMT not yet validated."
     exit 0
   fi
@@ -178,6 +179,7 @@ if [[ "$REBUILD" == "1" ]]; then
                 "$MD/app/Madeira/arm64ec-windows/xtajit64.dll"; do
       [[ -s "$file" ]] || { echo "ERROR: required Wine ARM64EC output not compiled: $file" >&2; exit 2; }
     done
+    python3 "$ROOT/scripts/verify_madeira_component_outputs.py" --root "$MD" --stage wine
     echo "PASS: public FEX and Wine Unix/wineserver/ARM64EC artifacts compiled; DXMT not yet validated."
     exit 0
   fi
@@ -336,5 +338,6 @@ if [[ "${IDECK_BUILD_WOW64:-1}" == "1" ]]; then
   done
 fi
 
+python3 "$ROOT/scripts/verify_madeira_component_outputs.py" --root "$MD" --stage dxmt
 echo "Madeira FEX/Wine ARM64EC/DXMT native inputs are present (graphics: $GRAPHICS)."
 echo "Next: build the upstream host bridge and link the iDeck app."
