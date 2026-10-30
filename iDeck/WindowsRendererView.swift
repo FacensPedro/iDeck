@@ -64,7 +64,10 @@ struct WindowsRendererView: UIViewRepresentable {
     }
 
     static var isReadyForFrames: Bool {
-        guard isNativeDisplayLinked,
+        // A hosted UIView is not a usable native renderer until Madeira
+        // has received the actual persistent CAMetalLayer pointer. Starting
+        // Wine sooner may create its first swapchain against a null layer.
+        guard isNativeDisplayLinked, layerRegistered,
               let view = activeViewport,
               let window = view.window else { return false }
         let host = MadeiraWindowMetalHost.shared
