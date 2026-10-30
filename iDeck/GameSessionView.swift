@@ -186,7 +186,25 @@ struct GameSessionView: View {
                     }
                     .disabled(coordinator.isClosingWindowsSession)
                     .accessibilityLabel(tr("Close Wine and return to Steam library"))
-                    Spacer()
+                    // The Metal layer sits directly over the SwiftUI content
+                    // outside this top strip. Keep first-frame failures and
+                    // shutdown progress VISIBLE even when the drawable is black.
+                    if coordinator.isClosingWindowsSession {
+                        Text(tr("Closing Wine and wineserver..."))
+                            .foregroundColor(.white)
+                            .font(.caption.weight(.semibold))
+                            .lineLimit(2)
+                    } else if !metrics.receivedNewFrames &&
+                              (coordinator.windowsStatus == "Wine started; waiting for game..." ||
+                               coordinator.windowsStatus == "Running") {
+                        Text(tr(metrics.secondsSinceLaunch >= 20
+                            ? "No Windows game frame detected. Check the Wine log."
+                            : "Waiting for the first Windows game frame..."))
+                            .foregroundColor(metrics.secondsSinceLaunch >= 20 ? .yellow : .white)
+                            .font(.caption2.weight(.semibold))
+                            .lineLimit(2)
+                    }
+                    Spacer(minLength: 4)
                     if hasWineProblem && wineLogURL != nil {
                         Button(action: copyWineLog) {
                             Image(systemName: "doc.on.doc.fill")
