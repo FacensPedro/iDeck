@@ -1,0 +1,209 @@
+name: Madeira Stage 5 - DXMT D3D11 native Metal and ARM64EC
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [feature/madeira-dxmt-stage5-20261030]
+    paths:
+      - .github/workflows/madeira-dxmt-stage5.yml
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/madeira-dxmt-stage5.yml
+      - scripts/build_madeira_components.sh
+      - scripts/verify_madeira_dxmt_stage5.py
+      - scripts/verify_madeira_component_outputs.py
+      - tests/host/test_madeira_dxmt_stage5.py
+
+permissions:
+  contents: read
+
+concurrency:
+  group: madeira-stage5-dxmt-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  host:
+    name: Check DXMT Metal and D3D11 architecture gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout iDeck
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Validate Stage 5 DXMT shader and frontend gates
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests/host -p 'test_madeira_dxmt_stage5.py' -v
+          python3 -m unittest discover -s tests/host -p 'test_madeira_wine_stage4.py' -v
+          python3 -m unittest discover -s tests/host -p 'test_madeira_component_outputs.py' -v
+          python3 -m unittest discover -s tests/host -p 'test_madeira_component_stages.py' -v
+          python3 -m unittest discover -s tests/host -p 'test_madeira_fex_stage3.py' -v
+          bash -n scripts/build_madeira_components.sh
+          bash -n scripts/prepare_madeira_dependencies.sh
+
+  wine:
+    name: Build DXMT iPhoneOS Metal and real D3D11 ARM64EC frontends
+    needs: host
+    if: github.event_name != 'pull_request'
+    runs-on: xcode-27
+    timeout-minutes: 300
+    env:
+      IDECK_MADEIRA_GRAPHICS: d3d11
+      IDECK_BUILD_WOW64: '0'
+      IDECK_MADEIRA_STOP_AFTER: dxmt
+      IDECK_MADEIRA_REBUILD: '1'
+      IDECK_ACCEPT_METAL_CONVERTER_LICENSE: '0'
+      IDECK_LLVM_JOBS: '3'
+      IDECK_LLVM_REF: llvmorg-15.0.7
+      IDECK_PREBUILT_MODE: off
+      IDECK_MADEIRA_REV: fd9f2f3d0434a4116e4c3351f286a0fc376b4e36
+    steps:
+      - name: Checkout pinned public iDeck source
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Select iPhoneOS SDK
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Install public compiler prerequisites and optional Apple Metal command-line compiler
+        run: |
+          set -euo pipefail
+          packages=()
+          for tool in cmake ninja meson pkg-config; do
+            command -v "$tool" >/dev/null 2>&1 || packages+=("$tool")
+          done
+          if (( ${#packages[@]} )); then
+            HOMEBREW_NO_AUTO_UPDATE=1 brew install "${packages[@]}"
+          fi
+          bash scripts/ensure_madeira_bison.sh
+          bash scripts/ensure_metal_toolchain.sh
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-version
+          df -h .
+
+      - name: Fetch published Madeira Wine 11.4 fork and source backports
+        run: |
+          set -euo pipefail
+          bash scripts/fetch_madeira_sources.sh
+          python3 scripts/verify_madeira_sources.py \
+            --root vendor/Madeira --revision "$IDECK_MADEIRA_REV"
+
+      - name: Restore tested phase-2 LLVM and ARM64EC compilers
+        id: llvm
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            vendor/Madeira/toolchains/llvm-mingw-20260421-ucrt-macos-universal
+            vendor/Madeira/toolchains/llvm-ios-build
+          key: madeira-llvm15-ios-v3-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/prepare_madeira_toolchains.sh', 'scripts/llvm_ios_sdk.py') }}
+
+      - name: Require genuine iPhoneOS and ARM64EC compilers
+        run: |
+          set -euo pipefail
+          bash scripts/prepare_madeira_toolchains.sh
+          bash scripts/verify_madeira_toolchains.sh
+
+      - name: Save proven public cross-compiler cache if rebuilt
+        if: ${{ steps.llvm.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v5
+        with:
+          path: |
+            vendor/Madeira/toolchains/llvm-mingw-20260421-ucrt-macos-universal
+            vendor/Madeira/toolchains/llvm-ios-build
+          key: ${{ steps.llvm.outputs.cache-primary-key }}
+
+      - name: Restore pinned Wine crypto media and font dependencies
+        id: deps
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            vendor/Madeira/toolchains/gnutls-ios
+            vendor/Madeira/toolchains/ffmpeg-ios
+            vendor/Madeira/build/freetype-ios/build
+            vendor/Madeira/research/freetype
+          key: madeira-ios-deps-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/prepare_madeira_dependencies.sh') }}
+
+      - name: Verify real Wine Unix prerequisites
+        run: |
+          set -euo pipefail
+          bash scripts/prepare_madeira_dependencies.sh vendor/Madeira
+          bash scripts/verify_madeira_toolchains.sh --require-deps
+
+      - name: Compile real FEX Wine and DXMT D3D11 source without D3D12
+        run: |
+          set -euo pipefail
+          bash scripts/build_madeira_components.sh 2>&1 | tee dxmt-stage5-build.log
+
+      - name: Validate real DXMT iOS/ARM64EC graphics libraries and source-generated Metal shaders
+        run: |
+          set -euo pipefail
+          python3 scripts/verify_madeira_dxmt_stage5.py \
+            --root vendor/Madeira \
+            --revision "$IDECK_MADEIRA_REV" \
+            --receipt dxmt-stage5-receipt.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          data = json.loads(Path("dxmt-stage5-receipt.json").read_text(encoding="utf-8"))
+          if data.get("stage") != 5 or data.get("validated") is not True:
+              raise SystemExit("DXMT stage 5 failed validation")
+          if data.get("profile") != "d3d11-x86_64-only" or data.get("backend") != "dxmt-d3d11-metal":
+              raise SystemExit("DXMT stage 5 has unexpected profile")
+          if len(data.get("artifact_hashes", {})) != 9:
+              raise SystemExit("Expected 9 distinct real DXMT D3D11 native artifacts")
+          print("PASS: all genuine DXMT D3D11 iOS ARM64 and ARM64EC artifacts verified.")
+          PY
+
+      - name: Publish verified DXMT and both Windows PE frontend architectures
+        uses: actions/upload-artifact@v7
+        with:
+          name: Madeira-Stage5-DXMT-D3D11-native
+          path: |
+            vendor/Madeira/app/Madeira/libdxmt_combined.a
+            vendor/Madeira/app/Madeira/aarch64-windows/d3d11.dll
+            vendor/Madeira/app/Madeira/aarch64-windows/dxgi.dll
+            vendor/Madeira/app/Madeira/aarch64-windows/d3d10core.dll
+            vendor/Madeira/app/Madeira/aarch64-windows/winemetal.dll
+            vendor/Madeira/app/Madeira/arm64ec-windows/d3d11.dll
+            vendor/Madeira/app/Madeira/arm64ec-windows/dxgi.dll
+            vendor/Madeira/app/Madeira/arm64ec-windows/d3d10core.dll
+            vendor/Madeira/app/Madeira/arm64ec-windows/winemetal.dll
+            vendor/Madeira/build/dxmt-ios/shader-headers/*.air
+            vendor/Madeira/build/dxmt-ios/shader-headers/*.h
+            dxmt-stage5-receipt.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Publish compiler diagnostics even when build fails
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: Madeira-Stage5-DXMT-diagnostics
+          path: |
+            dxmt-stage5-build.log
+            vendor/Madeira/build/dxmt-ios/build-ideck.log
+            vendor/Madeira/build/dxmt-ios/obj/*.err
+            vendor/Madeira/dxmt/build-arm64ec/meson-logs/meson-log.txt
+            vendor/Madeira/dxmt/build-pe/meson-logs/meson-log.txt
+            vendor/Madeira/wine/build-arm64ec/config.log
+            vendor/Madeira/build/ntdll-unix/build-ideck.log
+            vendor/Madeira/build/ntdll-unix/obj/*.err
+            vendor/Madeira/build/wineserver/obj/err-*.txt
+            vendor/Madeira/wine/build-macos/config.log
+            vendor/Madeira/FEX/build-ios/CMakeFiles/CMakeConfigureLog.yaml
+            vendor/Madeira/FEX/build-arm64ec/CMakeFiles/CMakeConfigureLog.yaml
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Record exact Stage 5 limitations
+        if: success()
+        run: |
+          echo '### Stage 5 passed: DXMT/D3D11 source compilation and ARM64EC frontend validation' >> "$GITHUB_STEP_SUMMARY"
+          echo 'DXMT iOS ARM64 static library, macOS Metal AIR shader inputs and ARM64/ARM64EC D3D11/DXGI frontends compiled and passed architecture gates.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Nine DXMT artifacts and generated shader inputs were uploaded with SHA-256 receipt. No Apple Metal Shader Converter or D3D12 frontend included.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'NOT verified: final IPA link, guest first frame, on-device JIT, audio, input or Wine runtime lifecycle.' >> "$GITHUB_STEP_SUMMARY"
