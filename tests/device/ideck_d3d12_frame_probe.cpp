@@ -4,6 +4,32 @@
 #include <dxgi1_4.h>
 #include <cstdio>
 
+static void write_guest_frame_receipt(const char *api, unsigned int frames,
+                                      unsigned long hresult, int status) {
+    char directory[MAX_PATH] = {};
+    char filename[MAX_PATH] = {};
+    DWORD used = GetTempPathA(MAX_PATH, directory);
+    if (!used || used >= MAX_PATH ||
+        std::snprintf(filename, sizeof(filename),
+            "%sideck-guest-%s-frame.log", directory, api) >= (int)sizeof(filename))
+        return;
+    FILE *file = std::fopen(filename, "wb");
+    if (!file) return;
+    if (status == 0 && frames > 0) {
+        if (api[4] == '1') {
+            std::fprintf(file, "ideck-d3d11-frame-probe: presents=%u hr=0x%08lx\r\n",
+                         frames, hresult);
+        } else {
+            std::fprintf(file, "ideck-d3d12-frame-probe: presents=%u hr=0x%08lx exit=%d\r\n",
+                         frames, hresult, status);
+        }
+    } else {
+        std::fprintf(file, "ideck-%s-frame-failure: presents=%u hr=0x%08lx exit=%d\r\n",
+                     api, frames, hresult, status);
+    }
+    std::fclose(file);
+}
+
 static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM w, LPARAM l) {
     if (message == WM_DESTROY) {
         PostQuitMessage(0);
@@ -144,6 +170,7 @@ static int run(HWND window) {
     status = 0;
 
 cleanup:
+    write_guest_frame_receipt("d3d12", frames, (unsigned long)hr, status);
     std::printf("ideck-d3d12-frame-probe: presents=%u hr=0x%08lx exit=%d\n",
                 frames, (unsigned long)hr, status);
     std::fflush(stdout);
