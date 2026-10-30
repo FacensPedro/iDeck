@@ -9,8 +9,13 @@ final class WineInputBridge {
     }
 
     func stopBridging() {
-        // Native lifecycle cleanup is performed after Wine and wineserver
-        // actually exit. The controller discovery bridge may now be stopped.
+        // The SwiftUI session view can disappear on rotation, navigation
+        // or backgrounding while the guest and its wineserver still run.
+        // controller_stop also removes native XInput/HID devices; only the
+        // completed runtime session may perform that cleanup.
+        guard !ideck_wineprocess_running(),
+              !ideck_wineserver_running(),
+              ideck_wineprocess_thread_finished() else { return }
         ideck_controller_stop()
     }
 }
