@@ -619,8 +619,11 @@ class SystemCoordinator: ObservableObject {
                         ) { [weak self] result in
                             DispatchQueue.main.async {
                                 guard let self, self.windowsStatus == "Launching Windows app..." else { return }
+                                // A live Wine loader thread is not a rendered
+                                // Windows game. Wait for a real Metal present
+                                // before the game UI reports Running.
                                 self.setWindowsStatus(result == 0 && ideck_wineprocess_running()
-                                    ? "Running" : self.nativeLaunchFailure(result))
+                                    ? "Wine started; waiting for game..." : self.nativeLaunchFailure(result))
                             }
                         }
                     }
