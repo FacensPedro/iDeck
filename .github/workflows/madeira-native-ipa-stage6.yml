@@ -6,6 +6,10 @@ on:
     branches: [feature/madeira-native-ipa-stage6-20261030]
     paths:
       - .github/workflows/madeira-native-ipa-stage6.yml
+      - scripts/verify_madeira_stage6_ipa.py
+      - tests/host/test_madeira_stage6_ipa.py
+      - scripts/build_ipa.sh
+      - scripts/link_madeira_native.sh
   pull_request:
     branches: [main]
     paths:
