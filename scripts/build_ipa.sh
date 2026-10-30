@@ -172,6 +172,12 @@ fi
 # symlink/executable-bit preservation; do not duplicate the native app as
 # a temporary Payload tree or recompress PNG/ZIP/GZ assets.
 python3 scripts/package_ipa.py --app "$APP" --output iDeck.ipa
+if [[ "${IDECK_REQUIRE_MADEIRA:-0}" == "1" && "${IDECK_MADEIRA_GRAPHICS:-d3d11}" == "d3d12" && -n "${IDECK_MSC_PKG:-}" ]]; then
+  python3 scripts/verify_apple_msc_beta3_bundle.py \
+    --source "${IDECK_MADEIRA_ROOT:-$(pwd)/vendor/Madeira}/app/Madeira" \
+    --app "$APP" \
+    --ipa iDeck.ipa
+fi
 if [[ "${IDECK_REQUIRE_MADEIRA:-0}" == "1" ]]; then
   python3 - <<'PY'
 import stat
