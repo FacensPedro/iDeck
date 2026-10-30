@@ -64,6 +64,14 @@ class MadeiraPayloadStagingTests(unittest.TestCase):
             (converter / name).write_bytes(b"DXIL-test")
 
     def test_d3d11_stages_without_redistributing_converter_or_d3d12(self):
+        # A clean upstream Wine farm may already contain 32-bit/host WoW64.
+        # This profile must discard those files even when they are present.
+        i386 = self.source / "i386-windows"
+        i386.mkdir()
+        for name in ("ntdll.dll", "kernel32.dll", "user32.dll", "d3d11.dll", "dxgi.dll"):
+            (i386 / name).write_bytes(b"MZ" + bytes(128))
+        for name in ("xtajit.dll", "wow64.dll", "wow64win.dll"):
+            (self.source / "aarch64-windows" / name).write_bytes(b"MZ" + bytes(128))
         environment = dict(os.environ)
         environment.update({
             "IDECK_MADEIRA_APP_ROOT": str(self.source),
@@ -78,6 +86,12 @@ class MadeiraPayloadStagingTests(unittest.TestCase):
         )
         self.assertFalse((self.app / "d3d12").exists())
         self.assertFalse((self.app / "MadeiraRuntime/d3d12").exists())
+        for prefix in (self.app, self.app / "MadeiraRuntime"):
+            self.assertFalse((prefix / "i386-windows").exists())
+            for name in ("xtajit.dll", "wow64.dll", "wow64win.dll"):
+                self.assertFalse((prefix / "aarch64-windows" / name).exists())
+        self.assertTrue((self.source / "i386-windows/ntdll.dll").is_file())
+        self.assertTrue((self.source / "aarch64-windows/wow64.dll").is_file())
         for folder in ("aarch64-windows", "arm64ec-windows"):
             for name in ("d3d12.dll", "d3d12core.dll", "madeira_d3d12.dll"):
                 self.assertFalse((self.app / folder / name).exists())
@@ -86,6 +100,21 @@ class MadeiraPayloadStagingTests(unittest.TestCase):
             self.assertTrue((self.app / "arm64ec-windows" / name).is_file())
             self.assertTrue((self.app / "MadeiraRuntime/arm64ec-windows" / name).is_file())
         self.assertTrue((self.source / "d3d12/libmetalirconverter.dylib").is_file())
+
+    def test_d3d11_rejects_explicit_wow64_option(self):
+        env = dict(os.environ)
+        env.update({
+            "IDECK_MADEIRA_APP_ROOT": str(self.source),
+            "IDECK_MADEIRA_GRAPHICS": "d3d11",
+            "IDECK_BUILD_WOW64": "1",
+            "IDECK_ACCEPT_METAL_CONVERTER_LICENSE": "0",
+        })
+        result = subprocess.run(
+            ["bash", str(STAGER), str(self.app)],
+            env=env, capture_output=True, text=True, check=False,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("forbids WoW64", result.stderr)
 
     def test_vcruntime_requires_all_supplied_files(self):
         source = self.source / "x86_64-vcruntime"
