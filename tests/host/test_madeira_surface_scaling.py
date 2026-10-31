@@ -14,7 +14,8 @@ class MadeiraSurfaceScalingTests(unittest.TestCase):
         view = (ROOT / "iDeck/MainView.swift").read_text()
         self.assertIn('selection: $profile.surfaceScaling', view)
         self.assertIn('choices: ["fit", "fill", "stretch", "aspect"]', view)
-        self.assertIn("profile.controllerAPI", source)
+        self.assertIn("var controllerAPI: String = \"Automatic\"", source)
+        self.assertIn("$profile.controllerAPI", view)
 
     def test_guest_virtual_mode_read_dynamically_from_madeira(self):
         renderer = (ROOT / "iDeck/WindowsRendererView.swift").read_text()
