@@ -144,9 +144,9 @@ struct SettingsView: View {
                 }
                 Spacer()
                 VStack(alignment: .trailing, spacing: 4) {
-                    StatusPill(text: coordinator.isJITEnabled ? tr("JIT active") : tr("JIT off"),
+                    SettingsStatusPill(text: coordinator.isJITEnabled ? tr("JIT active") : tr("JIT off"),
                                color: coordinator.isJITEnabled ? .green : .orange)
-                    StatusPill(text: tr(MadeiraBundleIdentity.isNative ? "Madeira-native" : "Interface-only"),
+                    SettingsStatusPill(text: tr(MadeiraBundleIdentity.isNative ? "Madeira-native" : "Interface-only"),
                                color: MadeiraBundleIdentity.isNative ? .green : .orange)
                 }
             }
@@ -596,7 +596,7 @@ struct SettingsRow: View {
     }
 }
 
-private struct StatusPill: View {
+private struct SettingsStatusPill: View {
     let text: String
     let color: Color
 
