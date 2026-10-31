@@ -91,8 +91,7 @@ class MadeiraBlackScreenCloseAndLocalizationTests(unittest.TestCase):
         self.assertIn('Text(tr("Closing Wine and wineserver..."))', session)
         self.assertIn('.alert(tr("Wine did not close")', session)
         self.assertIn("Text(tr(coordinator.windowsCloseWarning ?? \"\"))", session)
-        self.assertIn('Toggle(tr("Keep child game processes running (experimental)")', main)
-        self.assertIn('Text(tr("Use only when a launcher exits after starting its game.', main)
+        self.assertIn('DetailToggleRow(title: tr("Keep child game processes running (experimental)")', main)
 
 
 if __name__ == "__main__":

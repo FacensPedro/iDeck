@@ -66,6 +66,7 @@
 		A1000000000000000000000D /* SteamLibraryPreviewCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000D /* SteamLibraryPreviewCache.swift */; };
 		999999999999999999999914 /* UpdateChecker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 999999999999999999999906 /* UpdateChecker.swift */; };
 		F30000000000000000000021 /* WineLogClipboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = F40000000000000000000021 /* WineLogClipboard.swift */; };
+		F3A000000000000000000005 /* GameDetailComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000005 /* GameDetailComponents.swift */; };
 		F3A000000000000000000011 /* LiveContainerSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000011 /* LiveContainerSettings.swift */; };
 		F3A000000000000000000010 /* JITBuiltInHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000010 /* JITBuiltInHost.swift */; };
 		F3A00000000000000000000F /* JITBuiltInMessages.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A00000000000000000000F /* JITBuiltInMessages.swift */; };
@@ -167,6 +168,7 @@
 		A2000000000000000000000D /* SteamLibraryPreviewCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamLibraryPreviewCache.swift; sourceTree = "<group>"; };
 		999999999999999999999906 /* UpdateChecker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateChecker.swift; sourceTree = "<group>"; };
 		F40000000000000000000021 /* WineLogClipboard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WineLogClipboard.swift; sourceTree = "<group>"; };
+		F4A000000000000000000005 /* GameDetailComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameDetailComponents.swift; sourceTree = "<group>"; };
 		F4A000000000000000000011 /* LiveContainerSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveContainerSettings.swift; sourceTree = "<group>"; };
 		F4A000000000000000000010 /* JITBuiltInHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JITBuiltInHost.swift; sourceTree = "<group>"; };
 		F4A00000000000000000000F /* JITBuiltInMessages.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JITBuiltInMessages.swift; sourceTree = "<group>"; };
@@ -295,6 +297,7 @@
 				A1000000000000000000000D /* SteamLibraryPreviewCache.swift in Sources */,
 				999999999999999999999914 /* UpdateChecker.swift in Sources */,
 				F30000000000000000000021 /* WineLogClipboard.swift in Sources */,
+				F3A000000000000000000005 /* GameDetailComponents.swift in Sources */,
 				F3A000000000000000000011 /* LiveContainerSettings.swift in Sources */,
 				F3A000000000000000000010 /* JITBuiltInHost.swift in Sources */,
 				F3A00000000000000000000F /* JITBuiltInMessages.swift in Sources */,
@@ -416,6 +419,7 @@
 				222222222222222222222229 /* GraphicsConfig.swift */,
 				999999999999999999999906 /* UpdateChecker.swift */,
 				F40000000000000000000021 /* WineLogClipboard.swift */,
+				F4A000000000000000000005 /* GameDetailComponents.swift */,
 				F4A000000000000000000011 /* LiveContainerSettings.swift */,
 				F4A000000000000000000010 /* JITBuiltInHost.swift */,
 				F4A00000000000000000000F /* JITBuiltInMessages.swift */,

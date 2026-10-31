@@ -599,6 +599,13 @@ struct WindowsWorkspaceView: View {
             resolvePrefixPath()
             appManager.refreshInstalledApps()
         }
+        // A finished Wine session may have installed a game (a GOG installer,
+        // a setup program): look for new installs whenever Wine stops.
+        .onChange(of: coordinator.windowsStatus) { _, _ in
+            guard mode == .pc, let prefixPath, !ideck_wineprocess_running() else { return }
+            gogLibrary.refreshInstalled(prefixPath: prefixPath)
+            windowsLibrary.refresh(prefixPath: prefixPath)
+        }
         .preferredColorScheme(.dark)
     }
 
@@ -673,10 +680,10 @@ struct WindowsWorkspaceView: View {
             Text(tr("Game Library"))
                 .font(.system(size: isCompact ? 25 : 29, weight: .bold, design: .rounded))
                 .foregroundColor(.white)
-            Text(tr("Install games from your Steam library"))
+            Text(tr("%d installed", windowsLibrary.executableURLs.count + installedSteamGames.count
+                    + installedGOGGames.count + installedEpicGames.count))
                 .font(.subheadline)
                 .foregroundColor(.gray)
-                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -703,14 +710,31 @@ struct WindowsWorkspaceView: View {
         HStack(spacing: 12) {
             if let onBack = onBack {
                 Button(action: onBack) {
-                    Label(tr("Home"), systemImage: "house.fill")
+                    Image(systemName: "chevron.left")
+                        .font(.headline)
                         .foregroundColor(.white)
+                        .frame(width: 42, height: 42)
+                        .background(secondaryColor)
+                        .clipShape(Circle())
                 }
+                .accessibilityLabel(tr("Home"))
             }
             Spacer()
-            Text(mode == .pc ? tr("Madeira") : tr("LiveContainer"))
-                .font(.headline)
-                .foregroundColor(.white)
+            VStack(spacing: 2) {
+                Text(mode == .pc ? tr("Madeira") : tr("LiveContainer"))
+                    .font(.headline)
+                    .foregroundColor(.white)
+                if mode == .pc {
+                    HStack(spacing: 5) {
+                        Circle()
+                            .fill(coordinator.isJITEnabled ? Color.green : Color.orange)
+                            .frame(width: 6, height: 6)
+                        Text(coordinator.isJITEnabled ? tr("JIT active") : tr("JIT off"))
+                            .font(.caption2)
+                            .foregroundColor(.gray)
+                    }
+                }
+            }
             Spacer()
             Button { isSettingsPresented = true } label: {
                 Image(systemName: "gearshape.fill")
@@ -984,11 +1008,11 @@ struct WindowsWorkspaceView: View {
                 }
             } else if let fraction = gogLibrary.downloadProgress[game.id] {
                 progressAction(fraction: fraction,
-                               label: tr("Downloading installer %d%%", Int((fraction * 100).rounded())),
+                               label: tr("Installing %d%%", Int((fraction * 100).rounded())),
                                onStop: { gogLibrary.cancelDownload(game) })
             } else if game.worksOnWindows {
                 Button { downloadGOGInstaller(game) } label: {
-                    cardActionLabel(tr("Get installer"), systemImage: "arrow.down.circle.fill")
+                    cardActionLabel(tr("Install"), systemImage: "arrow.down.circle.fill")
                 }
                 .disabled(prefixPath == nil)
             } else {
@@ -1165,6 +1189,7 @@ struct WindowsWorkspaceView: View {
                 }
                 steamLibrary.refreshInstalledApps(prefixPath: root)
                 gogLibrary.refreshInstalled(prefixPath: root)
+                coordinator.installSteamClientComponentsIfNeeded()
                 appManager.refreshInstalledApps()
             }
         }
@@ -1320,14 +1345,24 @@ struct WindowsWorkspaceView: View {
         coordinator.launchWindowsExecutable(at: game.executable, profile: profile)
     }
 
+    /// Downloads a GOG game's offline installer and installs it without any
+    /// installer windows. The game then appears under Installed games.
     private func downloadGOGInstaller(_ game: GOGGame) {
         guard let prefixPath else { return }
         gogLibrary.downloadInstaller(game, prefixPath: prefixPath) { setup in
             windowsLibrary.refresh(prefixPath: prefixPath)
             guard let setup else { return }
-            installMessage = tr("The %@ installer is ready under Installed games as %@. Run it to install the game; it then appears with the GOG mark.",
-                                game.title, setup.deletingPathExtension().lastPathComponent)
-            isShowingInstallResult = true
+            coordinator.refreshJITStatus()
+            guard coordinator.isJITEnabled else {
+                installMessage = tr("The %@ installer is ready under Installed games as %@. Run it to install the game; it then appears with the GOG mark.",
+                                    game.title, setup.deletingPathExtension().lastPathComponent)
+                isShowingInstallResult = true
+                return
+            }
+            let profile = WindowsGameProfile(id: "gog-setup:\(game.id)", title: game.title,
+                                             arguments: GOGLibraryModel.silentInstallArguments(for: game),
+                                             touchControlPreset: "off")
+            coordinator.launchWindowsExecutable(at: setup, profile: profile)
         }
     }
 
@@ -1825,12 +1860,14 @@ private struct SteamProgramDetailsView: View {
                         .foregroundColor(.gray)
                         .multilineTextAlignment(.center)
                         .frame(maxWidth: .infinity)
-                    Label(installed ? tr("Installed") : tr("Not installed"),
-                          systemImage: installed ? "checkmark.circle.fill" : "arrow.down.circle")
-                        .foregroundColor(installed ? .green : .gray)
-                    WindowsGameProfileForm(profile: $profile,
-                                           globalMetalFXEnabled: $coordinator.isMetalFXEnabled)
-                    steamCloudControls
+                    HStack(spacing: 8) {
+                        DetailChip(text: installed ? tr("Installed") : tr("Not installed"),
+                                   systemImage: installed ? "checkmark.circle.fill" : "arrow.down.circle",
+                                   tint: installed ? .green : .gray)
+                        if let size = installedSizeText {
+                            DetailChip(text: size, systemImage: "internaldrive", tint: .gray)
+                        }
+                    }
                     if installing {
                         downloadStatus
                     } else if installed {
@@ -1900,13 +1937,20 @@ private struct SteamProgramDetailsView: View {
                         .disabled(prefixPath == nil || !game.installableOnWindows)
                     }
 
-                    if installed {
-                        dlcList
-                    }
                     if let error = steamLibrary.downloadErrors[game.appID] {
                         Text(error)
                             .foregroundColor(.red)
                             .font(.caption)
+                    }
+                    WindowsGameProfileForm(profile: $profile,
+                                           globalMetalFXEnabled: $coordinator.isMetalFXEnabled)
+                    DetailCard(title: tr("Steam Cloud saves")) {
+                        steamCloudControls.padding(14)
+                    }
+                    if installed {
+                        DetailCard(title: tr("DLC for this game")) {
+                            dlcList.padding(14)
+                        }
                     }
                 }
                 .padding(22)
@@ -1952,17 +1996,19 @@ private struct SteamProgramDetailsView: View {
 
     @AppStorage("iDeck.steamCloud.autoSaveEnabled") private var autoSaveEnabled = true
 
+    private var installedSizeText: String? {
+        guard installed, let bytes = steamLibrary.installedSizes[game.appID], bytes > 0 else { return nil }
+        return ByteCountFormatter.string(fromByteCount: Int64(clamping: bytes), countStyle: .file)
+    }
+
     private var steamCloudControls: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Label(tr("Steam Cloud saves"), systemImage: "icloud")
-                    .font(.headline)
-                Spacer()
+                Toggle(tr("Auto Save"), isOn: $autoSaveEnabled)
                 if steamLibrary.cloudSyncing.contains(game.appID) {
-                    ProgressView()
+                    ProgressView().padding(.leading, 6)
                 }
             }
-            Toggle(tr("Auto Save"), isOn: $autoSaveEnabled)
                 .tint(.blue)
             Text(tr("Automatically sync Steam Cloud saves before playing when available. Conflicting saves are never overwritten."))
                 .font(.caption)
@@ -2055,9 +2101,6 @@ private struct SteamProgramDetailsView: View {
 
     private var dlcList: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(tr("DLC for this game"))
-                .font(.headline)
-                .foregroundColor(.white)
             let ids = steamLibrary.availableDLC[game.appID] ?? []
             if ids.isEmpty {
                 Text(tr("No DLC found for this game"))
@@ -2130,72 +2173,56 @@ private struct WindowsGameProfileForm: View {
     @Binding var globalMetalFXEnabled: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text(tr("Game configuration"))
-                .font(.headline)
-                .foregroundColor(.white)
-            VStack(alignment: .leading, spacing: 6) {
-                Text(tr("Launch arguments"))
-                    .font(.subheadline)
-                    .foregroundColor(.gray)
+        VStack(alignment: .leading, spacing: 22) {
+            DetailCard(title: tr("Display")) {
+                DetailPickerRow(title: tr("Resolution"), selection: $profile.resolution,
+                                choices: ["Device native", "960x540", "1280x720", "1600x900", "1920x1080"])
+                DetailPickerRow(title: tr("Surface scaling"), selection: $profile.surfaceScaling,
+                                choices: ["fit", "fill", "stretch", "aspect"])
+                DetailPickerRow(title: tr("Frame rate limit"), selection: $profile.fpsLimit,
+                                choices: ["30", "40", "60", "Uncapped"])
+                DetailToggleRow(title: tr("MetalFX upscaling"), isOn: $globalMetalFXEnabled, showsDivider: false)
+            }
+            DetailCard(title: tr("Graphics")) {
+                DetailPickerRow(title: tr("Graphics API"), selection: $profile.graphicsAPI,
+                                choices: ["Automatic", "Direct3D 9", "Direct3D 10", "Direct3D 11", "Direct3D 12"])
+                DetailPickerRow(title: tr("Vulkan"), selection: $profile.vulkanMode, choices: WindowsGameProfile.vulkanModes)
+                DetailPickerRow(title: tr("OpenGL"), selection: $profile.openGLBackend,
+                                choices: WindowsGameProfile.openGLBackends, showsDivider: false)
+            }
+            DetailCard(title: tr("Controls")) {
+                DetailPickerRow(title: tr("Controller API"), selection: $profile.controllerAPI,
+                                choices: ["Automatic", "XInput", "XInput + DirectInput", "HID", "DualSense HID", "Generic HID"])
+                DetailPickerRow(title: tr("Touch controls"), selection: $profile.touchControlPreset,
+                                choices: ["xbox", "minimal", "off"], showsDivider: false)
+            }
+            DetailCard(title: tr("Compatibility"),
+                       footer: tr("Games iDeck recognises get the settings they were tested with.")) {
+                DetailToggleRow(title: tr("Use recommended settings"), isOn: $profile.useRecommended)
+                DetailToggleRow(title: tr("Enable AVX/AVX2 translation"), isOn: $profile.avxEnabled)
+                DetailToggleRow(title: tr("Keep child game processes running (experimental)"),
+                                isOn: $profile.keepChildProcessesRunning)
+                if profile.id.hasPrefix("steam:") {
+                    DetailToggleRow(title: tr("Start through the Steam client"), isOn: $profile.launchThroughSteam)
+                }
+                DetailRow(title: tr("Reset to Recommended"), showsDivider: false) {
+                    Button(tr("Reset")) {
+                        GameRecommendations.applySwitches(for: profile.id, to: &profile)
+                    }
+                    .foregroundColor(.blue)
+                }
+            }
+            DetailCard(title: tr("Launch arguments"),
+                       footer: profile.id.hasPrefix("steam:")
+                           ? tr("Start through the Steam client for games with Steam DRM (Madeira Dock).")
+                           : nil) {
                 TextField(tr("Example: -windowed"), text: $profile.arguments)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
-                    .textFieldStyle(.roundedBorder)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 14)
+                    .frame(minHeight: 46)
             }
-            profilePicker(title: tr("Resolution"), selection: $profile.resolution, choices: ["Device native", "960x540", "1280x720", "1600x900", "1920x1080"])
-            profilePicker(title: tr("Surface scaling"), selection: $profile.surfaceScaling,
-                          choices: ["fit", "fill", "stretch", "aspect"])
-            profilePicker(title: tr("Graphics API"), selection: $profile.graphicsAPI, choices: ["Automatic", "Direct3D 9", "Direct3D 10", "Direct3D 11", "Direct3D 12"])
-            profilePicker(title: tr("Vulkan"), selection: $profile.vulkanMode, choices: WindowsGameProfile.vulkanModes)
-            profilePicker(title: tr("OpenGL"), selection: $profile.openGLBackend, choices: WindowsGameProfile.openGLBackends)
-            profilePicker(title: tr("Controller API"), selection: $profile.controllerAPI, choices: ["Automatic", "XInput", "XInput + DirectInput", "HID", "DualSense HID", "Generic HID"])
-            profilePicker(title: tr("Touch controls"), selection: $profile.touchControlPreset, choices: ["xbox", "minimal", "off"])
-            profilePicker(title: tr("Frame rate limit"), selection: $profile.fpsLimit, choices: ["30", "40", "60", "Uncapped"])
-            Toggle(tr("MetalFX upscaling"), isOn: $globalMetalFXEnabled)
-                .tint(.blue)
-            Toggle(tr("Enable AVX/AVX2 translation"), isOn: $profile.avxEnabled)
-                .tint(.blue)
-            Toggle(tr("Keep child game processes running (experimental)"), isOn: $profile.keepChildProcessesRunning)
-                .tint(.blue)
-            Text(tr("Use only when a launcher exits after starting its game. This may keep Wine running after the game ends."))
-                .font(.caption)
-                .foregroundColor(.gray)
-            if profile.id.hasPrefix("steam:") {
-                Toggle(tr("Start through the Steam client"), isOn: $profile.launchThroughSteam)
-                    .tint(.blue)
-                Text(tr("Valve's own Windows client signs in and starts the game (Madeira Dock). Needed for games with Steam DRM. Download Steam's components in Settings › Steam first."))
-                    .font(.caption)
-                    .foregroundColor(.gray)
-            }
-            Toggle(tr("Use recommended settings"), isOn: $profile.useRecommended)
-                .tint(.blue)
-            Button(tr("Reset to Recommended")) {
-                GameRecommendations.applySwitches(for: profile.id, to: &profile)
-            }
-            .foregroundColor(.blue)
-            Text(tr("Games iDeck recognises get the settings they were tested with."))
-                .font(.caption)
-                .foregroundColor(.gray)
-        }
-        .padding(16)
-        .background(Color.white.opacity(0.055))
-        .clipShape(RoundedRectangle(cornerRadius: 14))
-    }
-
-    private func profilePicker(title: String, selection: Binding<String>, choices: [String]) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(title)
-                .font(.subheadline)
-                .foregroundColor(.gray)
-            Picker(title, selection: selection) {
-                ForEach(choices, id: \.self) { choice in
-                    Text(choice).tag(choice)
-                }
-            }
-            .pickerStyle(.menu)
-            .tint(.white)
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 }
