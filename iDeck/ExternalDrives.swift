@@ -291,20 +291,9 @@ final class ExternalDrives: ObservableObject {
         }
     }
 
-    /// Removes a game folder that is a link to a registered drive: the files on
-    /// the drive and the link. Returns false for anything else.
+    /// Removes a game folder that is a link to a registered drive.
     nonisolated static func removeExternalInstall(at local: URL) -> Bool {
-        let fm = FileManager.default
-        guard let type = try? fm.attributesOfItem(atPath: local.path)[.type] as? FileAttributeType,
-              type == .typeSymbolicLink,
-              let destination = try? fm.destinationOfSymbolicLink(atPath: local.path) else { return false }
-        let target = URL(fileURLWithPath: destination).standardizedFileURL
-        // Only folders iDeck created on a drive are removed.
-        guard target.pathComponents.contains("iDeck Games"),
-              target.lastPathComponent == local.lastPathComponent else { return false }
-        try? fm.removeItem(at: target)
-        try? fm.removeItem(at: local)
-        return true
+        ExternalInstallLink.remove(at: local)
     }
 }
 
