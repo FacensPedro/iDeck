@@ -181,6 +181,24 @@ if [[ "$REBUILD" == "1" ]]; then
   # Build a pinned GC64 interpreter-only LuaJIT, then compile the iOS
   # wineserver replacement mapper into the native static archive.
   bash "$ROOT/scripts/build_madeira_luajit.sh"
+  # Newer Madeira renames colliding wineserver symbols with llvm-objcopy.
+  # llvm-mingw ships one that handles Mach-O; expose only that binary so
+  # mingw's clang never shadows Xcode's on PATH.
+  if ! command -v llvm-objcopy >/dev/null 2>&1; then
+    MINGW_OBJCOPY="$MD/toolchains/llvm-mingw-20260421-ucrt-macos-universal/bin/llvm-objcopy"
+    if [[ -x "$MINGW_OBJCOPY" ]]; then
+      OBJCOPY_DIR="$MD/toolchains/ideck-objcopy/bin"
+      mkdir -p "$OBJCOPY_DIR"
+      ln -sf "$MINGW_OBJCOPY" "$OBJCOPY_DIR/llvm-objcopy"
+      export PATH="$OBJCOPY_DIR:$PATH"
+    elif command -v brew >/dev/null 2>&1; then
+      HOMEBREW_NO_AUTO_UPDATE=1 brew install llvm
+      export PATH="$(brew --prefix llvm)/bin:$PATH"
+    fi
+  fi
+  command -v llvm-objcopy >/dev/null 2>&1 || {
+    echo "ERROR: llvm-objcopy is required by the Madeira wineserver build." >&2; exit 2;
+  }
   bash "$MD/build/wineserver/build.sh"
   bash "$MD/build/win32u-unix/build.sh"
   if [[ "$STOP_AFTER" == "wine" ]]; then
