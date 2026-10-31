@@ -370,10 +370,17 @@ enum ZipError: Error {
 enum ZipExtractor {
     /// Extracts a ZIP archive (stored and deflate entries, no ZIP64, no encryption).
     /// Entries that would land outside `destination` (zip-slip) are rejected.
+    /// The archive is memory-mapped once; entry payloads go from the mapping
+    /// straight to their files through ZipNative.c, without copies.
     static func extract(archive: URL, to destination: URL) throws {
         let data = try Data(contentsOf: archive, options: .alwaysMapped)
-        let fm = FileManager.default
-        try fm.createDirectory(at: destination, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
+        try data.withUnsafeBytes { (raw: UnsafeRawBufferPointer) in
+            try extract(raw, to: destination)
+        }
+    }
+
+    private static func extract(_ data: UnsafeRawBufferPointer, to destination: URL) throws {
         let lexicalRoot = destination.standardizedFileURL.path
         let resolvedRoot = destination.resolvingSymlinksInPath().standardizedFileURL.path
 
@@ -408,7 +415,8 @@ enum ZipExtractor {
 
             let nameStart = cursor + 46
             guard nameStart + nameLength <= data.count else { throw ZipError.invalidArchive }
-            guard let name = String(data: data.subdata(in: nameStart..<(nameStart + nameLength)), encoding: .utf8) else {
+            let nameBytes = UnsafeRawBufferPointer(rebasing: data[nameStart..<(nameStart + nameLength)])
+            guard let name = String(bytes: nameBytes, encoding: .utf8) else {
                 throw ZipError.invalidArchive
             }
             guard extraLength <= data.count - (nameStart + nameLength),
@@ -462,13 +470,12 @@ enum ZipExtractor {
             let payloadStart = localOffset + 30 + localName + localExtra
             guard localName == nameLength,
                   localOffset + 30 + localName <= data.count,
-                  data.subdata(in: (localOffset + 30)..<(localOffset + 30 + localName)) ==
-                    data.subdata(in: nameStart..<(nameStart + nameLength)),
+                  memcmp(data.baseAddress! + localOffset + 30, data.baseAddress! + nameStart, nameLength) == 0,
                   payloadStart <= data.count,
                   compressedSize <= data.count - payloadStart else {
                 throw ZipError.invalidArchive
             }
-            let payload = data.subdata(in: payloadStart..<(payloadStart + compressedSize))
+            let payload = UnsafeRawBufferPointer(rebasing: data[payloadStart..<(payloadStart + compressedSize)])
 
             do {
                 try writeEntry(name: name, method: method, payload: payload, uncompressedSize: uncompressedSize,
@@ -483,7 +490,7 @@ enum ZipExtractor {
         }
     }
 
-    private static func writeEntry(name: String, method: Int, payload: Data, uncompressedSize: Int,
+    private static func writeEntry(name: String, method: Int, payload: UnsafeRawBufferPointer, uncompressedSize: Int,
                                    unixMode: Int, lexicalRoot: String, resolvedRoot: String, destination: URL) throws {
         let fm = FileManager.default
 
@@ -518,7 +525,7 @@ enum ZipExtractor {
             throw ZipError.unsafePath
         }
         if fileType == 0xA000 { // symbolic link
-            guard method == 0, let linkTarget = String(data: payload, encoding: .utf8),
+            guard method == 0, let linkTarget = String(bytes: payload, encoding: .utf8),
                   !linkTarget.hasPrefix("/") else { throw ZipError.unsafePath }
             let resolved = URL(fileURLWithPath: linkTarget, relativeTo: resolvedParent)
                 .standardizedFileURL.resolvingSymlinksInPath()
@@ -532,14 +539,19 @@ enum ZipExtractor {
             return
         }
 
-        switch method {
-        case 0:
-            guard payload.count == uncompressedSize else { throw ZipError.invalidArchive }
-            guard fm.createFile(atPath: target.path, contents: payload) else { throw ZipError.invalidArchive }
-        case 8:
-            try inflate(payload, expectedSize: uncompressedSize, to: target)
-        default:
-            throw ZipError.unsupported
+        if method == 0 && payload.count != uncompressedSize { throw ZipError.invalidArchive }
+        guard method == 0 || method == 8 else { throw ZipError.unsupported }
+        // O_EXCL|O_NOFOLLOW: the target was removed above; never follow a link here.
+        let fd = open(target.path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0o644)
+        guard fd >= 0 else { throw ZipError.invalidArchive }
+        let base = payload.baseAddress?.assumingMemoryBound(to: UInt8.self)
+        let status = method == 0
+            ? ideck_zip_write_to_fd(base, payload.count, fd)
+            : ideck_zip_inflate_to_fd(base, payload.count, fd, UInt64(uncompressedSize))
+        close(fd)
+        guard status == Int32(IDECK_ZIP_OK) else {
+            try? fm.removeItem(at: target)
+            throw ZipError.invalidArchive
         }
 
         let permissions = unixMode & 0o777
@@ -553,59 +565,7 @@ enum ZipExtractor {
         guard path == root || path.hasPrefix(root + "/") else { throw ZipError.unsafePath }
     }
 
-    private static func inflate(_ input: Data, expectedSize: Int, to url: URL) throws {
-        guard FileManager.default.createFile(atPath: url.path, contents: nil) else { throw ZipError.invalidArchive }
-        if expectedSize == 0 { return }
-        guard !input.isEmpty else { throw ZipError.invalidArchive }
-
-        let handle = try FileHandle(forWritingTo: url)
-        defer { try? handle.close() }
-
-        let bufferSize = 64 * 1024
-        let output = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
-        defer { output.deallocate() }
-
-        var stream = compression_stream(dst_ptr: output, dst_size: 0, src_ptr: UnsafePointer(output), src_size: 0, state: nil)
-        guard compression_stream_init(&stream, COMPRESSION_STREAM_DECODE, COMPRESSION_ZLIB) == COMPRESSION_STATUS_OK else {
-            throw ZipError.invalidArchive
-        }
-        defer { compression_stream_destroy(&stream) }
-
-        try input.withUnsafeBytes { (raw: UnsafeRawBufferPointer) throws -> Void in
-            guard let base = raw.bindMemory(to: UInt8.self).baseAddress else { throw ZipError.invalidArchive }
-            stream.src_ptr = base
-            stream.src_size = input.count
-            stream.dst_ptr = output
-            stream.dst_size = bufferSize
-
-            var written = 0
-            while true {
-                let status = compression_stream_process(&stream, Int32(COMPRESSION_STREAM_FINALIZE.rawValue))
-                guard status == COMPRESSION_STATUS_OK || status == COMPRESSION_STATUS_END else {
-                    throw ZipError.invalidArchive
-                }
-
-                let produced = bufferSize - stream.dst_size
-                if produced > 0 {
-                    written += produced
-                    if written > expectedSize { throw ZipError.invalidArchive } // guards against zip bombs
-                    try handle.write(contentsOf: Data(bytes: output, count: produced))
-                } else if status == COMPRESSION_STATUS_OK && stream.src_size == 0 {
-                    throw ZipError.invalidArchive // truncated stream, no progress possible
-                }
-
-                stream.dst_ptr = output
-                stream.dst_size = bufferSize
-
-                if status == COMPRESSION_STATUS_END {
-                    guard written == expectedSize else { throw ZipError.invalidArchive }
-                    return
-                }
-            }
-        }
-    }
-
-    private static func findEndOfCentralDirectory(_ data: Data) -> Int? {
+    private static func findEndOfCentralDirectory(_ data: UnsafeRawBufferPointer) -> Int? {
         guard data.count >= 22 else { return nil }
         let lowest = max(0, data.count - 22 - 0xFFFF)
         var index = data.count - 22
@@ -618,12 +578,12 @@ enum ZipExtractor {
         return nil
     }
 
-    private static func u16(_ data: Data, _ offset: Int) throws -> Int {
+    private static func u16(_ data: UnsafeRawBufferPointer, _ offset: Int) throws -> Int {
         guard offset >= 0, offset + 2 <= data.count else { throw ZipError.invalidArchive }
         return Int(data[offset]) | (Int(data[offset + 1]) << 8)
     }
 
-    private static func u32(_ data: Data, _ offset: Int) throws -> Int {
+    private static func u32(_ data: UnsafeRawBufferPointer, _ offset: Int) throws -> Int {
         guard offset >= 0, offset + 4 <= data.count else { throw ZipError.invalidArchive }
         return Int(data[offset]) | (Int(data[offset + 1]) << 8) | (Int(data[offset + 2]) << 16) | (Int(data[offset + 3]) << 24)
     }

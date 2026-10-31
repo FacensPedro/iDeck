@@ -96,12 +96,18 @@ class HuskIPAExtractionTests(unittest.TestCase):
             runner = root / "Runner.swift"
             runner.write_text(RUNNER, encoding="utf-8")
             binary = root / "test-ipa-extractor"
+            native = root / "ZipNative.o"
+            subprocess.run(
+                ["xcrun", "clang", "-O2", "-c", str(ROOT / "iDeck/ZipNative.c"), "-o", str(native)],
+                check=True, timeout=120,
+            )
             subprocess.run(
                 [
                     "xcrun", "swiftc",
+                    "-import-objc-header", str(ROOT / "iDeck/ZipNative.h"),
                     str(ROOT / "iDeck/IPAArchivePath.swift"),
                     str(actual_extractor),
-                    str(runner), "-o", str(binary),
+                    str(runner), str(native), "-lz", "-o", str(binary),
                 ], check=True, timeout=120,
             )
             subprocess.run(
