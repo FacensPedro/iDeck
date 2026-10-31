@@ -5,6 +5,14 @@
 	};
 	objectVersion = 56;
 	objects = {
+		F5A000000000000000000001 /* iDeckJITHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5A000000000000000000004 /* iDeckJITHelper.swift */; };
+		F5A000000000000000000002 /* JITBuiltInMessages.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A00000000000000000000F /* JITBuiltInMessages.swift */; };
+		F5A000000000000000000003 /* iDeckJITHelper.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = F5A000000000000000000007 /* iDeckJITHelper.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		F5A000000000000000000004 /* iDeckJITHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iDeckJITHelper.swift; sourceTree = "<group>"; };
+		F5A000000000000000000005 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		F5A000000000000000000006 /* iDeckJITHelper.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = iDeckJITHelper.entitlements; sourceTree = "<group>"; };
+		F5A000000000000000000007 /* iDeckJITHelper.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = iDeckJITHelper.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		F5A000000000000000000008 /* StikJIT.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; path = Frameworks/StikJIT.xcframework; sourceTree = SOURCE_ROOT; };
 
 		E10000000000000000000001 /* SteamKeyValues.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000001 /* SteamKeyValues.swift */; };
 		E10000000000000000000002 /* SteamChunkCodecs.c in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000002 /* SteamChunkCodecs.c */; };
@@ -57,6 +65,21 @@
 		A1000000000000000000000D /* SteamLibraryPreviewCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000D /* SteamLibraryPreviewCache.swift */; };
 		999999999999999999999914 /* UpdateChecker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 999999999999999999999906 /* UpdateChecker.swift */; };
 		F30000000000000000000021 /* WineLogClipboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = F40000000000000000000021 /* WineLogClipboard.swift */; };
+		F3A000000000000000000011 /* LiveContainerSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000011 /* LiveContainerSettings.swift */; };
+		F3A000000000000000000010 /* JITBuiltInHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000010 /* JITBuiltInHost.swift */; };
+		F3A00000000000000000000F /* JITBuiltInMessages.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A00000000000000000000F /* JITBuiltInMessages.swift */; };
+		F3A00000000000000000000E /* MadeiraDock.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A00000000000000000000E /* MadeiraDock.swift */; };
+		F3A00000000000000000000D /* EpicGames.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A00000000000000000000D /* EpicGames.swift */; };
+		F3A00000000000000000000C /* EpicLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A00000000000000000000C /* EpicLibrary.swift */; };
+		F3A00000000000000000000B /* EpicCloud.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A00000000000000000000B /* EpicCloud.swift */; };
+		F3A00000000000000000000A /* EpicCloudSaves.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A00000000000000000000A /* EpicCloudSaves.swift */; };
+		F3A000000000000000000009 /* EpicDownloader.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000009 /* EpicDownloader.swift */; };
+		F3A000000000000000000008 /* EpicFormats.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000008 /* EpicFormats.swift */; };
+		F3A000000000000000000007 /* EpicAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000007 /* EpicAPI.swift */; };
+		F3A000000000000000000006 /* GameRecommendations.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000006 /* GameRecommendations.swift */; };
+		F3A000000000000000000005 /* HardwareInput.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000005 /* HardwareInput.swift */; };
+		F3A000000000000000000004 /* ExternalDrives.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000004 /* ExternalDrives.swift */; };
+		F3A000000000000000000003 /* BackgroundDownloads.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000003 /* BackgroundDownloads.swift */; };
 		F3A000000000000000000002 /* GOGLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000002 /* GOGLibrary.swift */; };
 		F3A000000000000000000001 /* BugReportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000001 /* BugReportView.swift */; };
 		999999999999999999999915 /* Localization.swift in Sources */ = {isa = PBXBuildFile; fileRef = 999999999999999999999907 /* Localization.swift */; };
@@ -145,6 +168,21 @@
 		A2000000000000000000000D /* SteamLibraryPreviewCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamLibraryPreviewCache.swift; sourceTree = "<group>"; };
 		999999999999999999999906 /* UpdateChecker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateChecker.swift; sourceTree = "<group>"; };
 		F40000000000000000000021 /* WineLogClipboard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WineLogClipboard.swift; sourceTree = "<group>"; };
+		F4A000000000000000000011 /* LiveContainerSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveContainerSettings.swift; sourceTree = "<group>"; };
+		F4A000000000000000000010 /* JITBuiltInHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JITBuiltInHost.swift; sourceTree = "<group>"; };
+		F4A00000000000000000000F /* JITBuiltInMessages.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JITBuiltInMessages.swift; sourceTree = "<group>"; };
+		F4A00000000000000000000E /* MadeiraDock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MadeiraDock.swift; sourceTree = "<group>"; };
+		F4A00000000000000000000D /* EpicGames.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EpicGames.swift; sourceTree = "<group>"; };
+		F4A00000000000000000000C /* EpicLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EpicLibrary.swift; sourceTree = "<group>"; };
+		F4A00000000000000000000B /* EpicCloud.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EpicCloud.swift; sourceTree = "<group>"; };
+		F4A00000000000000000000A /* EpicCloudSaves.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EpicCloudSaves.swift; sourceTree = "<group>"; };
+		F4A000000000000000000009 /* EpicDownloader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EpicDownloader.swift; sourceTree = "<group>"; };
+		F4A000000000000000000008 /* EpicFormats.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EpicFormats.swift; sourceTree = "<group>"; };
+		F4A000000000000000000007 /* EpicAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EpicAPI.swift; sourceTree = "<group>"; };
+		F4A000000000000000000006 /* GameRecommendations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameRecommendations.swift; sourceTree = "<group>"; };
+		F4A000000000000000000005 /* HardwareInput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HardwareInput.swift; sourceTree = "<group>"; };
+		F4A000000000000000000004 /* ExternalDrives.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExternalDrives.swift; sourceTree = "<group>"; };
+		F4A000000000000000000003 /* BackgroundDownloads.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundDownloads.swift; sourceTree = "<group>"; };
 		F4A000000000000000000002 /* GOGLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GOGLibrary.swift; sourceTree = "<group>"; };
 		F4A000000000000000000001 /* BugReportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BugReportView.swift; sourceTree = "<group>"; };
 		999999999999999999999907 /* Localization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Localization.swift; sourceTree = "<group>"; };
@@ -258,6 +296,21 @@
 				A1000000000000000000000D /* SteamLibraryPreviewCache.swift in Sources */,
 				999999999999999999999914 /* UpdateChecker.swift in Sources */,
 				F30000000000000000000021 /* WineLogClipboard.swift in Sources */,
+				F3A000000000000000000011 /* LiveContainerSettings.swift in Sources */,
+				F3A000000000000000000010 /* JITBuiltInHost.swift in Sources */,
+				F3A00000000000000000000F /* JITBuiltInMessages.swift in Sources */,
+				F3A00000000000000000000E /* MadeiraDock.swift in Sources */,
+				F3A00000000000000000000D /* EpicGames.swift in Sources */,
+				F3A00000000000000000000C /* EpicLibrary.swift in Sources */,
+				F3A00000000000000000000B /* EpicCloud.swift in Sources */,
+				F3A00000000000000000000A /* EpicCloudSaves.swift in Sources */,
+				F3A000000000000000000009 /* EpicDownloader.swift in Sources */,
+				F3A000000000000000000008 /* EpicFormats.swift in Sources */,
+				F3A000000000000000000007 /* EpicAPI.swift in Sources */,
+				F3A000000000000000000006 /* GameRecommendations.swift in Sources */,
+				F3A000000000000000000005 /* HardwareInput.swift in Sources */,
+				F3A000000000000000000004 /* ExternalDrives.swift in Sources */,
+				F3A000000000000000000003 /* BackgroundDownloads.swift in Sources */,
 				F3A000000000000000000002 /* GOGLibrary.swift in Sources */,
 				F3A000000000000000000001 /* BugReportView.swift in Sources */,
 				999999999999999999999915 /* Localization.swift in Sources */,
@@ -365,6 +418,21 @@
 				222222222222222222222229 /* GraphicsConfig.swift */,
 				999999999999999999999906 /* UpdateChecker.swift */,
 				F40000000000000000000021 /* WineLogClipboard.swift */,
+				F4A000000000000000000011 /* LiveContainerSettings.swift */,
+				F4A000000000000000000010 /* JITBuiltInHost.swift */,
+				F4A00000000000000000000F /* JITBuiltInMessages.swift */,
+				F4A00000000000000000000E /* MadeiraDock.swift */,
+				F4A00000000000000000000D /* EpicGames.swift */,
+				F4A00000000000000000000C /* EpicLibrary.swift */,
+				F4A00000000000000000000B /* EpicCloud.swift */,
+				F4A00000000000000000000A /* EpicCloudSaves.swift */,
+				F4A000000000000000000009 /* EpicDownloader.swift */,
+				F4A000000000000000000008 /* EpicFormats.swift */,
+				F4A000000000000000000007 /* EpicAPI.swift */,
+				F4A000000000000000000006 /* GameRecommendations.swift */,
+				F4A000000000000000000005 /* HardwareInput.swift */,
+				F4A000000000000000000004 /* ExternalDrives.swift */,
+				F4A000000000000000000003 /* BackgroundDownloads.swift */,
 				F4A000000000000000000002 /* GOGLibrary.swift */,
 				F4A000000000000000000001 /* BugReportView.swift */,
 				999999999999999999999907 /* Localization.swift */,
@@ -425,6 +493,7 @@
 			children = (
 				222222222222222222222227 /* iDeck.app */,
 				999999999999999999999902 /* VPNExtension.appex */,
+				F5A000000000000000000007 /* iDeckJITHelper.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -434,6 +503,7 @@
 			children = (
 				444444444444444444444441 /* iDeck */,
 				999999999999999999999981 /* VPNExtension */,
+				F5A000000000000000000009 /* iDeckJITHelper */,
 				444444444444444444444442 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -447,11 +517,13 @@
 				333333333333333333333331 /* Frameworks */,
 				333333333333333333333333 /* Resources */,
 				999999999999999999999924 /* Embed Foundation Extensions */,
+				F5A000000000000000000013 /* Embed StikJIT */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 				999999999999999999999941 /* PBXTargetDependency */,
+				F5A000000000000000000012 /* PBXTargetDependency */,
 			);
 			name = iDeck;
 			packageProductDependencies = (
@@ -492,6 +564,7 @@
 			dstSubfolderSpec = 13;
 			files = (
 				999999999999999999999912 /* VPNExtension.appex in Embed Foundation Extensions */,
+				F5A000000000000000000003 /* iDeckJITHelper.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -585,6 +658,152 @@
 			};
 			name = Release;
 		};
+		F5A000000000000000000009 /* iDeckJITHelper */ = {
+			isa = PBXGroup;
+			children = (
+				F5A000000000000000000004 /* iDeckJITHelper.swift */,
+				F5A000000000000000000005 /* Info.plist */,
+				F5A000000000000000000006 /* iDeckJITHelper.entitlements */,
+				F5A000000000000000000008 /* StikJIT.xcframework */,
+			);
+			path = iDeckJITHelper;
+			sourceTree = "<group>";
+		};
+		F5A00000000000000000000A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F5A000000000000000000001 /* iDeckJITHelper.swift in Sources */,
+				F5A000000000000000000002 /* JITBuiltInMessages.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F5A00000000000000000000B /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F5A00000000000000000000C /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F5A000000000000000000013 /* Embed StikJIT */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Embed StikJIT";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -e\n[ \"$PLATFORM_NAME\" = iphoneos ] || exit 0\n# iDeck.app/Frameworks, which the JIT helper (PlugIns/iDeckJITHelper.appex) loads\n# through @executable_path/../../Frameworks.\nSRC=\"$SRCROOT/Frameworks/StikJIT.xcframework/ios-arm64/StikJIT.framework\"\nDST=\"$TARGET_BUILD_DIR/$FRAMEWORKS_FOLDER_PATH/StikJIT.framework\"\nrm -rf \"$DST\"\nmkdir -p \"$(dirname \"$DST\")\"\nditto \"$SRC\" \"$DST\"\nif [ ! -f \"$DST/Info.plist\" ]; then\n  P=\"$DST/Info.plist\"\n  /usr/libexec/PlistBuddy -c 'Add :CFBundleExecutable string StikJIT' -c \"Add :CFBundleIdentifier string $PRODUCT_BUNDLE_IDENTIFIER.StikJIT\" -c 'Add :CFBundleName string StikJIT' -c 'Add :CFBundlePackageType string FMWK' -c 'Add :CFBundleInfoDictionaryVersion string 6.0' -c 'Add :CFBundleShortVersionString string 1.0' -c 'Add :CFBundleVersion string 1' -c 'Add :CFBundleSupportedPlatforms array' -c 'Add :CFBundleSupportedPlatforms:0 string iPhoneOS' -c 'Add :MinimumOSVersion string 26.0' \"$P\" >/dev/null\n  plutil -convert binary1 \"$P\"\nfi\nif [ -n \"$EXPANDED_CODE_SIGN_IDENTITY\" ] && [ \"$CODE_SIGNING_ALLOWED\" != \"NO\" ]; then\n  codesign --force --sign \"$EXPANDED_CODE_SIGN_IDENTITY\" --timestamp=none \"$DST\"\nfi\n";
+		};
+		F5A000000000000000000011 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 777777777777777777777771 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = F5A00000000000000000000D;
+			remoteInfo = iDeckJITHelper;
+		};
+		F5A000000000000000000012 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = F5A00000000000000000000D /* iDeckJITHelper */;
+			targetProxy = F5A000000000000000000011 /* PBXContainerItemProxy */;
+		};
+		F5A00000000000000000000D /* iDeckJITHelper */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F5A000000000000000000010 /* Build configuration list for PBXNativeTarget "iDeckJITHelper" */;
+			buildPhases = (
+				F5A00000000000000000000A /* Sources */,
+				F5A00000000000000000000B /* Frameworks */,
+				F5A00000000000000000000C /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = iDeckJITHelper;
+			productName = iDeckJITHelper;
+			productReference = F5A000000000000000000007 /* iDeckJITHelper.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		F5A00000000000000000000E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = iDeckJITHelper/iDeckJITHelper.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				"FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*]" = "$(SRCROOT)/Frameworks/StikJIT.xcframework/ios-arm64";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = iDeckJITHelper/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				"OTHER_LDFLAGS[sdk=iphoneos*]" = (
+					"$(inherited)",
+					"-framework",
+					StikJIT,
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.ideck.ideck.JITHelper;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		F5A00000000000000000000F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = iDeckJITHelper/iDeckJITHelper.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				"FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*]" = "$(SRCROOT)/Frameworks/StikJIT.xcframework/ios-arm64";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = iDeckJITHelper/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				"OTHER_LDFLAGS[sdk=iphoneos*]" = (
+					"$(inherited)",
+					"-framework",
+					StikJIT,
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.ideck.ideck.JITHelper;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		F5A000000000000000000010 /* Build configuration list for PBXNativeTarget "iDeckJITHelper" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F5A00000000000000000000E /* Debug */,
+				F5A00000000000000000000F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		999999999999999999999961 /* Build configuration list for PBXNativeTarget "VPNExtension" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -625,6 +844,7 @@
 			targets = (
 				555555555555555555555551 /* iDeck */,
 				999999999999999999999931 /* VPNExtension */,
+				F5A00000000000000000000D /* iDeckJITHelper */,
 			);
 		};
 

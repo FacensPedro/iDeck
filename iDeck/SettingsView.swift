@@ -1,266 +1,305 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
+/// Settings: a grouped list of categories, each opening its own page.
 struct SettingsView: View {
     @ObservedObject var coordinator: SystemCoordinator
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.scenePhase) private var scenePhase
-    @Environment(\.presentationMode) var presentationMode
+    @Environment(\.dismiss) private var dismiss
     @StateObject private var inputManager = InputManager.shared
+    @ObservedObject private var hardwareInput = HardwareInput.shared
     @AppStorage("controllerLeftSensitivity") private var controllerLeftSensitivity = 1.0
     @AppStorage("controllerRightSensitivity") private var controllerRightSensitivity = 1.0
     @AppStorage("controllerDeadzone") private var controllerDeadzone = 0.10
     @AppStorage("wineControllerAPI") private var wineControllerAPI = "XInput"
     @AppStorage("wineJITPoolMiB") private var wineJITPoolMiB = 0
+    @AppStorage(HardwareInput.enabledKey) private var keyboardMouseEnabled = true
+    @AppStorage(HardwareInput.mouseSensitivityKey) private var mouseSensitivity = 1.0
+    @AppStorage(HardwareInput.stickMouseKey) private var rightStickMouse = false
+    @AppStorage(BackgroundDownloads.continuedKey) private var continueDownloadsInBackground = true
+    @AppStorage(BackgroundDownloads.notificationsKey) private var downloadNotifications = true
+    @AppStorage(SystemCoordinator.jitMethodKey) private var jitMethod = "stikdebug"
     @State private var winePoolChangeRequiresRestart = false
     @AppStorage("showGamePerformanceOverlay") private var showGamePerformanceOverlay = false
     @StateObject private var updater = UpdateChecker()
     @State private var isSteamSignInPresented = false
     @ObservedObject private var gogLibrary = GOGLibraryModel.shared
+    @ObservedObject private var epicLibrary = EpicLibrary.shared
+    @ObservedObject private var externalDrives = ExternalDrives.shared
     @State private var isGOGSignInPresented = false
+    @State private var isEpicSignInPresented = false
+    @State private var isPairingImporterPresented = false
     @State private var jitDiagnosticsCopied = false
+    @State private var steamComponentsStatus: String?
+    @State private var steamComponentsBusy = false
     @AppStorage(AppLanguage.storageKey) private var appLanguage = AppLanguage.system.rawValue
-    
+
     var body: some View {
-        NavigationView {
-            ZStack {
-                Color.black.ignoresSafeArea()
-                
-                ScrollView {
-                    VStack(spacing: 24) {
-                        settingsSection(title: tr("Language")) {
-                            languagePicker
-                        }
-                        
-                        settingsSection(title: tr("JIT & Debugging")) {
-                            statusRow
-                            VStack(alignment: .leading, spacing: 8) {
-                                HStack {
-                                    Text(tr("Wine JIT pool"))
-                                        .foregroundColor(.white)
-                                    Spacer()
-                                    Picker(tr("Wine JIT pool"), selection: $wineJITPoolMiB) {
-                                        Text(tr("Automatic")).tag(0)
-                                        ForEach([64, 96, 128, 192, 256, 384], id: \.self) { size in
-                                            Text("\(size) MiB").tag(size)
-                                        }
-                                    }
-                                    .tint(.white)
-                                }
-                                Text(tr("Wine JIT pool size is selected before allocation and cannot change while mapped."))
-                                    .font(.caption)
-                                    .foregroundColor(.gray)
-                                if winePoolChangeRequiresRestart {
-                                    Text(tr("Restart iDeck before the new Wine JIT pool size can take effect."))
-                                        .font(.caption)
-                                        .foregroundColor(.orange)
-                                }
-                            }
-                            .padding(16)
-                        }
-                        
-                        settingsSection(title: tr("Steam")) {
-                            HStack(alignment: .top) {
-                                Text(tr("Steam account"))
-                                    .foregroundColor(.white)
-                                Spacer()
-                                VStack(alignment: .trailing, spacing: 4) {
-                                    Text(coordinator.isSteamConnected ? tr("Connected") : tr("Not connected"))
-                                        .font(.caption)
-                                        .foregroundColor(coordinator.isSteamConnected ? .green : .gray)
-                                    if coordinator.isSteamConnected, let account = SteamSignIn.accountName {
-                                        Text(account)
-                                            .font(.caption)
-                                            .foregroundColor(.white)
-                                    }
-                                }
-                            }
-                            .padding()
-                            if coordinator.isSteamConnected {
-                                actionButton(title: tr("Disconnect Steam"), icon: "rectangle.portrait.and.arrow.right") {
-                                    coordinator.disconnectSteamAccount()
-                                }
-                            } else {
-                                actionButton(title: tr("Connect Steam"), icon: "link") {
-                                    isSteamSignInPresented = true
-                                }
-                            }
-                        }
+        NavigationStack {
+            Form {
+                overviewSection
 
-                        settingsSection(title: tr("Controller")) {
-                            HStack {
-                                Text(tr("Windows controller API")).foregroundColor(.white)
-                                Spacer()
-                                Picker(tr("Windows controller API"), selection: $wineControllerAPI) {
-                                    ForEach(["XInput", "XInput + DirectInput", "HID", "DualSense HID", "Generic HID"], id: \.self) { api in
-                                        Text(tr(api)).tag(api)
-                                    }
-                                }
-                                .tint(.white)
-                            }.padding(.horizontal, 16)
-                            HStack {
-                                Text(tr("Connected controller")).foregroundColor(.white)
-                                Spacer()
-                                Text(inputManager.isControllerConnected ? inputManager.controllerName : tr("Not connected"))
-                                    .font(.caption).foregroundColor(inputManager.isControllerConnected ? .green : .gray)
-                                    .multilineTextAlignment(.trailing)
-                            }.padding()
-                            if inputManager.isControllerConnected {
-                                sensitivityRow(title: tr("Left stick sensitivity"), value: $controllerLeftSensitivity)
-                                sensitivityRow(title: tr("Right stick sensitivity"), value: $controllerRightSensitivity)
-                                VStack(alignment: .leading, spacing: 8) {
-                                    HStack {
-                                        Text(tr("Stick dead zone")).foregroundColor(.white)
-                                        Spacer()
-                                        Text(String(format: "%.2f", controllerDeadzone)).foregroundColor(.gray)
-                                    }
-                                    Slider(value: $controllerDeadzone, in: 0...0.35, step: 0.01).tint(.blue)
-                                }.padding()
-                            }
-                        }
-
-                        settingsSection(title: tr("Graphics & Performance")) {
-                            toggleRow(title: tr("MetalFX Upscaling"), isOn: $coordinator.isMetalFXEnabled)
-                            toggleRow(title: tr("Hold Display at Maximum Rate"), isOn: $coordinator.isMaxRefreshRateEnabled)
-                            toggleRow(title: tr("Show FPS, CPU & GPU overlay"), isOn: $showGamePerformanceOverlay)
-                            toggleRow(title: tr("D3DMetal Rendering"), isOn: $coordinator.isD3DMetalEnabled)
-                            Text(tr("Graphics changes apply when you launch the next game."))
-                                .font(.caption)
-                                .foregroundColor(.gray)
-                                .padding(.horizontal, 16)
-                                .padding(.bottom, 12)
-                        }
-                        
-                        settingsSection(title: tr("Updates")) {
-                            updatesContent
-                        }
-                        
-                        settingsSection(title: tr("Windows runtime")) {
-                            let runtime = MadeiraBundleIdentity.profile
-                            VStack(alignment: .leading, spacing: 8) {
-                                HStack {
-                                    Text(tr("IPA runtime"))
-                                    Spacer()
-                                    Text(tr(MadeiraBundleIdentity.isNative
-                                        ? "Madeira-native" : "Interface-only"))
-                                        .foregroundColor(MadeiraBundleIdentity.isNative ? .green : .orange)
-                                }
-                                HStack {
-                                    Text(tr("Graphics backend"))
-                                    Spacer()
-                                    Text((runtime["graphicsBackend"] as? String ?? "none").uppercased())
-                                }
-                                HStack {
-                                    Text("WoW64")
-                                    Spacer()
-                                    Text(tr((runtime["wow64Enabled"] as? Bool ?? false) ? "Bundled" : "Not bundled"))
-                                }
-                                HStack {
-                                    Text("Wine Mono")
-                                    Spacer()
-                                    Text(tr((runtime["wineMonoBundled"] as? Bool ?? false) ? "Bundled" : "Not bundled"))
-                                }
-                                if runtime["wineMonoBundled"] as? Bool != true {
-                                    Text(tr("Wine Mono is not included. Run iOS Build with Require Madeira runtime and Wine Mono enabled to create a different signed IPA."))
-                                        .font(.caption)
-                                        .foregroundColor(.gray)
-                                        .fixedSize(horizontal: false, vertical: true)
-                                }
-                                HStack {
-                                    Text("Metal Shader Converter")
-                                    Spacer()
-                                    Text(tr((runtime["metalShaderConverterBundled"] as? Bool ?? false) ? "Bundled" : "Not bundled"))
-                                }
-                                if !MadeiraBundleIdentity.isNative {
-                                    Text(tr(MadeiraBundleIdentity.missingRuntimeMessage))
-                                        .font(.caption)
-                                        .foregroundColor(.orange)
-                                        .fixedSize(horizontal: false, vertical: true)
-                                }
-                            }
-                            .font(.caption)
-                            .foregroundColor(.white)
-                            .padding(16)
-                        }
-
-                        settingsSection(title: tr("GOG")) {
-                            HStack {
-                                Text(gogLibrary.isSignedIn
-                                     ? (gogLibrary.username ?? tr("Connected"))
-                                     : tr("Not connected"))
-                                    .foregroundColor(gogLibrary.isSignedIn ? .green : .gray)
-                                Spacer()
-                                if gogLibrary.isSignedIn {
-                                    Button(tr("Sign out"), role: .destructive) { gogLibrary.signOut() }
-                                } else {
-                                    Button(tr("Connect GOG")) { isGOGSignInPresented = true }
-                                }
-                            }
-                            .padding()
-                            .background(Color(red: 0.15, green: 0.15, blue: 0.15))
-                            .padding(.bottom, 2)
-                        }
-
-                        settingsSection(title: tr("LiveContainer")) {
-                            toggleRow(title: tr("Inject Guest Hooks"), isOn: $coordinator.isGuestHooksEnabled)
-                        }
-
-                        settingsSection(title: tr("Support")) {
-                            NavigationLink(destination: BugReportView()) {
-                                HStack {
-                                    Image(systemName: "ladybug")
-                                        .frame(width: 24)
-                                    Text(tr("Bugs & logs"))
-                                    Spacer()
-                                    Image(systemName: "chevron.right")
-                                        .font(.caption)
-                                        .foregroundColor(.gray)
-                                }
-                                .padding()
-                                .foregroundColor(.white)
-                                .background(Color(red: 0.15, green: 0.15, blue: 0.15))
-                            }
-                            .padding(.bottom, 2)
-                        }
+                Section(tr("Accounts")) {
+                    NavigationLink { steamPage } label: {
+                        SettingsRow(icon: "gamecontroller.fill", color: .blue, title: "Steam",
+                                    value: coordinator.isSteamConnected ? (SteamSignIn.accountName ?? tr("Connected")) : tr("Not connected"))
                     }
-                    .padding(horizontalSizeClass == .compact ? 14 : 28)
-                    .frame(maxWidth: 720)
-                    .frame(maxWidth: .infinity)
+                    NavigationLink { gogPage } label: {
+                        SettingsRow(icon: "shippingbox.fill", color: .purple, title: "GOG",
+                                    value: gogLibrary.isSignedIn ? (gogLibrary.username ?? tr("Connected")) : tr("Not connected"))
+                    }
+                    NavigationLink { epicPage } label: {
+                        SettingsRow(icon: "e.square.fill", color: .gray, title: "Epic Games",
+                                    value: epicLibrary.signedIn ? (epicLibrary.accountName ?? tr("Connected")) : tr("Not connected"))
+                    }
+                }
+
+                Section(tr("Windows")) {
+                    NavigationLink { jitPage } label: {
+                        SettingsRow(icon: "bolt.fill", color: .orange, title: tr("JIT & Debugging"),
+                                    value: coordinator.isJITEnabled ? tr("Active") : tr("Off"))
+                    }
+                    NavigationLink { graphicsPage } label: {
+                        SettingsRow(icon: "sparkles.tv.fill", color: .pink, title: tr("Graphics & Performance"))
+                    }
+                    NavigationLink { controlsPage } label: {
+                        SettingsRow(icon: "keyboard.fill", color: .indigo, title: tr("Controls"),
+                                    value: inputManager.isControllerConnected ? inputManager.controllerName : nil)
+                    }
+                    NavigationLink { storagePage } label: {
+                        SettingsRow(icon: "externaldrive.fill", color: .teal, title: tr("Storage & Downloads"),
+                                    value: externalDrives.folders.isEmpty ? nil : "\(externalDrives.folders.count)")
+                    }
+                    NavigationLink { runtimePage } label: {
+                        SettingsRow(icon: "cpu.fill", color: .green, title: tr("Windows runtime"),
+                                    value: tr(MadeiraBundleIdentity.isNative ? "Madeira-native" : "Interface-only"))
+                    }
+                }
+
+                Section(tr("Apps")) {
+                    NavigationLink { LiveContainerSettingsView(coordinator: coordinator) } label: {
+                        SettingsRow(icon: "square.stack.3d.up.fill", color: .cyan, title: "LiveContainer")
+                    }
+                }
+
+                Section(tr("General")) {
+                    languagePicker
+                    NavigationLink { updatesPage } label: {
+                        SettingsRow(icon: "arrow.triangle.2.circlepath", color: .blue, title: tr("Updates"),
+                                    value: "v\(updater.currentVersion)")
+                    }
+                }
+
+                settingsSection(title: tr("Support")) {
+                    NavigationLink(destination: BugReportView()) {
+                        SettingsRow(icon: "ladybug.fill", color: .red, title: tr("Bugs & logs"))
+                    }
                 }
             }
             .navigationTitle(tr("Settings"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(tr("Done")) {
-                        presentationMode.wrappedValue.dismiss()
-                    }
-                    .foregroundColor(.white)
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(tr("Done")) { dismiss() }
                 }
             }
         }
-        .navigationViewStyle(.stack)
-        .sheet(isPresented: $isSteamSignInPresented) {
-            SteamSignInView()
-        }
-        .sheet(isPresented: $isGOGSignInPresented) {
-            GOGSignInView()
+        .sheet(isPresented: $isSteamSignInPresented) { SteamSignInView() }
+        .sheet(isPresented: $isGOGSignInPresented) { GOGSignInView() }
+        .sheet(isPresented: $isEpicSignInPresented) { EpicSignInView() }
+        .fileImporter(isPresented: $isPairingImporterPresented,
+                      allowedContentTypes: [.propertyList, .xml, .json, .data]) { result in
+            if case .success(let url) = result { coordinator.importPairingFile(at: url) }
         }
         .task {
             inputManager.refreshControllers()
             coordinator.refreshJITStatus()
+            coordinator.refreshPairingFileState()
+            HardwareInput.shared.start()
             await updater.check()
         }
         .onChange(of: wineJITPoolMiB) { _, selected in
             winePoolChangeRequiresRestart = !coordinator.updateWineJITPoolPreference(selected)
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active {
-                coordinator.refreshJITStatus()
-            }
+            if phase == .active { coordinator.refreshJITStatus() }
         }
         .preferredColorScheme(.dark)
     }
-    
+
+    // MARK: Overview
+
+    private var overviewSection: some View {
+        Section {
+            HStack(spacing: 14) {
+                Image(systemName: "gamecontroller.fill")
+                    .font(.title2.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 52, height: 52)
+                    .background(LinearGradient(colors: [.blue, .indigo], startPoint: .topLeading, endPoint: .bottomTrailing),
+                                in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("iDeck").font(.headline)
+                    Text("v\(updater.currentVersion)").font(.subheadline).foregroundStyle(.secondary)
+                }
+                Spacer()
+                VStack(alignment: .trailing, spacing: 4) {
+                    StatusPill(text: coordinator.isJITEnabled ? tr("JIT active") : tr("JIT off"),
+                               color: coordinator.isJITEnabled ? .green : .orange)
+                    StatusPill(text: tr(MadeiraBundleIdentity.isNative ? "Madeira-native" : "Interface-only"),
+                               color: MadeiraBundleIdentity.isNative ? .green : .orange)
+                }
+            }
+            .padding(.vertical, 4)
+        }
+    }
+
+    // MARK: Accounts
+
+    private var steamPage: some View {
+        Form {
+            settingsSection(title: tr("Steam")) {
+                LabeledContent(tr("Steam account")) {
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text(coordinator.isSteamConnected ? tr("Connected") : tr("Not connected"))
+                            .foregroundStyle(coordinator.isSteamConnected ? .green : .secondary)
+                        if coordinator.isSteamConnected, let account = SteamSignIn.accountName {
+                            Text(account).font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                if coordinator.isSteamConnected {
+                    Button(tr("Disconnect Steam"), role: .destructive) { coordinator.disconnectSteamAccount() }
+                } else {
+                    Button(tr("Connect Steam")) { isSteamSignInPresented = true }
+                }
+            }
+            Section {
+                LabeledContent(tr("Madeira Dock"), value: tr(MadeiraDock.bundled ? "Bundled" : "Not bundled"))
+                LabeledContent(tr("Steam client components"),
+                               value: MadeiraDock.clientInstalled
+                                   ? tr(MadeiraDock.clientSupported ? "Ready" : "Unsupported build")
+                                   : tr("Not downloaded"))
+                if MadeiraDock.bundled && !MadeiraDock.clientInstalled {
+                    Button {
+                        downloadSteamComponents()
+                    } label: {
+                        HStack {
+                            Text(tr("Download Steam's components"))
+                            if steamComponentsBusy { Spacer(); ProgressView() }
+                        }
+                    }
+                    .disabled(steamComponentsBusy)
+                }
+                if let steamComponentsStatus {
+                    Text(steamComponentsStatus).font(.caption).foregroundStyle(.secondary)
+                }
+            } header: {
+                Text(tr("Steam client"))
+            } footer: {
+                Text(tr("Games with Steam DRM start through Valve's own Windows client (Madeira Dock): turn on \"Start through the Steam client\" in the game's settings. The components (about 72 MB) come from Valve's update server and are checked against pinned checksums."))
+            }
+        }
+        .navigationTitle("Steam")
+    }
+
+    private func downloadSteamComponents() {
+        steamComponentsBusy = true
+        steamComponentsStatus = nil
+        Task {
+            do {
+                try await SteamRuntimeInstaller.shared.prepare(prefix: MadeiraDock.prefix) { message in
+                    await MainActor.run { steamComponentsStatus = message }
+                }
+            } catch {
+                steamComponentsStatus = error.localizedDescription
+            }
+            steamComponentsBusy = false
+        }
+    }
+
+    private var gogPage: some View {
+        Form {
+            settingsSection(title: tr("GOG")) {
+                LabeledContent(tr("Account"),
+                               value: gogLibrary.isSignedIn ? (gogLibrary.username ?? tr("Connected")) : tr("Not connected"))
+                if gogLibrary.isSignedIn {
+                    Button(tr("Sign out"), role: .destructive) { gogLibrary.signOut() }
+                } else {
+                    Button(tr("Connect GOG")) { isGOGSignInPresented = true }
+                }
+            }
+        }
+        .navigationTitle("GOG")
+    }
+
+    private var epicPage: some View {
+        Form {
+            Section {
+                LabeledContent(tr("Account"),
+                               value: epicLibrary.signedIn ? (epicLibrary.accountName ?? tr("Connected")) : tr("Not connected"))
+                if epicLibrary.signedIn {
+                    Button(tr("Sign out"), role: .destructive) { epicLibrary.signOut() }
+                } else {
+                    Button(tr("Connect Epic")) { isEpicSignInPresented = true }
+                }
+            } header: {
+                Text("Epic Games")
+            } footer: {
+                Text(tr("Games download from Epic's servers and start with a one-use Epic sign-in code. The Epic launcher is not installed."))
+            }
+            if epicLibrary.signedIn {
+                Section(tr("Cloud saves")) {
+                    EpicCloudSettingRows()
+                }
+            }
+        }
+        .navigationTitle("Epic Games")
+        .onAppear { epicLibrary.start() }
+    }
+
+    // MARK: JIT
+
+    private var jitPage: some View {
+        Form {
+            settingsSection(title: tr("JIT & Debugging")) {
+                statusRow
+            }
+            Section {
+                Picker(tr("Method"), selection: $jitMethod) {
+                    Text("StikDebug").tag("stikdebug")
+                    Text(tr("Built-in")).tag("builtIn")
+                }
+                LabeledContent(tr("Pairing file"), value: coordinator.hasPairingFile ? tr("Imported") : tr("Missing"))
+                Button(coordinator.hasPairingFile ? tr("Replace pairing file") : tr("Import pairing file")) {
+                    isPairingImporterPresented = true
+                }
+            } header: {
+                Text(tr("Activation"))
+            } footer: {
+                Text(tr("Built-in: iDeck's own helper attaches the debugger through LocalDevVPN with your pairing file, without opening another app. StikDebug: iDeck asks StikDebug to attach."))
+            }
+            Section {
+                Picker(selection: $wineJITPoolMiB) {
+                    Text(tr("Automatic")).tag(0)
+                    ForEach([64, 96, 128, 192, 256, 384], id: \.self) { size in
+                        Text("\(size) MiB").tag(size)
+                    }
+                } label: {
+                    Text(tr("Wine JIT pool"))
+                }
+                if winePoolChangeRequiresRestart {
+                    Text(tr("Restart iDeck before the new Wine JIT pool size can take effect."))
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+            } footer: {
+                Text(tr("Wine JIT pool size is selected before allocation and cannot change while mapped."))
+            }
+        }
+        .navigationTitle(tr("JIT & Debugging"))
+    }
+
     private var shouldShowJITDiagnostics: Bool {
         // The snapshot is a read-only try-lock probe; reading it does not
         // allocate executable memory or trigger the StikDebug BRK handler.
@@ -272,97 +311,58 @@ struct SettingsView: View {
                snapshot.wine_failure_mach_code != 0
     }
 
+    @ViewBuilder
     private var statusRow: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 10) {
-                Image(systemName: coordinator.isJITEnabled ? "checkmark.shield.fill" : "shield.lefthalf.filled")
-                    .font(.title3)
-                    .foregroundColor(coordinator.isJITEnabled ? .green : .orange)
-                    .frame(width: 28, height: 28)
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(coordinator.isJITEnabled ? tr("JIT detected") : tr("JIT not detected"))
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundColor(.white)
-                    Text(tr("JIT permission does not guarantee that FEX is ready."))
-                        .font(.caption)
-                        .foregroundColor(.gray)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer(minLength: 0)
-            }
-            if shouldShowJITDiagnostics {
-                Button {
-                    copyJITDiagnostics()
-                } label: {
-                    HStack {
-                        Image(systemName: "doc.on.doc")
-                        Text(tr("Copy JIT diagnostics"))
-                        Spacer()
-                        if jitDiagnosticsCopied {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundColor(.green)
-                        }
-                    }
-                    .font(.subheadline)
-                    .foregroundColor(.white)
-                    .padding(.vertical, 10)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(tr("Copy JIT diagnostics"))
-                if jitDiagnosticsCopied {
-                    Text(tr("JIT diagnostics copied to clipboard"))
-                        .font(.caption)
-                        .foregroundColor(.green)
-                }
-            }
-            if coordinator.isJITEnabled {
-                HStack {
-                    Text(tr("Debugger connection")).foregroundColor(.white)
-                    Spacer()
-                    Text(coordinator.isStikDebugAttached ? tr("Attached") : tr("Detached"))
-                        .foregroundColor(coordinator.isStikDebugAttached ? .green : .orange)
-                }
-                .font(.caption)
-            }
-            if coordinator.isJITEnabled && !coordinator.isStikDebugAttached && !coordinator.isWineJITPrepared {
-                Text(tr("JIT permission is active, but StikDebug's debugger script is not connected. Use the button below to reconnect before starting Wine."))
+        HStack(spacing: 12) {
+            Image(systemName: coordinator.isJITEnabled ? "checkmark.shield.fill" : "shield.lefthalf.filled")
+                .font(.title2)
+                .foregroundStyle(coordinator.isJITEnabled ? .green : .orange)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(coordinator.isJITEnabled ? tr("JIT detected") : tr("JIT not detected"))
+                    .font(.headline)
+                Text(tr("JIT permission does not guarantee that FEX is ready."))
                     .font(.caption)
-                    .foregroundColor(.orange)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            if !coordinator.isJITEnabled || (!coordinator.isStikDebugAttached && !coordinator.isWineJITPrepared) {
-                Button {
-                    coordinator.requestStikDebugJIT()
-                } label: {
-                    HStack(spacing: 10) {
-                        Image(systemName: "bolt.fill")
-                            .font(.system(size: 16, weight: .semibold))
-                        Text(tr(coordinator.isJITEnabled ? "Reconnect JIT debugger" : "Enable JIT"))
-                            .font(.subheadline.weight(.semibold))
-                        Spacer(minLength: 0)
-                        Image(systemName: "arrow.up.right")
-                            .font(.footnote.weight(.semibold))
-                            .opacity(0.7)
-                    }
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 16)
-                    .frame(minHeight: 48)
-                    .background(Color(red: 0.12, green: 0.34, blue: 0.70), in: RoundedRectangle(cornerRadius: 12))
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(tr(coordinator.isJITEnabled ? "Reconnect JIT debugger" : "Enable JIT"))
-                Text(tr("StikDebug requires pairing, LocalDevVPN, and a debug-signable iDeck. Opening StikDebug does not prove FEX JIT is ready."))
-                    .font(.caption)
-                    .foregroundColor(.gray)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .foregroundStyle(.secondary)
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
-        .background(Color(red: 0.15, green: 0.15, blue: 0.15), in: RoundedRectangle(cornerRadius: 12))
-        .padding(.bottom, 2)
+        .padding(.vertical, 4)
+        if coordinator.isJITEnabled {
+            LabeledContent(tr("Debugger connection")) {
+                Text(coordinator.isStikDebugAttached ? tr("Attached") : tr("Detached"))
+                    .foregroundStyle(coordinator.isStikDebugAttached ? .green : .orange)
+            }
+        }
+        if coordinator.isJITEnabled && !coordinator.isStikDebugAttached && !coordinator.isWineJITPrepared {
+            Text(tr("JIT permission is active, but StikDebug's debugger script is not connected. Use the button below to reconnect before starting Wine."))
+                .font(.caption)
+                .foregroundStyle(.orange)
+        }
+        if !coordinator.isJITEnabled || (!coordinator.isStikDebugAttached && !coordinator.isWineJITPrepared) {
+            Button {
+                coordinator.requestStikDebugJIT()
+            } label: {
+                Label(tr(coordinator.isJITEnabled ? "Reconnect JIT debugger" : "Enable JIT"), systemImage: "bolt.fill")
+            }
+            Text(tr("StikDebug requires pairing, LocalDevVPN, and a debug-signable iDeck. Opening StikDebug does not prove FEX JIT is ready."))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        if shouldShowJITDiagnostics {
+            Button {
+                copyJITDiagnostics()
+            } label: {
+                HStack {
+                    Label(tr("Copy JIT diagnostics"), systemImage: "doc.on.doc")
+                    Spacer()
+                    if jitDiagnosticsCopied {
+                        Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                    }
+                }
+            }
+            .accessibilityLabel(tr("Copy JIT diagnostics"))
+        }
     }
-    
+
     private func copyJITDiagnostics() {
         let snapshot = ideck_jit_snapshot()
         let jitPermission = ideck_process_has_jit_permission()
@@ -372,6 +372,7 @@ struct SettingsView: View {
             "iDeck Madeira Stage 7 — on-device JIT snapshot",
             "iPadOS version: \(UIDevice.current.systemVersion)",
             "App version: \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown")",
+            "JIT method: \(jitMethod)",
             "CS_DEBUGGED permission: \(jitPermission)",
             "Live debugger attached: \(snapshot.debugger_attached)",
             "FEX initialized: \(snapshot.fex_initialized)",
@@ -392,51 +393,158 @@ struct SettingsView: View {
         jitDiagnosticsCopied = true
     }
 
-    private var languagePicker: some View {
-        HStack {
-            Text(tr("Language"))
-                .foregroundColor(.white)
-            Spacer()
-            Picker(tr("Language"), selection: $appLanguage) {
-                ForEach(AppLanguage.allCases) { language in
-                    Text(language.displayName).tag(language.rawValue)
+    // MARK: Controls
+
+    private var controlsPage: some View {
+        Form {
+            settingsSection(title: tr("Controller")) {
+                Picker(tr("Windows controller API"), selection: $wineControllerAPI) {
+                    ForEach(["XInput", "XInput + DirectInput", "HID", "DualSense HID", "Generic HID"], id: \.self) { api in
+                        Text(tr(api)).tag(api)
+                    }
                 }
+                LabeledContent(tr("Connected controller")) {
+                    Text(inputManager.isControllerConnected ? inputManager.controllerName : tr("Not connected"))
+                        .foregroundStyle(inputManager.isControllerConnected ? .green : .secondary)
+                }
+                if inputManager.isControllerConnected {
+                    sensitivityRow(title: tr("Left stick sensitivity"), value: $controllerLeftSensitivity)
+                    sensitivityRow(title: tr("Right stick sensitivity"), value: $controllerRightSensitivity)
+                    VStack(alignment: .leading, spacing: 6) {
+                        LabeledContent(tr("Stick dead zone"), value: String(format: "%.2f", controllerDeadzone))
+                        Slider(value: $controllerDeadzone, in: 0...0.35, step: 0.01)
+                    }
+                }
+                toggleRow(title: tr("Right stick controls mouse"), isOn: $rightStickMouse)
             }
-            .pickerStyle(.menu)
-            .tint(.blue)
+            Section {
+                toggleRow(title: tr("Keyboard & mouse in games"), isOn: $keyboardMouseEnabled)
+                LabeledContent(tr("Keyboard"), value: hardwareInput.keyboardName ?? tr("Not connected"))
+                LabeledContent(tr("Mouse"), value: hardwareInput.mouseName ?? tr("Not connected"))
+                VStack(alignment: .leading, spacing: 6) {
+                    LabeledContent(tr("Mouse sensitivity"), value: String(format: "%.2fx", mouseSensitivity))
+                    Slider(value: $mouseSensitivity, in: 0.25...3.0, step: 0.05)
+                }
+            } header: {
+                Text(tr("Keyboard & mouse"))
+            } footer: {
+                Text(tr("Physical keys and raw mouse movement go to the game while it is on screen. With the right stick as mouse, R1 clicks and L1 right-clicks."))
+            }
         }
-        .padding()
-        .background(Color(red: 0.15, green: 0.15, blue: 0.15))
-        .padding(.bottom, 2)
+        .navigationTitle(tr("Controls"))
     }
-    
-    @ViewBuilder
-    private var updatesContent: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            ForEach(updater.statuses) { status in
-                HStack {
-                    Text(status.project.name)
-                        .foregroundColor(.white)
-                    Spacer()
-                    Text(versionText(for: status))
+
+    // MARK: Graphics
+
+    private var graphicsPage: some View {
+        Form {
+            settingsSection(title: tr("Graphics & Performance")) {
+                toggleRow(title: tr("MetalFX Upscaling"), isOn: $coordinator.isMetalFXEnabled)
+                toggleRow(title: tr("Hold Display at Maximum Rate"), isOn: $coordinator.isMaxRefreshRateEnabled)
+                toggleRow(title: tr("Show FPS, CPU & GPU overlay"), isOn: $showGamePerformanceOverlay)
+                toggleRow(title: tr("D3DMetal Rendering"), isOn: $coordinator.isD3DMetalEnabled)
+            }
+            Section {
+            } footer: {
+                Text(tr("Graphics changes apply when you launch the next game."))
+            }
+        }
+        .navigationTitle(tr("Graphics & Performance"))
+    }
+
+    // MARK: Storage
+
+    private var storagePage: some View {
+        Form {
+            Section {
+                NavigationLink { ExternalDrivesSettingsView() } label: {
+                    SettingsRow(icon: "externaldrive.fill", color: .teal, title: tr("External drives"),
+                                value: externalDrives.folders.isEmpty ? tr("None") : "\(externalDrives.folders.count)")
+                }
+                if let missing = externalDrives.installFolderMissing {
+                    Text(tr("The install drive \"%@\" is not connected; new games go to this device.", missing))
                         .font(.caption)
-                        .foregroundColor(.gray)
+                        .foregroundStyle(.orange)
+                }
+            }
+            Section {
+                toggleRow(title: tr("Continue downloads in the background"), isOn: $continueDownloadsInBackground)
+                toggleRow(title: tr("Download notifications"), isOn: $downloadNotifications)
+            } header: {
+                Text(tr("Downloads"))
+            } footer: {
+                Text(tr("iOS shows the download's progress while iDeck is in the background. If iOS stops it, the download pauses and continues when you return."))
+            }
+        }
+        .navigationTitle(tr("Storage & Downloads"))
+    }
+
+    // MARK: Runtime
+
+    private var runtimePage: some View {
+        Form {
+            settingsSection(title: tr("Windows runtime")) {
+                let runtime = MadeiraBundleIdentity.profile
+                LabeledContent(tr("IPA runtime")) {
+                    Text(tr(MadeiraBundleIdentity.isNative ? "Madeira-native" : "Interface-only"))
+                        .foregroundStyle(MadeiraBundleIdentity.isNative ? .green : .orange)
+                }
+                LabeledContent(tr("Graphics backend"), value: (runtime["graphicsBackend"] as? String ?? "none").uppercased())
+                LabeledContent("WoW64", value: tr((runtime["wow64Enabled"] as? Bool ?? false) ? "Bundled" : "Not bundled"))
+                LabeledContent("Wine Mono", value: tr((runtime["wineMonoBundled"] as? Bool ?? false) ? "Bundled" : "Not bundled"))
+                LabeledContent("Metal Shader Converter",
+                               value: tr((runtime["metalShaderConverterBundled"] as? Bool ?? false) ? "Bundled" : "Not bundled"))
+                LabeledContent(tr("Madeira Dock"), value: tr(MadeiraDock.bundled ? "Bundled" : "Not bundled"))
+                if runtime["wineMonoBundled"] as? Bool != true {
+                    Text(tr("Wine Mono is not included. Run iOS Build with Require Madeira runtime and Wine Mono enabled to create a different signed IPA."))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                if !MadeiraBundleIdentity.isNative {
+                    Text(tr(MadeiraBundleIdentity.missingRuntimeMessage))
+                        .font(.caption)
+                        .foregroundStyle(.orange)
                 }
             }
         }
-        .padding()
-        .background(Color(red: 0.15, green: 0.15, blue: 0.15))
-        .padding(.bottom, 2)
-        
-        actionButton(title: updater.isChecking ? tr("Checking...") : tr("Check for Updates"), icon: "arrow.triangle.2.circlepath") {
-            Task { await updater.check() }
-        }
-        .disabled(updater.isChecking)
-        
-        // No in-app iDeck update action: users install signed IPAs through
-        // their chosen installer. The version list remains read-only.
+        .navigationTitle(tr("Windows runtime"))
     }
-    
+
+    // MARK: General
+
+    private var languagePicker: some View {
+        Picker(selection: $appLanguage) {
+            ForEach(AppLanguage.allCases) { language in
+                Text(language.displayName).tag(language.rawValue)
+            }
+        } label: {
+            SettingsRow(icon: "globe", color: .blue, title: tr("Language"))
+        }
+        .pickerStyle(.menu)
+    }
+
+    private var updatesPage: some View {
+        Form {
+            settingsSection(title: tr("Updates")) {
+                ForEach(updater.statuses) { status in
+                    LabeledContent(status.project.name, value: versionText(for: status))
+                }
+                Button {
+                    Task { await updater.check() }
+                } label: {
+                    HStack {
+                        Text(updater.isChecking ? tr("Checking...") : tr("Check for Updates"))
+                        if updater.isChecking { Spacer(); ProgressView() }
+                    }
+                }
+                .disabled(updater.isChecking)
+            }
+            // No in-app iDeck update action: users install signed IPAs through
+            // their chosen installer. The version list remains read-only.
+        }
+        .navigationTitle(tr("Updates"))
+    }
+
     /// Installed iDeck version, plus the newest release with an IPA once checked.
     private func versionText(for status: ProjectStatus) -> String {
         let installed = "v\(updater.currentVersion)"
@@ -444,57 +552,60 @@ struct SettingsView: View {
               UpdateChecker.isNewer(latest, than: updater.currentVersion) else { return installed }
         return installed + " → " + latest
     }
-    
+
+    // MARK: Building blocks
+
     private func settingsSection<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(title.uppercased())
-                .font(.caption)
-                .fontWeight(.bold)
-                .foregroundColor(.gray)
-                .padding(.horizontal, 4)
-            
-            VStack(spacing: 0) {
-                content()
-            }
-            .background(Color(red: 0.1, green: 0.1, blue: 0.1))
-            .cornerRadius(12)
-        }
+        Section(title) { content() }
     }
-    
-    private func actionButton(title: String, icon: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack {
-                Image(systemName: icon)
-                    .frame(width: 24)
-                Text(title)
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .foregroundColor(.gray)
-            }
-            .padding()
-            .foregroundColor(.white)
-            .background(Color(red: 0.15, green: 0.15, blue: 0.15))
-        }
-        .padding(.bottom, 2)
-    }
-    
+
     private func sensitivityRow(title: String, value: Binding<Double>) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack { Text(title).foregroundColor(.white); Spacer(); Text(String(format: "%.2fx", value.wrappedValue)).foregroundColor(.gray) }
-            Slider(value: value, in: 0.25...2.0, step: 0.05).tint(.blue)
+        VStack(alignment: .leading, spacing: 6) {
+            LabeledContent(title, value: String(format: "%.2fx", value.wrappedValue))
+            Slider(value: value, in: 0.25...2.0, step: 0.05)
         }
-        .padding()
-        .background(Color(red: 0.15, green: 0.15, blue: 0.15))
-        .padding(.bottom, 2)
     }
 
     private func toggleRow(title: String, isOn: Binding<Bool>) -> some View {
         Toggle(title, isOn: isOn)
-            .padding()
-            .foregroundColor(.white)
-            .background(Color(red: 0.15, green: 0.15, blue: 0.15))
-            .padding(.bottom, 2)
-            .tint(.blue)
+    }
+}
+
+/// A settings row: a coloured symbol tile, a title and an optional value.
+struct SettingsRow: View {
+    let icon: String
+    let color: Color
+    let title: String
+    var value: String? = nil
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 28, height: 28)
+                .background(color, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+            Text(title)
+            Spacer(minLength: 8)
+            if let value {
+                Text(value)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+        }
+    }
+}
+
+private struct StatusPill: View {
+    let text: String
+    let color: Color
+
+    var body: some View {
+        Text(text)
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(color)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(color.opacity(0.15), in: Capsule())
     }
 }

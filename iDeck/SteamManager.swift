@@ -4778,37 +4778,6 @@ enum SteamFileError: LocalizedError {
     }
 }
 
-// Adapted from Madeira's background-download grace strategy. This is the
-// short iPadOS background execution allowance, NOT an unlimited background
-// transfer entitlement. Completed chunks remain recoverable via journals.
-@MainActor
-private final class SteamDownloadBackgroundGrace {
-    private var identifier: UIBackgroundTaskIdentifier = .invalid
-
-    func begin(appID: UInt32) {
-        guard identifier == .invalid else { return }
-        identifier = UIApplication.shared.beginBackgroundTask(
-            withName: "Steam download \(appID)"
-        ) { [weak self] in
-            DispatchQueue.main.async {
-                SteamLog.event("[bg-download] grace expired; system may suspend transfers")
-                self?.end()
-            }
-        }
-    }
-
-    func end() {
-        guard identifier != .invalid else { return }
-        let task = identifier
-        identifier = .invalid
-        UIApplication.shared.endBackgroundTask(task)
-    }
-
-    deinit {
-        // This lease is explicitly ended from the owning download's defer.
-    }
-}
-
 @MainActor
 final class SteamOwnedGamesModel: ObservableObject {
     @Published private(set) var games: [SteamAppInfo] = []
@@ -4955,9 +4924,12 @@ final class SteamOwnedGamesModel: ObservableObject {
 
     func startInstall(appID: UInt32, prefixPath: URL) {
         guard installTasks[appID] == nil else { return }
+        attachBackgroundDownloads()
+        installPrefixes[appID] = prefixPath
         installTasks[appID] = Task { @MainActor in
             await self.install(appID: appID, prefixPath: prefixPath)
             self.installTasks.removeValue(forKey: appID)
+            self.installPrefixes.removeValue(forKey: appID)
             self.cancellingApps.remove(appID)
         }
     }
@@ -5113,11 +5085,13 @@ final class SteamOwnedGamesModel: ObservableObject {
         installingApps.insert(appID)
         downloadErrors[appID] = nil
         downloadProgress[appID] = SteamDownloadProgress()
-        let backgroundGrace = SteamDownloadBackgroundGrace()
-        backgroundGrace.begin(appID: appID)
+        let displayName = games.first(where: { $0.appID == appID })?.name ?? "App \(appID)"
+        BackgroundDownloads.steam.started(name: displayName)
+        var outcome = BackgroundDownloads.Outcome.paused
         defer {
-            backgroundGrace.end()
             installingApps.remove(appID)
+            BackgroundDownloads.steam.ended(name: displayName, outcome: outcome,
+                                            queueEmpty: installingApps.isEmpty)
         }
         var installFolder: String?
         var installFolderAlreadyExisted = false
@@ -5158,15 +5132,22 @@ final class SteamOwnedGamesModel: ObservableObject {
                 try installFolder.write(to: installOwnership, atomically: true, encoding: .utf8)
             }
             try FileManager.default.createDirectory(at: steamApps, withIntermediateDirectories: true)
+            if !wasInstalled, !installFolderAlreadyExisted, let installFolder {
+                ExternalDrives.shared.prepareExternalInstall(
+                    local: SteamInstallPaths.common(drive: drive).appendingPathComponent(installFolder, isDirectory: true),
+                    store: "Steam")
+            }
             _ = try await downloader.install(
                 app,
                 steamApps: steamApps,
                 ownedDepots: { [weak self] in try? await self?.fetcher.ownedDepotIDs() },
                 progress: { [weak self] progress in
                     self?.downloadProgress[appID] = progress
+                    BackgroundDownloads.steam.progress(done: progress.doneBytes, total: progress.totalBytes)
                 }
             )
             try Task.checkCancellation()
+            outcome = .completed
             installedApps.insert(appID)
             if let measuredSize = downloadProgress[appID]?.installedBytes {
                 installedSizes[appID] = measuredSize
@@ -5174,6 +5155,13 @@ final class SteamOwnedGamesModel: ObservableObject {
             downloadErrors[appID] = nil
         } catch {
             let cancelled = Task.isCancelled || error is CancellationError
+            if cancelled, pausedForBackground[appID] != nil {
+                // Paused by iOS: keep every journaled chunk for the resume.
+                downloadProgress.removeValue(forKey: appID)
+                downloadErrors[appID] = nil
+                return
+            }
+            if !cancelled { outcome = .failed(SteamSignIn.message(error)) }
             if cancelled, !wasInstalled {
                 if ownsIncompleteInstall, let installFolder {
                     SteamInstallFiles.delete(appID: Int(appID), folderName: installFolder,
@@ -5203,11 +5191,13 @@ final class SteamOwnedGamesModel: ObservableObject {
         installingApps.insert(appID)
         downloadErrors[appID] = nil
         downloadProgress[appID] = SteamDownloadProgress()
-        let backgroundGrace = SteamDownloadBackgroundGrace()
-        backgroundGrace.begin(appID: appID)
+        let dlcName = dlcMetadata[dlcAppID]?.name ?? "DLC \(dlcAppID)"
+        BackgroundDownloads.steam.started(name: dlcName)
+        var outcome = BackgroundDownloads.Outcome.paused
         defer {
-            backgroundGrace.end()
             installingApps.remove(appID)
+            BackgroundDownloads.steam.ended(name: dlcName, outcome: outcome,
+                                            queueEmpty: installingApps.isEmpty)
         }
         do {
             try Task.checkCancellation()
@@ -5230,8 +5220,12 @@ final class SteamOwnedGamesModel: ObservableObject {
                 ownedDepots: { [weak self] in try? await self?.fetcher.ownedDepotIDs() },
                 includedDLC: [dlcAppID],
                 dlcOnly: true,
-                progress: { [weak self] progress in self?.downloadProgress[appID] = progress })
+                progress: { [weak self] progress in
+                    self?.downloadProgress[appID] = progress
+                    BackgroundDownloads.steam.progress(done: progress.doneBytes, total: progress.totalBytes)
+                })
             try Task.checkCancellation()
+            outcome = .completed
             installedApps.insert(appID)
             if let measuredSize = downloadProgress[appID]?.installedBytes {
                 installedSizes[appID] = measuredSize
@@ -5242,7 +5236,47 @@ final class SteamOwnedGamesModel: ObservableObject {
                 downloadErrors[appID] = nil
                 downloadProgress.removeValue(forKey: appID)
             } else {
+                outcome = .failed(SteamSignIn.message(error))
                 downloadErrors[appID] = SteamSignIn.message(error)
+            }
+        }
+    }
+
+    // MARK: Background pause and resume
+
+    /// Games paused because iOS ended iDeck's background time, with their prefix.
+    private var pausedForBackground: [UInt32: URL] = [:]
+    private var installPrefixes: [UInt32: URL] = [:]
+    private var backgroundAttached = false
+
+    private func attachBackgroundDownloads() {
+        guard !backgroundAttached else { return }
+        backgroundAttached = true
+        BackgroundDownloads.steam.attach(
+            active: { [weak self] in !(self?.installTasks.isEmpty ?? true) },
+            pause: { [weak self] in self?.pauseForBackground() },
+            resume: { [weak self] in self?.resumeAfterBackground() })
+    }
+
+    private func pauseForBackground() {
+        for (appID, task) in installTasks {
+            guard let prefix = installPrefixes[appID] else { continue }
+            pausedForBackground[appID] = prefix
+            task.cancel()
+        }
+    }
+
+    private func resumeAfterBackground() {
+        let paused = pausedForBackground
+        guard !paused.isEmpty else { return }
+        Task { @MainActor in
+            // Let the cancelled tasks unwind before starting again.
+            for _ in 0..<50 where paused.keys.contains(where: { installTasks[$0] != nil }) {
+                try? await Task.sleep(nanoseconds: 100_000_000)
+            }
+            for (appID, prefix) in paused {
+                pausedForBackground.removeValue(forKey: appID)
+                startInstall(appID: appID, prefixPath: prefix)
             }
         }
     }

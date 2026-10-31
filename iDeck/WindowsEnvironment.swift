@@ -60,6 +60,7 @@ class WindowsEnvironment {
     let steamManager = SteamManager()
     /// The profile's Vulkan/OpenGL choices, applied when the executable is known.
     private var sessionVulkanMode = "Automatic"
+    private var sessionUseRecommended = true
     private var sessionOpenGLBackend = "Automatic"
     /// MetalFX spatial upscale factor for this launch (nil = off).
     private var sessionMetalFXFactor: Double?
@@ -331,7 +332,8 @@ class WindowsEnvironment {
             completion(Int(ENOTSUP))
             return
         }
-        writeSessionGraphicsConfig(binary: binary, is32Bit: needsWoW64)
+        writeSessionGraphicsConfig(binary: binary, is32Bit: needsWoW64,
+                                   steamAppID: steamAppID, steamInstallDirectory: steamInstallDirectory)
 
         let architectureTranslator = BoxTranslator()
         architectureTranslator.translateAndRun(
@@ -380,13 +382,48 @@ class WindowsEnvironment {
         return false
     }
 
+    /// C:\ path of a file inside the prefix's drive_c, or nil.
+    static func windowsPath(_ url: URL) -> String? {
+        let parts = url.standardizedFileURL.pathComponents
+        guard let index = parts.lastIndex(of: "drive_c") else { return nil }
+        return "C:\\" + parts[(index + 1)...].joined(separator: "\\")
+    }
+
+    /// The recommendation for the program being launched; `.standard` for an
+    /// unrecognised game.
+    static func recommendation(binary: URL, steamAppID: UInt32?, steamInstallDirectory: URL?) -> GameRecommendation {
+        let exists: (String) -> Bool = { windows in
+            guard let root = binary.standardizedFileURL.pathComponents.lastIndex(of: "drive_c") else { return false }
+            let drive = NSString.path(withComponents: Array(binary.standardizedFileURL.pathComponents[...root]))
+            let relative = windows.dropFirst(3).replacingOccurrences(of: "\\", with: "/")
+            return FileManager.default.fileExists(atPath: drive + "/" + relative)
+        }
+        if let steamAppID, let folder = steamInstallDirectory.flatMap(windowsPath),
+           let match = GameRecommendations.match(windowsPath: folder, steamAppID: Int(steamAppID), fileExists: exists) {
+            return match
+        }
+        if let path = windowsPath(binary),
+           let match = GameRecommendations.match(windowsPath: path, steamAppID: steamAppID.map(Int.init), fileExists: exists) {
+            return match
+        }
+        return GameRecommendations.standard
+    }
+
     /// Writes this launch's lines of Madeira's per-game config (MADEIRA_CFG_GAME,
     /// read after Documents/madeira.cfg so these keys win). `vulkan = moltenvk`
     /// makes the bridge link winevulkan/vulkan-1 into the prefix and point
     /// winevulkan at gl/libMoltenVK.dylib; `gl-backend` picks Zink or OpenGL ES.
     /// Upstream binds no 32-bit Vulkan table yet, so Vulkan is x64-only.
-    private func writeSessionGraphicsConfig(binary: URL, is32Bit: Bool) {
+    private func writeSessionGraphicsConfig(binary: URL, is32Bit: Bool,
+                                            steamAppID: UInt32? = nil, steamInstallDirectory: URL? = nil) {
         var lines = ["# Written by iDeck for this launch: \(binary.lastPathComponent)"]
+        if sessionUseRecommended {
+            let recommendation = Self.recommendation(binary: binary, steamAppID: steamAppID,
+                                                     steamInstallDirectory: steamInstallDirectory)
+            lines += recommendation.config.split(separator: "\n").map(String.init)
+                .filter { !$0.hasPrefix("#") && !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+            SteamLog.event("[wine-launch] recommended settings: \(recommendation.id) v\(recommendation.version)")
+        }
         let runtime = Self.hasGLVulkanRuntime
         switch sessionVulkanMode {
         case "Off":
@@ -427,6 +464,16 @@ class WindowsEnvironment {
     }
 
     func applyGameProfile(_ profile: WindowsGameProfile) {
+        // A previous Madeira Dock launch leaves its host switches in the
+        // process environment; only a new Dock launch sets them again.
+        for key in ["MADEIRA_STEAM_HOST_PROBE", "MADEIRA_STEAM_HOST_SESSION", "MADEIRA_STEAM_HOST_LOGIN",
+                    "MADEIRA_STEAM_HOST_LAUNCH", "MADEIRA_STEAM_HOST_APPID", "MADEIRA_STEAM_HOST_LAUNCH_OPTION",
+                    "MADEIRA_STEAM_HOST_CLIENT_DIR", "MADEIRA_STEAM_HOST_EXPECTED_INSTALL", "MADEIRA_STEAM_HOST_LOG",
+                    "MADEIRA_STEAM_HOST_ARGUMENTS", "MADEIRA_STEAM_HOST_CEG", "MADEIRA_JIT_IMAGE_RETIRE",
+                    "MADEIRA_IMAGE_MAP_GUARD", "MADEIRA_DOCK_AUTH_FILE", "MADEIRA_DOCK_OFFLINE"] {
+            unsetenv(key)
+        }
+        sessionUseRecommended = profile.useRecommended
         sessionVulkanMode = profile.vulkanMode
         sessionOpenGLBackend = profile.openGLBackend
         setenv("IDECK_DISPLAY_SCALING", RuntimeConfiguration.SurfaceMode(saved: profile.surfaceScaling).rawValue, 1)

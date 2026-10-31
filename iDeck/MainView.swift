@@ -297,6 +297,10 @@ struct WindowsWorkspaceView: View {
     @State private var isGOGSignInPresented = false
     @AppStorage("library.steamOwnedCollapsed") private var steamOwnedCollapsed = false
     @AppStorage("library.gogOwnedCollapsed") private var gogOwnedCollapsed = false
+    @ObservedObject private var epicLibrary = EpicLibrary.shared
+    @State private var isEpicSignInPresented = false
+    @State private var selectedEpicGame: SelectedEpicGame?
+    @AppStorage("library.epicOwnedCollapsed") private var epicOwnedCollapsed = false
     @Environment(\.openURL) private var openURL
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -323,6 +327,16 @@ struct WindowsWorkspaceView: View {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty else { return gogLibrary.games }
         return gogLibrary.games.filter { $0.title.localizedCaseInsensitiveContains(query) }
+    }
+
+    private var filteredEpicGames: [EpicOwnedGame] {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return epicLibrary.owned }
+        return epicLibrary.owned.filter { $0.title.localizedCaseInsensitiveContains(query) }
+    }
+
+    private var installedEpicGames: [EpicInstalledGame] {
+        epicLibrary.installed.values.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
     }
 
     private var installedGOGGames: [GOGInstalledGame] {
@@ -480,6 +494,8 @@ struct WindowsWorkspaceView: View {
 
                         gogContent
 
+                        epicContent
+
                         } else {
                             liveContainerContent
                         }
@@ -497,6 +513,15 @@ struct WindowsWorkspaceView: View {
         }
         .sheet(isPresented: $isGOGSignInPresented) {
             GOGSignInView()
+        }
+        .sheet(isPresented: $isEpicSignInPresented) {
+            EpicSignInView()
+        }
+        .sheet(item: $selectedEpicGame) { selection in
+            EpicGameDetailView(appName: selection.id) { game in launchEpicGame(game) }
+        }
+        .onAppear {
+            if mode == .pc { epicLibrary.start() }
         }
         .task(id: gogLibrary.isSignedIn) {
             if mode == .pc && gogLibrary.isSignedIn && gogLibrary.games.isEmpty {
@@ -979,6 +1004,133 @@ struct WindowsWorkspaceView: View {
         .clipShape(RoundedRectangle(cornerRadius: 13))
     }
 
+    @ViewBuilder
+    private var epicContent: some View {
+        if epicLibrary.signedIn {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(spacing: 10) {
+                    ownedHeader(tr("Epic games: %d", epicLibrary.owned.count), collapsed: $epicOwnedCollapsed)
+                    Button {
+                        Task { await epicLibrary.refreshLibrary() }
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.headline)
+                            .frame(width: 32, height: 32)
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(epicLibrary.refreshing)
+                }
+                if !epicOwnedCollapsed {
+                    if epicLibrary.refreshing && epicLibrary.owned.isEmpty {
+                        HStack(spacing: 10) {
+                            ProgressView().tint(.white)
+                            Text(tr("Loading Epic Games library...")).foregroundColor(.gray)
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 120)
+                    } else if let error = epicLibrary.error, epicLibrary.owned.isEmpty {
+                        Text(error)
+                            .font(.subheadline)
+                            .foregroundColor(.orange)
+                            .frame(maxWidth: .infinity, minHeight: 80)
+                    } else if filteredEpicGames.isEmpty {
+                        Text(epicLibrary.owned.isEmpty ? tr("No Epic games found yet.") : tr("No games match this search"))
+                            .font(.subheadline)
+                            .foregroundColor(.gray)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 24)
+                    } else {
+                        LazyVGrid(columns: columns, spacing: 14) {
+                            ForEach(filteredEpicGames) { game in epicCard(game) }
+                        }
+                    }
+                }
+            }
+        } else {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Epic Games")
+                        .font(.headline)
+                        .foregroundColor(.white)
+                    Text(tr("Sign in on Epic's own page to see your Epic games. iDeck keeps only the sign-in token, in this device's Keychain."))
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 8)
+                Button(tr("Connect Epic")) { isEpicSignInPresented = true }
+                    .buttonStyle(.borderedProminent)
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(panelColor)
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+        }
+    }
+
+    private func epicCard(_ game: EpicOwnedGame) -> some View {
+        let installed = epicLibrary.installed[game.appName]
+        let download = epicLibrary.downloads[game.appName]
+        return VStack(alignment: .center, spacing: 10) {
+            Button {
+                selectedEpicGame = SelectedEpicGame(id: game.appName)
+            } label: {
+                VStack(alignment: .center, spacing: 9) {
+                    GOGArtworkView(urls: [game.cover].compactMap { $0 }, fallbackColor: secondaryColor)
+                        .frame(width: artworkWidth, height: artworkHeight)
+                    cardTitle(game.title, store: .epic)
+                }
+            }
+            .buttonStyle(.plain)
+            if let download {
+                switch download.state {
+                case .failed(let message):
+                    Text(message)
+                        .font(.caption2)
+                        .foregroundColor(.red)
+                        .lineLimit(2)
+                        .frame(height: cardActionHeight)
+                case .paused:
+                    Button { epicLibrary.install(game.appName) } label: {
+                        cardActionLabel(tr("Resume"), systemImage: "play.circle.fill")
+                    }
+                default:
+                    progressAction(fraction: download.progress.fraction,
+                                   label: tr("Installing %d%%", Int((download.progress.fraction * 100).rounded())),
+                                   onStop: { epicLibrary.pause(game.appName) })
+                }
+            } else if let installed {
+                Button { launchEpicGame(installed) } label: {
+                    cardActionLabel(tr("Launch"), systemImage: "play.fill")
+                }
+            } else {
+                Button { epicLibrary.install(game.appName) } label: {
+                    cardActionLabel(tr("Install"), systemImage: "arrow.down.circle.fill")
+                }
+            }
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(panelColor)
+        .clipShape(RoundedRectangle(cornerRadius: 13))
+    }
+
+    private func launchEpicGame(_ game: EpicInstalledGame) {
+        guard requireJIT() else { return }
+        let executable = EpicLibrary.drive.appendingPathComponent(game.programPath)
+        let savedProfile = windowsLibrary.profile(for: "epic:\(game.appName)", title: game.title)
+        Task { @MainActor in
+            do {
+                let epicArguments = try await epicLibrary.launchArguments(appName: game.appName)
+                var profile = savedProfile
+                profile.arguments = [profile.arguments, epicArguments].filter { !$0.isEmpty }.joined(separator: " ")
+                coordinator.launchWindowsExecutable(at: executable, profile: profile)
+            } catch {
+                installMessage = error.localizedDescription
+                isShowingInstallResult = true
+            }
+        }
+    }
+
     private func steamProgressAction(for game: SteamAppInfo) -> some View {
         let progress = steamLibrary.downloadProgress[game.appID]
         let checking = progress?.phase == .checking
@@ -1002,6 +1154,7 @@ struct WindowsWorkspaceView: View {
             guard let mountedPath else { return }
             let root = URL(fileURLWithPath: mountedPath, isDirectory: true)
             Task { @MainActor in
+                ExternalDrives.shared.mountAll(prefix: root)
                 prefixPath = root
                 windowsLibrary.refresh(prefixPath: root)
                 let unindexedIcons = Array(windowsLibrary.executableURLs.prefix(40))
@@ -1024,12 +1177,12 @@ struct WindowsWorkspaceView: View {
                     .font(.headline)
                     .foregroundColor(.white)
                 Spacer()
-                Text(tr("%d installed", windowsLibrary.executableURLs.count + installedSteamGames.count + installedGOGGames.count))
+                Text(tr("%d installed", windowsLibrary.executableURLs.count + installedSteamGames.count + installedGOGGames.count + installedEpicGames.count))
                     .font(.caption)
                     .foregroundColor(.gray)
             }
 
-            if windowsLibrary.executableURLs.isEmpty && installedSteamGames.isEmpty && installedGOGGames.isEmpty {
+            if windowsLibrary.executableURLs.isEmpty && installedSteamGames.isEmpty && installedGOGGames.isEmpty && installedEpicGames.isEmpty {
                 HStack(spacing: 12) {
                     Image(systemName: "square.grid.2x2")
                         .font(.title2)
@@ -1086,6 +1239,29 @@ struct WindowsWorkspaceView: View {
                             .background(panelColor)
                             .clipShape(RoundedRectangle(cornerRadius: 13))
                             Button { launchGOGGame(game) } label: {
+                                cardActionLabel(tr("Launch"), systemImage: "play.fill")
+                            }
+                        }
+                    }
+
+                    ForEach(installedEpicGames, id: \.appName) { game in
+                        VStack(spacing: 8) {
+                            Button {
+                                selectedEpicGame = SelectedEpicGame(id: game.appName)
+                            } label: {
+                                VStack(alignment: .center, spacing: 9) {
+                                    GOGArtworkView(urls: [epicLibrary.game(game.appName)?.cover].compactMap { $0 },
+                                                   fallbackColor: panelColor)
+                                        .frame(width: artworkWidth, height: artworkHeight)
+                                    cardTitle(game.title, store: .epic)
+                                }
+                                .padding(10)
+                                .frame(maxWidth: .infinity, alignment: .center)
+                                .background(panelColor)
+                                .clipShape(RoundedRectangle(cornerRadius: 13))
+                            }
+                            .buttonStyle(.plain)
+                            Button { launchEpicGame(game) } label: {
                                 cardActionLabel(tr("Launch"), systemImage: "play.fill")
                             }
                         }
@@ -1983,6 +2159,22 @@ private struct WindowsGameProfileForm: View {
             Toggle(tr("Keep child game processes running (experimental)"), isOn: $profile.keepChildProcessesRunning)
                 .tint(.blue)
             Text(tr("Use only when a launcher exits after starting its game. This may keep Wine running after the game ends."))
+                .font(.caption)
+                .foregroundColor(.gray)
+            if profile.id.hasPrefix("steam:") {
+                Toggle(tr("Start through the Steam client"), isOn: $profile.launchThroughSteam)
+                    .tint(.blue)
+                Text(tr("Valve's own Windows client signs in and starts the game (Madeira Dock). Needed for games with Steam DRM. Download Steam's components in Settings › Steam first."))
+                    .font(.caption)
+                    .foregroundColor(.gray)
+            }
+            Toggle(tr("Use recommended settings"), isOn: $profile.useRecommended)
+                .tint(.blue)
+            Button(tr("Reset to Recommended")) {
+                GameRecommendations.applySwitches(for: profile.id, to: &profile)
+            }
+            .foregroundColor(.blue)
+            Text(tr("Games iDeck recognises get the settings they were tested with."))
                 .font(.caption)
                 .foregroundColor(.gray)
         }

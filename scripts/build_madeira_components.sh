@@ -338,6 +338,12 @@ if [[ "$REBUILD" == "1" ]]; then
   # OpenGL (Mesa OSMesa + Zink) and Vulkan (MoltenVK) host runtimes for gl/.
   bash "$ROOT/scripts/build_madeira_gl_vulkan.sh" "$MD"
 
+  # Madeira Dock host (dockhost.exe, x86-64 PE) for starting Steam games
+  # through Valve's client. Optional: without it the app hides the option.
+  if [[ -x "$MD/build/madeira-dock/build.sh" && -f "$MD/madeira-dock/src/main.c" ]]; then
+    bash "$MD/build/madeira-dock/build.sh" || echo "WARNING: Madeira Dock host was not built; Dock stays hidden." >&2
+  fi
+
 fi
 
 for file in \

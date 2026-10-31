@@ -35,7 +35,8 @@ class XcodeProjectTests(unittest.TestCase):
         self.assertIn('Bundle.main.bundleIdentifier! + ".VPNExtension"', vpn_manager)
 
     def test_ipados_26_deployment_is_consistent_for_app_and_extension(self):
-        self.assertEqual(self.project.count("IPHONEOS_DEPLOYMENT_TARGET = 26.0;"), 6)
+        # App, VPN extension and JIT helper extension, Debug and Release, plus the project.
+        self.assertEqual(self.project.count("IPHONEOS_DEPLOYMENT_TARGET = 26.0;"), 8)
         self.assertNotIn("IPHONEOS_DEPLOYMENT_TARGET = 27.0;", self.project)
         build = (PROJECT.parents[1] / "scripts/build_ipa.sh").read_text(encoding="utf-8")
         self.assertIn('[[ "$MINIMUM_OS" == "26.0" ]]', build)

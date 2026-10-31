@@ -62,7 +62,7 @@ class MadeiraOpenGLVulkanRuntimeTests(unittest.TestCase):
         self.assertIn('static let openGLBackends = ["Automatic", "Desktop OpenGL", "OpenGL ES"]', model)
         self.assertIn("forKey: .vulkanMode", model)
         environment = read("iDeck/WindowsEnvironment.swift")
-        self.assertIn("writeSessionGraphicsConfig(binary: binary, is32Bit: needsWoW64)", environment)
+        self.assertIn("writeSessionGraphicsConfig(binary: binary, is32Bit: needsWoW64,", environment)
         self.assertIn('lines.append("vulkan = moltenvk")', environment)
         self.assertIn('lines.append("gl-backend = zink")', environment)
         self.assertIn('setenv("MADEIRA_CFG_GAME", file.path, 1)', environment)

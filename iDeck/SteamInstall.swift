@@ -136,6 +136,8 @@ enum SteamInstallFiles {
     /// `steamApps/common` are removed.
     nonisolated static func delete(appID: Int, folderName: String, steamApps: URL) {
         let fm = FileManager.default
+        _ = ExternalDrives.removeExternalInstall(at: steamApps.appendingPathComponent("common", isDirectory: true)
+            .appendingPathComponent(safeFolderName(folderName), isDirectory: true))
         let common = steamApps.appendingPathComponent("common", isDirectory: true).resolvingSymlinksInPath().standardizedFileURL
         let folder = common.appendingPathComponent(safeFolderName(folderName)).resolvingSymlinksInPath().standardizedFileURL
         if folder.path.hasPrefix(common.path + "/"), folder.deletingLastPathComponent().path == common.path {
