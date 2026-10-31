@@ -459,6 +459,24 @@ struct WindowsWorkspaceView: View {
                             }
                         }
 
+                        HStack(spacing: 10) {
+                            Image(systemName: "magnifyingglass")
+                                .foregroundColor(.gray)
+                            TextField(tr("Search your games"), text: $searchText)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                                .foregroundColor(.white)
+                            if !searchText.isEmpty {
+                                Button { searchText = "" } label: {
+                                    Image(systemName: "xmark.circle.fill").foregroundColor(.gray)
+                                }
+                            }
+                        }
+                        .padding(.horizontal, 13)
+                        .padding(.vertical, 12)
+                        .background(panelColor)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+
                         installedProgramsContent
 
                         if coordinator.isSteamConnected {
@@ -818,18 +836,6 @@ struct WindowsWorkspaceView: View {
                 ownedHeader(tr("Owned games: %d", steamLibrary.games.count), collapsed: $steamOwnedCollapsed)
 
                 if !steamOwnedCollapsed {
-                HStack(spacing: 10) {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundColor(.gray)
-                    TextField(tr("Search your games"), text: $searchText)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .foregroundColor(.white)
-                }
-                .padding(.horizontal, 13)
-                .padding(.vertical, 12)
-                .background(panelColor)
-                .clipShape(RoundedRectangle(cornerRadius: 10))
 
                 if filteredSteamGames.isEmpty {
                     Text(tr("No games match this search"))
@@ -2199,6 +2205,8 @@ private struct WindowsGameProfileForm: View {
             DetailCard(title: tr("Compatibility"),
                        footer: tr("Games iDeck recognises get the settings they were tested with.")) {
                 DetailToggleRow(title: tr("Use recommended settings"), isOn: $profile.useRecommended)
+                DetailPickerRow(title: tr("Code checks"), selection: $profile.codeChecks,
+                                choices: WindowsGameProfile.codeCheckModes)
                 DetailToggleRow(title: tr("Enable AVX/AVX2 translation"), isOn: $profile.avxEnabled)
                 DetailToggleRow(title: tr("Keep child game processes running (experimental)"),
                                 isOn: $profile.keepChildProcessesRunning)

@@ -76,6 +76,9 @@ struct GameSessionView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @StateObject private var metrics = GameRuntimeMetrics()
     @AppStorage("showGamePerformanceOverlay") private var showGamePerformanceOverlay = false
+    @AppStorage("touchControls.enabled") private var touchControlsEnabled = true
+    @AppStorage("touchControls.hideWithController") private var touchControlsHideWithController = true
+    @ObservedObject private var inputManager = InputManager.shared
     @State private var recentWineLogFinding: String?
     @State private var logCopyMessage: String?
     @State private var isCopyingWineLog = false
@@ -162,15 +165,15 @@ struct GameSessionView: View {
             }
             .ignoresSafeArea(edges: .bottom)
 
-            if let preset = coordinator.activeWindowsProfile?.touchControlPreset,
-               preset != "off", !coordinator.isClosingWindowsSession {
-                VStack {
-                    Spacer()
-                    IDeckTouchGamepadOverlay(preset: preset)
-                        .padding(.horizontal, 12)
-                        .padding(.bottom, 18)
-                }
-                .transition(.opacity)
+            if touchControlsEnabled,
+               let preset = coordinator.activeWindowsProfile?.touchControlPreset,
+               preset != "off", !coordinator.isClosingWindowsSession,
+               !(touchControlsHideWithController && inputManager.isControllerConnected) {
+                IDeckTouchGamepadOverlay(preset: preset)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 64)
+                    .padding(.bottom, 20)
+                    .transition(.opacity)
             }
 
             VStack {
@@ -412,6 +415,8 @@ private struct IDeckVirtualGamepadState {
 
 private struct IDeckTouchGamepadOverlay: View {
     let preset: String
+    @AppStorage("touchControls.opacity") private var controlOpacity = 0.8
+    @AppStorage("touchControls.haptics") private var controlHaptics = true
     @State private var pad = IDeckVirtualGamepadState()
 
     private func publish() {
@@ -425,18 +430,37 @@ private struct IDeckTouchGamepadOverlay: View {
         publish()
     }
 
+    /// Face buttons carry the Xbox letter colours; the rest are neutral.
+    private func tint(for label: String) -> Color {
+        switch label {
+        case "A": return Color(red: 0.36, green: 0.72, blue: 0.27)
+        case "B": return Color(red: 0.86, green: 0.24, blue: 0.20)
+        case "X": return Color(red: 0.20, green: 0.48, blue: 0.90)
+        case "Y": return Color(red: 0.95, green: 0.74, blue: 0.16)
+        default: return .white
+        }
+    }
+
     private func control(_ label: String, bit: UInt16) -> some View {
-        Text(label)
-            .font(.caption.bold())
-            .foregroundColor(.white)
-            .frame(width: 43, height: 43)
-            .background(Color.blue.opacity(pad.buttons & bit == 0 ? 0.35 : 0.8),
-                        in: Circle())
+        let held = pad.buttons & bit != 0
+        let face = ["A", "B", "X", "Y"].contains(label)
+        let size: CGFloat = face ? 54 : 44
+        return Text(label)
+            .font(face ? .title3.bold() : .subheadline.bold())
+            .foregroundColor(face ? tint(for: label) : .white)
+            .frame(width: size, height: size)
+            .background(Circle().fill(Color.black.opacity(held ? 0.55 : 0.30)))
+            .overlay(Circle().stroke(tint(for: label).opacity(held ? 0.95 : 0.45), lineWidth: 2))
+            .scaleEffect(held ? 0.92 : 1)
+            .opacity(controlOpacity)
             .contentShape(Circle())
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { _ in
-                        if pad.buttons & bit == 0 { setButton(bit, pressed: true) }
+                        if pad.buttons & bit == 0 {
+                            setButton(bit, pressed: true)
+                            if controlHaptics { UIImpactFeedbackGenerator(style: .light).impactOccurred() }
+                        }
                     }
                     .onEnded { _ in setButton(bit, pressed: false) }
             )
@@ -473,35 +497,79 @@ private struct IDeckTouchGamepadOverlay: View {
                     }
             )
         }
-        .frame(width: 98, height: 98)
+        .frame(width: 124, height: 124)
+        .opacity(controlOpacity)
     }
 
-    var body: some View {
-        HStack(alignment: .bottom, spacing: 8) {
-            if preset == "xbox" {
-                analog(false)
-                VStack(spacing: 5) {
-                    control("↑", bit: 0x0001)
-                    HStack(spacing: 4) {
-                        control("←", bit: 0x0004)
-                        control("→", bit: 0x0008)
+    private func trigger(_ label: String, right: Bool) -> some View {
+        let held = (right ? pad.rightTrigger : pad.leftTrigger) > 0
+        return Text(label)
+            .font(.caption.bold())
+            .foregroundColor(.white)
+            .frame(width: 58, height: 36)
+            .background(Color.white.opacity(held ? 0.55 : 0.18), in: RoundedRectangle(cornerRadius: 10))
+            .opacity(controlOpacity)
+            .contentShape(RoundedRectangle(cornerRadius: 10))
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { _ in
+                        guard !held else { return }
+                        if right { pad.rightTrigger = 255 } else { pad.leftTrigger = 255 }
+                        publish()
                     }
-                    control("↓", bit: 0x0002)
-                }
+                    .onEnded { _ in
+                        if right { pad.rightTrigger = 0 } else { pad.leftTrigger = 0 }
+                        publish()
+                    }
+            )
+    }
+
+    /// Xbox layout: triggers and bumpers in the top corners, View and Menu
+    /// at the top centre, left stick and D-pad bottom left, face buttons
+    /// and right stick bottom right. The middle of the screen stays free.
+    var body: some View {
+        let full = preset == "xbox"
+        VStack(spacing: 0) {
+            HStack(spacing: 8) {
+                if full { trigger("LT", right: false) }
+                control("LB", bit: 0x0100)
+                Spacer(minLength: 0)
+                control("⧉", bit: 0x0020)
+                control("≡", bit: 0x0010)
+                Spacer(minLength: 0)
+                control("RB", bit: 0x0200)
+                if full { trigger("RT", right: true) }
             }
             Spacer(minLength: 0)
-            VStack(spacing: 5) {
-                HStack(spacing: 6) {
-                    control("LB", bit: 0x0100)
-                    control("Start", bit: 0x0010)
+            HStack(alignment: .bottom, spacing: 0) {
+                VStack(alignment: .leading, spacing: 14) {
+                    analog(false)
+                    if full {
+                        VStack(spacing: 2) {
+                            control("↑", bit: 0x0001)
+                            HStack(spacing: 40) {
+                                control("←", bit: 0x0004)
+                                control("→", bit: 0x0008)
+                            }
+                            control("↓", bit: 0x0002)
+                        }
+                        .padding(.leading, 70)
+                    }
                 }
-                HStack(spacing: 4) {
-                    control("Y", bit: 0x8000)
-                    control("X", bit: 0x4000)
-                }
-                HStack(spacing: 4) {
-                    control("B", bit: 0x2000)
-                    control("A", bit: 0x1000)
+                Spacer(minLength: 0)
+                VStack(alignment: .trailing, spacing: 14) {
+                    VStack(spacing: 2) {
+                        control("Y", bit: 0x8000)
+                        HStack(spacing: 40) {
+                            control("X", bit: 0x4000)
+                            control("B", bit: 0x2000)
+                        }
+                        control("A", bit: 0x1000)
+                    }
+                    if full {
+                        analog(true)
+                            .padding(.trailing, 70)
+                    }
                 }
             }
         }

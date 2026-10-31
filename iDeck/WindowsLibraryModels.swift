@@ -17,24 +17,28 @@ struct WindowsGameProfile: Codable, Equatable, Identifiable {
     var openGLBackend: String = "Automatic"
     var touchControlPreset: String = "xbox"
     var metalFXEnabled: Bool = false
-    var fpsLimit: String = "30"
+    var fpsLimit: String = "60"
     var avxEnabled: Bool = false
     var keepChildProcessesRunning: Bool = false
     /// Writes the recommended config lines of a recognised game at launch.
     var useRecommended: Bool = true
     /// Steam games: start through Valve's Windows client (Madeira Dock).
     var launchThroughSteam: Bool = false
+    /// FEX code-change checks: "Automatic" (full for Unity/Mono games),
+    /// "Fast" (page tracking) or "Compatible" (full, slower).
+    var codeChecks: String = "Automatic"
+    static let codeCheckModes = ["Automatic", "Fast", "Compatible"]
     var artworkFilename: String? = nil
     var updatedAt: Date = Date()
 
     private enum CodingKeys: String, CodingKey {
-        case id, title, arguments, resolution, surfaceScaling, graphicsAPI, controllerAPI, touchControlPreset, metalFXEnabled, fpsLimit, avxEnabled, keepChildProcessesRunning, artworkFilename, updatedAt, vulkanMode, openGLBackend, useRecommended, launchThroughSteam
+        case id, title, arguments, resolution, surfaceScaling, graphicsAPI, controllerAPI, touchControlPreset, metalFXEnabled, fpsLimit, avxEnabled, keepChildProcessesRunning, artworkFilename, updatedAt, vulkanMode, openGLBackend, useRecommended, launchThroughSteam, codeChecks
     }
 
     static let vulkanModes = ["Automatic", "On", "Off"]
     static let openGLBackends = ["Automatic", "Desktop OpenGL", "OpenGL ES"]
 
-    init(id: String, title: String, arguments: String = "", resolution: String = "960x540", surfaceScaling: String = "fit", graphicsAPI: String = "Automatic", controllerAPI: String = "Automatic", touchControlPreset: String = "xbox", metalFXEnabled: Bool = false, fpsLimit: String = "30", avxEnabled: Bool = false, keepChildProcessesRunning: Bool = false, artworkFilename: String? = nil, updatedAt: Date = Date(), vulkanMode: String = "Automatic", openGLBackend: String = "Automatic") {
+    init(id: String, title: String, arguments: String = "", resolution: String = "960x540", surfaceScaling: String = "fit", graphicsAPI: String = "Automatic", controllerAPI: String = "Automatic", touchControlPreset: String = "xbox", metalFXEnabled: Bool = false, fpsLimit: String = "60", avxEnabled: Bool = false, keepChildProcessesRunning: Bool = false, artworkFilename: String? = nil, updatedAt: Date = Date(), vulkanMode: String = "Automatic", openGLBackend: String = "Automatic") {
         self.id = id
         self.title = title
         self.arguments = arguments
@@ -68,11 +72,13 @@ struct WindowsGameProfile: Codable, Equatable, Identifiable {
         let savedTouchPreset = try values.decodeIfPresent(String.self, forKey: .touchControlPreset) ?? "xbox"
         touchControlPreset = ["xbox", "minimal", "off"].contains(savedTouchPreset) ? savedTouchPreset : "xbox"
         metalFXEnabled = try values.decodeIfPresent(Bool.self, forKey: .metalFXEnabled) ?? false
-        fpsLimit = try values.decodeIfPresent(String.self, forKey: .fpsLimit) ?? "30"
+        fpsLimit = try values.decodeIfPresent(String.self, forKey: .fpsLimit) ?? "60"
         avxEnabled = try values.decodeIfPresent(Bool.self, forKey: .avxEnabled) ?? false
         keepChildProcessesRunning = try values.decodeIfPresent(Bool.self, forKey: .keepChildProcessesRunning) ?? false
         useRecommended = (try? values.decodeIfPresent(Bool.self, forKey: .useRecommended)) ?? true
         launchThroughSteam = (try? values.decodeIfPresent(Bool.self, forKey: .launchThroughSteam)) ?? false
+        let savedChecks = (try? values.decodeIfPresent(String.self, forKey: .codeChecks)) ?? "Automatic"
+        codeChecks = Self.codeCheckModes.contains(savedChecks) ? savedChecks : "Automatic"
         artworkFilename = try values.decodeIfPresent(String.self, forKey: .artworkFilename)
         updatedAt = try values.decodeIfPresent(Date.self, forKey: .updatedAt) ?? Date()
         let savedVulkan = (try? values.decodeIfPresent(String.self, forKey: .vulkanMode)) ?? "Automatic"
