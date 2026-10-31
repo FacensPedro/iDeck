@@ -11,14 +11,25 @@ KITS = (ROOT / "scripts/madeira_native_kit.py").read_text()
 class ActionsNativeDispatchMatrix(unittest.TestCase):
     def test_manual_default_is_real_d3d11_with_wow64(self):
         header = WORKFLOW.split("  push:", 1)[0]
-        def field(name):
-            return header.split("      " + name + ":", 1)[1].split("\n      ", 1)[0]
-        self.assertIn("default: true", field("require_madeira"))
-        self.assertIn("default: d3d11", field("graphics_profile"))
-        self.assertIn("default: true", field("build_wow64"))
-        self.assertIn("default: false", field("accept_converter_license"))
-        self.assertIn("default: false", field("bundle_wine_mono"))
-        self.assertIn("default: false", field("export_runtime_kit"))
+
+        def field_default(name):
+            # Match YAML input keys at exactly six spaces, not a prefix of
+            # their eight-space nested description/type/default mappings.
+            key = re.search(rf"(?m)^      {re.escape(name)}:\\s*$", header)
+            self.assertIsNotNone(key, f"Missing workflow input: {name}")
+            remaining = header[key.end():]
+            sibling = re.search(r"(?m)^      [A-Za-z_][A-Za-z0-9_]*:\\s*$", remaining)
+            block = remaining[:sibling.start()] if sibling else remaining
+            default = re.search(r"(?m)^        default:\\s*(\\S+)\\s*$", block)
+            self.assertIsNotNone(default, f"Missing default for workflow input: {name}")
+            return default.group(1)
+
+        self.assertEqual("true", field_default("require_madeira"))
+        self.assertEqual("d3d11", field_default("graphics_profile"))
+        self.assertEqual("true", field_default("build_wow64"))
+        self.assertEqual("false", field_default("accept_converter_license"))
+        self.assertEqual("false", field_default("bundle_wine_mono"))
+        self.assertEqual("false", field_default("export_runtime_kit"))
 
     def test_native_build_not_enabled_on_pull_requests(self):
         native = re.search(r"^\s+IDECK_NATIVE_BUILD: (.+)$", WORKFLOW, re.MULTILINE)
