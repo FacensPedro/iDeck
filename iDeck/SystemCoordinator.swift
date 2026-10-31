@@ -283,6 +283,7 @@ class SystemCoordinator: ObservableObject {
                             return
                         }
                         self.windowsEnvironment.configureWine(prefix: mountPath)
+                        self.mountExternalDrives(prefix: mountPath)
                         self.setWindowsStatus(self.windowsEnvironment.hasRuntime(in: mountPath)
                             ? "Windows Runtime Ready" : "Madeira runtime components are missing")
                     }
@@ -291,7 +292,54 @@ class SystemCoordinator: ObservableObject {
         }
     }
 
+    static let jitMethodKey = "jit.method"
+
+    /// "builtIn" (iDeck's own helper through LocalDevVPN) or "stikdebug".
+    var jitMethod: String {
+        UserDefaults.standard.string(forKey: Self.jitMethodKey) ?? "stikdebug"
+    }
+
+    /// Enables JIT with iDeck's built-in helper: StikJIT, inside iDeck's own
+    /// app extension, attaches to iDeck through LocalDevVPN with the imported
+    /// pairing file and runs the bundled universal.js script.
+    func requestBuiltInJIT() {
+        guard let pairing = try? Data(contentsOf: pairingFileURL), !pairing.isEmpty else {
+            setWindowsStatus("Import a pairing file in Settings › JIT before using the built-in JIT.")
+            return
+        }
+        guard let scriptURL = Bundle.main.url(forResource: "universal", withExtension: "js"),
+              let script = try? Data(contentsOf: scriptURL), !script.isEmpty else {
+            setWindowsStatus("Cannot request JIT: the bundled universal.js debugger script is missing.")
+            return
+        }
+        setWindowsStatus("Starting the built-in JIT helper...")
+        let request = MadeiraJITRequest.enable(targetPID: getpid(), pairingData: pairing,
+                                               scriptBase64: script.base64EncodedString())
+        MainActor.assumeIsolated {
+            IDeckBuiltInJIT.send(request, started: { [weak self] in
+                // The request lasts as long as the debugger stays attached.
+                for delay in [1.0, 2.0, 4.0, 8.0] {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + delay) { self?.refreshJITStatus() }
+                }
+            }) { [weak self] result in
+                guard let self else { return }
+                self.refreshJITStatus()
+                switch result {
+                case .success(let response):
+                    AppLog.record("[jit-builtin] finished: \(response.message)")
+                    if !response.success { self.setWindowsStatus("Built-in JIT: " + response.message) }
+                case .failure(let error):
+                    self.setWindowsStatus("Built-in JIT: " + error.localizedDescription)
+                }
+            }
+        }
+    }
+
     func requestStikDebugJIT() {
+        if jitMethod == "builtIn", FileManager.default.fileExists(atPath: pairingFileURL.path), MainActor.assumeIsolated({ IDeckBuiltInJIT.isAvailable }) {
+            requestBuiltInJIT()
+            return
+        }
         guard let bundleID = Bundle.main.bundleIdentifier, !bundleID.isEmpty else {
             setWindowsStatus("Cannot request JIT: missing iDeck bundle identifier.")
             return
@@ -443,6 +491,7 @@ class SystemCoordinator: ObservableObject {
                 return
             }
             self.windowsEnvironment.configureWine(prefix: mountPath)
+            self.mountExternalDrives(prefix: mountPath)
             let steamProfile = WindowsGameProfile(id: "steam", title: "Steam")
             self.activeWindowsProfile = steamProfile
             self.windowsEnvironment.applyGameProfile(steamProfile)
@@ -614,7 +663,12 @@ class SystemCoordinator: ObservableObject {
 
                 let source = url.standardizedFileURL
                 let downloadDirectory = downloads.standardizedFileURL
-                let isAlreadyInLibrary = source.deletingLastPathComponent() == downloadDirectory
+                // A program already inside the prefix (an installed GOG or Epic
+                // game, or anything under C:\) starts in place, next to its DLLs.
+                let drive = root.appendingPathComponent("drive_c", isDirectory: true).standardizedFileURL
+                let insidePrefix = source.path.hasPrefix(drive.path + "/") ||
+                    source.resolvingSymlinksInPath().path.hasPrefix(drive.resolvingSymlinksInPath().path + "/")
+                let isAlreadyInLibrary = source.deletingLastPathComponent() == downloadDirectory || insidePrefix
                 let destination: URL
 
                 if isAlreadyInLibrary {
@@ -655,6 +709,7 @@ class SystemCoordinator: ObservableObject {
                         self?.launchWindowsExecutable(at: destination, profile: profile)
                     }) { return }
                     self.windowsEnvironment.configureWine(prefix: mountPath)
+                    self.mountExternalDrives(prefix: mountPath)
                     var effectiveProfile = profile ?? WindowsGameProfile(id: destination.path, title: destination.deletingPathExtension().lastPathComponent)
                     if self.isMetalFXEnabled { effectiveProfile.metalFXEnabled = true }
                     self.windowsEnvironment.applyGameProfile(effectiveProfile)
@@ -793,11 +848,16 @@ class SystemCoordinator: ObservableObject {
             self?.launchSteamGame(game: game, profile: profile, prefixPath: prefixPath)
         }) { return }
         windowsEnvironment.configureWine(prefix: prefixPath.path)
+        mountExternalDrives(prefix: prefixPath.path)
         windowsEnvironment.graphicsConfig.applyGraphicsEnvironment()
         var effectiveProfile = profile
         if isMetalFXEnabled { effectiveProfile.metalFXEnabled = true }
         windowsEnvironment.applyGameProfile(effectiveProfile)
         activeWindowsProfile = effectiveProfile
+        if profile.launchThroughSteam {
+            launchThroughDock(game: game, profile: profile, prefixPath: prefixPath)
+            return
+        }
         pendingSteamGameID = game.appID
         setWindowsStatus("Launching Steam game...")
         withPreparedMetalDisplay(expectedStatus: "Launching Steam game...") { [weak self] in
@@ -836,6 +896,67 @@ class SystemCoordinator: ObservableObject {
                     }
                 }
             }
+        }
+    }
+
+    /// Starts an installed Steam game through Valve's own Windows client
+    /// (Madeira Dock): Valve's client signs in, checks the licence and starts
+    /// the game with its DRM untouched.
+    private func launchThroughDock(game: SteamAppInfo, profile: WindowsGameProfile, prefixPath: URL) {
+        let host: URL
+        do {
+            host = try MainActor.assumeIsolated {
+                try MadeiraDock.prepareLaunch(appID: game.appID, arguments: profile.arguments)
+            }
+        } catch {
+            setWindowsStatus("Cannot launch: " + error.localizedDescription)
+            return
+        }
+        let standardizedPrefix = prefixPath.standardizedFileURL.path
+        pendingSteamGameID = game.appID
+        setWindowsStatus("Launching Steam game...")
+        withPreparedMetalDisplay(expectedStatus: "Launching Steam game...") { [weak self] in
+            guard let self, self.pendingSteamGameID == game.appID else { return }
+            guard !ideck_wineprocess_running() else {
+                self.pendingSteamGameID = nil
+                self.setWindowsStatus("Execution Error: another Wine process started during game preparation.")
+                return
+            }
+            self.windowsEnvironment.execute(binary: host, arguments: "", jitEnabler: self.jitEnabler) { [weak self] status in
+                DispatchQueue.main.async {
+                    guard let self else { return }
+                    self.pendingSteamGameID = nil
+                    let running = status == 0 && ideck_wineprocess_running()
+                    self.activeSteamGameID = running ? game.appID : nil
+                    self.activeSteamPrefix = running ? standardizedPrefix : nil
+                    if running { self.watchDockReport() }
+                    if self.windowsStatus == "Launching Steam game..." {
+                        self.setWindowsStatus(running ? "Wine started; waiting for game..." : self.nativeLaunchFailure(status))
+                    }
+                }
+            }
+        }
+    }
+
+    /// Follows the host's numeric report and shows its failure, if any.
+    private func watchDockReport(remaining: Int = 600) {
+        guard remaining > 0, ideck_wineprocess_running() else {
+            MainActor.assumeIsolated { MadeiraDock.cleanup() }
+            return
+        }
+        let report = MainActor.assumeIsolated { MadeiraDock.pollReport() }
+        MainActor.assumeIsolated { DockOffline.observe(report.fields) }
+        if let failure = report.failure {
+            setWindowsStatus("Steam: " + failure)
+            MainActor.assumeIsolated { MadeiraDock.cleanup() }
+            return
+        }
+        if report.result == 0 {
+            MainActor.assumeIsolated { MadeiraDock.cleanup() }
+            return
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
+            self?.watchDockReport(remaining: remaining - 1)
         }
     }
 
@@ -1157,6 +1278,16 @@ class SystemCoordinator: ObservableObject {
         }).first, best.score > -100 else { return nil }
         SteamLog.event("[steam-start] app=\(game.appID) using executable fallback; Steam metadata did not resolve")
         return (best.url, "", best.url.deletingLastPathComponent(), "installed-files", "")
+    }
+
+    /// Links the saved external folders into the prefix before Wine starts.
+    func mountExternalDrives(prefix: String) {
+        let url = URL(fileURLWithPath: prefix, isDirectory: true)
+        if Thread.isMainThread {
+            MainActor.assumeIsolated { ExternalDrives.shared.mountAll(prefix: url) }
+        } else {
+            DispatchQueue.main.sync { MainActor.assumeIsolated { ExternalDrives.shared.mountAll(prefix: url) } }
+        }
     }
 
     /// Loads and starts a guest .app inside this process (see LiveContainerHook).

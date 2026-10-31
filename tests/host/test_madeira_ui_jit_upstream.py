@@ -57,12 +57,14 @@ class MadeiraUIJITUpstreamTests(unittest.TestCase):
         self.assertIn('ideck_vcrt_valid_pe_x64(path)', EXTRACTOR)
         self.assertIn('state->found_count++;', EXTRACTOR)
 
-    def test_background_grace_has_balanced_lease(self):
-        self.assertIn('private final class SteamDownloadBackgroundGrace', STEAM)
-        self.assertIn('beginBackgroundTask(', STEAM)
-        self.assertIn('endBackgroundTask(task)', STEAM)
-        self.assertEqual(STEAM.count('backgroundGrace.begin(appID: appID)'), 2)
-        self.assertEqual(STEAM.count('backgroundGrace.end()'), 2)
+    def test_background_downloads_are_balanced(self):
+        background = (ROOT / "iDeck/BackgroundDownloads.swift").read_text()
+        self.assertIn('beginBackgroundTask(', background)
+        self.assertIn('UIApplication.shared.endBackgroundTask(graceTask)', background)
+        self.assertIn('BGContinuedProcessingTaskRequest', background)
+        # Every started Steam download reports its end, also when it fails.
+        self.assertEqual(STEAM.count('BackgroundDownloads.steam.started('), 2)
+        self.assertEqual(STEAM.count('BackgroundDownloads.steam.ended('), 2)
 
 if __name__ == '__main__':
     unittest.main()

@@ -7,7 +7,8 @@ ROOT = Path(__file__).resolve().parents[2]
 class SteamInstallProgressAccountingTests(unittest.TestCase):
     def test_installing_label_replaces_downloading_in_both_views(self):
         view = (ROOT / "iDeck/MainView.swift").read_text(encoding="utf-8")
-        self.assertEqual(view.count('tr("Installing %d%%"'), 2)
+        # Steam's card and game sheet, and the Epic card.
+        self.assertEqual(view.count('tr("Installing %d%%"'), 3)
         # Cards keep a fixed-height progress row; byte counts live in the game sheet.
         self.assertEqual(view.count('tr("Installed: %@"'), 1)
         self.assertIn("private func steamProgressAction(for game: SteamAppInfo)", view)

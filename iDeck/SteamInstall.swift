@@ -136,6 +136,8 @@ enum SteamInstallFiles {
     /// `steamApps/common` are removed.
     nonisolated static func delete(appID: Int, folderName: String, steamApps: URL) {
         let fm = FileManager.default
+        _ = ExternalInstallLink.remove(at: steamApps.appendingPathComponent("common", isDirectory: true)
+            .appendingPathComponent(safeFolderName(folderName), isDirectory: true))
         let common = steamApps.appendingPathComponent("common", isDirectory: true).resolvingSymlinksInPath().standardizedFileURL
         let folder = common.appendingPathComponent(safeFolderName(folderName)).resolvingSymlinksInPath().standardizedFileURL
         if folder.path.hasPrefix(common.path + "/"), folder.deletingLastPathComponent().path == common.path {
@@ -338,5 +340,24 @@ enum SteamDLCRecords {
         } catch {
             return false
         }
+    }
+}
+
+
+/// A game folder that is a link to a folder iDeck created on an external
+/// drive (ExternalDrives.prepareExternalInstall). Removing the game removes
+/// the files on the drive and the link; anything else is left alone.
+enum ExternalInstallLink {
+    nonisolated static func remove(at local: URL) -> Bool {
+        let fm = FileManager.default
+        guard let type = try? fm.attributesOfItem(atPath: local.path)[.type] as? FileAttributeType,
+              type == .typeSymbolicLink,
+              let destination = try? fm.destinationOfSymbolicLink(atPath: local.path) else { return false }
+        let target = URL(fileURLWithPath: destination).standardizedFileURL
+        guard target.pathComponents.contains("iDeck Games"),
+              target.lastPathComponent == local.lastPathComponent else { return false }
+        try? fm.removeItem(at: target)
+        try? fm.removeItem(at: local)
+        return true
     }
 }

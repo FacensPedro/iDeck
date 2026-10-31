@@ -20,11 +20,15 @@ struct WindowsGameProfile: Codable, Equatable, Identifiable {
     var fpsLimit: String = "30"
     var avxEnabled: Bool = false
     var keepChildProcessesRunning: Bool = false
+    /// Writes the recommended config lines of a recognised game at launch.
+    var useRecommended: Bool = true
+    /// Steam games: start through Valve's Windows client (Madeira Dock).
+    var launchThroughSteam: Bool = false
     var artworkFilename: String? = nil
     var updatedAt: Date = Date()
 
     private enum CodingKeys: String, CodingKey {
-        case id, title, arguments, resolution, surfaceScaling, graphicsAPI, controllerAPI, touchControlPreset, metalFXEnabled, fpsLimit, avxEnabled, keepChildProcessesRunning, artworkFilename, updatedAt, vulkanMode, openGLBackend
+        case id, title, arguments, resolution, surfaceScaling, graphicsAPI, controllerAPI, touchControlPreset, metalFXEnabled, fpsLimit, avxEnabled, keepChildProcessesRunning, artworkFilename, updatedAt, vulkanMode, openGLBackend, useRecommended, launchThroughSteam
     }
 
     static let vulkanModes = ["Automatic", "On", "Off"]
@@ -67,6 +71,8 @@ struct WindowsGameProfile: Codable, Equatable, Identifiable {
         fpsLimit = try values.decodeIfPresent(String.self, forKey: .fpsLimit) ?? "30"
         avxEnabled = try values.decodeIfPresent(Bool.self, forKey: .avxEnabled) ?? false
         keepChildProcessesRunning = try values.decodeIfPresent(Bool.self, forKey: .keepChildProcessesRunning) ?? false
+        useRecommended = (try? values.decodeIfPresent(Bool.self, forKey: .useRecommended)) ?? true
+        launchThroughSteam = (try? values.decodeIfPresent(Bool.self, forKey: .launchThroughSteam)) ?? false
         artworkFilename = try values.decodeIfPresent(String.self, forKey: .artworkFilename)
         updatedAt = try values.decodeIfPresent(Date.self, forKey: .updatedAt) ?? Date()
         let savedVulkan = (try? values.decodeIfPresent(String.self, forKey: .vulkanMode)) ?? "Automatic"
@@ -433,4 +439,8 @@ enum WindowsPEIcon {
         }
         return nil
     }
+}
+
+struct SelectedEpicGame: Identifiable {
+    let id: String
 }

@@ -378,10 +378,15 @@ final class GOGLibraryModel: ObservableObject {
         downloadErrors[game.id] = nil
         downloadProgress[game.id] = 0
         let folder = prefixPath.appendingPathComponent("drive_c/WindowsDownloads", isDirectory: true)
+        BackgroundDownloads.gog.attach(active: { [weak self] in !(self?.downloadTasks.isEmpty ?? true) },
+                                       pause: {}, resume: {})
+        BackgroundDownloads.gog.started(name: game.title)
         downloadTasks[game.id] = Task {
+            var outcome = BackgroundDownloads.Outcome.paused
             defer {
                 downloadTasks[game.id] = nil
                 downloadProgress[game.id] = nil
+                BackgroundDownloads.gog.ended(name: game.title, outcome: outcome, queueEmpty: downloadTasks.isEmpty)
             }
             do {
                 let tokens = try await tokens()
@@ -391,16 +396,20 @@ final class GOGLibraryModel: ObservableObject {
                 for (index, file) in files.enumerated() {
                     try Task.checkCancellation()
                     let saved = try await download(file, into: folder, tokens: tokens) { fraction in
-                        self.downloadProgress[game.id] = (Double(index) + fraction) / Double(files.count)
+                        let overall = (Double(index) + fraction) / Double(files.count)
+                        self.downloadProgress[game.id] = overall
+                        BackgroundDownloads.gog.progress(done: UInt64(overall * 10_000), total: 10_000)
                     }
                     if setup == nil, saved.pathExtension.lowercased() == "exe" { setup = saved }
                 }
                 AppLog.record("[gog] installer downloaded for game \(game.id)")
+                outcome = .completed
                 completion(setup)
             } catch is CancellationError {
                 completion(nil)
             } catch {
                 downloadErrors[game.id] = error.localizedDescription
+                outcome = .failed(error.localizedDescription)
                 AppLog.record("[gog] installer download failed for game \(game.id): \(error.localizedDescription)")
                 completion(nil)
             }
@@ -527,16 +536,35 @@ private struct GOGLoginWebView: UIViewRepresentable {
 
 // MARK: - Store badge
 
-enum GameStore { case steam, gog }
+enum GameStore { case steam, gog, epic }
 
 /// A small store mark next to a game's name. When the app bundles official
-/// artwork as "StoreBadgeSteam" / "StoreBadgeGOG" image assets, that is used;
-/// otherwise a neutral text tag.
+/// artwork as "StoreBadgeSteam" / "StoreBadgeGOG" / "StoreBadgeEpic" image
+/// assets, that is used; otherwise a neutral text tag.
 struct StoreBadge: View {
     let store: GameStore
 
-    private var assetName: String { store == .steam ? "StoreBadgeSteam" : "StoreBadgeGOG" }
-    private var label: String { store == .steam ? "Steam" : "GOG" }
+    private var assetName: String {
+        switch store {
+        case .steam: return "StoreBadgeSteam"
+        case .gog: return "StoreBadgeGOG"
+        case .epic: return "StoreBadgeEpic"
+        }
+    }
+    private var label: String {
+        switch store {
+        case .steam: return "Steam"
+        case .gog: return "GOG"
+        case .epic: return "Epic"
+        }
+    }
+    private var tint: Color {
+        switch store {
+        case .steam: return Color(red: 0.11, green: 0.24, blue: 0.40)
+        case .gog: return Color(red: 0.42, green: 0.16, blue: 0.55)
+        case .epic: return Color(red: 0.20, green: 0.20, blue: 0.22)
+        }
+    }
 
     var body: some View {
         Group {
@@ -551,9 +579,7 @@ struct StoreBadge: View {
                     .foregroundColor(.white)
                     .padding(.horizontal, 4)
                     .padding(.vertical, 2)
-                    .background(store == .steam ? Color(red: 0.11, green: 0.24, blue: 0.40)
-                                                : Color(red: 0.42, green: 0.16, blue: 0.55),
-                                in: RoundedRectangle(cornerRadius: 3))
+                    .background(tint, in: RoundedRectangle(cornerRadius: 3))
             }
         }
         .accessibilityLabel(label)

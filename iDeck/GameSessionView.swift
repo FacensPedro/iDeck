@@ -356,6 +356,8 @@ struct GameSessionView: View {
         .modifier(WineGamepadEventClaim())
         .onAppear {
             WineInputBridge.shared.startBridging()
+            HardwareInput.shared.start()
+            HardwareInput.shared.sessionVisible = true
             metrics.sample(collectPerformance: showGamePerformanceOverlay)
             updateRecentWineLogFinding()
         }
@@ -386,6 +388,7 @@ struct GameSessionView: View {
         }
         .onDisappear {
             WineInputBridge.shared.stopBridging()
+            HardwareInput.shared.sessionVisible = false
         }
         .alert(tr("Wine did not close"), isPresented: Binding(
             get: { coordinator.windowsCloseWarning != nil },
