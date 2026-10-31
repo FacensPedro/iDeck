@@ -7,7 +7,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-REVISION = "fd9f2f3d0434a4116e4c3351f286a0fc376b4e36"
+REVISION = "c2c1b03a9e36ef986c980b9eae3c14d05a372db1"
 PUBLIC_MODULES = {
     "FEX": "https://github.com/willfaust/FEX.git",
     "wine": "https://github.com/willfaust/wine.git",

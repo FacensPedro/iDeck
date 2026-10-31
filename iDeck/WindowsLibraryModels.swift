@@ -11,6 +11,10 @@ struct WindowsGameProfile: Codable, Equatable, Identifiable {
     var surfaceScaling: String = "fit"
     var graphicsAPI: String = "Automatic"
     var controllerAPI: String = "Automatic"
+    /// "Automatic" (on when the x64 executable references vulkan-1.dll), "On" or "Off".
+    var vulkanMode: String = "Automatic"
+    /// "Automatic" (desktop OpenGL through Zink when bundled), "Desktop OpenGL" or "OpenGL ES".
+    var openGLBackend: String = "Automatic"
     var touchControlPreset: String = "xbox"
     var metalFXEnabled: Bool = false
     var fpsLimit: String = "30"
@@ -20,10 +24,13 @@ struct WindowsGameProfile: Codable, Equatable, Identifiable {
     var updatedAt: Date = Date()
 
     private enum CodingKeys: String, CodingKey {
-        case id, title, arguments, resolution, surfaceScaling, graphicsAPI, controllerAPI, touchControlPreset, metalFXEnabled, fpsLimit, avxEnabled, keepChildProcessesRunning, artworkFilename, updatedAt
+        case id, title, arguments, resolution, surfaceScaling, graphicsAPI, controllerAPI, touchControlPreset, metalFXEnabled, fpsLimit, avxEnabled, keepChildProcessesRunning, artworkFilename, updatedAt, vulkanMode, openGLBackend
     }
 
-    init(id: String, title: String, arguments: String = "", resolution: String = "960x540", surfaceScaling: String = "fit", graphicsAPI: String = "Automatic", controllerAPI: String = "Automatic", touchControlPreset: String = "xbox", metalFXEnabled: Bool = false, fpsLimit: String = "30", avxEnabled: Bool = false, keepChildProcessesRunning: Bool = false, artworkFilename: String? = nil, updatedAt: Date = Date()) {
+    static let vulkanModes = ["Automatic", "On", "Off"]
+    static let openGLBackends = ["Automatic", "Desktop OpenGL", "OpenGL ES"]
+
+    init(id: String, title: String, arguments: String = "", resolution: String = "960x540", surfaceScaling: String = "fit", graphicsAPI: String = "Automatic", controllerAPI: String = "Automatic", touchControlPreset: String = "xbox", metalFXEnabled: Bool = false, fpsLimit: String = "30", avxEnabled: Bool = false, keepChildProcessesRunning: Bool = false, artworkFilename: String? = nil, updatedAt: Date = Date(), vulkanMode: String = "Automatic", openGLBackend: String = "Automatic") {
         self.id = id
         self.title = title
         self.arguments = arguments
@@ -38,6 +45,8 @@ struct WindowsGameProfile: Codable, Equatable, Identifiable {
         self.keepChildProcessesRunning = keepChildProcessesRunning
         self.artworkFilename = artworkFilename
         self.updatedAt = updatedAt
+        self.vulkanMode = Self.vulkanModes.contains(vulkanMode) ? vulkanMode : "Automatic"
+        self.openGLBackend = Self.openGLBackends.contains(openGLBackend) ? openGLBackend : "Automatic"
     }
 
     init(from decoder: Decoder) throws {
@@ -60,6 +69,10 @@ struct WindowsGameProfile: Codable, Equatable, Identifiable {
         keepChildProcessesRunning = try values.decodeIfPresent(Bool.self, forKey: .keepChildProcessesRunning) ?? false
         artworkFilename = try values.decodeIfPresent(String.self, forKey: .artworkFilename)
         updatedAt = try values.decodeIfPresent(Date.self, forKey: .updatedAt) ?? Date()
+        let savedVulkan = (try? values.decodeIfPresent(String.self, forKey: .vulkanMode)) ?? "Automatic"
+        vulkanMode = Self.vulkanModes.contains(savedVulkan) ? savedVulkan : "Automatic"
+        let savedGL = (try? values.decodeIfPresent(String.self, forKey: .openGLBackend)) ?? "Automatic"
+        openGLBackend = Self.openGLBackends.contains(savedGL) ? savedGL : "Automatic"
     }
 }
 

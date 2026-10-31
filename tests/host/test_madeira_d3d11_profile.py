@@ -54,8 +54,14 @@ class MadeiraD3D11ProfileTests(unittest.TestCase):
                 dll.write_bytes(pe(0x8664 if arm64ec else 0xAA64, arm64ec))
             (base / "compat/love").mkdir(parents=True, exist_ok=True)
             (base / "compat/love/lua51.dll").write_bytes(pe(0x8664))
+            (base / "vulkan/arm64ec-windows").mkdir(parents=True, exist_ok=True)
+            for name in ("winevulkan.dll", "vulkan-1.dll"):
+                (base / "vulkan/arm64ec-windows" / name).write_bytes(pe(0x8664, True))
             (base / "nls").mkdir(exist_ok=True)
             (base / "nls/locale.nls").write_text("valid")
+        (self.app / "gl").mkdir()
+        for name in ("libMoltenVK.dylib", "libOSMesa.dylib"):
+            (self.app / "gl" / name).write_bytes(bytes.fromhex("cffaedfe0c000001") + bytes(64))
         (self.app / "cacert.pem").write_bytes(b"-----BEGIN CERTIFICATE-----\nfixture")
         (self.app / "prefix-template.tar.gz").write_bytes(b"\x1f\x8b" + bytes(2048))
         for name in ("legal", "licenses"):

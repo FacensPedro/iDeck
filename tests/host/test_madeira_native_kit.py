@@ -44,6 +44,12 @@ class MadeiraNativeKitTests(unittest.TestCase):
             "resources/licenses/NOTICE": b"notice",
             "resources/licenses/LuaJIT-MIT.txt": b"MIT LuaJIT license",
             "resources/compat/love/lua51.dll": b"MZ GC64 LuaJIT",
+            "resources/vulkan/arm64ec-windows/winevulkan.dll": b"MZ winevulkan",
+            "resources/vulkan/arm64ec-windows/vulkan-1.dll": b"MZ vulkan-1",
+            "resources/gl/libMoltenVK.dylib": bytes.fromhex("cffaedfe") + b"MoltenVK",
+            "resources/gl/libOSMesa.dylib": bytes.fromhex("cffaedfe") + b"OSMesa",
+            "resources/licenses/MoltenVK-Apache-2.0.txt": b"Apache-2.0",
+            "resources/licenses/Mesa-license.rst": b"MIT",
             "resources/d3d12/libmetalirconverter.dylib": b"dummy-not-production",
             "resources/d3d12/canary_vs.dxil": b"dxil",
             "resources/d3d12/canary_ps.dxil": b"dxil",
@@ -83,6 +89,7 @@ class MadeiraNativeKitTests(unittest.TestCase):
             "repeat_wine_session_patch_sha256": kit.REPEAT_WINE_SESSION_PATCH_SHA256,
             "dcomp_backport_sha256": kit.DCOMP_BACKPORT_SHA256,
             "luajit_backport_sha256": kit.LUAJIT_BACKPORT_SHA256,
+            "gl_vulkan_runtime": kit.GL_VULKAN_RUNTIME,
             "files": {
                 name: {
                     "sha256": hashlib.sha256(data).hexdigest(),

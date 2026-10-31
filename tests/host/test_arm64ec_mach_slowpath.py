@@ -49,7 +49,8 @@ class ARM64ECMachSlowpathTests(unittest.TestCase):
         self.assertIn("thread_set_state( thread, ARM_THREAD_STATE64", PATCH)
         self.assertIn("Roll back the NEON state", PATCH)
         self.assertIn("+#else", PATCH)
-        self.assertIn("+    raise( SIGUSR2 );", PATCH)
+        # Non-iOS builds keep the SIGUSR2 slowpath (an added or context line).
+        self.assertRegex(PATCH, r"\n[+ ]    raise\( SIGUSR2 \);\n\+#endif")
 
     def test_prebuilt_kits_cannot_silently_undo_native_fix(self):
         self.assertIn("arm64ec_context_patch_sha256", KIT)

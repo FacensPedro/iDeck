@@ -57,6 +57,9 @@ class WindowsEnvironment {
     let graphicsConfig = GraphicsConfig()
     let audioManager = AudioManager()
     let steamManager = SteamManager()
+    /// The profile's Vulkan/OpenGL choices, applied when the executable is known.
+    private var sessionVulkanMode = "Automatic"
+    private var sessionOpenGLBackend = "Automatic"
     
     private var nativeGraphicsBackend: String? {
         MadeiraBundleIdentity.nativeManifest?["graphicsBackend"] as? String
@@ -325,6 +328,7 @@ class WindowsEnvironment {
             completion(Int(ENOTSUP))
             return
         }
+        writeSessionGraphicsConfig(binary: binary, is32Bit: needsWoW64)
 
         let architectureTranslator = BoxTranslator()
         architectureTranslator.translateAndRun(
@@ -343,7 +347,80 @@ class WindowsEnvironment {
         }
     }
 
+    /// Whether this IPA carries Madeira's OpenGL/Vulkan runtime (gl/ and vulkan/).
+    static var hasGLVulkanRuntime: Bool {
+        let bundle = Bundle.main.bundleURL
+        return ["gl/libMoltenVK.dylib", "vulkan/arm64ec-windows/winevulkan.dll",
+                "vulkan/arm64ec-windows/vulkan-1.dll"].allSatisfy {
+            FileManager.default.fileExists(atPath: bundle.appendingPathComponent($0).path)
+        }
+    }
+
+    /// Looks for "vulkan-1.dll" (ASCII or UTF-16, any case) in the first and last
+    /// 4 MB of a PE file: covers the import table and LoadLibrary strings, the
+    /// same bounded scan Madeira's library uses to detect a game's graphics API.
+    static func executableReferencesVulkan(_ url: URL) -> Bool {
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return false }
+        defer { try? handle.close() }
+        let length = (try? handle.seekToEnd()) ?? 0
+        let window: UInt64 = 4 * 1024 * 1024
+        let name = "vulkan-1.dll"
+        let ascii = Data(name.utf8)
+        let wide = Data(name.utf16.flatMap { [UInt8($0 & 0xff), UInt8($0 >> 8)] })
+        for offset in [UInt64(0), length > window ? length - window : 0] {
+            try? handle.seek(toOffset: offset)
+            guard let bytes = try? handle.read(upToCount: Int(window)) else { break }
+            let folded = Data(bytes.map { (65...90).contains($0) ? $0 + 32 : $0 })
+            if folded.range(of: ascii) != nil || folded.range(of: wide) != nil { return true }
+            if length <= window { break }
+        }
+        return false
+    }
+
+    /// Writes this launch's lines of Madeira's per-game config (MADEIRA_CFG_GAME,
+    /// read after Documents/madeira.cfg so these keys win). `vulkan = moltenvk`
+    /// makes the bridge link winevulkan/vulkan-1 into the prefix and point
+    /// winevulkan at gl/libMoltenVK.dylib; `gl-backend` picks Zink or OpenGL ES.
+    /// Upstream binds no 32-bit Vulkan table yet, so Vulkan is x64-only.
+    private func writeSessionGraphicsConfig(binary: URL, is32Bit: Bool) {
+        var lines = ["# Written by iDeck for this launch: \(binary.lastPathComponent)"]
+        let runtime = Self.hasGLVulkanRuntime
+        switch sessionVulkanMode {
+        case "Off":
+            lines.append("vulkan = off")
+        case "On" where runtime && !is32Bit:
+            lines.append("vulkan = moltenvk")
+        case "Automatic" where runtime && !is32Bit && Self.executableReferencesVulkan(binary):
+            lines.append("vulkan = moltenvk")
+        default:
+            break
+        }
+        switch sessionOpenGLBackend {
+        case "Desktop OpenGL": lines.append("gl-backend = zink")
+        case "OpenGL ES": lines.append("gl-backend = gles")
+        default: break
+        }
+        if lines.count == 1 {
+            unsetenv("MADEIRA_CFG_GAME")
+            return
+        }
+        let directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("iDeck/GameConfig", isDirectory: true)
+        let file = directory.appendingPathComponent("session.cfg")
+        do {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            try (lines.joined(separator: "\n") + "\n").write(to: file, atomically: true, encoding: .utf8)
+            setenv("MADEIRA_CFG_GAME", file.path, 1)
+            SteamLog.event("[wine-launch] graphics: " + lines.dropFirst().joined(separator: "; "))
+        } catch {
+            unsetenv("MADEIRA_CFG_GAME")
+            SteamLog.event("[wine-launch] could not write the game graphics config: \(error.localizedDescription)")
+        }
+    }
+
     func applyGameProfile(_ profile: WindowsGameProfile) {
+        sessionVulkanMode = profile.vulkanMode
+        sessionOpenGLBackend = profile.openGLBackend
         setenv("IDECK_DISPLAY_SCALING", RuntimeConfiguration.SurfaceMode(saved: profile.surfaceScaling).rawValue, 1)
         setenv("IDECK_TOUCH_CONTROLS_ACTIVE", profile.touchControlPreset == "off" ? "0" : "1", 1)
         let controllerMode = profile.controllerAPI == "Automatic"

@@ -2,7 +2,7 @@
 
 ## Upstream revision and ABI rules
 
-iDeck pins Madeira **fd9f2f3d0434a4116e4c3351f286a0fc376b4e36**
+iDeck pins Madeira **c2c1b03a9e36ef986c980b9eae3c14d05a372db1**
 (Wine **11.4** ARM64EC/iOS, with individually audited ARM host, Mach context,
 and repeat-session patches). The new, selectively imported source files
 in this change are from Madeira **c2c1b03a9e36ef986c980b9eae3c14d05a372db1**.
@@ -36,27 +36,29 @@ not an interface-only build. Binary presence, exports, kit provenance and
 IPA staging can be verified on macOS CI. Actual game compatibility still
 requires testing on an iPad with working JIT.
 
-### Imported source: Vulkan / MoltenVK / OpenGL / WGL
+### OpenGL and Vulkan (built since the c2c1b03 pin)
 
-The following sources are now available for a **separate coordinated Wine
-ABI port**:
+The pinned Madeira compiles the Wine `opengl32` and `winevulkan` Unix sides
+into `libntdll_unix.a` and the winios WGL/Vulkan drivers into
+`libwin32u_unix.a`. iDeck completes the runtime:
 
-- `build/vulkan-ios/backend.c`: MoltenVK static Vulkan entrypoints.
-- `build/win32u-unix/vulkan_ios.c`: Wine's Unix Vulkan dispatch.
-- `build/win32u-unix/vulkan_surface_ios.c`: real CAMetalLayer surfaces.
-- `build/win32u-unix/opengl_ios.c`: WGL, OpenGL ES and Mesa/Zink paths.
+- `Winios/WiniosGL.m` (the GL presenter onto the game's CAMetalLayer) is
+  linked with `OpenGLES.framework` and `IOSurface.framework`.
+- `build/host/madeira_host_input.c` supplies `winios_mouse_routing_enabled`,
+  which upstream implements in Swift.
+- `scripts/build_madeira_gl_vulkan.sh` builds MoltenVK v1.4.2
+  (`gl/libMoltenVK.dylib`) and Mesa 25.0.7 OSMesa + Zink
+  (`gl/libOSMesa.dylib`) with Madeira's own scripts, and caches them.
+- Wine's ARM64EC `winevulkan.dll`/`vulkan-1.dll` are staged in
+  `vulkan/arm64ec-windows`, outside the prefix farm.
 
-**Not yet runnable:** These are source files, not automatic runtime
-providers. They are deliberately not compiled into the current native
-runtime. A correct implementation also requires the matching later
-Wine/FEX/DXMT ABI, the Wine `opengl32` and `winevulkan` Unix thunk tables,
-rebuilding `libntdll_unix.a` and `libwin32u_unix.a`, the newer
-`WiniosGL.m` and `IOSDisplayShim.m` host APIs, licensed/validated
-MoltenVK and Mesa/Zink runtimes, and per-session Vulkan/D3D12 DLL
-selection. Simply linking the C files would produce unresolved symbols
-or a Vulkan/GL implementation that never presents a frame. Until the
-coordinated port compiles and passes iOS hardware tests, the iDeck
-Direct3D 11 path remains DXMT, and Direct3D 12 remains madeira-d3d12.
+OpenGL games get desktop OpenGL 3.3–4.x through Zink (or OpenGL ES 3.0 when
+chosen). Vulkan is per game: the profile's **Vulkan** setting (Automatic
+turns it on when an x64 executable references `vulkan-1.dll`) writes
+`vulkan = moltenvk` to the per-game Madeira config (`MADEIRA_CFG_GAME`).
+32-bit games get no Vulkan, because upstream binds no WoW64 Vulkan table.
+DXVK and vkd3d-proton are not bundled; Direct3D stays on DXMT and
+madeira-d3d12. Rendering must still be verified on an iPad.
 
 The files are preserved as an auditable baseline rather than misleading
 users with fake Vulkan/OpenGL support.

@@ -33,6 +33,9 @@ SYMBOLS = (
     "madeira_get_present_count",
     "madeira_d3d12_canary_run",
     "madeira_luajit_compat_fd",
+    "madeira_gl_present",
+    "madeira_display_layer_for_hwnd",
+    "winios_mouse_routing_enabled",
 )
 D3D12_SYMBOLS = ("madeira_d3d12_canary_run",)
 D3D12_PE_FILES = (
@@ -289,6 +292,20 @@ def inspect(app: Path, require_wow64: bool = False, graphics: str = "d3d12") -> 
                     problem = _pe_arch_error(dll, False)
                     if problem:
                         errors.append(problem)
+
+    for directory in (app, runtime):
+        for name in ("winevulkan.dll", "vulkan-1.dll"):
+            dll = directory / "vulkan" / "arm64ec-windows" / name
+            if not dll.is_file() or dll.stat().st_size < 1024:
+                errors.append(f"missing Vulkan ARM64EC module: {dll}")
+            else:
+                problem = _pe_arch_error(dll, True)
+                if problem:
+                    errors.append(problem)
+    for name in ("libMoltenVK.dylib", "libOSMesa.dylib"):
+        library = app / "gl" / name
+        if not library.is_file() or library.read_bytes()[:4] != bytes.fromhex("cffaedfe"):
+            errors.append(f"missing arm64 OpenGL/Vulkan runtime: {library}")
 
     ca = app / "cacert.pem"
     if not ca.is_file() or b"-----BEGIN CERTIFICATE-----" not in ca.read_bytes():

@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DEST="${1:-$ROOT/vendor/Madeira}"
-REV="${IDECK_MADEIRA_REV:-fd9f2f3d0434a4116e4c3351f286a0fc376b4e36}"
+REV="${IDECK_MADEIRA_REV:-c2c1b03a9e36ef986c980b9eae3c14d05a372db1}"
 
 command -v git >/dev/null || { echo "git is required" >&2; exit 1; }
 if [ ! -d "$DEST/.git" ]; then
@@ -32,7 +32,8 @@ fi
 # Upstream only updates a private prebuilt wineserver archive. Build the
 # complete iOS archive from the pinned server sources on clean runners.
 SERVER_PATCH="$ROOT/patches/madeira-wineserver-from-source.patch"
-if ! grep -Fq 'SERVER_SOURCES=' "$DEST/build/wineserver/build.sh"; then
+if ! grep -Fq 'SERVER_SOURCES=' "$DEST/build/wineserver/build.sh" &&
+   ! grep -Fq 'Building wineserver base from source' "$DEST/build/wineserver/build.sh"; then
   git -C "$DEST" apply --check "$SERVER_PATCH"
   git -C "$DEST" apply "$SERVER_PATCH"
 fi

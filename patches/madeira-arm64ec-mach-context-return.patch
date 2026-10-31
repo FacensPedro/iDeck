@@ -1,12 +1,10 @@
 diff --git a/build/ntdll-unix/signal_arm64_ios.c b/build/ntdll-unix/signal_arm64_ios.c
 --- a/build/ntdll-unix/signal_arm64_ios.c
 +++ b/build/ntdll-unix/signal_arm64_ios.c
-@@ -1487,9 +1487,126 @@
-     dprintf( 2, "[jit-dump] ml1242 %s: wrote %zu of %zu pool bytes to %s (untouched pages left as holes)\n",
-              why, written, total, path );
+@@ -2429,6 +2429,123 @@
+     return v;
  }
  
--static void *ios_mach_exception_thread( void *arg )
 +/* iDeck ARM64EC slow-context return:
 + * A normal SIGUSR2 raised from Wine's syscall dispatcher is intercepted as an
 + * EXC_BREAKPOINT in Apple's pthread_kill/raise host machinery under StikDebug.
@@ -124,21 +122,13 @@ diff --git a/build/ntdll-unix/signal_arm64_ios.c b/build/ntdll-unix/signal_arm64
 +}
 +#endif
 +
-+static void *ios_mach_exception_thread( void *arg )
+ static void *ios_mach_exception_thread( void *arg )
  {
      mach_port_t port = (mach_port_t)(uintptr_t)arg;
- 
-     /* Name this thread for debugging */
-@@ -1999,11 +2116,20 @@
-         arm_neon_state64_t neon_state;
-         mach_msg_type_number_t neon_count = ARM_NEON_STATE64_COUNT;
-         int have_neon = (thread_get_state(thread, ARM_NEON_STATE64,
+@@ -2943,6 +3060,15 @@
                                            (thread_state_t)&neon_state, &neon_count) == KERN_SUCCESS);
--        if (kr == KERN_SUCCESS)
--        {
--            uintptr_t fault_addr = (uintptr_t)req->code[1];
-+        if (kr == KERN_SUCCESS)
-+        {
+         if (kr == KERN_SUCCESS)
+         {
 +#ifdef WINE_IOS
 +            if (req->exception == EXC_BREAKPOINT &&
 +                ios_mach_resume_arm64ec_slowpath( thread, thread_teb,
@@ -148,34 +138,21 @@ diff --git a/build/ntdll-unix/signal_arm64_ios.c b/build/ntdll-unix/signal_arm64
 +                goto ios_mach_send_reply;
 +            }
 +#endif
-+            uintptr_t fault_addr = (uintptr_t)req->code[1];
+             uintptr_t fault_addr = (uintptr_t)req->code[1];
  #ifdef WINE_IOS
              /* ml939: THE SUB-FLOOR SERVICE BELONGS HERE, NOT IN segv_handler.
-              *
-              * ml938 put it in segv_handler and the emulation itself was correct --
-@@ -6382,9 +6508,10 @@
-                 }
+@@ -7468,6 +7594,7 @@
              }
          }
  
--        /* Build reply */
 +ios_mach_send_reply:
-+        /* Build reply */
+         /* Build reply */
          ios_exc_reply_t reply;
          reply.head.msgh_bits = MACH_MSGH_BITS( MACH_MSGH_BITS_REMOTE(req->head.msgh_bits), 0 );
-         reply.head.msgh_size = sizeof(reply);
-         reply.head.msgh_remote_port = req->head.msgh_remote_port;
-@@ -13937,12 +14064,22 @@
- 
- /***********************************************************************
-  *           syscall_dispatcher_return_slowpath
+@@ -15295,7 +15422,17 @@
   */
--void syscall_dispatcher_return_slowpath(void)
--{
--    raise( SIGUSR2 );
--}
-+void syscall_dispatcher_return_slowpath(void)
-+{
+ void syscall_dispatcher_return_slowpath(void)
+ {
 +#ifdef WINE_IOS
 +    /* Guest CONTEXT_INTEGER needs both x16 and x17 restored. SIGUSR2 via
 +     * Apple's raise/pthread_kill is intercepted as a Mach breakpoint under
@@ -185,10 +162,8 @@ diff --git a/build/ntdll-unix/signal_arm64_ios.c b/build/ntdll-unix/signal_arm64
 +    __asm__ volatile( "brk #0x5a5a" ::: "memory" );
 +    __builtin_unreachable();
 +#else
-+    raise( SIGUSR2 );
+     raise( SIGUSR2 );
 +#endif
-+}
+ }
  
  /***********************************************************************
-  *           init_syscall_frame
-  */

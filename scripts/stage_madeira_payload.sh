@@ -140,6 +140,50 @@ cp "$SOURCE/compat/love/lua51.dll" "$RUNTIME/compat/love/lua51.dll"
   exit 2
 }
 
+# Vulkan: Wine's ARM64EC winevulkan/vulkan-1 live OUTSIDE the arm64ec farm
+# (every farm file is linked into every prefix, and a program probing for
+# vulkan-1.dll must find none unless the session turns Vulkan on). The
+# upstream WineProcessBridge links them per session from vulkan/.
+for name in winevulkan.dll vulkan-1.dll; do
+  FILE="$SOURCE/vulkan/arm64ec-windows/$name"
+  [[ -s "$FILE" && "$(head -c 2 "$FILE")" == "MZ" ]] || {
+    echo "ERROR: missing Vulkan ARM64EC module: vulkan/arm64ec-windows/$name" >&2; exit 2;
+  }
+done
+mkdir -p "$APP/vulkan/arm64ec-windows" "$RUNTIME/vulkan/arm64ec-windows"
+for file in "$SOURCE/vulkan/arm64ec-windows/"*.dll; do
+  # vkd3d-proton's d3d12*.dll belongs to the licensed D3D12 profile only.
+  case "$(basename "$file")" in d3d12*.dll) [[ "$GRAPHICS" == "d3d12" ]] || continue ;; esac
+  cp "$file" "$APP/vulkan/arm64ec-windows/"
+  cp "$file" "$RUNTIME/vulkan/arm64ec-windows/"
+done
+
+# OpenGL / Vulkan host libraries (scripts/build_madeira_gl_vulkan.sh):
+# MoltenVK for winevulkan and Zink, Mesa OSMesa + Zink for desktop OpenGL.
+# The bridge reads them from <bundle>/gl via NSBundle.mainBundle.
+for name in libMoltenVK.dylib libOSMesa.dylib; do
+  [[ -s "$SOURCE/gl/$name" ]] || {
+    echo "ERROR: missing OpenGL/Vulkan runtime: gl/$name (run scripts/build_madeira_gl_vulkan.sh)" >&2; exit 2;
+  }
+  # Mach-O 64-bit magic followed by CPU_TYPE_ARM64 (0x0100000c), little endian.
+  [[ "$(od -An -tx1 -N8 "$SOURCE/gl/$name" | tr -d '[:space:]')" == "cffaedfe0c000001" ]] || {
+    echo "ERROR: gl/$name is not an arm64 iOS dylib" >&2; exit 2;
+  }
+done
+mkdir -p "$APP/gl"
+cp "$SOURCE/gl/libMoltenVK.dylib" "$SOURCE/gl/libOSMesa.dylib" "$APP/gl/"
+for license in MoltenVK-Apache-2.0.txt SPIRV-Cross-Apache-2.0.txt SPIRV-Tools-Apache-2.0.txt \
+               cereal-BSD-3-Clause.txt Mesa-license.rst; do
+  [[ -s "$APP/licenses/$license" ]] || {
+    echo "ERROR: missing OpenGL/Vulkan license notice: licenses/$license" >&2; exit 2;
+  }
+done
+if [[ -n "${IDECK_CODESIGN_IDENTITY:-}" ]]; then
+  for library in "$APP/gl/libMoltenVK.dylib" "$APP/gl/libOSMesa.dylib"; do
+    codesign --force --sign "$IDECK_CODESIGN_IDENTITY" --timestamp=none "$library"
+  done
+fi
+
 # Official Microsoft VC++ libraries are not included in Madeira's git checkout.
 # When the owner supplies an authorized, complete distribution, stage it in
 # the exact location read by the upstream WineProcessBridge. No fake DLLs.

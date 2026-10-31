@@ -341,6 +341,9 @@ jobs:
           xcrun swiftc iDeck/WindowsLaunchArguments.swift tests/host/WindowsLaunchArgumentsTests.swift -o /tmp/ideck-launch-args-tests
           /tmp/ideck-launch-args-tests
 
+      - name: Test Madeira OpenGL (WGL on Zink/GLES) and Vulkan (MoltenVK) runtime wiring
+        run: python3 -m unittest discover -s tests/host -p 'test_madeira_gl_vulkan_runtime.py' -v
+
       - name: Test live Madeira virtual monitor, four surface scaling modes and touch mapping
         run: python3 -m unittest discover -s tests/host -p 'test_madeira_surface_scaling.py' -v
 
@@ -458,7 +461,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: build/native-cache
-          key: madeira-kit-v3-${{ runner.os }}-${{ runner.arch }}-${{ env.IDECK_MADEIRA_GRAPHICS }}-${{ env.IDECK_BUILD_WOW64 == '1' && 'wow64' || 'no-wow64' }}-${{ env.IDECK_BUNDLE_WINE_MONO == '1' && 'mono' || 'no-mono' }}-${{ hashFiles('scripts/madeira_native_kit.py', 'scripts/build_madeira_components.sh', 'scripts/build_madeira_dcomp.sh', 'scripts/build_madeira_luajit.sh', 'scripts/link_madeira_native.sh', 'scripts/fetch_madeira_sources.sh', 'build/dcomp/*', 'build/wineserver/*', 'patches/*') }}
+          key: madeira-kit-v3-${{ runner.os }}-${{ runner.arch }}-${{ env.IDECK_MADEIRA_GRAPHICS }}-${{ env.IDECK_BUILD_WOW64 == '1' && 'wow64' || 'no-wow64' }}-${{ env.IDECK_BUNDLE_WINE_MONO == '1' && 'mono' || 'no-mono' }}-${{ hashFiles('scripts/madeira_native_kit.py', 'scripts/build_madeira_components.sh', 'scripts/build_madeira_dcomp.sh', 'scripts/build_madeira_luajit.sh', 'scripts/link_madeira_native.sh', 'scripts/fetch_madeira_sources.sh', 'build/dcomp/*', 'build/wineserver/*', 'build/host/*', 'scripts/build_madeira_gl_vulkan.sh', 'scripts/stage_madeira_payload.sh', 'patches/*') }}
 
       - name: Locate repository or cached Madeira runtime
         if: ${{ env.IDECK_NATIVE_BUILD == '1' }}
@@ -543,7 +546,7 @@ jobs:
             vendor/Madeira/toolchains/ffmpeg-ios
             vendor/Madeira/research/freetype
             vendor/Madeira/build/freetype-ios/build
-          key: madeira-deps-v1-xcode27-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/prepare_madeira_dependencies.sh') }}
+          key: madeira-deps-v2-xcode27-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/prepare_madeira_dependencies.sh', 'scripts/fetch_madeira_sources.sh') }}
 
       - name: Prepare ARM64EC and iOS LLVM toolchains
         if: ${{ env.IDECK_NATIVE_BUILD == '1' && steps.madeira_kit.outputs.available != 'true' }}
@@ -560,6 +563,16 @@ jobs:
             vendor/Madeira/toolchains/llvm-ios-build
           key: ${{ steps.native_toolchains.outputs.cache-primary-key }}
 
+      # MoltenVK (Vulkan) and Mesa OSMesa + Zink (desktop OpenGL) take a long
+      # time to compile; scripts/build_madeira_gl_vulkan.sh reuses this cache.
+      - name: Restore compiled OpenGL and Vulkan runtimes
+        id: gl_runtime
+        if: ${{ env.IDECK_NATIVE_BUILD == '1' && steps.madeira_kit.outputs.available != 'true' }}
+        uses: actions/cache/restore@v5
+        with:
+          path: build/gl-runtime-cache
+          key: madeira-gl-vulkan-v1-xcode27-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/build_madeira_gl_vulkan.sh', 'scripts/fetch_madeira_sources.sh') }}
+
       - name: Build and package iDeck.ipa
         env:
           IDECK_REQUIRE_MADEIRA: ${{ env.IDECK_NATIVE_BUILD }}
@@ -573,6 +586,13 @@ jobs:
           bash scripts/build_ipa.sh 2>&1 | tee build.log || status=$?
           grep -E "error:" build.log | sort -u | head -40 | while IFS= read -r line; do echo "::error::${line}"; done || true
           exit ${status:-0}
+
+      - name: Save compiled OpenGL and Vulkan runtimes
+        if: ${{ always() && env.IDECK_NATIVE_BUILD == '1' && steps.madeira_kit.outputs.available != 'true' && steps.gl_runtime.outputs.cache-hit != 'true' && hashFiles('build/gl-runtime-cache/gl/libOSMesa.dylib') != '' }}
+        uses: actions/cache/save@v5
+        with:
+          path: build/gl-runtime-cache
+          key: ${{ steps.gl_runtime.outputs.cache-primary-key }}
 
       - name: Verify IPA archive
         run: |

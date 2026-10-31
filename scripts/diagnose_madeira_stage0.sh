@@ -48,7 +48,7 @@ echo "=== Running exact pinned Madeira fetch, including submodules and iDeck pat
 bash scripts/fetch_madeira_sources.sh 2>&1 | tee "$REPORT/fetch.txt"
 
 MD="$ROOT/vendor/Madeira"
-PIN="fd9f2f3d0434a4116e4c3351f286a0fc376b4e36"
+PIN="c2c1b03a9e36ef986c980b9eae3c14d05a372db1"
 ACTUAL="$(git -C "$MD" rev-parse HEAD)"
 [[ "$ACTUAL" == "$PIN" ]] || {
   echo "ERROR: Madeira revision mismatch: $ACTUAL != $PIN" >&2

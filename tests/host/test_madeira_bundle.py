@@ -65,6 +65,14 @@ class MadeiraBundleTests(unittest.TestCase):
             lua = base / "compat/love/lua51.dll"
             lua.parent.mkdir(parents=True, exist_ok=True)
             lua.write_bytes(make_64bit_pe(0x8664))
+            for name in ("winevulkan.dll", "vulkan-1.dll"):
+                vulkan = base / "vulkan/arm64ec-windows" / name
+                vulkan.parent.mkdir(parents=True, exist_ok=True)
+                vulkan.write_bytes(make_64bit_pe(0x8664, chpe=True))
+        for name in ("libMoltenVK.dylib", "libOSMesa.dylib"):
+            library = self.app / "gl" / name
+            library.parent.mkdir(parents=True, exist_ok=True)
+            library.write_bytes(bytes.fromhex("cffaedfe0c000001") + bytes(64))
         (self.app / "prefix-template.tar.gz").write_bytes(b"\x1f\x8b" + bytes(2048))
         (self.app / "cacert.pem").write_bytes(b"-----BEGIN CERTIFICATE-----\nfixture")
         for folder in ("legal", "licenses"):

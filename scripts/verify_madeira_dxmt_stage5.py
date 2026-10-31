@@ -25,7 +25,7 @@ REQUIRED_BUILDS = (
     "dxmt/build-pe/build.ninja",
     "dxmt/build-arm64ec/build.ninja",
 )
-SOURCE_REVISION = "fd9f2f3d0434a4116e4c3351f286a0fc376b4e36"
+SOURCE_REVISION = "c2c1b03a9e36ef986c980b9eae3c14d05a372db1"
 
 
 def source_errors(root: Path) -> list[str]:

@@ -144,7 +144,12 @@ if [[ "$REBUILD" == "1" ]]; then
   [[ -f "$MD/wine/build-arm64ec/config.status" ]] || {
     echo "ERROR: Wine ARM64EC configure did not complete." >&2; exit 2;
   }
-  if [[ ! -s "$MD/wine/build-macos/include/config.h" ]]; then
+  if [[ -f "$MD/tools/build/build-wine.sh" ]]; then
+    # Newer Madeira configures build-macos itself (aarch64 PE, no FreeType
+    # or GnuTLS in configure, winegstreamer on) and builds its tools. The
+    # Unix libraries read this config.h, so it must match upstream exactly.
+    ROOT="$MD" JOBS="$(sysctl -n hw.ncpu)" bash "$MD/tools/build/build-wine.sh"
+  elif [[ ! -s "$MD/wine/build-macos/include/config.h" ]]; then
     mkdir -p "$MD/wine/build-macos"
     (cd "$MD/wine/build-macos" && \
       PATH="$MD/toolchains/llvm-mingw-20260421-ucrt-macos-universal/bin:$PATH" \
@@ -282,7 +287,7 @@ if [[ "$REBUILD" == "1" ]]; then
 
   if [[ "$STOP_AFTER" == "dxmt" ]]; then
     python3 "$ROOT/scripts/verify_madeira_component_outputs.py" --root "$MD" --stage dxmt
-    python3 "$ROOT/scripts/verify_madeira_dxmt_stage5.py" --root "$MD" --revision "${IDECK_MADEIRA_REV:-fd9f2f3d0434a4116e4c3351f286a0fc376b4e36}"
+    python3 "$ROOT/scripts/verify_madeira_dxmt_stage5.py" --root "$MD" --revision "${IDECK_MADEIRA_REV:-c2c1b03a9e36ef986c980b9eae3c14d05a372db1}"
     echo "PASS: full iOS DXMT and ARM64/ARM64EC D3D11 frontends compiled; D3D12, WoW64 and packaging not attempted."
     exit 0
   fi
@@ -312,6 +317,9 @@ if [[ "$REBUILD" == "1" ]]; then
   # Validate all PE exports before staging; never substitute a stub.
   bash "$ROOT/scripts/build_madeira_dcomp.sh"
 
+  # OpenGL (Mesa OSMesa + Zink) and Vulkan (MoltenVK) host runtimes for gl/.
+  bash "$ROOT/scripts/build_madeira_gl_vulkan.sh" "$MD"
+
 fi
 
 for file in \
@@ -329,7 +337,11 @@ for file in \
   "$MD/app/Madeira/arm64ec-windows/d3d10core.dll" \
   "$MD/app/Madeira/aarch64-windows/winemetal.dll" \
   "$MD/app/Madeira/prefix-template.tar.gz" \
-  "$MD/app/Madeira/arm64ec-windows/winemetal.dll"; do
+  "$MD/app/Madeira/arm64ec-windows/winemetal.dll" \
+  "$MD/app/Madeira/vulkan/arm64ec-windows/winevulkan.dll" \
+  "$MD/app/Madeira/vulkan/arm64ec-windows/vulkan-1.dll" \
+  "$MD/app/Madeira/gl/libMoltenVK.dylib" \
+  "$MD/app/Madeira/gl/libOSMesa.dylib"; do
   [[ -s "$file" ]] || { echo "ERROR: missing compiled native/PE component: $file" >&2; exit 2; }
 done
 
