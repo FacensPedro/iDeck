@@ -67,15 +67,17 @@ final class DepotDownloader {
         // re-check thermal and Low Power Mode changes during the transfer.
         if process.isLowPowerModeEnabled { return 2 }
         switch process.thermalState {
-        case .nominal: return min(24, max(16, process.activeProcessorCount * 3))
-        case .fair: return min(12, max(6, process.activeProcessorCount * 2))
+        // Download speed is preferred over CPU use: more chunks are fetched,
+        // decrypted and decompressed at once while the device stays cool.
+        case .nominal: return min(64, max(32, process.activeProcessorCount * 8))
+        case .fair: return min(32, max(16, process.activeProcessorCount * 4))
         case .serious: return 4
         case .critical: return 1
         @unknown default: return 4
         }
     }
     private let attemptsPerChunk = 5
-    private let hostPoolSize = 12
+    private let hostPoolSize = 16
 
 
     private nonisolated static let http: URLSession = {
@@ -85,7 +87,7 @@ final class DepotDownloader {
         config.timeoutIntervalForRequest = 30
         config.timeoutIntervalForResource = 300
         // No bandwidth throttle is applied. This is a connection safety limit.
-        config.httpMaximumConnectionsPerHost = 24
+        config.httpMaximumConnectionsPerHost = 64
         return URLSession(configuration: config)
     }()
 
@@ -523,7 +525,7 @@ final class DepotDownloader {
         state.checkDone = 0
         report(state)
         let isExternal = checks.contains { $0.path.contains("/LiveFiles/") || $0.path.contains("/External/") }
-        let readers = isExternal ? 3 : min(8, max(5, ProcessInfo.processInfo.activeProcessorCount))
+        let readers = isExternal ? 3 : min(12, max(6, ProcessInfo.processInfo.activeProcessorCount * 2))
         let journals = try plans.indices.map { try JournalWriter(url: prepared.journals[$0]) }
         defer { journals.forEach { $0.close() } }
         var verified: [Set<UInt64>] = plans.map { _ in [] }

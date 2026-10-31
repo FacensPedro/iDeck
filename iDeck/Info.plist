@@ -13,8 +13,6 @@
 	</dict>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Local network access is required for JIT activation.</string>
-	<key>UIApplicationSupportsIndirectInputEvents</key>
-	<true/>
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array>
 		<string>$(PRODUCT_BUNDLE_IDENTIFIER).download.*</string>
