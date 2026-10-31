@@ -19,7 +19,16 @@ class AutomaticJITAndDownloadHUDTests(unittest.TestCase):
         self.assertIn("if !debuggerAttached {", COORDINATOR)
         self.assertIn("DispatchQueue.global(qos: .userInitiated)", COORDINATOR)
         self.assertIn("wineJITPreparationInFlight ? isWineJITPrepared", COORDINATOR)
-        self.assertNotIn('Text(tr("Wine JIT pool"))', SETTINGS)
+        # A pool-size preference was added after the original automatic-JIT
+        # test. It is safe because it only configures the native allocation
+        # before preparation; the app must not resize an executable JIT pool.
+        self.assertIn('Text(tr("Wine JIT pool"))', SETTINGS)
+        self.assertIn('@AppStorage("wineJITPoolMiB")', SETTINGS)
+        self.assertIn('ForEach([64, 96, 128, 192, 256, 384]', SETTINGS)
+        self.assertIn('updateWineJITPoolPreference(selected)', SETTINGS)
+        self.assertIn('guard !wineJITPreparationInFlight && !ideck_wine_jit_pool_ready()', COORDINATOR)
+        self.assertIn('setenv("IDECK_WINE_JIT_MIB", String(sizeMiB), 1)', COORDINATOR)
+        self.assertIn('unsetenv("IDECK_WINE_JIT_MIB")', COORDINATOR)
 
     def test_updates_settings_hide_unnecessary_release_messages(self):
         self.assertNotIn('actionButton(title: tr("Update iDeck %@", update.latest ?? "")', SETTINGS)
