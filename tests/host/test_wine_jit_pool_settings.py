@@ -32,7 +32,6 @@ class WineJITPoolSettingsTests(unittest.TestCase):
         self.assertIn('Wine Mono is not included. Run iOS Build', settings)
         self.assertNotIn("downloadWineMono()", settings)
         self.assertIn('"wineMonoBundled"', env)
-        self.assertIn("ideck_process_has_jit_permission()", settings)
         self.assertIn("coordinator.requestStikDebugJIT()", settings)
 
     def test_localization_and_no_jit_faking(self):

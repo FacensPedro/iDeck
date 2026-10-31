@@ -46,12 +46,10 @@ class MadeiraStage7JITTests(unittest.TestCase):
         ):
             self.assertIn(field, HEADER)
 
-    def test_settings_copies_read_only_on_device_evidence_without_exposing_addresses(self):
-        self.assertIn("private func copyJITDiagnostics()", SETTINGS)
-        self.assertIn("let snapshot = ideck_jit_snapshot()", SETTINGS)
-        self.assertIn("UIPasteboard.general.string = values.joined", SETTINGS)
-        self.assertIn('tr("Copy JIT diagnostics")', SETTINGS)
-        self.assertIn("JIT guest code execution: NOT TESTED by this snapshot", SETTINGS)
+    def test_settings_no_longer_copies_jit_diagnostics(self):
+        # JIT problems are reported in Bugs & logs instead.
+        self.assertNotIn("copyJITDiagnostics", SETTINGS)
+        self.assertNotIn("UIPasteboard.general.string = values.joined", SETTINGS)
         self.assertNotIn("String(format: \"%p\"", SETTINGS)
 
     def test_existing_stikdebug_brk_guards_remain(self):

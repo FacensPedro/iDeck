@@ -569,30 +569,69 @@ private struct GOGLoginWebView: UIViewRepresentable {
 
     func makeCoordinator() -> Coordinator { Coordinator(onCode: onCode) }
 
+    /// Google refuses to sign in inside embedded web views that announce
+    /// themselves as such, so the page sees mobile Safari's user agent.
+    static let safariUserAgent = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1"
+
     func makeUIView(context: Context) -> WKWebView {
         // A non-persistent store: GOG's session cookie is not kept by iDeck.
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .nonPersistent()
+        configuration.preferences.javaScriptCanOpenWindowsAutomatically = true
         let view = WKWebView(frame: .zero, configuration: configuration)
+        view.customUserAgent = Self.safariUserAgent
         view.navigationDelegate = context.coordinator
+        view.uiDelegate = context.coordinator
         view.load(URLRequest(url: GOGAPI.loginURL))
         return view
     }
 
     func updateUIView(_ uiView: WKWebView, context: Context) {}
 
-    final class Coordinator: NSObject, WKNavigationDelegate {
+    /// Handles GOG's redirect and the pop-up windows that "Sign in with
+    /// Google / Steam / Discord / Xbox" open. Each pop-up is shown on top of
+    /// the login page and shares its session, so the provider can hand the
+    /// result back to GOG's page through window.opener.
+    final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
         let onCode: (String) -> Void
+        private var popups: [WKWebView] = []
         init(onCode: @escaping (String) -> Void) { self.onCode = onCode }
 
         func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
                      decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
             if let url = navigationAction.request.url, let code = GOGAPI.loginCode(from: url) {
                 decisionHandler(.cancel)
+                closeAllPopups()
                 onCode(code)
                 return
             }
             decisionHandler(.allow)
+        }
+
+        func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
+                     for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
+            // A link with target=_blank: keep it in the same page.
+            guard navigationAction.targetFrame == nil else { return nil }
+            let host = webView
+            let popup = WKWebView(frame: host.bounds, configuration: configuration)
+            popup.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+            popup.customUserAgent = GOGLoginWebView.safariUserAgent
+            popup.navigationDelegate = self
+            popup.uiDelegate = self
+            host.addSubview(popup)
+            popups.append(popup)
+            return popup
+        }
+
+        func webViewDidClose(_ webView: WKWebView) {
+            guard let index = popups.firstIndex(of: webView) else { return }
+            popups.remove(at: index)
+            webView.removeFromSuperview()
+        }
+
+        private func closeAllPopups() {
+            popups.forEach { $0.removeFromSuperview() }
+            popups.removeAll()
         }
     }
 }
@@ -633,9 +672,11 @@ struct StoreBadge: View {
         Group {
             if UIImage(named: assetName) != nil {
                 Image(assetName)
+                    .renderingMode(store == .epic ? .template : .original)
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 13, height: 13)
+                    .foregroundColor(.white)
+                    .frame(width: store == .epic ? 15 : 13, height: store == .epic ? 17 : 13)
             } else {
                 Text(label)
                     .font(.system(size: 8, weight: .heavy, design: .rounded))

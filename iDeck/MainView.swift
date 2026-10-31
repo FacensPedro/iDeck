@@ -479,20 +479,9 @@ struct WindowsWorkspaceView: View {
 
                         installedProgramsContent
 
-                        if coordinator.isSteamConnected {
-                            HStack {
-                                Spacer()
-                                Button {
-                                    Task { await steamLibrary.refresh(force: true) }
-                                } label: {
-                                    Image(systemName: "arrow.clockwise")
-                                        .font(.headline)
-                                        .frame(width: 32, height: 32)
-                                }
-                                .buttonStyle(.bordered)
-                            }
-                            libraryContent
-                         } else {
+                        mixedLibraryContent
+
+                        if !coordinator.isSteamConnected {
                             VStack(alignment: .leading, spacing: 10) {
                                 Label(tr("Connect Steam to continue"), systemImage: "steam")
                                     .font(.headline)
@@ -509,10 +498,12 @@ struct WindowsWorkspaceView: View {
                             .background(panelColor)
                             .clipShape(RoundedRectangle(cornerRadius: 14))
                         }
-
-                        gogContent
-
-                        epicContent
+                        if !gogLibrary.isSignedIn {
+                            gogContent
+                        }
+                        if !epicLibrary.signedIn {
+                            epicContent
+                        }
 
                         } else {
                             liveContainerContent
@@ -769,87 +760,124 @@ struct WindowsWorkspaceView: View {
         .background(Color.black)
     }
 
+    /// One game in the combined library, from whichever store owns it.
+    private enum MixedLibraryEntry: Identifiable {
+        case steam(SteamAppInfo)
+        case gog(GOGGame)
+        case epic(EpicOwnedGame)
+
+        var id: String {
+            switch self {
+            case .steam(let game): return "steam:\(game.appID)"
+            case .gog(let game): return "gog:\(game.id)"
+            case .epic(let game): return "epic:\(game.id)"
+            }
+        }
+
+        var title: String {
+            switch self {
+            case .steam(let game): return game.name
+            case .gog(let game): return game.title
+            case .epic(let game): return game.title
+            }
+        }
+    }
+
+    /// Steam, GOG and Epic games of every connected account, in one list
+    /// sorted by name.
+    private var mixedLibraryEntries: [MixedLibraryEntry] {
+        var entries: [MixedLibraryEntry] = []
+        if coordinator.isSteamConnected { entries += filteredSteamGames.map { .steam($0) } }
+        if gogLibrary.isSignedIn { entries += filteredGOGGames.map { .gog($0) } }
+        if epicLibrary.signedIn { entries += filteredEpicGames.map { .epic($0) } }
+        return entries.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+    }
+
+    private var mixedLibraryCount: Int {
+        (coordinator.isSteamConnected ? steamLibrary.games.count : 0) +
+        (gogLibrary.isSignedIn ? gogLibrary.games.count : 0) +
+        (epicLibrary.signedIn ? epicLibrary.owned.count : 0)
+    }
+
+    private var mixedLibraryLoading: Bool {
+        (coordinator.isSteamConnected && steamLibrary.isLoading) ||
+        (gogLibrary.isSignedIn && gogLibrary.isLoading) ||
+        (epicLibrary.signedIn && epicLibrary.refreshing)
+    }
+
+    /// Short status lines for stores that are loading or failed to load.
+    private var mixedLibraryNotices: [(text: String, isError: Bool)] {
+        var notices: [(text: String, isError: Bool)] = []
+        if coordinator.isSteamConnected {
+            if steamLibrary.isLoading { notices.append((tr("Loading Steam library..."), false)) }
+            else if let error = steamLibrary.errorMessage { notices.append(("Steam: " + tr(error), true)) }
+        }
+        if gogLibrary.isSignedIn {
+            if gogLibrary.isLoading { notices.append((tr("Loading GOG library..."), false)) }
+            else if let error = gogLibrary.errorMessage { notices.append(("GOG: " + tr(error), true)) }
+        }
+        if epicLibrary.signedIn {
+            if epicLibrary.refreshing { notices.append((tr("Loading Epic Games library..."), false)) }
+            else if let error = epicLibrary.error { notices.append(("Epic Games: " + error, true)) }
+        }
+        return notices
+    }
+
+    private func refreshAllLibraries() {
+        if coordinator.isSteamConnected { Task { await steamLibrary.refresh(force: true) } }
+        if gogLibrary.isSignedIn { Task { await gogLibrary.refresh() } }
+        if epicLibrary.signedIn { Task { await epicLibrary.refreshLibrary() } }
+    }
+
     @ViewBuilder
-    private var libraryContent: some View {
-        if steamLibrary.isLoading {
-            HStack(spacing: 10) {
-                ProgressView().tint(.white)
-                Text(tr("Loading Steam library..."))
-                    .foregroundColor(.gray)
-            }
-            .frame(maxWidth: .infinity, minHeight: 150)
-            .background(panelColor)
-            .clipShape(RoundedRectangle(cornerRadius: 14))
-        } else if let error = steamLibrary.errorMessage {
-            VStack(spacing: 12) {
-                Image(systemName: "exclamationmark.triangle")
-                    .font(.largeTitle)
-                    .foregroundColor(.orange)
-                Text(tr(error))
-                    .font(.subheadline)
-                    .foregroundColor(.white)
-                    .multilineTextAlignment(.center)
-                Button {
-                    Task { await steamLibrary.refresh() }
-                } label: {
-                    Image(systemName: "arrow.clockwise")
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 10)
-                        .background(secondaryColor)
-                        .clipShape(RoundedRectangle(cornerRadius: 9))
-                }
-            }
-            .frame(maxWidth: .infinity, minHeight: 150)
-            .padding(18)
-            .background(panelColor)
-            .clipShape(RoundedRectangle(cornerRadius: 14))
-        } else if steamLibrary.games.isEmpty {
-            VStack(spacing: 10) {
-                Image(systemName: "gamecontroller")
-                    .font(.system(size: 34))
-                    .foregroundColor(.gray)
-                Text(tr("No owned games found yet."))
-                    .font(.headline)
-                    .foregroundColor(.white)
-                Text(tr("Check your Steam account and refresh the library."))
-                    .font(.subheadline)
-                    .foregroundColor(.gray)
-                    .multilineTextAlignment(.center)
-                Button {
-                    Task { await steamLibrary.refresh() }
-                } label: {
-                    Image(systemName: "arrow.clockwise")
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 10)
-                        .background(secondaryColor)
-                        .clipShape(RoundedRectangle(cornerRadius: 9))
-                }
-            }
-            .frame(maxWidth: .infinity, minHeight: 200)
-            .padding(18)
-            .background(panelColor)
-            .clipShape(RoundedRectangle(cornerRadius: 14))
-        } else {
+    private var mixedLibraryContent: some View {
+        if coordinator.isSteamConnected || gogLibrary.isSignedIn || epicLibrary.signedIn {
             VStack(alignment: .leading, spacing: 14) {
-                ownedHeader(tr("Owned games: %d", steamLibrary.games.count), collapsed: $steamOwnedCollapsed)
-
+                HStack(spacing: 10) {
+                    ownedHeader(tr("Games: %d", mixedLibraryCount), collapsed: $steamOwnedCollapsed)
+                    Button { refreshAllLibraries() } label: {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.headline)
+                            .frame(width: 32, height: 32)
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(mixedLibraryLoading)
+                    .accessibilityLabel(tr("Refresh"))
+                }
                 if !steamOwnedCollapsed {
-
-                if filteredSteamGames.isEmpty {
-                    Text(tr("No games match this search"))
-                        .font(.subheadline)
-                        .foregroundColor(.gray)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 32)
-                } else {
-                    LazyVGrid(columns: columns, spacing: 14) {
-                        ForEach(filteredSteamGames, id: \.appID) { game in
-                            gameCard(game)
+                    ForEach(Array(mixedLibraryNotices.enumerated()), id: \.offset) { _, notice in
+                        HStack(spacing: 8) {
+                            if notice.isError {
+                                Image(systemName: "exclamationmark.triangle.fill").foregroundColor(.orange)
+                            } else {
+                                ProgressView().tint(.white)
+                            }
+                            Text(notice.text)
+                                .font(.caption)
+                                .foregroundColor(notice.isError ? .orange : .gray)
+                                .lineLimit(2)
                         }
                     }
-                }
+                    let entries = mixedLibraryEntries
+                    if entries.isEmpty {
+                        if !mixedLibraryLoading {
+                            Text(mixedLibraryCount == 0 ? tr("No owned games found yet.") : tr("No games match this search"))
+                                .font(.subheadline)
+                                .foregroundColor(.gray)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 32)
+                        }
+                    } else {
+                        LazyVGrid(columns: columns, spacing: 14) {
+                            ForEach(entries) { entry in
+                                switch entry {
+                                case .steam(let game): gameCard(game)
+                                case .gog(let game): gogCard(game)
+                                case .epic(let game): epicCard(game)
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -1861,11 +1889,6 @@ private struct SteamProgramDetailsView: View {
                         .foregroundColor(.white)
                         .multilineTextAlignment(.center)
                         .frame(maxWidth: .infinity)
-                    Text(tr("Steam app ID: %u", game.appID))
-                        .font(.caption)
-                        .foregroundColor(.gray)
-                        .multilineTextAlignment(.center)
-                        .frame(maxWidth: .infinity)
                     HStack(spacing: 8) {
                         DetailChip(text: installed ? tr("Installed") : tr("Not installed"),
                                    systemImage: installed ? "checkmark.circle.fill" : "arrow.down.circle",
@@ -1950,12 +1973,14 @@ private struct SteamProgramDetailsView: View {
                     }
                     WindowsGameProfileForm(profile: $profile,
                                            globalMetalFXEnabled: $coordinator.isMetalFXEnabled)
-                    DetailCard(title: tr("Steam Cloud saves")) {
-                        steamCloudControls.padding(14)
+                    DetailCard(title: tr("Steam Cloud saves"),
+                               footer: steamLibrary.cloudMessages[game.appID]
+                                   ?? tr("Automatically sync Steam Cloud saves before playing when available. Conflicting saves are never overwritten.")) {
+                        steamCloudControls
                     }
                     if installed {
                         DetailCard(title: tr("DLC for this game")) {
-                            dlcList.padding(14)
+                            dlcList
                         }
                     }
                 }
@@ -2008,69 +2033,33 @@ private struct SteamProgramDetailsView: View {
     }
 
     private var steamCloudControls: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Toggle(tr("Auto Save"), isOn: $autoSaveEnabled)
-                if steamLibrary.cloudSyncing.contains(game.appID) {
-                    ProgressView().padding(.leading, 6)
-                }
-            }
-                .tint(.blue)
-            Text(tr("Automatically sync Steam Cloud saves before playing when available. Conflicting saves are never overwritten."))
-                .font(.caption)
-                .foregroundColor(.gray)
-            if let message = steamLibrary.cloudMessages[game.appID] {
-                Text(message)
-                    .font(.caption)
-                    .foregroundColor(.gray)
-                    .fixedSize(horizontal: false, vertical: true)
+        let syncing = steamLibrary.cloudSyncing.contains(game.appID)
+        return VStack(spacing: 0) {
+            DetailRow(title: tr("Auto Save"), icon: "icloud.fill", iconColor: .blue) {
+                if syncing { ProgressView() }
+                Toggle(tr("Auto Save"), isOn: $autoSaveEnabled).labelsHidden().tint(.green)
             }
             if steamLibrary.cloudConflicts.contains(game.appID) {
-                Text(tr("Conflicting saves: choose which copy to keep. The replaced copy will be backed up."))
-                    .font(.caption)
-                    .foregroundColor(.orange)
-                VStack(spacing: 10) {
-                    Button {
-                        guard let prefixPath else { return }
-                        Task {
-                            await steamLibrary.resolveCloud(
-                                appID: game.appID, prefixPath: prefixPath, preferCloud: true)
-                        }
-                    } label: {
-                        Label(tr("Use Steam Cloud saves"), systemImage: "icloud.and.arrow.down")
-                            .font(.subheadline.weight(.semibold))
-                            .frame(maxWidth: .infinity, minHeight: 42)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.blue)
-                    Button {
-                        guard let prefixPath else { return }
-                        Task {
-                            await steamLibrary.resolveCloud(
-                                appID: game.appID, prefixPath: prefixPath, preferCloud: false)
-                        }
-                    } label: {
-                        Label(tr("Use local saves"), systemImage: "internaldrive")
-                            .font(.subheadline.weight(.semibold))
-                            .frame(maxWidth: .infinity, minHeight: 42)
-                    }
-                    .buttonStyle(.bordered)
-                    .tint(.white)
+                DetailRow(title: tr("Conflicting saves: choose which copy to keep. The replaced copy will be backed up."),
+                          icon: "exclamationmark.triangle.fill", iconColor: .orange) { EmptyView() }
+                DetailButtonRow(title: tr("Use Steam Cloud saves"), systemImage: "icloud.and.arrow.down") {
+                    guard let prefixPath else { return }
+                    Task { await steamLibrary.resolveCloud(appID: game.appID, prefixPath: prefixPath, preferCloud: true) }
                 }
-                .disabled(prefixPath == nil || steamLibrary.cloudSyncing.contains(game.appID))
+                .disabled(prefixPath == nil || syncing)
+                DetailButtonRow(title: tr("Use local saves"), systemImage: "internaldrive") {
+                    guard let prefixPath else { return }
+                    Task { await steamLibrary.resolveCloud(appID: game.appID, prefixPath: prefixPath, preferCloud: false) }
+                }
+                .disabled(prefixPath == nil || syncing)
             }
-            Button {
+            DetailButtonRow(title: tr("Sync saves now"), systemImage: "arrow.triangle.2.circlepath.icloud",
+                            showsDivider: false) {
                 guard let prefixPath else { return }
                 Task { await steamLibrary.syncCloud(appID: game.appID, prefixPath: prefixPath) }
-            } label: {
-                Label(tr("Sync saves now"), systemImage: "arrow.triangle.2.circlepath.icloud")
-                    .font(.subheadline.weight(.semibold))
-                    .frame(maxWidth: .infinity, minHeight: 44)
             }
-            .buttonStyle(.bordered)
-            .disabled(prefixPath == nil || steamLibrary.cloudSyncing.contains(game.appID))
+            .disabled(prefixPath == nil || syncing)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var downloadStatus: some View {
@@ -2106,17 +2095,16 @@ private struct SteamProgramDetailsView: View {
     }
 
     private var dlcList: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(spacing: 0) {
             let ids = steamLibrary.availableDLC[game.appID] ?? []
             if ids.isEmpty {
-                Text(tr("No DLC found for this game"))
-                    .font(.caption)
-                    .foregroundColor(.gray)
+                DetailRow(title: tr("No DLC found for this game"), showsDivider: false) { EmptyView() }
             }
             ForEach(ids, id: \.self) { id in
                 HStack(spacing: 12) {
                     SteamGameArtworkView(game: steamLibrary.dlcMetadata[id] ?? SteamAppInfo(appID: id))
-                        .frame(width: 58, height: 78)
+                        .frame(width: 40, height: 54)
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
                     Text(steamLibrary.dlcMetadata[id]?.name ?? "DLC \(id)")
                         .font(.subheadline)
                         .foregroundColor(.white)
@@ -2160,9 +2148,11 @@ private struct SteamProgramDetailsView: View {
                         .disabled(steamLibrary.installingApps.contains(game.appID))
                     }
                 }
-                .padding(10)
-                .background(Color.white.opacity(0.06))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                if id != ids.last {
+                    Divider().background(Color.white.opacity(0.08)).padding(.leading, 68)
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -2182,42 +2172,54 @@ private struct WindowsGameProfileForm: View {
         VStack(alignment: .leading, spacing: 22) {
             DetailCard(title: tr("Display")) {
                 DetailPickerRow(title: tr("Resolution"), selection: $profile.resolution,
-                                choices: ["Device native", "960x540", "1280x720", "1600x900", "1920x1080"])
+                                choices: ["Device native", "960x540", "1280x720", "1600x900", "1920x1080"],
+                                icon: "rectangle.on.rectangle", iconColor: .blue)
                 DetailPickerRow(title: tr("Surface scaling"), selection: $profile.surfaceScaling,
-                                choices: ["fit", "fill", "stretch", "aspect"])
+                                choices: ["fit", "fill", "stretch", "aspect"],
+                                icon: "arrow.up.left.and.arrow.down.right", iconColor: .blue)
                 DetailPickerRow(title: tr("Frame rate limit"), selection: $profile.fpsLimit,
-                                choices: ["30", "40", "60", "Uncapped"])
-                DetailToggleRow(title: tr("MetalFX upscaling"), isOn: $globalMetalFXEnabled, showsDivider: false)
+                                choices: ["30", "40", "60", "Uncapped"],
+                                icon: "speedometer", iconColor: .orange)
+                DetailToggleRow(title: tr("MetalFX upscaling"), isOn: $globalMetalFXEnabled, showsDivider: false,
+                                icon: "sparkles", iconColor: .purple)
             }
             DetailCard(title: tr("Graphics")) {
                 DetailPickerRow(title: tr("Graphics API"), selection: $profile.graphicsAPI,
-                                choices: ["Automatic", "Direct3D 9", "Direct3D 10", "Direct3D 11", "Direct3D 12"])
-                DetailPickerRow(title: tr("Vulkan"), selection: $profile.vulkanMode, choices: WindowsGameProfile.vulkanModes)
+                                choices: ["Automatic", "Direct3D 9", "Direct3D 10", "Direct3D 11", "Direct3D 12"],
+                                icon: "cube.fill", iconColor: .indigo)
+                DetailPickerRow(title: tr("Vulkan"), selection: $profile.vulkanMode, choices: WindowsGameProfile.vulkanModes,
+                                icon: "flame.fill", iconColor: .red)
                 DetailPickerRow(title: tr("OpenGL"), selection: $profile.openGLBackend,
-                                choices: WindowsGameProfile.openGLBackends, showsDivider: false)
+                                choices: WindowsGameProfile.openGLBackends, showsDivider: false,
+                                icon: "circle.hexagongrid.fill", iconColor: .teal)
             }
             DetailCard(title: tr("Controls")) {
                 DetailPickerRow(title: tr("Controller API"), selection: $profile.controllerAPI,
-                                choices: ["Automatic", "XInput", "XInput + DirectInput", "HID", "DualSense HID", "Generic HID"])
+                                choices: ["Automatic", "XInput", "XInput + DirectInput", "HID", "DualSense HID", "Generic HID"],
+                                icon: "gamecontroller.fill", iconColor: .green)
                 DetailPickerRow(title: tr("Touch controls"), selection: $profile.touchControlPreset,
-                                choices: ["xbox", "minimal", "off"], showsDivider: false)
+                                choices: ["xbox", "minimal", "off"], showsDivider: false,
+                                icon: "hand.tap.fill", iconColor: .pink)
             }
             DetailCard(title: tr("Compatibility"),
                        footer: tr("Games iDeck recognises get the settings they were tested with.")) {
-                DetailToggleRow(title: tr("Use recommended settings"), isOn: $profile.useRecommended)
+                DetailToggleRow(title: tr("Use recommended settings"), isOn: $profile.useRecommended,
+                                icon: "checkmark.seal.fill", iconColor: .green)
                 DetailPickerRow(title: tr("Code checks"), selection: $profile.codeChecks,
-                                choices: WindowsGameProfile.codeCheckModes)
-                DetailToggleRow(title: tr("Enable AVX/AVX2 translation"), isOn: $profile.avxEnabled)
-                DetailToggleRow(title: tr("Keep child game processes running (experimental)"),
-                                isOn: $profile.keepChildProcessesRunning)
+                                choices: WindowsGameProfile.codeCheckModes,
+                                icon: "checkmark.shield.fill", iconColor: .orange)
+                DetailToggleRow(title: tr("Enable AVX/AVX2 translation"), isOn: $profile.avxEnabled,
+                                icon: "cpu.fill", iconColor: .gray)
+                DetailToggleRow(title: tr("Keep helper processes running"),
+                                isOn: $profile.keepChildProcessesRunning,
+                                icon: "square.stack.3d.up.fill", iconColor: .gray)
                 if profile.id.hasPrefix("steam:") {
-                    DetailToggleRow(title: tr("Start through the Steam client"), isOn: $profile.launchThroughSteam)
+                    DetailToggleRow(title: tr("Start through the Steam client"), isOn: $profile.launchThroughSteam,
+                                icon: "play.rectangle.fill", iconColor: .blue)
                 }
-                DetailRow(title: tr("Reset to Recommended"), showsDivider: false) {
-                    Button(tr("Reset")) {
-                        GameRecommendations.applySwitches(for: profile.id, to: &profile)
-                    }
-                    .foregroundColor(.blue)
+                DetailButtonRow(title: tr("Reset to Recommended"), systemImage: "arrow.counterclockwise",
+                                showsDivider: false) {
+                    GameRecommendations.applySwitches(for: profile.id, to: &profile)
                 }
             }
             DetailCard(title: tr("Launch arguments"),
@@ -2228,8 +2230,8 @@ private struct WindowsGameProfileForm: View {
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .foregroundColor(.white)
-                    .padding(.horizontal, 14)
-                    .frame(minHeight: 46)
+                    .padding(.horizontal, 16)
+                    .frame(minHeight: 48)
             }
         }
     }
