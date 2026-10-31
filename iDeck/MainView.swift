@@ -599,6 +599,13 @@ struct WindowsWorkspaceView: View {
             resolvePrefixPath()
             appManager.refreshInstalledApps()
         }
+        // A finished Wine session may have installed a game (a GOG installer,
+        // a setup program): look for new installs whenever Wine stops.
+        .onChange(of: coordinator.windowsStatus) { _, _ in
+            guard mode == .pc, let prefixPath, !ideck_wineprocess_running() else { return }
+            gogLibrary.refreshInstalled(prefixPath: prefixPath)
+            windowsLibrary.refresh(prefixPath: prefixPath)
+        }
         .preferredColorScheme(.dark)
     }
 
@@ -984,11 +991,11 @@ struct WindowsWorkspaceView: View {
                 }
             } else if let fraction = gogLibrary.downloadProgress[game.id] {
                 progressAction(fraction: fraction,
-                               label: tr("Downloading installer %d%%", Int((fraction * 100).rounded())),
+                               label: tr("Installing %d%%", Int((fraction * 100).rounded())),
                                onStop: { gogLibrary.cancelDownload(game) })
             } else if game.worksOnWindows {
                 Button { downloadGOGInstaller(game) } label: {
-                    cardActionLabel(tr("Get installer"), systemImage: "arrow.down.circle.fill")
+                    cardActionLabel(tr("Install"), systemImage: "arrow.down.circle.fill")
                 }
                 .disabled(prefixPath == nil)
             } else {
@@ -1165,6 +1172,7 @@ struct WindowsWorkspaceView: View {
                 }
                 steamLibrary.refreshInstalledApps(prefixPath: root)
                 gogLibrary.refreshInstalled(prefixPath: root)
+                coordinator.installSteamClientComponentsIfNeeded()
                 appManager.refreshInstalledApps()
             }
         }
@@ -1320,14 +1328,24 @@ struct WindowsWorkspaceView: View {
         coordinator.launchWindowsExecutable(at: game.executable, profile: profile)
     }
 
+    /// Downloads a GOG game's offline installer and installs it without any
+    /// installer windows. The game then appears under Installed games.
     private func downloadGOGInstaller(_ game: GOGGame) {
         guard let prefixPath else { return }
         gogLibrary.downloadInstaller(game, prefixPath: prefixPath) { setup in
             windowsLibrary.refresh(prefixPath: prefixPath)
             guard let setup else { return }
-            installMessage = tr("The %@ installer is ready under Installed games as %@. Run it to install the game; it then appears with the GOG mark.",
-                                game.title, setup.deletingPathExtension().lastPathComponent)
-            isShowingInstallResult = true
+            coordinator.refreshJITStatus()
+            guard coordinator.isJITEnabled else {
+                installMessage = tr("The %@ installer is ready under Installed games as %@. Run it to install the game; it then appears with the GOG mark.",
+                                    game.title, setup.deletingPathExtension().lastPathComponent)
+                isShowingInstallResult = true
+                return
+            }
+            let profile = WindowsGameProfile(id: "gog-setup:\(game.id)", title: game.title,
+                                             arguments: GOGLibraryModel.silentInstallArguments(for: game),
+                                             touchControlPreset: "off")
+            coordinator.launchWindowsExecutable(at: setup, profile: profile)
         }
     }
 

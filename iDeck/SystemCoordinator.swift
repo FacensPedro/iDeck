@@ -109,6 +109,7 @@ class SystemCoordinator: ObservableObject {
             guard let self else { return }
             self.steamSignInLoaded = true
             self.isSteamConnected = SteamSignIn.isSignedIn
+            self.installSteamClientComponentsIfNeeded()
         }
     }
 
@@ -117,6 +118,28 @@ class SystemCoordinator: ObservableObject {
         nativeHostConfigured = true
         ideck_native_memory_install_notifications()
         _ = ideck_native_memory_configure(64 * 1024 * 1024, 8 * 1024 * 1024)
+    }
+
+    private var steamComponentsTask: Task<Void, Never>?
+
+    /// Madeira Dock needs Valve's client components in the prefix. They are
+    /// fetched once, in the background, as soon as a Steam account is signed
+    /// in and the Wine prefix exists (again on the next library visit if not).
+    func installSteamClientComponentsIfNeeded() {
+        guard steamComponentsTask == nil, SteamSignIn.isSignedIn, MadeiraDock.bundled,
+              !MadeiraDock.clientInstalled,
+              PrefixInstaller.isPrefixInstalled(at: MadeiraDock.prefix),
+              !ideck_wineprocess_running(), !ideck_wineserver_running() else { return }
+        steamComponentsTask = Task.detached(priority: .utility) { [weak self] in
+            do {
+                try await SteamRuntimeInstaller.shared.prepare(prefix: MadeiraDock.prefix) { message in
+                    AppLog.record("[steam-components] " + message)
+                }
+            } catch {
+                AppLog.record("[steam-components] automatic setup failed: \(error.localizedDescription)")
+            }
+            await MainActor.run { self?.steamComponentsTask = nil }
+        }
     }
 
     func loadSteamAccountIfNeeded() {

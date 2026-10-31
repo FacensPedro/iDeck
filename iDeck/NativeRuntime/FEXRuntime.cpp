@@ -270,6 +270,21 @@ bool acceptable_pool(uintptr_t address, size_t size) {
     return executable_mapping(address, size);
 }
 
+// A RW reservation inside the layout Wine accepts (below 0x7000000000 and
+// outside the PE image window). On iPadOS 27 the debugger's own `_M`
+// allocation can land above 0x7000000000, which acceptable_pool() must
+// reject; asking it to prepare this reservation keeps the pool in range.
+uintptr_t reserve_low_pool(size_t size) {
+    constexpr uintptr_t step = 0x100000000ULL;   // 4 GiB
+    for (uintptr_t hint = 0x200000000ULL; hint + size <= 0x7000000000ULL; hint += step) {
+        vm_address_t address = static_cast<vm_address_t>(hint);
+        if (vm_allocate(mach_task_self(), &address, size, VM_FLAGS_FIXED) == KERN_SUCCESS) {
+            return static_cast<uintptr_t>(address);
+        }
+    }
+    return 0;
+}
+
 bool export_pool(uintptr_t rx, uintptr_t rw, size_t size) {
     char rx_text[32], rw_text[32], size_text[32];
     snprintf(rx_text, sizeof(rx_text), "%" PRIxPTR, rx);
@@ -358,7 +373,23 @@ extern "C" bool ideck_wine_jit_pool_prepare(void) {
             return false;
         }
         fprintf(stderr, "[iDeck Wine JIT] requesting %zu MiB RX from StikDebug\n", size / MiB);
-        void *result = jit26_prepare_region(nullptr, size);
+        void *result = nullptr;
+        if (const uintptr_t low = reserve_low_pool(size)) {
+            result = jit26_prepare_region(reinterpret_cast<void *>(low), size);
+            if (reinterpret_cast<uintptr_t>(result) != low) {
+                fprintf(stderr, "[iDeck Wine JIT] debugger did not prepare the low reservation 0x%" PRIxPTR
+                                "; letting it choose the address\n", low);
+                vm_deallocate(mach_task_self(), static_cast<vm_address_t>(low), size);
+                result = nullptr;
+            }
+        }
+        if (result == nullptr) {
+            if (!debugger_attached()) {
+                record_wine_pool_failure(1);
+                return false;
+            }
+            result = jit26_prepare_region(nullptr, size);
+        }
         const uintptr_t rx = reinterpret_cast<uintptr_t>(result);
         if (rx == 0) {
             record_wine_pool_failure(2);

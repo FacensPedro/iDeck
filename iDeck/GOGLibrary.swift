@@ -238,21 +238,30 @@ struct GOGInstalledGame: Hashable {
     let name: String
     let executable: URL
     let arguments: String
+    var isRoot = true
 }
 
 enum GOGInstallScanner {
     static func installed(in drive: URL) -> [Int: GOGInstalledGame] {
         let manager = FileManager.default
         var result: [Int: GOGInstalledGame] = [:]
-        for root in ["GOG Games", "Program Files/GOG Galaxy/Games", "Program Files (x86)/GOG Galaxy/Games"] {
+        var roots = ["GOG Games", "Games", "Program Files/GOG Galaxy/Games", "Program Files (x86)/GOG Galaxy/Games",
+                     "Program Files/GOG.com", "Program Files (x86)/GOG.com", "Program Files", "Program Files (x86)"]
+        // Folders on external drives (ExternalDrives links them under C:\External).
+        if let drives = try? manager.contentsOfDirectory(atPath: drive.appendingPathComponent("External").path) {
+            roots += drives.map { "External/\($0)/GOG Games" }
+        }
+        for root in roots {
             let base = drive.appendingPathComponent(root, isDirectory: true)
             guard let folders = try? manager.contentsOfDirectory(at: base, includingPropertiesForKeys: nil) else { continue }
-            for folder in folders {
+            for folder in folders.prefix(500) {
                 guard let files = try? manager.contentsOfDirectory(atPath: folder.path) else { continue }
-                for file in files where file.hasPrefix("goggame-") && file.hasSuffix(".info") {
-                    if let game = parse(folder.appendingPathComponent(file), folder: folder) {
-                        result[game.gameID] = game
-                    }
+                let infos = files.filter { file in file.hasPrefix("goggame-") && file.hasSuffix(".info") }
+                // DLCs add their own info files next to the game's; the game's
+                // own file is the one whose gameId equals its rootGameId.
+                let parsed = infos.compactMap { parse(folder.appendingPathComponent($0), folder: folder) }
+                if let game = parsed.first(where: { $0.isRoot }) ?? parsed.first {
+                    result[game.gameID] = game
                 }
             }
         }
@@ -269,11 +278,18 @@ enum GOGInstallScanner {
                 ?? tasks.first(where: { $0["path"] is String }),
               let relative = (task["path"] as? String)?.replacingOccurrences(of: "\\", with: "/"),
               !relative.contains("..") else { return nil }
-        let executable = folder.appendingPathComponent(relative)
+        var executable = folder.appendingPathComponent(relative)
+        if !FileManager.default.fileExists(atPath: executable.path),
+           let resolved = SteamInstallFiles.resolveLaunchPath(relative, root: folder, executable: true) {
+            // Windows paths are case-insensitive; the files on APFS may differ in case.
+            executable = resolved
+        }
         guard executable.pathExtension.lowercased() == "exe",
               FileManager.default.fileExists(atPath: executable.path) else { return nil }
+        let rootValue = json["rootGameId"] as? String ?? (json["rootGameId"] as? Int).map(String.init)
         return GOGInstalledGame(gameID: gameID, name: json["name"] as? String ?? folder.lastPathComponent,
-                                executable: executable, arguments: task["arguments"] as? String ?? "")
+                                executable: executable, arguments: task["arguments"] as? String ?? "",
+                                isRoot: rootValue == nil || rootValue == idValue)
     }
 }
 
@@ -365,6 +381,7 @@ final class GOGLibraryModel: ObservableObject {
             installed = await Task.detached(priority: .utility) {
                 GOGInstallScanner.installed(in: drive)
             }.value
+            removeFinishedInstallers()
         }
     }
 
@@ -393,15 +410,18 @@ final class GOGLibraryModel: ObservableObject {
                 let files = try await GOGAPI.windowsInstaller(gameID: game.id, tokens: tokens)
                 try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
                 var setup: URL?
+                var saved: [URL] = []
                 for (index, file) in files.enumerated() {
                     try Task.checkCancellation()
-                    let saved = try await download(file, into: folder, tokens: tokens) { fraction in
+                    let part = try await download(file, into: folder, tokens: tokens) { fraction in
                         let overall = (Double(index) + fraction) / Double(files.count)
                         self.downloadProgress[game.id] = overall
                         BackgroundDownloads.gog.progress(done: UInt64(overall * 10_000), total: 10_000)
                     }
-                    if setup == nil, saved.pathExtension.lowercased() == "exe" { setup = saved }
+                    saved.append(part)
+                    if setup == nil, part.pathExtension.lowercased() == "exe" { setup = part }
                 }
+                installerFiles[game.id] = saved
                 AppLog.record("[gog] installer downloaded for game \(game.id)")
                 outcome = .completed
                 completion(setup)
@@ -416,6 +436,28 @@ final class GOGLibraryModel: ObservableObject {
         }
     }
 
+    /// Installer files downloaded per game, removed once the game is installed.
+    private var installerFiles: [Int: [URL]] = [:]
+
+    /// The command line that installs a GOG offline installer (Inno Setup)
+    /// without any windows, into C:\GOG Games\<title>.
+    static func silentInstallArguments(for game: GOGGame) -> String {
+        let folder = String(game.title.unicodeScalars.filter {
+            !"\\/:*?\"<>|".unicodeScalars.contains($0) && $0.value >= 32
+        }.map(Character.init)).trimmingCharacters(in: CharacterSet(charactersIn: " ."))
+        let name = folder.isEmpty ? "Game \(game.id)" : folder
+        return "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /NOICONS /DIR=\"C:\\GOG Games\\\(name)\""
+    }
+
+    /// After a Wine session: removes the installers of games that are now installed.
+    func removeFinishedInstallers() {
+        for (id, files) in installerFiles where installed[id] != nil {
+            for file in files { try? FileManager.default.removeItem(at: file) }
+            installerFiles[id] = nil
+            AppLog.record("[gog] game \(id) installed; installer removed")
+        }
+    }
+
     func cancelDownload(_ game: GOGGame) {
         downloadTasks[game.id]?.cancel()
     }
@@ -427,7 +469,28 @@ final class GOGLibraryModel: ObservableObject {
         var request = URLRequest(url: URL(string: "https://www.gog.com" + file.manualURL)!)
         request.setValue("Bearer " + tokens.accessToken, forHTTPHeaderField: "Authorization")
         let delegate = GOGDownloadDelegate(progress: progress)
-        let (temporary, response) = try await GOGAPI.session.download(for: request, delegate: delegate)
+        // Large installers often outlive a Wi-Fi hiccup: resume up to five
+        // times from where the connection dropped instead of failing.
+        var resumeData: Data?
+        var attempt = 0
+        var result: (URL, URLResponse)
+        while true {
+            do {
+                if let data = resumeData {
+                    result = try await GOGAPI.session.download(resumeFrom: data, delegate: delegate)
+                } else {
+                    result = try await GOGAPI.session.download(for: request, delegate: delegate)
+                }
+                break
+            } catch let error as URLError where attempt < 5 && [.networkConnectionLost, .timedOut,
+                                                                .notConnectedToInternet, .cannotConnectToHost].contains(error.code) {
+                attempt += 1
+                resumeData = error.downloadTaskResumeData ?? resumeData
+                AppLog.record("[gog] download interrupted (\(error.code.rawValue)); retry \(attempt)/5")
+                try await Task.sleep(nanoseconds: UInt64(attempt) * 2_000_000_000)
+            }
+        }
+        let (temporary, response) = result
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         guard status == 200 else { throw GOGError.http(status) }
         var name = response.suggestedFilename ?? response.url?.lastPathComponent ?? file.name
