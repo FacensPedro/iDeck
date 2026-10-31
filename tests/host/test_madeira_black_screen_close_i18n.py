@@ -66,9 +66,8 @@ class MadeiraBlackScreenCloseAndLocalizationTests(unittest.TestCase):
             "Retry Close",
             "Keep Waiting",
             "Return to Game",
-            "Copy JIT diagnostics",
             "JIT diagnostics copied to clipboard",
-            "Keep child game processes running (experimental)",
+            "Keep helper processes running",
             "Use only when a launcher exits after starting its game.",
         ):
             with self.subTest(key=key):
@@ -76,12 +75,11 @@ class MadeiraBlackScreenCloseAndLocalizationTests(unittest.TestCase):
                 self.assertIn('"pt":', source[pos:pos + 700])
                 self.assertIn('"es":', source[pos:pos + 700])
 
-    def test_jit_copy_is_hidden_without_a_failure_and_update_button_is_removed(self):
+    def test_jit_copy_is_removed_and_update_button_is_removed(self):
         source = (ROOT / "iDeck/SettingsView.swift").read_text()
-        self.assertIn("if shouldShowJITDiagnostics {", source)
+        self.assertNotIn("copyJITDiagnostics", source)
+        self.assertNotIn('tr("Copy JIT diagnostics")', source)
         self.assertIn("!coordinator.isJITEnabled", source)
-        self.assertIn("snapshot.wine_failure_stage != 0", source)
-        self.assertIn("snapshot.wine_failure_mach_code != 0", source)
         self.assertNotIn('actionButton(title: tr("Update iDeck %@', source)
         self.assertNotIn("updater.installIDeckUpdate()", source)
 
@@ -91,7 +89,7 @@ class MadeiraBlackScreenCloseAndLocalizationTests(unittest.TestCase):
         self.assertIn('Text(tr("Closing Wine and wineserver..."))', session)
         self.assertIn('.alert(tr("Wine did not close")', session)
         self.assertIn("Text(tr(coordinator.windowsCloseWarning ?? \"\"))", session)
-        self.assertIn('DetailToggleRow(title: tr("Keep child game processes running (experimental)")', main)
+        self.assertIn('DetailToggleRow(title: tr("Keep helper processes running")', main)
 
 
 if __name__ == "__main__":

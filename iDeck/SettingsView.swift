@@ -29,7 +29,6 @@ struct SettingsView: View {
     @State private var isGOGSignInPresented = false
     @State private var isEpicSignInPresented = false
     @State private var isPairingImporterPresented = false
-    @State private var jitDiagnosticsCopied = false
     @State private var steamComponentsStatus: String?
     @State private var steamComponentsBusy = false
     @AppStorage(AppLanguage.storageKey) private var appLanguage = AppLanguage.system.rawValue
@@ -49,8 +48,9 @@ struct SettingsView: View {
                                     value: gogLibrary.isSignedIn ? (gogLibrary.username ?? tr("Connected")) : tr("Not connected"))
                     }
                     NavigationLink { epicPage } label: {
-                        SettingsRow(icon: "e.square.fill", color: .gray, title: "Epic Games",
-                                    value: epicLibrary.signedIn ? (epicLibrary.accountName ?? tr("Connected")) : tr("Not connected"))
+                        SettingsRow(icon: "e.square.fill", color: Color(white: 0.22), title: "Epic Games",
+                                    value: epicLibrary.signedIn ? (epicLibrary.accountName ?? tr("Connected")) : tr("Not connected"),
+                                    asset: "StoreBadgeEpic")
                     }
                 }
 
@@ -299,17 +299,6 @@ struct SettingsView: View {
         .navigationTitle(tr("JIT & Debugging"))
     }
 
-    private var shouldShowJITDiagnostics: Bool {
-        // The snapshot is a read-only try-lock probe; reading it does not
-        // allocate executable memory or trigger the StikDebug BRK handler.
-        let snapshot = ideck_jit_snapshot()
-        return !coordinator.isJITEnabled ||
-               (!coordinator.isStikDebugAttached && !coordinator.isWineJITPrepared) ||
-               snapshot.wine_failure_stage != 0 ||
-               snapshot.wine_failure_rx_detail != 0 ||
-               snapshot.wine_failure_mach_code != 0
-    }
-
     @ViewBuilder
     private var statusRow: some View {
         HStack(spacing: 12) {
@@ -346,50 +335,6 @@ struct SettingsView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
-        if shouldShowJITDiagnostics {
-            Button {
-                copyJITDiagnostics()
-            } label: {
-                HStack {
-                    Label(tr("Copy JIT diagnostics"), systemImage: "doc.on.doc")
-                    Spacer()
-                    if jitDiagnosticsCopied {
-                        Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
-                    }
-                }
-            }
-            .accessibilityLabel(tr("Copy JIT diagnostics"))
-        }
-    }
-
-    private func copyJITDiagnostics() {
-        let snapshot = ideck_jit_snapshot()
-        let jitPermission = ideck_process_has_jit_permission()
-        let wineValidated = snapshot.wine_pool_prepared &&
-            snapshot.rx_executable && snapshot.rw_writable
-        let values = [
-            "iDeck Madeira Stage 7 — on-device JIT snapshot",
-            "iPadOS version: \(UIDevice.current.systemVersion)",
-            "App version: \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown")",
-            "JIT method: \(jitMethod)",
-            "CS_DEBUGGED permission: \(jitPermission)",
-            "Live debugger attached: \(snapshot.debugger_attached)",
-            "FEX initialized: \(snapshot.fex_initialized)",
-            "FEX initialization in progress: \(snapshot.fex_state_busy)",
-            "Wine pool prepared: \(snapshot.wine_pool_prepared)",
-            "Wine pool inspection busy: \(snapshot.wine_state_busy)",
-            "Wine RX executable and non-writable: \(snapshot.rx_executable)",
-            "Wine RW writable and non-executable: \(snapshot.rw_writable)",
-            "Wine pool mapping validated: \(wineValidated)",
-            "Wine pool size MiB: \(snapshot.wine_pool_mib)",
-            "Wine failure stage: \(snapshot.wine_failure_stage)",
-            "Wine RX failure detail: \(snapshot.wine_failure_rx_detail)",
-            "Wine Mach error: \(snapshot.wine_failure_mach_code)",
-            "JIT guest code execution: NOT TESTED by this snapshot",
-            "StikDebug BRK handler compatibility: NOT PROVEN by debugger attachment"
-        ]
-        UIPasteboard.general.string = values.joined(separator: "\n")
-        jitDiagnosticsCopied = true
     }
 
     // MARK: Controls
@@ -575,10 +520,12 @@ struct SettingsRow: View {
     let color: Color
     let title: String
     var value: String? = nil
+    /// An asset image used in place of the SF Symbol.
+    var asset: String? = nil
 
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: icon)
+            iconView
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(.white)
                 .frame(width: 28, height: 28)
@@ -590,6 +537,15 @@ struct SettingsRow: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
+        }
+    }
+
+    @ViewBuilder private var iconView: some View {
+        if let asset {
+            Image(asset).renderingMode(.template).resizable().scaledToFit()
+                .padding(5)
+        } else {
+            Image(systemName: icon)
         }
     }
 }
