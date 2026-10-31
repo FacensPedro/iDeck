@@ -10,6 +10,10 @@ struct SettingsView: View {
     @AppStorage("controllerLeftSensitivity") private var controllerLeftSensitivity = 1.0
     @AppStorage("controllerRightSensitivity") private var controllerRightSensitivity = 1.0
     @AppStorage("controllerDeadzone") private var controllerDeadzone = 0.10
+    @AppStorage("touchControls.enabled") private var touchControlsEnabled = true
+    @AppStorage("touchControls.hideWithController") private var touchControlsHideWithController = true
+    @AppStorage("touchControls.haptics") private var touchControlsHaptics = true
+    @AppStorage("touchControls.opacity") private var touchControlsOpacity = 0.8
     @AppStorage("wineControllerAPI") private var wineControllerAPI = "XInput"
     @AppStorage("wineJITPoolMiB") private var wineJITPoolMiB = 0
     @AppStorage(BackgroundDownloads.continuedKey) private var continueDownloadsInBackground = true
@@ -392,6 +396,19 @@ struct SettingsView: View {
 
     private var controlsPage: some View {
         Form {
+            Section {
+                toggleRow(title: tr("Show touch controls"), isOn: $touchControlsEnabled)
+                toggleRow(title: tr("Hide when a controller is connected"), isOn: $touchControlsHideWithController)
+                toggleRow(title: tr("Vibration on press"), isOn: $touchControlsHaptics)
+                VStack(alignment: .leading, spacing: 6) {
+                    LabeledContent(tr("Opacity"), value: "\(Int((touchControlsOpacity * 100).rounded()))%")
+                    Slider(value: $touchControlsOpacity, in: 0.2...1.0, step: 0.05)
+                }
+            } header: {
+                Text(tr("Touch controls"))
+            } footer: {
+                Text(tr("Xbox layout: triggers and bumpers in the top corners, left stick and D-pad at the bottom left, buttons and right stick at the bottom right. Each game can also choose Minimal or Off."))
+            }
             settingsSection(title: tr("Controller")) {
                 Picker(tr("Windows controller API"), selection: $wineControllerAPI) {
                     ForEach(["XInput", "XInput + DirectInput", "HID", "DualSense HID", "Generic HID"], id: \.self) { api in
