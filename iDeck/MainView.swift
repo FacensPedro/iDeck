@@ -680,10 +680,10 @@ struct WindowsWorkspaceView: View {
             Text(tr("Game Library"))
                 .font(.system(size: isCompact ? 25 : 29, weight: .bold, design: .rounded))
                 .foregroundColor(.white)
-            Text(tr("Install games from your Steam library"))
+            Text(tr("%d installed", windowsLibrary.executableURLs.count + installedSteamGames.count
+                    + installedGOGGames.count + installedEpicGames.count))
                 .font(.subheadline)
                 .foregroundColor(.gray)
-                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -710,14 +710,31 @@ struct WindowsWorkspaceView: View {
         HStack(spacing: 12) {
             if let onBack = onBack {
                 Button(action: onBack) {
-                    Label(tr("Home"), systemImage: "house.fill")
+                    Image(systemName: "chevron.left")
+                        .font(.headline)
                         .foregroundColor(.white)
+                        .frame(width: 42, height: 42)
+                        .background(secondaryColor)
+                        .clipShape(Circle())
                 }
+                .accessibilityLabel(tr("Home"))
             }
             Spacer()
-            Text(mode == .pc ? tr("Madeira") : tr("LiveContainer"))
-                .font(.headline)
-                .foregroundColor(.white)
+            VStack(spacing: 2) {
+                Text(mode == .pc ? tr("Madeira") : tr("LiveContainer"))
+                    .font(.headline)
+                    .foregroundColor(.white)
+                if mode == .pc {
+                    HStack(spacing: 5) {
+                        Circle()
+                            .fill(coordinator.isJITEnabled ? Color.green : Color.orange)
+                            .frame(width: 6, height: 6)
+                        Text(coordinator.isJITEnabled ? tr("JIT active") : tr("JIT off"))
+                            .font(.caption2)
+                            .foregroundColor(.gray)
+                    }
+                }
+            }
             Spacer()
             Button { isSettingsPresented = true } label: {
                 Image(systemName: "gearshape.fill")
