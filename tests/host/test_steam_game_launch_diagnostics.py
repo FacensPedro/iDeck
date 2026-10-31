@@ -69,7 +69,7 @@ class SteamWebSocketBackpressureTests(unittest.TestCase):
         self.assertIn("Self.isPE32WindowsExecutable(downloadPath)", environment)
         self.assertIn("func hasWoW64Runtime() -> Bool", environment)
         self.assertIn("default: true", workflow)
-        self.assertIn("IDECK_BUILD_WOW64: ${{ (github.event_name != 'workflow_dispatch' || inputs.build_wow64) && '1' || '0' }}", workflow)
+        self.assertIn("IDECK_BUILD_WOW64: ${{ ((github.event_name == 'workflow_dispatch' && inputs.require_madeira && inputs.build_wow64)", workflow)
         self.assertIn("manifest[\"wow64Enabled\"] as? Bool == true", environment)
         self.assertIn("guard !needsWoW64 || hasWoW64Runtime() else", environment)
         self.assertIn("completion(Int(ENOTSUP))", environment)
