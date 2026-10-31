@@ -61,6 +61,7 @@ class WindowsEnvironment {
     /// The profile's Vulkan/OpenGL choices, applied when the executable is known.
     private var sessionVulkanMode = "Automatic"
     private var sessionUseRecommended = true
+    private var sessionCodeChecks = "Automatic"
     private var sessionOpenGLBackend = "Automatic"
     /// MetalFX spatial upscale factor for this launch (nil = off).
     private var sessionMetalFXFactor: Double?
@@ -452,9 +453,16 @@ class WindowsEnvironment {
         // from translated code crashed the game (Cuphead: PROTECTION_FAILURE
         // at the Mono code page, Wine exit code 1). Full checks validate the
         // code before it runs instead of trapping the writes.
-        if Self.usesMonoJIT(binary) {
+        switch sessionCodeChecks {
+        case "Compatible":
             lines.append("env.FEX_SMCCHECKS = full")
-            SteamLog.event("[wine-launch] Mono JIT game: FEX code checks set to full")
+        case "Fast":
+            lines.append("env.FEX_SMCCHECKS = mtrack")
+        default:
+            if Self.usesMonoJIT(binary) {
+                lines.append("env.FEX_SMCCHECKS = full")
+                SteamLog.event("[wine-launch] Mono JIT game: FEX code checks set to full")
+            }
         }
         // madeira-d3d12 reads its MetalFX factor from the game's config lines;
         // DXMT gets the same factor through DXMT_CONFIG (applyGameProfile).
@@ -495,6 +503,21 @@ class WindowsEnvironment {
             unsetenv(key)
         }
         sessionUseRecommended = profile.useRecommended
+        sessionCodeChecks = profile.codeChecks
+        // Release-style runtime by default, as upstream Madeira's bridge does:
+        // no PC sampler suspending the game thread ~500 times a second, no
+        // thread-suspending profilers, no per-present log lines, no 256 MB
+        // JIT dump on a crash, and Mono logs at warning level. Settings ›
+        // Bugs & logs › Detailed diagnostics turns them back on.
+        if UserDefaults.standard.bool(forKey: "diagnostics.detailed") {
+            for key in ["MADEIRA_QUIET", "MADEIRA_LEAN_DIAG"] { unsetenv(key) }
+            setenv("MADEIRA_JIT_DUMP", "1", 1)
+        } else {
+            setenv("MADEIRA_QUIET", "1", 1)
+            setenv("MADEIRA_LEAN_DIAG", "1", 1)
+            setenv("MADEIRA_JIT_DUMP", "0", 1)
+        }
+        setenv("MONO_LOG_LEVEL", "warning", 0)
         sessionVulkanMode = profile.vulkanMode
         sessionOpenGLBackend = profile.openGLBackend
         setenv("IDECK_DISPLAY_SCALING", RuntimeConfiguration.SurfaceMode(saved: profile.surfaceScaling).rawValue, 1)

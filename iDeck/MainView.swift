@@ -2199,6 +2199,8 @@ private struct WindowsGameProfileForm: View {
             DetailCard(title: tr("Compatibility"),
                        footer: tr("Games iDeck recognises get the settings they were tested with.")) {
                 DetailToggleRow(title: tr("Use recommended settings"), isOn: $profile.useRecommended)
+                DetailPickerRow(title: tr("Code checks"), selection: $profile.codeChecks,
+                                choices: WindowsGameProfile.codeCheckModes)
                 DetailToggleRow(title: tr("Enable AVX/AVX2 translation"), isOn: $profile.avxEnabled)
                 DetailToggleRow(title: tr("Keep child game processes running (experimental)"),
                                 isOn: $profile.keepChildProcessesRunning)
