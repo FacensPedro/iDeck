@@ -231,12 +231,15 @@ def inspect(app: Path, require_wow64: bool = False, graphics: str = "d3d12") -> 
         for name in required_symbols if name not in exported
     )
 
-    runtime = app / "MadeiraRuntime"
+    # Runtime files live only at the bundle's top level; a MadeiraRuntime/
+    # mirror would duplicate the whole Windows payload.
+    if (app / "MadeiraRuntime").exists():
+        errors.append("duplicate MadeiraRuntime/ mirror found; stage each runtime file once")
     required_pe = PE_FILES if graphics == "d3d12" else tuple(
         name for name in PE_FILES if name not in D3D12_PE_FILES
     )
     for path in required_pe:
-        for directory in (app, runtime):
+        for directory in (app,):
             dll = directory / path
             if not dll.is_file() or dll.stat().st_size < 1024:
                 errors.append(f"missing compiled Windows PE library: {dll}")
@@ -244,7 +247,7 @@ def inspect(app: Path, require_wow64: bool = False, graphics: str = "d3d12") -> 
             problem = _pe_arch_error(dll, path.startswith("arm64ec-windows/"))
             if problem:
                 errors.append(problem)
-    for directory in (app, runtime) if graphics == "d3d12" else ():
+    for directory in (app,) if graphics == "d3d12" else ():
         native = directory / "arm64ec-windows/madeira_d3d12.dll"
         loader = directory / "arm64ec-windows/d3d12.dll"
         if native.is_file() and loader.is_file():
@@ -256,7 +259,7 @@ def inspect(app: Path, require_wow64: bool = False, graphics: str = "d3d12") -> 
                 return sha.digest()
             if digest(native) != digest(loader):
                 errors.append(f"D3D12 loader differs from Madeira native frontend: {loader}")
-    for directory in (app, runtime):
+    for directory in (app,):
         lua = directory / "compat" / "love" / "lua51.dll"
         if not lua.is_file() or lua.stat().st_size < 1024:
             errors.append(f"missing GC64 LuaJIT x64 compatibility DLL: {lua}")
@@ -265,13 +268,13 @@ def inspect(app: Path, require_wow64: bool = False, graphics: str = "d3d12") -> 
     license_file = app / "licenses" / "LuaJIT-MIT.txt"
     if not license_file.is_file() or not license_file.stat().st_size:
         errors.append(f"missing LuaJIT license notice: {license_file}")
-    for directory in (app, runtime):
+    for directory in (app,):
         locale = directory / "nls" / "locale.nls"
         if not locale.is_file() or locale.stat().st_size == 0:
             errors.append(f"missing Wine locale resource: {locale}")
     wow64 = require_wow64 or (app / "i386-windows/ntdll.dll").is_file()
     if wow64:
-        for directory in (app, runtime):
+        for directory in (app,):
             for name in ("ntdll.dll", "kernel32.dll", "user32.dll",
                          "d3d11.dll", "dxgi.dll"):
                 dll = directory / "i386-windows" / name
@@ -284,7 +287,7 @@ def inspect(app: Path, require_wow64: bool = False, graphics: str = "d3d12") -> 
         for name in ("aarch64-windows/xtajit.dll",
                      "aarch64-windows/wow64.dll",
                      "aarch64-windows/wow64win.dll"):
-            for directory in (app, runtime):
+            for directory in (app,):
                 dll = directory / name
                 if not dll.is_file() or dll.stat().st_size < 1024:
                     errors.append(f"missing WoW64 native host DLL: {dll}")
@@ -293,7 +296,7 @@ def inspect(app: Path, require_wow64: bool = False, graphics: str = "d3d12") -> 
                     if problem:
                         errors.append(problem)
 
-    for directory in (app, runtime):
+    for directory in (app,):
         for name in ("winevulkan.dll", "vulkan-1.dll"):
             dll = directory / "vulkan" / "arm64ec-windows" / name
             if not dll.is_file() or dll.stat().st_size < 1024:
@@ -316,10 +319,10 @@ def inspect(app: Path, require_wow64: bool = False, graphics: str = "d3d12") -> 
     if graphics == "d3d12":
         provenance_name = "d3d12/apple-msc-4.0-beta-3-provenance.json"
         license_name = "d3d12/METAL-SHADER-CONVERTER-4.0-BETA-3-LICENSE.rtf"
-        if any((root / provenance_name).exists() for root in (app, runtime)):
+        if any((root / provenance_name).exists() for root in (app,)):
             import json
             from prepare_apple_msc_beta3 import PACKAGE_SHA256, ios_macho_details
-            for root in (app, runtime):
+            for root in (app,):
                 provenance = root / provenance_name
                 license = root / license_name
                 library = root / "d3d12/libmetalirconverter.dylib"
@@ -337,7 +340,7 @@ def inspect(app: Path, require_wow64: bool = False, graphics: str = "d3d12") -> 
                     ios_macho_details(library)
                 except (OSError, ValueError, KeyError, TypeError) as exc:
                     errors.append(f"unverifiable Apple Metal Shader Converter beta 3: {exc}")
-    for directory in (app, runtime) if graphics == "d3d12" else ():
+    for directory in (app,) if graphics == "d3d12" else ():
         for name in ("canary_vs.dxil", "canary_ps.dxil",
                      "canary_layout_vs.dxil", "canary_layout_ps.dxil"):
             fixture = directory / "d3d12" / name
@@ -348,7 +351,7 @@ def inspect(app: Path, require_wow64: bool = False, graphics: str = "d3d12") -> 
             errors.append(f"missing or empty iOS shader converter dependency: {converter}")
 
     if graphics == "d3d11":
-        for directory in (app, runtime):
+        for directory in (app,):
             if not require_wow64:
                 wow64_dir = directory / "i386-windows"
                 if wow64_dir.exists() or wow64_dir.is_symlink():

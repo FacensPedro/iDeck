@@ -16,8 +16,11 @@ GRAPHICS="${IDECK_MADEIRA_GRAPHICS:-d3d12}"
 [[ -d "$APP" ]] || { echo "ERROR: missing iDeck.app: $APP" >&2; exit 2; }
 [[ -d "$SOURCE" ]] || { echo "ERROR: Madeira compiled resources missing: $SOURCE" >&2; exit 2; }
 
-RUNTIME="$APP/MadeiraRuntime"
-mkdir -p "$RUNTIME"
+# Every runtime file is staged once, at the bundle's top level, where the
+# Madeira bridge reads it through NSBundle.mainBundle. The former
+# MadeiraRuntime/ mirror duplicated the whole Windows payload and was never
+# read at runtime; remove one left by an older staging run.
+rm -rf "$APP/MadeiraRuntime"
 
 # Wine's crypt32 unix bridge requires the Mozilla trust bundle for TLS.
 [[ -s "$SOURCE/cacert.pem" ]] && grep -q "BEGIN CERTIFICATE" "$SOURCE/cacert.pem" || {
@@ -50,9 +53,9 @@ if [[ "$GRAPHICS" == "d3d11" ]]; then
     for module in xtajit.dll wow64.dll wow64win.dll; do
       rm -f "$APP/aarch64-windows/$module"
     done
-    rm -rf "$APP/i386-windows" "$RUNTIME/i386-windows"
+    rm -rf "$APP/i386-windows"
   fi
-  rm -rf "$APP/d3d12" "$RUNTIME/d3d12"
+  rm -rf "$APP/d3d12"
 fi
 
 [[ -s "$SOURCE/prefix-template.tar.gz" ]] || {
@@ -94,13 +97,7 @@ if [[ "$GRAPHICS" == "d3d12" ]]; then
   }
 fi
 
-# Windows-side IPA signers enumerate bundle entries through APIs that cannot
-# reliably inspect Unix symlinks. Package physical directories in the native
-# runtime mirror, preserving the original top-level paths used by Madeira.
-for folder in aarch64-windows arm64ec-windows nls; do
-  cp -R "$APP/$folder" "$RUNTIME/$folder"
-done
-[[ -s "$RUNTIME/nls/locale.nls" ]] || {
+[[ -s "$APP/nls/locale.nls" ]] || {
   echo "ERROR: Wine locale.nls is missing" >&2; exit 2;
 }
 
@@ -116,7 +113,6 @@ if [[ "${IDECK_BUILD_WOW64:-0}" == "1" && -s "$SOURCE/i386-windows/ntdll.dll" ]]
     }
   done
   cp -R "$SOURCE/i386-windows" "$APP/i386-windows"
-  cp -R "$APP/i386-windows" "$RUNTIME/i386-windows"
 elif [[ "${IDECK_BUILD_WOW64:-0}" == "1" ]]; then
   echo "ERROR: requested WoW64, but the i386 DLL farm was not compiled." >&2
   exit 2
@@ -132,9 +128,8 @@ fi
   echo "ERROR: bundled LuaJIT is not a Windows PE" >&2
   exit 2
 }
-mkdir -p "$APP/compat/love" "$RUNTIME/compat/love"
+mkdir -p "$APP/compat/love"
 cp "$SOURCE/compat/love/lua51.dll" "$APP/compat/love/lua51.dll"
-cp "$SOURCE/compat/love/lua51.dll" "$RUNTIME/compat/love/lua51.dll"
 [[ -s "$SOURCE/licenses/LuaJIT-MIT.txt" ]] || {
   echo "ERROR: missing LuaJIT MIT license notice" >&2
   exit 2
@@ -150,12 +145,11 @@ for name in winevulkan.dll vulkan-1.dll; do
     echo "ERROR: missing Vulkan ARM64EC module: vulkan/arm64ec-windows/$name" >&2; exit 2;
   }
 done
-mkdir -p "$APP/vulkan/arm64ec-windows" "$RUNTIME/vulkan/arm64ec-windows"
+mkdir -p "$APP/vulkan/arm64ec-windows"
 for file in "$SOURCE/vulkan/arm64ec-windows/"*.dll; do
   # vkd3d-proton's d3d12*.dll belongs to the licensed D3D12 profile only.
   case "$(basename "$file")" in d3d12*.dll) [[ "$GRAPHICS" == "d3d12" ]] || continue ;; esac
   cp "$file" "$APP/vulkan/arm64ec-windows/"
-  cp "$file" "$RUNTIME/vulkan/arm64ec-windows/"
 done
 
 # OpenGL / Vulkan host libraries (scripts/build_madeira_gl_vulkan.sh):
@@ -208,24 +202,21 @@ else
 fi
 
 if [[ "$GRAPHICS" == "d3d12" ]]; then
-mkdir -p "$APP/d3d12" "$RUNTIME/d3d12"
+mkdir -p "$APP/d3d12"
 for name in canary_vs.dxil canary_ps.dxil canary_layout_vs.dxil canary_layout_ps.dxil; do
   [[ -s "$SOURCE/d3d12/$name" ]] || {
     echo "ERROR: missing D3D12 canary shader: $name" >&2; exit 2;
   }
   cp "$SOURCE/d3d12/$name" "$APP/d3d12/$name"
-  cp "$SOURCE/d3d12/$name" "$RUNTIME/d3d12/$name"
 done
 for name in NOTICE.txt METAL-SHADER-CONVERTER-AGREEMENT.txt LICENSE-metal-shader-converter-headers.txt; do
   [[ -f "$SOURCE/d3d12/$name" ]] || { echo "ERROR: missing converter legal notice: $name" >&2; exit 2; }
   cp "$SOURCE/d3d12/$name" "$APP/d3d12/$name"
-  cp "$SOURCE/d3d12/$name" "$RUNTIME/d3d12/$name"
 done
 if [[ "${IDECK_MSC_REQUIRE_BETA3:-0}" == "1" ]]; then
   for name in METAL-SHADER-CONVERTER-4.0-BETA-3-LICENSE.rtf apple-msc-4.0-beta-3-provenance.json; do
     [[ -s "$SOURCE/d3d12/$name" ]] || { echo "ERROR: audited Apple 4.0 beta 3 converter notice missing: $name" >&2; exit 2; }
     cp "$SOURCE/d3d12/$name" "$APP/d3d12/$name"
-    cp "$SOURCE/d3d12/$name" "$RUNTIME/d3d12/$name"
   done
 fi
 
@@ -239,13 +230,11 @@ fi
   exit 2
 }
 cp "$SOURCE/d3d12/libmetalirconverter.dylib" "$APP/d3d12/libmetalirconverter.dylib"
-cp "$APP/d3d12/libmetalirconverter.dylib" "$RUNTIME/d3d12/libmetalirconverter.dylib"
 
 # Dynamic code must be signed by the same signing workflow as the host IPA.
 # An ad hoc signature alone is not a distribution/developer identity.
 if [[ -n "${IDECK_CODESIGN_IDENTITY:-}" ]]; then
-  for library in "$APP/d3d12/libmetalirconverter.dylib" \
-                 "$RUNTIME/d3d12/libmetalirconverter.dylib"; do
+  for library in "$APP/d3d12/libmetalirconverter.dylib"; do
     codesign --force --sign "$IDECK_CODESIGN_IDENTITY" --timestamp=none "$library"
   done
 fi

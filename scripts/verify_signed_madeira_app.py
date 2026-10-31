@@ -44,7 +44,6 @@ def verify(app: Path) -> None:
     manifest = app / "MadeiraRuntimeManifest.plist"
     profile = app / "embedded.mobileprovision"
     converter = app / "d3d12/libmetalirconverter.dylib"
-    mirror = app / "MadeiraRuntime/d3d12/libmetalirconverter.dylib"
     for file in (binary, info, manifest, profile):
         if not file.is_file() or not file.stat().st_size:
             raise ValueError(f"missing signed native app input: {file}")
@@ -63,7 +62,7 @@ def verify(app: Path) -> None:
     if backend not in ("d3d11", "d3d12") or metadata.get("d3d12Linked") is not (backend == "d3d12"):
         raise ValueError("native bundle graphics profile is incomplete or dishonest")
     if backend == "d3d12":
-        for file in (converter, mirror):
+        for file in (converter,):
             if not file.is_file() or not file.stat().st_size:
                 raise ValueError(f"missing signed native app input: {file}")
     elif any(p.name == "libmetalirconverter.dylib" for p in app.rglob("*")):
@@ -102,7 +101,7 @@ def verify(app: Path) -> None:
         raise ValueError("provisioning profile has expired")
 
     if backend == "d3d12":
-        for dylib in (converter, mirror):
+        for dylib in (converter,):
             command("codesign", "--verify", "--strict", "--verbose=2", str(dylib))
             if team_id(dylib) != app_team:
                 raise ValueError(f"dylib was signed with another team: {dylib}")

@@ -21,7 +21,7 @@ def digest(data: bytes) -> str:
 
 def verify(source: Path, app: Path, ipa: Path | None = None) -> list[str]:
     errors = []
-    paths = [source / "d3d12", app / "d3d12", app / "MadeiraRuntime/d3d12"]
+    paths = [source / "d3d12", app / "d3d12"]
     for directory in paths:
         for name in REQUIRED:
             target = directory / name
@@ -65,7 +65,7 @@ def verify(source: Path, app: Path, ipa: Path | None = None) -> list[str]:
         if ipa is not None:
             with zipfile.ZipFile(ipa, "r") as archive:
                 names = archive.namelist()
-                for directory in ("d3d12", "MadeiraRuntime/d3d12"):
+                for directory in ("d3d12",):
                     for name in REQUIRED:
                         member = f"Payload/iDeck.app/{directory}/{name}"
                         if names.count(member) != 1:

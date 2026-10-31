@@ -44,7 +44,7 @@ class MadeiraD3D11ProfileTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.app = Path(self.temp.name)
         (self.app / "iDeck").write_bytes(b"fixture")
-        for base in (self.app, self.app / "MadeiraRuntime"):
+        for base in (self.app,):
             for name in module.PE_FILES:
                 if name in module.D3D12_PE_FILES:
                     continue
@@ -84,7 +84,7 @@ class MadeiraD3D11ProfileTests(unittest.TestCase):
         self.assertTrue(any("missing or empty iOS shader converter" in error for error in errors))
 
     def test_d3d11_fails_without_dxmt_frontend(self):
-        (self.app / "MadeiraRuntime/arm64ec-windows/d3d11.dll").unlink()
+        (self.app / "arm64ec-windows/d3d11.dll").unlink()
         self.assertTrue(any("d3d11.dll" in error for error in self.inspect()))
 
     def test_d3d11_fails_without_fex_or_wine_symbol(self):
@@ -109,11 +109,11 @@ class MadeiraD3D11ProfileTests(unittest.TestCase):
                 path.unlink()
 
     def test_d3d11_fails_if_d3d12_payload_directory_exists(self):
-        (self.app / "MadeiraRuntime/d3d12").mkdir()
+        (self.app / "d3d12").mkdir()
         self.assertTrue(any("D3D12 payload directory" in error for error in self.inspect()))
 
     def test_d3d11_rejects_wow64_pe_tree(self):
-        for relative in ("i386-windows", "MadeiraRuntime/i386-windows"):
+        for relative in ("i386-windows",):
             with self.subTest(path=relative):
                 directory = self.app / relative
                 directory.mkdir()
@@ -123,7 +123,7 @@ class MadeiraD3D11ProfileTests(unittest.TestCase):
                 directory.rmdir()
 
     def test_d3d11_rejects_wow64_host_modules(self):
-        for root in (self.app, self.app / "MadeiraRuntime"):
+        for root in (self.app,):
             for name in ("xtajit.dll", "wow64.dll", "wow64win.dll"):
                 with self.subTest(name=name, root=root.name):
                     path = root / "aarch64-windows" / name
