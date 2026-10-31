@@ -57,14 +57,56 @@ let attachResponse = send_command(`vAttach;${pid.toString(16)}`);
 
 log(`pid = ${pid}`);
 log(`attach_response = ${attachResponse}`);
+
+// Only BRK stops need this script. Wine signals constantly (thread suspend
+// and resume) and FEX relies on faults; making the debugger stop on each of
+// them costs several protocol round trips per event and, under load, lets
+// iOS's watchdog kill StikDebug (0x8BADF00D), taking the game down with it.
+// Both packets are best-effort (Madeira's madeira-jit.js does the same):
+//   QSetIgnoredExceptions: Mach faults go to the app's own handlers.
+//   QPassSignals: signals reach the process without stopping. SIGTRAP (5)
+//     is excluded because BRK arrives as SIGTRAP.
+{
+    const ignored = send_command(`QSetIgnoredExceptions:EXC_BAD_ACCESS;EXC_BAD_INSTRUCTION`);
+    log(`QSetIgnoredExceptions -> ${ignored || "(unsupported)"}`);
+    const signals = [];
+    for (let signal = 1; signal <= 31; signal++) {
+        if (signal !== 5) signals.push(signal.toString(16));
+    }
+    const passed = send_command(`QPassSignals:${signals.join(";")}`);
+    log(`QPassSignals -> ${passed || "(unsupported)"}`);
+}
+
+// Each log() line redraws StikDebug's UI; inside the stop loop use ulog(),
+// which stops printing after a fixed number of lines.
+let logBudget = 40;
+function ulog(msg) {
+    if (logBudget > 0) {
+        logBudget--;
+        log(msg);
+    }
+}
+
+function looksLikeStop(response) {
+    return typeof response === "string" && /^[TSWX]/.test(response);
+}
+
+// A stop packet returned by a continue we already sent (vCont;C answers
+// with the next stop, so it must not be followed by another `c`).
+let pending = null;
     
 let totalBreakpoints = 0;
 while (!detached) {
     totalBreakpoints++;
-    log(`Handling signal ${totalBreakpoints}`);
-    
-    let brkResponse = send_command(`c`);
+    log_verbose(`Handling stop ${totalBreakpoints}`);
+
+    let brkResponse = pending !== null ? pending : send_command(`c`);
+    pending = null;
     log_verbose(`brkResponse = ${brkResponse}`);
+    if (/^[WX]/.test(brkResponse || "")) {
+        log(`Process exited: ${brkResponse}`);
+        break;
+    }
     
     // extract tid, pc, x16
     let tmpMatch = /T[0-9a-f]+thread:(?<tid>[0-9a-f]+);/.exec(brkResponse);
@@ -74,34 +116,37 @@ while (!detached) {
     tmpMatch = /10:(?<reg>[0-9a-f]{16});/.exec(brkResponse);
     x16 = tmpMatch ? tmpMatch.groups['reg'] : null;
     if (!tid || !pc || !x16) {
-        log(`Failed to extract registers: tid=${tid}, pc=${pc}, x16=${x16}`);
+        ulog(`Failed to extract registers: tid=${tid}, pc=${pc}, x16=${x16}`);
         continue;
     }
     pc = littleEndianHexStringToNumber(pc);
     x16 = littleEndianHexStringToNumber(x16);
     
     let instructionResponse = send_command(`m${pc.toString(16)},4`);
-    log(`instruction at pc: ${instructionResponse}`);
+    log_verbose(`instruction at pc: ${instructionResponse}`);
     let instrU32 = littleEndianHexToU32(instructionResponse);
-    
+
     // check if this is a brk
     if ((instrU32 & 0xFFE0001F)>>>0 != 0xD4200000) {
-        log(`Skipping: instruction was not a brk (was 0x${instrU32.toString(16)})`);
+        log_verbose(`Skipping: instruction was not a brk (was 0x${instrU32.toString(16)})`);
         if (continuesWithSignal) {
             let signum = /^T(?<sig>[a-z0-9;]{2})/.exec(brkResponse);
             signum = signum ? signum.groups['sig'] : null;
             if (!signum) {
-                log(`Failed to extract signal number: ${signum}`);
+                ulog(`Failed to extract signal number: ${signum}`);
                 continue;
             }
-            log(`Continuing with signal 0x${signum}`);
-            send_command(`vCont;S${signum}:${tid}`);
+            log_verbose(`Continuing with signal 0x${signum}`);
+            // Continue (not single-step) with the signal; the reply is the
+            // next stop, which the loop handles without another `c`.
+            const resumed = send_command(`vCont;C${signum}:${tid};c`);
+            if (looksLikeStop(resumed)) pending = resumed;
         }
         continue;
     }
     
     let brkImmediate = extractBrkImmediate(instrU32);
-    log(`BRK immediate: 0x${brkImmediate.toString(16)} (${brkImmediate})`);
+    log_verbose(`BRK immediate: 0x${brkImmediate.toString(16)} (${brkImmediate})`);
     if (legacyCommands[brkImmediate] != undefined) {
         // when we find a valid brk immediate command, parse x0 and x1
         tmpMatch = /00:(?<reg>[0-9a-f]{16});/.exec(brkResponse);
@@ -109,7 +154,7 @@ while (!detached) {
         tmpMatch = /01:(?<reg>[0-9a-f]{16});/.exec(brkResponse);
         x1 = tmpMatch ? tmpMatch.groups['reg'] : null;
         if (!x0 || !x1) {
-            log(`Failed to extract registers: x0=${x0}, x1=${x1}`);
+            ulog(`Failed to extract registers: x0=${x0}, x1=${x1}`);
             continue;
         }
         x0 = littleEndianHexStringToNumber(x0);
@@ -118,13 +163,13 @@ while (!detached) {
         // jump over brk
         let pcPlus4 = numberToLittleEndianHexString(pc + 4n);
         let pcPlus4Response = send_command(`P20=${pcPlus4};thread:${tid};`);
-        log(`pcPlus4Response = ${pcPlus4Response}`);
+        log_verbose(`pcPlus4Response = ${pcPlus4Response}`);
         
         // dispatch brk-immediate command
         const command = legacyCommands[brkImmediate];
         command(brkResponse);
     } else {
-        log(`Skipping breakpoint: brk immediate 0x${brkImmediate.toString(16)} was not handled by this script. You could add it by evaluating legacyCommands[0x${brkImmediate.toString(16)}] = yourFunction;`);
+        ulog(`Skipping breakpoint: brk immediate 0x${brkImmediate.toString(16)} was not handled by this script. You could add it by evaluating legacyCommands[0x${brkImmediate.toString(16)}] = yourFunction;`);
         continue;
     }
 }
@@ -138,7 +183,7 @@ function JIT26Detach() {
 // brk 0x68
 function JIT26NewBreakpoints(brkResponse) {
     let instructionResponse = send_command(`m${pc.toString(16)},4`);
-    log(`instruction at pc: ${instructionResponse}`);
+    log_verbose(`instruction at pc: ${instructionResponse}`);
     let instrU32 = littleEndianHexToU32(instructionResponse);
     let brkImmediate = extractBrkImmediate(instrU32);
     
@@ -173,7 +218,7 @@ function JIT26HandleBrk0xf00d(brkResponse) {
         log(`Unknown command ${x16.toString(16)}`);
         return;
     }
-    log(`Invoking command ${x16.toString(16)}`);
+    log_verbose(`Invoking command ${x16.toString(16)}`);
     command(brkResponse);
 }
 
@@ -303,7 +348,7 @@ commands[3] = wowBreakPoint;
 
 function wowBreakPoint(brekpoint) {
     let instructionResponse = send_command(`m${pc.toString(16)},4`);
-    log(`instruction at pc: ${instructionResponse}`);
+    log_verbose(`instruction at pc: ${instructionResponse}`);
     let instrU32 = littleEndianHexToU32(instructionResponse);
     let brkImmediate = extractBrkImmediate(instrU32);
     

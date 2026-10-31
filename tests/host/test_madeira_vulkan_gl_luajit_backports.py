@@ -91,22 +91,14 @@ class MadeiraGraphicsAndLuaJITBackportTests(unittest.TestCase):
         self.assertIn("luajit_backport_sha256", kit)
         self.assertIn("apply_madeira_luajit_backport.py", fetch)
 
-    def test_vulkan_opengl_are_source_only_until_compiled_with_matching_wine(self):
-        for relative in (
-            "build/vulkan-ios/backend.c",
-            "build/win32u-unix/vulkan_ios.c",
-            "build/win32u-unix/vulkan_surface_ios.c",
-            "build/win32u-unix/opengl_ios.c",
-        ):
-            source = ROOT / relative
-            self.assertTrue(source.is_file(), relative)
-            self.assertGreater(source.stat().st_size, 3000, relative)
-        vulkan = (ROOT / "build/win32u-unix/vulkan_ios.c").read_text()
-        self.assertIn("MADEIRA_VULKAN_LIBRARY", vulkan)
-        self.assertIn("vulkan_surface_ios.c", vulkan)
-        self.assertIn("madeira_vulkan_layer_acquire", (ROOT / "build/win32u-unix/vulkan_surface_ios.c").read_text())
-        self.assertIn("MADEIRA_GL_BACKEND", (ROOT / "build/win32u-unix/opengl_ios.c").read_text())
-        self.assertIn("madeira_vulkan_symbol", (ROOT / "build/vulkan-ios/backend.c").read_text())
+    def test_vulkan_opengl_come_from_the_pinned_madeira(self):
+        # Since Madeira c2c1b03 the WGL/Vulkan drivers are upstream sources it
+        # compiles itself; iDeck no longer carries unused copies of them.
+        for relative in ("build/vulkan-ios/backend.c", "build/win32u-unix/vulkan_ios.c",
+                         "build/win32u-unix/vulkan_surface_ios.c", "build/win32u-unix/opengl_ios.c"):
+            self.assertFalse((ROOT / relative).exists(), relative)
+        self.assertIn("c2c1b03a9e36ef986c980b9eae3c14d05a372db1",
+                      (ROOT / "scripts/fetch_madeira_sources.sh").read_text())
 
     def test_toolchain_cache_restores_after_pinned_checkout_and_isolated_prs(self):
         ios = (ROOT / ".github/workflows/ios.yml").read_text()

@@ -123,6 +123,11 @@ class SystemCoordinator: ObservableObject {
         guard !steamSignInLoaded else { return }
         steamSignInLoaded = true
         isSteamConnected = SteamSignIn.isSignedIn
+        if isSteamConnected {
+            // Rank CM servers while the library view loads, so the first
+            // Steam request does not wait for the directory round trip.
+            Task.detached(priority: .utility) { _ = try? await CMServerList.shared.candidates(1) }
+        }
     }
 
     private func isLocalDevVPNActive() -> Bool {
@@ -146,6 +151,7 @@ class SystemCoordinator: ObservableObject {
     }
     
     func setWindowsStatus(_ status: String) {
+        AppLog.record("[status] " + status)
         let update = {
             self.windowsStatus = status
             self.currentStatus = status
@@ -307,9 +313,13 @@ class SystemCoordinator: ObservableObject {
                 setWindowsStatus("Cannot request JIT: the bundled universal.js debugger script is missing.")
                 return
             }
-            components.queryItems?.append(
-                URLQueryItem(name: "script-data", value: scriptData.base64EncodedString())
-            )
+            // base64url: StikDebug decodes it, and it carries no "+", "/" or
+            // "=" that URL handling could reinterpret on the way.
+            let base64url = scriptData.base64EncodedString()
+                .replacingOccurrences(of: "+", with: "-")
+                .replacingOccurrences(of: "/", with: "_")
+                .replacingOccurrences(of: "=", with: "")
+            components.queryItems?.append(URLQueryItem(name: "script-data", value: base64url))
         }
         guard let url = components.url else {
             setWindowsStatus("Cannot create StikDebug request.")

@@ -78,3 +78,59 @@ for (const result of [false, "E22", "throw"]) {
     assert.equal(failed.prepared.length, 1);
 }
 console.log("PASS: StikDebug invalid _M and failed RX preparation never return executable addresses");
+
+
+// Full stop loop against a scripted debugserver: Wine's signals and FEX's
+// faults must be passed through without a debugger stop, a non-BRK stop is
+// continued with its signal in one round trip, and a JIT26PrepareRegion BRK
+// is still serviced.
+(function () {
+    const le = (value) => {
+        let hex = "";
+        for (let i = 0; i < 8; i++) hex += Number((value >> BigInt(i * 8)) & 0xffn).toString(16).padStart(2, "0");
+        return hex;
+    };
+    const brkPC = 0x100004000n;
+    const sigPC = 0x100008000n;
+    const stops = [
+        // SIGUSR2 (0x1f) at an ordinary instruction.
+        `T1fthread:24;20:${le(sigPC)};10:${le(0n)};00:${le(0n)};01:${le(0n)};`,
+        // BRK #0xf00d with x16 = 1 (prepare region), x0 = 0, x1 = 16 KiB.
+        `T05thread:24;20:${le(brkPC)};10:${le(1n)};00:${le(0n)};01:${le(0x4000n)};`,
+    ];
+    const sent = [];
+    let continues = 0;
+    const logs = [];
+    const runtime = vm.createContext({
+        BigInt, Number, String, parseInt, Error,
+        get_pid: () => 1234,
+        log: (message) => logs.push(String(message)),
+        prepare_memory_region: () => true,
+        send_command(command) {
+            sent.push(command);
+            if (command.startsWith("vAttach")) return "OK";
+            if (command.startsWith("QSetIgnoredExceptions") || command.startsWith("QPassSignals")) return "OK";
+            if (command === "c") {
+                continues++;
+                return continues === 1 ? stops[0] : "W00";
+            }
+            if (command.startsWith("vCont;C1f:24;c")) return stops[1];
+            if (command === `m${sigPC.toString(16)},4`) return "1f2003d5"; // nop
+            if (command === `m${brkPC.toString(16)},4`) return "a0013ed4"; // brk #0xf00d (0xd43e01a0)
+            if (command.startsWith("_M")) return "200000000";
+            return "OK";
+        },
+    });
+    vm.runInContext(source, runtime, { timeout: 2000 });
+
+    assert.ok(sent.includes("QSetIgnoredExceptions:EXC_BAD_ACCESS;EXC_BAD_INSTRUCTION"));
+    const pass = sent.find((command) => command.startsWith("QPassSignals:"));
+    assert.ok(pass, "signals must be passed through");
+    assert.ok(!pass.slice("QPassSignals:".length).split(";").includes("5"), "SIGTRAP carries BRK and must stop");
+    assert.ok(sent.includes("vCont;C1f:24;c"), "a non-BRK stop continues with its own signal");
+    assert.ok(!sent.some((command) => command.startsWith("vCont;S")), "never single-step to forward a signal");
+    assert.equal(continues, 2, "the stop returned by vCont;C must not be followed by an extra continue");
+    assert.ok(sent.some((command) => command.startsWith("_M4000,rx")), "the BRK request is serviced");
+    assert.ok(logs.length <= 60, `the stop loop must not flood StikDebug's UI (${logs.length} lines)`);
+    console.log("PASS: universal.js passes signals through and services JIT BRKs without extra round trips");
+})();

@@ -33,7 +33,7 @@ concurrency:
 jobs:
   host:
     name: Verify W^X policy and nonblocking JIT diagnostic state
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     steps:
       - name: Checkout iDeck

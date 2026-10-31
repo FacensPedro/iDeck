@@ -1660,13 +1660,16 @@ enum SteamLog {
 
     static func trace(_ message: @autoclosure () -> String) {
         guard tracing else { return }
-        // LogStore, not stderr: stderr is only captured into the log once a
-        // Wine session starts, and sign-in happens before one.
-        print("[steam-trace] " + message())
+        // Also into iDeck's own log: stderr is only captured once a Wine
+        // session starts, and sign-in happens before one.
+        let line = "[steam-trace] " + message()
+        print(line)
+        AppLog.record(line)
     }
 
     static func event(_ message: String) {
         print(message)
+        AppLog.record(message)
     }
 }
 
@@ -2504,7 +2507,7 @@ actor SteamConnection {
     private var webSocketTask: URLSessionWebSocketTask?
     private var urlSession: URLSession?
     private let wsDelegate = SteamWebSocketDelegate()
-    private let serverList = CMServerList()
+    private let serverList = CMServerList.shared
     private var currentEndpoint: String?
     private var messageHandler: ((Data) -> Void)?
     private var disconnectHandler: ((Error?) -> Void)?
@@ -2515,46 +2518,116 @@ actor SteamConnection {
 
     // MARK: - Connect
 
+    /// How many CM servers are dialled at once, and how long a WebSocket
+    /// handshake plus ping may take before that server counts as failed.
+    private static let raceWidth = 3
+    private static let handshakeTimeout: UInt64 = 6_000_000_000
+
+    /// Opens the WebSocket to the fastest healthy CM server. The best few
+    /// candidates are dialled in parallel and the first to answer a ping wins;
+    /// the rest are cancelled. Two rounds cover a bad first batch.
     func connect() async throws {
         var lastError: Error = SteamError.connectionTimeout
-        for attempt in 1...3 {
-            let server = try await serverList.getServer()
-            currentEndpoint = server.endpoint
-            SteamLog.trace("Connecting to CM (attempt \(attempt)/3): \(server.url)")
-            let config = URLSessionConfiguration.default
-            config.timeoutIntervalForRequest = 20
-            let session = URLSession(configuration: config, delegate: wsDelegate, delegateQueue: nil)
-            urlSession = session
-            let task = session.webSocketTask(with: server.url, protocols: ["steamdataport"])
-            webSocketTask = task
-            task.resume()
-            do {
-                let guardOnce = SteamPingResumeGuard()
-                try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-                    task.sendPing { error in
-                        guard guardOnce.claim() else { return }
-                        if let error { continuation.resume(throwing: SteamError.connectionFailed(error.localizedDescription)) }
-                        else { continuation.resume() }
-                    }
-                    Task {
-                        try? await Task.sleep(nanoseconds: 12_000_000_000)
-                        guard guardOnce.claim() else { return }
-                        continuation.resume(throwing: SteamError.connectionTimeout)
-                    }
-                }
-                await serverList.markSuccess(endpoint: server.endpoint)
-                scheduleReceive(task)
-                SteamLog.trace("WebSocket connected — ready for protocol messages")
+        for round in 1...2 {
+            let candidates = try await serverList.candidates(Self.raceWidth)
+            SteamLog.trace("Connecting to CM (round \(round)/2): " + candidates.map(\.endpoint).joined(separator: ", "))
+            let started = Date()
+            switch await Self.race(candidates, delegate: wsDelegate) {
+            case .success(let winner):
+                urlSession = winner.session
+                webSocketTask = winner.task
+                currentEndpoint = winner.server.endpoint
+                await serverList.markSuccess(endpoint: winner.server.endpoint)
+                scheduleReceive(winner.task)
+                SteamLog.trace(String(format: "WebSocket connected to %@ in %.0f ms", winner.server.endpoint,
+                                      Date().timeIntervalSince(started) * 1000))
                 return
-            } catch {
+            case .failure(let failed, let error):
                 lastError = error
-                SteamLog.trace("CM connection attempt \(attempt) failed: \(error.localizedDescription)")
-                await serverList.markFailed(endpoint: server.endpoint)
-                disconnect()
-                if attempt < 3 { try? await Task.sleep(nanoseconds: 350_000_000) }
+                for endpoint in failed { await serverList.markFailed(endpoint: endpoint) }
+                SteamLog.trace("CM round \(round) failed: \(error.localizedDescription)")
             }
         }
         throw lastError
+    }
+
+    private struct OpenSocket: @unchecked Sendable {
+        let server: CMServerList.CMServer
+        let session: URLSession
+        let task: URLSessionWebSocketTask
+    }
+
+    private enum RaceResult {
+        case success(OpenSocket)
+        case failure([String], Error)
+    }
+
+    /// Dials every candidate at once; returns the first socket whose ping is
+    /// answered and closes all the others.
+    private static func race(_ servers: [CMServerList.CMServer],
+                             delegate: SteamWebSocketDelegate) async -> RaceResult {
+        await withTaskGroup(of: (CMServerList.CMServer, OpenSocket?, Error?).self) { group in
+            for server in servers {
+                group.addTask {
+                    let config = URLSessionConfiguration.default
+                    config.timeoutIntervalForRequest = 20
+                    config.waitsForConnectivity = false
+                    let session = URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
+                    let task = session.webSocketTask(with: server.url, protocols: ["steamdataport"])
+                    task.resume()
+                    do {
+                        try await ping(task)
+                        if Task.isCancelled { throw CancellationError() }
+                        return (server, OpenSocket(server: server, session: session, task: task), nil)
+                    } catch {
+                        task.cancel(with: .goingAway, reason: nil)
+                        session.invalidateAndCancel()
+                        return (server, nil, error)
+                    }
+                }
+            }
+            var failed: [String] = []
+            var lastError: Error = SteamError.connectionTimeout
+            var winner: OpenSocket?
+            for await (server, socket, error) in group {
+                if let socket {
+                    if winner == nil {
+                        winner = socket
+                        group.cancelAll()
+                    } else {
+                        socket.task.cancel(with: .goingAway, reason: nil)
+                        socket.session.invalidateAndCancel()
+                    }
+                } else if winner == nil {
+                    failed.append(server.endpoint)
+                    if !(error is CancellationError) { lastError = error ?? lastError }
+                }
+            }
+            if let winner { return .success(winner) }
+            return .failure(failed, lastError)
+        }
+    }
+
+    /// A WebSocket ping that fails after `handshakeTimeout` (covers DNS, TLS
+    /// and the HTTP upgrade, which all happen before the first frame).
+    private static func ping(_ task: URLSessionWebSocketTask) async throws {
+        let guardOnce = SteamPingResumeGuard()
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                task.sendPing { error in
+                    guard guardOnce.claim() else { return }
+                    if let error { continuation.resume(throwing: SteamError.connectionFailed(error.localizedDescription)) }
+                    else { continuation.resume() }
+                }
+                Task {
+                    try? await Task.sleep(nanoseconds: handshakeTimeout)
+                    guard guardOnce.claim() else { return }
+                    continuation.resume(throwing: SteamError.connectionTimeout)
+                }
+            }
+        } onCancel: {
+            task.cancel(with: .goingAway, reason: nil)
+        }
     }
 
     // MARK: - Receive
@@ -2676,6 +2749,10 @@ import Foundation
 
 /// Discovers and manages Steam CM (Connection Manager) WebSocket endpoints.
 actor CMServerList {
+    /// One list for the whole app, so a server that failed once is avoided by
+    /// every later connection, and a fresh list is reused across sessions.
+    static let shared = CMServerList()
+
     /// A CM server endpoint (WebSocket)
     struct CMServer: Codable, Sendable {
         let host: String
@@ -2684,40 +2761,62 @@ actor CMServerList {
         var failCount: Int = 0
 
         var isHealthy: Bool { failCount < 3 }
-
         var endpoint: String { "\(host):\(port)" }
-
         var url: URL { URL(string: "wss://\(host):\(port)/cmsocket/")! }
+    }
+
+    private struct CachedList: Codable {
+        var servers: [CMServer]
+        var fetched: Date
+        var lastGood: String?
     }
 
     private var servers: [CMServer] = []
     private var lastFetched: Date?
-    private let cacheKey = "swiftsteam_cm_servers_websocket"
+    private var lastGood: String?
+    private var refreshTask: Task<Void, Never>?
+    private let cacheKey = "swiftsteam_cm_servers_websocket_v2"
+    /// Steam reshuffles CM load roughly hourly; a day-old list still mostly works.
     private let staleInterval: TimeInterval = 3600
+    private let unusableInterval: TimeInterval = 86_400
+    private static let directoryTimeout: TimeInterval = 6
+
+    init() {
+        if let data = UserDefaults.standard.data(forKey: cacheKey),
+           let cached = try? JSONDecoder().decode(CachedList.self, from: data) {
+            servers = cached.servers.map { var server = $0; server.failCount = 0; return server }
+            lastFetched = cached.fetched
+            lastGood = cached.lastGood
+        }
+    }
 
     // MARK: - Public API
 
-    /// Get the best available CM server to connect to
-    func getServer() async throws -> CMServer {
-        if servers.isEmpty || isListStale {
+    /// The best `count` healthy servers: the last one that worked first, then
+    /// Steam's own order (the directory ranks servers for the caller's IP).
+    /// A cached list is used at once; a stale one is refreshed in the
+    /// background, and only a missing or day-old list makes the caller wait.
+    func candidates(_ count: Int) async throws -> [CMServer] {
+        let age = lastFetched.map { Date().timeIntervalSince($0) } ?? .infinity
+        if servers.isEmpty || age > unusableInterval {
             try await refreshServerList()
+        } else if age > staleInterval {
+            refreshInBackground()
         }
-
-        guard let server = servers
-            .filter({ $0.isHealthy })
-            .sorted(by: { ($0.lastAttempt ?? .distantPast) < ($1.lastAttempt ?? .distantPast) })
-            .first
-        else {
-            for i in servers.indices {
-                servers[i].failCount = 0
-            }
-            guard let server = servers.first else {
-                throw SteamError.noServersAvailable
-            }
-            return server
+        var healthy = servers.filter(\.isHealthy)
+        if healthy.isEmpty {
+            for index in servers.indices { servers[index].failCount = 0 }
+            healthy = servers
         }
-
-        return server
+        // Fewer recent failures first; ties keep Steam's ranking (stable).
+        healthy = healthy.enumerated()
+            .sorted { ($0.element.failCount, $0.offset) < ($1.element.failCount, $1.offset) }
+            .map(\.element)
+        if let lastGood, let index = healthy.firstIndex(where: { $0.endpoint == lastGood && $0.failCount == 0 }) {
+            healthy.insert(healthy.remove(at: index), at: 0)
+        }
+        guard !healthy.isEmpty else { throw SteamError.noServersAvailable }
+        return Array(healthy.prefix(max(1, count)))
     }
 
     func markFailed(endpoint: String) {
@@ -2725,6 +2824,7 @@ actor CMServerList {
             servers[index].failCount += 1
             servers[index].lastAttempt = Date()
         }
+        if lastGood == endpoint { lastGood = nil }
     }
 
     func markSuccess(endpoint: String) {
@@ -2732,77 +2832,70 @@ actor CMServerList {
             servers[index].failCount = 0
             servers[index].lastAttempt = Date()
         }
+        lastGood = endpoint
+        cacheServerList()
     }
 
     func refreshServerList() async throws {
-        let freshServers = try await fetchServerList()
-        guard !freshServers.isEmpty else {
-            throw SteamError.noServersAvailable
-        }
-        servers = freshServers
+        let fresh = try await fetchServerList()
+        guard !fresh.isEmpty else { throw SteamError.noServersAvailable }
+        servers = fresh
         lastFetched = Date()
         cacheServerList()
     }
 
     // MARK: - Private
 
-    private var isListStale: Bool {
-        guard let lastFetched else { return true }
-        return Date().timeIntervalSince(lastFetched) > staleInterval
+    private func refreshInBackground() {
+        guard refreshTask == nil else { return }
+        refreshTask = Task {
+            try? await self.refreshServerList()
+            self.refreshTask = nil
+        }
     }
 
-    /// Fetch WebSocket CM server list from Steam Web API
+    /// WebSocket CM servers from the Steam directory, ranked for the actual
+    /// outgoing IP. No cell override: a stored cell is wrong after travel or
+    /// a VPN change, and Steam's IP-based ranking is what makes CMs fast.
     private func fetchServerList() async throws -> [CMServer] {
-        let urlString = "https://api.steampowered.com/ISteamDirectory/GetCMListForConnect/v1/?cmtype=websockets"
-        guard let url = URL(string: urlString) else {
-            throw SteamError.connectionFailed("Invalid CM directory URL")
-        }
+        let url = URL(string: "https://api.steampowered.com/ISteamDirectory/GetCMListForConnect/v1/?cmtype=websockets&maxcount=20")!
+        var request = URLRequest(url: url)
+        request.timeoutInterval = Self.directoryTimeout
 
-        let (data, response) = try await URLSession.shared.data(from: url)
-
-        guard let httpResponse = response as? HTTPURLResponse,
-              httpResponse.statusCode == 200 else {
-            if let cached = loadCachedServers(), !cached.isEmpty {
-                SteamLog.trace("CM directory unavailable, using cached servers")
-                return cached
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard (response as? HTTPURLResponse)?.statusCode == 200 else {
+                throw SteamError.connectionFailed("CM directory returned non-200 status")
             }
-            throw SteamError.connectionFailed("CM directory returned non-200 status")
+            // { "response": { "serverlist": [ { "endpoint": "host:port", ... } ] } }
+            guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let body = json["response"] as? [String: Any],
+                  let list = body["serverlist"] as? [[String: Any]] else {
+                throw SteamError.connectionFailed("Invalid CM directory response format")
+            }
+            let fresh = list.compactMap { entry -> CMServer? in
+                guard let endpoint = entry["endpoint"] as? String else { return nil }
+                let parts = endpoint.split(separator: ":")
+                guard parts.count == 2, let port = UInt16(parts[1]) else { return nil }
+                return CMServer(host: String(parts[0]), port: port)
+            }
+            SteamLog.trace("Fetched \(fresh.count) WebSocket CM servers ranked by Steam for this connection")
+            return fresh
+        } catch {
+            // An outdated list still beats no list: CM servers are long-lived.
+            if !servers.isEmpty {
+                SteamLog.trace("CM directory unavailable (\(error.localizedDescription)); keeping cached servers")
+                return servers
+            }
+            throw error
         }
-
-        // Response format: { "response": { "serverlist": [ { "endpoint": "host:port", ... }, ... ] } }
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let serverResponse = json["response"] as? [String: Any],
-              let serverList = serverResponse["serverlist"] as? [[String: Any]] else {
-            throw SteamError.connectionFailed("Invalid CM directory response format")
-        }
-
-        // Each entry has an "endpoint" field: "hostname:port"
-        let servers = serverList.compactMap { entry -> CMServer? in
-            guard let endpoint = entry["endpoint"] as? String else { return nil }
-            let parts = endpoint.split(separator: ":")
-            guard parts.count == 2,
-                  let port = UInt16(parts[1]) else { return nil }
-            return CMServer(host: String(parts[0]), port: port)
-        }
-
-        SteamLog.trace("Fetched \(servers.count) WebSocket CM servers selected by Steam for the outgoing IP")
-        return servers
     }
-
-    // MARK: - Caching
 
     private func cacheServerList() {
-        if let data = try? JSONEncoder().encode(servers) {
+        let cached = CachedList(servers: servers, fetched: lastFetched ?? Date(), lastGood: lastGood)
+        if let data = try? JSONEncoder().encode(cached) {
             UserDefaults.standard.set(data, forKey: cacheKey)
         }
-    }
-
-    private func loadCachedServers() -> [CMServer]? {
-        guard let data = UserDefaults.standard.data(forKey: cacheKey),
-              let cached = try? JSONDecoder().decode([CMServer].self, from: data) else {
-            return nil
-        }
-        return cached
     }
 }
 
@@ -2933,7 +3026,6 @@ class SteamSession: SteamCMSession {
     // MARK: - Internal State
 
     private let connection = SteamConnection()
-    let serverList = CMServerList()
     private var sessionID: Int32 = 0
     private var heartbeatInterval: Int32 = 30  // seconds
     private var heartbeatTask: Task<Void, Never>?
@@ -3063,8 +3155,8 @@ class SteamSession: SteamCMSession {
         }
         guard connectionState != .connecting else {
             // Already connecting — wait briefly for it to finish
-            for _ in 0..<40 {
-                try await Task.sleep(nanoseconds: 500_000_000)
+            for _ in 0..<200 {
+                try await Task.sleep(nanoseconds: 100_000_000)
                 if connectionState == .authenticated { return }
                 if connectionState == .disconnected { break }
             }

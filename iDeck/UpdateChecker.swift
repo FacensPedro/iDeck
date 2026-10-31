@@ -26,12 +26,9 @@ struct ProjectStatus: Identifiable {
 final class UpdateChecker: ObservableObject {
     static let ideck = TrackedProject(id: "ideck", name: "iDeck", owner: "FacensPedro", repo: "iDeck")
 
-    static let projects: [TrackedProject] = [
-        ideck,
-        TrackedProject(id: "stikdebug", name: "StikDebug", owner: "StikDebug", repo: "StikDebug"),
-        TrackedProject(id: "livecontainer", name: "LiveContainer", owner: "LiveContainer", repo: "LiveContainer"),
-        TrackedProject(id: "madeira", name: "Madeira", owner: "willfaust", repo: "madeira")
-    ]
+    /// Only iDeck itself: StikDebug, LiveContainer and Madeira are updated by
+    /// their own installers (Madeira is compiled into the iDeck IPA).
+    static let projects: [TrackedProject] = [ideck]
 
     @Published var statuses: [ProjectStatus] = UpdateChecker.projects.map { ProjectStatus(project: $0) }
     @Published var isChecking = false

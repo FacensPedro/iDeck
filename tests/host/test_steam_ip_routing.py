@@ -26,7 +26,17 @@ class SteamIPRoutingTests(unittest.TestCase):
             CM,
         )
         self.assertNotIn("GetCMListForConnect/v1/?cellid=0", CM)
-        self.assertIn("loadCachedServers()", CM)
+        self.assertNotIn('name: "cellid"', CM)
+        # A cached ranked list is used at once and refreshed in the background.
+        self.assertIn("static let shared = CMServerList()", CM)
+        self.assertIn("refreshInBackground()", CM)
+        self.assertIn("keeping cached servers", CM)
+
+    def test_cm_connect_races_best_servers(self):
+        self.assertIn("private static let raceWidth = 3", CM)
+        self.assertIn("switch await Self.race(candidates, delegate: wsDelegate)", CM)
+        self.assertIn("group.cancelAll()", CM)
+        self.assertIn("request.timeoutInterval = Self.directoryTimeout", CM)
 
     def test_existing_live_download_ranking_and_authorization_remain(self):
         self.assertIn("ContentHostHealth()", DEPOT)

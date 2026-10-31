@@ -114,11 +114,7 @@ struct GameSessionView: View {
     }
 
     private var wineLogURL: URL? {
-        guard let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
-            return nil
-        }
-        let url = documents.appendingPathComponent("madeira-log.txt", isDirectory: false)
-        return FileManager.default.fileExists(atPath: url.path) ? url : nil
+        BugReportModel.wineLogURL.flatMap { FileManager.default.fileExists(atPath: $0.path) ? $0 : nil }
     }
 
     private func copyWineLog() {
@@ -151,24 +147,7 @@ struct GameSessionView: View {
             return
         }
         let diagnosis = url.path.withCString { ideck_wine_log_diagnose($0) }
-        switch diagnosis {
-        case 1:
-            recentWineLogFinding = "Last Wine log indicates an executable JIT allocation or mapping failure."
-        case 2:
-            recentWineLogFinding = "Last Wine log indicates that executable memory permissions were denied."
-        case 3:
-            recentWineLogFinding = "Last Wine log indicates the Windows process ran out of memory."
-        case 4:
-            recentWineLogFinding = "Last Wine log indicates a Windows program memory access violation."
-        case 5:
-            recentWineLogFinding = "Last Wine log indicates a missing or incompatible DLL."
-        case 6:
-            recentWineLogFinding = "A 32-bit Windows program could not reserve its WoW64 address window. The iOS device's virtual address space is insufficient for the current Madeira memory policy."
-        case 7:
-            recentWineLogFinding = "Wine/FEX encountered an unhandled native ARM64EC exception (x18 handler) and terminated with NTSTATUS 0xC000001D. This is a runtime compatibility failure, not proof of a missing game DLL."
-        default:
-            recentWineLogFinding = nil
-        }
+        recentWineLogFinding = BugReportModel.finding(for: diagnosis)
     }
 
     private let tick = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
