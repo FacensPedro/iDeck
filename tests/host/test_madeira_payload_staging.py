@@ -31,6 +31,152 @@ class MadeiraPayloadStagingTests(unittest.TestCase):
         self.source = base / "madeira" / "app" / "Madeira"
         self.app = base / "iDeck.app"
         self.app.mkdir()
+        for directory, names in (
+            ("aarch64-windows", ARM64),
+            ("arm64ec-windows", ARM64EC),
+        ):
+            folder = self.source / directory
+            folder.mkdir(parents=True)
+            for name in names:
+                (folder / name).write_bytes(b"MZ" + bytes(128))
+        (self.source / "cacert.pem").write_bytes(b"-----BEGIN CERTIFICATE-----\nfixture")
+        for folder in ("legal", "licenses"):
+            (self.source / folder).mkdir()
+            (self.source / folder / "NOTICE.txt").write_text("Madeira notice", encoding="utf-8")
+        compat = self.source / "compat" / "love"
+        compat.mkdir(parents=True)
+        (compat / "lua51.dll").write_bytes(b"MZ" + bytes(128))
+        (self.source / "licenses" / "LuaJIT-MIT.txt").write_text(
+            "LuaJIT MIT license fixture", encoding="utf-8",
+        )
+        vulkan = self.source / "vulkan" / "arm64ec-windows"
+        vulkan.mkdir(parents=True)
+        for name in ("winevulkan.dll", "vulkan-1.dll"):
+            (vulkan / name).write_bytes(b"MZ" + bytes(128))
+        gl = self.source / "gl"
+        gl.mkdir()
+        for name in ("libMoltenVK.dylib", "libOSMesa.dylib"):
+            (gl / name).write_bytes(bytes.fromhex("cffaedfe0c000001") + bytes(64))
+        for name in ("MoltenVK-Apache-2.0.txt", "SPIRV-Cross-Apache-2.0.txt",
+                     "SPIRV-Tools-Apache-2.0.txt", "cereal-BSD-3-Clause.txt",
+                     "Mesa-license.rst"):
+            (self.source / "licenses" / name).write_text(name, encoding="utf-8")
+        (self.source / "nls").mkdir()
+        (self.source / "nls" / "locale.nls").write_bytes(b"nls-data")
+        (self.source / "prefix-template.tar.gz").write_bytes(
+            b"\x1f\x8b" + bytes(64)
+        )
+        converter = self.source / "d3d12"
+        converter.mkdir()
+        (converter / "libmetalirconverter.dylib").write_bytes(b"converter-fixture")
+        for notice in NOTICES:
+            (converter / notice).write_text(notice, encoding="utf-8")
+        for name in ("canary_vs.dxil", "canary_ps.dxil",
+                     "canary_layout_vs.dxil", "canary_layout_ps.dxil"):
+            (converter / name).write_bytes(b"DXIL-test")
+
+    def test_d3d11_stages_without_redistributing_converter_or_d3d12(self):
+        # A clean upstream Wine farm may already contain 32-bit/host WoW64.
+        # This profile must discard those files even when they are present.
+        i386 = self.source / "i386-windows"
+        i386.mkdir()
+        for name in ("ntdll.dll", "kernel32.dll", "user32.dll", "d3d11.dll", "dxgi.dll"):
+            (i386 / name).write_bytes(b"MZ" + bytes(128))
+        for name in ("xtajit.dll", "wow64.dll", "wow64win.dll"):
+            (self.source / "aarch64-windows" / name).write_bytes(b"MZ" + bytes(128))
+        environment = dict(os.environ)
+        environment.update({
+            "IDECK_MADEIRA_APP_ROOT": str(self.source),
+            "IDECK_MADEIRA_GRAPHICS": "d3d11",
+            "IDECK_BUILD_WOW64": "0",
+            "IDECK_ACCEPT_METAL_CONVERTER_LICENSE": "0",
+        })
+        environment.pop("IDECK_CODESIGN_IDENTITY", None)
+        subprocess.run(
+            ["bash", str(STAGER), str(self.app)],
+            env=environment, check=True, text=True, capture_output=True,
+        )
+        self.assertFalse((self.app / "d3d12").exists())
+        self.assertFalse((self.app / "MadeiraRuntime").exists())
+        for prefix in (self.app,):
+            self.assertFalse((prefix / "i386-windows").exists())
+            for name in ("xtajit.dll", "wow64.dll", "wow64win.dll"):
+                self.assertFalse((prefix / "aarch64-windows" / name).exists())
+        self.assertTrue((self.source / "i386-windows/ntdll.dll").is_file())
+        self.assertTrue((self.source / "aarch64-windows/wow64.dll").is_file())
+        for folder in ("aarch64-windows", "arm64ec-windows"):
+            for name in ("d3d12.dll", "d3d12core.dll", "madeira_d3d12.dll"):
+                self.assertFalse((self.app / folder / name).exists())
+        for name in ("d3d11.dll", "dxgi.dll", "winemetal.dll"):
+            self.assertTrue((self.app / "arm64ec-windows" / name).is_file())
+        self.assertTrue((self.source / "d3d12/libmetalirconverter.dylib").is_file())
+
+    def test_d3d11_opt_in_wow64_requires_full_i386_farm_and_stages_it(self):
+        i386 = self.source / "i386-windows"
+        i386.mkdir()
+        for name in ("ntdll.dll", "kernel32.dll", "user32.dll", "d3d11.dll", "dxgi.dll"):
+            (i386 / name).write_bytes(b"MZ" + bytes(128))
+        for name in ("xtajit.dll", "wow64.dll", "wow64win.dll"):
+            (self.source / "aarch64-windows" / name).write_bytes(b"MZ" + bytes(128))
+        env = dict(os.environ)
+        env.update({
+            "IDECK_MADEIRA_APP_ROOT": str(self.source),
+            "IDECK_MADEIRA_GRAPHICS": "d3d11",
+            "IDECK_BUILD_WOW64": "1",
+            "IDECK_ACCEPT_METAL_CONVERTER_LICENSE": "0",
+        })
+        result = subprocess.run(
+            ["bash", str(STAGER), str(self.app)],
+            env=env, capture_output=True, text=True, check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        for prefix in (self.app,):
+            self.assertTrue((prefix / "i386-windows/ntdll.dll").is_file())
+            self.assertTrue((prefix / "aarch64-windows/xtajit.dll").is_file())
+            self.assertFalse((prefix / "d3d12").exists())
+
+    def test_d3d11_opt_in_wow64_rejects_missing_i386_farm(self):
+        env = dict(os.environ)
+        env.update({
+            "IDECK_MADEIRA_APP_ROOT": str(self.source),
+            "IDECK_MADEIRA_GRAPHICS": "d3d11",
+            "IDECK_BUILD_WOW64": "1",
+            "IDECK_ACCEPT_METAL_CONVERTER_LICENSE": "0",
+        })
+        result = subprocess.run(
+            ["bash", str(STAGER), str(self.app)],
+            env=env, capture_output=True, text=True, check=False,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("requested WoW64", result.stderr)
+
+    def test_vcruntime_requires_all_supplied_files(self):
+        source = self.source / "x86_64-vcruntime"
+        source.mkdir()
+        (source / "vcruntime140.dll").write_bytes(b"MZ" + bytes(128))
+        environment = dict(os.environ)
+        environment.update({
+            "IDECK_MADEIRA_APP_ROOT": str(self.source),
+            "IDECK_ACCEPT_METAL_CONVERTER_LICENSE": "1",
+        })
+        result = subprocess.run(
+            ["bash", str(STAGER), str(self.app)],
+            env=environment, check=False, text=True, capture_output=True,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("incomplete Microsoft VC++ runtime", result.stderr)
+
+    def test_native_payload_has_no_madeira_symlinks(self):
+        environment = dict(os.environ)
+        environment.update({
+            "IDECK_MADEIRA_APP_ROOT": str(self.source),
+            "IDECK_ACCEPT_METAL_CONVERTER_LICENSE": "1",
+        })
+        environment.pop("IDECK_CODESIGN_IDENTITY", None)
+        subprocess.run(
+            ["bash", str(STAGER), str(self.app)],
+            env=environment, check=True, text=True, capture_output=True,
+        )
         # Each runtime file is staged once, as a real file at the top level.
         self.assertFalse((self.app / "MadeiraRuntime").exists())
         for directory, names in (
