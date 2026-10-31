@@ -42,6 +42,7 @@ SOURCES=(
   "Winios/Winios.m"
   "Winios/WiniosGamepad.c"
   "Winios/WiniosCursor.c"
+  "Winios/WiniosGL.m"
   "PadOutput.m"
   "wine_stubs.c"
 )
@@ -72,6 +73,16 @@ done
 # Madeira's libwineserver.a likewise owns wine_ui_log / its callback setter.
 # Do not build iDeck/NativeRuntime/MadeiraHostCallbacks.m into this archive;
 # that file defines another wine_ui_log and collides with wine_log_ios.o.
+# Host functions that upstream Madeira implements in Swift (not linked here).
+for host_src in "$ROOT/build/host/"*.c; do
+  [[ -s "$host_src" ]] || continue
+  obj="$OUT/obj/ideck_host_$(basename "${host_src%.c}").o"
+  echo "Compiling iDeck host shim: ${host_src#$ROOT/}"
+  xcrun --sdk iphoneos clang -arch arm64 -isysroot "$SDK" -miphoneos-version-min=18.0 -O2 -fPIC \
+    "${INCLUDES[@]}" -c "$host_src" -o "$obj"
+  OBJS+=("$obj")
+done
+
 xcrun --sdk iphoneos ar rcs "$OUT/libideck_madeira_upstream_bridges.a" "${OBJS[@]}"
 xcrun --sdk iphoneos ranlib "$OUT/libideck_madeira_upstream_bridges.a"
 
@@ -148,6 +159,7 @@ FLAGS=( -lz -lc++ -lsqlite3 -llzma
   -framework AudioToolbox -framework VideoToolbox -framework CoreMedia
   -framework CoreVideo -framework CoreFoundation -framework IOKit
   -framework ImageIO -framework GameController -framework CoreHaptics
+  -framework OpenGLES -framework IOSurface
 )
 FLAGS+=(-force_load "${ARCHIVES[0]}" -force_load "${ARCHIVES[11]}")
 for index in "${!ARCHIVES[@]}"; do

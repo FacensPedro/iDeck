@@ -4,6 +4,7 @@ import argparse
 from pathlib import Path
 
 ORIGINAL = '        echo "$present" | grep -qx "$l" && continue'
+UPSTREAM_FIXED = '        grep -Fx -- "$l" <<< "$present" >/dev/null && continue'
 PATCHED = '        grep -Fxq -- "$l" <<< "$present" && continue'
 
 
@@ -16,6 +17,9 @@ def patch(madeira: Path) -> bool:
         script.write_text(content.replace(ORIGINAL, PATCHED), encoding="utf-8")
         return True
     if old_count == 0 and new_count == 1:
+        return False
+    # Newer Madeira fixed the same SIGPIPE race upstream with a here-string.
+    if old_count == 0 and UPSTREAM_FIXED in content:
         return False
     raise ValueError("Unexpected pinned Madeira WoW64 import-checker source; refusing ambiguous changes")
 

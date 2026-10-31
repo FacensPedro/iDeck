@@ -435,6 +435,8 @@ enum Translations {
         "Example: -windowed": ["pt": "Exemplo: -windowed", "es": "Ejemplo: -windowed"],
         "Resolution": ["pt": "Resolução", "es": "Resolución"],
         "Graphics API": ["pt": "API gráfica", "es": "API gráfica"],
+        "Vulkan": ["pt": "Vulkan", "es": "Vulkan"],
+        "OpenGL": ["pt": "OpenGL", "es": "OpenGL"],
         "Frame rate limit": ["pt": "Limite de FPS", "es": "Límite de FPS"],
         "MetalFX upscaling": ["pt": "Upscaling MetalFX", "es": "Reescalado MetalFX"],
         "Enable AVX/AVX2 translation": ["pt": "Ativar tradução AVX/AVX2", "es": "Activar traducción AVX/AVX2"],

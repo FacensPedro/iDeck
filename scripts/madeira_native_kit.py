@@ -12,7 +12,7 @@ import zipfile
 from pathlib import Path, PurePosixPath
 
 ROOT = Path(__file__).resolve().parents[1]
-REVISION = os.environ.get("IDECK_MADEIRA_REV", "fd9f2f3d0434a4116e4c3351f286a0fc376b4e36")
+REVISION = os.environ.get("IDECK_MADEIRA_REV", "c2c1b03a9e36ef986c980b9eae3c14d05a372db1")
 WINE_VERSION = "11.4"
 D3D12_FRONTEND = "arm64ec-windows/madeira_d3d12.dll"
 D3D12_LOADER = "arm64ec-windows/d3d12.dll"
@@ -82,9 +82,17 @@ ARCHIVES = (
 FRAMEWORKS = (
     "Metal", "MetalFX", "QuartzCore", "AVFoundation", "AudioToolbox",
     "VideoToolbox", "CoreMedia", "CoreVideo", "CoreFoundation", "IOKit",
-    "ImageIO", "GameController", "CoreHaptics",
+    "ImageIO", "GameController", "CoreHaptics", "OpenGLES", "IOSurface",
 )
-BASIC_FOLDERS = ("aarch64-windows", "arm64ec-windows", "nls", "legal", "licenses", "compat")
+BASIC_FOLDERS = ("aarch64-windows", "arm64ec-windows", "nls", "legal", "licenses", "compat", "vulkan", "gl")
+# OpenGL (winios WGL driver on Mesa OSMesa + Zink, GLES fallback) and Vulkan
+# (winevulkan on MoltenVK). Kits built before these existed are rejected.
+GL_VULKAN_RUNTIME = 1
+GL_VULKAN_FILES = (
+    "vulkan/arm64ec-windows/winevulkan.dll", "vulkan/arm64ec-windows/vulkan-1.dll",
+    "gl/libMoltenVK.dylib", "gl/libOSMesa.dylib",
+    "licenses/MoltenVK-Apache-2.0.txt", "licenses/Mesa-license.rst",
+)
 D3D12_FOLDERS = ("d3d12",)
 D3D12_FILES = ("d3d12/libmetalirconverter.dylib", "d3d12/canary_vs.dxil", "d3d12/canary_ps.dxil")
 BASIC_FILES = ("prefix-template.tar.gz", "cacert.pem")
@@ -141,16 +149,20 @@ def check_assets(app: Path, wow64: bool, mono: bool, graphics: str = "d3d12") ->
     pe = REQUIRED_PE + (D3D12_PE if graphics == "d3d12" else ())
     for name in BASIC_FILES + pe + (
         "nls/locale.nls", "compat/love/lua51.dll", "licenses/LuaJIT-MIT.txt",
-    ) + (D3D12_FILES if graphics == "d3d12" else ()) + (WOW64_FILES if wow64 else ()) + (
+    ) + GL_VULKAN_FILES + (D3D12_FILES if graphics == "d3d12" else ()) + (WOW64_FILES if wow64 else ()) + (
         ("wine-mono/bin/libmono-2.0-x86.dll",) if mono else ()
     ):
         file = app / name
         if not file.is_file() or file.stat().st_size == 0:
             raise KitError("Missing native runtime resource: " + str(file))
-    for name in pe + ("compat/love/lua51.dll",) + (WOW64_FILES if wow64 else ()):
+    for name in pe + ("compat/love/lua51.dll",) + GL_VULKAN_FILES[:2] + (WOW64_FILES if wow64 else ()):
         with (app / name).open("rb") as stream:
             if stream.read(2) != b"MZ":
                 raise KitError("Not a Windows PE image: " + name)
+    for name in GL_VULKAN_FILES[2:4]:
+        with (app / name).open("rb") as stream:
+            if stream.read(4) != bytes.fromhex("cffaedfe"):
+                raise KitError("Not an arm64 Mach-O dylib: " + name)
     # Madeira's build-pe.sh copies the exact native frontend to the standard
     # d3d12.dll name. The copied loader must not be silently replaced by
     # an unrelated Wine or older D3D12 binary in a cached runtime.
@@ -268,6 +280,7 @@ def build_kit(output: Path, madeira: Path, bridge: Path, wow64: bool, mono: bool
                 "repeat_wine_session_patch_sha256": REPEAT_WINE_SESSION_PATCH_SHA256,
                 "dcomp_backport_sha256": DCOMP_BACKPORT_SHA256,
                 "luajit_backport_sha256": LUAJIT_BACKPORT_SHA256,
+                "gl_vulkan_runtime": GL_VULKAN_RUNTIME,
                 "files": hashes}
     output.parent.mkdir(parents=True, exist_ok=True)
     temporary = output.with_suffix(".zip.part")
@@ -327,6 +340,8 @@ def inspect(archive: Path, wow64: bool, mono: bool, graphics: str = "d3d12"):
             raise KitError("Repeat Wine session patch mismatch; rebuild the Madeira native kit")
         if metadata.get("dcomp_backport_sha256") != DCOMP_BACKPORT_SHA256:
             raise KitError("DirectComposition ARM64EC backport mismatch; rebuild the Madeira native kit")
+        if metadata.get("gl_vulkan_runtime") != GL_VULKAN_RUNTIME:
+            raise KitError("Kit predates the OpenGL/Vulkan runtime; rebuild the Madeira native kit")
         if metadata.get("luajit_backport_sha256") != LUAJIT_BACKPORT_SHA256:
             raise KitError("LuaJIT GC64 wineserver backport mismatch; rebuild the Madeira native kit")
         files = metadata.get("files")

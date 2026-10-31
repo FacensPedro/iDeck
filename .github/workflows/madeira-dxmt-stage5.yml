@@ -58,7 +58,7 @@ jobs:
       IDECK_LLVM_JOBS: '3'
       IDECK_LLVM_REF: llvmorg-15.0.7
       IDECK_PREBUILT_MODE: off
-      IDECK_MADEIRA_REV: fd9f2f3d0434a4116e4c3351f286a0fc376b4e36
+      IDECK_MADEIRA_REV: c2c1b03a9e36ef986c980b9eae3c14d05a372db1
     steps:
       - name: Checkout pinned public iDeck source
         uses: actions/checkout@v5

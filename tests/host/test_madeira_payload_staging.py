@@ -49,6 +49,18 @@ class MadeiraPayloadStagingTests(unittest.TestCase):
         (self.source / "licenses" / "LuaJIT-MIT.txt").write_text(
             "LuaJIT MIT license fixture", encoding="utf-8",
         )
+        vulkan = self.source / "vulkan" / "arm64ec-windows"
+        vulkan.mkdir(parents=True)
+        for name in ("winevulkan.dll", "vulkan-1.dll"):
+            (vulkan / name).write_bytes(b"MZ" + bytes(128))
+        gl = self.source / "gl"
+        gl.mkdir()
+        for name in ("libMoltenVK.dylib", "libOSMesa.dylib"):
+            (gl / name).write_bytes(bytes.fromhex("cffaedfe0c000001") + bytes(64))
+        for name in ("MoltenVK-Apache-2.0.txt", "SPIRV-Cross-Apache-2.0.txt",
+                     "SPIRV-Tools-Apache-2.0.txt", "cereal-BSD-3-Clause.txt",
+                     "Mesa-license.rst"):
+            (self.source / "licenses" / name).write_text(name, encoding="utf-8")
         (self.source / "nls").mkdir()
         (self.source / "nls" / "locale.nls").write_bytes(b"nls-data")
         (self.source / "prefix-template.tar.gz").write_bytes(

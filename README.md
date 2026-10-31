@@ -13,7 +13,7 @@
 | Steam | Sign-in, owned-game library, metadata, and downloads | Some games require Steam's Windows client and DRM authentication |
 | Windows | EXE import, Wine prefixes, game profiles, and the Madeira runtime | Requires an actual native IPA, FEX/JIT, and compatible Wine functionality |
 | WoW64 (32-bit x86) | Native Madeira builds include the i386 FEX translator, 32-bit Wine DLL farm and WoW64 host DLLs by default | Real device compatibility depends on the JIT pool, Wine prefix and individual game requirements |
-| Graphics | Metal adapters, DXMT, WineMetal, D3D12, and MetalFX settings | Game rendering and performance require hardware testing |
+| Graphics | Metal adapters, DXMT, WineMetal, D3D12, OpenGL (Mesa Zink or OpenGL ES), Vulkan (MoltenVK), and MetalFX settings | Game rendering and performance require hardware testing; Vulkan is x64-only |
 | iOS app hosting | LiveContainer-inspired integration | Subject to iPadOS entitlements, signing, and sandbox restrictions |
 | JIT | Integration with the external [StikDebug](https://github.com/StikDebug/StikDebug) workflow | iDeck cannot independently grant JIT permissions or bypass iOS security |
 | Runtime caching | Precompiled Madeira kits through GitHub Actions cache or Git LFS | Requires a legitimate native build and permission to redistribute components |

@@ -1740,6 +1740,8 @@ private struct WindowsGameProfileForm: View {
             profilePicker(title: tr("Surface scaling"), selection: $profile.surfaceScaling,
                           choices: ["fit", "fill", "stretch", "aspect"])
             profilePicker(title: tr("Graphics API"), selection: $profile.graphicsAPI, choices: ["Automatic", "Direct3D 9", "Direct3D 10", "Direct3D 11", "Direct3D 12"])
+            profilePicker(title: tr("Vulkan"), selection: $profile.vulkanMode, choices: WindowsGameProfile.vulkanModes)
+            profilePicker(title: tr("OpenGL"), selection: $profile.openGLBackend, choices: WindowsGameProfile.openGLBackends)
             profilePicker(title: tr("Controller API"), selection: $profile.controllerAPI, choices: ["Automatic", "XInput", "XInput + DirectInput", "HID", "DualSense HID", "Generic HID"])
             profilePicker(title: tr("Touch controls"), selection: $profile.touchControlPreset, choices: ["xbox", "minimal", "off"])
             profilePicker(title: tr("Frame rate limit"), selection: $profile.fpsLimit, choices: ["30", "40", "60", "Uncapped"])
