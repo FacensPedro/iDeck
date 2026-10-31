@@ -57,6 +57,8 @@
 		A1000000000000000000000D /* SteamLibraryPreviewCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000D /* SteamLibraryPreviewCache.swift */; };
 		999999999999999999999914 /* UpdateChecker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 999999999999999999999906 /* UpdateChecker.swift */; };
 		F30000000000000000000021 /* WineLogClipboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = F40000000000000000000021 /* WineLogClipboard.swift */; };
+		F3A000000000000000000002 /* GOGLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000002 /* GOGLibrary.swift */; };
+		F3A000000000000000000001 /* BugReportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000001 /* BugReportView.swift */; };
 		999999999999999999999915 /* Localization.swift in Sources */ = {isa = PBXBuildFile; fileRef = 999999999999999999999907 /* Localization.swift */; };
 		999999999999999999999911 /* PacketTunnelProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 999999999999999999999901 /* PacketTunnelProvider.swift */; };
 		999999999999999999999912 /* VPNExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 999999999999999999999902 /* VPNExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -143,6 +145,8 @@
 		A2000000000000000000000D /* SteamLibraryPreviewCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamLibraryPreviewCache.swift; sourceTree = "<group>"; };
 		999999999999999999999906 /* UpdateChecker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateChecker.swift; sourceTree = "<group>"; };
 		F40000000000000000000021 /* WineLogClipboard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WineLogClipboard.swift; sourceTree = "<group>"; };
+		F4A000000000000000000002 /* GOGLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GOGLibrary.swift; sourceTree = "<group>"; };
+		F4A000000000000000000001 /* BugReportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BugReportView.swift; sourceTree = "<group>"; };
 		999999999999999999999907 /* Localization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Localization.swift; sourceTree = "<group>"; };
 		999999999999999999999901 /* PacketTunnelProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PacketTunnelProvider.swift; sourceTree = "<group>"; };
 		999999999999999999999902 /* VPNExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = VPNExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -254,6 +258,8 @@
 				A1000000000000000000000D /* SteamLibraryPreviewCache.swift in Sources */,
 				999999999999999999999914 /* UpdateChecker.swift in Sources */,
 				F30000000000000000000021 /* WineLogClipboard.swift in Sources */,
+				F3A000000000000000000002 /* GOGLibrary.swift in Sources */,
+				F3A000000000000000000001 /* BugReportView.swift in Sources */,
 				999999999999999999999915 /* Localization.swift in Sources */,
 				111111111111111111111124 /* AppManager.swift in Sources */,
 				111111111111111111111125 /* GameSessionView.swift in Sources */,
@@ -359,6 +365,8 @@
 				222222222222222222222229 /* GraphicsConfig.swift */,
 				999999999999999999999906 /* UpdateChecker.swift */,
 				F40000000000000000000021 /* WineLogClipboard.swift */,
+				F4A000000000000000000002 /* GOGLibrary.swift */,
+				F4A000000000000000000001 /* BugReportView.swift */,
 				999999999999999999999907 /* Localization.swift */,
 				222222222222222222222236 /* AppManager.swift */,
 				222222222222222222222237 /* GameSessionView.swift */,

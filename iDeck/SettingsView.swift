@@ -15,6 +15,8 @@ struct SettingsView: View {
     @AppStorage("showGamePerformanceOverlay") private var showGamePerformanceOverlay = false
     @StateObject private var updater = UpdateChecker()
     @State private var isSteamSignInPresented = false
+    @ObservedObject private var gogLibrary = GOGLibraryModel.shared
+    @State private var isGOGSignInPresented = false
     @State private var jitDiagnosticsCopied = false
     @AppStorage(AppLanguage.storageKey) private var appLanguage = AppLanguage.system.rawValue
     
@@ -180,8 +182,44 @@ struct SettingsView: View {
                             .padding(16)
                         }
 
+                        settingsSection(title: tr("GOG")) {
+                            HStack {
+                                Text(gogLibrary.isSignedIn
+                                     ? (gogLibrary.username ?? tr("Connected"))
+                                     : tr("Not connected"))
+                                    .foregroundColor(gogLibrary.isSignedIn ? .green : .gray)
+                                Spacer()
+                                if gogLibrary.isSignedIn {
+                                    Button(tr("Sign out"), role: .destructive) { gogLibrary.signOut() }
+                                } else {
+                                    Button(tr("Connect GOG")) { isGOGSignInPresented = true }
+                                }
+                            }
+                            .padding()
+                            .background(Color(red: 0.15, green: 0.15, blue: 0.15))
+                            .padding(.bottom, 2)
+                        }
+
                         settingsSection(title: tr("LiveContainer")) {
                             toggleRow(title: tr("Inject Guest Hooks"), isOn: $coordinator.isGuestHooksEnabled)
+                        }
+
+                        settingsSection(title: tr("Support")) {
+                            NavigationLink(destination: BugReportView()) {
+                                HStack {
+                                    Image(systemName: "ladybug")
+                                        .frame(width: 24)
+                                    Text(tr("Bugs & logs"))
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                        .font(.caption)
+                                        .foregroundColor(.gray)
+                                }
+                                .padding()
+                                .foregroundColor(.white)
+                                .background(Color(red: 0.15, green: 0.15, blue: 0.15))
+                            }
+                            .padding(.bottom, 2)
                         }
                     }
                     .padding(horizontalSizeClass == .compact ? 14 : 28)
@@ -203,6 +241,9 @@ struct SettingsView: View {
         .navigationViewStyle(.stack)
         .sheet(isPresented: $isSteamSignInPresented) {
             SteamSignInView()
+        }
+        .sheet(isPresented: $isGOGSignInPresented) {
+            GOGSignInView()
         }
         .task {
             inputManager.refreshControllers()
@@ -396,15 +437,12 @@ struct SettingsView: View {
         // their chosen installer. The version list remains read-only.
     }
     
-    /// iDeck shows the installed version; the other projects show the newest release that has an IPA.
+    /// Installed iDeck version, plus the newest release with an IPA once checked.
     private func versionText(for status: ProjectStatus) -> String {
-        if status.project.id == UpdateChecker.ideck.id {
-            return "v\(updater.currentVersion)"
-        }
-        if !updater.hasChecked { return "-" }
-        if status.failed { return tr("unavailable") }
-        guard let latest = status.latest else { return tr("no IPA release") }
-        return latest
+        let installed = "v\(updater.currentVersion)"
+        guard updater.hasChecked, !status.failed, let latest = status.latest,
+              UpdateChecker.isNewer(latest, than: updater.currentVersion) else { return installed }
+        return installed + " → " + latest
     }
     
     private func settingsSection<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {

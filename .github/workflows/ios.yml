@@ -341,6 +341,9 @@ jobs:
           xcrun swiftc iDeck/WindowsLaunchArguments.swift tests/host/WindowsLaunchArgumentsTests.swift -o /tmp/ideck-launch-args-tests
           /tmp/ideck-launch-args-tests
 
+      - name: Test GOG library, store badges, bug screen, MetalFX and Steam connection
+        run: python3 -m unittest discover -s tests/host -p 'test_library_gog_bugs_metalfx.py' -v
+
       - name: Test Madeira OpenGL (WGL on Zink/GLES) and Vulkan (MoltenVK) runtime wiring
         run: python3 -m unittest discover -s tests/host -p 'test_madeira_gl_vulkan_runtime.py' -v
 
@@ -811,7 +814,7 @@ jobs:
     # Only main, version tags, or manual release requests may publish a
     # GitHub Release; PR content never gets to execute the release command.
     if: ${{ needs.checks.result == 'success' && needs.build.result == 'success' && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')))) }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: write
     steps:

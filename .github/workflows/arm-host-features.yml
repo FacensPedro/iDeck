@@ -23,7 +23,7 @@ permissions:
 jobs:
   host-tests:
     name: Validate ARM ISA capability gates and native kits
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v5
       - name: Compile ARMv8 feature probe and check Madeira patch

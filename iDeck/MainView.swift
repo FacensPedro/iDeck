@@ -293,6 +293,10 @@ struct WindowsWorkspaceView: View {
     @State private var pendingSteamCompatibilityLaunch: (game: SteamAppInfo, profile: WindowsGameProfile, prefixPath: URL)?
     @State private var steamCompatibilityMessage = ""
     @State private var showingSteamCompatibilityWarning = false
+    @ObservedObject private var gogLibrary = GOGLibraryModel.shared
+    @State private var isGOGSignInPresented = false
+    @AppStorage("library.steamOwnedCollapsed") private var steamOwnedCollapsed = false
+    @AppStorage("library.gogOwnedCollapsed") private var gogOwnedCollapsed = false
     @Environment(\.openURL) private var openURL
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -315,7 +319,21 @@ struct WindowsWorkspaceView: View {
         }
     }
 
+    private var filteredGOGGames: [GOGGame] {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return gogLibrary.games }
+        return gogLibrary.games.filter { $0.title.localizedCaseInsensitiveContains(query) }
+    }
+
+    private var installedGOGGames: [GOGInstalledGame] {
+        gogLibrary.installed.values.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
     private var isCompact: Bool { horizontalSizeClass == .compact }
+
+    /// Height of every card's action row (Launch, Install, progress), so a
+    /// game that is installing keeps exactly the size of an installed one.
+    private let cardActionHeight: CGFloat = 40
 
     private var columns: [GridItem] {
         [GridItem(.adaptive(minimum: isCompact ? 140 : 184, maximum: isCompact ? 184 : 226), spacing: isCompact ? 10 : 16)]
@@ -324,14 +342,84 @@ struct WindowsWorkspaceView: View {
     private var artworkWidth: CGFloat { isCompact ? 112 : 148 }
     private var artworkHeight: CGFloat { isCompact ? 168 : 222 }
 
-    private func cardTitle(_ title: String) -> some View {
-        Text(title)
+    private func cardTitle(_ title: String, store: GameStore? = nil) -> some View {
+        HStack(spacing: 4) {
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .foregroundColor(.white)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .multilineTextAlignment(.center)
+            if let store {
+                StoreBadge(store: store).fixedSize()
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .center)
+    }
+
+    /// The shared look of a card's primary action, at `cardActionHeight`.
+    private func cardActionLabel(_ title: String, systemImage: String) -> some View {
+        Label(title, systemImage: systemImage)
             .font(.subheadline.weight(.semibold))
             .foregroundColor(.white)
-            .lineLimit(1)
-            .truncationMode(.tail)
-            .multilineTextAlignment(.center)
-            .frame(maxWidth: .infinity, alignment: .center)
+            .frame(maxWidth: .infinity)
+            .frame(height: cardActionHeight)
+            .background(Color(red: 0.12, green: 0.35, blue: 0.65))
+            .clipShape(RoundedRectangle(cornerRadius: 9))
+    }
+
+    /// Download progress in the same footprint as the Launch button: a bar
+    /// with the percentage, and a stop button. Details are in the game sheet.
+    private func progressAction(fraction: Double, label: String, onStop: (() -> Void)?, stopping: Bool = false) -> some View {
+        HStack(spacing: 6) {
+            ZStack(alignment: .leading) {
+                RoundedRectangle(cornerRadius: 9).fill(Color.white.opacity(0.1))
+                GeometryReader { geometry in
+                    RoundedRectangle(cornerRadius: 9)
+                        .fill(Color(red: 0.12, green: 0.35, blue: 0.65))
+                        .frame(width: geometry.size.width * min(max(fraction, 0), 1))
+                }
+                Text(label)
+                    .font(.caption.weight(.semibold))
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .frame(maxWidth: .infinity)
+            }
+            if let onStop {
+                Button(role: .destructive, action: onStop) {
+                    Image(systemName: "stop.fill")
+                        .font(.caption)
+                        .frame(width: cardActionHeight, height: cardActionHeight)
+                        .background(Color.white.opacity(0.1))
+                        .clipShape(RoundedRectangle(cornerRadius: 9))
+                }
+                .disabled(stopping)
+                .accessibilityLabel(stopping ? tr("Stopping...") : tr("Stop download"))
+            }
+        }
+        .frame(height: cardActionHeight)
+    }
+
+    /// A collapsible "owned games" header (store, count, chevron).
+    private func ownedHeader(_ title: String, collapsed: Binding<Bool>) -> some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.2)) { collapsed.wrappedValue.toggle() }
+        } label: {
+            HStack {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundColor(.white)
+                Spacer()
+                Image(systemName: "chevron.down")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundColor(.gray)
+                    .rotationEffect(.degrees(collapsed.wrappedValue ? -90 : 0))
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(collapsed.wrappedValue ? tr("Show list") : tr("Hide list"))
     }
 
     var body: some View {
@@ -390,6 +478,8 @@ struct WindowsWorkspaceView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 14))
                         }
 
+                        gogContent
+
                         } else {
                             liveContainerContent
                         }
@@ -404,6 +494,14 @@ struct WindowsWorkspaceView: View {
         }
         .sheet(isPresented: $isSettingsPresented) {
             SettingsView(coordinator: coordinator)
+        }
+        .sheet(isPresented: $isGOGSignInPresented) {
+            GOGSignInView()
+        }
+        .task(id: gogLibrary.isSignedIn) {
+            if mode == .pc && gogLibrary.isSignedIn && gogLibrary.games.isEmpty {
+                await gogLibrary.refresh()
+            }
         }
         .sheet(item: $selectedGuestApp) { selection in
             GuestProgramDetailsView(appURL: selection.url, appManager: appManager, coordinator: coordinator)
@@ -668,13 +766,9 @@ struct WindowsWorkspaceView: View {
             .clipShape(RoundedRectangle(cornerRadius: 14))
         } else {
             VStack(alignment: .leading, spacing: 14) {
-                HStack {
-                    Text(tr("Owned games: %d", steamLibrary.games.count))
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundColor(.white)
-                    Spacer()
-                }
+                ownedHeader(tr("Owned games: %d", steamLibrary.games.count), collapsed: $steamOwnedCollapsed)
 
+                if !steamOwnedCollapsed {
                 HStack(spacing: 10) {
                     Image(systemName: "magnifyingglass")
                         .foregroundColor(.gray)
@@ -700,6 +794,7 @@ struct WindowsWorkspaceView: View {
                             gameCard(game)
                         }
                     }
+                }
                 }
             }
         }
@@ -732,7 +827,7 @@ struct WindowsWorkspaceView: View {
                 VStack(alignment: .center, spacing: 9) {
                     SteamGameArtworkView(game: game)
                         .frame(width: artworkWidth, height: artworkHeight)
-                    cardTitle(game.name.isEmpty ? tr("Untitled Steam app") : game.name)
+                    cardTitle(game.name.isEmpty ? tr("Untitled Steam app") : game.name, store: .steam)
                 }
                 .contentShape(Rectangle())
             }
@@ -751,16 +846,10 @@ struct WindowsWorkspaceView: View {
 
             if installed {
                 Button { launchSteamGame(game) } label: {
-                    Label(tr("Launch"), systemImage: "play.fill")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                        .background(Color(red: 0.12, green: 0.35, blue: 0.65))
-                        .clipShape(RoundedRectangle(cornerRadius: 9))
+                    cardActionLabel(tr("Launch"), systemImage: "play.fill")
                 }
             } else if steamLibrary.installingApps.contains(game.appID) {
-                downloadControls(for: game)
+                steamProgressAction(for: game)
             } else {
                 if let error = steamLibrary.downloadErrors[game.appID] {
                     Text(tr(error))
@@ -770,13 +859,7 @@ struct WindowsWorkspaceView: View {
                 }
                 if game.installableOnWindows {
                     Button { install(game) } label: {
-                        Label(tr("Install"), systemImage: "arrow.down.circle.fill")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 10)
-                            .background(Color(red: 0.12, green: 0.35, blue: 0.65))
-                            .clipShape(RoundedRectangle(cornerRadius: 9))
+                        cardActionLabel(tr("Install"), systemImage: "arrow.down.circle.fill")
                     }
                 } else {
                     Text(tr("Not available for Windows"))
@@ -793,44 +876,125 @@ struct WindowsWorkspaceView: View {
         .clipShape(RoundedRectangle(cornerRadius: 13))
     }
 
-    private func downloadControls(for game: SteamAppInfo) -> some View {
-        let progress = steamLibrary.downloadProgress[game.appID]
-        let stopping = steamLibrary.cancellingApps.contains(game.appID)
-        return VStack(spacing: 8) {
-            ProgressView(value: progress?.phase == .checking
-                         ? (progress?.checkFraction ?? 0)
-                         : (progress?.fraction ?? 0))
-                .tint(.white)
-            Text(progress?.phase == .preparing
-                 ? tr("Preparing download...")
-                 : progress?.phase == .checking
-                   ? tr("Checking existing files %d%%", Int(((progress?.checkFraction ?? 0) * 100).rounded()))
-                 : progress?.phase == .finishing
-                   ? tr("Finishing installation...")
-                   : tr("Installing %d%%", Int(((progress?.fraction ?? 0) * 100).rounded())))
-                .font(.caption)
-                .foregroundColor(.white)
-                .lineLimit(1)
-            if let progress, progress.installedBytes > 0 {
-                Text(tr("Installed: %@", ByteCountFormatter.string(
-                    fromByteCount: Int64(clamping: progress.installedBytes), countStyle: .file)))
-                    .font(.caption2)
-                    .foregroundColor(.green)
-            }
-            if steamLibrary.canCancelInstall(appID: game.appID) {
-                Button(role: .destructive) {
-                    steamLibrary.cancelInstall(appID: game.appID)
-                } label: {
-                    Label(stopping ? tr("Stopping...") : tr("Stop download"),
-                          systemImage: "stop.fill")
-                        .font(.caption.weight(.semibold))
-                        .frame(maxWidth: .infinity)
+    @ViewBuilder
+    private var gogContent: some View {
+        if gogLibrary.isSignedIn {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(spacing: 10) {
+                    ownedHeader(tr("GOG games: %d", gogLibrary.games.count), collapsed: $gogOwnedCollapsed)
+                    Button {
+                        Task { await gogLibrary.refresh() }
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.headline)
+                            .frame(width: 32, height: 32)
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(gogLibrary.isLoading)
                 }
-                .buttonStyle(.bordered)
-                .disabled(stopping)
+                if !gogOwnedCollapsed {
+                    if gogLibrary.isLoading && gogLibrary.games.isEmpty {
+                        HStack(spacing: 10) {
+                            ProgressView().tint(.white)
+                            Text(tr("Loading GOG library...")).foregroundColor(.gray)
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 120)
+                    } else if let error = gogLibrary.errorMessage, gogLibrary.games.isEmpty {
+                        Text(tr(error))
+                            .font(.subheadline)
+                            .foregroundColor(.orange)
+                            .frame(maxWidth: .infinity, minHeight: 80)
+                    } else if filteredGOGGames.isEmpty {
+                        Text(gogLibrary.games.isEmpty ? tr("No GOG games found yet.") : tr("No games match this search"))
+                            .font(.subheadline)
+                            .foregroundColor(.gray)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 24)
+                    } else {
+                        LazyVGrid(columns: columns, spacing: 14) {
+                            ForEach(filteredGOGGames) { game in gogCard(game) }
+                        }
+                    }
+                }
+            }
+        } else {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(tr("GOG"))
+                        .font(.headline)
+                        .foregroundColor(.white)
+                    Text(tr("Sign in on GOG's own page to see your GOG games. iDeck keeps only the sign-in token, in this device's Keychain."))
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 8)
+                Button(tr("Connect GOG")) { isGOGSignInPresented = true }
+                    .buttonStyle(.borderedProminent)
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(panelColor)
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+        }
+    }
+
+    private func gogCard(_ game: GOGGame) -> some View {
+        let installed = gogLibrary.installed[game.id]
+        return VStack(alignment: .center, spacing: 10) {
+            VStack(alignment: .center, spacing: 9) {
+                GOGArtworkView(urls: game.artworkCandidates, fallbackColor: secondaryColor)
+                    .frame(width: artworkWidth, height: artworkHeight)
+                cardTitle(game.title, store: .gog)
+            }
+            if let error = gogLibrary.downloadErrors[game.id] {
+                Text(tr(error))
+                    .font(.caption2)
+                    .foregroundColor(.red)
+                    .lineLimit(2)
+            }
+            if let installed {
+                Button { launchGOGGame(installed) } label: {
+                    cardActionLabel(tr("Launch"), systemImage: "play.fill")
+                }
+            } else if let fraction = gogLibrary.downloadProgress[game.id] {
+                progressAction(fraction: fraction,
+                               label: tr("Downloading installer %d%%", Int((fraction * 100).rounded())),
+                               onStop: { gogLibrary.cancelDownload(game) })
+            } else if game.worksOnWindows {
+                Button { downloadGOGInstaller(game) } label: {
+                    cardActionLabel(tr("Get installer"), systemImage: "arrow.down.circle.fill")
+                }
+                .disabled(prefixPath == nil)
+            } else {
+                Text(tr("Not available for Windows"))
+                    .font(.caption)
+                    .foregroundColor(.gray)
+                    .frame(height: cardActionHeight)
             }
         }
-        .padding(.vertical, 4)
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(panelColor)
+        .clipShape(RoundedRectangle(cornerRadius: 13))
+    }
+
+    private func steamProgressAction(for game: SteamAppInfo) -> some View {
+        let progress = steamLibrary.downloadProgress[game.appID]
+        let checking = progress?.phase == .checking
+        let fraction = checking ? (progress?.checkFraction ?? 0) : (progress?.fraction ?? 0)
+        let percent = Int((fraction * 100).rounded())
+        let label: String
+        switch progress?.phase {
+        case .preparing: label = tr("Preparing download...")
+        case .checking: label = tr("Checking existing files %d%%", percent)
+        case .finishing: label = tr("Finishing installation...")
+        default: label = tr("Installing %d%%", percent)
+        }
+        let canStop = steamLibrary.canCancelInstall(appID: game.appID)
+        return progressAction(fraction: fraction, label: label,
+                              onStop: canStop ? { steamLibrary.cancelInstall(appID: game.appID) } : nil,
+                              stopping: steamLibrary.cancellingApps.contains(game.appID))
     }
 
     private func resolvePrefixPath() {
@@ -847,6 +1011,7 @@ struct WindowsWorkspaceView: View {
                     }
                 }
                 steamLibrary.refreshInstalledApps(prefixPath: root)
+                gogLibrary.refreshInstalled(prefixPath: root)
                 appManager.refreshInstalledApps()
             }
         }
@@ -859,12 +1024,12 @@ struct WindowsWorkspaceView: View {
                     .font(.headline)
                     .foregroundColor(.white)
                 Spacer()
-                Text(tr("%d installed", windowsLibrary.executableURLs.count + installedSteamGames.count))
+                Text(tr("%d installed", windowsLibrary.executableURLs.count + installedSteamGames.count + installedGOGGames.count))
                     .font(.caption)
                     .foregroundColor(.gray)
             }
 
-            if windowsLibrary.executableURLs.isEmpty && installedSteamGames.isEmpty {
+            if windowsLibrary.executableURLs.isEmpty && installedSteamGames.isEmpty && installedGOGGames.isEmpty {
                 HStack(spacing: 12) {
                     Image(systemName: "square.grid.2x2")
                         .font(.title2)
@@ -890,10 +1055,7 @@ struct WindowsWorkspaceView: View {
                             VStack(alignment: .center, spacing: 9) {
                                 SteamGameArtworkView(game: game)
                                     .frame(width: artworkWidth, height: artworkHeight)
-                                cardTitle(game.name.isEmpty ? tr("Untitled Steam app") : game.name)
-                                Text("Steam")
-                                    .font(.caption)
-                                    .foregroundColor(.gray)
+                                cardTitle(game.name.isEmpty ? tr("Untitled Steam app") : game.name, store: .steam)
                             }
                             .padding(10)
                             .frame(maxWidth: .infinity, alignment: .center)
@@ -902,14 +1064,30 @@ struct WindowsWorkspaceView: View {
                         }
                         .buttonStyle(.plain)
                         if steamLibrary.installingApps.contains(game.appID) {
-                            downloadControls(for: game)
+                            steamProgressAction(for: game)
                         } else {
                             Button { launchSteamGame(game) } label: {
-                                Label(tr("Launch"), systemImage: "play.fill")
-                                    .frame(maxWidth: .infinity)
+                                cardActionLabel(tr("Launch"), systemImage: "play.fill")
                             }
-                            .buttonStyle(.borderedProminent)
                         }
+                        }
+                    }
+
+                    ForEach(installedGOGGames, id: \.gameID) { game in
+                        VStack(spacing: 8) {
+                            VStack(alignment: .center, spacing: 9) {
+                                GOGArtworkView(urls: gogLibrary.games.first { $0.id == game.gameID }?.artworkCandidates ?? [],
+                                               fallbackColor: panelColor)
+                                    .frame(width: artworkWidth, height: artworkHeight)
+                                cardTitle(game.name, store: .gog)
+                            }
+                            .padding(10)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .background(panelColor)
+                            .clipShape(RoundedRectangle(cornerRadius: 13))
+                            Button { launchGOGGame(game) } label: {
+                                cardActionLabel(tr("Launch"), systemImage: "play.fill")
+                            }
                         }
                     }
 
@@ -933,25 +1111,47 @@ struct WindowsWorkspaceView: View {
                         }
                         .buttonStyle(.plain)
                         Button {
-                            coordinator.refreshJITStatus()
-                            guard coordinator.isJITEnabled else {
-                                installMessage = tr("Activate JIT with StikDebug, then confirm it in Settings.")
-                                isShowingInstallResult = true
-                                return
-                            }
+                            guard requireJIT() else { return }
                             let profile = windowsLibrary.profile(
                                 for: windowsLibrary.profileID(for: executableURL),
                                 title: executableURL.deletingPathExtension().lastPathComponent)
                             coordinator.launchWindowsExecutable(at: executableURL, profile: profile)
                         } label: {
-                            Label(tr("Launch"), systemImage: "play.fill")
-                                .frame(maxWidth: .infinity)
+                            cardActionLabel(tr("Launch"), systemImage: "play.fill")
                         }
-                        .buttonStyle(.borderedProminent)
                         }
                     }
                 }
             }
+        }
+    }
+
+    /// JIT must be on before any Windows program starts.
+    private func requireJIT() -> Bool {
+        coordinator.refreshJITStatus()
+        guard coordinator.isJITEnabled else {
+            installMessage = tr("Activate JIT with StikDebug, then confirm it in Settings.")
+            isShowingInstallResult = true
+            return false
+        }
+        return true
+    }
+
+    private func launchGOGGame(_ game: GOGInstalledGame) {
+        guard requireJIT() else { return }
+        var profile = windowsLibrary.profile(for: "gog:\(game.gameID)", title: game.name)
+        if profile.arguments.isEmpty { profile.arguments = game.arguments }
+        coordinator.launchWindowsExecutable(at: game.executable, profile: profile)
+    }
+
+    private func downloadGOGInstaller(_ game: GOGGame) {
+        guard let prefixPath else { return }
+        gogLibrary.downloadInstaller(game, prefixPath: prefixPath) { setup in
+            windowsLibrary.refresh(prefixPath: prefixPath)
+            guard let setup else { return }
+            installMessage = tr("The %@ installer is ready under Installed games as %@. Run it to install the game; it then appears with the GOG mark.",
+                                game.title, setup.deletingPathExtension().lastPathComponent)
+            isShowingInstallResult = true
         }
     }
 
@@ -991,6 +1191,37 @@ struct WindowsWorkspaceView: View {
     }
 }
 
+
+/// A GOG cover: tries each candidate URL in turn, then a plain tile.
+private struct GOGArtworkView: View {
+    let urls: [URL]
+    let fallbackColor: Color
+    @State private var index = 0
+
+    var body: some View {
+        Group {
+            if index < urls.count {
+                AsyncImage(url: urls[index]) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image.resizable().scaledToFill()
+                    case .failure:
+                        Color.clear.onAppear { index += 1 }
+                    default:
+                        fallbackColor.overlay(ProgressView().tint(.gray))
+                    }
+                }
+                .id(index)
+            } else {
+                fallbackColor.overlay(
+                    Image(systemName: "gamecontroller")
+                        .font(.largeTitle)
+                        .foregroundColor(.gray))
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+    }
+}
 
 private struct WindowsExecutableArtworkView: View {
     let executableURL: URL

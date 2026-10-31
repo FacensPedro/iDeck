@@ -22,7 +22,7 @@ concurrency:
 jobs:
   verify:
     name: Verify exact public FEX, Wine, DXMT and nested rpmalloc gitlinks
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 60
     steps:
       - name: Checkout iDeck source and expected patch set

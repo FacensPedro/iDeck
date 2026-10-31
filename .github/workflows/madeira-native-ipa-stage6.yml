@@ -29,7 +29,7 @@ concurrency:
 jobs:
   host:
     name: Audit IPA, Mach-O exports and D3D11 source packaging gates
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 12
     steps:
       - name: Checkout pinned iDeck source

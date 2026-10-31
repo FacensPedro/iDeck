@@ -1,5 +1,6 @@
 import Foundation
 import Darwin
+import UIKit
 
 enum MadeiraBundleIdentity {
     static let missingRuntimeMessage = "This iDeck IPA contains only the interface. Download iDeck.ipa from an iOS Build Run workflow with Require Madeira runtime enabled."
@@ -60,6 +61,8 @@ class WindowsEnvironment {
     /// The profile's Vulkan/OpenGL choices, applied when the executable is known.
     private var sessionVulkanMode = "Automatic"
     private var sessionOpenGLBackend = "Automatic"
+    /// MetalFX spatial upscale factor for this launch (nil = off).
+    private var sessionMetalFXFactor: Double?
     
     private var nativeGraphicsBackend: String? {
         MadeiraBundleIdentity.nativeManifest?["graphicsBackend"] as? String
@@ -395,6 +398,11 @@ class WindowsEnvironment {
         default:
             break
         }
+        // madeira-d3d12 reads its MetalFX factor from the game's config lines;
+        // DXMT gets the same factor through DXMT_CONFIG (applyGameProfile).
+        if let factor = sessionMetalFXFactor {
+            lines.append(String(format: "metalfx-upscale = %.2f", factor))
+        }
         switch sessionOpenGLBackend {
         case "Desktop OpenGL": lines.append("gl-backend = zink")
         case "OpenGL ES": lines.append("gl-backend = gles")
@@ -466,21 +474,46 @@ class WindowsEnvironment {
             unsetenv("MADEIRA_FEX_AVX")
         }
 
-        if profile.metalFXEnabled {
-            setenv("MVK_CONFIG_USE_METALFX", "1", 1)
+        let screen = UIScreen.main.nativeBounds.size
+        sessionMetalFXFactor = profile.metalFXEnabled
+            ? Self.metalFXFactor(resolution: profile.resolution, screenLongSide: max(screen.width, screen.height))
+            : nil
+        if let factor = sessionMetalFXFactor {
+            // DXMT only builds its MetalFX swapchain when this is set.
+            setenv("DXMT_METALFX_SPATIAL_SWAPCHAIN", "1", 1)
+            SteamLog.event(String(format: "[wine-launch] MetalFX spatial upscaling %.2fx", factor))
         } else {
-            unsetenv("MVK_CONFIG_USE_METALFX")
+            unsetenv("DXMT_METALFX_SPATIAL_SWAPCHAIN")
+            if profile.metalFXEnabled {
+                SteamLog.event("[wine-launch] MetalFX skipped: the game already renders at the screen's resolution")
+            }
         }
 
         setenv("IDECK_PREFERRED_GRAPHICS_API", profile.graphicsAPI, 1)
         setenv("IDECK_FPS_LIMIT", profile.fpsLimit, 1)
         let limit = profile.fpsLimit == "Uncapped" ? 0 : RuntimeConfiguration.settings(for: profile).framesPerSecond
+        let managed: Set<String> = ["d3d11.preferredMaxFrameRate", "d3d11.metalSpatialUpscaleFactor"]
         let existing = getenv("DXMT_CONFIG").map { String(cString: $0) } ?? ""
         var options = existing.split(separator: ";").map(String.init).filter {
-            $0.split(separator: "=", maxSplits: 1).first?.trimmingCharacters(in: .whitespaces) != "d3d11.preferredMaxFrameRate"
+            !managed.contains($0.split(separator: "=", maxSplits: 1).first?.trimmingCharacters(in: .whitespaces) ?? "")
         }
         options.append("d3d11.preferredMaxFrameRate = \(limit)")
+        if let factor = sessionMetalFXFactor {
+            options.append(String(format: "d3d11.metalSpatialUpscaleFactor = %.2f", factor))
+        }
         setenv("DXMT_CONFIG", options.joined(separator: ";"), 1)
+    }
+
+    /// How much MetalFX should enlarge a game rendering at `resolution` to fill
+    /// a screen whose long side is `screenLongSide` pixels. DXMT and
+    /// madeira-d3d12 accept 1 to 2; below 1.1 upscaling only costs GPU time,
+    /// so it is off (nil), as it is for "Device native".
+    static func metalFXFactor(resolution: String, screenLongSide: CGFloat) -> Double? {
+        let parts = resolution.split(separator: "x")
+        guard parts.count == 2, let width = Double(parts[0]), let height = Double(parts[1]),
+              width > 0, height > 0, screenLongSide > 0 else { return nil }
+        let factor = min(Double(screenLongSide) / max(width, height), 2.0)
+        return factor >= 1.1 ? (factor * 100).rounded(.down) / 100 : nil
     }
 }
 

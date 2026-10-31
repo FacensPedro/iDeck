@@ -8,7 +8,10 @@ class SteamInstallProgressAccountingTests(unittest.TestCase):
     def test_installing_label_replaces_downloading_in_both_views(self):
         view = (ROOT / "iDeck/MainView.swift").read_text(encoding="utf-8")
         self.assertEqual(view.count('tr("Installing %d%%"'), 2)
-        self.assertEqual(view.count('tr("Installed: %@"'), 2)
+        # Cards keep a fixed-height progress row; byte counts live in the game sheet.
+        self.assertEqual(view.count('tr("Installed: %@"'), 1)
+        self.assertIn("private func steamProgressAction(for game: SteamAppInfo)", view)
+        self.assertIn(".frame(height: cardActionHeight)", view)
         self.assertNotIn('tr("Downloading %d%%"', view)
         self.assertNotIn('tr("Already on device: %@"', view)
         self.assertNotIn("progress.reusedBytes", view)
