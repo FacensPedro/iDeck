@@ -15,12 +15,12 @@ class ActionsNativeDispatchMatrix(unittest.TestCase):
         def field_default(name):
             # Match YAML input keys at exactly six spaces, not a prefix of
             # their eight-space nested description/type/default mappings.
-            key = re.search(rf"(?m)^      {re.escape(name)}:\\s*$", header)
+            key = re.search(rf"(?m)^      {re.escape(name)}:[ \t]*$", header)
             self.assertIsNotNone(key, f"Missing workflow input: {name}")
             remaining = header[key.end():]
-            sibling = re.search(r"(?m)^      [A-Za-z_][A-Za-z0-9_]*:\\s*$", remaining)
+            sibling = re.search(r"(?m)^      [A-Za-z_][A-Za-z0-9_]*:[ \t]*$", remaining)
             block = remaining[:sibling.start()] if sibling else remaining
-            default = re.search(r"(?m)^        default:\\s*(\\S+)\\s*$", block)
+            default = re.search(r"(?m)^        default:[ \t]*([^ \t\r\n]+)[ \t]*$", block)
             self.assertIsNotNone(default, f"Missing default for workflow input: {name}")
             return default.group(1)
 
