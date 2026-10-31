@@ -382,6 +382,18 @@ class WindowsEnvironment {
         return false
     }
 
+    /// A Unity game running on Mono (not IL2CPP): <Name>_Data/Managed with
+    /// mscorlib.dll beside the program and no GameAssembly.dll.
+    static func usesMonoJIT(_ binary: URL) -> Bool {
+        let folder = binary.deletingLastPathComponent()
+        let fm = FileManager.default
+        if fm.fileExists(atPath: folder.appendingPathComponent("GameAssembly.dll").path) { return false }
+        let data = folder.appendingPathComponent(binary.deletingPathExtension().lastPathComponent + "_Data", isDirectory: true)
+        return fm.fileExists(atPath: data.appendingPathComponent("Managed/mscorlib.dll").path) ||
+            fm.fileExists(atPath: folder.appendingPathComponent("MonoBleedingEdge").path) ||
+            fm.fileExists(atPath: folder.appendingPathComponent("Mono/mono.dll").path)
+    }
+
     /// C:\ path of a file inside the prefix's drive_c, or nil.
     static func windowsPath(_ url: URL) -> String? {
         let parts = url.standardizedFileURL.pathComponents
@@ -434,6 +446,15 @@ class WindowsEnvironment {
             lines.append("vulkan = moltenvk")
         default:
             break
+        }
+        // Unity games on Mono JIT-compile into RWX memory. FEX's page tracking
+        // write-protects those pages after running them, and the next write
+        // from translated code crashed the game (Cuphead: PROTECTION_FAILURE
+        // at the Mono code page, Wine exit code 1). Full checks validate the
+        // code before it runs instead of trapping the writes.
+        if Self.usesMonoJIT(binary) {
+            lines.append("env.FEX_SMCCHECKS = full")
+            SteamLog.event("[wine-launch] Mono JIT game: FEX code checks set to full")
         }
         // madeira-d3d12 reads its MetalFX factor from the game's config lines;
         // DXMT gets the same factor through DXMT_CONFIG (applyGameProfile).

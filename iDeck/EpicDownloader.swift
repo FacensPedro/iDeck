@@ -46,8 +46,8 @@ enum EpicDownloadError: LocalizedError {
 /// - Paths stay inside the install folder; directory names are matched without
 ///   case, as Windows does.
 final class EpicDownloader: @unchecked Sendable {
-    var window = 12
-    var memoryBudget = 96 << 20
+    var window = 32
+    var memoryBudget = 256 << 20
     var attempts = 6
     /// Pause between retries of one chunk, doubled per attempt (tests set 0).
     var retryDelay: Double = 0.25
@@ -62,7 +62,7 @@ final class EpicDownloader: @unchecked Sendable {
         config.requestCachePolicy = .reloadIgnoringLocalCacheData
         config.urlCache = nil
         config.timeoutIntervalForRequest = 60
-        config.httpMaximumConnectionsPerHost = 16
+        config.httpMaximumConnectionsPerHost = 48
         config.httpAdditionalHeaders = ["User-Agent": Self.userAgent]
         http = URLSession(configuration: config)
     }

@@ -7,15 +7,11 @@ struct SettingsView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dismiss) private var dismiss
     @StateObject private var inputManager = InputManager.shared
-    @ObservedObject private var hardwareInput = HardwareInput.shared
     @AppStorage("controllerLeftSensitivity") private var controllerLeftSensitivity = 1.0
     @AppStorage("controllerRightSensitivity") private var controllerRightSensitivity = 1.0
     @AppStorage("controllerDeadzone") private var controllerDeadzone = 0.10
     @AppStorage("wineControllerAPI") private var wineControllerAPI = "XInput"
     @AppStorage("wineJITPoolMiB") private var wineJITPoolMiB = 0
-    @AppStorage(HardwareInput.enabledKey) private var keyboardMouseEnabled = true
-    @AppStorage(HardwareInput.mouseSensitivityKey) private var mouseSensitivity = 1.0
-    @AppStorage(HardwareInput.stickMouseKey) private var rightStickMouse = false
     @AppStorage(BackgroundDownloads.continuedKey) private var continueDownloadsInBackground = true
     @AppStorage(BackgroundDownloads.notificationsKey) private var downloadNotifications = true
     @AppStorage(SystemCoordinator.jitMethodKey) private var jitMethod = "stikdebug"
@@ -63,7 +59,7 @@ struct SettingsView: View {
                         SettingsRow(icon: "sparkles.tv.fill", color: .pink, title: tr("Graphics & Performance"))
                     }
                     NavigationLink { controlsPage } label: {
-                        SettingsRow(icon: "keyboard.fill", color: .indigo, title: tr("Controls"),
+                        SettingsRow(icon: "gamecontroller", color: .indigo, title: tr("Controls"),
                                     value: inputManager.isControllerConnected ? inputManager.controllerName : nil)
                     }
                     NavigationLink { storagePage } label: {
@@ -115,7 +111,6 @@ struct SettingsView: View {
             inputManager.refreshControllers()
             coordinator.refreshJITStatus()
             coordinator.refreshPairingFileState()
-            HardwareInput.shared.start()
             await updater.check()
         }
         .onChange(of: wineJITPoolMiB) { _, selected in
@@ -415,20 +410,6 @@ struct SettingsView: View {
                         Slider(value: $controllerDeadzone, in: 0...0.35, step: 0.01)
                     }
                 }
-                toggleRow(title: tr("Right stick controls mouse"), isOn: $rightStickMouse)
-            }
-            Section {
-                toggleRow(title: tr("Keyboard & mouse in games"), isOn: $keyboardMouseEnabled)
-                LabeledContent(tr("Keyboard"), value: hardwareInput.keyboardName ?? tr("Not connected"))
-                LabeledContent(tr("Mouse"), value: hardwareInput.mouseName ?? tr("Not connected"))
-                VStack(alignment: .leading, spacing: 6) {
-                    LabeledContent(tr("Mouse sensitivity"), value: String(format: "%.2fx", mouseSensitivity))
-                    Slider(value: $mouseSensitivity, in: 0.25...3.0, step: 0.05)
-                }
-            } header: {
-                Text(tr("Keyboard & mouse"))
-            } footer: {
-                Text(tr("Physical keys and raw mouse movement go to the game while it is on screen. With the right stick as mouse, R1 clicks and L1 right-clicks."))
             }
         }
         .navigationTitle(tr("Controls"))

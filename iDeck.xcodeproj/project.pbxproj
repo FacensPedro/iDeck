@@ -77,7 +77,6 @@
 		F3A000000000000000000008 /* EpicFormats.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000008 /* EpicFormats.swift */; };
 		F3A000000000000000000007 /* EpicAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000007 /* EpicAPI.swift */; };
 		F3A000000000000000000006 /* GameRecommendations.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000006 /* GameRecommendations.swift */; };
-		F3A000000000000000000005 /* HardwareInput.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000005 /* HardwareInput.swift */; };
 		F3A000000000000000000004 /* ExternalDrives.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000004 /* ExternalDrives.swift */; };
 		F3A000000000000000000003 /* BackgroundDownloads.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000003 /* BackgroundDownloads.swift */; };
 		F3A000000000000000000002 /* GOGLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000002 /* GOGLibrary.swift */; };
@@ -180,7 +179,6 @@
 		F4A000000000000000000008 /* EpicFormats.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EpicFormats.swift; sourceTree = "<group>"; };
 		F4A000000000000000000007 /* EpicAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EpicAPI.swift; sourceTree = "<group>"; };
 		F4A000000000000000000006 /* GameRecommendations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameRecommendations.swift; sourceTree = "<group>"; };
-		F4A000000000000000000005 /* HardwareInput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HardwareInput.swift; sourceTree = "<group>"; };
 		F4A000000000000000000004 /* ExternalDrives.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExternalDrives.swift; sourceTree = "<group>"; };
 		F4A000000000000000000003 /* BackgroundDownloads.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundDownloads.swift; sourceTree = "<group>"; };
 		F4A000000000000000000002 /* GOGLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GOGLibrary.swift; sourceTree = "<group>"; };
@@ -308,7 +306,6 @@
 				F3A000000000000000000008 /* EpicFormats.swift in Sources */,
 				F3A000000000000000000007 /* EpicAPI.swift in Sources */,
 				F3A000000000000000000006 /* GameRecommendations.swift in Sources */,
-				F3A000000000000000000005 /* HardwareInput.swift in Sources */,
 				F3A000000000000000000004 /* ExternalDrives.swift in Sources */,
 				F3A000000000000000000003 /* BackgroundDownloads.swift in Sources */,
 				F3A000000000000000000002 /* GOGLibrary.swift in Sources */,
@@ -430,7 +427,6 @@
 				F4A000000000000000000008 /* EpicFormats.swift */,
 				F4A000000000000000000007 /* EpicAPI.swift */,
 				F4A000000000000000000006 /* GameRecommendations.swift */,
-				F4A000000000000000000005 /* HardwareInput.swift */,
 				F4A000000000000000000004 /* ExternalDrives.swift */,
 				F4A000000000000000000003 /* BackgroundDownloads.swift */,
 				F4A000000000000000000002 /* GOGLibrary.swift */,

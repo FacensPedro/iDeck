@@ -60,9 +60,10 @@ class AutomaticJITAndDownloadHUDTests(unittest.TestCase):
     def test_faster_chunks_still_respect_thermal_and_low_power_modes(self):
         self.assertIn("if process.isLowPowerModeEnabled { return 2 }", DEPOT)
         self.assertIn("case .critical: return 1", DEPOT)
-        self.assertIn("case .nominal: return min(24, max(16, process.activeProcessorCount * 3))", DEPOT)
-        self.assertIn("config.httpMaximumConnectionsPerHost = 24", DEPOT)
-        self.assertIn("let readers = isExternal ? 3 : min(8", DEPOT)
+        self.assertIn("case .nominal: return min(64, max(32, process.activeProcessorCount * 8))", DEPOT)
+        self.assertIn("case .serious: return 4", DEPOT)
+        self.assertIn("config.httpMaximumConnectionsPerHost = 64", DEPOT)
+        self.assertIn("let readers = isExternal ? 3 : min(12", DEPOT)
         self.assertIn("try await withThrowingTaskGroup", DEPOT)
         self.assertIn("SteamChunkScheduler.batches(paths:", DEPOT)
 
