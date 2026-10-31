@@ -97,8 +97,8 @@ class MadeiraPayloadStagingTests(unittest.TestCase):
             env=environment, check=True, text=True, capture_output=True,
         )
         self.assertFalse((self.app / "d3d12").exists())
-        self.assertFalse((self.app / "MadeiraRuntime/d3d12").exists())
-        for prefix in (self.app, self.app / "MadeiraRuntime"):
+        self.assertFalse((self.app / "MadeiraRuntime").exists())
+        for prefix in (self.app,):
             self.assertFalse((prefix / "i386-windows").exists())
             for name in ("xtajit.dll", "wow64.dll", "wow64win.dll"):
                 self.assertFalse((prefix / "aarch64-windows" / name).exists())
@@ -107,10 +107,8 @@ class MadeiraPayloadStagingTests(unittest.TestCase):
         for folder in ("aarch64-windows", "arm64ec-windows"):
             for name in ("d3d12.dll", "d3d12core.dll", "madeira_d3d12.dll"):
                 self.assertFalse((self.app / folder / name).exists())
-                self.assertFalse((self.app / "MadeiraRuntime" / folder / name).exists())
         for name in ("d3d11.dll", "dxgi.dll", "winemetal.dll"):
             self.assertTrue((self.app / "arm64ec-windows" / name).is_file())
-            self.assertTrue((self.app / "MadeiraRuntime/arm64ec-windows" / name).is_file())
         self.assertTrue((self.source / "d3d12/libmetalirconverter.dylib").is_file())
 
     def test_d3d11_opt_in_wow64_requires_full_i386_farm_and_stages_it(self):
@@ -132,7 +130,7 @@ class MadeiraPayloadStagingTests(unittest.TestCase):
             env=env, capture_output=True, text=True, check=False,
         )
         self.assertEqual(result.returncode, 0, result.stderr)
-        for prefix in (self.app, self.app / "MadeiraRuntime"):
+        for prefix in (self.app,):
             self.assertTrue((prefix / "i386-windows/ntdll.dll").is_file())
             self.assertTrue((prefix / "aarch64-windows/xtajit.dll").is_file())
             self.assertFalse((prefix / "d3d12").exists())
@@ -179,29 +177,20 @@ class MadeiraPayloadStagingTests(unittest.TestCase):
             ["bash", str(STAGER), str(self.app)],
             env=environment, check=True, text=True, capture_output=True,
         )
+        # Each runtime file is staged once, as a real file at the top level.
+        self.assertFalse((self.app / "MadeiraRuntime").exists())
         for directory, names in (
             ("aarch64-windows", ARM64),
             ("arm64ec-windows", ARM64EC),
         ):
-            canonical = self.app / directory
-            mirror = self.app / "MadeiraRuntime" / directory
-            self.assertTrue(mirror.is_dir())
-            self.assertFalse(mirror.is_symlink())
             for name in names:
                 self.assertEqual(
-                    (canonical / name).read_bytes(), (mirror / name).read_bytes()
+                    (self.app / directory / name).read_bytes(),
+                    (self.source / directory / name).read_bytes(),
                 )
-        self.assertEqual(
-            (self.app / "compat/love/lua51.dll").read_bytes(),
-            (self.app / "MadeiraRuntime/compat/love/lua51.dll").read_bytes(),
-        )
-        canonical_converter = self.app / "d3d12" / "libmetalirconverter.dylib"
-        mirror_converter = (
-            self.app / "MadeiraRuntime" / "d3d12" / "libmetalirconverter.dylib"
-        )
-        self.assertTrue(mirror_converter.is_file())
-        self.assertFalse(mirror_converter.is_symlink())
-        self.assertEqual(canonical_converter.read_bytes(), mirror_converter.read_bytes())
+        converter = self.app / "d3d12" / "libmetalirconverter.dylib"
+        self.assertTrue(converter.is_file())
+        self.assertFalse(converter.is_symlink())
         self.assertEqual(
             (self.app / "cacert.pem").read_bytes(),
             (self.source / "cacert.pem").read_bytes(),
@@ -209,13 +198,13 @@ class MadeiraPayloadStagingTests(unittest.TestCase):
         for name in ("canary_vs.dxil", "canary_ps.dxil",
                      "canary_layout_vs.dxil", "canary_layout_ps.dxil"):
             self.assertEqual(
-                (self.app / "MadeiraRuntime/d3d12" / name).read_bytes(),
+                (self.app / "d3d12" / name).read_bytes(),
                 (self.source / "d3d12" / name).read_bytes(),
             )
-        for path in (self.app / "MadeiraRuntime").rglob("*"):
+        for path in self.app.rglob("*"):
             self.assertFalse(path.is_symlink(), str(path))
         self.assertEqual(
-            (self.app / "MadeiraRuntime/nls/locale.nls").read_bytes(),
+            (self.app / "nls/locale.nls").read_bytes(),
             (self.source / "nls/locale.nls").read_bytes(),
         )
         self.assertEqual(

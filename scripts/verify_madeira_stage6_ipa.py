@@ -25,12 +25,10 @@ IPA_PAYLOADS = (
     "PlugIns/VPNExtension.appex/Info.plist",
     "arm64ec-windows/ntdll.dll",
     "arm64ec-windows/xtajit64.dll",
-    "MadeiraRuntime/arm64ec-windows/ntdll.dll",
-    "MadeiraRuntime/arm64ec-windows/xtajit64.dll",
     "licenses/LuaJIT-MIT.txt",
 ) + tuple(
     f"{prefix}/{machine}-windows/{name}"
-    for prefix in ("", "MadeiraRuntime")
+    for prefix in ("",)
     for machine in ("aarch64", "arm64ec")
     for name in GRAPHICS
 )

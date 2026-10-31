@@ -35,7 +35,7 @@ def build_ipa(app: Path, output: Path) -> None:
     try:
         with zipfile.ZipFile(
             temporary, "w", compression=zipfile.ZIP_DEFLATED,
-            compresslevel=1, allowZip64=True,
+            compresslevel=6, allowZip64=True,
         ) as archive:
             archive.writestr("Payload/", b"", compress_type=zipfile.ZIP_STORED)
             archive.write(app, root + "/")

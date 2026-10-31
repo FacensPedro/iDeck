@@ -89,7 +89,6 @@
 		B10000000000000000000051 /* universal.js in Resources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000051 /* universal.js */; };
 		111111111111111111111124 /* AppManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222236 /* AppManager.swift */; };
 		111111111111111111111125 /* GameSessionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222237 /* GameSessionView.swift */; };
-		111111111111111111111126 /* GuestAppListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222238 /* GuestAppListView.swift */; };
 		111111111111111111111127 /* WindowsRendererView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222239 /* WindowsRendererView.swift */; };
 		111111111111111111111128 /* WineInputBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222240 /* WineInputBridge.swift */; };
 		111111111111111111111129 /* LiveContainerHook.m in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222241 /* LiveContainerHook.m */; };
@@ -193,7 +192,6 @@
 		B20000000000000000000051 /* universal.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "../scripts/jit/universal.js"; sourceTree = "<group>"; };
 		222222222222222222222236 /* AppManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppManager.swift"; sourceTree = "<group>"; };
 		222222222222222222222237 /* GameSessionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GameSessionView.swift"; sourceTree = "<group>"; };
-		222222222222222222222238 /* GuestAppListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GuestAppListView.swift"; sourceTree = "<group>"; };
 		222222222222222222222239 /* WindowsRendererView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WindowsRendererView.swift"; sourceTree = "<group>"; };
 		222222222222222222222240 /* WineInputBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WineInputBridge.swift"; sourceTree = "<group>"; };
 		222222222222222222222241 /* LiveContainerHook.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "LiveContainerHook.m"; sourceTree = "<group>"; };
@@ -316,7 +314,6 @@
 				999999999999999999999915 /* Localization.swift in Sources */,
 				111111111111111111111124 /* AppManager.swift in Sources */,
 				111111111111111111111125 /* GameSessionView.swift in Sources */,
-				111111111111111111111126 /* GuestAppListView.swift in Sources */,
 				111111111111111111111127 /* WindowsRendererView.swift in Sources */,
 				111111111111111111111128 /* WineInputBridge.swift in Sources */,
 				111111111111111111111129 /* LiveContainerHook.m in Sources */,
@@ -438,7 +435,6 @@
 				999999999999999999999907 /* Localization.swift */,
 				222222222222222222222236 /* AppManager.swift */,
 				222222222222222222222237 /* GameSessionView.swift */,
-				222222222222222222222238 /* GuestAppListView.swift */,
 				222222222222222222222239 /* WindowsRendererView.swift */,
 				222222222222222222222240 /* WineInputBridge.swift */,
 				222222222222222222222241 /* LiveContainerHook.m */,

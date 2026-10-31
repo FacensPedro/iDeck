@@ -36,7 +36,7 @@ def verify(app: Path, graphics: str) -> list[str]:
         if not all(marker in content for marker in markers):
             issues.append(f"invalid or mismatched license notice: {file}")
     if graphics == "d3d11":
-        for name in ("d3d12", "MadeiraRuntime/d3d12"):
+        for name in ("d3d12",):
             path = app / name
             if path.exists() or path.is_symlink():
                 issues.append(f"converter-free D3D11 IPA contains a D3D12 directory: {path}")

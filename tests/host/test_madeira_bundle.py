@@ -49,19 +49,19 @@ class MadeiraBundleTests(unittest.TestCase):
         (self.app / "iDeck").write_bytes(b"fixture")
         for name in bundle.PE_FILES:
             arm64ec = name.startswith("arm64ec-windows/")
-            for base in (self.app, self.app / "MadeiraRuntime"):
+            for base in (self.app,):
                 path = base / name
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_bytes(make_64bit_pe(0x8664 if arm64ec else 0xAA64,
                                                chpe=arm64ec))
-        for base in (self.app, self.app / "MadeiraRuntime"):
+        for base in (self.app,):
             converter = base / "d3d12/libmetalirconverter.dylib"
             converter.parent.mkdir(parents=True, exist_ok=True)
             converter.write_bytes(bytes(2048))
             locale = base / "nls/locale.nls"
             locale.parent.mkdir(parents=True, exist_ok=True)
             locale.write_bytes(b"locale-fixture")
-        for base in (self.app, self.app / "MadeiraRuntime"):
+        for base in (self.app,):
             lua = base / "compat/love/lua51.dll"
             lua.parent.mkdir(parents=True, exist_ok=True)
             lua.write_bytes(make_64bit_pe(0x8664))
@@ -80,7 +80,7 @@ class MadeiraBundleTests(unittest.TestCase):
         (self.app / "licenses/LuaJIT-MIT.txt").write_text(
             "LuaJIT MIT license fixture", encoding="utf-8"
         )
-        for base in (self.app, self.app / "MadeiraRuntime"):
+        for base in (self.app,):
             for name in ("canary_vs.dxil", "canary_ps.dxil",
                          "canary_layout_vs.dxil", "canary_layout_ps.dxil"):
                 (base / "d3d12" / name).write_bytes(b"DXIL-test")
@@ -103,7 +103,7 @@ class MadeiraBundleTests(unittest.TestCase):
         self.assertTrue(any("D3D12 loader differs from Madeira native frontend" in e for e in self.inspect()))
 
     def test_missing_arm64ec_frontend(self):
-        (self.app / "MadeiraRuntime/arm64ec-windows/d3d11.dll").unlink()
+        (self.app / "arm64ec-windows/d3d11.dll").unlink()
         self.assertTrue(any("missing compiled Windows PE" in error for error in self.inspect()))
 
     def test_missing_https_trust_store(self):
@@ -136,24 +136,24 @@ class MadeiraBundleTests(unittest.TestCase):
         self.assertTrue(any("missing Wine locale resource" in e for e in self.inspect()))
 
     def test_rejects_plain_x64_module_in_arm64ec_directory(self):
-        path = self.app / "MadeiraRuntime/arm64ec-windows/dxgi.dll"
+        path = self.app / "arm64ec-windows/dxgi.dll"
         path.write_bytes(make_64bit_pe(0x8664))
         self.assertTrue(any("missing ARM64EC CHPE metadata" in error for error in self.inspect()))
 
     def test_rejects_coff_object_machine_in_final_pe(self):
-        path = self.app / "MadeiraRuntime/arm64ec-windows/dxgi.dll"
+        path = self.app / "arm64ec-windows/dxgi.dll"
         path.write_bytes(make_64bit_pe(0xA641))
         self.assertTrue(any("unexpected PE machine 0xa641" in error for error in self.inspect()))
 
     def test_rejects_bad_chpe_metadata_pointer(self):
-        path = self.app / "MadeiraRuntime/arm64ec-windows/dxgi.dll"
+        path = self.app / "arm64ec-windows/dxgi.dll"
         data = bytearray(path.read_bytes())
         struct.pack_into("<Q", data, 0x400 + 0xC8, 0x180000000 + 0x990000)
         path.write_bytes(data)
         self.assertTrue(any("invalid ARM64EC PE structure" in error for error in self.inspect()))
 
     def test_rejects_bad_chpe_metadata_version(self):
-        path = self.app / "MadeiraRuntime/arm64ec-windows/dxgi.dll"
+        path = self.app / "arm64ec-windows/dxgi.dll"
         data = bytearray(path.read_bytes())
         struct.pack_into("<I", data, 0x600, 0)
         path.write_bytes(data)
@@ -161,7 +161,7 @@ class MadeiraBundleTests(unittest.TestCase):
                             for error in self.inspect()))
 
     def test_rejects_x64_module_in_native_aarch64_directory(self):
-        path = self.app / "MadeiraRuntime/aarch64-windows/dxgi.dll"
+        path = self.app / "aarch64-windows/dxgi.dll"
         path.write_bytes(make_64bit_pe(0x8664, chpe=True))
         self.assertTrue(any("unexpected PE machine 0x8664" in error for error in self.inspect()))
 

@@ -164,6 +164,12 @@ done
 if [ "${IDECK_REQUIRE_MADEIRA:-0}" = "1" ]; then
   IDECK_MADEIRA_APP_ROOT="$NATIVE_ASSET_SOURCE" \
     bash scripts/stage_madeira_payload.sh "$APP"
+  # Native builds use the Debug configuration (upstream Madeira's guest code
+  # is unreliable in Release). Drop only the debugger's STABS debug map from
+  # the executables: exported and global symbols stay for dlsym and crash logs.
+  for image in "$APP/iDeck" "$APP/iDeck.debug.dylib"; do
+    [[ -f "$image" ]] && xcrun strip -S "$image"
+  done
   if [[ "${IDECK_BUILD_WOW64:-0}" == "1" ]]; then
     python3 scripts/verify_madeira_bundle.py --app "$APP" --require --require-wow64 --graphics "$IDECK_MADEIRA_GRAPHICS"
   else
@@ -203,7 +209,8 @@ import zipfile
 with zipfile.ZipFile("iDeck.ipa") as archive:
     links = [
         item.filename for item in archive.infolist()
-        if item.filename.startswith("Payload/iDeck.app/MadeiraRuntime/")
+        if item.filename.startswith("Payload/iDeck.app/")
+        and item.filename.split("/")[2] in ("aarch64-windows", "arm64ec-windows", "i386-windows", "nls", "vulkan", "d3d12", "compat")
         and stat.S_ISLNK(item.external_attr >> 16)
     ]
     if links:

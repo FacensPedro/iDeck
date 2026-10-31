@@ -47,7 +47,7 @@ class AppleMSCBundleTests(unittest.TestCase):
             msc.LICENSE_NAME: license_data,
             msc.PROVENANCE_NAME: json.dumps(receipt).encode(),
         }
-        for folder in (self.source / "d3d12", self.app / "d3d12", self.app / "MadeiraRuntime/d3d12"):
+        for folder in (self.source / "d3d12", self.app / "d3d12"):
             folder.mkdir(parents=True)
             for name, content in self.data.items():
                 (folder / name).write_bytes(content)
@@ -59,7 +59,7 @@ class AppleMSCBundleTests(unittest.TestCase):
                 "Payload/iDeck.app/MadeiraRuntimeManifest.plist",
                 plistlib.dumps({"graphicsBackend": "d3d12", "d3d12Linked": True}),
             )
-            for directory in ("d3d12", "MadeiraRuntime/d3d12"):
+            for directory in ("d3d12",):
                 for name, content in self.data.items():
                     archive.writestr(f"Payload/iDeck.app/{directory}/{name}", content)
 
@@ -78,7 +78,7 @@ class AppleMSCBundleTests(unittest.TestCase):
         self.assertTrue(msc.verify(self.source, self.app, self.ipa))
 
     def test_tampered_license_fails(self):
-        (self.app / "MadeiraRuntime/d3d12" / msc.LICENSE_NAME).write_bytes(b"bad")
+        (self.app / "d3d12" / msc.LICENSE_NAME).write_bytes(b"bad")
         self.assertTrue(msc.verify(self.source, self.app, self.ipa))
 
     def test_wrong_profile_fails(self):
@@ -95,7 +95,7 @@ class AppleMSCBundleTests(unittest.TestCase):
         receipt = json.loads(self.data[msc.PROVENANCE_NAME])
         receipt["library_sha256"] = hashlib.sha256(invalid).hexdigest()
         self.data[msc.PROVENANCE_NAME] = json.dumps(receipt).encode()
-        for folder in (self.source / "d3d12", self.app / "d3d12", self.app / "MadeiraRuntime/d3d12"):
+        for folder in (self.source / "d3d12", self.app / "d3d12"):
             for name, content in self.data.items():
                 (folder / name).write_bytes(content)
         self.pack()
@@ -106,7 +106,7 @@ class AppleMSCBundleTests(unittest.TestCase):
         receipt = json.loads(self.data[msc.PROVENANCE_NAME])
         receipt["sdk"] = "25.0.0"
         self.data[msc.PROVENANCE_NAME] = json.dumps(receipt).encode()
-        for folder in (self.source / "d3d12", self.app / "d3d12", self.app / "MadeiraRuntime/d3d12"):
+        for folder in (self.source / "d3d12", self.app / "d3d12"):
             (folder / msc.PROVENANCE_NAME).write_bytes(self.data[msc.PROVENANCE_NAME])
         self.pack()
         self.assertTrue(any("sdk" in error for error in msc.verify(self.source, self.app, self.ipa)))
