@@ -66,7 +66,9 @@ class AutomaticIPAReleaseTests(unittest.TestCase):
         self.assertIn("does NOT include Wine, FEX, DXMT or D3D12", release)
         self.assertIn("if [[ \"$AUTO_TAG\" != \"true\" && \"$KIND\" != \"native\" ]]", release)
         self.assertIn('gh release create "$TAG" iDeck.ipa', release)
-        self.assertIn('gh release upload "$TAG" iDeck.ipa --clobber', release)
+        self.assertIn('gh release upload "$TAG" iDeck.ipa iDeck.ipa.sha256 iDeck-distribution-audit.json --clobber', release)
+        self.assertIn('gh release create "$TAG" iDeck.ipa iDeck.ipa.sha256 iDeck-distribution-audit.json', release)
+        self.assertIn("sha256sum --check iDeck.ipa.sha256", release)
 
     def test_versioned_release_rejects_ui_only_and_tampered_native_manifest(self):
         release = WORKFLOW.split("\n  release:\n", 1)[1]
