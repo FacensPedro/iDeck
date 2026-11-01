@@ -303,6 +303,9 @@ jobs:
           /tmp/ideck-wine-diagnosis-tests
           python3 -m unittest discover -s tests/host -p 'test_native_steam_performance.py' -v
 
+      - name: Test GOG CDN signed URLs and Steam client setup concurrency
+        run: python3 -m unittest discover -s tests/host -p 'test_steam_gog_startup_regressions.py' -v
+
       - name: Test Steam CDN host performance selection
         run: |
           xcrun swiftc iDeck/SteamCDNHostSelection.swift tests/host/SteamCDNHostSelectionTests.swift -o /tmp/ideck-cdn-selection-tests
