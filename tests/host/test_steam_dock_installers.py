@@ -125,9 +125,10 @@ class SteamDockInstallerTests(unittest.TestCase):
             harness = pathlib.Path(directory) / "SteamDockHostTests.swift"
             harness.write_text(HARNESS, encoding="utf-8")
             binary = pathlib.Path(directory) / "steam-dock-tests"
-            subprocess.run([swiftc, "-parse-as-library", "-swift-version", "5",
-                            str(SOURCE), str(harness), "-o", str(binary)],
-                           check=True, capture_output=True, text=True, timeout=120)
+            build = subprocess.run([swiftc, "-parse-as-library", "-swift-version", "5",
+                                    str(SOURCE), str(harness), "-o", str(binary)],
+                                   capture_output=True, text=True, timeout=120)
+            self.assertEqual(build.returncode, 0, build.stdout + "\n" + build.stderr)
             subprocess.run([str(binary)], check=True, capture_output=True, text=True, timeout=20)
 
     def test_wiring_and_security(self):
