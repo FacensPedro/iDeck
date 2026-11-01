@@ -50,6 +50,9 @@ class SystemCoordinator: ObservableObject {
     private var steamSignInLoaded = false
     private var nativeHostConfigured = false
     private var activeSteamGameID: UInt32?
+    /// A Madeira Dock (Steam client) session is running; its final report is
+    /// read when Wine exits.
+    private var dockSessionActive = false
     /// Whether the current (or last) Wine session is a game installed by
     /// Steam. Errors that mention Steam are shown only for those sessions.
     /// Kept across launches so Bugs & logs can tell what the last run was.
@@ -996,6 +999,7 @@ class SystemCoordinator: ObservableObject {
                     let running = status == 0 && ideck_wineprocess_running()
                     self.activeSteamGameID = running ? game.appID : nil
                     self.activeSteamPrefix = running ? standardizedPrefix : nil
+                    self.dockSessionActive = running
                     if running { self.watchDockReport() }
                     if self.windowsStatus == "Launching Steam game..." {
                         self.setWindowsStatus(running ? "Wine started; waiting for game..." : self.nativeLaunchFailure(status))
@@ -1014,11 +1018,13 @@ class SystemCoordinator: ObservableObject {
         let report = MainActor.assumeIsolated { MadeiraDock.pollReport() }
         MainActor.assumeIsolated { DockOffline.observe(report.fields) }
         if let failure = report.failure {
+            dockSessionActive = false
             setWindowsStatus("Steam: " + failure)
             MainActor.assumeIsolated { MadeiraDock.cleanup() }
             return
         }
         if report.result == 0 {
+            dockSessionActive = false
             MainActor.assumeIsolated { MadeiraDock.cleanup() }
             return
         }
@@ -1163,6 +1169,20 @@ class SystemCoordinator: ObservableObject {
         activeSteamGameID = nil
         activeSteamPrefix = nil
         pendingSteamGameID = nil
+        // Madeira Dock writes its result (sign-in, license, offline checks)
+        // and exits at once, often between two one-second report polls. Read
+        // the report a last time: its reason beats Wine's bare exit code
+        // (code 34, for one, means Steam did not finish signing in).
+        if dockSessionActive {
+            dockSessionActive = false
+            let report = MainActor.assumeIsolated { MadeiraDock.pollReport() }
+            MainActor.assumeIsolated { MadeiraDock.cleanup() }
+            if let failure = report.failure {
+                SteamLog.event("[wine-exit] Steam: \(failure)")
+                setWindowsStatus("Steam: " + failure)
+                return
+            }
+        }
         var exitCode: Int32 = 0
         var crashStatus: UInt32 = 0
         let code = ideck_wineprocess_last_exit_code(&exitCode) ? exitCode : nil
