@@ -2351,23 +2351,6 @@ struct SteamMessageCodec {
         OutgoingMessage(eMsg: eMsg, header: header, body: body).serialize()
     }
 
-        method: SteamServiceMethod,
-        body: Data,
-        steamID: UInt64 = 0,
-        sessionID: Int32 = 0,
-        jobID: UInt64? = nil
-    ) -> Data {
-        var header = CMsgProtoBufHeader()
-        header.steamid = steamID
-        header.clientSessionid = sessionID
-        header.targetJobName = method.rawValue
-        if let jobID {
-            header.jobidSource = jobID
-        }
-
-        return encode(eMsg: .serviceMethodCallFromClient, header: header, body: body)
-    }
-
     /// Create a standard client message
     static func encodeClientMessage(
         eMsg: EMsg,
