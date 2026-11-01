@@ -633,8 +633,20 @@ enum IDeckSteamDockInstallers {
         let pending = plan.filter { $0.status == .pending }.map(\.process)
         guard !pending.isEmpty else { return nil }
         let cmd = drive.appendingPathComponent("windows/system32/cmd.exe")
-        guard FileManager.default.fileExists(atPath: cmd.path) else {
-            throw PreparationError.unavailable("The Wine command interpreter cmd.exe is missing; cannot run Steam prerequisites.")
+        // The Wine DLL/EXE farm is normally linked by WineProcessBridge only
+        // after the native launcher starts. The iDeck launch validator needs
+        // to inspect cmd.exe before that point, so stage the verified bundled
+        // ARM64EC image as a regular file within the prefix. Wine later
+        // recreates its usual symlink to the same bundle image.
+        let linked = (try? cmd.resourceValues(forKeys: [.isSymbolicLinkKey]))?.isSymbolicLink == true
+        if linked || !FileManager.default.fileExists(atPath: cmd.path) {
+            let bundled = Bundle.main.bundleURL.appendingPathComponent("arm64ec-windows/cmd.exe")
+            guard FileManager.default.fileExists(atPath: bundled.path) else {
+                throw PreparationError.unavailable("The Madeira-native IPA has no ARM64EC cmd.exe for Steam prerequisites.")
+            }
+            try FileManager.default.createDirectory(at: cmd.deletingLastPathComponent(), withIntermediateDirectories: true)
+            if linked { try FileManager.default.removeItem(at: cmd) }
+            try FileManager.default.copyItem(at: bundled, to: cmd)
         }
         // The host handles service start only; no client sign-in occurs in the
         // prerequisite session. Do not share the game's large-memory layout.
