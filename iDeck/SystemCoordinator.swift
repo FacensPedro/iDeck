@@ -372,7 +372,7 @@ class SystemCoordinator: ObservableObject {
             setWindowsStatus("Import a pairing file in Settings › JIT before using the built-in JIT.")
             return
         }
-        guard let scriptURL = Bundle.main.url(forResource: "universal", withExtension: "js"),
+        guard let scriptURL = Bundle.main.url(forResource: "universal", withExtension: "jitscript"),
               let script = try? Data(contentsOf: scriptURL), !script.isEmpty else {
             setWindowsStatus("Cannot request JIT: the bundled universal.js debugger script is missing.")
             return
@@ -420,7 +420,7 @@ class SystemCoordinator: ObservableObject {
             URLQueryItem(name: "pid", value: String(getpid()))
         ]
         if #available(iOS 26.0, *) {
-            guard let scriptURL = Bundle.main.url(forResource: "universal", withExtension: "js"),
+            guard let scriptURL = Bundle.main.url(forResource: "universal", withExtension: "jitscript"),
                   let scriptData = try? Data(contentsOf: scriptURL),
                   !scriptData.isEmpty else {
                 setWindowsStatus("Cannot request JIT: the bundled universal.js debugger script is missing.")

@@ -639,7 +639,9 @@ jobs:
         run: |
           test -s iDeck.ipa
           unzip -tq iDeck.ipa
-          unzip -Z1 iDeck.ipa | grep -Fx 'Payload/iDeck.app/universal.js'
+          unzip -Z1 iDeck.ipa | grep -Fx 'Payload/iDeck.app/universal.jitscript'
+          # No Windows script file types in the IPA (Defender false positive).
+          ! unzip -Z1 iDeck.ipa | grep -Ei '\.(js|jse|vbs|vbe|wsf|wsh|ps1|psm1|bat|cmd|hta)$'
           if [[ "${{ env.IDECK_NATIVE_BUILD == '1' && '1' || '0' }}" == "1" ]]; then
             python3 - <<'PY'
           import os

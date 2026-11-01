@@ -15,14 +15,14 @@ from pathlib import Path, PurePosixPath
 
 SOURCE_ROOT = Path(__file__).resolve().parents[1]
 ROOT = "Payload/iDeck.app/"
-SCRIPT_EXTENSIONS = {".js", ".jse", ".vbs", ".vbe", ".wsf", ".wsh", ".ps1", ".psm1",
+# .jitscript: StikDebug's JavaScript, shipped under its own extension. It is
+# iOS debugger data, never a Windows script, and a .js name made Windows
+# Defender's machine-learning model flag the downloaded IPA
+# (Trojan:Script/Wacatac.B!ml, a generic false positive).
+SCRIPT_EXTENSIONS = {".jitscript", ".js", ".jse", ".vbs", ".vbe", ".wsf", ".wsh", ".ps1", ".psm1",
                      ".bat", ".cmd", ".hta"}
 EXPECTED_JIT = {
-    ROOT + "universal.js": "scripts/jit/universal.js",
-    ROOT + "Frameworks/StikJIT.framework/universal.js":
-        "Frameworks/StikJIT.xcframework/ios-arm64/StikJIT.framework/universal.js",
-    ROOT + "Frameworks/StikJIT.framework/legacy.js":
-        "Frameworks/StikJIT.xcframework/ios-arm64/StikJIT.framework/legacy.js",
+    ROOT + "universal.jitscript": "scripts/jit/universal.jitscript",
 }
 
 
@@ -87,8 +87,8 @@ def inspect_ipa(path, source_root=SOURCE_ROOT):
             scripts.append(record)
         if ROOT + "Info.plist" not in names:
             raise ValueError("IPA is missing its app Info.plist")
-        if ROOT + "universal.js" not in verified:
-            raise ValueError("IPA is missing the verified StikDebug universal.js required for Madeira JIT")
+        if ROOT + "universal.jitscript" not in verified:
+            raise ValueError("IPA is missing the verified StikDebug universal.jitscript required for Madeira JIT")
     return {
         "schema_version": 1,
         "product": "iDeck for iOS/iPadOS",

@@ -3,7 +3,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
 
-const source = fs.readFileSync(path.resolve(__dirname, "../../scripts/jit/universal.js"), "utf8");
+const source = fs.readFileSync(path.resolve(__dirname, "../../scripts/jit/universal.jitscript"), "utf8");
 const start = source.indexOf("function littleEndianHexStringToNumber(");
 const end = source.indexOf("function littleEndianHexToU32(", start);
 assert.ok(start >= 0 && end > start, "Register helpers must be present");

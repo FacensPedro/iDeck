@@ -41,7 +41,7 @@ class WineJITPoolSettingsTests(unittest.TestCase):
         self.assertIn('"pt":', locale)
         self.assertIn('"es":', locale)
         bridge = (ROOT / "iDeck/SystemCoordinator.swift").read_text()
-        self.assertIn('universal", withExtension: "js"', bridge)
+        self.assertIn('universal", withExtension: "jitscript"', bridge)
         self.assertIn("isStikDebugAttached", bridge)
 
 
