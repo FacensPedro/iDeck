@@ -18,7 +18,12 @@ class AutomaticJITAndDownloadHUDTests(unittest.TestCase):
         self.assertIn("let prepared = ideck_wine_jit_pool_prepare()", COORDINATOR)
         self.assertIn("if !debuggerAttached {", COORDINATOR)
         self.assertIn("DispatchQueue.global(qos: .userInitiated)", COORDINATOR)
-        self.assertIn("wineJITPreparationInFlight ? isWineJITPrepared", COORDINATOR)
+        # The main thread never waits on the pool mutex: snapshot try-locks.
+        self.assertIn("(wineJITPreparationInFlight || snapshot.wine_state_busy)", COORDINATOR)
+        self.assertIn("? isWineJITPrepared : snapshot.wine_pool_prepared", COORDINATOR)
+        # The last working pool size is tried first next time.
+        self.assertIn('getenv("IDECK_WINE_JIT_LAST_GOOD_MIB")', (ROOT / "iDeck/NativeRuntime/FEXRuntime.cpp").read_text())
+        self.assertIn('UserDefaults.standard.set(poolMiB, forKey: Self.lastGoodPoolKey)', COORDINATOR)
         # A pool-size preference was added after the original automatic-JIT
         # test. It is safe because it only configures the native allocation
         # before preparation; the app must not resize an executable JIT pool.

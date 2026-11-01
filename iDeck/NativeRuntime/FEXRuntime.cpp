@@ -137,6 +137,22 @@ std::vector<size_t> wine_pool_candidates() {
         else fprintf(stderr, "[iDeck Wine JIT] ignored unsupported IDECK_WINE_JIT_MIB=%s\n",
                      override_text);
     }
+    // The largest size that worked on this device last time (set by the app
+    // from IDECK_WINE_JIT_LAST_GOOD_MIB) is tried first: every larger size
+    // the debugger cannot allocate costs a full StikDebug round trip, and
+    // that is what made JIT preparation slow after the pool grew to 896 MiB.
+    // An explicit IDECK_WINE_JIT_MIB choice is not shortened.
+    if (!(override_text && *override_text)) {
+        const char *last_text = getenv("IDECK_WINE_JIT_LAST_GOOD_MIB");
+        unsigned long last = last_text ? strtoul(last_text, nullptr, 10) : 0;
+        for (size_t candidate : allowed) {
+            if (last == candidate && candidate < preferred) {
+                fprintf(stderr, "[iDeck Wine JIT] starting at the last working pool size %zu MiB\n", candidate);
+                preferred = candidate;
+                break;
+            }
+        }
+    }
     std::vector<size_t> sizes;
     for (size_t candidate : allowed)
         if (candidate <= preferred) sizes.push_back(candidate * MiB);
