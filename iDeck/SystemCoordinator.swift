@@ -129,7 +129,10 @@ class SystemCoordinator: ObservableObject {
     /// fetched once, in the background, as soon as a Steam account is signed
     /// in and the Wine prefix exists (again on the next library visit if not).
     func installSteamClientComponentsIfNeeded() {
-        guard steamComponentsTask == nil, SteamSignIn.isSignedIn, MadeiraDock.bundled,
+        // Runs when the Madeira workspace first opens (its Wine prefix
+        // ready), with or without a Steam account: the components come from
+        // Valve's public update server.
+        guard steamComponentsTask == nil, MadeiraDock.bundled,
               !MadeiraDock.clientInstalled,
               PrefixInstaller.isPrefixInstalled(at: MadeiraDock.prefix),
               !ideck_wineprocess_running(), !ideck_wineserver_running() else { return }
