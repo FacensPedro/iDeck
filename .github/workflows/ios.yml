@@ -34,7 +34,7 @@ on:
         required: false
         default: false
       release_tag:
-        description: "Publish a GitHub release for this tag (e.g. 0.1.0); empty = build only"
+        description: "Optional version/tag for publishing a release (e.g. v0.1.0); leave empty to build IPA only"
         required: false
         default: ""
   push:
@@ -867,9 +867,9 @@ jobs:
     name: ${{ github.event_name == 'pull_request' && 'Verify PR iDeck IPA preview' || 'Publish verified iDeck IPA release' }}
     needs: [checks, build]
     # Every PR gets a final, read-only IPA verification and an artifact link.
-    # Only main, version tags, or manual release requests may publish a
-    # GitHub Release; PR content never gets to execute the release command.
-    if: ${{ needs.checks.result == 'success' && needs.build.result == 'success' && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')))) }}
+    # Verify IPA artifacts for PRs and manual runs. Pushes never publish releases.
+    # A manual run only publishes when the release_tag input is nonblank.
+    if: ${{ needs.checks.result == 'success' && needs.build.result == 'success' && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') }}
     runs-on: ubuntu-26.04
     permissions:
       contents: write
@@ -966,21 +966,21 @@ jobs:
           echo 'A pull request does not create a public GitHub Release.' >> "$GITHUB_STEP_SUMMARY"
 
       - name: Publish release
-        if: ${{ github.event_name != 'pull_request' }}
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag != '' }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
           KIND: ${{ needs.build.outputs.ipa_kind }}
           GRAPHICS: ${{ needs.build.outputs.graphics_backend }}
-          TAG: ${{ (github.event_name == 'workflow_dispatch' && inputs.release_tag) || (startsWith(github.ref, 'refs/tags/') && github.ref_name) || format('ideck-ci-{0}-{1}', github.run_id, github.run_attempt) }}
-          AUTO_TAG: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.release_tag == '') }}
+          TAG: ${{ inputs.release_tag }}
         run: |
           set -euo pipefail
+          [[ -n "${TAG//[[:space:]]/}" ]] || { echo "::error::release_tag is required to publish a GitHub Release."; exit 2; }
           [[ "$KIND" == "native" || "$KIND" == "interface" ]] || {
             echo "::error::The IPA type was not verified."
             exit 2
           }
-          if [[ "$AUTO_TAG" != "true" && "$KIND" != "native" ]]; then
+          if [[ "$KIND" != "native" ]]; then
             echo "::error::Versioned releases require verified Wine/FEX/DXMT/D3D12; this IPA contains only the interface. Request a native build with an authorized converter."
             exit 2
           fi
@@ -997,16 +997,13 @@ jobs:
           fi
 
           if gh release view "$TAG" >/dev/null 2>&1; then
-            if [[ "$AUTO_TAG" != "true" && "$KIND" != "native" ]]; then
+            if [[ "$KIND" != "native" ]]; then
               echo "::error::Refusing to overwrite an existing versioned release with an interface-only IPA."
               exit 2
             fi
             gh release upload "$TAG" iDeck.ipa iDeck.ipa.sha256 iDeck-distribution-audit.json --clobber
           else
             OPTIONS=(--target "$GITHUB_SHA" --title "$TITLE" --notes "$NOTES")
-            if [[ "$AUTO_TAG" == "true" || "$KIND" != "native" ]]; then
-              OPTIONS+=(--prerelease --latest=false)
-            fi
             gh release create "$TAG" iDeck.ipa iDeck.ipa.sha256 iDeck-distribution-audit.json "${OPTIONS[@]}"
           fi
           echo "Published $KIND IPA under GitHub Release $TAG" >> "$GITHUB_STEP_SUMMARY"
