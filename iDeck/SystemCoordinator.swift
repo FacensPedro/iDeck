@@ -133,7 +133,8 @@ class SystemCoordinator: ObservableObject {
               !MadeiraDock.clientInstalled,
               PrefixInstaller.isPrefixInstalled(at: MadeiraDock.prefix),
               !ideck_wineprocess_running(), !ideck_wineserver_running() else { return }
-        steamComponentsTask = Task.detached(priority: .utility) { [weak self] in
+        // SteamRuntimeInstaller is an actor: its work runs off the main thread.
+        steamComponentsTask = Task(priority: .utility) { @MainActor [weak self] in
             do {
                 try await SteamRuntimeInstaller.shared.prepare(prefix: MadeiraDock.prefix) { message in
                     AppLog.record("[steam-components] " + message)
@@ -141,7 +142,7 @@ class SystemCoordinator: ObservableObject {
             } catch {
                 AppLog.record("[steam-components] automatic setup failed: \(error.localizedDescription)")
             }
-            await MainActor.run { self?.steamComponentsTask = nil }
+            self?.steamComponentsTask = nil
         }
     }
 
@@ -201,7 +202,8 @@ class SystemCoordinator: ObservableObject {
         // The native prepare function owns the pool mutex while issuing BRK
         // requests. Do not block SwiftUI refreshes waiting for that mutex.
         let wineReady = wineJITPreparationInFlight ? isWineJITPrepared : ideck_wine_jit_pool_ready()
-        let update = {
+        let update = { [weak self] in
+            guard let self else { return }
             if self.isJITEnabled != detected { self.isJITEnabled = detected }
             if self.isStikDebugAttached != debuggerAttached { self.isStikDebugAttached = debuggerAttached }
             if self.isWineJITPrepared != wineReady { self.isWineJITPrepared = wineReady }
@@ -939,28 +941,27 @@ class SystemCoordinator: ObservableObject {
         setWindowsStatus(Self.steamComponentsInstallStatus)
         steamComponentsProgress = nil
         let running = steamComponentsTask
-        Task { [weak self] in
+        Task { @MainActor [weak self] in
             await running?.value
             var failure: String?
             if !MadeiraDock.clientInstalled {
+                let owner = self
                 do {
                     try await SteamRuntimeInstaller.shared.prepare(prefix: MadeiraDock.prefix) { message in
                         AppLog.record("[steam-components] " + message)
-                        await MainActor.run { self?.steamComponentsProgress = message }
+                        await MainActor.run { owner?.steamComponentsProgress = message }
                     }
                 } catch {
                     failure = error.localizedDescription
                 }
             }
-            await MainActor.run {
-                guard let self, self.windowsStatus == Self.steamComponentsInstallStatus else { return }
-                self.steamComponentsProgress = nil
-                if MadeiraDock.clientInstalled && MadeiraDock.clientSupported {
-                    self.launchThroughDock(game: game, profile: profile, prefixPath: prefixPath)
-                } else {
-                    AppLog.record("[steam-components] starting without Steam's client: \(failure ?? "unsupported build")")
-                    self.launchSteamGame(game: game, profile: profile, prefixPath: prefixPath, skipSteamClient: true)
-                }
+            guard let self, self.windowsStatus == Self.steamComponentsInstallStatus else { return }
+            self.steamComponentsProgress = nil
+            if MadeiraDock.clientInstalled && MadeiraDock.clientSupported {
+                self.launchThroughDock(game: game, profile: profile, prefixPath: prefixPath)
+            } else {
+                AppLog.record("[steam-components] starting without Steam's client: \(failure ?? "unsupported build")")
+                self.launchSteamGame(game: game, profile: profile, prefixPath: prefixPath, skipSteamClient: true)
             }
         }
     }

@@ -560,7 +560,14 @@ class WindowsEnvironment {
             unsetenv("MADEIRA_FEX_AVX")
         }
 
-        let screen = UIScreen.main.nativeBounds.size
+        // The game's screen: the active window scene's (UIScreen.main is deprecated).
+        let screen: CGSize = Thread.isMainThread
+            ? MainActor.assumeIsolated {
+                UIApplication.shared.connectedScenes
+                    .compactMap { ($0 as? UIWindowScene)?.screen.nativeBounds.size }
+                    .first ?? CGSize(width: 2732, height: 2048)
+            }
+            : CGSize(width: 2732, height: 2048)
         sessionMetalFXFactor = profile.metalFXEnabled
             ? Self.metalFXFactor(resolution: profile.resolution, screenLongSide: max(screen.width, screen.height))
             : nil

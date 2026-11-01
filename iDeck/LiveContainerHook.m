@@ -284,7 +284,12 @@ static int LCGuestUIApplicationMain(int argc, char *_Nullable *_Nonnull argv, NS
             if ([gGuestSceneDelegate respondsToSelector:@selector(scene:willConnectToSession:options:)]) {
                 // UIKit creates connection options internally; instantiating them is unavailable.
                 // Hosted guests receive no new scene connection options.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wnonnull"
+                // Deliberately nil: UISceneConnectionOptions cannot be created
+                // by an app, and a hosted guest has no connection options.
                 [gGuestSceneDelegate scene:hostScene willConnectToSession:hostScene.session options:nil];
+#pragma clang diagnostic pop
             }
             if ([gGuestSceneDelegate respondsToSelector:@selector(window)]) window = [gGuestSceneDelegate window];
         }
