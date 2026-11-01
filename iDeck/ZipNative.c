@@ -65,3 +65,21 @@ int ideck_zip_inflate_to_fd(const uint8_t *src, size_t src_len, int fd, uint64_t
     inflateEnd(&stream);
     return result;
 }
+
+int ideck_zip_inflate_raw(const uint8_t *src, size_t src_len, uint8_t *dst, size_t dst_cap,
+                          size_t *out_len, size_t *consumed) {
+    if (out_len) *out_len = 0;
+    if (consumed) *consumed = 0;
+    if (src_len > UINT32_MAX || dst_cap > UINT32_MAX) return IDECK_ZIP_INVALID;
+    z_stream stream = {0};
+    if (inflateInit2(&stream, -15) != Z_OK) return IDECK_ZIP_INVALID;
+    stream.next_in = (Bytef *)src;
+    stream.avail_in = (uInt)src_len;
+    stream.next_out = dst;
+    stream.avail_out = (uInt)dst_cap;
+    int result = inflate(&stream, Z_FINISH);
+    if (out_len) *out_len = (size_t)stream.total_out;
+    if (consumed) *consumed = (size_t)stream.total_in;
+    inflateEnd(&stream);
+    return result == Z_STREAM_END ? IDECK_ZIP_OK : IDECK_ZIP_INVALID;
+}

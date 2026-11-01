@@ -284,7 +284,7 @@ struct SettingsView: View {
             Section {
                 Picker(selection: $wineJITPoolMiB) {
                     Text(tr("Automatic")).tag(0)
-                    ForEach([64, 96, 128, 192, 256, 384], id: \.self) { size in
+                    ForEach([384, 512, 640, 768, 896, 1152], id: \.self) { size in
                         Text("\(size) MiB").tag(size)
                     }
                 } label: {

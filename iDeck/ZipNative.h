@@ -16,6 +16,12 @@ enum {
 /// expands past its declared size (a ZIP bomb) stops at the limit.
 int ideck_zip_inflate_to_fd(const uint8_t *src, size_t src_len, int fd, uint64_t expected_size);
 
+/// Inflates a raw-deflate stream into memory. `*out_len` receives the bytes
+/// produced. Returns IDECK_ZIP_OK only when the stream ends within `dst_cap`
+/// bytes and, if `consumed` is not NULL, reports the input bytes it used.
+int ideck_zip_inflate_raw(const uint8_t *src, size_t src_len, uint8_t *dst, size_t dst_cap,
+                          size_t *out_len, size_t *consumed);
+
 /// Writes a stored ZIP entry (method 0) into an open file.
 int ideck_zip_write_to_fd(const uint8_t *src, size_t src_len, int fd);
 

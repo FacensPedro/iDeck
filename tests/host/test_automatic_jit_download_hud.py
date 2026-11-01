@@ -24,7 +24,7 @@ class AutomaticJITAndDownloadHUDTests(unittest.TestCase):
         # before preparation; the app must not resize an executable JIT pool.
         self.assertIn('Text(tr("Wine JIT pool"))', SETTINGS)
         self.assertIn('@AppStorage("wineJITPoolMiB")', SETTINGS)
-        self.assertIn('ForEach([64, 96, 128, 192, 256, 384]', SETTINGS)
+        self.assertIn('ForEach([384, 512, 640, 768, 896, 1152]', SETTINGS)
         self.assertIn('updateWineJITPoolPreference(selected)', SETTINGS)
         self.assertIn('guard !wineJITPreparationInFlight && !ideck_wine_jit_pool_ready()', COORDINATOR)
         self.assertIn('setenv("IDECK_WINE_JIT_MIB", String(sizeMiB), 1)', COORDINATOR)

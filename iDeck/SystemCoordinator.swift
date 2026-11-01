@@ -71,7 +71,7 @@ class SystemCoordinator: ObservableObject {
     private var visualCRuntimeSkipAction: (() -> Void)?
     private var bypassVisualCRuntimeForPrefix: String?
 
-    private static let supportedWineJITPoolMiB: Set<Int> = [64, 96, 128, 192, 256, 384]
+    private static let supportedWineJITPoolMiB: Set<Int> = [64, 96, 128, 192, 256, 384, 512, 640, 768, 896, 1152]
 
     private static func exportWineJITPreference(_ sizeMiB: Int) {
         if supportedWineJITPoolMiB.contains(sizeMiB) {

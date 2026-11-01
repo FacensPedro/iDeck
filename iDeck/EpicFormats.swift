@@ -2,15 +2,14 @@
 // Copyright 2026 Akshay CM
 // Madeira Converter Exception: see LICENSE-EXCEPTION.md
 
-import Compression
 import CryptoKit
 import Foundation
 
 // Epic's content formats (docs/EPIC_GAMES.md, "How it works"): the binary build
 // manifest (header, metadata, chunk list, file list, custom fields and, from
 // feature level 24, an encrypted block with the file names), the older JSON
-// manifest, and the chunk container the CDN serves. Little-endian throughout. Everything here is pure
-// Foundation, CryptoKit and Compression, so the host test compiles it as is.
+// manifest, and the chunk container the CDN serves. Little-endian throughout. Parsing is Swift;
+// chunk inflate and SHA-1 run in C++ (EpicChunkCodec.cpp) via EpicChunkBridge.mm.
 // Hostile input throws; it never traps.
 
 enum EpicFormatError: LocalizedError, Equatable {
@@ -113,30 +112,17 @@ struct EpicReader {
 }
 
 enum EpicCodec {
-    /// A zlib stream (RFC 1950) of known decompressed size. Compression's ZLIB
-    /// algorithm is raw DEFLATE, so the two-byte header is skipped here.
+    /// A zlib stream (RFC 1950) of known decompressed size.
     static func inflate(_ data: Data, size: Int, what: String) throws -> Data {
-        guard data.count >= 2, data[data.startIndex] & 0x0F == 8,
-              (UInt16(data[data.startIndex]) << 8 | UInt16(data[data.startIndex + 1])) % 31 == 0,
-              data[data.startIndex + 1] & 0x20 == 0, size >= 0, size <= 512 << 20 else {
+        // C++ (EpicChunkCodec.cpp) through the Objective-C++ bridge.
+        guard size >= 0, size <= 512 << 20,
+              let output = IDEpicChunkCodec.inflate(data, size: UInt(size)) else {
             throw EpicFormatError.decompress(what)
         }
-        if size == 0 { return Data() }
-        let body = data.dropFirst(2)
-        var output = Data(count: size + 1)
-        let written = output.withUnsafeMutableBytes { out -> Int in
-            body.withUnsafeBytes { input -> Int in
-                guard let dst = out.bindMemory(to: UInt8.self).baseAddress,
-                      let src = input.bindMemory(to: UInt8.self).baseAddress else { return 0 }
-                return compression_decode_buffer(dst, size + 1, src, body.count, nil, COMPRESSION_ZLIB)
-            }
-        }
-        guard written == size else { throw EpicFormatError.decompress(what) }
-        output.count = size
         return output
     }
 
-    static func sha1(_ data: Data) -> Data { Data(Insecure.SHA1.hash(data: data)) }
+    static func sha1(_ data: Data) -> Data { IDEpicChunkCodec.sha1(data) }
 
     static func sha1(of url: URL, progress: (Int) -> Void = { _ in }) throws -> Data {
         let handle = try FileHandle(forReadingFrom: url)
