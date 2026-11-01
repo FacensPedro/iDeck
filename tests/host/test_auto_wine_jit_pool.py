@@ -9,7 +9,7 @@ class AutomaticWineJITPoolTests(unittest.TestCase):
     def test_supported_sizes_and_manual_override(self):
         self.assertIn('getenv("IDECK_WINE_JIT_MIB")', FEX)
         self.assertIn('sysctlbyname("hw.memsize"', FEX)
-        self.assertIn('constexpr size_t allowed[] = {1152, 896, 768, 640, 512, 384, 256, 192, 128, 96, 64}', FEX)
+        self.assertIn('constexpr size_t allowed[] = {1152, 896, 768, 640, 512, 384, 256}', FEX)
         self.assertIn('errno == 0 && end != override_text && *end ==', FEX)
         self.assertIn('if (value == candidate)', FEX)
         self.assertIn("*end == '\\0'", FEX)

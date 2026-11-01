@@ -1031,7 +1031,41 @@ class SystemCoordinator: ObservableObject {
         }
     }
 
+    /// Steam's client loads its own ~25 MiB of DLLs plus a browser helper on
+    /// top of the game: below this pool it runs out of executable memory
+    /// (every DLL fails with STATUS_NO_MEMORY) and the session dies.
+    static let dockMinimumPoolMiB: UInt32 = 512
+
+    /// Prepares Wine's JIT pool before a Steam client session and checks it is
+    /// large enough. The components download can outlast StikDebug's
+    /// attachment, so this runs again right before the client starts.
     private func launchThroughDock(game: SteamAppInfo, profile: WindowsGameProfile, prefixPath: URL) {
+        guard ideck_wine_jit_pool_ready() || ideck_jit_debugger_attached() else {
+            setWindowsStatus("Cannot launch: StikDebug detached while Steam's client was being prepared. Enable JIT in StikDebug again and start the game.")
+            requestStikDebugJIT()
+            return
+        }
+        setWindowsStatus("Preparing JIT...")
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            let ready = ideck_wine_jit_pool_ready() || (ideck_wine_jit_pool_prepare() && ideck_wine_jit_pool_ready())
+            let poolMiB = ideck_jit_snapshot().wine_pool_mib
+            DispatchQueue.main.async {
+                guard let self, self.windowsStatus == "Preparing JIT..." else { return }
+                guard ready else {
+                    self.setWindowsStatus("Execution Error: StikDebug could not allocate the Wine executable RX region, including smaller pools. Keep the debugger attached and check available virtual memory.")
+                    return
+                }
+                guard poolMiB >= Self.dockMinimumPoolMiB else {
+                    AppLog.record("[dock-launch] JIT pool \(poolMiB) MiB is below Steam's client minimum (\(Self.dockMinimumPoolMiB) MiB); starting the game directly")
+                    self.launchSteamGame(game: game, profile: profile, prefixPath: prefixPath, skipSteamClient: true)
+                    return
+                }
+                self.startDockSession(game: game, profile: profile, prefixPath: prefixPath)
+            }
+        }
+    }
+
+    private func startDockSession(game: SteamAppInfo, profile: WindowsGameProfile, prefixPath: URL) {
         let host: URL
         do {
             host = try MainActor.assumeIsolated {

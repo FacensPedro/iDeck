@@ -60,7 +60,7 @@ class SteamIPRoutingTests(unittest.TestCase):
         self.assertIn("let attempts = attemptsPerChunk", DEPOT)
 
     def test_jit_pool_retries_are_bounded_and_debugger_protected(self):
-        self.assertIn("constexpr size_t allowed[] = {1152, 896, 768, 640, 512, 384, 256, 192, 128, 96, 64}", FEX)
+        self.assertIn("constexpr size_t allowed[] = {1152, 896, 768, 640, 512, 384, 256}", FEX)
         self.assertIn('sysctlbyname("hw.memsize"', FEX)
         self.assertIn("if (candidate <= preferred) sizes.push_back(candidate * MiB);", FEX)
         self.assertIn("std::vector<size_t> candidates = wine_pool_candidates();", FEX)
