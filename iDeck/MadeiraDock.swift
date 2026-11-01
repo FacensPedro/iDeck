@@ -126,19 +126,15 @@ enum SteamRuntimeFiles {
                 try need(compressed == size); decoded = encoded
             } else {
                 decoded = Data(count: max(size, 1))
-                var stream = z_stream(), valid = false
+                var produced = 0, used = 0, status = Int(IDECK_ZIP_INVALID)
                 encoded.withUnsafeBytes { source in
                     decoded.withUnsafeMutableBytes { destination in
-                        stream.next_in = UnsafeMutablePointer(mutating: source.bindMemory(to: UInt8.self).baseAddress)
-                        stream.avail_in = UInt32(compressed)
-                        stream.next_out = destination.bindMemory(to: UInt8.self).baseAddress
-                        stream.avail_out = UInt32(max(size, 1))
-                        guard inflateInit2_(&stream, -15, ZLIB_VERSION, Int32(MemoryLayout<z_stream>.size)) == Z_OK else { return }
-                        let result = inflate(&stream, Z_FINISH)
-                        valid = result == Z_STREAM_END && stream.total_in == compressed && stream.total_out == size
-                        inflateEnd(&stream)
+                        status = Int(ideck_zip_inflate_raw(source.bindMemory(to: UInt8.self).baseAddress, compressed,
+                                                           destination.bindMemory(to: UInt8.self).baseAddress, max(size, 1),
+                                                           &produced, &used))
                     }
                 }
+                let valid = status == Int(IDECK_ZIP_OK) && used == compressed && produced == size
                 try need(valid); decoded.count = size
             }
             let actualCRC = decoded.withUnsafeBytes { crc32(0, $0.bindMemory(to: UInt8.self).baseAddress, UInt32(size)) }

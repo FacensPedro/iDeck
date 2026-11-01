@@ -19,6 +19,8 @@
 		E10000000000000000000010 /* SteamDepotRegionPolicy.c in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000010 /* SteamDepotRegionPolicy.c */; };
 		E10000000000000000000012 /* SteamDiskIO.c in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000012 /* SteamDiskIO.c */; };
 		F7A000000000000000000001 /* ZipNative.c in Sources */ = {isa = PBXBuildFile; fileRef = F8A000000000000000000001 /* ZipNative.c */; };
+		F7C000000000000000000002 /* EpicChunkBridge.mm in Sources */ = {isa = PBXBuildFile; fileRef = F8C000000000000000000004 /* EpicChunkBridge.mm */; };
+		F7C000000000000000000001 /* EpicChunkCodec.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F8C000000000000000000002 /* EpicChunkCodec.cpp */; };
 		E10000000000000000000014 /* SteamNativeCore.c in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000014 /* SteamNativeCore.c */; };
 		F30000000000000000000007 /* WineLogTriage.c in Sources */ = {isa = PBXBuildFile; fileRef = F40000000000000000000007 /* WineLogTriage.c */; };
 		E10000000000000000000005 /* LzmaDec.c in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000004 /* LzmaDec.c */; };
@@ -228,6 +230,10 @@
 		E20000000000000000000013 /* SteamDiskIO.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SteamDiskIO.h; sourceTree = "<group>"; };
 		F8A000000000000000000001 /* ZipNative.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = ZipNative.c; sourceTree = "<group>"; };
 		F8B000000000000000000001 /* ZipNative.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ZipNative.h; sourceTree = "<group>"; };
+		F8C000000000000000000004 /* EpicChunkBridge.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = EpicChunkBridge.mm; sourceTree = "<group>"; };
+		F8C000000000000000000003 /* EpicChunkBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = EpicChunkBridge.h; sourceTree = "<group>"; };
+		F8C000000000000000000002 /* EpicChunkCodec.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = EpicChunkCodec.cpp; sourceTree = "<group>"; };
+		F8C000000000000000000001 /* EpicChunkCodec.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = EpicChunkCodec.hpp; sourceTree = "<group>"; };
 		E20000000000000000000014 /* SteamNativeCore.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = SteamNativeCore.c; sourceTree = "<group>"; };
 		E20000000000000000000015 /* SteamNativeCore.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SteamNativeCore.h; sourceTree = "<group>"; };
 		F40000000000000000000007 /* WineLogTriage.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = NativeRuntime/WineLogTriage.c; sourceTree = "<group>"; };
@@ -347,6 +353,8 @@
 				E10000000000000000000010 /* SteamDepotRegionPolicy.c in Sources */,
 				E10000000000000000000012 /* SteamDiskIO.c in Sources */,
 				F7A000000000000000000001 /* ZipNative.c in Sources */,
+				F7C000000000000000000002 /* EpicChunkBridge.mm in Sources */,
+				F7C000000000000000000001 /* EpicChunkCodec.cpp in Sources */,
 				E10000000000000000000014 /* SteamNativeCore.c in Sources */,
 				F30000000000000000000007 /* WineLogTriage.c in Sources */,
 				E10000000000000000000005 /* LzmaDec.c in Sources */,
@@ -479,6 +487,10 @@
 				E20000000000000000000013 /* SteamDiskIO.h */,
 				F8A000000000000000000001 /* ZipNative.c */,
 				F8B000000000000000000001 /* ZipNative.h */,
+				F8C000000000000000000004 /* EpicChunkBridge.mm */,
+				F8C000000000000000000003 /* EpicChunkBridge.h */,
+				F8C000000000000000000002 /* EpicChunkCodec.cpp */,
+				F8C000000000000000000001 /* EpicChunkCodec.hpp */,
 				E20000000000000000000003 /* SteamChunkCodecs.h */,
 				E20000000000000000000004 /* LzmaDec.c */,
 				E20000000000000000000005 /* LzmaDec.h */,

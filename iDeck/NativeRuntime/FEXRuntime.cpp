@@ -100,21 +100,26 @@ std::atomic<int32_t> wine_pool_last_rx_detail{0};
 std::vector<vm_address_t> wine_pool_low_va_pins;
 bool wine_pool_frontier_prepared = false;
 
-// Automatic pool selection avoids oversized initial BRK allocations on low-RAM devices.
-// An explicit override is honored only for sizes already supported by Madeira.
+// Madeira's app reserves an 896 MiB pool for every game session. Wine's
+// ntdll carves more than FEX's code buffers from it: every anonymous RWX
+// guest allocation (a Mono/Unity code heap) and the RWX sections of PE images
+// live there too. A pool too small for those makes DLL loads fail with
+// STATUS_NO_MEMORY (c0000017, shown by games as "not enough memory") and puts
+// JIT code outside the pool, where its stores cannot be emulated. Use
+// Madeira's size, smaller only on devices with less memory, and fall back.
+// An explicit override is honored only for these sizes.
 std::vector<size_t> wine_pool_candidates() {
     constexpr size_t MiB = 1024ULL * 1024;
-    constexpr size_t allowed[] = {384, 256, 192, 128, 96, 64};
-    size_t preferred = 128;
+    constexpr size_t allowed[] = {1152, 896, 768, 640, 512, 384, 256, 192, 128, 96, 64};
+    size_t preferred = 384;
     uint64_t physical_bytes = 0;
     size_t length = sizeof(physical_bytes);
     if (sysctlbyname("hw.memsize", &physical_bytes, &length, nullptr, 0) == 0 &&
         length == sizeof(physical_bytes)) {
-        if (physical_bytes >= 8ULL * 1024 * MiB) preferred = 384;
-        else if (physical_bytes >= 6ULL * 1024 * MiB) preferred = 256;
-        else if (physical_bytes >= 4ULL * 1024 * MiB) preferred = 192;
-        else if (physical_bytes >= 3ULL * 1024 * MiB) preferred = 128;
-        else preferred = 96;
+        if (physical_bytes >= 6ULL * 1024 * MiB) preferred = 896;
+        else if (physical_bytes >= 4ULL * 1024 * MiB) preferred = 640;
+        else if (physical_bytes >= 3ULL * 1024 * MiB) preferred = 512;
+        else preferred = 384;
     }
     const char *override_text = getenv("IDECK_WINE_JIT_MIB");
     if (override_text && *override_text) {
@@ -151,7 +156,34 @@ void record_wine_pool_failure(int32_t stage, int32_t mach_code = 0) {
 // Reserve low virtual pages (not resident memory) to encourage the debugger's
 // subsequent executable allocation to land above the known 0x119000000
 // frontier. These placeholders are retained for this process lifetime.
+// Madeira (StikJITHelper, ml1034) holds [0x140000000, +128 MiB) before the RX
+// pool is allocated and tells ntdll through WINE_IOS_EXE_WINDOW, which
+// releases it to a fixed-base main executable on demand. Without it the
+// debugger's allocations can land there and a non-relocatable game image is
+// displaced, leaving its absolute pointers stale.
+bool wine_exe_window_held = false;
+
+void reserve_exe_window() {
+    constexpr vm_address_t base = 0x140000000ULL;
+    constexpr vm_size_t size = 0x8000000ULL;            // 128 MiB
+    if (wine_exe_window_held) return;
+    const char *skip = getenv("MADEIRA_NO_EXE_WINDOW");
+    if (skip && strcmp(skip, "0") != 0) return;
+    vm_address_t address = base;
+    kern_return_t kr = vm_allocate(mach_task_self(), &address, size, VM_FLAGS_FIXED);
+    if (kr == KERN_SUCCESS && address == base) {
+        wine_exe_window_held = true;
+        setenv("WINE_IOS_EXE_WINDOW", "140000000:8000000", 1);
+        fprintf(stderr, "[iDeck Wine JIT] reserved executable window [0x140000000,+128MiB) before RX\n");
+    } else {
+        if (kr == KERN_SUCCESS) vm_deallocate(mach_task_self(), address, size);
+        unsetenv("WINE_IOS_EXE_WINDOW");
+        fprintf(stderr, "[iDeck Wine JIT] could not reserve the executable window kr=%d\n", kr);
+    }
+}
+
 void prepare_wine_pool_frontier() {
+    reserve_exe_window();
     if (wine_pool_frontier_prepared) return;
     wine_pool_frontier_prepared = true;
     constexpr vm_size_t chunk = 16ULL * 1024 * 1024;
@@ -358,7 +390,7 @@ extern "C" bool ideck_wine_jit_pool_prepare(void) {
 
     prepare_wine_pool_frontier();
 
-    // FEXCore already owns a separate 64 MiB pool. A second 384 MiB RX
+    // FEXCore already owns a separate 64 MiB pool. A large RX
     // reservation may fail on iPads with fragmented / restricted virtual
     // address space even when the debugger is correctly attached. Negotiate
     // progressively smaller allocations rather than treating that as a

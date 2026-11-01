@@ -744,21 +744,16 @@ final class DepotDownloader {
         let entry = data.subdata(in: start..<(start + compSize))
         if method == 0 { return entry }
 
-        // Zip stores raw deflate — inflate with zlib, negative windowBits
-        var strm = z_stream()
+        // Zip stores raw deflate: inflated in C (ZipNative.c).
         let cap = max(uncompSize, 1024)
         var out = Data(count: cap)
+        var produced = 0
         var n = -1
         entry.withUnsafeBytes { src in
             out.withUnsafeMutableBytes { dst in
-                strm.next_in = UnsafeMutablePointer(mutating: src.bindMemory(to: UInt8.self).baseAddress)
-                strm.avail_in = UInt32(entry.count)
-                strm.next_out = dst.bindMemory(to: UInt8.self).baseAddress
-                strm.avail_out = UInt32(cap)
-                guard inflateInit2_(&strm, -15, ZLIB_VERSION, Int32(MemoryLayout<z_stream>.size)) == Z_OK else { return }
-                let r = inflate(&strm, Z_FINISH)
-                inflateEnd(&strm)
-                if r == Z_STREAM_END { n = Int(strm.total_out) }
+                if ideck_zip_inflate_raw(src.bindMemory(to: UInt8.self).baseAddress, entry.count,
+                                         dst.bindMemory(to: UInt8.self).baseAddress, cap,
+                                         &produced, nil) == Int32(IDECK_ZIP_OK) { n = produced }
             }
         }
         guard n >= 0 else { throw SteamError.decompressionFailed }

@@ -13,6 +13,7 @@
 #import "SteamDepotRegionPolicy.h"
 #import "SteamDiskIO.h"
 #import "ZipNative.h"
+#import "EpicChunkBridge.h"
 #import "SteamNativeCore.h"
 #import "NativeRuntime/WineLogTriage.h"
 
