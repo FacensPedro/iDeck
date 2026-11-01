@@ -343,6 +343,18 @@ if [[ "$REBUILD" == "1" ]]; then
       echo "ERROR: d3d12.dll is not the compiled madeira-d3d12 frontend." >&2
       exit 2
     }
+    # vkd3d-proton, Madeira's second Direct3D 12 route (madeira.cfg
+    # `d3d12 = vkd3d`, chosen per game in iDeck): ARM64EC d3d12.dll and
+    # d3d12core.dll in vulkan/arm64ec-windows, linked only for that session.
+    # Optional: without them iDeck keeps madeira-d3d12 for every game.
+    if [[ -x "$MD/build/vkd3d-proton/build.sh" ]]; then
+      if bash "$MD/build/vkd3d-proton/build.sh"; then
+        echo "vkd3d-proton built into vulkan/arm64ec-windows."
+      else
+        rm -f "$MD/app/Madeira/vulkan/arm64ec-windows/d3d12.dll" "$MD/app/Madeira/vulkan/arm64ec-windows/d3d12core.dll"
+        echo "WARNING: vkd3d-proton was not built; Direct3D 12 stays on madeira-d3d12." >&2
+      fi
+    fi
   fi
 
   # Replace the pinned older dcomp.dll with upstream's source-level

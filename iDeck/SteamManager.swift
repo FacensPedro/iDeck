@@ -4337,10 +4337,11 @@ class SteamLibraryFetcher {
         let appInfos = try await fetchAppInfo(appIDs: Array(appIDs), tokens: appTokens)
         SteamLog.trace("Got info for \(appInfos.count) apps")
 
-        // Playable types only: games, demos and applications. This leaves out
-        // DLC, soundtracks and tools (redistributables, runtimes, SDKs, servers).
-        let games = appInfos.filter { $0.type.isPlayable }
-        SteamLog.trace("\(games.count) of \(appInfos.count) apps are playable (game/demo/application)")
+        // Games only. This leaves out demos, applications (software, video
+        // players, benchmarks), DLC, soundtracks and tools (redistributables,
+        // runtimes, SDKs, servers).
+        let games = appInfos.filter { $0.type == .game }
+        SteamLog.trace("\(games.count) of \(appInfos.count) apps are games")
         return games
     }
 

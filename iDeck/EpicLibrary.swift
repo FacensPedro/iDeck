@@ -299,12 +299,12 @@ struct EpicInstalledGame: Codable, Sendable {
     /// willfaust/Madeira#207, iediot), and Unreal Engine content outside the "ue"
     /// namespace: marketplace assets, plugins and sample projects ("Animation Starter
     /// Pack"), and engines and editors ("ARK ModKit (UE4)" is filed under "engines" and
-    /// "applications"). An item filed under "games" always stays.
+    /// "applications"). Only items filed under "games" are listed: software
+    /// and applications without that category are left out too.
     static func isGame(categories: [String]) -> Bool {
         let roots = Set(categories.map { $0.split(separator: "/").first.map(String.init) ?? $0 })
         if roots.contains("mods") || roots.contains("addons") { return false }
-        if roots.contains("games") { return true }
-        return roots.isDisjoint(with: ["assets", "plugins", "projects", "engines"])
+        return roots.contains("games")
     }
 
     func updateAvailable(_ app: String) -> Bool {
