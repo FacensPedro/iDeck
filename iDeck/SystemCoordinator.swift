@@ -120,6 +120,8 @@ class SystemCoordinator: ObservableObject {
         _ = ideck_native_memory_configure(64 * 1024 * 1024, 8 * 1024 * 1024)
     }
 
+    /// The installer's latest message while components download for a launch.
+    @Published var steamComponentsProgress: String?
     private var steamComponentsTask: Task<Void, Never>?
 
     /// Madeira Dock needs Valve's client components in the prefix. They are
@@ -785,7 +787,7 @@ class SystemCoordinator: ObservableObject {
 
     /// Launches a Steam game in its original installation directory, preserving
     /// relative DLL and asset paths instead of copying the executable elsewhere.
-    func launchSteamGame(game: SteamAppInfo, profile: WindowsGameProfile, prefixPath: URL) {
+    func launchSteamGame(game: SteamAppInfo, profile: WindowsGameProfile, prefixPath: URL, skipSteamClient: Bool = false) {
         guard !isClosingWindowsSession else { return }
         guard MadeiraBundleIdentity.isNative else {
             setWindowsStatus(MadeiraBundleIdentity.missingRuntimeMessage)
@@ -868,7 +870,7 @@ class SystemCoordinator: ObservableObject {
             return
         }
         if prepareVisualCRuntimeIfNeeded(prefix: prefixPath, resume: { [weak self] in
-            self?.launchSteamGame(game: game, profile: profile, prefixPath: prefixPath)
+            self?.launchSteamGame(game: game, profile: profile, prefixPath: prefixPath, skipSteamClient: skipSteamClient)
         }) { return }
         windowsEnvironment.configureWine(prefix: prefixPath.path)
         mountExternalDrives(prefix: prefixPath.path)
@@ -880,9 +882,15 @@ class SystemCoordinator: ObservableObject {
         // Steam games start through Valve's client (Madeira Dock) on their
         // own whenever its components are installed and supported; the
         // components install automatically when the Steam account signs in.
-        if MadeiraDock.bundled && MadeiraDock.clientInstalled && MadeiraDock.clientSupported {
-            launchThroughDock(game: game, profile: profile, prefixPath: prefixPath)
-            return
+        if MadeiraDock.bundled && !skipSteamClient {
+            if MadeiraDock.clientInstalled && MadeiraDock.clientSupported {
+                launchThroughDock(game: game, profile: profile, prefixPath: prefixPath)
+                return
+            }
+            if !MadeiraDock.clientInstalled {
+                installSteamComponentsThenLaunch(game: game, profile: profile, prefixPath: prefixPath)
+                return
+            }
         }
         pendingSteamGameID = game.appID
         setWindowsStatus("Launching Steam game...")
@@ -928,6 +936,43 @@ class SystemCoordinator: ObservableObject {
     /// Starts an installed Steam game through Valve's own Windows client
     /// (Madeira Dock): Valve's client signs in, checks the licence and starts
     /// the game with its DRM untouched.
+    /// Status shown on the game's loading screen while Steam's client
+    /// components download before the first Steam game starts.
+    static let steamComponentsInstallStatus = "Installing Steam client components..."
+
+    /// First Steam game launch without Steam's client: download the
+    /// components on the game's loading screen, then start the game through
+    /// the client. If they cannot be installed, the game starts directly.
+    private func installSteamComponentsThenLaunch(game: SteamAppInfo, profile: WindowsGameProfile, prefixPath: URL) {
+        setWindowsStatus(Self.steamComponentsInstallStatus)
+        steamComponentsProgress = nil
+        let running = steamComponentsTask
+        Task { [weak self] in
+            await running?.value
+            var failure: String?
+            if !MadeiraDock.clientInstalled {
+                do {
+                    try await SteamRuntimeInstaller.shared.prepare(prefix: MadeiraDock.prefix) { message in
+                        AppLog.record("[steam-components] " + message)
+                        await MainActor.run { self?.steamComponentsProgress = message }
+                    }
+                } catch {
+                    failure = error.localizedDescription
+                }
+            }
+            await MainActor.run {
+                guard let self, self.windowsStatus == Self.steamComponentsInstallStatus else { return }
+                self.steamComponentsProgress = nil
+                if MadeiraDock.clientInstalled && MadeiraDock.clientSupported {
+                    self.launchThroughDock(game: game, profile: profile, prefixPath: prefixPath)
+                } else {
+                    AppLog.record("[steam-components] starting without Steam's client: \(failure ?? "unsupported build")")
+                    self.launchSteamGame(game: game, profile: profile, prefixPath: prefixPath, skipSteamClient: true)
+                }
+            }
+        }
+    }
+
     private func launchThroughDock(game: SteamAppInfo, profile: WindowsGameProfile, prefixPath: URL) {
         let host: URL
         do {

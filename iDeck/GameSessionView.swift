@@ -88,6 +88,9 @@ struct GameSessionView: View {
         if status == VisualCRuntimeBootstrap.installStatus {
             return (0.15, "Preparing Microsoft Visual C++")
         }
+        if status == SystemCoordinator.steamComponentsInstallStatus {
+            return (0.30, "Installing Steam client components")
+        }
         if status == "Preparing Wine prefix..." || status == "Preparing Windows Environment..." {
             return (0.20, "Preparing Wine prefix")
         }
@@ -279,11 +282,14 @@ struct GameSessionView: View {
                 if coordinator.windowsStatus == "Launching Steam game..." ||
                     coordinator.windowsStatus == "Launching Steam client..." ||
                     coordinator.windowsStatus == "Launching Windows app..." ||
-                    coordinator.windowsStatus == VisualCRuntimeBootstrap.installStatus {
+                    coordinator.windowsStatus == VisualCRuntimeBootstrap.installStatus ||
+                    coordinator.windowsStatus == SystemCoordinator.steamComponentsInstallStatus {
                     HStack {
                         ProgressView()
                         Text(coordinator.windowsStatus == VisualCRuntimeBootstrap.installStatus
                             ? tr("Installing Microsoft Visual C++...")
+                            : coordinator.windowsStatus == SystemCoordinator.steamComponentsInstallStatus
+                            ? tr("Installing Steam client components...") + (coordinator.steamComponentsProgress.map { "\n" + tr($0) } ?? "")
                             : tr("Preparing Wine and graphics..."))
                     }
                     .padding(10)
