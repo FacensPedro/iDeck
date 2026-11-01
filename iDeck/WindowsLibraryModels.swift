@@ -9,21 +9,12 @@ struct WindowsGameProfile: Codable, Equatable, Identifiable {
     var arguments: String = ""
     var resolution: String = "960x540"
     var surfaceScaling: String = "fit"
-    /// Automatic (the game's own choice), "DXMT" (prefer Direct3D 11) or
-    /// "D3D12" (prefer Direct3D 12). A preference is passed to the game's
-    /// engine as its own API switch; it never translates one API to another.
+    /// Always "Automatic": Direct3D 11 and 12 are chosen per game at launch
+    /// (WindowsEnvironment.prepareGraphicsAPI). Kept so saved profiles load.
     var graphicsAPI: String = "Automatic"
-    static let graphicsAPIModes = ["Automatic", "DXMT", "D3D12"]
 
-    /// Older profiles stored "Direct3D 9/10/11/12"; those that matched a
-    /// backend keep their meaning, the rest become Automatic.
-    static func normalizedGraphicsAPI(_ stored: String?) -> String {
-        switch stored {
-        case "DXMT", "Direct3D 11": return "DXMT"
-        case "D3D12", "Direct3D 12": return "D3D12"
-        default: return "Automatic"
-        }
-    }
+    /// Profiles from before the automatic choice may hold another value.
+    static func normalizedGraphicsAPI(_ stored: String?) -> String { "Automatic" }
     var controllerAPI: String = "Automatic"
     /// "Automatic" (on when the x64 executable references vulkan-1.dll), "On" or "Off".
     var vulkanMode: String = "Automatic"

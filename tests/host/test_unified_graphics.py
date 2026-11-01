@@ -89,8 +89,17 @@ class UnifiedProfileTests(unittest.TestCase):
         self.assertIn('return preferD3D12 ? "-dx12" : "-dx11"', env)
         self.assertNotIn("IDECK_PREFERRED_GRAPHICS_API", env)
         self.assertIn("ideck_pe_graphics_apis", env)
+
+    def test_direct3d_choice_is_automatic(self):
+        env = (ROOT / "iDeck/WindowsEnvironment.swift").read_text()
+        self.assertIn("guard d3d11 && d3d12 else {", env)
+        self.assertIn("guard !d3d12Available else {", env)
+        self.assertIn("Self.engineAPIArgument(binary: binary, preferD3D12: false)", env)
+        self.assertNotIn("sessionGraphicsAPI", env)
+        view = (ROOT / "iDeck/MainView.swift").read_text()
+        self.assertNotIn('DetailPickerRow(title: tr("Graphics API")', view)
         models = (ROOT / "iDeck/WindowsLibraryModels.swift").read_text()
-        self.assertIn('static let graphicsAPIModes = ["Automatic", "DXMT", "D3D12"]', models)
+        self.assertIn('static func normalizedGraphicsAPI(_ stored: String?) -> String { "Automatic" }', models)
 
 
 if __name__ == "__main__":

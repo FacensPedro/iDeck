@@ -77,7 +77,6 @@ class WindowsEnvironment {
     private var sessionVulkanMode = "Automatic"
     private var sessionUseRecommended = true
     private var sessionCodeChecks = "Automatic"
-    private var sessionGraphicsAPI = "Automatic"
     private var sessionOpenGLBackend = "Automatic"
     /// MetalFX spatial upscale factor for this launch (nil = off).
     private var sessionMetalFXFactor: Double?
@@ -435,23 +434,24 @@ class WindowsEnvironment {
             AppLog.record("[graphics] \(binary.lastPathComponent) needs Direct3D 12, which this IPA cannot run: "
                           + "it was built with the d3d11 profile. Use an IPA built with the unified profile.")
         }
-        guard sessionGraphicsAPI != "Automatic" else { return [] }
-        let wantsD3D12 = sessionGraphicsAPI == "D3D12"
-        if wantsD3D12 && !d3d12Available {
-            AppLog.record("[graphics] Direct3D 12 preference ignored: this IPA cannot run Direct3D 12 (d3d11 profile).")
+        // Automatic choice, per game. Wine loads whichever Direct3D the game
+        // calls, so only a game able to use both has a choice to make:
+        // it keeps its own choice when this IPA runs both, and is switched to
+        // Direct3D 11 (DXMT) through its engine when this IPA has no D3D12.
+        guard d3d11 && d3d12 else {
+            SteamLog.event("[graphics] automatic: \(d3d12 ? "Direct3D 12 (Madeira)" : d3d11 ? "Direct3D 11 (DXMT)" : "no Direct3D")")
             return []
         }
-        if (wantsD3D12 && !d3d12) || (!wantsD3D12 && !d3d11) {
-            AppLog.record("[graphics] \(wantsD3D12 ? "Direct3D 12" : "Direct3D 11") preference ignored: "
-                          + "\(binary.lastPathComponent) does not use that API.")
+        guard !d3d12Available else {
+            SteamLog.event("[graphics] automatic: the game chooses between Direct3D 11 and 12; both are available")
             return []
         }
-        guard let argument = Self.engineAPIArgument(binary: binary, preferD3D12: wantsD3D12) else {
-            AppLog.record("[graphics] API preference ignored: \(binary.lastPathComponent) has no known engine switch "
-                          + "(Unity or Unreal); the game chooses its API itself.")
+        guard let argument = Self.engineAPIArgument(binary: binary, preferD3D12: false) else {
+            AppLog.record("[graphics] \(binary.lastPathComponent) can use Direct3D 12, which this IPA cannot run, "
+                          + "and has no known engine switch (Unity or Unreal) to select Direct3D 11.")
             return []
         }
-        SteamLog.event("[graphics] API preference: passing \(argument) to the game's engine")
+        SteamLog.event("[graphics] automatic: Direct3D 11 (DXMT), passing \(argument): this IPA has no Direct3D 12")
         return [argument]
     }
 
@@ -654,7 +654,6 @@ class WindowsEnvironment {
             }
         }
 
-        sessionGraphicsAPI = WindowsGameProfile.normalizedGraphicsAPI(profile.graphicsAPI)
         setenv("IDECK_FPS_LIMIT", profile.fpsLimit, 1)
         let limit = profile.fpsLimit == "Uncapped" ? 0 : RuntimeConfiguration.settings(for: profile).framesPerSecond
         let managed: Set<String> = ["d3d11.preferredMaxFrameRate", "d3d11.metalSpatialUpscaleFactor"]
