@@ -1371,13 +1371,14 @@ struct WindowsWorkspaceView: View {
         coordinator.launchWindowsExecutable(at: game.executable, profile: profile)
     }
 
-    /// Downloads a GOG game's offline installer and installs it without any
-    /// installer windows. The game then appears under Installed games.
+    /// Installs a GOG game from GOG's content system (the game's own files,
+    /// no installer). Games without a Galaxy build fall back to the offline
+    /// installer, run without any installer windows.
     private func downloadGOGInstaller(_ game: GOGGame) {
         guard let prefixPath else { return }
-        gogLibrary.downloadInstaller(game, prefixPath: prefixPath) { setup in
+        gogLibrary.install(game, prefixPath: prefixPath) { outcome in
             windowsLibrary.refresh(prefixPath: prefixPath)
-            guard let setup else { return }
+            guard case .installer(let setup) = outcome else { return }
             coordinator.refreshJITStatus()
             guard coordinator.isJITEnabled else {
                 installMessage = tr("The %@ installer is ready under Installed games as %@. Run it to install the game; it then appears with the GOG mark.",

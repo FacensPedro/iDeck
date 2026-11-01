@@ -337,9 +337,110 @@ final class GOGLibraryModel: ObservableObject {
             let bytes = await Task.detached(priority: .utility) { Self.folderSize(root) }.value
             if bytes > 0 { installedSizes[game.id] = bytes }
         }
-        guard downloadSizes[game.id] == nil, let tokens = try? await tokens(),
-              let files = try? await GOGAPI.windowsInstaller(gameID: game.id, tokens: tokens) else { return }
+        guard downloadSizes[game.id] == nil, let tokens = try? await tokens() else { return }
+        if let plan = try? await GOGContentSystem.plan(gameID: game.id, tokens: tokens) {
+            downloadSizes[game.id] = plan.installBytes
+            return
+        }
+        guard let files = try? await GOGAPI.windowsInstaller(gameID: game.id, tokens: tokens) else { return }
         downloadSizes[game.id] = files.reduce(0) { $0 + $1.sizeBytes }
+    }
+
+    enum InstallOutcome {
+        /// The game's files are in C:\GOG Games\<folder>.
+        case installed
+        /// GOG has no Galaxy build: the offline installer was downloaded instead.
+        case installer(URL)
+        case failed
+    }
+
+    /// Installs a game the way GOG Galaxy does: every file of the newest
+    /// Windows build is downloaded from GOG's content system straight into
+    /// C:\GOG Games\<installDirectory>. Nothing runs in Wine. Games without
+    /// a Galaxy build fall back to the offline installer.
+    func install(_ game: GOGGame, prefixPath: URL, completion: @escaping (InstallOutcome) -> Void) {
+        guard downloadTasks[game.id] == nil else { return }
+        downloadErrors[game.id] = nil
+        downloadProgress[game.id] = 0
+        let games = prefixPath.appendingPathComponent("drive_c/GOG Games", isDirectory: true)
+        BackgroundDownloads.gog.attach(active: { [weak self] in !(self?.downloadTasks.isEmpty ?? true) },
+                                       pause: {}, resume: {})
+        BackgroundDownloads.gog.started(name: game.title)
+        downloadTasks[game.id] = Task {
+            var outcome = BackgroundDownloads.Outcome.paused
+            var fallback = false
+            defer {
+                downloadTasks[game.id] = nil
+                if !fallback {
+                    downloadProgress[game.id] = nil
+                    BackgroundDownloads.gog.ended(name: game.title, outcome: outcome, queueEmpty: downloadTasks.isEmpty)
+                }
+            }
+            do {
+                let tokens = try await tokens()
+                let plan: GOGContentPlan
+                do {
+                    plan = try await GOGContentSystem.plan(gameID: game.id, tokens: tokens)
+                } catch GOGContentError.noBuild {
+                    AppLog.record("[gog] game \(game.id) has no Galaxy build; using the offline installer")
+                    fallback = true
+                    BackgroundDownloads.gog.ended(name: game.title, outcome: .paused, queueEmpty: true)
+                    downloadProgress[game.id] = nil
+                    DispatchQueue.main.async {
+                        self.downloadInstaller(game, prefixPath: prefixPath) { setup in
+                            completion(setup.map { .installer($0) } ?? .failed)
+                        }
+                    }
+                    return
+                }
+                let name = GOGContentSystem.safePath(plan.installDirectory)?.replacingOccurrences(of: "/", with: " ")
+                    ?? "Game \(game.id)"
+                let staging = games.appendingPathComponent(".downloading/\(name)", isDirectory: true)
+                let final = games.appendingPathComponent(name, isDirectory: true)
+                let total = max(plan.downloadBytes, 1)
+                downloadSizes[game.id] = plan.installBytes
+                let counter = GOGByteCounter()
+                AppLog.record("[gog] installing game \(game.id): \(plan.files.count) files, \(plan.downloadBytes) bytes to download")
+                let installer = GOGContentInstaller(tokens: tokens) { bytes in
+                    let done = counter.add(bytes)
+                    Task { @MainActor in
+                        self.downloadProgress[game.id] = min(Double(done) / Double(total), 1)
+                        BackgroundDownloads.gog.progress(done: UInt64(done), total: UInt64(total))
+                    }
+                }
+                try await installer.install(plan, into: staging)
+                let manager = FileManager.default
+                if manager.fileExists(atPath: final.path) {
+                    // Merge into an existing folder (an update or an earlier installer).
+                    let walker = manager.enumerator(at: staging, includingPropertiesForKeys: [.isRegularFileKey])
+                    while let item = walker?.nextObject() as? URL {
+                        guard (try? item.resourceValues(forKeys: [.isRegularFileKey]))?.isRegularFile == true else { continue }
+                        let relative = String(item.standardizedFileURL.path.dropFirst(staging.standardizedFileURL.path.count + 1))
+                        let target = final.appendingPathComponent(relative)
+                        try manager.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
+                        try? manager.removeItem(at: target)
+                        try manager.moveItem(at: item, to: target)
+                    }
+                    try? manager.removeItem(at: staging)
+                } else {
+                    try manager.moveItem(at: staging, to: final)
+                }
+                if !plan.dependencies.isEmpty {
+                    AppLog.record("[gog] game \(game.id) lists redistributables: \(plan.dependencies.joined(separator: ", "))")
+                }
+                AppLog.record("[gog] game \(game.id) installed into C:\\GOG Games\\\(name)")
+                outcome = .completed
+                refreshInstalled(prefixPath: prefixPath)
+                completion(.installed)
+            } catch is CancellationError {
+                completion(.failed)
+            } catch {
+                downloadErrors[game.id] = error.localizedDescription
+                outcome = .failed(error.localizedDescription)
+                AppLog.record("[gog] install failed for game \(game.id): \(error.localizedDescription)")
+                completion(.failed)
+            }
+        }
     }
 
     /// The game's own folder: the highest folder up from the program that
@@ -579,6 +680,17 @@ final class GOGLibraryModel: ObservableObject {
         try? FileManager.default.removeItem(at: destination)
         try FileManager.default.moveItem(at: temporary, to: destination)
         return destination
+    }
+}
+
+/// Bytes downloaded so far, shared by the parallel file downloads.
+final class GOGByteCounter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var total: Int64 = 0
+    func add(_ bytes: Int64) -> Int64 {
+        lock.lock(); defer { lock.unlock() }
+        total += bytes
+        return total
     }
 }
 
