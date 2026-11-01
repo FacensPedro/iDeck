@@ -143,8 +143,14 @@ extern "C" int32_t ideck_runtime_launch(const char *executable_path,
             !ideck_native_validate_pe(canonicalExecutable.fileSystemRepresentation)) return EACCES;
 
         uint16_t guestMachine = ideck_native_pe_machine(canonicalExecutable.fileSystemRepresentation);
-        if (guestMachine != 0x014c && guestMachine != 0x8664) {
-            return ideck_invalid_launch("unsupported or corrupted Windows PE32/PE32+ executable");
+        // Wine's ARM64EC cmd.exe is required to run Steam's signed
+        // installscript.vdf prerequisites. Never admit an arbitrary ARM64EC
+        // guest path: only the prefix's own system32 command interpreter.
+        const NSString *systemCMD = [canonicalDrive stringByAppendingPathComponent:@"windows/system32/cmd.exe"];
+        const BOOL allowedSystemCMD = guestMachine == 0xa641 &&
+            [canonicalExecutable isEqualToString:(NSString *)systemCMD];
+        if (guestMachine != 0x014c && guestMachine != 0x8664 && !allowedSystemCMD) {
+            return ideck_invalid_launch("unsupported Windows PE machine or untrusted ARM64EC executable");
         }
         if (guestMachine == 0x014c) {
             // Never trust the is32Bit JSON hint: imported games can bypass
