@@ -101,11 +101,16 @@ struct EpicInstalledGame: Codable, Sendable {
 
     /// Install size of games not yet installed, read from their manifest; 0 = unknown.
     @Published private(set) var manifestSizes: [String: Int64] = [:]
+    private var manifestSizeBuilds: [String: String] = [:]
+    private var accountGeneration = 0
 
     /// Size for the game details page: the recorded install size, or the
     /// current build's manifest total for a game that is not installed.
     func loadSize(_ app: String) async {
-        guard installed[app] == nil, manifestSizes[app] == nil, let game = game(app) else { return }
+        guard signedIn, installed[app] == nil, let game = game(app) else { return }
+        if manifestSizes[app] != nil && manifestSizeBuilds[app] == game.buildVersion { return }
+        let generation = accountGeneration
+        let account = accountID
         let asset = EpicAsset(appName: game.appName, labelName: "Live", buildVersion: game.buildVersion,
                               catalogItemId: game.catalogItemID, namespace: game.namespace)
         guard let location = try? await api.manifestLocation(asset),
@@ -113,6 +118,9 @@ struct EpicInstalledGame: Codable, Sendable {
               let manifest = try? await Task.detached(priority: .utility, operation: {
                   try EpicManifest.parse(data, secrets: location.secrets)
               }).value else { return }
+        guard signedIn, accountGeneration == generation, accountID == account,
+              installed[app] == nil, game == self.game(app) else { return }
+        manifestSizeBuilds[app] = game.buildVersion
         manifestSizes[app] = manifest.files.reduce(0) { $0 + $1.size }
     }
 
@@ -210,6 +218,9 @@ struct EpicInstalledGame: Codable, Sendable {
     /// The authorization code from Epic's login page (EpicSignInView).
     func signIn(code: String) async throws {
         let session = try await api.signIn(authorizationCode: code)
+        accountGeneration += 1
+        manifestSizes.removeAll()
+        manifestSizeBuilds.removeAll()
         signedIn = true
         accountName = session.displayName
         accountID = session.accountID
@@ -224,11 +235,17 @@ struct EpicInstalledGame: Codable, Sendable {
         for app in Array(downloads.keys) { pause(app) }
         Task { await api.signOut() }
         try? FileManager.default.removeItem(at: Self.cacheURL)
+        accountGeneration += 1
+        manifestSizes.removeAll()
+        manifestSizeBuilds.removeAll()
         signedIn = false; accountName = nil; accountID = nil; owned = []; libraryUpdated = nil
     }
 
     private func handle(_ error: Error, context: String, report: Bool) {
         if case EpicAPIError.signedOut = error {
+            accountGeneration += 1
+            manifestSizes.removeAll()
+            manifestSizeBuilds.removeAll()
             signedIn = false; accountName = nil; accountID = nil
         }
         let reason = (error as? EpicAPIError)?.reason ?? (error as? URLError).map { "url-\($0.code.rawValue)" } ?? String(describing: type(of: error))
@@ -285,6 +302,9 @@ struct EpicInstalledGame: Codable, Sendable {
                     games.append(game)
                 }
             }
+            let builds = Dictionary(games.map { ($0.appName, $0.buildVersion) }, uniquingKeysWith: { first, _ in first })
+            manifestSizes = manifestSizes.filter { builds[$0.key] == manifestSizeBuilds[$0.key] }
+            manifestSizeBuilds = manifestSizeBuilds.filter { builds[$0.key] == $0.value }
             owned = games.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
             libraryUpdated = Date()
             if let account = await api.account() { writeCache(account: account.id); accountName = account.name }
