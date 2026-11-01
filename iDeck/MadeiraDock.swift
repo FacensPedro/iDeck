@@ -217,14 +217,38 @@ private final class SteamRuntimeRedirects: NSObject, URLSessionTaskDelegate, @un
 
 actor SteamRuntimeInstaller {
     static let shared = SteamRuntimeInstaller()
-    private var busy = false
+    // Coalesce concurrent workspace prefetch and foreground Play requests.
+    // A second caller must await the same verified Valve downloads instead of
+    // reporting a fictitious active Wine session while the actor is busy.
+    private var inFlight: Task<Void, Error>?
+    private var inFlightPrefix: String?
 
-    // Runs before any Wine session in this app run; no Wine/JIT run.
-    func prepare(prefix: URL, progress: @Sendable (String) async -> Void) async throws {
-        guard !busy, !ideck_wineprocess_running(), !ideck_wineserver_running() else {
+    func prepare(prefix: URL, progress: @Sendable @escaping (String) async -> Void) async throws {
+        let path = prefix.standardizedFileURL.path
+        if let running = inFlight {
+            guard inFlightPrefix == path else { throw SteamRuntimeFiles.Failure.activeSession }
+            try await running.value
+            await progress("Steam components are ready.")
+            return
+        }
+        let operation = Task { try await self.prepareOnce(prefix: prefix, progress: progress) }
+        inFlight = operation
+        inFlightPrefix = path
+        defer { inFlight = nil; inFlightPrefix = nil }
+        try await operation.value
+    }
+
+    // Only the first caller performs writes; another request waits for it.
+    private func prepareOnce(prefix: URL, progress: @Sendable (String) async -> Void) async throws {
+        // Wine can leave an idle wineserver behind after a failed launch.
+        // Stop it only if its guest thread has finished; never edit a live hive.
+        if !ideck_wineprocess_running(), ideck_wineserver_running(),
+           ideck_wineprocess_thread_finished() {
+            _ = ideck_wineserver_stop_if_idle()
+        }
+        guard !ideck_wineprocess_running(), !ideck_wineserver_running() else {
             throw SteamRuntimeFiles.Failure.activeSession
         }
-        busy = true; defer { busy = false }
         SteamRuntimeFiles.lastConflict = nil
         let fm = FileManager.default
         // iDeck's prefix comes from its own template (PrefixInstaller); the
