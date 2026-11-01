@@ -627,6 +627,7 @@ class SystemCoordinator: ObservableObject {
             }
             return true
         }
+        if legacyVisualCRuntimeTask != nil { return true }
         let prefix = prefix.standardizedFileURL
         let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
         if VisualCRuntimeBootstrap.installed(in: prefix, documents: documents) {
@@ -664,16 +665,22 @@ class SystemCoordinator: ObservableObject {
 
     /// Set once per app run, so a failed package does not block every launch.
     private var legacyVisualCRuntimeAttempted = false
+    private var legacyVisualCRuntimeTask: Task<Void, Never>?
+    private var legacyVisualCRuntimeGeneration = UUID()
 
     private func beginLegacyVisualCRuntimeInstallation(documents: URL, resume: @escaping () -> Void) {
         legacyVisualCRuntimeAttempted = true
         setWindowsStatus(VisualCRuntimeLegacy.installStatus)
-        Task { [weak self] in
+        let generation = UUID()
+        legacyVisualCRuntimeGeneration = generation
+        legacyVisualCRuntimeTask = Task { [weak self] in
             let failures = await VisualCRuntimeLegacy.installAll(documents: documents) { name in
                 AppLog.record("[vcrt] installing Visual C++ \(name)")
             }
             await MainActor.run {
-                guard let self else { return }
+                guard let self, self.legacyVisualCRuntimeGeneration == generation else { return }
+                self.legacyVisualCRuntimeTask = nil
+                guard self.windowsStatus == VisualCRuntimeLegacy.installStatus else { return }
                 for failure in failures { AppLog.record("[vcrt] \(failure)") }
                 AppLog.record(failures.isEmpty ? "[vcrt] Visual C++ 2005-2013 and 32-bit runtimes installed"
                                                : "[vcrt] \(failures.count) Visual C++ packages failed; retried next launch")
@@ -1079,7 +1086,7 @@ class SystemCoordinator: ObservableObject {
                 }
                 guard poolMiB >= Self.dockMinimumPoolMiB else {
                     AppLog.record("[dock-launch] JIT pool \(poolMiB) MiB is below Steam's client minimum (\(Self.dockMinimumPoolMiB) MiB)")
-                    self.setWindowsStatus("Cannot launch Steam through Madeira Dock: the Wine JIT pool is only \(poolMiB) MiB; at least \(Self.dockMinimumPoolMiB) MiB is required. Increase the pool and reattach StikDebug.")
+                    self.setWindowsStatus("Cannot launch Steam through Madeira Dock: the Wine JIT pool is only \(poolMiB) MiB; at least \(Self.dockMinimumPoolMiB) MiB is required. Select Automatic or at least 512 MiB in Settings, fully close and reopen iDeck, then enable StikDebug from iDeck. Reattaching alone cannot resize an existing pool.")
                     return
                 }
                 self.startDockSession(game: game, profile: profile, prefixPath: prefixPath)
@@ -1261,6 +1268,12 @@ class SystemCoordinator: ObservableObject {
     // terminate iDeck and all of its Steam library state.
     func requestCloseWindowsSession() {
         guard !isClosingWindowsSession else { return }
+        legacyVisualCRuntimeGeneration = UUID()
+        if let task = legacyVisualCRuntimeTask {
+            task.cancel()
+            legacyVisualCRuntimeTask = nil
+            legacyVisualCRuntimeAttempted = false
+        }
         isClosingWindowsSession = true
         windowsCloseWarning = nil
         windowsCloseWarningWasShown = false

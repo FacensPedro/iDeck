@@ -155,12 +155,13 @@ static int nested_candidate(const char *filename) {
     return 0;
 }
 
-static int contains_cabinet_header(const char *path) {
+static int contains_archive_header(const char *path) {
     FILE *stream = fopen(path, "rb");
     if (!stream) return 0;
-    unsigned char bytes[4];
+    unsigned char bytes[8];
+    static const unsigned char compound[8] = {0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1};
     int valid = fread(bytes, 1, sizeof bytes, stream) == sizeof bytes &&
-                memcmp(bytes, "MSCF", 4) == 0;
+                (memcmp(bytes, "MSCF", 4) == 0 || memcmp(bytes, compound, 8) == 0);
     fclose(stream);
     return valid;
 }
@@ -238,8 +239,10 @@ static int inspect_cabinets(const char *source, const char *target,
                 goto finish;
             }
             if (dec->extract(dec, file, nested) == MSPACK_ERR_OK &&
-                contains_cabinet_header(nested)) {
-                /* A separate decompressor prevents recursive use of the
+                contains_archive_header(nested)) {
+                /* VC++ 2005 stores its runtime CAB inside an MSI compound file.
+                 * search() locates embedded cabinets; the MSI header is not MSCF.
+                 * A separate decompressor prevents recursive use of the
                  * same libmspack instance during the outer enumeration. */
                 status = inspect_cabinets(nested, target, level + 1,
                                           state, message, capacity);

@@ -101,6 +101,13 @@ class ExtractorTests(unittest.TestCase):
         for i, name in enumerate(DLL_NAMES):
             self.assertEqual((stage / name).read_bytes()[340], i + 1, name)
 
+    def test_cabinet_inside_msi_compound_header_is_searched(self):
+        # Model the contiguous embedded CAB found in the VC++ 2005 MSI.
+        msi = bytes.fromhex("d0cf11e0a1b11ae1") + bytes(504) + make_cab()
+        result, stage = self.extract(make_cab_payloads([("vcredist.msi", msi)]))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(sorted(p.name for p in stage.iterdir()), sorted(DLL_NAMES))
+
     def test_nested_archives_missing_concrt140_are_rejected(self):
         result, _ = self.extract(make_nested_cab(missing="concrt140.dll"))
         self.assertNotEqual(result.returncode, 0)

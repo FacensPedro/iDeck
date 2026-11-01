@@ -300,16 +300,20 @@ enum VisualCRuntimeLegacy {
     static func installAll(documents: URL, progress: @escaping (String) -> Void) async -> [String] {
         var failures: [String] = []
         for package in packages {
+            if Task.isCancelled { return failures }
             progress(package.name)
             do {
                 let installer = try await download(package)
                 defer { try? FileManager.default.removeItem(at: installer) }
+                try Task.checkCancellation()
                 _ = try extract(package, installer: installer, documents: documents)
+                try Task.checkCancellation()
             } catch {
+                if Task.isCancelled { return failures }
                 failures.append("\(package.name): \(error.localizedDescription)")
             }
         }
-        if failures.isEmpty {
+        if failures.isEmpty && !Task.isCancelled {
             let marker = documents.appendingPathComponent("vcruntime/\(markerName)")
             FileManager.default.createFile(atPath: marker.path, contents: Data())
         }
