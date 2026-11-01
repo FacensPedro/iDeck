@@ -159,11 +159,25 @@ class SystemCoordinator: ObservableObject {
     
     func setWindowsStatus(_ status: String) {
         AppLog.record("[status] " + status)
+        recordBenchmarkMilestone(status)
         let update = {
             self.windowsStatus = status
             self.currentStatus = status
         }
         if Thread.isMainThread { update() } else { DispatchQueue.main.async(execute: update) }
+    }
+
+    /// Benchmark milestones and the end of a game session, from its status.
+    private func recordBenchmarkMilestone(_ status: String) {
+        switch status {
+        case "Wine started; waiting for game...": BenchmarkSession.mark("wine_started")
+        case "Running", "Steam Running": BenchmarkSession.mark("running")
+        case "Windows Ready": BenchmarkSession.finish(kind: "game", outcome: "closed")
+        default:
+            if status.hasPrefix("Execution Error") || status.hasPrefix("Cannot launch") {
+                BenchmarkSession.finish(kind: "game", outcome: "failed: " + status)
+            }
+        }
     }
 
     func setLiveContainerStatus(_ status: String) {
@@ -628,6 +642,8 @@ class SystemCoordinator: ObservableObject {
     func launchWindowsExecutable(at url: URL, profile: WindowsGameProfile? = nil) {
         guard !isClosingWindowsSession else { return }
         isSteamSession = false
+        BenchmarkSession.begin(kind: "game", scenario: profile?.title ?? url.deletingPathExtension().lastPathComponent,
+                               settings: BenchmarkSession.gameSettings(profile))
         guard !previousWineSessionStillFinishing() else { return }
         guard MadeiraBundleIdentity.isNative else {
             setWindowsStatus(MadeiraBundleIdentity.missingRuntimeMessage)
@@ -762,6 +778,9 @@ class SystemCoordinator: ObservableObject {
     func launchSteamGame(game: SteamAppInfo, profile: WindowsGameProfile, prefixPath: URL, skipSteamClient: Bool = false) {
         guard !isClosingWindowsSession else { return }
         isSteamSession = true
+        var benchmarkSettings = BenchmarkSession.gameSettings(profile)
+        benchmarkSettings["store"] = "steam"
+        BenchmarkSession.begin(kind: "game", scenario: game.name, settings: benchmarkSettings)
         guard MadeiraBundleIdentity.isNative else {
             setWindowsStatus(MadeiraBundleIdentity.missingRuntimeMessage)
             return

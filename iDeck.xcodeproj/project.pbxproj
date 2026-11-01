@@ -19,6 +19,9 @@
 		E10000000000000000000010 /* SteamDepotRegionPolicy.c in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000010 /* SteamDepotRegionPolicy.c */; };
 		E10000000000000000000012 /* SteamDiskIO.c in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000012 /* SteamDiskIO.c */; };
 		F7A000000000000000000001 /* ZipNative.c in Sources */ = {isa = PBXBuildFile; fileRef = F8A000000000000000000001 /* ZipNative.c */; };
+		F7C000000000000000000005 /* BenchmarkBridge.mm in Sources */ = {isa = PBXBuildFile; fileRef = F8C00000000000000000000A /* BenchmarkBridge.mm */; };
+		F7C000000000000000000004 /* BenchmarkRecorder.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F8C000000000000000000008 /* BenchmarkRecorder.cpp */; };
+		F7C000000000000000000003 /* PipelineCounters.c in Sources */ = {isa = PBXBuildFile; fileRef = F8C000000000000000000006 /* PipelineCounters.c */; };
 		F7C000000000000000000002 /* EpicChunkBridge.mm in Sources */ = {isa = PBXBuildFile; fileRef = F8C000000000000000000004 /* EpicChunkBridge.mm */; };
 		F7C000000000000000000001 /* EpicChunkCodec.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F8C000000000000000000002 /* EpicChunkCodec.cpp */; };
 		E10000000000000000000014 /* SteamNativeCore.c in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000014 /* SteamNativeCore.c */; };
@@ -67,6 +70,7 @@
 		A1000000000000000000000D /* SteamLibraryPreviewCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000D /* SteamLibraryPreviewCache.swift */; };
 		999999999999999999999914 /* UpdateChecker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 999999999999999999999906 /* UpdateChecker.swift */; };
 		F30000000000000000000021 /* WineLogClipboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = F40000000000000000000021 /* WineLogClipboard.swift */; };
+		F3A000000000000000000013 /* BenchmarkSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000013 /* BenchmarkSession.swift */; };
 		F3A000000000000000000012 /* DownloadSpeed.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000012 /* DownloadSpeed.swift */; };
 		F3A000000000000000000005 /* GameDetailComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000005 /* GameDetailComponents.swift */; };
 		F3A000000000000000000011 /* LiveContainerSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000011 /* LiveContainerSettings.swift */; };
@@ -169,6 +173,7 @@
 		A2000000000000000000000D /* SteamLibraryPreviewCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamLibraryPreviewCache.swift; sourceTree = "<group>"; };
 		999999999999999999999906 /* UpdateChecker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateChecker.swift; sourceTree = "<group>"; };
 		F40000000000000000000021 /* WineLogClipboard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WineLogClipboard.swift; sourceTree = "<group>"; };
+		F4A000000000000000000013 /* BenchmarkSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BenchmarkSession.swift; sourceTree = "<group>"; };
 		F4A000000000000000000012 /* DownloadSpeed.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadSpeed.swift; sourceTree = "<group>"; };
 		F4A000000000000000000005 /* GameDetailComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameDetailComponents.swift; sourceTree = "<group>"; };
 		F4A000000000000000000011 /* LiveContainerSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveContainerSettings.swift; sourceTree = "<group>"; };
@@ -228,6 +233,12 @@
 		E20000000000000000000013 /* SteamDiskIO.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SteamDiskIO.h; sourceTree = "<group>"; };
 		F8A000000000000000000001 /* ZipNative.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = ZipNative.c; sourceTree = "<group>"; };
 		F8B000000000000000000001 /* ZipNative.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ZipNative.h; sourceTree = "<group>"; };
+		F8C00000000000000000000A /* BenchmarkBridge.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = BenchmarkBridge.mm; sourceTree = "<group>"; };
+		F8C000000000000000000009 /* BenchmarkBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = BenchmarkBridge.h; sourceTree = "<group>"; };
+		F8C000000000000000000008 /* BenchmarkRecorder.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = BenchmarkRecorder.cpp; sourceTree = "<group>"; };
+		F8C000000000000000000007 /* BenchmarkRecorder.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = BenchmarkRecorder.hpp; sourceTree = "<group>"; };
+		F8C000000000000000000006 /* PipelineCounters.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = PipelineCounters.c; sourceTree = "<group>"; };
+		F8C000000000000000000005 /* PipelineCounters.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = PipelineCounters.h; sourceTree = "<group>"; };
 		F8C000000000000000000004 /* EpicChunkBridge.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = EpicChunkBridge.mm; sourceTree = "<group>"; };
 		F8C000000000000000000003 /* EpicChunkBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = EpicChunkBridge.h; sourceTree = "<group>"; };
 		F8C000000000000000000002 /* EpicChunkCodec.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = EpicChunkCodec.cpp; sourceTree = "<group>"; };
@@ -302,6 +313,7 @@
 				A1000000000000000000000D /* SteamLibraryPreviewCache.swift in Sources */,
 				999999999999999999999914 /* UpdateChecker.swift in Sources */,
 				F30000000000000000000021 /* WineLogClipboard.swift in Sources */,
+				F3A000000000000000000013 /* BenchmarkSession.swift in Sources */,
 				F3A000000000000000000012 /* DownloadSpeed.swift in Sources */,
 				F3A000000000000000000005 /* GameDetailComponents.swift in Sources */,
 				F3A000000000000000000011 /* LiveContainerSettings.swift in Sources */,
@@ -350,6 +362,9 @@
 				E10000000000000000000010 /* SteamDepotRegionPolicy.c in Sources */,
 				E10000000000000000000012 /* SteamDiskIO.c in Sources */,
 				F7A000000000000000000001 /* ZipNative.c in Sources */,
+				F7C000000000000000000005 /* BenchmarkBridge.mm in Sources */,
+				F7C000000000000000000004 /* BenchmarkRecorder.cpp in Sources */,
+				F7C000000000000000000003 /* PipelineCounters.c in Sources */,
 				F7C000000000000000000002 /* EpicChunkBridge.mm in Sources */,
 				F7C000000000000000000001 /* EpicChunkCodec.cpp in Sources */,
 				E10000000000000000000014 /* SteamNativeCore.c in Sources */,
@@ -426,6 +441,7 @@
 				222222222222222222222229 /* GraphicsConfig.swift */,
 				999999999999999999999906 /* UpdateChecker.swift */,
 				F40000000000000000000021 /* WineLogClipboard.swift */,
+				F4A000000000000000000013 /* BenchmarkSession.swift */,
 				F4A000000000000000000012 /* DownloadSpeed.swift */,
 				F4A000000000000000000005 /* GameDetailComponents.swift */,
 				F4A000000000000000000011 /* LiveContainerSettings.swift */,
@@ -483,6 +499,12 @@
 				E20000000000000000000013 /* SteamDiskIO.h */,
 				F8A000000000000000000001 /* ZipNative.c */,
 				F8B000000000000000000001 /* ZipNative.h */,
+				F8C00000000000000000000A /* BenchmarkBridge.mm */,
+				F8C000000000000000000009 /* BenchmarkBridge.h */,
+				F8C000000000000000000008 /* BenchmarkRecorder.cpp */,
+				F8C000000000000000000007 /* BenchmarkRecorder.hpp */,
+				F8C000000000000000000006 /* PipelineCounters.c */,
+				F8C000000000000000000005 /* PipelineCounters.h */,
 				F8C000000000000000000004 /* EpicChunkBridge.mm */,
 				F8C000000000000000000003 /* EpicChunkBridge.h */,
 				F8C000000000000000000002 /* EpicChunkCodec.cpp */,

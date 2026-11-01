@@ -1,4 +1,5 @@
 #include "EpicChunkCodec.hpp"
+#include "PipelineCounters.h"
 
 #include <CommonCrypto/CommonDigest.h>
 #include <zlib.h>
@@ -10,8 +11,22 @@ namespace {
 constexpr size_t kMaxWindow = 512u << 20;
 }
 
+namespace {
+CodecStatus inflateWindowUntimed(const uint8_t *input, size_t inputSize,
+                                 uint8_t *out, size_t expectedSize);
+}
+
 CodecStatus inflateWindow(const uint8_t *input, size_t inputSize,
                           uint8_t *out, size_t expectedSize) {
+    const uint64_t start = ideck_stage_now();
+    const CodecStatus status = inflateWindowUntimed(input, inputSize, out, expectedSize);
+    ideck_stage_add(IDECK_STAGE_DECOMPRESS, status == CodecStatus::ok ? expectedSize : 0, start);
+    return status;
+}
+
+namespace {
+CodecStatus inflateWindowUntimed(const uint8_t *input, size_t inputSize,
+                                 uint8_t *out, size_t expectedSize) {
     if (expectedSize > kMaxWindow) return CodecStatus::tooLarge;
     // RFC 1950 header: CM = 8 (DEFLATE), no preset dictionary, FCHECK valid.
     if (inputSize < 2 || (input[0] & 0x0F) != 8 || (input[1] & 0x20) != 0 ||
@@ -48,6 +63,7 @@ CodecStatus inflateWindow(const uint8_t *input, size_t inputSize,
     inflateEnd(&stream);
     return (result == Z_STREAM_END && produced == expectedSize) ? CodecStatus::ok : CodecStatus::corrupt;
 }
+} // namespace
 
 void sha1(const uint8_t *bytes, size_t size, uint8_t digest[20]) {
     CC_SHA1_CTX context;

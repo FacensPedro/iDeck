@@ -397,6 +397,8 @@ struct EpicInstalledGame: Codable, Sendable {
     private func run(_ app: String) async {
         let kind = downloads[app]?.kind ?? .install
         var outcome = BackgroundDownloads.Outcome.paused
+        BenchmarkSession.begin(kind: "install", scenario: "Epic: " + (game(app)?.title ?? installed[app]?.title ?? app),
+                               settings: ["store": "epic", "operation": kind.rawValue])
         do {
             guard let game = game(app) ?? installed[app].map({ record in
                 EpicOwnedGame(appName: record.appName, title: record.title, namespace: record.namespace, catalogItemID: record.catalogItemID,
@@ -460,6 +462,13 @@ struct EpicInstalledGame: Codable, Sendable {
         active = nil
         background.ended(name: game(app)?.title ?? installed[app]?.title ?? "Epic game",
                          outcome: outcome, queueEmpty: queue.isEmpty)
+        switch outcome {
+        case .completed:
+            BenchmarkSession.finish(kind: "install", outcome: "completed",
+                                    installBytes: UInt64(max(0, installed[app]?.installBytes ?? 0)))
+        case .failed(let message): BenchmarkSession.finish(kind: "install", outcome: "failed: " + message)
+        case .paused: BenchmarkSession.finish(kind: "install", outcome: "paused")
+        }
         pump()
     }
 

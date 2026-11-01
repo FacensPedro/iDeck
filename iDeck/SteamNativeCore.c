@@ -1,4 +1,5 @@
 #include "SteamNativeCore.h"
+#include "PipelineCounters.h"
 
 #include <CommonCrypto/CommonCryptor.h>
 #include <CommonCrypto/CommonDigest.h>
@@ -147,7 +148,7 @@ bool ideck_steam_hex_encode(const uint8_t *bytes, size_t count,
     return true;
 }
 
-int32_t ideck_steam_decrypt_chunk(const uint8_t *input, size_t input_length,
+static int32_t ideck_steam_decrypt_chunk_untimed(const uint8_t *input, size_t input_length,
                                   const uint8_t *key, size_t key_length,
                                   uint8_t *output, size_t output_capacity,
                                   size_t *output_length) {
@@ -177,4 +178,14 @@ int32_t ideck_steam_decrypt_chunk(const uint8_t *input, size_t input_length,
         return -3;
     }
     return 0;
+}
+
+int32_t ideck_steam_decrypt_chunk(const uint8_t *input, size_t input_length,
+                                  const uint8_t *key, size_t key_length,
+                                  uint8_t *output, size_t output_capacity,
+                                  size_t *output_length) {
+    const uint64_t start = ideck_stage_now();
+    const int32_t result = ideck_steam_decrypt_chunk_untimed(input, input_length, key, key_length, output, output_capacity, output_length);
+    ideck_stage_add(IDECK_STAGE_DECRYPT, (result == 0 && output_length) ? *output_length : 0, start);
+    return result;
 }
