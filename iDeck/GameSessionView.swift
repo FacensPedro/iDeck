@@ -121,9 +121,10 @@ struct GameSessionView: View {
                 let recentlyReady = metrics.secondsSinceLaunch - (metrics.firstFrameAt ?? 0) < 2.5
                 return recentlyReady ? (1.0, "First Metal frame displayed") : nil
             }
-            return (0.90, coordinator.currentSteamLaunchUsesDock
-                ? "Waiting for a Metal frame after Steam's LaunchApp"
-                : "Waiting for the first game frame")
+            if coordinator.currentSteamLaunchUsesDock {
+                return (0.90, "Waiting for a Metal frame after Steam's LaunchApp")
+            }
+            return (0.90, "Waiting for the first game frame")
         }
         return nil
     }
