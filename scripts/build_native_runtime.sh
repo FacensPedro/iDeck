@@ -18,6 +18,7 @@ for tool in xcodebuild xcrun python3; do
 done
 
 export IDECK_MADEIRA_GRAPHICS="${IDECK_MADEIRA_GRAPHICS:-d3d11}"
+[[ "$IDECK_MADEIRA_GRAPHICS" == "unified" ]] && export IDECK_GRAPHICS_PROFILE=unified IDECK_MADEIRA_GRAPHICS=d3d12
 [[ "$IDECK_MADEIRA_GRAPHICS" == "d3d11" || "$IDECK_MADEIRA_GRAPHICS" == "d3d12" ]] || {
   echo "ERROR: unsupported native graphics profile: $IDECK_MADEIRA_GRAPHICS" >&2
   exit 2

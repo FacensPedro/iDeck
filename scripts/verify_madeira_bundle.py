@@ -378,18 +378,30 @@ def inspect(app: Path, require_wow64: bool = False, graphics: str = "d3d12") -> 
     return errors
 
 
+def graphics_profile(options) -> str:
+    """The profile name for the manifest; it must agree with what was built."""
+    profile = options.profile or ("unified" if options.graphics == "d3d12" else "d3d11")
+    if (profile == "d3d11") != (options.graphics == "d3d11"):
+        raise SystemExit(f"graphics profile {profile} does not match the {options.graphics} build")
+    return profile
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--app", type=Path)
     parser.add_argument("--linker-flags", action="store_true",
                         help="retain and export required native entry points")
-    parser.add_argument("--graphics", choices=("d3d11", "d3d12"), default="d3d12",
+    parser.add_argument("--graphics", choices=("d3d11", "d3d12", "unified"), default="d3d12",
                         help="strict native graphics profile; d3d11 forbids D3D12 and Apple converter")
+    parser.add_argument("--profile", choices=("unified", "d3d11", "d3d12"),
+                        help="graphics profile recorded in the manifest (default: unified for d3d12)")
     parser.add_argument("--require", action="store_true",
                         help="fail if native runtime is absent; never produce a false-ready IPA")
     parser.add_argument("--require-wow64", action="store_true",
                         help="require a complete i386/ARM64 WoW64 payload")
     options = parser.parse_args()
+    if options.graphics == "unified":   # DXMT + Madeira D3D12: the d3d12 payload
+        options.graphics = "d3d12"
     if options.linker_flags:
         symbols = SYMBOLS if options.graphics == "d3d12" else tuple(
             name for name in SYMBOLS if name not in D3D12_SYMBOLS
@@ -421,6 +433,11 @@ def main() -> int:
             "dxmtLinked": True,
             "d3d12Linked": options.graphics == "d3d12",
             "graphicsBackend": options.graphics,
+            # Each backend's availability, recorded separately: D3D12 is
+            # added next to DXMT, never in its place.
+            "d3d11Available": True,
+            "d3d12Available": options.graphics == "d3d12",
+            "graphicsProfile": graphics_profile(options),
             "wow64Enabled": (app / "i386-windows/ntdll.dll").is_file(),
         }, handle)
     print("Native payload and symbols found. Device integration testing is still required.")

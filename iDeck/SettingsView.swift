@@ -437,7 +437,11 @@ struct SettingsView: View {
                     Text(tr(MadeiraBundleIdentity.isNative ? "Madeira-native" : "Interface-only"))
                         .foregroundStyle(MadeiraBundleIdentity.isNative ? .green : .orange)
                 }
-                LabeledContent(tr("Graphics backend"), value: (runtime["graphicsBackend"] as? String ?? "none").uppercased())
+                LabeledContent(tr("Graphics profile"), value: MadeiraBundleIdentity.graphicsProfile)
+                LabeledContent("Direct3D 11 (DXMT)",
+                               value: tr(MadeiraBundleIdentity.d3d11Available ? "Bundled" : "Not bundled"))
+                LabeledContent("Direct3D 12 (Madeira)",
+                               value: tr(MadeiraBundleIdentity.d3d12Available ? "Bundled" : "Not bundled"))
                 LabeledContent("WoW64", value: tr((runtime["wow64Enabled"] as? Bool ?? false) ? "Bundled" : "Not bundled"))
                 LabeledContent("Wine Mono", value: tr((runtime["wineMonoBundled"] as? Bool ?? false) ? "Bundled" : "Not bundled"))
                 LabeledContent("Metal Shader Converter",

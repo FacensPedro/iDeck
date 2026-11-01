@@ -25,6 +25,13 @@ class RuntimeProfileStampTests(unittest.TestCase):
             "wow64Enabled": wow64,
         }
         (self.app / "MadeiraRuntimeManifest.plist").write_bytes(plistlib.dumps(data))
+        modules = ["d3d11.dll", "dxgi.dll", "winemetal.dll"]
+        if graphics == "d3d12":
+            modules += ["madeira_d3d12.dll", "d3d12.dll", "d3d12core.dll"]
+        for name in modules:
+            dll = self.app / "arm64ec-windows" / name
+            dll.parent.mkdir(parents=True, exist_ok=True)
+            dll.write_bytes(b"MZtest-only-fixture")
         if graphics == "d3d12":
             converter = self.app / "d3d12/libmetalirconverter.dylib"
             converter.parent.mkdir(parents=True, exist_ok=True)
@@ -60,6 +67,26 @@ class RuntimeProfileStampTests(unittest.TestCase):
         self.assertTrue(profile["wineMonoBundled"])
         self.assertFalse(profile["metalShaderConverterBundled"])
 
+    def test_unified_records_both_backends_from_files(self):
+        self.native_manifest("d3d12")
+        profile = module.stamp(self.app, require_native=True, expected_graphics="unified")
+        self.assertEqual(profile["graphicsProfile"], "unified")
+        self.assertTrue(profile["d3d11Available"])
+        self.assertTrue(profile["d3d12Available"])
+
+    def test_d3d11_profile_records_d3d12_unavailable(self):
+        self.native_manifest("d3d11")
+        profile = module.stamp(self.app, require_native=True, expected_graphics="d3d11")
+        self.assertEqual(profile["graphicsProfile"], "d3d11")
+        self.assertTrue(profile["d3d11Available"])
+        self.assertFalse(profile["d3d12Available"])
+
+    def test_missing_dxmt_is_never_reported_as_available(self):
+        self.native_manifest("d3d12")
+        (self.app / "arm64ec-windows/d3d11.dll").unlink()
+        with self.assertRaisesRegex(ValueError, "missing DXMT"):
+            module.stamp(self.app, require_native=True, expected_graphics="unified")
+
     def test_native_d3d12_requires_converter_asset(self):
         self.native_manifest("d3d12")
         (self.app / "d3d12/libmetalirconverter.dylib").unlink()
@@ -82,7 +109,7 @@ class RuntimeProfileStampTests(unittest.TestCase):
         self.assertIn("static var nativeManifest: [String: Any]?", app)
         self.assertIn("static var isNative: Bool", app)
         settings = (ROOT / "iDeck/SettingsView.swift").read_text()
-        for field in ("runtimeKind", "graphicsBackend", "wow64Enabled",
+        for field in ("runtimeKind", "d3d12Available", "wow64Enabled",
                       "wineMonoBundled", "metalShaderConverterBundled"):
             self.assertIn(field if field != "runtimeKind" else "MadeiraBundleIdentity.isNative", settings)
 

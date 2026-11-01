@@ -444,7 +444,7 @@ def main() -> int:
     parser.add_argument("action", choices=("create", "install", "inspect", "path"))
     parser.add_argument("--wow64", action="store_true")
     parser.add_argument("--mono", action="store_true")
-    parser.add_argument("--graphics", choices=("d3d11", "d3d12"), default="d3d12")
+    parser.add_argument("--graphics", choices=("d3d11", "d3d12", "unified"), default="d3d12")
     parser.add_argument("--cache", action="store_true")
     parser.add_argument("--archive", type=Path)
     parser.add_argument("--output", type=Path, default=ROOT / "build/madeira-prebuilt")
@@ -452,6 +452,8 @@ def main() -> int:
     parser.add_argument("--bridge", type=Path, default=ROOT / "build/madeira-native")
     parser.add_argument("--resource-root", type=Path)
     args = parser.parse_args()
+    if args.graphics == "unified":   # DXMT + Madeira D3D12: the d3d12 payload
+        args.graphics = "d3d12"
     archive = args.archive or default_path(args.wow64, args.mono, args.cache, args.graphics)
     try:
         if args.action == "path":

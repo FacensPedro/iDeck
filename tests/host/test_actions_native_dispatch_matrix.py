@@ -25,7 +25,7 @@ class ActionsNativeDispatchMatrix(unittest.TestCase):
             return default.group(1)
 
         self.assertEqual("true", field_default("require_madeira"))
-        self.assertEqual("d3d11", field_default("graphics_profile"))
+        self.assertEqual("unified", field_default("graphics_profile"))
         self.assertEqual("true", field_default("build_wow64"))
         self.assertEqual("false", field_default("accept_converter_license"))
         self.assertEqual("false", field_default("bundle_wine_mono"))

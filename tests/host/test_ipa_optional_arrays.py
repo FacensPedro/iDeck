@@ -49,7 +49,7 @@ python3 -c 'import json,sys;print(json.dumps(sys.argv[1:]))' ${FLAGS[@]+"${FLAGS
         self.assertIn('export IDECK_MADEIRA_GRAPHICS="${IDECK_MADEIRA_GRAPHICS:-d3d11}"', native)
         self.assertIn('export IDECK_PREBUILT_MODE="${IDECK_PREBUILT_MODE:-prefer}"', native)
         self.assertIn('D3D12 requires confirmed rights', native)
-        self.assertIn('export IDECK_MADEIRA_GRAPHICS="${IDECK_MADEIRA_GRAPHICS:-d3d12}"', ipa)
+        self.assertIn('export IDECK_GRAPHICS_PROFILE="${IDECK_GRAPHICS_PROFILE:-${IDECK_MADEIRA_GRAPHICS:-unified}}"', ipa)
         self.assertIn('export IDECK_BUILD_WOW64="${IDECK_BUILD_WOW64:-1}"', ipa)
         self.assertIn('IDECK_BUILD_WOW64 must be 0 or 1', ipa)
         self.assertIn('IDECK_BUILD_WOW64 must be 0 or 1', native)
@@ -64,7 +64,7 @@ python3 -c 'import json,sys;print(json.dumps(sys.argv[1:]))' ${FLAGS[@]+"${FLAGS
             source,
         )
         self.assertIn(
-            'python3 scripts/verify_madeira_bundle.py --app "$APP" --require --graphics "$IDECK_MADEIRA_GRAPHICS"\n',
+            'python3 scripts/verify_madeira_bundle.py --app "$APP" --require --graphics "$IDECK_MADEIRA_GRAPHICS" --profile "$IDECK_GRAPHICS_PROFILE"\n',
             source,
         )
 

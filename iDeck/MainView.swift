@@ -2148,7 +2148,7 @@ private struct WindowsGameProfileForm: View {
             }
             DetailCard(title: tr("Graphics")) {
                 DetailPickerRow(title: tr("Graphics API"), selection: $profile.graphicsAPI,
-                                choices: ["Automatic", "Direct3D 9", "Direct3D 10", "Direct3D 11", "Direct3D 12"],
+                                choices: WindowsGameProfile.graphicsAPIModes,
                                 icon: "cube.fill", iconColor: .indigo)
                 DetailPickerRow(title: tr("Vulkan"), selection: $profile.vulkanMode, choices: WindowsGameProfile.vulkanModes,
                                 icon: "flame.fill", iconColor: .red)

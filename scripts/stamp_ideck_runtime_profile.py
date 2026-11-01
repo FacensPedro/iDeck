@@ -33,6 +33,8 @@ def stamp(app: Path, require_native: bool = False, expected_graphics: str | None
         graphics = native.get("graphicsBackend")
         if graphics not in ("d3d11", "d3d12") or native.get("d3d12Linked") is not (graphics == "d3d12"):
             raise ValueError("Native runtime graphics profile is invalid")
+        if expected_graphics == "unified":
+            expected_graphics = "d3d12"   # unified builds the d3d12 payload: DXMT + Madeira D3D12
         if expected_graphics and graphics != expected_graphics:
             raise ValueError("Native runtime graphics profile differs from requested graphics")
         wow64 = native.get("wow64Enabled") is True
@@ -43,12 +45,24 @@ def stamp(app: Path, require_native: bool = False, expected_graphics: str | None
             raise ValueError("WoW64 manifest advertises missing i386 Windows DLLs")
         mono = (app / "wine-mono/bin/libmono-2.0-x86.dll").is_file()
         kind = "madeira-native"
+        # Both backends are checked on disk, not inferred from the profile.
+        d3d11 = all((app / "arm64ec-windows" / name).is_file() for name in ("d3d11.dll", "dxgi.dll", "winemetal.dll"))
+        d3d12 = all((app / "arm64ec-windows" / name).is_file() for name in ("madeira_d3d12.dll", "d3d12.dll", "d3d12core.dll")) and converter
+        if not d3d11:
+            raise ValueError("Native runtime is missing DXMT (D3D11)")
+        if d3d12 != (graphics == "d3d12"):
+            raise ValueError("D3D12 files on disk do not match the native graphics backend")
+        if native.get("d3d12Available", d3d12) is not d3d12 or native.get("d3d11Available", True) is not True:
+            raise ValueError("Manifest backend availability differs from the bundle")
+        profile_name = native.get("graphicsProfile") or ("unified" if d3d12 else "d3d11")
     else:
         if require_native:
             raise ValueError("Native runtime requested but the packaged IPA is interface-only")
         if (app / "arm64ec-windows/ntdll.dll").is_file() or (app / "d3d12/libmetalirconverter.dylib").is_file():
             raise ValueError("Interface-only IPA unexpectedly contains a native Windows payload")
         kind, graphics, wow64, mono, converter = "interface-only", "none", False, False, False
+        d3d11 = d3d12 = False
+        profile_name = "none"
 
     profile = {
         "profileSchema": 1,
@@ -57,6 +71,9 @@ def stamp(app: Path, require_native: bool = False, expected_graphics: str | None
         "wow64Enabled": wow64,
         "wineMonoBundled": mono,
         "metalShaderConverterBundled": converter,
+        "graphicsProfile": profile_name,
+        "d3d11Available": d3d11,
+        "d3d12Available": d3d12,
         "sourceCommit": source_commit(),
     }
     with (app / "iDeckRuntimeProfile.plist").open("wb") as handle:
@@ -68,7 +85,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--app", type=Path, required=True)
     parser.add_argument("--require-native", action="store_true")
-    parser.add_argument("--expected-graphics", choices=("d3d11", "d3d12"))
+    parser.add_argument("--expected-graphics", choices=("d3d11", "d3d12", "unified"))
     args = parser.parse_args()
     try:
         profile = stamp(args.app, args.require_native, args.expected_graphics)

@@ -66,7 +66,8 @@ class MadeiraOpenGLVulkanRuntimeTests(unittest.TestCase):
         self.assertIn('lines.append("vulkan = moltenvk")', environment)
         self.assertIn('lines.append("gl-backend = zink")', environment)
         self.assertIn('setenv("MADEIRA_CFG_GAME", file.path, 1)', environment)
-        self.assertIn('let name = "vulkan-1.dll"', environment)
+        self.assertIn("graphicsAPIs(of: url) & UInt32(IDECK_API_VULKAN) != 0", environment)
+        self.assertIn('{"vulkan-1.dll", IDECK_API_VULKAN}', read("iDeck/GraphicsAPIScan.c"))
         # 32-bit sessions never get Vulkan: upstream binds no WoW64 Vulkan table.
         self.assertIn('case "On" where runtime && !is32Bit:', environment)
         view = read("iDeck/MainView.swift")

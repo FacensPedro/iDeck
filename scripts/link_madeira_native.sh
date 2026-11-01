@@ -6,6 +6,8 @@ MD="${IDECK_MADEIRA_ROOT:-$ROOT/vendor/Madeira}"
 OUT="$ROOT/build/madeira-native"
 APP="$MD/app/Madeira"
 GRAPHICS="${IDECK_MADEIRA_GRAPHICS:-d3d12}"
+# "unified" (DXMT + Madeira D3D12 in one IPA) builds the d3d12 payload.
+[[ "$GRAPHICS" == "unified" ]] && GRAPHICS=d3d12
 [[ "$GRAPHICS" == "d3d11" || "$GRAPHICS" == "d3d12" ]] || {
   echo "ERROR: unsupported Madeira graphics profile: $GRAPHICS" >&2; exit 2;
 }
