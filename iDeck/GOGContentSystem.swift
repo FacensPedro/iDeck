@@ -106,7 +106,10 @@ enum GOGContentSystem {
                 let status = (response as? HTTPURLResponse)?.statusCode ?? 0
                 guard status == 200 else { throw status == 401 ? GOGError.notSignedIn : GOGError.http(status) }
                 return data
+            } catch let error as URLError where error.code == .cancelled {
+                throw CancellationError()
             } catch let error as URLError where attempt < 5 {
+                try Task.checkCancellation()
                 attempt += 1
                 AppLog.record("[gog] request interrupted (\(error.code.rawValue)); retry \(attempt)/5")
                 try await Task.sleep(nanoseconds: UInt64(attempt) * 1_500_000_000)
