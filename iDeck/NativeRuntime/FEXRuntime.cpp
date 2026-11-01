@@ -118,7 +118,10 @@ bool wine_pool_frontier_prepared = false;
 // An explicit override is honored only for these sizes.
 std::vector<size_t> wine_pool_candidates() {
     constexpr size_t MiB = 1024ULL * 1024;
-    constexpr size_t allowed[] = {1152, 896, 768, 640, 512, 384, 256, 192, 128, 96, 64};
+    // Madeira never goes below 256 MiB (StikJITHelper's minimum): a smaller
+    // pool runs out while Wine itself loads, and Steam's client then fails
+    // every DLL with STATUS_NO_MEMORY before the session dies.
+    constexpr size_t allowed[] = {1152, 896, 768, 640, 512, 384, 256};
     size_t preferred = 384;
     uint64_t physical_bytes = 0;
     size_t length = sizeof(physical_bytes);
@@ -164,7 +167,7 @@ std::vector<size_t> wine_pool_candidates() {
     std::vector<size_t> sizes;
     for (size_t candidate : allowed)
         if (candidate <= preferred) sizes.push_back(candidate * MiB);
-    fprintf(stderr, "[iDeck Wine JIT] initial pool preference=%zu MiB; fallback to 64 MiB\n",
+    fprintf(stderr, "[iDeck Wine JIT] initial pool preference=%zu MiB; fallback to 256 MiB\n",
             preferred);
     return sizes;
 }
@@ -256,7 +259,8 @@ size_t release_placeholder_and_plug(size_t wanted) {
     vm_size_t largest = 0;
     for (const auto &hole : holes) largest = std::max(largest, hole.second);
     largest -= largest % step;
-    const size_t fit = std::min<size_t>(wanted, largest);
+    // Below Madeira's 256 MiB minimum the regular sizes are tried instead.
+    const size_t fit = largest < (256ULL << 20) ? 0 : std::min<size_t>(wanted, largest);
     fprintf(stderr, "[iDeck Wine JIT] free runs >= 64 MiB above 0x119000000: %zu, largest %lu MiB -> pool %zu MiB\n",
             holes.size(), static_cast<unsigned long>(largest >> 20), fit >> 20);
     if (!placeholder || fit == 0) return fit;
@@ -623,7 +627,7 @@ extern "C" bool ideck_wine_jit_pool_prepare(void) {
     }
 
     fprintf(stderr, "[iDeck Wine JIT] FAILED: unable to allocate and dual-map "
-                    "even a 64 MiB executable pool. Check StikDebug's in-app "
+                    "even a 256 MiB executable pool. Check StikDebug's in-app "
                     "BRK script, iPadOS memory limit and Wine JIT logs.\n");
     return false;
 #else

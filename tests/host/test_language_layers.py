@@ -31,7 +31,7 @@ class WineJITPoolMatchesMadeiraTests(unittest.TestCase):
     CPP = (ROOT / "iDeck/NativeRuntime/FEXRuntime.cpp").read_text()
 
     def test_pool_uses_madeira_session_size(self):
-        self.assertIn("constexpr size_t allowed[] = {1152, 896, 768, 640, 512, 384, 256, 192, 128, 96, 64};", self.CPP)
+        self.assertIn("constexpr size_t allowed[] = {1152, 896, 768, 640, 512, 384, 256};", self.CPP)
         self.assertIn("if (physical_bytes >= 6ULL * 1024 * MiB) preferred = 896;", self.CPP)
 
     def test_executable_window_is_held_before_rx(self):

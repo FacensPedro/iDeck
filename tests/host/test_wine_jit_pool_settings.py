@@ -7,7 +7,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 class WineJITPoolSettingsTests(unittest.TestCase):
     def test_native_pool_sizes_are_exactly_the_supported_set(self):
         native = (ROOT / "iDeck/NativeRuntime/FEXRuntime.cpp").read_text()
-        self.assertIn("constexpr size_t allowed[] = {1152, 896, 768, 640, 512, 384, 256, 192, 128, 96, 64}", native)
+        self.assertIn("constexpr size_t allowed[] = {1152, 896, 768, 640, 512, 384, 256}", native)
         self.assertIn('getenv("IDECK_WINE_JIT_MIB")', native)
         self.assertIn('ignored unsupported IDECK_WINE_JIT_MIB', native)
 
