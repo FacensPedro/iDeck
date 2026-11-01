@@ -700,10 +700,6 @@ final class DepotDownloader {
         throw lastError
     }
 
-    private nonisolated static func parseManifest(_ raw: Data, depotID: UInt32, manifestGID: UInt64, key: Data) throws -> DepotManifest {
-        try parseManifestKeepingPayload(raw, depotID: depotID, manifestGID: manifestGID, key: key).0
-    }
-
     /// The manifest and the binary manifest bytes it was parsed from (unzipped, decrypted).
     private nonisolated static func parseManifestKeepingPayload(_ raw: Data, depotID: UInt32, manifestGID: UInt64,
                                                                 key: Data) throws -> (DepotManifest, Data) {

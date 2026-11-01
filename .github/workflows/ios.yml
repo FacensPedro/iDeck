@@ -576,6 +576,17 @@ jobs:
           path: build/gl-runtime-cache
           key: madeira-gl-vulkan-v1-xcode27-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/build_madeira_gl_vulkan.sh', 'scripts/fetch_madeira_sources.sh') }}
 
+      # Swift package checkouts and the Clang/Swift module cache: rebuilt from
+      # scratch on every run otherwise.
+      - name: Restore Swift package and module caches
+        uses: actions/cache@v5
+        with:
+          path: |
+            build/SourcePackages
+            build/ModuleCache.noindex
+          key: ideck-spm-modules-v1-${{ runner.os }}-${{ hashFiles('iDeck.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved', 'iDeck.xcodeproj/project.pbxproj') }}
+          restore-keys: ideck-spm-modules-v1-${{ runner.os }}-
+
       - name: Build and package iDeck.ipa
         env:
           IDECK_REQUIRE_MADEIRA: ${{ env.IDECK_NATIVE_BUILD }}

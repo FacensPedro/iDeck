@@ -189,7 +189,7 @@ struct GameSessionView: View {
                             .padding(8)
                     }
                     .disabled(coordinator.isClosingWindowsSession)
-                    .accessibilityLabel(tr("Close Wine and return to Steam library"))
+                    .accessibilityLabel(tr("Close Wine and return to the library"))
                     // The Metal layer sits directly over the SwiftUI content
                     // outside this top strip. Keep first-frame failures and
                     // shutdown progress VISIBLE even when the drawable is black.
@@ -340,7 +340,9 @@ struct GameSessionView: View {
                            coordinator.windowsStatus == "Running") &&
                            metrics.secondsSinceLaunch >= 20 && !metrics.receivedNewFrames {
                     VStack(alignment: .leading, spacing: 9) {
-                        Text(tr("Wine started, but no game frame was detected. The selected executable may require Steam, a different working folder or missing runtime DLLs."))
+                        Text(tr(coordinator.isSteamSession
+                            ? "Wine started, but no game frame was detected. The selected executable may require Steam, a different working folder or missing runtime DLLs."
+                            : "Wine started, but no game frame was detected. The selected executable may need a different working folder or missing runtime DLLs."))
                             .foregroundColor(.yellow)
                         Text(tr("Wine is still active. Check its log before closing the session."))
                             .font(.caption)

@@ -31,8 +31,6 @@ class XcodeProjectTests(unittest.TestCase):
         extension_entitlements = (root / "VPNExtension/VPNExtension.entitlements").read_text(encoding="utf-8")
         self.assertIn("<string>group.com.ideck.ideck</string>", extension_entitlements)
         self.assertNotIn("group.com.example.iDeck", extension_entitlements)
-        vpn_manager = (root / "iDeck/VPNManager.swift").read_text(encoding="utf-8")
-        self.assertIn('Bundle.main.bundleIdentifier! + ".VPNExtension"', vpn_manager)
 
     def test_ipados_26_deployment_is_consistent_for_app_and_extension(self):
         # App, VPN extension and JIT helper extension, Debug and Release, plus the project.

@@ -444,8 +444,6 @@ final class GOGLibraryModel: ObservableObject {
         }
     }
 
-    func isDownloading(_ game: GOGGame) -> Bool { downloadTasks[game.id] != nil }
-
     /// Deletes an installed game's folder (the one holding its goggame-*.info
     /// file) and rescans. Refuses folders that are not inside drive_c.
     @discardableResult

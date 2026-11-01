@@ -350,8 +350,6 @@ struct DockGame: Equatable, Sendable {
 }
 
 enum MadeiraDock {
-    static let enabledKey = "steam.launchThroughDock"
-
     static var bundledURL: URL? {
         Bundle.main.url(forResource: "dockhost", withExtension: "exe", subdirectory: "arm64ec-windows")
     }

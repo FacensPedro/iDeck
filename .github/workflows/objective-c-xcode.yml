@@ -22,7 +22,7 @@ jobs:
         run: |
           set -o pipefail
           mkdir -p build
-          xcodebuild clean build analyze -project iDeck.xcodeproj -scheme iDeck -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath build CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO 2>&1 | tee build-analyze.log
+          xcodebuild clean build analyze -project iDeck.xcodeproj -scheme iDeck -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath build -parallelizeTargets -jobs "$(sysctl -n hw.ncpu)" -skipPackagePluginValidation -skipMacroValidation COMPILER_INDEX_STORE_ENABLE=NO DEBUG_INFORMATION_FORMAT=dwarf ONLY_ACTIVE_ARCH=YES CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO 2>&1 | tee build-analyze.log
 
       - name: Upload Xcode build diagnostics
         if: failure()

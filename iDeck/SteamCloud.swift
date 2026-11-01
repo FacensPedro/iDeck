@@ -311,39 +311,6 @@ struct SteamCloudAudit: Equatable, Sendable {
         return audit
     }
 
-    /// Where saves the cloud lists, and this prefix lacks, might really be: the
-    /// first file of that name, or folder named like the saves' folder, under
-    /// any user folder, as a path relative to `users` with the user folder's
-    /// name left out. Diagnostic for a game that keeps its saves somewhere Steam
-    /// does not say.
-    static func findElsewhere(cloudPath: String, drive: URL) -> String? {
-        let parts = SteamCloudPaths.split(cloudPath).rest.split(separator: "/").map(String.init)
-        guard let name = parts.last else { return nil }
-        let folderName = parts.count >= 2 ? parts[parts.count - 2] : nil
-        let users = drive.appendingPathComponent("users", isDirectory: true)
-        let userNames = ((try? FileManager.default.contentsOfDirectory(atPath: users.path)) ?? []).sorted()
-        for (index, user) in userNames.enumerated() {
-            let root = users.appendingPathComponent(user, isDirectory: true)
-            guard let walk = FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil) else { continue }
-            let base = root.resolvingSymlinksInPath().path
-            var visited = 0
-            for case let url as URL in walk {
-                visited += 1
-                if visited > 60_000 { break }
-                if walk.level > 8 { walk.skipDescendants(); continue }
-                let last = url.lastPathComponent
-                // Browser caches and the like: large, and never where a game saves.
-                if last == "htmlcache" || last == "Temp" || last == "INetCache" { walk.skipDescendants(); continue }
-                if last.caseInsensitiveCompare(name) == .orderedSame
-                    || (folderName.map { last.caseInsensitiveCompare($0) == .orderedSame } ?? false) {
-                    let relative = url.resolvingSymlinksInPath().path.dropFirst(base.count).drop { $0 == "/" }
-                    return "<user \(index)>/" + String(relative)
-                }
-            }
-        }
-        return nil
-    }
-
     var summary: String {
         "cloud-change=\(changeNumber) cloud-files=\(cloudFiles) same=\(count(.same)) differ=\(count(.differ)) " +
         "missing-local=\(count(.cloudOnly)) local-only=\(count(.localOnly)) unmapped=\(unmapped.count)"
