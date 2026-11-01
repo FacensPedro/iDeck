@@ -46,5 +46,6 @@ struct MadeiraJITRequest: Codable, Sendable {
         static let itemKey = "madeira-jit-response"
         let success: Bool
         let message: String
+        let txmPresent: Bool?
     }
 }
