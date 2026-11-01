@@ -38,16 +38,18 @@ that `LoadLibrary` their renderer). For Unity it also reads `UnityPlayer.dll`.
 The result is logged (`[graphics] Game.exe uses: D3D11, D3D12, DXGI`), and a game
 that needs D3D12 on a `d3d11` IPA is reported in Bugs & logs.
 
-### Per-game *Graphics API* setting
+### Automatic choice
 
-- **Automatic** (default): the game chooses.
-- **DXMT** / **D3D12**: passed to the game's own engine switch — Unity
-  `-force-d3d11` / `-force-d3d12`, Unreal `-dx11` / `-dx12`. Ignored, with a
-  logged reason, when the game does not use that API, has no known switch, or
-  the IPA lacks D3D12. No API is ever translated into another.
+There is no manual setting: the choice is made per game at launch.
 
-The old setting stored "Direct3D 9/10/11/12" in an environment variable nothing
-read; profiles migrate (11 → DXMT, 12 → D3D12, others → Automatic).
+- A game that uses one Direct3D version gets it (DXMT for D3D11, Madeira for D3D12).
+- A game able to use both (typically Unity or Unreal) keeps its own choice when
+  the IPA runs both. On a `d3d11` IPA it is switched to Direct3D 11 through its
+  engine (Unity `-force-d3d11`, Unreal `-dx11`); a game without a known switch
+  is reported in Bugs & logs.
+- No API is ever translated into another.
+
+The former per-game setting is gone; saved profiles load as Automatic.
 
 ## Validation status
 

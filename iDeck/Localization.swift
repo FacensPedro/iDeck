@@ -462,6 +462,7 @@ enum Translations {
         "Graphics profile": ["pt": "Perfil gráfico", "es": "Perfil gráfico"],
         "DXMT": ["pt": "Direct3D 11 (DXMT)", "es": "Direct3D 11 (DXMT)"],
         "D3D12": ["pt": "Direct3D 12", "es": "Direct3D 12"],
+        "Direct3D 11 and Direct3D 12 are chosen automatically for each game.": ["pt": "O Direct3D 11 e o Direct3D 12 são escolhidos automaticamente para cada jogo.", "es": "Direct3D 11 y Direct3D 12 se eligen automáticamente para cada juego."],
         "Games: %d": ["pt": "Jogos: %d", "es": "Juegos: %d"],
         "Owned games: %d": ["pt": "Jogos na conta: %d", "es": "Juegos en la cuenta: %d"],
         "App ID: %u": ["pt": "ID do aplicativo: %u", "es": "ID de la aplicación: %u"],

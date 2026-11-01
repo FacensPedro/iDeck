@@ -2178,10 +2178,8 @@ private struct WindowsGameProfileForm: View {
                 DetailToggleRow(title: tr("MetalFX upscaling"), isOn: $globalMetalFXEnabled, showsDivider: false,
                                 icon: "sparkles", iconColor: .purple)
             }
-            DetailCard(title: tr("Graphics")) {
-                DetailPickerRow(title: tr("Graphics API"), selection: $profile.graphicsAPI,
-                                choices: WindowsGameProfile.graphicsAPIModes,
-                                icon: "cube.fill", iconColor: .indigo)
+            DetailCard(title: tr("Graphics"),
+                       footer: tr("Direct3D 11 and Direct3D 12 are chosen automatically for each game.")) {
                 DetailPickerRow(title: tr("Vulkan"), selection: $profile.vulkanMode, choices: WindowsGameProfile.vulkanModes,
                                 icon: "flame.fill", iconColor: .red)
                 DetailPickerRow(title: tr("OpenGL"), selection: $profile.openGLBackend,
