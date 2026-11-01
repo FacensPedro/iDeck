@@ -400,7 +400,7 @@ class WindowsEnvironment {
 
     /// "D3D11, D3D12, DXGI" for the launch log.
     static func describeGraphicsAPIs(_ bits: UInt32) -> String {
-        let names: [(Int32, String)] = [(IDECK_API_D3D9, "D3D9"), (IDECK_API_D3D10, "D3D10"), (IDECK_API_D3D11, "D3D11"),
+        let names: [(Int, String)] = [(IDECK_API_D3D9, "D3D9"), (IDECK_API_D3D10, "D3D10"), (IDECK_API_D3D11, "D3D11"),
                                         (IDECK_API_D3D12, "D3D12"), (IDECK_API_DXGI, "DXGI"),
                                         (IDECK_API_VULKAN, "Vulkan"), (IDECK_API_OPENGL, "OpenGL")]
         let found = names.filter { bits & UInt32($0.0) != 0 }.map(\.1)
