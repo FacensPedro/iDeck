@@ -296,10 +296,13 @@ class SystemCoordinator: ObservableObject {
 
     func reconnectStikDebugForWineIfNeeded() {
         refreshJITStatus()
-        // CS_DEBUGGED can stay set after StikDebug's app-list activation
-        // detaches its debugger. Send the bundled BRK script from Madeira
-        // when the user opens this mode, even with a ready Wine prefix.
-        if isJITEnabled && !isStikDebugAttached && !isWineJITPrepared {
+        // When the user explicitly opens Madeira, request JIT even if
+        // CS_DEBUGGED is still OFF. Previously this path only reconnected
+        // *already enabled* processes, so a fresh iPad install silently
+        // entered the library without requesting the permission at all.
+        // A detached debugger also needs the bundled BRK handler unless
+        // the Wine executable pool was already prepared.
+        if !isJITEnabled || (!isStikDebugAttached && !isWineJITPrepared) {
             requestStikDebugJIT()
         }
     }
