@@ -515,6 +515,9 @@ class SystemCoordinator: ObservableObject {
     func launchSteam() {
         guard !isClosingWindowsSession else { return }
         guard !previousWineSessionStillFinishing() else { return }
+        currentSteamLaunchUsesDock = false
+        dockLaunchAccepted = false
+        steamDockLaunchStage = nil
         guard MadeiraBundleIdentity.isNative else {
             setWindowsStatus(MadeiraBundleIdentity.missingRuntimeMessage)
             return
@@ -718,6 +721,9 @@ class SystemCoordinator: ObservableObject {
         BenchmarkSession.begin(kind: "game", scenario: profile?.title ?? url.deletingPathExtension().lastPathComponent,
                                settings: BenchmarkSession.gameSettings(profile))
         guard !previousWineSessionStillFinishing() else { return }
+        currentSteamLaunchUsesDock = false
+        dockLaunchAccepted = false
+        steamDockLaunchStage = nil
         guard MadeiraBundleIdentity.isNative else {
             setWindowsStatus(MadeiraBundleIdentity.missingRuntimeMessage)
             return
