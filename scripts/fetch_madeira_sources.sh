@@ -94,6 +94,14 @@ else
   git -C "$DEST" apply "$COMPAT_PATCH"
 fi
 
+# iDeck's Visual C++ 2005-2022 runtimes for 32-bit code (syswow64) and the
+# VC80/VC90 side-by-side assemblies, from Documents/vcruntime.
+VCRT_PATCH="$ROOT/patches/ideck-vcruntime-wow64.patch"
+if ! grep -Fq 'ideck_link_vcruntime_wow64(fm, prefix);' "$DEST/app/Madeira/WineProcessBridge.m"; then
+  git -C "$DEST" apply --check "$VCRT_PATCH"
+  git -C "$DEST" apply "$VCRT_PATCH"
+fi
+
 # The pinned Madeira FEX bridge assumes every iOS device is an Apple A15.
 # Patch its FEXCore HostFeatures construction to use actual iOS sysctl
 # capabilities. A missing feature query must never enable a JIT instruction.

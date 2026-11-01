@@ -190,6 +190,7 @@ enum Translations {
         "Install Microsoft Visual C++?": ["pt": "Instalar Microsoft Visual C++?", "es": "¿Instalar Microsoft Visual C++?"],
         "Install and play": ["pt": "Instalar e jogar", "es": "Instalar y jugar"],
         "Play without installing": ["pt": "Jogar sem instalar", "es": "Jugar sin instalar"],
+        "Installing Microsoft Visual C++ 2005-2013 and 32-bit runtimes...": ["pt": "Instalando Microsoft Visual C++ 2005-2013 e as versões de 32 bits...", "es": "Instalando Microsoft Visual C++ 2005-2013 y las versiones de 32 bits..."],
         "Installing Microsoft Visual C++...": ["pt": "Instalando Microsoft Visual C++...", "es": "Instalando Microsoft Visual C++..."],
         "iDeck can download the official Microsoft x64 Visual C++ Redistributable when you launch your first Windows game. It will run once inside Wine. This may require WoW64 and may not be supported by all Wine versions.": ["pt": "O iDeck pode baixar o instalador oficial x64 do Microsoft Visual C++ ao abrir o primeiro jogo Windows. Ele será executado uma vez no Wine. Isso pode exigir WoW64 e não é compatível com todas as versões do Wine.", "es": "iDeck puede descargar el instalador oficial x64 de Microsoft Visual C++ al iniciar el primer juego de Windows. Se ejecutará una vez en Wine. Puede requerir WoW64 y no es compatible con todas las versiones de Wine."],
         "Visual C++ setup download failed": ["pt": "Falha ao baixar o instalador Visual C++", "es": "Error al descargar el instalador Visual C++"],

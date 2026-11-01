@@ -621,6 +621,14 @@ class SystemCoordinator: ObservableObject {
         let prefix = prefix.standardizedFileURL
         let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
         if VisualCRuntimeBootstrap.installed(in: prefix, documents: documents) {
+            // Visual C++ 2005-2013 and the 32-bit runtimes, once, for users who
+            // accepted Microsoft's runtime (it is in Documents/vcruntime).
+            if let documents, !legacyVisualCRuntimeAttempted,
+               !VisualCRuntimeLegacy.installed(documents: documents),
+               FileManager.default.fileExists(atPath: documents.appendingPathComponent("vcruntime").path) {
+                beginLegacyVisualCRuntimeInstallation(documents: documents, resume: resume)
+                return true
+            }
             return false
         }
         if bypassVisualCRuntimeForPrefix == prefix.path {
@@ -643,6 +651,27 @@ class SystemCoordinator: ObservableObject {
         }
         needsVisualCRuntimeConsent = true
         return true
+    }
+
+    /// Set once per app run, so a failed package does not block every launch.
+    private var legacyVisualCRuntimeAttempted = false
+
+    private func beginLegacyVisualCRuntimeInstallation(documents: URL, resume: @escaping () -> Void) {
+        legacyVisualCRuntimeAttempted = true
+        setWindowsStatus(VisualCRuntimeLegacy.installStatus)
+        Task { [weak self] in
+            let failures = await VisualCRuntimeLegacy.installAll(documents: documents) { name in
+                AppLog.record("[vcrt] installing Visual C++ \(name)")
+            }
+            await MainActor.run {
+                guard let self else { return }
+                for failure in failures { AppLog.record("[vcrt] \(failure)") }
+                AppLog.record(failures.isEmpty ? "[vcrt] Visual C++ 2005-2013 and 32-bit runtimes installed"
+                                               : "[vcrt] \(failures.count) Visual C++ packages failed; retried next launch")
+                if self.windowsStatus == VisualCRuntimeLegacy.installStatus { self.setWindowsStatus("Windows Ready") }
+                resume()
+            }
+        }
     }
 
     private func beginVisualCRuntimeInstallation(prefix: URL, resume: @escaping () -> Void) {

@@ -53,7 +53,7 @@ class MadeiraUIJITUpstreamTests(unittest.TestCase):
 
     def test_dll_extraction_stops_at_verified_completion(self):
         self.assertIn('unsigned int found_count;', EXTRACTOR)
-        self.assertIn('if (state->found_count == DLL_COUNT) goto finish;', EXTRACTOR)
+        self.assertIn('if ((int)state->found_count == state->count) goto finish;', EXTRACTOR)
         self.assertIn('ideck_vcrt_valid_pe_x64(path)', EXTRACTOR)
         self.assertIn('state->found_count++;', EXTRACTOR)
 
