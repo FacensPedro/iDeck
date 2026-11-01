@@ -1464,7 +1464,7 @@ private struct GOGArtworkView: View {
                 AsyncImage(url: urls[index]) { phase in
                     switch phase {
                     case .success(let image):
-                        image.resizable().scaledToFill()
+                        image.resizable().scaledToFit()
                     case .failure:
                         Color.clear.onAppear { index += 1 }
                     default:
