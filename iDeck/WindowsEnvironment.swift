@@ -23,6 +23,21 @@ enum MadeiraBundleIdentity {
 
     static var isNative: Bool { nativeManifest != nil }
 
+    /// Each backend's availability in this IPA. DXMT (D3D11, D3D10, DXGI)
+    /// is part of every native profile; Madeira D3D12 is added next to it
+    /// by the unified (and legacy d3d12) profile, never in its place.
+    static var d3d11Available: Bool { nativeManifest != nil }
+    static var d3d12Available: Bool {
+        guard let manifest = nativeManifest else { return false }
+        return manifest["d3d12Available"] as? Bool ?? (manifest["graphicsBackend"] as? String == "d3d12")
+    }
+    /// "unified", "d3d11" or "d3d12" (legacy), as recorded at build time.
+    static var graphicsProfile: String {
+        guard let manifest = nativeManifest else { return "none" }
+        return manifest["graphicsProfile"] as? String
+            ?? ((manifest["graphicsBackend"] as? String) == "d3d12" ? "unified" : "d3d11")
+    }
+
     static var profile: [String: Any] {
         let path = Bundle.main.bundleURL.appendingPathComponent("iDeckRuntimeProfile.plist")
         guard let data = try? Data(contentsOf: path),
@@ -62,6 +77,7 @@ class WindowsEnvironment {
     private var sessionVulkanMode = "Automatic"
     private var sessionUseRecommended = true
     private var sessionCodeChecks = "Automatic"
+    private var sessionGraphicsAPI = "Automatic"
     private var sessionOpenGLBackend = "Automatic"
     /// MetalFX spatial upscale factor for this launch (nil = off).
     private var sessionMetalFXFactor: Double?
@@ -336,10 +352,14 @@ class WindowsEnvironment {
         writeSessionGraphicsConfig(binary: binary, is32Bit: needsWoW64,
                                    steamAppID: steamAppID, steamInstallDirectory: steamInstallDirectory)
 
+        // The engine's own switch for the game's API preference goes last,
+        // after the game's and the user's arguments.
+        let engineSwitch = prepareGraphicsAPI(binary: binary)
+        let launchArguments = parsedArguments + engineSwitch.filter { !parsedArguments.contains($0) }
         let architectureTranslator = BoxTranslator()
         architectureTranslator.translateAndRun(
             executablePath: binary.path,
-            arguments: parsedArguments,
+            arguments: launchArguments,
             environment: winePrefixPath,
             is32Bit: needsWoW64,
             isSteam: isSteam,
@@ -362,25 +382,77 @@ class WindowsEnvironment {
         }
     }
 
-    /// Looks for "vulkan-1.dll" (ASCII or UTF-16, any case) in the first and last
-    /// 4 MB of a PE file: covers the import table and LoadLibrary strings, the
-    /// same bounded scan Madeira's library uses to detect a game's graphics API.
-    static func executableReferencesVulkan(_ url: URL) -> Bool {
-        guard let handle = try? FileHandle(forReadingFrom: url) else { return false }
-        defer { try? handle.close() }
-        let length = (try? handle.seekToEnd()) ?? 0
-        let window: UInt64 = 4 * 1024 * 1024
-        let name = "vulkan-1.dll"
-        let ascii = Data(name.utf8)
-        let wide = Data(name.utf16.flatMap { [UInt8($0 & 0xff), UInt8($0 >> 8)] })
-        for offset in [UInt64(0), length > window ? length - window : 0] {
-            try? handle.seek(toOffset: offset)
-            guard let bytes = try? handle.read(upToCount: Int(window)) else { break }
-            let folded = Data(bytes.map { (65...90).contains($0) ? $0 + 32 : $0 })
-            if folded.range(of: ascii) != nil || folded.range(of: wide) != nil { return true }
-            if length <= window { break }
+    /// Graphics APIs a game can use: its executable and, for Unity games,
+    /// UnityPlayer.dll next to it (where the engine's renderer lives). Read
+    /// in C (GraphicsAPIScan.c) from import tables and LoadLibrary strings.
+    static func graphicsAPIs(of binary: URL) -> UInt32 {
+        var bits = binary.path.withCString { ideck_pe_graphics_apis($0) }
+        let unity = binary.deletingLastPathComponent().appendingPathComponent("UnityPlayer.dll")
+        if FileManager.default.fileExists(atPath: unity.path) {
+            bits |= unity.path.withCString { ideck_pe_graphics_apis($0) }
         }
-        return false
+        return bits
+    }
+
+    static func executableReferencesVulkan(_ url: URL) -> Bool {
+        graphicsAPIs(of: url) & UInt32(IDECK_API_VULKAN) != 0
+    }
+
+    /// "D3D11, D3D12, DXGI" for the launch log.
+    static func describeGraphicsAPIs(_ bits: UInt32) -> String {
+        let names: [(Int, String)] = [(IDECK_API_D3D9, "D3D9"), (IDECK_API_D3D10, "D3D10"), (IDECK_API_D3D11, "D3D11"),
+                                        (IDECK_API_D3D12, "D3D12"), (IDECK_API_DXGI, "DXGI"),
+                                        (IDECK_API_VULKAN, "Vulkan"), (IDECK_API_OPENGL, "OpenGL")]
+        let found = names.filter { bits & UInt32($0.0) != 0 }.map(\.1)
+        return found.isEmpty ? "none found" : found.joined(separator: ", ")
+    }
+
+    /// The game engine's own switch for a Direct3D version, if it has one:
+    /// Unity (UnityPlayer.dll next to the game) and Unreal (Win64 shipping
+    /// builds). Other games choose their API themselves.
+    static func engineAPIArgument(binary: URL, preferD3D12: Bool) -> String? {
+        let folder = binary.deletingLastPathComponent()
+        if FileManager.default.fileExists(atPath: folder.appendingPathComponent("UnityPlayer.dll").path) {
+            return preferD3D12 ? "-force-d3d12" : "-force-d3d11"
+        }
+        let path = binary.path
+        if path.hasSuffix("-Win64-Shipping.exe") || path.contains("/Binaries/Win64/") {
+            return preferD3D12 ? "-dx12" : "-dx11"
+        }
+        return nil
+    }
+
+    /// Logs the APIs the game uses, reports one this IPA cannot run, and
+    /// returns the engine switch for the game's API preference, if any.
+    private func prepareGraphicsAPI(binary: URL) -> [String] {
+        let bits = Self.graphicsAPIs(of: binary)
+        let d3d11 = bits & UInt32(IDECK_API_D3D11) != 0
+        let d3d12 = bits & UInt32(IDECK_API_D3D12) != 0
+        let d3d12Available = MadeiraBundleIdentity.d3d12Available
+        SteamLog.event("[graphics] \(binary.lastPathComponent) uses: \(Self.describeGraphicsAPIs(bits)); "
+                       + "this IPA: D3D11 (DXMT) yes, D3D12 (Madeira) \(d3d12Available ? "yes" : "no")")
+        if d3d12 && !d3d11 && !d3d12Available {
+            AppLog.record("[graphics] \(binary.lastPathComponent) needs Direct3D 12, which this IPA cannot run: "
+                          + "it was built with the d3d11 profile. Use an IPA built with the unified profile.")
+        }
+        guard sessionGraphicsAPI != "Automatic" else { return [] }
+        let wantsD3D12 = sessionGraphicsAPI == "D3D12"
+        if wantsD3D12 && !d3d12Available {
+            AppLog.record("[graphics] Direct3D 12 preference ignored: this IPA cannot run Direct3D 12 (d3d11 profile).")
+            return []
+        }
+        if (wantsD3D12 && !d3d12) || (!wantsD3D12 && !d3d11) {
+            AppLog.record("[graphics] \(wantsD3D12 ? "Direct3D 12" : "Direct3D 11") preference ignored: "
+                          + "\(binary.lastPathComponent) does not use that API.")
+            return []
+        }
+        guard let argument = Self.engineAPIArgument(binary: binary, preferD3D12: wantsD3D12) else {
+            AppLog.record("[graphics] API preference ignored: \(binary.lastPathComponent) has no known engine switch "
+                          + "(Unity or Unreal); the game chooses its API itself.")
+            return []
+        }
+        SteamLog.event("[graphics] API preference: passing \(argument) to the game's engine")
+        return [argument]
     }
 
     /// C:\ path of a file inside the prefix's drive_c, or nil.
@@ -582,7 +654,7 @@ class WindowsEnvironment {
             }
         }
 
-        setenv("IDECK_PREFERRED_GRAPHICS_API", profile.graphicsAPI, 1)
+        sessionGraphicsAPI = WindowsGameProfile.normalizedGraphicsAPI(profile.graphicsAPI)
         setenv("IDECK_FPS_LIMIT", profile.fpsLimit, 1)
         let limit = profile.fpsLimit == "Uncapped" ? 0 : RuntimeConfiguration.settings(for: profile).framesPerSecond
         let managed: Set<String> = ["d3d11.preferredMaxFrameRate", "d3d11.metalSpatialUpscaleFactor"]

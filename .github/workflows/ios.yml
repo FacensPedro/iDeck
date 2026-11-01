@@ -9,10 +9,10 @@ on:
         required: false
         default: true
       graphics_profile:
-        description: "Native renderer: D3D11-only does not redistribute the Apple Metal Shader Converter"
+        description: "Native renderers: unified = DXMT (D3D11) + Madeira D3D12 in one IPA; d3d11 = DXMT only, without the Apple Metal Shader Converter; d3d12 = legacy name of unified"
         type: choice
-        options: [d3d11, d3d12]
-        default: d3d11
+        options: [unified, d3d11, d3d12]
+        default: unified
       accept_converter_license:
         description: "I have reviewed the Metal Shader Converter terms and have permission to package the converter in this IPA"
         type: boolean
@@ -424,8 +424,11 @@ jobs:
       IDECK_NATIVE_BUILD: ${{ ((github.event_name == 'workflow_dispatch' && inputs.require_madeira) || (github.event_name == 'push' && vars.IDECK_NATIVE_DISTRIBUTION_APPROVED == 'true')) && '1' || '0' }}
       IDECK_BUILD_WOW64: ${{ ((github.event_name == 'workflow_dispatch' && inputs.require_madeira && inputs.build_wow64) || (github.event_name == 'push' && vars.IDECK_NATIVE_DISTRIBUTION_APPROVED == 'true')) && '1' || '0' }}
       IDECK_BUNDLE_WINE_MONO: ${{ github.event_name == 'workflow_dispatch' && inputs.require_madeira && inputs.bundle_wine_mono && '1' || '0' }}
-      IDECK_MADEIRA_GRAPHICS: ${{ github.event_name == 'workflow_dispatch' && inputs.graphics_profile || 'd3d12' }}
-      IDECK_ACCEPT_METAL_CONVERTER_LICENSE: ${{ (((github.event_name == 'workflow_dispatch' && inputs.accept_converter_license) || (github.event_name == 'push' && vars.IDECK_NATIVE_DISTRIBUTION_APPROVED == 'true')) && (github.event_name != 'workflow_dispatch' || inputs.graphics_profile == 'd3d12')) && '1' || '0' }}
+      # The profile name (unified / d3d11 / d3d12) and the payload it builds:
+      # unified and d3d12 both build DXMT + Madeira D3D12 ("d3d12" payload).
+      IDECK_GRAPHICS_PROFILE: ${{ github.event_name == 'workflow_dispatch' && inputs.graphics_profile || 'unified' }}
+      IDECK_MADEIRA_GRAPHICS: ${{ (github.event_name == 'workflow_dispatch' && inputs.graphics_profile == 'd3d11') && 'd3d11' || 'd3d12' }}
+      IDECK_ACCEPT_METAL_CONVERTER_LICENSE: ${{ (((github.event_name == 'workflow_dispatch' && inputs.accept_converter_license) || (github.event_name == 'push' && vars.IDECK_NATIVE_DISTRIBUTION_APPROVED == 'true')) && (github.event_name != 'workflow_dispatch' || inputs.graphics_profile != 'd3d11')) && '1' || '0' }}
 
     steps:
       - name: Checkout
@@ -596,6 +599,7 @@ jobs:
           IDECK_PREBUILT_EXPORT: ${{ env.IDECK_NATIVE_BUILD == '1' && '1' || '0' }}
           IDECK_PREBUILT_MODE: prefer
           IDECK_MADEIRA_GRAPHICS: ${{ env.IDECK_MADEIRA_GRAPHICS }}
+          IDECK_GRAPHICS_PROFILE: ${{ env.IDECK_GRAPHICS_PROFILE }}
           IDECK_CONFIGURATION: ${{ env.IDECK_NATIVE_BUILD == '1' && 'Debug' || 'Release' }}
         run: |
           set -o pipefail
@@ -660,6 +664,11 @@ jobs:
                   raise SystemExit("Native Madeira manifest is incomplete")
               if flags.get("graphicsBackend") != backend or flags.get("d3d12Linked") is not (backend == "d3d12"):
                   raise SystemExit("Native Madeira graphics profile mismatch")
+              # Each backend is recorded on its own: D3D12 never replaces DXMT.
+              if flags.get("d3d11Available") is not True or flags.get("d3d12Available") is not (backend == "d3d12"):
+                  raise SystemExit("Native Madeira backend availability mismatch")
+              if flags.get("graphicsProfile") != os.environ.get("IDECK_GRAPHICS_PROFILE", flags.get("graphicsProfile")):
+                  raise SystemExit("Native Madeira graphics profile name mismatch")
               if backend == "d3d11":
                   forbidden = ("arm64ec-windows/madeira_d3d12.dll",
                                "arm64ec-windows/d3d12.dll",
@@ -809,7 +818,7 @@ jobs:
             echo '## iDeck Madeira native IPA: static checks passed' >> "$GITHUB_STEP_SUMMARY"
             echo 'The native payload passed build verification, but game execution, JIT and device signing are not verified.' >> "$GITHUB_STEP_SUMMARY"
             echo "Kit: ${NATIVE_KIT_FOUND}; Actions cache: ${NATIVE_CACHE_HIT}; WoW64: ${IDECK_BUILD_WOW64}; Mono: ${IDECK_BUNDLE_WINE_MONO}; converter license acknowledged: ${IDECK_ACCEPT_METAL_CONVERTER_LICENSE}" >> "$GITHUB_STEP_SUMMARY"
-            echo "Selected graphics backend: $IDECK_MADEIRA_GRAPHICS" >> "$GITHUB_STEP_SUMMARY"
+            echo "Graphics profile: $IDECK_GRAPHICS_PROFILE (payload: $IDECK_MADEIRA_GRAPHICS; D3D11 via DXMT: yes; D3D12 via Madeira: $([[ "$IDECK_MADEIRA_GRAPHICS" == "d3d12" ]] && echo yes || echo no))" >> "$GITHUB_STEP_SUMMARY"
             echo 'Download **iDeck.ipa** directly under Artifacts; the file is not wrapped in another ZIP.' >> "$GITHUB_STEP_SUMMARY"
           else
             echo '## iDeck interface-only IPA' >> "$GITHUB_STEP_SUMMARY"

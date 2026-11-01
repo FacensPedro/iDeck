@@ -5,6 +5,8 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP="${1:?Usage: stage_madeira_payload.sh /path/to/iDeck.app}"
 SOURCE="${IDECK_MADEIRA_APP_ROOT:-$ROOT/vendor/Madeira/app/Madeira}"
 GRAPHICS="${IDECK_MADEIRA_GRAPHICS:-d3d12}"
+# "unified" (DXMT + Madeira D3D12 in one IPA) builds the d3d12 payload.
+[[ "$GRAPHICS" == "unified" ]] && GRAPHICS=d3d12
 [[ "$GRAPHICS" == "d3d11" || "$GRAPHICS" == "d3d12" ]] || {
   echo "ERROR: unsupported Madeira graphics profile: $GRAPHICS" >&2; exit 2;
 }

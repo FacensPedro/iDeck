@@ -16,6 +16,7 @@
 #import "EpicChunkBridge.h"
 #import "BenchmarkBridge.h"
 #import "PipelineCounters.h"
+#import "GraphicsAPIScan.h"
 #import "SteamNativeCore.h"
 #import "NativeRuntime/WineLogTriage.h"
 

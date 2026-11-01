@@ -48,8 +48,10 @@ def verify(app: Path, graphics: str) -> list[str]:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--app", type=Path, required=True)
-    parser.add_argument("--graphics", choices=("d3d11", "d3d12"), required=True)
+    parser.add_argument("--graphics", choices=("d3d11", "d3d12", "unified"), required=True)
     args = parser.parse_args()
+    if args.graphics == "unified":   # DXMT + Madeira D3D12: the d3d12 payload
+        args.graphics = "d3d12"
     try:
         errors = verify(args.app, args.graphics)
     except (OSError, ValueError) as exc:

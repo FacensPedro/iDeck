@@ -28,10 +28,20 @@ NATIVE_ASSET_SOURCE=""
 EXPORT_NATIVE_KIT=0
 if [[ "${IDECK_REQUIRE_MADEIRA:-0}" == "1" ]]; then
   CONFIGURATION="${IDECK_CONFIGURATION:-Debug}"
-  export IDECK_MADEIRA_GRAPHICS="${IDECK_MADEIRA_GRAPHICS:-d3d12}"
-  [[ "$IDECK_MADEIRA_GRAPHICS" == "d3d11" || "$IDECK_MADEIRA_GRAPHICS" == "d3d12" ]] || {
-    echo "ERROR: IDECK_MADEIRA_GRAPHICS must be d3d11 or d3d12." >&2; exit 2;
-  }
+  # Graphics profiles:
+  #   unified (default): one IPA with DXMT (D3D11/D3D10/DXGI) and Madeira
+  #                      D3D12, sharing FEX, Wine ARM64EC and wineserver.
+  #                      Wine loads each API's DLL when a game asks for it.
+  #   d3d12:             legacy name of the same build.
+  #   d3d11:             DXMT only, without the Apple Metal Shader Converter.
+  # The pipeline below builds "d3d12" for both unified and d3d12; the
+  # profile name is recorded in the manifest.
+  export IDECK_GRAPHICS_PROFILE="${IDECK_GRAPHICS_PROFILE:-${IDECK_MADEIRA_GRAPHICS:-unified}}"
+  case "$IDECK_GRAPHICS_PROFILE" in
+    unified|d3d12) export IDECK_MADEIRA_GRAPHICS=d3d12 ;;
+    d3d11) export IDECK_MADEIRA_GRAPHICS=d3d11 ;;
+    *) echo "ERROR: graphics profile must be unified, d3d11 or d3d12." >&2; exit 2 ;;
+  esac
   if [[ "$IDECK_MADEIRA_GRAPHICS" == "d3d12" ]]; then
     [[ "${IDECK_ACCEPT_METAL_CONVERTER_LICENSE:-0}" == "1" ]] || {
       echo "ERROR: Native D3D12 build requires explicit converter distribution permission." >&2
@@ -181,9 +191,9 @@ if [ "${IDECK_REQUIRE_MADEIRA:-0}" = "1" ]; then
     [[ -f "$image" ]] && xcrun strip -S "$image"
   done
   if [[ "${IDECK_BUILD_WOW64:-0}" == "1" ]]; then
-    python3 scripts/verify_madeira_bundle.py --app "$APP" --require --require-wow64 --graphics "$IDECK_MADEIRA_GRAPHICS"
+    python3 scripts/verify_madeira_bundle.py --app "$APP" --require --require-wow64 --graphics "$IDECK_MADEIRA_GRAPHICS" --profile "$IDECK_GRAPHICS_PROFILE"
   else
-    python3 scripts/verify_madeira_bundle.py --app "$APP" --require --graphics "$IDECK_MADEIRA_GRAPHICS"
+    python3 scripts/verify_madeira_bundle.py --app "$APP" --require --graphics "$IDECK_MADEIRA_GRAPHICS" --profile "$IDECK_GRAPHICS_PROFILE"
   fi
   python3 scripts/verify_madeira_legal_notices.py --app "$APP" --graphics "$IDECK_MADEIRA_GRAPHICS"
   if [[ "$EXPORT_NATIVE_KIT" == "1" ]]; then

@@ -19,6 +19,7 @@
 		E10000000000000000000010 /* SteamDepotRegionPolicy.c in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000010 /* SteamDepotRegionPolicy.c */; };
 		E10000000000000000000012 /* SteamDiskIO.c in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000012 /* SteamDiskIO.c */; };
 		F7A000000000000000000001 /* ZipNative.c in Sources */ = {isa = PBXBuildFile; fileRef = F8A000000000000000000001 /* ZipNative.c */; };
+		F7C000000000000000000006 /* GraphicsAPIScan.c in Sources */ = {isa = PBXBuildFile; fileRef = F8C00000000000000000000C /* GraphicsAPIScan.c */; };
 		F7C000000000000000000005 /* BenchmarkBridge.mm in Sources */ = {isa = PBXBuildFile; fileRef = F8C00000000000000000000A /* BenchmarkBridge.mm */; };
 		F7C000000000000000000004 /* BenchmarkRecorder.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F8C000000000000000000008 /* BenchmarkRecorder.cpp */; };
 		F7C000000000000000000003 /* PipelineCounters.c in Sources */ = {isa = PBXBuildFile; fileRef = F8C000000000000000000006 /* PipelineCounters.c */; };
@@ -233,6 +234,8 @@
 		E20000000000000000000013 /* SteamDiskIO.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SteamDiskIO.h; sourceTree = "<group>"; };
 		F8A000000000000000000001 /* ZipNative.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = ZipNative.c; sourceTree = "<group>"; };
 		F8B000000000000000000001 /* ZipNative.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ZipNative.h; sourceTree = "<group>"; };
+		F8C00000000000000000000C /* GraphicsAPIScan.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = GraphicsAPIScan.c; sourceTree = "<group>"; };
+		F8C00000000000000000000B /* GraphicsAPIScan.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = GraphicsAPIScan.h; sourceTree = "<group>"; };
 		F8C00000000000000000000A /* BenchmarkBridge.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = BenchmarkBridge.mm; sourceTree = "<group>"; };
 		F8C000000000000000000009 /* BenchmarkBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = BenchmarkBridge.h; sourceTree = "<group>"; };
 		F8C000000000000000000008 /* BenchmarkRecorder.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = BenchmarkRecorder.cpp; sourceTree = "<group>"; };
@@ -362,6 +365,7 @@
 				E10000000000000000000010 /* SteamDepotRegionPolicy.c in Sources */,
 				E10000000000000000000012 /* SteamDiskIO.c in Sources */,
 				F7A000000000000000000001 /* ZipNative.c in Sources */,
+				F7C000000000000000000006 /* GraphicsAPIScan.c in Sources */,
 				F7C000000000000000000005 /* BenchmarkBridge.mm in Sources */,
 				F7C000000000000000000004 /* BenchmarkRecorder.cpp in Sources */,
 				F7C000000000000000000003 /* PipelineCounters.c in Sources */,
@@ -499,6 +503,8 @@
 				E20000000000000000000013 /* SteamDiskIO.h */,
 				F8A000000000000000000001 /* ZipNative.c */,
 				F8B000000000000000000001 /* ZipNative.h */,
+				F8C00000000000000000000C /* GraphicsAPIScan.c */,
+				F8C00000000000000000000B /* GraphicsAPIScan.h */,
 				F8C00000000000000000000A /* BenchmarkBridge.mm */,
 				F8C000000000000000000009 /* BenchmarkBridge.h */,
 				F8C000000000000000000008 /* BenchmarkRecorder.cpp */,
