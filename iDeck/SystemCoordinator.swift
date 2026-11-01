@@ -1079,7 +1079,7 @@ class SystemCoordinator: ObservableObject {
                 }
                 guard poolMiB >= Self.dockMinimumPoolMiB else {
                     AppLog.record("[dock-launch] JIT pool \(poolMiB) MiB is below Steam's client minimum (\(Self.dockMinimumPoolMiB) MiB)")
-                    self.setWindowsStatus("Cannot launch Steam through Madeira Dock: the Wine JIT pool is only \(poolMiB) MiB; at least \(Self.dockMinimumPoolMiB) MiB is required. Increase the pool and reattach StikDebug.")
+                    self.setWindowsStatus("Cannot launch Steam through Madeira Dock: the Wine JIT pool is only \(poolMiB) MiB; at least \(Self.dockMinimumPoolMiB) MiB is required. Select Automatic or at least 512 MiB in Settings, fully close and reopen iDeck, then enable StikDebug from iDeck. Reattaching alone cannot resize an existing pool.")
                     return
                 }
                 self.startDockSession(game: game, profile: profile, prefixPath: prefixPath)
