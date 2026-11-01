@@ -7,6 +7,7 @@ struct SettingsView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dismiss) private var dismiss
     @StateObject private var inputManager = InputManager.shared
+    @AppStorage(DownloadSpeed.key) private var unlimitedDownloadSpeed = false
     @AppStorage("controllerLeftSensitivity") private var controllerLeftSensitivity = 1.0
     @AppStorage("controllerRightSensitivity") private var controllerRightSensitivity = 1.0
     @AppStorage("controllerDeadzone") private var controllerDeadzone = 0.10
@@ -40,12 +41,14 @@ struct SettingsView: View {
 
                 Section(tr("Accounts")) {
                     NavigationLink { steamPage } label: {
-                        SettingsRow(icon: "gamecontroller.fill", color: .blue, title: "Steam",
-                                    value: coordinator.isSteamConnected ? (SteamSignIn.accountName ?? tr("Connected")) : tr("Not connected"))
+                        SettingsRow(icon: "gamecontroller.fill", color: Color(red: 0.07, green: 0.12, blue: 0.25), title: "Steam",
+                                    value: coordinator.isSteamConnected ? (SteamSignIn.accountName ?? tr("Connected")) : tr("Not connected"),
+                                    asset: "StoreBadgeSteam", assetKeepsColors: true)
                     }
                     NavigationLink { gogPage } label: {
-                        SettingsRow(icon: "shippingbox.fill", color: .purple, title: "GOG",
-                                    value: gogLibrary.isSignedIn ? (gogLibrary.username ?? tr("Connected")) : tr("Not connected"))
+                        SettingsRow(icon: "shippingbox.fill", color: Color(red: 0.42, green: 0.16, blue: 0.55), title: "GOG",
+                                    value: gogLibrary.isSignedIn ? (gogLibrary.username ?? tr("Connected")) : tr("Not connected"),
+                                    asset: "StoreBadgeGOG")
                     }
                     NavigationLink { epicPage } label: {
                         SettingsRow(icon: "e.square.fill", color: Color(white: 0.22), title: "Epic Games",
@@ -413,10 +416,12 @@ struct SettingsView: View {
             Section {
                 toggleRow(title: tr("Continue downloads in the background"), isOn: $continueDownloadsInBackground)
                 toggleRow(title: tr("Download notifications"), isOn: $downloadNotifications)
+                toggleRow(title: tr("Unlimited download speed"), isOn: $unlimitedDownloadSpeed)
             } header: {
                 Text(tr("Downloads"))
             } footer: {
-                Text(tr("iOS shows the download's progress while iDeck is in the background. If iOS stops it, the download pauses and continues when you return."))
+                Text(tr("Off: games download with a few parallel connections, leaving bandwidth for other apps. On: as many connections as the device handles while it stays cool, for the fastest installs.")
+                     + "\n\n" + tr("iOS shows the download's progress while iDeck is in the background. If iOS stops it, the download pauses and continues when you return."))
             }
         }
         .navigationTitle(tr("Storage & Downloads"))
@@ -522,6 +527,8 @@ struct SettingsRow: View {
     var value: String? = nil
     /// An asset image used in place of the SF Symbol.
     var asset: String? = nil
+    /// Draws the asset in its own colors filling the tile (Steam's round logo).
+    var assetKeepsColors = false
 
     var body: some View {
         HStack(spacing: 12) {
@@ -541,7 +548,10 @@ struct SettingsRow: View {
     }
 
     @ViewBuilder private var iconView: some View {
-        if let asset {
+        if let asset, assetKeepsColors {
+            Image(asset).renderingMode(.original).resizable().scaledToFit()
+                .padding(2)
+        } else if let asset {
             Image(asset).renderingMode(.template).resizable().scaledToFit()
                 .padding(5)
         } else {

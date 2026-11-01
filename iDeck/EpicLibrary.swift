@@ -99,6 +99,23 @@ struct EpicInstalledGame: Codable, Sendable {
     var hasActiveDownload: Bool { downloads.values.contains { $0.state == .active || $0.state == .queued } }
     func game(_ app: String) -> EpicOwnedGame? { owned.first { $0.appName == app } }
 
+    /// Install size of games not yet installed, read from their manifest; 0 = unknown.
+    @Published private(set) var manifestSizes: [String: Int64] = [:]
+
+    /// Size for the game details page: the recorded install size, or the
+    /// current build's manifest total for a game that is not installed.
+    func loadSize(_ app: String) async {
+        guard installed[app] == nil, manifestSizes[app] == nil, let game = game(app) else { return }
+        let asset = EpicAsset(appName: game.appName, labelName: "Live", buildVersion: game.buildVersion,
+                              catalogItemId: game.catalogItemID, namespace: game.namespace)
+        guard let location = try? await api.manifestLocation(asset),
+              let data = try? await api.manifest(location),
+              let manifest = try? await Task.detached(priority: .utility, operation: {
+                  try EpicManifest.parse(data, secrets: location.secrets)
+              }).value else { return }
+        manifestSizes[app] = manifest.files.reduce(0) { $0 + $1.size }
+    }
+
     // MARK: Files
 
     static var drive: URL {
@@ -390,6 +407,7 @@ struct EpicInstalledGame: Codable, Sendable {
             let asset = EpicAsset(appName: game.appName, labelName: "Live", buildVersion: game.buildVersion,
                                   catalogItemId: game.catalogItemID, namespace: game.namespace)
             let location = try await api.manifestLocation(asset)
+            downloader.window = DownloadSpeed.epicWindow
             let data = try await api.manifest(location)
             let manifest = try await Task.detached(priority: .userInitiated) { try EpicManifest.parse(data, secrets: location.secrets) }.value
             let launch = manifest.launchExe.replacingOccurrences(of: "\\", with: "/").trimmingCharacters(in: CharacterSet(charactersIn: "/"))
