@@ -77,8 +77,14 @@ enum LogIssueScanner {
     private static let failures = ["failed", "failure", "cannot", "could not", "unable to", "timed out", "timeout", "denied"]
     /// Wine debug channels that print "err:" for harmless probing.
     private static let noise = ["fixme:", "err:ole:", "err:winediag:"]
+    /// Counters that report no problem at all ("launch-client-error=0").
+    private static let zeroCount = try! NSRegularExpression(pattern: #"\b(error|errors|failed|failures)\s*[=:]\s*0\b"#)
+    /// Lines from iDeck's Steam client, downloads and Madeira Dock.
+    private static let steamTags = ["[steam", "[dock", "steam client", "steam's", "madeira dock", "steamworks", "steam_api"]
 
-    static func scan(_ text: String, source: LogIssue.Source, limit: Int = 300) -> [LogIssue] {
+    /// `steamSession` false leaves Steam-only lines out: they belong to an
+    /// earlier Steam run, not to the game (GOG, Epic, any .exe) that failed.
+    static func scan(_ text: String, source: LogIssue.Source, steamSession: Bool = true, limit: Int = 300) -> [LogIssue] {
         var found: [String: LogIssue] = [:]
         var order: [String] = []
         for raw in text.split(whereSeparator: \.isNewline) {
@@ -86,6 +92,10 @@ enum LogIssueScanner {
             guard !line.isEmpty, line.count < 2000 else { continue }
             let lower = line.lowercased()
             if noise.contains(where: lower.contains) { continue }
+            if !steamSession, steamTags.contains(where: lower.contains) { continue }
+            let range = NSRange(lower.startIndex..., in: lower)
+            if zeroCount.firstMatch(in: lower, range: range) != nil,
+               !errors.contains(where: { $0 != "error" && lower.contains($0) }) { continue }
             let severity = errors.contains(where: lower.contains) ? 2
                 : failures.contains(where: lower.contains) ? 1 : 0
             guard severity > 0 else { continue }
@@ -140,14 +150,15 @@ final class BugReportModel: ObservableObject {
             .filter { FileManager.default.fileExists(atPath: $0.path) }
         hasWineLog = wineURL != nil
         hasAppLog = !appURLs.isEmpty
+        let steamSession = UserDefaults.standard.bool(forKey: "session.lastWasSteam")
         let result = await Task.detached(priority: .userInitiated) { () -> ([LogIssue], Int32) in
             var issues: [LogIssue] = []
             let appText = appURLs.compactMap { try? WineLogClipboard.read(from: $0).text }.joined(separator: "\n")
-            issues += LogIssueScanner.scan(appText, source: .app)
+            issues += LogIssueScanner.scan(appText, source: .app, steamSession: steamSession)
             var diagnosis: Int32 = 0
             if let wineURL {
                 if let text = try? WineLogClipboard.read(from: wineURL).text {
-                    issues += LogIssueScanner.scan(text, source: .wine)
+                    issues += LogIssueScanner.scan(text, source: .wine, steamSession: steamSession)
                 }
                 diagnosis = wineURL.path.withCString { ideck_wine_log_diagnose($0) }
             }

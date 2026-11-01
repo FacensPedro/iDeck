@@ -38,25 +38,6 @@ struct GameRecommendation: Equatable {
     /// Aspect & scaling (DisplayMode raw value); "fit" is the default.
     var display: String? = nil
 
-    /// The config file's text as GameProfile stores it (one trailing newline).
-    var fileText: String { config.hasSuffix("\n") ? config : config + "\n" }
-
-    /// A short list of the switches it sets, for Game details.
-    var switchSummary: String {
-        var parts: [String] = []
-        if let avx { parts.append("AVX \(avx ? "on" : "off")") }
-        if let nvidia { parts.append("NVIDIA \(nvidia ? "on" : "off")") }
-        if let olderNvidia { parts.append("older NVIDIA card \(olderNvidia ? "on" : "off")") }
-        if let wineVCRT { parts.append("Wine's C++ runtime \(wineVCRT ? "on" : "off")") }
-        if fastSync == false { parts.append("fast synchronization off") }
-        if let semaphoreFastPath { parts.append("fast semaphore waits \(semaphoreFastPath ? "on" : "off")") }
-        if let fpsMode {
-            let label = [1: "60", 3: "30", 4: "40", 0: "display maximum", 2: "uncapped"][fpsMode] ?? "\(fpsMode)"
-            parts.append("FPS limit \(label)")
-        }
-        if let resolution { parts.append(resolution == Self.screen720 ? "this screen's shape at 720 lines" : resolution) }
-        return parts.joined(separator: ", ")
-    }
 }
 
 enum GameRecommendations {

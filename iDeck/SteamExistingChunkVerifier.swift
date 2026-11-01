@@ -9,8 +9,6 @@ enum SteamExistingChunkVerifier {
         let sha: Data
     }
 
-    static let readBlockBytes = 4 * 1024 * 1024
-
     static func verify(path: String, entries: [Entry]) throws -> [Bool] {
         var results = [Bool](repeating: false, count: entries.count)
         guard !entries.isEmpty else { return results }

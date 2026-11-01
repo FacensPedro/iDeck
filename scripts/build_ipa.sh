@@ -123,6 +123,10 @@ if [[ "${IDECK_REQUIRE_MADEIRA:-0}" == "1" ]]; then
   )
 fi
 
+# Faster CI builds: no code index or dSYM (nobody reads them from an
+# unsigned IPA), all cores, targets in parallel, and Swift packages checked
+# out into a folder the workflow caches between runs.
+JOBS="$(sysctl -n hw.ncpu 2>/dev/null || echo 4)"
 xcodebuild build \
   -project iDeck.xcodeproj \
   -scheme iDeck \
@@ -130,6 +134,12 @@ xcodebuild build \
   -sdk iphoneos \
   -destination 'generic/platform=iOS' \
   -derivedDataPath "$BUILD_DIR" \
+  -clonedSourcePackagesDirPath "${IDECK_SPM_DIR:-$BUILD_DIR/SourcePackages}" \
+  -parallelizeTargets -jobs "$JOBS" \
+  -skipPackagePluginValidation -skipMacroValidation \
+  COMPILER_INDEX_STORE_ENABLE=NO \
+  DEBUG_INFORMATION_FORMAT=dwarf \
+  ONLY_ACTIVE_ARCH=YES \
   CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO \
   ${EXTRA_XCODE_SETTINGS[@]+"${EXTRA_XCODE_SETTINGS[@]}"}
 

@@ -251,27 +251,6 @@ struct SteamGameBannerView: View {
     }
 }
 
-struct StatusPill: View {
-    let isActive: Bool
-    let label: String
-    
-    var body: some View {
-        HStack(spacing: 6) {
-            Circle()
-                .fill(isActive ? Color.green : Color.red)
-                .frame(width: 8, height: 8)
-            Text(label)
-                .font(.caption)
-                .fontWeight(.bold)
-                .foregroundColor(.white)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
-        .background(Color(red: 0.15, green: 0.15, blue: 0.15))
-        .cornerRadius(16)
-    }
-}
-
 struct WindowsWorkspaceView: View {
     @ObservedObject var coordinator: SystemCoordinator
     let onBack: (() -> Void)?

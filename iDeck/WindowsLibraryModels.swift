@@ -398,10 +398,6 @@ enum WindowsPEIcon {
         func groupWord(_ offset: Int) -> Int {
             Int(group[offset]) | Int(group[offset + 1]) << 8
         }
-        func groupDword(_ offset: Int) -> Int {
-            Int(group[offset]) | Int(group[offset + 1]) << 8 |
-            Int(group[offset + 2]) << 16 | Int(group[offset + 3]) << 24
-        }
         let count = groupWord(4)
         guard groupWord(2) == 1, count > 0, count <= 128,
               count <= (group.count - 6) / 14 else { return nil }

@@ -32,11 +32,6 @@ class SystemCoordinator: ObservableObject {
         }
     }
     
-    @Published var isJITPoolEnabled: Bool = false
-    /// Starts the LocalDevVPN extension before activating JIT. Off by default: the extension needs
-    /// a provisioning profile with the Network Extensions capability, and the helper-server
-    /// flow does not need it.
-    @Published var isVPNJITEnabled: Bool = false
     @Published var hasPairingFile: Bool = false
     @Published var isGuestHooksEnabled: Bool = true
     
@@ -55,6 +50,12 @@ class SystemCoordinator: ObservableObject {
     private var steamSignInLoaded = false
     private var nativeHostConfigured = false
     private var activeSteamGameID: UInt32?
+    /// Whether the current (or last) Wine session is a game installed by
+    /// Steam. Errors that mention Steam are shown only for those sessions.
+    /// Kept across launches so Bugs & logs can tell what the last run was.
+    @Published private(set) var isSteamSession: Bool = UserDefaults.standard.bool(forKey: "session.lastWasSteam") {
+        didSet { UserDefaults.standard.set(isSteamSession, forKey: "session.lastWasSteam") }
+    }
     @Published private(set) var activeWindowsProfile: WindowsGameProfile?
     private var activeSteamPrefix: String?
     private var pendingSteamGameID: UInt32?
@@ -155,25 +156,6 @@ class SystemCoordinator: ObservableObject {
         }
     }
 
-    private func isLocalDevVPNActive() -> Bool {
-        var interfaces: UnsafeMutablePointer<ifaddrs>?
-        guard getifaddrs(&interfaces) == 0 else { return false }
-        defer { freeifaddrs(interfaces) }
-        
-        var current = interfaces
-        while let interface = current {
-            let name = String(cString: interface.pointee.ifa_name)
-            let isTunnel = name.hasPrefix("utun") || name.hasPrefix("tun") || name.hasPrefix("ipsec")
-            // System utun interfaces only carry IPv6 link-local addresses; a VPN with an
-            // IPv4 address on a tunnel interface is what the JIT bridge needs.
-            if isTunnel, let addr = interface.pointee.ifa_addr, addr.pointee.sa_family == UInt8(AF_INET),
-               (interface.pointee.ifa_flags & UInt32(IFF_UP)) != 0 {
-                return true
-            }
-            current = interface.pointee.ifa_next
-        }
-        return false
-    }
     
     func setWindowsStatus(_ status: String) {
         AppLog.record("[status] " + status)
@@ -406,10 +388,6 @@ class SystemCoordinator: ObservableObject {
         }
     }
 
-    func confirmJITActivatedByStikDebug() {
-        refreshJITStatus()
-    }
-
     func disconnectSteamAccount() {
         SteamSignIn.signOut()
         isSteamConnected = false
@@ -455,13 +433,6 @@ class SystemCoordinator: ObservableObject {
         }
     }
     
-    /// The JIT server mounts the Developer Disk Image itself; the picked files are not uploaded.
-    func mountDDI(urls: [URL]) {
-        currentStatus = "Mounting DDI..."
-        jitEnabler.mountDeveloperDiskImage { [weak self] success in
-            self?.currentStatus = success ? "DDI Mounted" : "DDI Mount Failed"
-        }
-    }
     
     private func applyMaxRefreshRate() {
         if isMaxRefreshRateEnabled {
@@ -656,6 +627,7 @@ class SystemCoordinator: ObservableObject {
 
     func launchWindowsExecutable(at url: URL, profile: WindowsGameProfile? = nil) {
         guard !isClosingWindowsSession else { return }
+        isSteamSession = false
         guard !previousWineSessionStillFinishing() else { return }
         guard MadeiraBundleIdentity.isNative else {
             setWindowsStatus(MadeiraBundleIdentity.missingRuntimeMessage)
@@ -789,6 +761,7 @@ class SystemCoordinator: ObservableObject {
     /// relative DLL and asset paths instead of copying the executable elsewhere.
     func launchSteamGame(game: SteamAppInfo, profile: WindowsGameProfile, prefixPath: URL, skipSteamClient: Bool = false) {
         guard !isClosingWindowsSession else { return }
+        isSteamSession = true
         guard MadeiraBundleIdentity.isNative else {
             setWindowsStatus(MadeiraBundleIdentity.missingRuntimeMessage)
             return
@@ -1194,7 +1167,9 @@ class SystemCoordinator: ObservableObject {
             return "Execution Error: Wine prefix or runtime components are missing."
         }
         if status == Int(EINVAL) {
-            return "Execution Error: invalid Windows launch request (code 22). Check the executable format, Steam game metadata and launch arguments. The iDeck console identifies rejected native parameters under [iDeck native launch] EINVAL or [wine-launch]."
+            return isSteamSession
+                ? "Execution Error: invalid Windows launch request (code 22). Check the executable format, Steam game metadata and launch arguments. The iDeck console identifies rejected native parameters under [iDeck native launch] EINVAL or [wine-launch]."
+                : "Execution Error: invalid Windows launch request (code 22). Check the executable format and launch arguments. The iDeck console identifies rejected native parameters under [iDeck native launch] EINVAL or [wine-launch]."
         }
         if status == Int(ENOMEM) {
             let machCode = ideck_wine_jit_pool_failure_mach_code()

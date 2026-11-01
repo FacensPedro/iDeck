@@ -62,7 +62,6 @@
 		111111111111111111111118 /* GraphicsConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222229 /* GraphicsConfig.swift */; };
 		111111111111111111111119 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222230 /* SettingsView.swift */; };
 		111111111111111111111120 /* InputManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222231 /* InputManager.swift */; };
-		111111111111111111111121 /* VPNManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222232 /* VPNManager.swift */; };
 		111111111111111111111122 /* PrefixInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222233 /* PrefixInstaller.swift */; };
 		111111111111111111111123 /* SteamManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222235 /* SteamManager.swift */; };
 		A1000000000000000000000D /* SteamLibraryPreviewCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000D /* SteamLibraryPreviewCache.swift */; };
@@ -164,7 +163,6 @@
 		222222222222222222222229 /* GraphicsConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GraphicsConfig.swift; sourceTree = "<group>"; };
 		222222222222222222222230 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		222222222222222222222231 /* InputManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputManager.swift; sourceTree = "<group>"; };
-		222222222222222222222232 /* VPNManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VPNManager.swift; sourceTree = "<group>"; };
 		222222222222222222222233 /* PrefixInstaller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrefixInstaller.swift; sourceTree = "<group>"; };
 		222222222222222222222234 /* iDeck.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = iDeck.entitlements; sourceTree = "<group>"; };
 		222222222222222222222235 /* SteamManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamManager.swift; sourceTree = "<group>"; };
@@ -299,7 +297,6 @@
 				111111111111111111111118 /* GraphicsConfig.swift in Sources */,
 				111111111111111111111119 /* SettingsView.swift in Sources */,
 				111111111111111111111120 /* InputManager.swift in Sources */,
-				111111111111111111111121 /* VPNManager.swift in Sources */,
 				111111111111111111111122 /* PrefixInstaller.swift in Sources */,
 				111111111111111111111123 /* SteamManager.swift in Sources */,
 				A1000000000000000000000D /* SteamLibraryPreviewCache.swift in Sources */,
@@ -386,7 +383,6 @@
 				222222222222222222222222 /* MainView.swift */,
 				222222222222222222222230 /* SettingsView.swift */,
 				222222222222222222222231 /* InputManager.swift */,
-				222222222222222222222232 /* VPNManager.swift */,
 				222222222222222222222233 /* PrefixInstaller.swift */,
 				222222222222222222222235 /* SteamManager.swift */,
 				A2000000000000000000000D /* SteamLibraryPreviewCache.swift */,

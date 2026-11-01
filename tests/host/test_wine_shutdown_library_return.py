@@ -14,7 +14,7 @@ INPUT = (ROOT / "iDeck/WineInputBridge.swift").read_text(encoding="utf-8")
 class WineCloseSessionTests(unittest.TestCase):
     def test_x_requests_real_shutdown_without_dismissing_active_wine(self):
         self.assertIn("Button(action: coordinator.requestCloseWindowsSession)", SESSION)
-        self.assertIn('Close Wine and return to Steam library', SESSION)
+        self.assertIn('Close Wine and return to the library', SESSION)
         self.assertNotIn("presentationMode.wrappedValue.dismiss()", SESSION)
         self.assertNotIn('closeRequested = ideck_wineprocess_request_close()', SESSION)
         self.assertIn("coordinator.pollWindowsSessionClose()", SESSION)
