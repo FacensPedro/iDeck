@@ -641,7 +641,7 @@ enum IDeckSteamDockInstallers {
         _ = try MadeiraDock.stageHost()
         let batch = DockInstallScripts.batch(pending,
             resultFile: "C:\\" + stem(appID) + ".result",
-            services: .start(executable: "C:\\windows\\system32\\dockhost.exe"))
+            services: .start("C:\\windows\\system32\\dockhost.exe"))
         let saved = try JSONEncoder().encode(pending.map(\.run))
         let planURL = planFile(appID, prefix: prefix)
         try saved.write(to: planURL, options: .atomic)
