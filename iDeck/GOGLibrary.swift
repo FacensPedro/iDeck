@@ -206,7 +206,8 @@ enum GOGAPI {
                   let products = json["products"] as? [[String: Any]] else { throw GOGError.invalidResponse }
             pages = (json["totalPages"] as? Int) ?? 1
             for product in products {
-                guard let id = product["id"] as? Int, let title = product["title"] as? String else { continue }
+                guard let id = product["id"] as? Int, let title = product["title"] as? String,
+                      (product["isGame"] as? Bool) ?? true else { continue }
                 let worksOn = product["worksOn"] as? [String: Any]
                 games.append(GOGGame(id: id, title: title, image: product["image"] as? String,
                                      worksOnWindows: (worksOn?["Windows"] as? Bool) ?? true))

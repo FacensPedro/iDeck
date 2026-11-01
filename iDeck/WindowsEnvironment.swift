@@ -75,6 +75,7 @@ class WindowsEnvironment {
     let steamManager = SteamManager()
     /// The profile's Vulkan/OpenGL choices, applied when the executable is known.
     private var sessionVulkanMode = "Automatic"
+    private var sessionD3D12Renderer = "Madeira D3D12"
     private var sessionUseRecommended = true
     private var sessionCodeChecks = "Automatic"
     private var sessionOpenGLBackend = "Automatic"
@@ -381,6 +382,14 @@ class WindowsEnvironment {
         }
     }
 
+    /// Whether this IPA carries vkd3d-proton (build/vkd3d-proton/build.sh output).
+    static var hasVKD3DProton: Bool {
+        let bundle = Bundle.main.bundleURL
+        return hasGLVulkanRuntime && ["vulkan/arm64ec-windows/d3d12.dll", "vulkan/arm64ec-windows/d3d12core.dll"].allSatisfy {
+            FileManager.default.fileExists(atPath: bundle.appendingPathComponent($0).path)
+        }
+    }
+
     /// Graphics APIs a game can use: its executable and, for Unity games,
     /// UnityPlayer.dll next to it (where the engine's renderer lives). Read
     /// in C (GraphicsAPIScan.c) from import tables and LoadLibrary strings.
@@ -508,6 +517,16 @@ class WindowsEnvironment {
         default:
             break
         }
+        // As Madeira: `d3d12 = vkd3d` links vkd3d-proton's d3d12.dll and
+        // d3d12core.dll over madeira-d3d12 for this session and turns on Vulkan
+        // (MoltenVK). vkd3d-proton is ARM64EC, so 64-bit games only.
+        if sessionD3D12Renderer == "VKD3D-Proton" {
+            if Self.hasVKD3DProton && !is32Bit {
+                lines.append("d3d12 = vkd3d")
+            } else {
+                SteamLog.event("[wine-launch] VKD3D-Proton chosen but \(is32Bit ? "the game is 32-bit" : "not in this build"); madeira-d3d12 used")
+            }
+        }
         // Automatic leaves FEX's code checks as Madeira ships them (mtrack):
         // Madeira's Wine and FEX handle Mono/Unity code heaps with that mode.
         // Forcing full checks for Mono games broke Cuphead, which runs in
@@ -586,6 +605,7 @@ class WindowsEnvironment {
         }
         setenv("MONO_LOG_LEVEL", "warning", 0)
         sessionVulkanMode = profile.vulkanMode
+        sessionD3D12Renderer = profile.d3d12Renderer
         sessionOpenGLBackend = profile.openGLBackend
         setenv("IDECK_DISPLAY_SCALING", RuntimeConfiguration.SurfaceMode(saved: profile.surfaceScaling).rawValue, 1)
         setenv("IDECK_TOUCH_CONTROLS_ACTIVE", profile.touchControlPreset == "off" ? "0" : "1", 1)

@@ -351,6 +351,16 @@ struct WindowsWorkspaceView: View {
         gogLibrary.installed.values.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 
+    /// GOG and Epic games being installed: listed under Installed games with
+    /// their progress, as Steam games are while they download.
+    private var installingGOGGames: [GOGGame] {
+        gogLibrary.games.filter { gogLibrary.downloadProgress[$0.id] != nil && gogLibrary.installed[$0.id] == nil }
+    }
+
+    private var installingEpicGames: [EpicOwnedGame] {
+        epicLibrary.owned.filter { epicLibrary.downloads[$0.appName] != nil && epicLibrary.installed[$0.appName] == nil }
+    }
+
     private var isCompact: Bool { horizontalSizeClass == .compact }
 
     /// Height of every card's action row (Launch, Install, progress), so a
@@ -1228,12 +1238,14 @@ struct WindowsWorkspaceView: View {
                     .font(.headline)
                     .foregroundColor(.white)
                 Spacer()
-                Text(tr("%d installed", windowsLibrary.executableURLs.count + installedSteamGames.count + installedGOGGames.count + installedEpicGames.count))
+                Text(tr("%d installed", windowsLibrary.executableURLs.count + installedSteamGames.count + installedGOGGames.count + installedEpicGames.count
+                        + installingGOGGames.count + installingEpicGames.count))
                     .font(.caption)
                     .foregroundColor(.gray)
             }
 
-            if windowsLibrary.executableURLs.isEmpty && installedSteamGames.isEmpty && installedGOGGames.isEmpty && installedEpicGames.isEmpty {
+            if windowsLibrary.executableURLs.isEmpty && installedSteamGames.isEmpty && installedGOGGames.isEmpty && installedEpicGames.isEmpty
+                && installingGOGGames.isEmpty && installingEpicGames.isEmpty {
                 HStack(spacing: 12) {
                     Image(systemName: "square.grid.2x2")
                         .font(.title2)
@@ -1275,6 +1287,14 @@ struct WindowsWorkspaceView: View {
                             }
                         }
                         }
+                    }
+
+                    ForEach(installingGOGGames, id: \.id) { game in
+                        gogCard(game)
+                    }
+
+                    ForEach(installingEpicGames, id: \.appName) { game in
+                        epicCard(game)
                     }
 
                     ForEach(installedGOGGames, id: \.gameID) { game in
@@ -2181,6 +2201,9 @@ private struct WindowsGameProfileForm: View {
             }
             DetailCard(title: tr("Graphics"),
                        footer: tr("Direct3D 11 and Direct3D 12 are chosen automatically for each game.")) {
+                DetailPickerRow(title: tr("Direct3D 12"), selection: $profile.d3d12Renderer,
+                                choices: WindowsGameProfile.d3d12Renderers,
+                                icon: "cube.transparent.fill", iconColor: .indigo)
                 DetailPickerRow(title: tr("Vulkan"), selection: $profile.vulkanMode, choices: WindowsGameProfile.vulkanModes,
                                 icon: "flame.fill", iconColor: .red)
                 DetailPickerRow(title: tr("OpenGL"), selection: $profile.openGLBackend,

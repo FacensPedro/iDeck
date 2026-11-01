@@ -20,6 +20,10 @@ struct WindowsGameProfile: Codable, Equatable, Identifiable {
     var vulkanMode: String = "Automatic"
     /// "Automatic" (desktop OpenGL through Zink when bundled), "Desktop OpenGL" or "OpenGL ES".
     var openGLBackend: String = "Automatic"
+    /// Direct3D 12 renderer: "Madeira D3D12" (Metal, default) or "VKD3D-Proton"
+    /// (vkd3d-proton on Vulkan/MoltenVK, Madeira's `d3d12 = vkd3d`; x64 only).
+    var d3d12Renderer: String = "Madeira D3D12"
+    static let d3d12Renderers = ["Madeira D3D12", "VKD3D-Proton"]
     var touchControlPreset: String = "xbox"
     var metalFXEnabled: Bool = false
     var fpsLimit: String = "60"
@@ -37,7 +41,7 @@ struct WindowsGameProfile: Codable, Equatable, Identifiable {
     var updatedAt: Date = Date()
 
     private enum CodingKeys: String, CodingKey {
-        case id, title, arguments, resolution, surfaceScaling, graphicsAPI, controllerAPI, touchControlPreset, metalFXEnabled, fpsLimit, avxEnabled, keepChildProcessesRunning, artworkFilename, updatedAt, vulkanMode, openGLBackend, useRecommended, launchThroughSteam, codeChecks
+        case id, title, arguments, resolution, surfaceScaling, graphicsAPI, controllerAPI, touchControlPreset, metalFXEnabled, fpsLimit, avxEnabled, keepChildProcessesRunning, artworkFilename, updatedAt, vulkanMode, openGLBackend, useRecommended, launchThroughSteam, codeChecks, d3d12Renderer
     }
 
     static let vulkanModes = ["Automatic", "On", "Off"]
@@ -90,6 +94,8 @@ struct WindowsGameProfile: Codable, Equatable, Identifiable {
         vulkanMode = Self.vulkanModes.contains(savedVulkan) ? savedVulkan : "Automatic"
         let savedGL = (try? values.decodeIfPresent(String.self, forKey: .openGLBackend)) ?? "Automatic"
         openGLBackend = Self.openGLBackends.contains(savedGL) ? savedGL : "Automatic"
+        let savedD3D12 = (try? values.decodeIfPresent(String.self, forKey: .d3d12Renderer)) ?? "Madeira D3D12"
+        d3d12Renderer = Self.d3d12Renderers.contains(savedD3D12) ? savedD3D12 : "Madeira D3D12"
     }
 }
 
