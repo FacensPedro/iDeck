@@ -278,6 +278,8 @@ struct BugReportView: View {
     @StateObject private var model = BugReportModel()
     @State private var expanded: Set<String> = []
     @AppStorage("diagnostics.detailed") private var detailedDiagnostics = false
+    @AppStorage(BenchmarkSession.enabledKey) private var recordBenchmarks = false
+    @State private var benchmarkReports: [URL] = []
 
     var body: some View {
         ZStack {
@@ -314,6 +316,20 @@ struct BugReportView: View {
                 } footer: {
                     Text(tr("Turns on Madeira's profilers and full logs for the next game. They slow games down: use only to report a bug."))
                 }
+                Section {
+                    Toggle(tr("Record benchmarks"), isOn: $recordBenchmarks)
+                    ForEach(benchmarkReports.prefix(20), id: \.self) { url in
+                        ShareLink(item: url) {
+                            Label(url.deletingPathExtension().lastPathComponent, systemImage: "chart.bar.doc.horizontal")
+                                .font(.caption.monospaced())
+                        }
+                    }
+                } header: {
+                    Text(tr("Benchmarks"))
+                } footer: {
+                    Text(tr("Records each game session and each Steam or Epic install: FPS, frame times, CPU, memory, thermal state and install speed. Reports are saved in Files › iDeck › iDeck › Benchmarks. Detailed diagnostics change the results, so keep them off while measuring."))
+                }
+                .onAppear { benchmarkReports = BenchmarkSession.reports() }
                 Section(tr("Logs")) {
                     Button { model.copyAll() } label: {
                         Label(tr("Copy all bugs"), systemImage: "doc.on.doc")

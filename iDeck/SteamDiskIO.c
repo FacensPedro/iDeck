@@ -1,4 +1,5 @@
 #include "SteamDiskIO.h"
+#include "PipelineCounters.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
@@ -25,7 +26,7 @@ static int matches_existing(int fd, const uint8_t *bytes,
     return 1;
 }
 
-int ideck_steam_write_chunk(const char *path, const void *data, size_t size,
+static int ideck_steam_write_chunk_untimed(const char *path, const void *data, size_t size,
                             uint64_t offset, int allow_skip_identical,
                             uint64_t *actual_written) {
     if (actual_written) *actual_written = 0;
@@ -63,4 +64,13 @@ int ideck_steam_write_chunk(const char *path, const void *data, size_t size,
     if (actual_written) *actual_written = (uint64_t)written;
     if (close(fd) != 0) return errno;
     return 0;
+}
+
+int ideck_steam_write_chunk(const char *path, const void *data, size_t size,
+                            uint64_t offset, int allow_skip_identical,
+                            uint64_t *actual_written) {
+    const uint64_t start = ideck_stage_now();
+    const int result = ideck_steam_write_chunk_untimed(path, data, size, offset, allow_skip_identical, actual_written);
+    ideck_stage_add(IDECK_STAGE_WRITE, result == 0 ? (uint64_t)size : 0, start);
+    return result;
 }

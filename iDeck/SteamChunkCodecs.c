@@ -1,4 +1,5 @@
 #include "SteamChunkCodecs.h"
+#include "PipelineCounters.h"
 #include "SteamLZMA/LzmaDec.h"
 
 #include <limits.h>
@@ -39,7 +40,7 @@ static void lzma_release(ISzAllocPtr allocator, void *address) {
     free(address);
 }
 
-int32_t lzma_shim_decode(const void *properties, size_t properties_length,
+static int32_t lzma_shim_decode_untimed(const void *properties, size_t properties_length,
                          const void *source, size_t source_length,
                          void *destination, size_t destination_capacity,
                          size_t *produced) {
@@ -69,7 +70,7 @@ int32_t lzma_shim_decode(const void *properties, size_t properties_length,
     return 0;
 }
 
-intptr_t zstd_safe_decompress(void *destination, size_t destination_capacity,
+static intptr_t zstd_safe_decompress_untimed(void *destination, size_t destination_capacity,
                               const void *source, size_t source_length) {
     if (!source || !source_length || !destination || !destination_capacity ||
         destination_capacity > STEAM_MAX_CHUNK_SIZE) {
@@ -83,7 +84,7 @@ intptr_t zstd_safe_decompress(void *destination, size_t destination_capacity,
     return (intptr_t)length;
 }
 
-int32_t chunk_zip_decode(const uint8_t *source, size_t source_length,
+static int32_t chunk_zip_decode_untimed(const uint8_t *source, size_t source_length,
                          uint8_t *destination, size_t destination_capacity,
                          size_t *produced) {
     if (produced) *produced = 0;
@@ -178,4 +179,31 @@ int32_t chunk_zip_decode(const uint8_t *source, size_t source_length,
     if ((uint32_t)crc != expected_crc) return -9;
     *produced = destination_capacity;
     return 0;
+}
+
+int32_t lzma_shim_decode(const void *properties, size_t properties_length,
+                         const void *source, size_t source_length,
+                         void *destination, size_t destination_capacity,
+                         size_t *produced) {
+    const uint64_t start = ideck_stage_now();
+    const int32_t result = lzma_shim_decode_untimed(properties, properties_length, source, source_length, destination, destination_capacity, produced);
+    ideck_stage_add(IDECK_STAGE_DECOMPRESS, (result == 0 && produced) ? *produced : 0, start);
+    return result;
+}
+
+intptr_t zstd_safe_decompress(void *destination, size_t destination_capacity,
+                              const void *source, size_t source_length) {
+    const uint64_t start = ideck_stage_now();
+    const intptr_t result = zstd_safe_decompress_untimed(destination, destination_capacity, source, source_length);
+    ideck_stage_add(IDECK_STAGE_DECOMPRESS, result > 0 ? (uint64_t)result : 0, start);
+    return result;
+}
+
+int32_t chunk_zip_decode(const uint8_t *source, size_t source_length,
+                         uint8_t *destination, size_t destination_capacity,
+                         size_t *produced) {
+    const uint64_t start = ideck_stage_now();
+    const int32_t result = chunk_zip_decode_untimed(source, source_length, destination, destination_capacity, produced);
+    ideck_stage_add(IDECK_STAGE_DECOMPRESS, (result == 0 && produced) ? *produced : 0, start);
+    return result;
 }

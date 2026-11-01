@@ -2,9 +2,23 @@
 """Record the actual Madeira IPA profile after strict native bundle verification."""
 
 import argparse
+import os
 import plistlib
+import subprocess
 import sys
 from pathlib import Path
+
+
+def source_commit() -> str:
+    """The commit the IPA was built from, for benchmark reports."""
+    sha = os.environ.get("GITHUB_SHA", "").strip()
+    if not sha:
+        try:
+            sha = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True,
+                                 check=True, cwd=Path(__file__).resolve().parent).stdout.strip()
+        except (OSError, subprocess.CalledProcessError):
+            sha = ""
+    return sha if len(sha) == 40 and all(c in "0123456789abcdef" for c in sha) else "unknown"
 
 
 def stamp(app: Path, require_native: bool = False, expected_graphics: str | None = None) -> dict:
@@ -43,6 +57,7 @@ def stamp(app: Path, require_native: bool = False, expected_graphics: str | None
         "wow64Enabled": wow64,
         "wineMonoBundled": mono,
         "metalShaderConverterBundled": converter,
+        "sourceCommit": source_commit(),
     }
     with (app / "iDeckRuntimeProfile.plist").open("wb") as handle:
         plistlib.dump(profile, handle, sort_keys=True)

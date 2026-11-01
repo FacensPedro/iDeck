@@ -5039,11 +5039,21 @@ final class SteamOwnedGamesModel: ObservableObject {
         downloadProgress[appID] = SteamDownloadProgress()
         let displayName = games.first(where: { $0.appID == appID })?.name ?? "App \(appID)"
         BackgroundDownloads.steam.started(name: displayName)
+        BenchmarkSession.begin(kind: "install", scenario: "Steam: " + displayName,
+                               settings: ["store": "steam", "reinstall": isInstalled(appID: appID, prefixPath: prefixPath)])
         var outcome = BackgroundDownloads.Outcome.paused
         defer {
             installingApps.remove(appID)
             BackgroundDownloads.steam.ended(name: displayName, outcome: outcome,
                                             queueEmpty: installingApps.isEmpty)
+            let benchmarkOutcome: String
+            switch outcome {
+            case .completed: benchmarkOutcome = "completed"
+            case .failed(let message): benchmarkOutcome = "failed: " + message
+            default: benchmarkOutcome = "paused"
+            }
+            BenchmarkSession.finish(kind: "install", outcome: benchmarkOutcome,
+                                    installBytes: installedSizes[appID] ?? 0)
         }
         var installFolder: String?
         var installFolderAlreadyExisted = false

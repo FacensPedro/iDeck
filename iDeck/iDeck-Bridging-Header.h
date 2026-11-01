@@ -14,6 +14,8 @@
 #import "SteamDiskIO.h"
 #import "ZipNative.h"
 #import "EpicChunkBridge.h"
+#import "BenchmarkBridge.h"
+#import "PipelineCounters.h"
 #import "SteamNativeCore.h"
 #import "NativeRuntime/WineLogTriage.h"
 

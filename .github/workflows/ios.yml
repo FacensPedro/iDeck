@@ -236,7 +236,7 @@ jobs:
       - name: Test native Steam disk writer
         run: |
           xcrun clang -std=c11 -D_DARWIN_C_SOURCE -O2 -Wall -Wextra -Werror \
-            tests/host/SteamDiskIOTests.c iDeck/SteamDiskIO.c \
+            tests/host/SteamDiskIOTests.c iDeck/SteamDiskIO.c iDeck/PipelineCounters.c \
             -o /tmp/ideck-steam-disk-tests
           /tmp/ideck-steam-disk-tests
 
@@ -283,14 +283,16 @@ jobs:
       - name: Test Steam native C crypto and bounded existing-file verification
         run: |
           xcrun clang -std=c11 -D_DARWIN_C_SOURCE -O2 -Wall -Wextra -Werror \
-            tests/host/SteamNativeCoreTests.c iDeck/SteamNativeCore.c \
+            tests/host/SteamNativeCoreTests.c iDeck/SteamNativeCore.c iDeck/PipelineCounters.c \
             -o /tmp/ideck-steam-native-tests
           /tmp/ideck-steam-native-tests
           xcrun clang -std=c11 -D_DARWIN_C_SOURCE -O2 -c iDeck/SteamNativeCore.c \
             -o /tmp/ideck-steam-native-core.o
+          xcrun clang -std=c11 -D_DARWIN_C_SOURCE -O2 -c iDeck/PipelineCounters.c \
+            -o /tmp/ideck-pipeline-counters.o
           xcrun swiftc -import-objc-header iDeck/SteamNativeCore.h \
             iDeck/SteamExistingChunkVerifier.swift tests/host/SteamExistingChunkVerifierTests.swift \
-            /tmp/ideck-steam-native-core.o -o /tmp/ideck-steam-existing-chunk-tests
+            /tmp/ideck-steam-native-core.o /tmp/ideck-pipeline-counters.o -o /tmp/ideck-steam-existing-chunk-tests
           /tmp/ideck-steam-existing-chunk-tests
 
       - name: Test bounded native Madeira Wine log diagnostics
