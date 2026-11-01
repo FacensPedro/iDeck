@@ -1456,7 +1456,12 @@ private struct GOGArtworkView: View {
                         .foregroundColor(.gray))
             }
         }
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        // Take the size the card gives (the same 2:3 frame as a Steam cover)
+        // and crop to it, as SteamGameArtworkView does: a filled image is
+        // otherwise drawn larger than its frame and spills out of it.
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.white.opacity(0.06))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 }
 
