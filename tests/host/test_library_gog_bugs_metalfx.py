@@ -107,10 +107,6 @@ class SteamConnectionSpeedTests(unittest.TestCase):
         self.assertIn("for _ in 0..<200 {", steam)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class GOGContentSystemTests(unittest.TestCase):
     """GOG games are installed from Galaxy's content system, not an installer."""
 
@@ -135,3 +131,31 @@ class GOGContentSystemTests(unittest.TestCase):
         project = read("iDeck.xcodeproj/project.pbxproj")
         self.assertEqual(project.count("path = GOGContentSystem.swift;"), 1)
         self.assertEqual(project.count("/* GOGContentSystem.swift in Sources */,"), 1)
+
+class LegacyVisualCRuntimeTests(unittest.TestCase):
+    """Visual C++ 2005-2013 (x86/x64) and the 32-bit 2015-2022 runtime."""
+
+    def test_official_packages_and_layout(self):
+        swift = read("iDeck/VisualCRuntimeBootstrap.swift")
+        for url in ("8B42259F-5D70-43F4-AC2E-4B208FD8D66A/vcredist_x86.EXE",
+                    "5D8C65CB-C849-4025-8E95-C3966CAFD8AE/vcredist_x64.exe",
+                    "165255E7-1014-4D0A-B094-B6A430A6BFFC/vcredist_x86.exe",
+                    "VSU_4/vcredist_x64.exe", "https://aka.ms/highdpimfc2013x86enu",
+                    "https://aka.ms/vc14/vc_redist.x86.exe"):
+            self.assertIn(url, swift)
+        self.assertIn('if machine == x86Machine { return "x86/" + name }', swift)
+        self.assertIn("ideck_vcrt_extract_set(", swift)
+
+    def test_extractor_handles_pe32_and_msi_names(self):
+        c = read("iDeck/NativeRuntime/VCArchiveExtractor.c")
+        self.assertIn('else if (machine == 0x014c && magic == 0x10b) directories = 96;', c)
+        self.assertIn('{ "f_central_", "fl_", "nosxs_" }', c)
+
+    def test_madeira_links_32bit_and_side_by_side(self):
+        patch = read("patches/ideck-vcruntime-wow64.patch")
+        self.assertIn("+                ideck_link_vcruntime_wow64(fm, prefix);", patch)
+        self.assertIn('@"x86_", assembly', patch)
+        self.assertIn("ideck-vcruntime-wow64.patch", read("scripts/fetch_madeira_sources.sh"))
+
+if __name__ == "__main__":
+    unittest.main()

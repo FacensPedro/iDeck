@@ -1,0 +1,90 @@
+diff --git a/app/Madeira/WineProcessBridge.m b/app/Madeira/WineProcessBridge.m
+index 1002df1..71cc3bb 100644
+--- a/app/Madeira/WineProcessBridge.m
++++ b/app/Madeira/WineProcessBridge.m
+@@ -1057,6 +1057,77 @@ static void madeira_link_wine_mono(NSFileManager *fm, NSString *prefix, NSString
+  * 64-bit processes in the same prefix see no difference. An assembly whose
+  * first file is missing from the i386 farm is skipped: a manifest without its
+  * DLL would redirect that DLL's loads into an empty directory. */
++/* iDeck: Microsoft's Visual C++ 2005-2022 runtimes for 32-bit code and the
++ * x64 side-by-side ATL, from Documents/vcruntime (extracted on the device
++ * from Microsoft's redistributables; the top-level x64 DLLs are linked into
++ * system32 by the vcruntime overlay below). Runs after the farms and the x86
++ * store are linked, so these links replace Wine's builtins:
++ *   vcruntime/x86/*.dll    syswow64, except the VC80/VC90 CRT and ATL, which
++ *                          go into their x86 side-by-side store directories
++ *                          (they refuse to load outside an activation context)
++ *   vcruntime/x64-sxs/*    the amd64 store directories of the same assemblies
++ * 32-bit code runs entirely in FEX's WOW64 translator, so none of the x64
++ * ARM64EC exemptions (vcruntime140, msvcp140) apply here. */
++static NSString *ideck_sxs_assembly(NSString *lower)
++{
++    if ([lower isEqualToString:@"msvcr80.dll"] || [lower isEqualToString:@"msvcp80.dll"] ||
++        [lower isEqualToString:@"msvcm80.dll"]) return @"microsoft.vc80.crt_";
++    if ([lower isEqualToString:@"msvcr90.dll"] || [lower isEqualToString:@"msvcp90.dll"] ||
++        [lower isEqualToString:@"msvcm90.dll"]) return @"microsoft.vc90.crt_";
++    if ([lower isEqualToString:@"atl80.dll"]) return @"microsoft.vc80.atl_";
++    if ([lower isEqualToString:@"atl90.dll"]) return @"microsoft.vc90.atl_";
++    return nil;
++}
++
++static int ideck_link_into_store(NSFileManager *fm, NSString *winsxs, NSArray *stores,
++                                 NSString *arch, NSString *assembly, NSString *lower, NSString *src)
++{
++    int linked = 0;
++    NSString *wanted = [arch stringByAppendingString:assembly];
++    for (NSString *dir in stores) {
++        if (![[dir lowercaseString] hasPrefix:wanted]) continue;
++        NSString *dst = [[winsxs stringByAppendingPathComponent:dir] stringByAppendingPathComponent:lower];
++        [fm removeItemAtPath:dst error:nil];
++        if ([fm createSymbolicLinkAtPath:dst withDestinationPath:src error:nil]) linked++;
++    }
++    return linked;
++}
++
++static void ideck_link_vcruntime_wow64(NSFileManager *fm, NSString *prefix)
++{
++    NSString *root = [[NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES)
++                       firstObject] stringByAppendingPathComponent:@"vcruntime"];
++    NSString *x86 = [root stringByAppendingPathComponent:@"x86"];
++    NSString *x64sxs = [root stringByAppendingPathComponent:@"x64-sxs"];
++    NSString *wow = [prefix stringByAppendingPathComponent:@"drive_c/windows/syswow64"];
++    NSString *winsxs = [prefix stringByAppendingPathComponent:@"drive_c/windows/winsxs"];
++    NSArray *stores = [fm contentsOfDirectoryAtPath:winsxs error:nil];
++    int wowLinked = 0, sxsLinked = 0;
++    for (NSString *f in [fm contentsOfDirectoryAtPath:x86 error:nil]) {
++        NSString *lower = [f lowercaseString];
++        if (![[lower pathExtension] isEqualToString:@"dll"]) continue;
++        NSString *src = [x86 stringByAppendingPathComponent:f];
++        NSString *assembly = ideck_sxs_assembly(lower);
++        if (assembly) {
++            sxsLinked += ideck_link_into_store(fm, winsxs, stores, @"x86_", assembly, lower, src);
++            continue;
++        }
++        NSString *dst = [wow stringByAppendingPathComponent:lower];
++        [fm removeItemAtPath:dst error:nil];
++        if ([fm createSymbolicLinkAtPath:dst withDestinationPath:src error:nil]) wowLinked++;
++    }
++    for (NSString *f in [fm contentsOfDirectoryAtPath:x64sxs error:nil]) {
++        NSString *lower = [f lowercaseString];
++        NSString *assembly = ideck_sxs_assembly(lower);
++        if (!assembly) continue;
++        sxsLinked += ideck_link_into_store(fm, winsxs, stores, @"amd64_", assembly, lower,
++                                           [x64sxs stringByAppendingPathComponent:f]);
++    }
++    if (wowLinked || sxsLinked)
++        dprintf(STDERR_FILENO, "[WineProc] iDeck VC++ runtimes: %d syswow64 links, %d side-by-side links\n",
++                wowLinked, sxsLinked);
++}
++
+ static void madeira_seed_winsxs_x86(NSFileManager *fm, NSString *prefix, NSString *bundle)
+ {
+     struct sxs_file { const char *in_assembly; const char *in_farm; };
+@@ -2054,6 +2125,7 @@ static void *wine_process_thread(void *arg) {
+                 madeira_link_syswow64(fm, prefix, bundlePath);
+                 madeira_link_syswow64_wbem(fm, prefix, bundlePath);
+                 madeira_seed_winsxs_x86(fm, prefix, bundlePath);
++                ideck_link_vcruntime_wow64(fm, prefix);
+             }
+             madeira_link_wine_mono(fm, prefix, bundlePath);
+             if (madeira_d3d9_wined3d_wanted())

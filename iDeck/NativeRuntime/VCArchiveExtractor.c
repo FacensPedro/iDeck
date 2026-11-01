@@ -36,7 +36,10 @@ static uint32_t u32(const unsigned char *b) {
            ((uint32_t)b[2] << 16) | ((uint32_t)b[3] << 24);
 }
 
-int ideck_vcrt_valid_pe_x64(const char *filename) {
+/* A PE image of the given machine (0x8664 x64, 0x014c x86). With
+ * require_cert, its Authenticode directory must be present and in bounds
+ * (presence and bounds only, not trust). */
+static int valid_pe(const char *filename, uint16_t machine, int require_cert) {
     if (!filename) return 0;
     FILE *stream = fopen(filename, "rb");
     if (!stream) return 0;
@@ -52,21 +55,33 @@ int ideck_vcrt_valid_pe_x64(const char *filename) {
         if (offset < 64 || (uint64_t)offset + sizeof pe > (uint64_t)st.st_size ||
             fseek(stream, (long)offset, SEEK_SET)) break;
         if (fread(pe, 1, sizeof pe, stream) != sizeof pe ||
-            memcmp(pe, "PE\0\0", 4) || u16(pe + 4) != 0x8664 ||
-            u16(pe + 24) != 0x20b) break;
-        /* IMAGE_DIRECTORY_ENTRY_SECURITY stores a file offset, not RVA.
-         * This validates presence and bounds, not Authenticode trust.
-         */
-        uint32_t directory_count = u32(pe + 24 + 108);
+            memcmp(pe, "PE\0\0", 4) || u16(pe + 4) != machine) break;
+        /* PE32+ data directories start at optional header + 112, PE32 at + 96. */
+        uint16_t magic = u16(pe + 24);
+        unsigned directories;
+        if (machine == 0x8664 && magic == 0x20b) directories = 112;
+        else if (machine == 0x014c && magic == 0x10b) directories = 96;
+        else break;
+        if (!require_cert) { valid = 1; break; }
+        uint32_t directory_count = u32(pe + 24 + directories - 4);
         if (directory_count <= 4) break;
-        uint32_t cert_offset = u32(pe + 24 + 112 + 4 * 8);
-        uint32_t cert_length = u32(pe + 24 + 112 + 4 * 8 + 4);
+        /* IMAGE_DIRECTORY_ENTRY_SECURITY stores a file offset, not RVA. */
+        uint32_t cert_offset = u32(pe + 24 + directories + 4 * 8);
+        uint32_t cert_length = u32(pe + 24 + directories + 4 * 8 + 4);
         if (cert_offset == 0 || cert_length < 8 ||
             (uint64_t)cert_offset + cert_length > (uint64_t)st.st_size) break;
         valid = 1;
     } while (0);
     fclose(stream);
     return valid;
+}
+
+int ideck_vcrt_valid_pe_x64(const char *filename) {
+    return valid_pe(filename, 0x8664, 1);
+}
+
+int ideck_vcrt_valid_pe(const char *filename, int machine) {
+    return valid_pe(filename, (uint16_t)machine, 0);
 }
 
 static int name_match(const char *filename, const char *wanted) {
@@ -88,16 +103,28 @@ static int name_match(const char *filename, const char *wanted) {
     size_t base_len = (size_t)(dot - wanted);
     memcpy(stem, wanted, base_len);
     stem[base_len] = '\0';
-    const char *prefix = "f_central_";
-    if (strncmp(name, prefix, strlen(prefix))) return 0;
-    const char *body = name + strlen(prefix);
-    return !strncmp(body, stem, base_len) &&
-           (body[base_len] == '_' || body[base_len] == '-' ||
-            body[base_len] == '.' || body[base_len] == '\0');
+    /* MSI cabinet names: F_CENTRAL_msvcr100_x86 (2010-2013),
+     * FL_msvcr90_dll_... and nosxs_... (2005/2008). */
+    static const char *const prefixes[] = { "f_central_", "fl_", "nosxs_" };
+    for (size_t p = 0; p < sizeof prefixes / sizeof prefixes[0]; p++) {
+        size_t pl = strlen(prefixes[p]);
+        if (strncmp(name, prefixes[p], pl)) continue;
+        const char *body = name + pl;
+        if (!strncmp(body, stem, base_len) &&
+            (body[base_len] == '_' || body[base_len] == '-' ||
+             body[base_len] == '.' || body[base_len] == '\0')) return 1;
+    }
+    return 0;
 }
 
+#define MAX_WANTED 64
+
 typedef struct {
-    int found[DLL_COUNT];
+    const char *const *wanted;
+    int count;
+    uint16_t machine;
+    int require_cert;
+    int found[MAX_WANTED];
     unsigned int found_count;
     unsigned int file_count;
     unsigned int nested_count;
@@ -159,7 +186,7 @@ static int inspect_cabinets(const char *source, const char *target,
     int status = 0;
     for (struct mscabd_cabinet *cab = head; cab; cab = cab->next) {
         for (struct mscabd_file *file = cab->files; file; file = file->next) {
-            if (state->found_count == DLL_COUNT) goto finish;
+            if ((int)state->found_count == state->count) goto finish;
             if (++state->file_count > MAX_FILES_PER_INSTALLER) {
                 status = -5;
                 error_set(message, capacity, "CAB file count exceeds safety limit.");
@@ -169,23 +196,23 @@ static int inspect_cabinets(const char *source, const char *target,
             int best = -1;
             size_t longest = 0;
             if ((uint64_t)file->length <= MAX_DLL_SIZE) {
-                for (int i = 0; i < DLL_COUNT; i++) {
-                    if (name_match(file->filename, required[i])) {
-                        size_t length = strlen(required[i]);
+                for (int i = 0; i < state->count; i++) {
+                    if (name_match(file->filename, state->wanted[i])) {
+                        size_t length = strlen(state->wanted[i]);
                         if (length > longest) { best = i; longest = length; }
                     }
                 }
             }
             if (best >= 0 && !state->found[best]) {
                 char path[2048];
-                if (snprintf(path, sizeof path, "%s/%s", target, required[best]) >=
+                if (snprintf(path, sizeof path, "%s/%s", target, state->wanted[best]) >=
                     (int)sizeof path) {
                     status = -6;
                     error_set(message, capacity, "Destination path too long.");
                     goto finish;
                 }
                 if (dec->extract(dec, file, path) == MSPACK_ERR_OK &&
-                    ideck_vcrt_valid_pe_x64(path)) {
+                    valid_pe(path, state->machine, state->require_cert)) {
                     state->found[best] = 1;
                     state->found_count++;
                 } else {
@@ -219,7 +246,7 @@ static int inspect_cabinets(const char *source, const char *target,
             }
             unlink(nested);
             if (status) goto finish;
-            if (state->found_count == DLL_COUNT) goto finish;
+            if ((int)state->found_count == state->count) goto finish;
         }
     }
 finish:
@@ -241,6 +268,10 @@ int ideck_vcrt_extract(const char *installer, const char *target,
         return -2;
     }
     extract_state state = {0};
+    state.wanted = required;
+    state.count = DLL_COUNT;
+    state.machine = 0x8664;
+    state.require_cert = 1;
     int status = inspect_cabinets(installer, target, 0, &state, message, capacity);
     if (status) return status;
     if (!state.saw_cabinet) {
@@ -259,4 +290,33 @@ int ideck_vcrt_extract(const char *installer, const char *target,
     }
     error_set(message, capacity, "Extracted all 14 Microsoft x64 DLLs from nested CABs.");
     return 0;
+}
+
+int ideck_vcrt_extract_set(const char *installer, const char *target,
+                           const char *const *names, int count, int machine,
+                           int *found, char *message, size_t capacity) {
+    if (!installer || !target || !*installer || !*target || !names ||
+        count <= 0 || count > MAX_WANTED || !found) {
+        error_set(message, capacity, "Invalid extraction arguments.");
+        return -1;
+    }
+    struct stat dst;
+    if (lstat(target, &dst) || !S_ISDIR(dst.st_mode) || (dst.st_mode & 0002)) {
+        error_set(message, capacity, "Destination must be a private directory.");
+        return -2;
+    }
+    extract_state state = {0};
+    state.wanted = names;
+    state.count = count;
+    state.machine = (uint16_t)machine;
+    int status = inspect_cabinets(installer, target, 0, &state, message, capacity);
+    for (int i = 0; i < count; i++) found[i] = state.found[i];
+    if (status) return status;
+    if (!state.saw_cabinet) {
+        error_set(message, capacity, "No readable Microsoft CAB archive in installer.");
+        return -4;
+    }
+    if (message && capacity)
+        snprintf(message, capacity, "Extracted %u of %d Microsoft DLLs.", state.found_count, count);
+    return (int)state.found_count;
 }
