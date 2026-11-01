@@ -383,18 +383,6 @@ class WindowsEnvironment {
         return false
     }
 
-    /// A Unity game running on Mono (not IL2CPP): <Name>_Data/Managed with
-    /// mscorlib.dll beside the program and no GameAssembly.dll.
-    static func usesMonoJIT(_ binary: URL) -> Bool {
-        let folder = binary.deletingLastPathComponent()
-        let fm = FileManager.default
-        if fm.fileExists(atPath: folder.appendingPathComponent("GameAssembly.dll").path) { return false }
-        let data = folder.appendingPathComponent(binary.deletingPathExtension().lastPathComponent + "_Data", isDirectory: true)
-        return fm.fileExists(atPath: data.appendingPathComponent("Managed/mscorlib.dll").path) ||
-            fm.fileExists(atPath: folder.appendingPathComponent("MonoBleedingEdge").path) ||
-            fm.fileExists(atPath: folder.appendingPathComponent("Mono/mono.dll").path)
-    }
-
     /// C:\ path of a file inside the prefix's drive_c, or nil.
     static func windowsPath(_ url: URL) -> String? {
         let parts = url.standardizedFileURL.pathComponents
@@ -448,21 +436,28 @@ class WindowsEnvironment {
         default:
             break
         }
-        // Unity games on Mono JIT-compile into RWX memory. FEX's page tracking
-        // write-protects those pages after running them, and the next write
-        // from translated code crashed the game (Cuphead: PROTECTION_FAILURE
-        // at the Mono code page, Wine exit code 1). Full checks validate the
-        // code before it runs instead of trapping the writes.
+        // Automatic leaves FEX's code checks as Madeira ships them (mtrack):
+        // Madeira's Wine and FEX handle Mono/Unity code heaps with that mode.
+        // Forcing full checks for Mono games broke Cuphead, which runs in
+        // Madeira; its earlier crash came from a JIT pool too small for Mono's
+        // code heap. "Compatible" and "Fast" stay available per game.
+        // As Madeira (BCDLaunch.realSuspend): a Unity IL2CPP game's garbage
+        // collector suspends its threads and reads their registers, which
+        // needs Wine to stop the thread for real. Only for those games.
+        if FileManager.default.fileExists(atPath: binary.deletingLastPathComponent()
+            .appendingPathComponent("GameAssembly.dll").path) {
+            setenv("MADEIRA_REAL_SUSPEND", "1", 1)
+            SteamLog.event("[wine-launch] Unity IL2CPP game: real thread suspension on")
+        } else {
+            unsetenv("MADEIRA_REAL_SUSPEND")
+        }
         switch sessionCodeChecks {
         case "Compatible":
             lines.append("env.FEX_SMCCHECKS = full")
         case "Fast":
             lines.append("env.FEX_SMCCHECKS = mtrack")
         default:
-            if Self.usesMonoJIT(binary) {
-                lines.append("env.FEX_SMCCHECKS = full")
-                SteamLog.event("[wine-launch] Mono JIT game: FEX code checks set to full")
-            }
+            break
         }
         // madeira-d3d12 reads its MetalFX factor from the game's config lines;
         // DXMT gets the same factor through DXMT_CONFIG (applyGameProfile).
