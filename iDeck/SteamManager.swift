@@ -4101,8 +4101,22 @@ struct SteamAppInfo {
     /// of the base install and are left out. Treat the figure as "about".
     /// Uncompressed installation footprint, when Steam PICS supplies it.
     /// Never interpret a compressed CDN total as disk usage.
+    /// Depot IDs in the signed-in account's licenses. Regional editions are
+    /// separate depots sold in separate packages, so only the ones the
+    /// account's region bought count toward a game's size.
+    nonisolated(unsafe) static var licensedDepots: Set<UInt32> = []
+
+    /// Keeps only depots the account's licenses include, when that is known
+    /// and leaves something (free games and shared content may be unlisted).
+    private func licensed(_ depots: [DepotInfo]) -> [DepotInfo] {
+        let owned = Self.licensedDepots
+        guard !owned.isEmpty else { return depots }
+        let kept = depots.filter { owned.contains($0.depotID) }
+        return kept.isEmpty ? depots : kept
+    }
+
     func installedSize(for os: String) -> UInt64 {
-        let selected = installDepots(os: os)
+        let selected = licensed(installDepots(os: os))
         guard !selected.isEmpty else { return 0 }
         var result: UInt64 = 0
         for depot in selected {
@@ -4116,7 +4130,7 @@ struct SteamAppInfo {
     }
 
     func downloadSize(for os: String) -> UInt64 {
-        let selected = installDepots(os: os)
+        let selected = licensed(installDepots(os: os))
         // If no regional Black Desert depot is installable, the correct
         // answer is "unavailable", not the sum of nine unrelated editions.
         if appID == 582660 && selected.isEmpty { return 0 }
@@ -4130,7 +4144,7 @@ struct SteamAppInfo {
                  $0.language.caseInsensitiveCompare("english") == .orderedSame)
             }
             let architecture = relevant.contains(where: { $0.osarch == "64" }) ? "64" : "32"
-            candidates = relevant.filter { $0.osarch.isEmpty || $0.osarch == architecture }
+            candidates = licensed(relevant.filter { $0.osarch.isEmpty || $0.osarch == architecture })
         }
         var result: UInt64 = 0
         for depot in candidates {
@@ -4421,6 +4435,7 @@ class SteamLibraryFetcher {
             }
         }
         ownedDepotCache = depots
+        SteamAppInfo.licensedDepots = depots
         return depots
     }
 
@@ -4536,6 +4551,7 @@ class SteamLibraryFetcher {
 
     private func fetchAppIDsFromPackages(packageIDs: [UInt32], tokens: [UInt32: UInt64]) async throws -> Set<UInt32> {
         var allAppIDs = Set<UInt32>()
+        var licensedDepots = Set<UInt32>()
 
         // Package info requests in batches of 50.
         let batches = stride(from: 0, to: packageIDs.count, by: 50).map {
@@ -4561,9 +4577,12 @@ class SteamLibraryFetcher {
                 let picsResponse = try CMsgClientPICSProductInfoResponse.deserialize(from: response.body)
                 for pkg in picsResponse.packages {
                     allAppIDs.formUnion(VDFParser.parsePackageAppIDs(from: pkg.buffer))
+                    licensedDepots.formUnion(VDFParser.parsePackageIDs(key: "depotids", from: pkg.buffer))
                 }
             }
         }
+        ownedDepotCache = licensedDepots
+        SteamAppInfo.licensedDepots = licensedDepots
 
         return allAppIDs
     }

@@ -46,7 +46,7 @@ enum EpicDownloadError: LocalizedError {
 /// - Paths stay inside the install folder; directory names are matched without
 ///   case, as Windows does.
 final class EpicDownloader: @unchecked Sendable {
-    var window = 32
+    var window = DownloadSpeed.epicWindow
     var memoryBudget = 256 << 20
     var attempts = 6
     /// Pause between retries of one chunk, doubled per attempt (tests set 0).

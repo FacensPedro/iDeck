@@ -44,8 +44,10 @@ enum AppLog {
         }
     }
 
+    /// Deletes the log now (waits for pending writes first), so a scan right
+    /// after it no longer finds the old lines.
     static func clear() {
-        queue.async {
+        queue.sync {
             for url in [fileURL, rotatedURL].compactMap({ $0 }) {
                 try? FileManager.default.removeItem(at: url)
             }
@@ -231,10 +233,18 @@ final class BugReportModel: ObservableObject {
         notice = tr("Log copied to the clipboard.")
     }
 
-    func clearAppLog() {
+    /// Clears every log the bug list reads: iDeck's own log and the last
+    /// Wine log. Live JIT state is checked again, not cleared.
+    func clearLogs() {
         AppLog.clear()
-        issues.removeAll { $0.source == .app }
+        if let wine = Self.wineLogURL {
+            try? FileManager.default.removeItem(at: wine)
+        }
         hasAppLog = false
+        hasWineLog = false
+        wineFinding = nil
+        issues = Self.liveJITIssues()
+        notice = tr("Logs cleared.")
     }
 
     /// A paste-ready report: device, app build and the selected problems.
@@ -306,10 +316,10 @@ struct BugReportView: View {
                         Label(tr("Copy iDeck log"), systemImage: "list.bullet.rectangle")
                     }
                     .disabled(!model.hasAppLog)
-                    Button(role: .destructive) { model.clearAppLog() } label: {
-                        Label(tr("Clear iDeck log"), systemImage: "trash")
+                    Button(role: .destructive) { model.clearLogs() } label: {
+                        Label(tr("Clear logs"), systemImage: "trash")
                     }
-                    .disabled(!model.hasAppLog)
+                    .disabled(!model.hasAppLog && !model.hasWineLog)
                 }
             }
             .scrollContentBackground(.hidden)

@@ -103,6 +103,23 @@ struct GOGGame: Identifiable, Hashable, Codable {
 struct GOGInstallerFile: Hashable {
     let manualURL: String
     let name: String
+    /// GOG's size label ("1.2 GB", "540 MB"), when listed.
+    var size: String = ""
+
+    /// The size label in bytes, or 0 when it is missing or unreadable.
+    var sizeBytes: Int64 {
+        let parts = size.replacingOccurrences(of: ",", with: ".").split(separator: " ")
+        guard parts.count == 2, let value = Double(parts[0]) else { return 0 }
+        let unit: Double
+        switch parts[1].uppercased() {
+        case "KB": unit = 1_000
+        case "MB": unit = 1_000_000
+        case "GB": unit = 1_000_000_000
+        case "TB": unit = 1_000_000_000_000
+        default: return 0
+        }
+        return Int64(value * unit)
+    }
 }
 
 enum GOGAPI {
@@ -216,7 +233,8 @@ enum GOGAPI {
                   let windows = platforms["windows"] as? [[String: Any]] else { continue }
             let files = windows.compactMap { file -> GOGInstallerFile? in
                 guard let manual = file["manualUrl"] as? String else { return nil }
-                return GOGInstallerFile(manualURL: manual, name: (file["name"] as? String) ?? "")
+                return GOGInstallerFile(manualURL: manual, name: (file["name"] as? String) ?? "",
+                                        size: (file["size"] as? String) ?? "")
             }
             if !files.isEmpty { byLanguage.append((language, files)) }
         }
@@ -307,6 +325,47 @@ final class GOGLibraryModel: ObservableObject {
     @Published private(set) var installed: [Int: GOGInstalledGame] = [:]
     @Published private(set) var downloadProgress: [Int: Double] = [:]
     @Published private(set) var downloadErrors: [Int: String] = [:]
+    /// Download size of each game's Windows installer, from GOG; 0 = unknown.
+    @Published private(set) var downloadSizes: [Int: Int64] = [:]
+    /// Size on disk of installed games, measured from their install folder.
+    @Published private(set) var installedSizes: [Int: Int64] = [:]
+
+    /// Fetches the installer size for the game details page (once).
+    func loadSize(for game: GOGGame) async {
+        if let folder = installed[game.id]?.executable.deletingLastPathComponent(), installedSizes[game.id] == nil {
+            let root = Self.installFolder(containing: folder)
+            let bytes = await Task.detached(priority: .utility) { Self.folderSize(root) }.value
+            if bytes > 0 { installedSizes[game.id] = bytes }
+        }
+        guard downloadSizes[game.id] == nil, let tokens = try? await tokens(),
+              let files = try? await GOGAPI.windowsInstaller(gameID: game.id, tokens: tokens) else { return }
+        downloadSizes[game.id] = files.reduce(0) { $0 + $1.sizeBytes }
+    }
+
+    /// The game's own folder: the highest folder up from the program that
+    /// still holds a goggame-*.info file, otherwise the program's folder.
+    nonisolated static func installFolder(containing folder: URL) -> URL {
+        var best = folder
+        var current = folder
+        for _ in 0..<4 {
+            let names = (try? FileManager.default.contentsOfDirectory(atPath: current.path)) ?? []
+            if names.contains(where: { $0.hasPrefix("goggame-") && $0.hasSuffix(".info") }) { best = current }
+            let parent = current.deletingLastPathComponent()
+            if parent.path == current.path { break }
+            current = parent
+        }
+        return best
+    }
+
+    nonisolated static func folderSize(_ folder: URL) -> Int64 {
+        guard let walker = FileManager.default.enumerator(at: folder, includingPropertiesForKeys: [.totalFileAllocatedSizeKey, .isRegularFileKey]) else { return 0 }
+        var total: Int64 = 0
+        for case let url as URL in walker {
+            let values = try? url.resourceValues(forKeys: [.totalFileAllocatedSizeKey, .isRegularFileKey])
+            if values?.isRegularFile == true { total += Int64(values?.totalFileAllocatedSize ?? 0) }
+        }
+        return total
+    }
 
     private var downloadTasks: [Int: Task<Void, Never>] = [:]
     private let cacheURL = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
@@ -386,6 +445,29 @@ final class GOGLibraryModel: ObservableObject {
     }
 
     func isDownloading(_ game: GOGGame) -> Bool { downloadTasks[game.id] != nil }
+
+    /// Deletes an installed game's folder (the one holding its goggame-*.info
+    /// file) and rescans. Refuses folders that are not inside drive_c.
+    @discardableResult
+    func uninstall(_ gameID: Int, prefixPath: URL) -> Bool {
+        guard let game = installed[gameID] else { return false }
+        let drive = prefixPath.appendingPathComponent("drive_c", isDirectory: true).standardizedFileURL.path
+        let folder = Self.installFolder(containing: game.executable.deletingLastPathComponent()).standardizedFileURL
+        guard folder.path.hasPrefix(drive + "/"), folder.pathComponents.count > drive.split(separator: "/").count + 2 else { return false }
+        do { try FileManager.default.removeItem(at: folder) } catch { return false }
+        installed[gameID] = nil
+        installedSizes[gameID] = nil
+        refreshInstalled(prefixPath: prefixPath)
+        return true
+    }
+
+    /// Wide artwork for a game's details page, best first.
+    static func bannerCandidates(_ game: GOGGame) -> [URL] {
+        guard let image = game.image, !image.isEmpty else { return [] }
+        let base = image.hasPrefix("//") ? "https:" + image : image
+        return ["_glx_bg_top_padding_7.webp", "_bg_crop_1366x655.jpg", "_product_card_v2_mobile_slider_639.jpg"]
+            .compactMap { URL(string: base + $0) }
+    }
 
     /// Downloads the Windows offline installer (setup .exe plus any .bin
     /// parts, which must sit next to it) into the prefix's WindowsDownloads
@@ -672,11 +754,11 @@ struct StoreBadge: View {
         Group {
             if UIImage(named: assetName) != nil {
                 Image(assetName)
-                    .renderingMode(store == .epic ? .template : .original)
+                    .renderingMode(store == .steam ? .original : .template)
                     .resizable()
                     .scaledToFit()
                     .foregroundColor(.white)
-                    .frame(width: store == .epic ? 15 : 13, height: store == .epic ? 17 : 13)
+                    .frame(width: store == .epic ? 15 : 16, height: store == .epic ? 17 : 16)
             } else {
                 Text(label)
                     .font(.system(size: 8, weight: .heavy, design: .rounded))

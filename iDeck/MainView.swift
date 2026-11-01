@@ -300,6 +300,7 @@ struct WindowsWorkspaceView: View {
     @ObservedObject private var epicLibrary = EpicLibrary.shared
     @State private var isEpicSignInPresented = false
     @State private var selectedEpicGame: SelectedEpicGame?
+    @State private var selectedGOGGame: GOGGame?
     @AppStorage("library.epicOwnedCollapsed") private var epicOwnedCollapsed = false
     @Environment(\.openURL) private var openURL
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -526,8 +527,14 @@ struct WindowsWorkspaceView: View {
         .sheet(isPresented: $isEpicSignInPresented) {
             EpicSignInView()
         }
+        .sheet(item: $selectedGOGGame) { game in
+            GOGGameDetailsSheet(game: game, prefixPath: prefixPath, gog: gogLibrary, library: windowsLibrary,
+                                coordinator: coordinator, launch: { launchGOGGame($0) },
+                                install: { downloadGOGInstaller($0) })
+        }
         .sheet(item: $selectedEpicGame) { selection in
-            EpicGameDetailView(appName: selection.id) { game in launchEpicGame(game) }
+            EpicGameDetailsSheet(appName: selection.id, epic: epicLibrary, library: windowsLibrary,
+                                 coordinator: coordinator) { game in launchEpicGame(game) }
         }
         .onAppear {
             if mode == .pc { epicLibrary.start() }
@@ -883,23 +890,6 @@ struct WindowsWorkspaceView: View {
         }
     }
 
-    private func displayedSize(for game: SteamAppInfo) -> UInt64 {
-        if steamLibrary.installedApps.contains(game.appID),
-           let actual = steamLibrary.installedSizes[game.appID] {
-            return actual
-        }
-        if steamLibrary.installedApps.contains(game.appID), let prefixPath {
-            let steamApps = SteamInstallPaths.steamApps(
-                drive: prefixPath.appendingPathComponent("drive_c", isDirectory: true))
-            if let installed = SteamInstallFiles.sizeOnDisk(
-                appID: Int(game.appID), steamApps: steamApps), installed > 0 {
-                return UInt64(installed)
-            }
-        }
-        let onDisk = game.installedSize(for: "windows")
-        return onDisk > 0 ? onDisk : game.downloadSize(for: "windows")
-    }
-
     private func gameCard(_ game: SteamAppInfo) -> some View {
         let installed = steamLibrary.installedApps.contains(game.appID)
 
@@ -915,17 +905,6 @@ struct WindowsWorkspaceView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            let displayedBytes = displayedSize(for: game)
-            if displayedBytes > 0 {
-                Text(ByteCountFormatter.string(fromByteCount: Int64(clamping: displayedBytes), countStyle: .file).replacingOccurrences(of: ",", with: "."))
-                    .font(.caption)
-                    .foregroundColor(.gray)
-                    .lineLimit(1)
-            } else {
-                Text(tr("Size unavailable"))
-                    .font(.caption)
-                    .foregroundColor(.gray)
-            }
 
             if installed {
                 Button { launchSteamGame(game) } label: {
@@ -1025,11 +1004,17 @@ struct WindowsWorkspaceView: View {
     private func gogCard(_ game: GOGGame) -> some View {
         let installed = gogLibrary.installed[game.id]
         return VStack(alignment: .center, spacing: 10) {
-            VStack(alignment: .center, spacing: 9) {
-                GOGArtworkView(urls: game.artworkCandidates, fallbackColor: secondaryColor)
-                    .frame(width: artworkWidth, height: artworkHeight)
-                cardTitle(game.title, store: .gog)
+            Button {
+                selectedGOGGame = game
+            } label: {
+                VStack(alignment: .center, spacing: 9) {
+                    GOGArtworkView(urls: game.artworkCandidates, fallbackColor: secondaryColor)
+                        .frame(width: artworkWidth, height: artworkHeight)
+                    cardTitle(game.title, store: .gog)
+                }
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
             if let error = gogLibrary.downloadErrors[game.id] {
                 Text(tr(error))
                     .font(.caption2)
@@ -2027,8 +2012,14 @@ private struct SteamProgramDetailsView: View {
 
     @AppStorage("iDeck.steamCloud.autoSaveEnabled") private var autoSaveEnabled = true
 
+    /// Size on disk when installed; otherwise what the account's own
+    /// edition takes once installed (or, failing that, its download size).
     private var installedSizeText: String? {
-        guard installed, let bytes = steamLibrary.installedSizes[game.appID], bytes > 0 else { return nil }
+        var bytes: UInt64 = 0
+        if installed { bytes = steamLibrary.installedSizes[game.appID] ?? 0 }
+        if bytes == 0 { bytes = game.installedSize(for: "windows") }
+        if bytes == 0 { bytes = game.downloadSize(for: "windows") }
+        guard bytes > 0 else { return nil }
         return ByteCountFormatter.string(fromByteCount: Int64(clamping: bytes), countStyle: .file)
     }
 
@@ -2234,5 +2225,289 @@ private struct WindowsGameProfileForm: View {
                     .frame(minHeight: 48)
             }
         }
+    }
+}
+
+// MARK: - GOG and Epic game details
+
+/// The game page shared by GOG and Epic: the same banner, cover, title,
+/// actions and per-game settings as a Steam game's page. Store-specific
+/// rows (Epic's version, update, repair, cloud saves) go in `extra`.
+private struct StoreGameDetailsView<Extra: View>: View {
+    let title: String
+    let store: GameStore
+    let profileID: String
+    let covers: [URL]
+    let banners: [URL]
+    let installed: Bool
+    /// Install progress 0...1 while downloading or installing.
+    let progress: Double?
+    let paused: Bool
+    let sizeText: String?
+    let errorText: String?
+    let canInstall: Bool
+    let onLaunch: () -> Void
+    let onInstall: () -> Void
+    let onStop: () -> Void
+    let onUninstall: (() -> Bool)?
+    @ObservedObject var library: WindowsLibraryStore
+    @ObservedObject var coordinator: SystemCoordinator
+    @ViewBuilder var extra: Extra
+    @Environment(\.dismiss) private var dismiss
+    @State private var profile: WindowsGameProfile
+    @State private var confirmUninstall = false
+    @State private var errorMessage: String?
+
+    init(title: String, store: GameStore, profileID: String, covers: [URL], banners: [URL],
+         installed: Bool, progress: Double?, paused: Bool = false, sizeText: String?, errorText: String?,
+         canInstall: Bool, onLaunch: @escaping () -> Void, onInstall: @escaping () -> Void,
+         onStop: @escaping () -> Void, onUninstall: (() -> Bool)?,
+         library: WindowsLibraryStore, coordinator: SystemCoordinator,
+         @ViewBuilder extra: () -> Extra) {
+        self.title = title
+        self.store = store
+        self.profileID = profileID
+        self.covers = covers
+        self.banners = banners
+        self.installed = installed
+        self.progress = progress
+        self.paused = paused
+        self.sizeText = sizeText
+        self.errorText = errorText
+        self.canInstall = canInstall
+        self.onLaunch = onLaunch
+        self.onInstall = onInstall
+        self.onStop = onStop
+        self.onUninstall = onUninstall
+        self.library = library
+        self.coordinator = coordinator
+        self.extra = extra()
+        var initial = library.profile(for: profileID, title: title)
+        if coordinator.isMetalFXEnabled { initial.metalFXEnabled = true }
+        _profile = State(initialValue: initial)
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .center, spacing: 18) {
+                    ZStack {
+                        GOGArtworkView(urls: banners + covers, fallbackColor: Color.white.opacity(0.06))
+                            .frame(height: 220)
+                            .frame(maxWidth: .infinity)
+                            .opacity(0.85)
+                        GOGArtworkView(urls: covers, fallbackColor: Color.black.opacity(0.65))
+                            .frame(width: 160, height: 220)
+                            .clipShape(RoundedRectangle(cornerRadius: 11))
+                            .shadow(color: .black.opacity(0.4), radius: 12)
+                    }
+                    .frame(height: 250)
+                    .frame(maxWidth: .infinity)
+                    HStack(spacing: 8) {
+                        Text(title)
+                            .font(.title2.bold())
+                            .foregroundColor(.white)
+                            .multilineTextAlignment(.center)
+                        StoreBadge(store: store).fixedSize()
+                    }
+                    .frame(maxWidth: .infinity)
+                    HStack(spacing: 8) {
+                        DetailChip(text: installed ? tr("Installed") : tr("Not installed"),
+                                   systemImage: installed ? "checkmark.circle.fill" : "arrow.down.circle",
+                                   tint: installed ? .green : .gray)
+                        DetailChip(text: sizeText ?? tr("Calculating..."), systemImage: "internaldrive", tint: .gray)
+                    }
+
+                    actions
+
+                    if let errorText {
+                        Text(errorText)
+                            .foregroundColor(.red)
+                            .font(.caption)
+                    }
+                    WindowsGameProfileForm(profile: $profile,
+                                           globalMetalFXEnabled: $coordinator.isMetalFXEnabled)
+                    extra
+                }
+                .padding(22)
+            }
+            .background(Color.black.ignoresSafeArea())
+            .navigationTitle(tr("Game details"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(tr("Done")) { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button {
+                        library.save(profile)
+                        dismiss()
+                    } label: {
+                        Label(tr("Save"), systemImage: "checkmark")
+                            .font(.subheadline.weight(.semibold))
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.blue)
+                }
+            }
+            .confirmationDialog(tr("Delete this game's files?"), isPresented: $confirmUninstall, titleVisibility: .visible) {
+                Button(tr("Uninstall"), role: .destructive) {
+                    if onUninstall?() == true {
+                        library.removeProfile(for: profileID)
+                        dismiss()
+                    } else {
+                        errorMessage = tr("Could not remove this game's files.")
+                    }
+                }
+                Button(tr("Cancel"), role: .cancel) {}
+            }
+            .alert(tr("Operation failed"), isPresented: Binding(get: { errorMessage != nil },
+                                                                 set: { if !$0 { errorMessage = nil } })) {
+                Button(tr("OK"), role: .cancel) {}
+            } message: {
+                Text(errorMessage ?? "")
+            }
+        }
+        .preferredColorScheme(.dark)
+    }
+
+    @ViewBuilder private var actions: some View {
+        if let progress, !paused {
+            VStack(spacing: 10) {
+                ProgressView(value: progress)
+                Text(tr("Installing %d%%", Int((progress * 100).rounded())))
+                    .font(.caption)
+                    .foregroundColor(.white)
+                Button(role: .destructive, action: onStop) {
+                    Label(tr("Stop download"), systemImage: "stop.fill")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+            }
+        } else if installed {
+            Button {
+                library.save(profile)
+                dismiss()
+                onLaunch()
+            } label: {
+                Label(tr("Launch"), systemImage: "play.fill")
+                    .font(.headline)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+            }
+            .buttonStyle(.borderedProminent)
+            if onUninstall != nil {
+                Button(role: .destructive) { confirmUninstall = true } label: {
+                    Label(tr("Uninstall"), systemImage: "trash")
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                }
+                .buttonStyle(.bordered)
+            }
+        } else if canInstall {
+            Button(action: onInstall) {
+                Label(tr(paused ? "Resume" : "Install"),
+                      systemImage: paused ? "play.circle.fill" : "arrow.down.circle.fill")
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+            }
+            .buttonStyle(.borderedProminent)
+        } else {
+            Text(tr("Not available for Windows"))
+                .font(.caption)
+                .foregroundColor(.gray)
+        }
+    }
+}
+
+/// GOG game page.
+private struct GOGGameDetailsSheet: View {
+    let game: GOGGame
+    let prefixPath: URL?
+    @ObservedObject var gog: GOGLibraryModel
+    @ObservedObject var library: WindowsLibraryStore
+    @ObservedObject var coordinator: SystemCoordinator
+    let launch: (GOGInstalledGame) -> Void
+    let install: (GOGGame) -> Void
+
+    private var sizeText: String? {
+        let bytes = gog.installedSizes[game.id] ?? gog.downloadSizes[game.id] ?? 0
+        if bytes == 0 && gog.downloadSizes[game.id] != nil && gog.installed[game.id] == nil { return tr("Size unavailable") }
+        return bytes > 0 ? ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file) : nil
+    }
+
+    var body: some View {
+        let installed = gog.installed[game.id]
+        StoreGameDetailsView(
+            title: game.title, store: .gog, profileID: "gog:\(game.id)",
+            covers: game.artworkCandidates, banners: GOGLibraryModel.bannerCandidates(game),
+            installed: installed != nil, progress: gog.downloadProgress[game.id],
+            sizeText: sizeText, errorText: gog.downloadErrors[game.id].map { tr($0) },
+            canInstall: game.worksOnWindows && prefixPath != nil,
+            onLaunch: { if let installed { launch(installed) } },
+            onInstall: { install(game) },
+            onStop: { gog.cancelDownload(game) },
+            onUninstall: prefixPath.map { prefix in { gog.uninstall(game.id, prefixPath: prefix) } },
+            library: library, coordinator: coordinator
+        ) { EmptyView() }
+        .task(id: game.id) { await gog.loadSize(for: game) }
+    }
+}
+
+/// Epic game page.
+private struct EpicGameDetailsSheet: View {
+    let appName: String
+    @ObservedObject var epic: EpicLibrary
+    @ObservedObject var library: WindowsLibraryStore
+    @ObservedObject var coordinator: SystemCoordinator
+    let launch: (EpicInstalledGame) -> Void
+
+    private var title: String { epic.game(appName)?.title ?? epic.installed[appName]?.title ?? "Epic Games" }
+
+    private var sizeText: String? {
+        let bytes = epic.installed[appName]?.installBytes ?? epic.manifestSizes[appName] ?? 0
+        return bytes > 0 ? ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file) : nil
+    }
+
+    var body: some View {
+        let installed = epic.installed[appName]
+        let download = epic.downloads[appName]
+        let failed: String? = { if case .failed(let message) = download?.state { return message }; return nil }()
+        let paused: Bool = { if case .paused = download?.state { return true }; return false }()
+        StoreGameDetailsView(
+            title: title, store: .epic, profileID: "epic:\(appName)",
+            covers: [epic.game(appName)?.cover].compactMap { $0 },
+            banners: [epic.game(appName)?.wide].compactMap { $0 },
+            installed: installed != nil && download == nil,
+            progress: (download != nil && failed == nil) ? download?.progress.fraction : nil,
+            paused: paused, sizeText: sizeText, errorText: failed,
+            canInstall: true,
+            onLaunch: { if let installed { launch(installed) } },
+            onInstall: { epic.install(appName) },
+            onStop: { epic.pause(appName) },
+            onUninstall: (epic.sessionRunning || EpicCloud.shared.isBusy) ? nil : { epic.uninstall(appName); return true },
+            library: library, coordinator: coordinator
+        ) {
+            if installed != nil {
+                DetailCard(title: "Epic Games") {
+                    DetailValueRow(title: tr("Version"), value: installed?.buildVersion ?? "",
+                                   icon: "number", iconColor: .gray)
+                    if epic.updateAvailable(appName) {
+                        DetailButtonRow(title: tr("Update"), systemImage: "arrow.down.circle") { epic.install(appName) }
+                    }
+                    DetailButtonRow(title: tr("Repair"), systemImage: "wrench.and.screwdriver", showsDivider: false) {
+                        epic.repair(appName)
+                    }
+                }
+                VStack(alignment: .leading, spacing: 10) {
+                    EpicCloudSection(appName: appName)
+                }
+                .font(.subheadline)
+                .padding(16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color(white: 0.11), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
+        }
+        .task(id: appName) { await epic.loadSize(appName) }
     }
 }

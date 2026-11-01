@@ -69,8 +69,12 @@ final class DepotDownloader {
         switch process.thermalState {
         // Download speed is preferred over CPU use: more chunks are fetched,
         // decrypted and decompressed at once while the device stays cool.
-        case .nominal: return min(64, max(32, process.activeProcessorCount * 8))
-        case .fair: return min(32, max(16, process.activeProcessorCount * 4))
+        case .nominal: return DownloadSpeed.isUnlimited
+            ? min(DownloadSpeed.steamChunks, max(32, process.activeProcessorCount * 8))
+            : DownloadSpeed.steamChunks
+        case .fair: return DownloadSpeed.isUnlimited
+            ? min(32, max(16, process.activeProcessorCount * 4))
+            : max(4, DownloadSpeed.steamChunks / 2)
         case .serious: return 4
         case .critical: return 1
         @unknown default: return 4
