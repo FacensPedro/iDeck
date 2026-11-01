@@ -77,6 +77,17 @@ class SystemCoordinator: ObservableObject {
 
     private static let supportedWineJITPoolMiB: Set<Int> = [64, 96, 128, 192, 256, 384, 512, 640, 768, 896, 1152]
 
+    /// The pool size that last prepared successfully on this device: the
+    /// native side starts there instead of retrying larger sizes the
+    /// debugger cannot allocate. Choosing a size in Settings resets it.
+    private static let lastGoodPoolKey = "wineJITPoolLastGoodMiB"
+
+    private static func exportLastGoodPool() {
+        let size = UserDefaults.standard.integer(forKey: lastGoodPoolKey)
+        if size > 0 { setenv("IDECK_WINE_JIT_LAST_GOOD_MIB", String(size), 1) }
+        else { unsetenv("IDECK_WINE_JIT_LAST_GOOD_MIB") }
+    }
+
     private static func exportWineJITPreference(_ sizeMiB: Int) {
         if supportedWineJITPoolMiB.contains(sizeMiB) {
             setenv("IDECK_WINE_JIT_MIB", String(sizeMiB), 1)
@@ -96,11 +107,14 @@ class SystemCoordinator: ObservableObject {
             return false
         }
         Self.exportWineJITPreference(sizeMiB)
+        UserDefaults.standard.removeObject(forKey: Self.lastGoodPoolKey)
+        Self.exportLastGoodPool()
         return true
     }
 
     init() {
         Self.exportWineJITPreference(UserDefaults.standard.integer(forKey: "wineJITPoolMiB"))
+        Self.exportLastGoodPool()
         // Keep app startup free of native Wine/JIT probes and Keychain reads.
         // In particular, a CS_DEBUGGED flag left behind by StikDebug or a
         // previous Wine crash must not be used to initialize FEX on app open.
@@ -207,7 +221,12 @@ class SystemCoordinator: ObservableObject {
         let detected = ideck_process_has_jit_permission() || debuggerAttached
         // The native prepare function owns the pool mutex while issuing BRK
         // requests. Do not block SwiftUI refreshes waiting for that mutex.
-        let wineReady = wineJITPreparationInFlight ? isWineJITPrepared : ideck_wine_jit_pool_ready()
+        // ideck_jit_snapshot only try-locks: while any preparation (this
+        // one or a game launch's) holds the pool, keep the last known state
+        // instead of blocking the main thread for the debugger round trips.
+        let snapshot = ideck_jit_snapshot()
+        let wineReady = (wineJITPreparationInFlight || snapshot.wine_state_busy)
+            ? isWineJITPrepared : snapshot.wine_pool_prepared
         let update = { [weak self] in
             guard let self else { return }
             if self.isJITEnabled != detected { self.isJITEnabled = detected }
@@ -226,7 +245,16 @@ class SystemCoordinator: ObservableObject {
                     self.wineJITAttemptedDuringAttachment = true
                     self.wineJITPreparationInFlight = true
                     DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                        let started = Date()
                         let prepared = ideck_wine_jit_pool_prepare()
+                        let poolMiB = Int(ideck_jit_snapshot().wine_pool_mib)
+                        AppLog.record(String(format: "[iDeck Wine JIT] pool %@ in %.1f s (%d MiB)",
+                                             prepared ? "prepared" : "not prepared",
+                                             Date().timeIntervalSince(started), poolMiB))
+                        if prepared && poolMiB > 0 {
+                            UserDefaults.standard.set(poolMiB, forKey: Self.lastGoodPoolKey)
+                            Self.exportLastGoodPool()
+                        }
                         DispatchQueue.main.async {
                             guard let self else { return }
                             self.wineJITPreparationInFlight = false
