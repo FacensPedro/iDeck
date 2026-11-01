@@ -62,6 +62,27 @@ struct GOGContentPlan {
 enum GOGContentSystem {
     static let metaBase = "https://gog-cdn-fastly.gog.com/content-system/v2/meta/"
 
+    // GOG secure_link returns a signed URL template plus its parameters.
+    // The path must be normalized only once: double slashes in a signed CDN
+    // store URL may return HTTP 404 even though the chunk exists.
+    static func signedChunkURL(format: String, parameters: [String: String], hash: String) -> URL? {
+        guard hash.count == 32, hash.utf8.allSatisfy({
+            ($0 >= 48 && $0 <= 57) || ($0 >= 65 && $0 <= 70) || ($0 >= 97 && $0 <= 102)
+        }) else { return nil }
+        var values = parameters
+        let base = (values["path"] ?? "").trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        let suffix = galaxyPath(hash)
+        values["path"] = "/" + (base.isEmpty ? suffix : base + "/" + suffix)
+        var text = format.replacingOccurrences(of: "\\/", with: "/")
+        for (name, value) in values {
+            text = text.replacingOccurrences(of: "{\(name)}", with: value)
+        }
+        guard !text.contains("{"), !text.contains("}"),
+              let url = URL(string: text), url.scheme == "https",
+              url.host != nil, url.user == nil, url.password == nil else { return nil }
+        return url
+    }
+
     static func galaxyPath(_ hash: String) -> String {
         guard hash.count > 4 else { return hash }
         let a = hash.prefix(2), b = hash.dropFirst(2).prefix(2)
@@ -207,8 +228,21 @@ enum GOGContentSystem {
 final class GOGContentInstaller: @unchecked Sendable {
     private let tokens: GOGTokens
     private let progress: @Sendable (Int64) -> Void
-    private var links: [String: (format: String, parameters: [String: String], fetched: Date)] = [:]
-    private let lock = NSLock()
+    private struct SignedCDN: Sendable {
+        let format: String
+        let parameters: [String: String]
+    }
+
+    private actor SecureLinkCache {
+        struct Entry: Sendable {
+            let providers: [SignedCDN]
+            let fetched: Date
+        }
+        private var values: [String: Entry] = [:]
+        func entry(for productID: String) -> Entry? { values[productID] }
+        func store(_ entry: Entry, for productID: String) { values[productID] = entry }
+    }
+    private let linkCache = SecureLinkCache()
 
     init(tokens: GOGTokens, progress: @escaping @Sendable (Int64) -> Void) {
         self.tokens = tokens
@@ -305,20 +339,32 @@ final class GOGContentInstaller: @unchecked Sendable {
         var attempt = 0
         while true {
             do {
-                let url = try await chunkURL(chunk.compressedMd5, productID: productID, renew: attempt > 0)
+                try Task.checkCancellation()
+                let url = try await chunkURL(chunk.compressedMd5, productID: productID, attempt: attempt)
                 let (data, response) = try await GOGAPI.session.data(from: url)
                 let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-                guard status == 200 else { throw GOGError.http(status) }
+                guard status == 200 else { throw status == 401 ? GOGError.notSignedIn : GOGError.http(status) }
+                // Check the *compressed* checksum before inflating. Each GOG
+                // content-system chunk has both hashes in its depot manifest.
+                guard Self.md5(data) == chunk.compressedMd5.lowercased() else {
+                    throw GOGContentError.checksum(label)
+                }
                 let inflated = try GOGContentSystem.inflate(data)
                 guard Self.md5(inflated) == chunk.md5.lowercased() else { throw GOGContentError.checksum(label) }
                 return inflated
             } catch is CancellationError {
                 throw CancellationError()
+            } catch let error as URLError where error.code == .cancelled {
+                // URLSession translates task-group cancellation into -999.
+                // It is never a CDN failure, and must not be retried.
+                throw CancellationError()
             } catch {
+                try Task.checkCancellation()
+                if case GOGError.notSignedIn = error { throw error }
                 attempt += 1
                 guard attempt <= 5 else { throw error }
-                AppLog.record("[gog] chunk of \(label) failed (\(error.localizedDescription)); retry \(attempt)/5")
-                try await Task.sleep(nanoseconds: UInt64(attempt) * 1_500_000_000)
+                AppLog.record("[gog] chunk of \(label) failed (\(error.localizedDescription)); retry \(attempt)/5 with refreshed or alternate CDN")
+                try await Task.sleep(nanoseconds: UInt64(attempt) * 1_000_000_000)
             }
         }
     }
@@ -327,13 +373,15 @@ final class GOGContentInstaller: @unchecked Sendable {
         Insecure.MD5.hash(data: data).map { String(format: "%02x", $0) }.joined()
     }
 
-    /// The CDN URL of a chunk, from the product's secure link (GOG lists its preferred CDN first) (renewed when
-    /// older than 30 minutes or after a failure).
-    private func chunkURL(_ hash: String, productID: String, renew: Bool) async throws -> URL {
-        lock.lock()
-        var link = links[productID]
-        lock.unlock()
-        if renew || link == nil || Date().timeIntervalSince(link!.fetched) > 1800 {
+    /// Obtain signed links from the official GOG content system. Rotate all
+    /// returned CDN providers before renewing a token. Never log signed URLs
+    /// or bearer credentials; links are scoped to each product ID.
+    private func chunkURL(_ hash: String, productID: String, attempt: Int) async throws -> URL {
+        var saved = await linkCache.entry(for: productID)
+        let expired = saved.map { Date().timeIntervalSince($0.fetched) > 600 } ?? true
+        let exhausted = attempt > 0 && (saved?.providers.isEmpty != false ||
+                                         attempt % max(1, saved?.providers.count ?? 1) == 0)
+        if expired || exhausted {
             let url = URL(string: "https://content-system.gog.com/products/\(productID)/secure_link?generation=2&path=/&_version=2")!
             var request = URLRequest(url: url)
             request.setValue("Bearer " + tokens.accessToken, forHTTPHeaderField: "Authorization")
@@ -341,22 +389,32 @@ final class GOGContentInstaller: @unchecked Sendable {
             let status = (response as? HTTPURLResponse)?.statusCode ?? 0
             guard status == 200 else { throw status == 401 ? GOGError.notSignedIn : GOGError.http(status) }
             guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let urls = json["urls"] as? [[String: Any]],
-                  let best = urls.first,
-                  let format = best["url_format"] as? String,
-                  let raw = best["parameters"] as? [String: Any] else { throw GOGContentError.invalidManifest }
-            var parameters: [String: String] = [:]
-            for (key, value) in raw { parameters[key] = "\(value)" }
-            link = (format, parameters, Date())
-            lock.lock()
-            links[productID] = link
-            lock.unlock()
+                  let urls = json["urls"] as? [[String: Any]] else {
+                throw GOGContentError.invalidManifest
+            }
+            let providers: [SignedCDN] = urls.compactMap { item in
+                guard let format = item["url_format"] as? String,
+                      let raw = item["parameters"] as? [String: Any] else { return nil }
+                var parameters: [String: String] = [:]
+                for (key, value) in raw { parameters[key] = String(describing: value) }
+                // Reject malformed and non-HTTPS templates before caching.
+                guard GOGContentSystem.signedChunkURL(
+                    format: format, parameters: parameters, hash: hash) != nil else { return nil }
+                return SignedCDN(format: format, parameters: parameters)
+            }
+            guard !providers.isEmpty else { throw GOGContentError.invalidManifest }
+            let entry = SecureLinkCache.Entry(providers: providers, fetched: Date())
+            await linkCache.store(entry, for: productID)
+            saved = entry
         }
-        var parameters = link!.parameters
-        parameters["path"] = (parameters["path"] ?? "") + "/" + GOGContentSystem.galaxyPath(hash)
-        var text = link!.format
-        for (key, value) in parameters { text = text.replacingOccurrences(of: "{\(key)}", with: value) }
-        guard let url = URL(string: text) else { throw GOGContentError.invalidManifest }
+        guard let choices = saved?.providers, !choices.isEmpty else {
+            throw GOGContentError.invalidManifest
+        }
+        let server = choices[attempt % choices.count]
+        guard let url = GOGContentSystem.signedChunkURL(
+            format: server.format, parameters: server.parameters, hash: hash) else {
+            throw GOGContentError.invalidManifest
+        }
         return url
     }
 }
