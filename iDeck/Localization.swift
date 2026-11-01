@@ -496,6 +496,7 @@ enum Translations {
         "Resolution": ["pt": "Resolução", "es": "Resolución"],
         "Graphics API": ["pt": "API gráfica", "es": "API gráfica"],
         "Vulkan": ["pt": "Vulkan", "es": "Vulkan"],
+        "Pause games in the background": ["pt": "Pausar jogos em segundo plano", "es": "Pausar juegos en segundo plano"],
         "Direct3D 12": ["pt": "Direct3D 12", "es": "Direct3D 12"],
         "OpenGL": ["pt": "OpenGL", "es": "OpenGL"],
         "Frame rate limit": ["pt": "Limite de FPS", "es": "Límite de FPS"],

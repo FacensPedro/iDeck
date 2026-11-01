@@ -121,6 +121,10 @@ class SystemCoordinator: ObservableObject {
     }
 
     init() {
+        MainActor.assumeIsolated {
+            ResourceGovernor.shared.onActivityChange = { [weak self] in self?.applyMaxRefreshRate() }
+            ResourceGovernor.shared.start()
+        }
         Self.exportWineJITPreference(UserDefaults.standard.integer(forKey: "wineJITPoolMiB"))
         Self.exportLastGoodPool()
         // Keep app startup free of native Wine/JIT probes and Keychain reads.
@@ -192,6 +196,8 @@ class SystemCoordinator: ObservableObject {
         let update = {
             self.windowsStatus = status
             self.currentStatus = status
+            // A session starting or ending changes whether 120 Hz may be held.
+            self.applyMaxRefreshRate()
         }
         if Thread.isMainThread { update() } else { DispatchQueue.main.async(execute: update) }
     }
@@ -495,8 +501,12 @@ class SystemCoordinator: ObservableObject {
     }
     
     
+    /// Holds 120 Hz only while a game runs on screen (ResourceGovernor):
+    /// menus, the background and Low Power Mode keep the system's rate.
     private func applyMaxRefreshRate() {
-        if isMaxRefreshRateEnabled {
+        let wanted = isMaxRefreshRateEnabled && MainActor.assumeIsolated { ResourceGovernor.maxRateAllowed }
+        guard wanted != (displayLink != nil) else { return }
+        if wanted {
             displayLink = CADisplayLink(target: self, selector: #selector(dummyDisplayLinkUpdate))
             if #available(iOS 15.0, *) {
                 var maxFPS: Float = 60.0
