@@ -296,6 +296,17 @@ void release_pool_plugs() {
     wine_pool_plugs.clear();
 }
 
+void release_low_va_pins() {
+    constexpr vm_size_t chunk = 16ULL * 1024 * 1024;
+    for (vm_address_t address : wine_pool_low_va_pins) {
+        const kern_return_t kr = vm_deallocate(mach_task_self(), address, chunk);
+        if (kr != KERN_SUCCESS)
+            fprintf(stderr, "[iDeck Wine JIT] low-VA pin release failed at 0x%lx kr=%d\n",
+                    static_cast<unsigned long>(address), kr);
+    }
+    wine_pool_low_va_pins.clear();
+}
+
 void prepare_wine_pool_frontier() {
     reserve_exe_window();
     if (wine_pool_frontier_prepared) return;
@@ -315,7 +326,7 @@ void prepare_wine_pool_frontier() {
         wine_pool_low_va_pins.push_back(address);
         if (address > UINTPTR_MAX - chunk || address + chunk >= 0x119000000ULL) break;
     }
-    fprintf(stderr, "[iDeck Wine JIT] pinned %zu low-VA placeholders before RX allocation\n",
+    fprintf(stderr, "[iDeck Wine JIT] temporarily pinned %zu low-VA placeholders before RX allocation\n",
             wine_pool_low_va_pins.size());
 }
 
@@ -525,7 +536,12 @@ extern "C" bool ideck_wine_jit_pool_prepare(void) {
         for (size_t size : candidates) if (size < fit) fitted.push_back(size);
         candidates.swap(fitted);
     }
-    struct PlugRelease { ~PlugRelease() { release_pool_plugs(); } } plug_release;
+    struct TemporaryReservationsRelease {
+        ~TemporaryReservationsRelease() {
+            release_pool_plugs();
+            release_low_va_pins();
+        }
+    } temporary_reservations_release;
     for (size_t size : candidates) {
         // Every jit26_prepare_region call triggers BRK #0xf00d.
         // A detached debugger here would make the call process-fatal.
