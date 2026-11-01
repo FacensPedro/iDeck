@@ -8,6 +8,7 @@
 
 #define IDECK_PE_I386 0x014Cu
 #define IDECK_PE_AMD64 0x8664u
+#define IDECK_PE_ARM64EC 0xA641u
 
 static inline uint16_t ideck_pe_machine_from_stream(FILE *file) {
     struct stat info;
@@ -34,7 +35,7 @@ static inline uint16_t ideck_pe_machine_from_stream(FILE *file) {
     uint16_t optional_size = (uint16_t)(pe[20] | ((uint16_t)pe[21] << 8));
     uint16_t magic = (uint16_t)(pe[24] | ((uint16_t)pe[25] << 8));
     if ((cpu == IDECK_PE_I386 && magic == 0x10Bu && optional_size >= 96) ||
-        (cpu == IDECK_PE_AMD64 && magic == 0x20Bu && optional_size >= 112)) {
+        ((cpu == IDECK_PE_AMD64 || cpu == IDECK_PE_ARM64EC) && magic == 0x20Bu && optional_size >= 112)) {
         if ((uint64_t)offset + 24u + optional_size <= (uint64_t)info.st_size)
             return cpu;
     }

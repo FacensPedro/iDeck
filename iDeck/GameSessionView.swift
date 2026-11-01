@@ -34,6 +34,17 @@ private final class GameRuntimeMetrics: ObservableObject {
         }
     }
 
+    /// Re-arm the render-counter baseline once Valve's LaunchApp succeeds.
+    /// Frames produced earlier by Wine's desktop or the Steam loader cannot
+    /// count as a successful post-launch Metal presentation.
+    func armAfterSteamLaunch() {
+        if let pointer = dlsym(UnsafeMutableRawPointer(bitPattern: -2), "madeira_get_present_count") {
+            baselineFrames = unsafeBitCast(pointer, to: PresentCount.self)()
+            receivedNewFrames = false
+            firstFrameAt = nil
+        }
+    }
+
     func sample(collectPerformance: Bool = false) {
         let uptime = ProcessInfo.processInfo.systemUptime
         secondsSinceLaunch = max(0, uptime - startedAt)
@@ -91,6 +102,9 @@ struct GameSessionView: View {
         if status == SystemCoordinator.steamComponentsInstallStatus {
             return (0.30, "Installing Steam client components")
         }
+        if status == "Installing Steam prerequisites..." {
+            return (0.35, coordinator.steamPrerequisiteProgress ?? "Installing Steam game prerequisites")
+        }
         if status == "Preparing Wine prefix..." || status == "Preparing Windows Environment..." {
             return (0.20, "Preparing Wine prefix")
         }
@@ -100,9 +114,15 @@ struct GameSessionView: View {
         }
         if status == "Running" || status == "Steam Running" ||
            status == "Wine started; waiting for game..." {
+            if coordinator.currentSteamLaunchUsesDock && !coordinator.dockLaunchAccepted {
+                return (0.70, coordinator.steamDockLaunchStage ?? "Starting Madeira Dock")
+            }
             if metrics.receivedNewFrames {
                 let recentlyReady = metrics.secondsSinceLaunch - (metrics.firstFrameAt ?? 0) < 2.5
                 return recentlyReady ? (1.0, "First Metal frame displayed") : nil
+            }
+            if coordinator.currentSteamLaunchUsesDock {
+                return (0.90, "Waiting for a Metal frame after Steam's LaunchApp")
             }
             return (0.90, "Waiting for the first game frame")
         }
@@ -282,6 +302,7 @@ struct GameSessionView: View {
                 if coordinator.windowsStatus == "Launching Steam game..." ||
                     coordinator.windowsStatus == "Launching Steam client..." ||
                     coordinator.windowsStatus == "Launching Windows app..." ||
+                    coordinator.windowsStatus == "Installing Steam prerequisites..." ||
                     coordinator.windowsStatus == VisualCRuntimeBootstrap.installStatus ||
                     coordinator.windowsStatus == SystemCoordinator.steamComponentsInstallStatus {
                     HStack {
@@ -373,6 +394,11 @@ struct GameSessionView: View {
         .onChange(of: coordinator.windowsStatus) { _, _ in
             updateRecentWineLogFinding()
         }
+        .onChange(of: coordinator.dockLaunchAccepted) { _, accepted in
+            if accepted && coordinator.currentSteamLaunchUsesDock {
+                metrics.armAfterSteamLaunch()
+            }
+        }
         .onReceive(tick) { _ in
             // Wine's GDI compositor may come online after SwiftUI has already
             // laid out the persistent Metal layer. Re-publish the exact
@@ -386,10 +412,13 @@ struct GameSessionView: View {
             }
             metrics.sample(collectPerformance: showGamePerformanceOverlay)
             if coordinator.windowsStatus == "Wine started; waiting for game..." &&
-               metrics.receivedNewFrames {
+               metrics.receivedNewFrames &&
+               (!coordinator.currentSteamLaunchUsesDock || coordinator.dockLaunchAccepted) {
                 // The loader thread being alive is insufficient. Require a
                 // native Metal presentation before promoting game readiness.
-                SteamLog.event("[steam-start] first Metal frame detected after Wine startup")
+                SteamLog.event(coordinator.currentSteamLaunchUsesDock
+                    ? "[steam-start] first Metal present after Steam LaunchApp (game-window identity not verified)"
+                    : "[steam-start] first Metal frame detected after Wine startup")
                 coordinator.setWindowsStatus("Running")
             }
             coordinator.pollWindowsSessionClose()

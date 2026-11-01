@@ -78,6 +78,7 @@
 		F3A000000000000000000010 /* JITBuiltInHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000010 /* JITBuiltInHost.swift */; };
 		F3A00000000000000000000F /* JITBuiltInMessages.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A00000000000000000000F /* JITBuiltInMessages.swift */; };
 		F3A00000000000000000000E /* MadeiraDock.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A00000000000000000000E /* MadeiraDock.swift */; };
+		FE0100000000000000000101 /* SteamDockInstallers.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE0100000000000000000102 /* SteamDockInstallers.swift */; };
 		F3A00000000000000000000D /* EpicGames.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A00000000000000000000D /* EpicGames.swift */; };
 		F3A00000000000000000000C /* EpicLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A00000000000000000000C /* EpicLibrary.swift */; };
 		F3A00000000000000000000B /* EpicCloud.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A00000000000000000000B /* EpicCloud.swift */; };
@@ -182,6 +183,7 @@
 		F4A000000000000000000010 /* JITBuiltInHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JITBuiltInHost.swift; sourceTree = "<group>"; };
 		F4A00000000000000000000F /* JITBuiltInMessages.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JITBuiltInMessages.swift; sourceTree = "<group>"; };
 		F4A00000000000000000000E /* MadeiraDock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MadeiraDock.swift; sourceTree = "<group>"; };
+		FE0100000000000000000102 /* SteamDockInstallers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamDockInstallers.swift; sourceTree = "<group>"; };
 		F4A00000000000000000000D /* EpicGames.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EpicGames.swift; sourceTree = "<group>"; };
 		F4A00000000000000000000C /* EpicLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EpicLibrary.swift; sourceTree = "<group>"; };
 		F4A00000000000000000000B /* EpicCloud.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EpicCloud.swift; sourceTree = "<group>"; };
@@ -325,6 +327,7 @@
 				F3A000000000000000000010 /* JITBuiltInHost.swift in Sources */,
 				F3A00000000000000000000F /* JITBuiltInMessages.swift in Sources */,
 				F3A00000000000000000000E /* MadeiraDock.swift in Sources */,
+				FE0100000000000000000101 /* SteamDockInstallers.swift in Sources */,
 				F3A00000000000000000000D /* EpicGames.swift in Sources */,
 				F3A00000000000000000000C /* EpicLibrary.swift in Sources */,
 				F3A00000000000000000000B /* EpicCloud.swift in Sources */,
@@ -455,6 +458,7 @@
 				F4A000000000000000000010 /* JITBuiltInHost.swift */,
 				F4A00000000000000000000F /* JITBuiltInMessages.swift */,
 				F4A00000000000000000000E /* MadeiraDock.swift */,
+				FE0100000000000000000102 /* SteamDockInstallers.swift */,
 				F4A00000000000000000000D /* EpicGames.swift */,
 				F4A00000000000000000000C /* EpicLibrary.swift */,
 				F4A00000000000000000000B /* EpicCloud.swift */,

@@ -56,6 +56,7 @@ class NativePEMachineTests(unittest.TestCase):
         cases = [
             (make_pe(0x014C, 0x010B, 224), 0x014C),
             (make_pe(0x8664, 0x020B, 240), 0x8664),
+            (make_pe(0xA641, 0x020B, 240), 0xA641),
             (make_pe(0x014C, 0x020B, 224), 0),
             (make_pe(0x8664, 0x010B, 240), 0),
             (make_pe(0xAA64, 0x020B, 240), 0),

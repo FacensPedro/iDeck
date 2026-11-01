@@ -72,6 +72,8 @@ struct MainView: View {
                 coordinator.windowsStatus == "Launching Steam game..." ||
                 coordinator.windowsStatus == "Launching Steam client..." ||
                 coordinator.windowsStatus == "Launching Windows app..." ||
+                coordinator.windowsStatus == "Installing Steam prerequisites..." ||
+                coordinator.windowsStatus == "Preparing JIT..." ||
                 coordinator.windowsStatus == VisualCRuntimeBootstrap.installStatus ||
                 coordinator.windowsStatus == SystemCoordinator.steamComponentsInstallStatus ||
                 coordinator.windowsStatus.hasPrefix("Visual C++") ||
