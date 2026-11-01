@@ -235,7 +235,12 @@ size_t release_placeholder_and_plug(size_t wanted) {
     constexpr vm_size_t step = 16ULL * 1024 * 1024;
     const vm_address_t placeholder = madeira_early_pool_base;
     if (placeholder && !wine_pool_placeholder_released) {
-        vm_deallocate(mach_task_self(), placeholder, madeira_early_pool_size);
+        const kern_return_t release_status = vm_deallocate(mach_task_self(), placeholder, madeira_early_pool_size);
+        if (release_status != KERN_SUCCESS) {
+            record_wine_pool_failure(2, release_status);
+            fprintf(stderr, "[iDeck Wine JIT] early pool placeholder release failed kr=%d\n", release_status);
+            return 0;
+        }
         wine_pool_placeholder_released = true;
         fprintf(stderr, "[iDeck Wine JIT] released the early pool placeholder 0x%lx+%lu MiB for the debugger\n",
                 static_cast<unsigned long>(placeholder), madeira_early_pool_size >> 20);
@@ -486,6 +491,13 @@ extern "C" bool ideck_wine_jit_pool_prepare(void) {
     wine_pool_last_mach_code.store(0);
     wine_pool_last_rx_detail.store(0);
     if (wine_pool_rx != 0) {
+        if (!ideck::jit::disjoint(wine_pool_rx, wine_pool_rw, wine_pool_size) ||
+            !executable_mapping(wine_pool_rx, wine_pool_size) ||
+            !writable_mapping(wine_pool_rw, wine_pool_size)) {
+            record_wine_pool_failure(3);
+            fprintf(stderr, "[iDeck Wine JIT] previously prepared RX/RW pool failed revalidation\n");
+            return false;
+        }
         if (export_pool(wine_pool_rx, wine_pool_rw, wine_pool_size)) return true;
         record_wine_pool_failure(6);
         return false;
@@ -603,6 +615,13 @@ extern "C" bool ideck_wine_jit_pool_prepare(void) {
                 continue;
             }
 
+            if (!executable_mapping(rx, size)) {
+                record_wine_pool_failure(3);
+                fprintf(stderr, "[iDeck Wine JIT] RX permissions changed after vm_remap/vm_protect\n");
+                vm_deallocate(mach_task_self(), rw, size);
+                continue;
+            }
+
             if (!writable_mapping(alias, size)) {
                 record_wine_pool_failure(5);
                 fprintf(stderr, "[iDeck Wine JIT] rejected RW alias with incomplete permissions or executable pages\n");
@@ -625,7 +644,12 @@ extern "C" bool ideck_wine_jit_pool_prepare(void) {
             fprintf(stderr, "[iDeck Wine JIT] ready with %zu MiB (RX/RW mirror)\n", size / MiB);
             return true;
         }
-        vm_deallocate(mach_task_self(), static_cast<vm_address_t>(rx), size);
+        const kern_return_t cleanup = vm_deallocate(mach_task_self(), static_cast<vm_address_t>(rx), size);
+        if (cleanup != KERN_SUCCESS) {
+            record_wine_pool_failure(4, cleanup);
+            fprintf(stderr, "[iDeck Wine JIT] RX cleanup failed kr=%d; stopping to avoid stale mappings\n", cleanup);
+            return false;
+        }
     }
 
     fprintf(stderr, "[iDeck Wine JIT] FAILED: unable to allocate and dual-map "
