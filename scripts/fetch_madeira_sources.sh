@@ -8,13 +8,14 @@ REV="${IDECK_MADEIRA_REV:-c2c1b03a9e36ef986c980b9eae3c14d05a372db1}"
 command -v git >/dev/null || { echo "git is required" >&2; exit 1; }
 if [ ! -d "$DEST/.git" ]; then
   mkdir -p "$(dirname "$DEST")"
-  git clone https://github.com/willfaust/Madeira.git "$DEST"
+  # Partial clone: only the blobs of the pinned checkout are downloaded.
+  git clone --filter=blob:none https://github.com/willfaust/Madeira.git "$DEST"
 fi
 
 git -C "$DEST" fetch origin "$REV"
 git -C "$DEST" checkout --detach "$REV"
 git -C "$DEST" submodule sync --recursive
-git -C "$DEST" submodule update --init --recursive
+git -C "$DEST" submodule update --init --recursive --jobs 8 --filter=blob:none
 python3 "$ROOT/scripts/verify_madeira_sources.py" --root "$DEST" --revision "$REV"
 
 # The pinned Madeira script says it builds the ARM64EC PE ntdll, but

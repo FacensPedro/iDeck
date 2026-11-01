@@ -592,12 +592,22 @@ jobs:
           key: ideck-spm-modules-v1-${{ runner.os }}-${{ hashFiles('iDeck.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved', 'iDeck.xcodeproj/project.pbxproj') }}
           restore-keys: ideck-spm-modules-v1-${{ runner.os }}-
 
+      # The i386 Wine farm is the slowest part of a runtime rebuild; it only
+      # changes with the pinned Madeira revision or iDeck's patches.
+      - name: Restore compiled i386 Wine farm
+        if: ${{ env.IDECK_NATIVE_BUILD == '1' && env.IDECK_BUILD_WOW64 == '1' && steps.madeira_kit.outputs.available != 'true' }}
+        uses: actions/cache@v5
+        with:
+          path: build/i386-farm-cache
+          key: madeira-i386-farm-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/fetch_madeira_sources.sh', 'patches/**') }}
+
       - name: Build and package iDeck.ipa
         env:
           IDECK_REQUIRE_MADEIRA: ${{ env.IDECK_NATIVE_BUILD }}
           IDECK_ACCEPT_METAL_CONVERTER_LICENSE: ${{ env.IDECK_ACCEPT_METAL_CONVERTER_LICENSE }}
           IDECK_PREBUILT_EXPORT: ${{ env.IDECK_NATIVE_BUILD == '1' && '1' || '0' }}
           IDECK_PREBUILT_MODE: prefer
+          IDECK_I386_FARM_CACHE: ${{ github.workspace }}/build/i386-farm-cache
           IDECK_MADEIRA_GRAPHICS: ${{ env.IDECK_MADEIRA_GRAPHICS }}
           IDECK_GRAPHICS_PROFILE: ${{ env.IDECK_GRAPHICS_PROFILE }}
           IDECK_CONFIGURATION: ${{ env.IDECK_NATIVE_BUILD == '1' && 'Debug' || 'Release' }}
