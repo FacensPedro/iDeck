@@ -412,6 +412,9 @@ jobs:
       - name: Test fast direct IPA packaging
         run: python3 -m unittest discover -s tests/host -p 'test_fast_ipa_packaging.py' -v
 
+      - name: Test IPA distribution integrity receipts
+        run: python3 -m unittest discover -s tests/host -p 'test_ipa_distribution_audit.py' -v
+
   build:
     name: Build iDeck IPA
     runs-on: xcode-27
@@ -811,6 +814,22 @@ jobs:
           print(f"Verified IPA runtime: {kind}")
           PY
 
+      - name: Audit IPA scripts and create independent SHA-256 receipts
+        run: |
+          python3 scripts/audit_ipa_distribution.py --ipa iDeck.ipa \
+            --json build/iDeck-distribution-audit.json \
+            --sha256-file build/iDeck.ipa.sha256
+
+      - name: Upload distribution integrity receipts
+        uses: actions/upload-artifact@v7
+        with:
+          name: iDeck-security-receipts
+          path: |
+            build/iDeck.ipa.sha256
+            build/iDeck-distribution-audit.json
+          if-no-files-found: error
+          retention-days: 30
+
       - name: Upload IPA directly (no outer ZIP)
         id: ipa_artifact
         uses: actions/upload-artifact@v7
@@ -857,6 +876,35 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           name: iDeck.ipa
+
+      - name: Download build integrity receipts
+        uses: actions/download-artifact@v8
+        with:
+          name: iDeck-security-receipts
+          path: build
+
+      - name: Check released IPA against its build SHA-256
+        run: |
+          set -euo pipefail
+          test -s build/iDeck.ipa.sha256
+          test -s build/iDeck-distribution-audit.json
+          cp build/iDeck.ipa.sha256 .
+          cp build/iDeck-distribution-audit.json .
+          sha256sum --check iDeck.ipa.sha256
+          python3 - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+          report = json.loads(Path("iDeck-distribution-audit.json").read_text(encoding="utf-8"))
+          if report.get("archive_file") != "iDeck.ipa":
+              raise SystemExit("Audit report does not identify iDeck.ipa")
+          expected = report["archive_sha256"]
+          actual = hashlib.sha256(Path("iDeck.ipa").read_bytes()).hexdigest()
+          if actual != expected:
+              raise SystemExit("Release IPA differs from its reviewed build receipt")
+          print("GitHub Release IPA SHA-256 matches the audited build.")
+          print("This is an integrity check, not a malware-free verdict.")
+          PY
 
       - name: Verify IPA before release
         env:
@@ -951,12 +999,14 @@ jobs:
               echo "::error::Refusing to overwrite an existing versioned release with an interface-only IPA."
               exit 2
             fi
-            gh release upload "$TAG" iDeck.ipa --clobber
+            gh release upload "$TAG" iDeck.ipa iDeck.ipa.sha256 iDeck-distribution-audit.json --clobber
           else
             OPTIONS=(--target "$GITHUB_SHA" --title "$TITLE" --notes "$NOTES")
             if [[ "$AUTO_TAG" == "true" || "$KIND" != "native" ]]; then
               OPTIONS+=(--prerelease --latest=false)
             fi
-            gh release create "$TAG" iDeck.ipa "${OPTIONS[@]}"
+            gh release create "$TAG" iDeck.ipa iDeck.ipa.sha256 iDeck-distribution-audit.json "${OPTIONS[@]}"
           fi
           echo "Published $KIND IPA under GitHub Release $TAG" >> "$GITHUB_STEP_SUMMARY"
+          echo 'Published `iDeck.ipa.sha256` and `iDeck-distribution-audit.json` for independent integrity verification.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'SHA-256 provenance does not constitute an antivirus verdict. Report Defender detections to Microsoft with the detected file and its hash.' >> "$GITHUB_STEP_SUMMARY"
