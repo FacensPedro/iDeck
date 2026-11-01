@@ -72,7 +72,11 @@ enum GOGContentSystem {
         var values = parameters
         let base = (values["path"] ?? "").trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         let suffix = galaxyPath(hash)
-        values["path"] = "/" + (base.isEmpty ? suffix : base + "/" + suffix)
+        var finalPath = "/" + (base.isEmpty ? suffix : base + "/" + suffix)
+        // GOG returns both ".../{path}" and "...{path}". Never add
+        // a second slash at the template boundary.
+        if format.contains("/{path}") { finalPath.removeFirst() }
+        values["path"] = finalPath
         var text = format.replacingOccurrences(of: "\\/", with: "/")
         for (name, value) in values {
             text = text.replacingOccurrences(of: "{\(name)}", with: value)
