@@ -104,3 +104,22 @@ class UnifiedProfileTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class JITPoolLayoutTests(unittest.TestCase):
+    """Madeira's layout (StikJITHelper ml1036/ml1040), ported to FEXRuntime.cpp."""
+    CPP = (ROOT / "iDeck/NativeRuntime/FEXRuntime.cpp").read_text()
+
+    def test_early_window_is_exported_not_reallocated(self):
+        self.assertIn("if (madeira_early_window_base == base && madeira_early_window_size == size) {", self.CPP)
+
+    def test_placeholder_released_census_and_plugs(self):
+        self.assertIn("vm_deallocate(mach_task_self(), placeholder, madeira_early_pool_size);", self.CPP)
+        self.assertIn("release_placeholder_and_plug(candidates.empty() ? 0 : candidates.front())", self.CPP)
+        self.assertIn("wine_pool_plugs.emplace_back(plug, hole.second);", self.CPP)
+        self.assertIn("struct PlugRelease { ~PlugRelease() { release_pool_plugs(); } } plug_release;", self.CPP)
+
+    def test_first_fit_before_fixed_reservation(self):
+        first = self.CPP.index("void *result = jit26_prepare_region(nullptr, size);")
+        fixed = self.CPP.index("result = jit26_prepare_region(reinterpret_cast<void *>(low), size);")
+        self.assertLess(first, fixed)

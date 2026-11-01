@@ -80,7 +80,9 @@ class SystemCoordinator: ObservableObject {
     /// The pool size that last prepared successfully on this device: the
     /// native side starts there instead of retrying larger sizes the
     /// debugger cannot allocate. Choosing a size in Settings resets it.
-    private static let lastGoodPoolKey = "wineJITPoolLastGoodMiB"
+    /// v2: sizes saved before the early placeholder was released (#150)
+    /// reflect the blocked layout, not the device, and are ignored.
+    private static let lastGoodPoolKey = "wineJITPoolLastGoodMiB.v2"
 
     private static func exportLastGoodPool() {
         let size = UserDefaults.standard.integer(forKey: lastGoodPoolKey)

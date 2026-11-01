@@ -89,6 +89,14 @@ extern "C" bool ideck_fex_initialize(void) {
 // This BRK protocol MUST be serviced by a live, compatible debugger.
 extern "C" void *jit26_prepare_region(void *address, size_t size);
 
+// Also from JITAllocator.c: its constructor (ml1040) runs at image load and
+// holds the executable window [0x140000000,+128MiB) and the largest run
+// directly above it, as PROT_NONE placeholders, before the rest of the app
+// fragments that low gap. Madeira's StikJITHelper exports the window and
+// releases the pool placeholder right before asking the debugger for RX.
+extern "C" unsigned long madeira_early_window_base, madeira_early_window_size;
+extern "C" unsigned long madeira_early_pool_base, madeira_early_pool_size;
+
 namespace {
 std::mutex wine_pool_mutex;
 uintptr_t wine_pool_rx = 0;
@@ -185,6 +193,14 @@ void reserve_exe_window() {
     if (wine_exe_window_held) return;
     const char *skip = getenv("MADEIRA_NO_EXE_WINDOW");
     if (skip && strcmp(skip, "0") != 0) return;
+    // Already held since image load by JITAllocator.c's constructor: only
+    // tell ntdll (a second vm_allocate there fails and used to unset this).
+    if (madeira_early_window_base == base && madeira_early_window_size == size) {
+        wine_exe_window_held = true;
+        setenv("WINE_IOS_EXE_WINDOW", "140000000:8000000", 1);
+        fprintf(stderr, "[iDeck Wine JIT] executable window [0x140000000,+128MiB) held since image load\n");
+        return;
+    }
     vm_address_t address = base;
     kern_return_t kr = vm_allocate(mach_task_self(), &address, size, VM_FLAGS_FIXED);
     if (kr == KERN_SUCCESS && address == base) {
@@ -196,6 +212,77 @@ void reserve_exe_window() {
         unsetenv("WINE_IOS_EXE_WINDOW");
         fprintf(stderr, "[iDeck Wine JIT] could not reserve the executable window kr=%d\n", kr);
     }
+}
+
+// Madeira StikJITHelper.allocatePool (ml1036/ml1040), the parts that decide
+// how large a pool can be and where the debugger's first-fit puts it:
+//  1. release the early pool placeholder (once per process);
+//  2. census the free runs >= 64 MiB in [0x119000000, 0x7000000000);
+//  3. if the run that held the placeholder fits the pool, plug every lower
+//     run that would also fit, so the debugger lands there; the plugs are
+//     released once the pool exists.
+// Returns the largest pool size that fits a single free run (0: unknown).
+bool wine_pool_placeholder_released = false;
+std::vector<std::pair<vm_address_t, vm_size_t>> wine_pool_plugs;
+
+size_t release_placeholder_and_plug(size_t wanted) {
+    constexpr vm_address_t low = 0x119000000ULL, guest = 0x7000000000ULL;
+    constexpr vm_size_t step = 16ULL * 1024 * 1024;
+    const vm_address_t placeholder = madeira_early_pool_base;
+    if (placeholder && !wine_pool_placeholder_released) {
+        vm_deallocate(mach_task_self(), placeholder, madeira_early_pool_size);
+        wine_pool_placeholder_released = true;
+        fprintf(stderr, "[iDeck Wine JIT] released the early pool placeholder 0x%lx+%lu MiB for the debugger\n",
+                static_cast<unsigned long>(placeholder), madeira_early_pool_size >> 20);
+    }
+    std::vector<std::pair<vm_address_t, vm_size_t>> holes;
+    vm_address_t address = low, previous_end = low;
+    while (address < guest) {
+        vm_size_t size = 0;
+        vm_region_basic_info_data_64_t info {};
+        mach_msg_type_number_t count = VM_REGION_BASIC_INFO_COUNT_64;
+        mach_port_t object = MACH_PORT_NULL;
+        if (vm_region_64(mach_task_self(), &address, &size, VM_REGION_BASIC_INFO_64,
+                         reinterpret_cast<vm_region_info_t>(&info), &count, &object) != KERN_SUCCESS) {
+            if (guest - previous_end >= (64ULL << 20)) holes.emplace_back(previous_end, guest - previous_end);
+            break;
+        }
+        const vm_address_t start = std::min(address, guest);
+        if (start > previous_end && start - previous_end >= (64ULL << 20))
+            holes.emplace_back(previous_end, start - previous_end);
+        previous_end = std::max(previous_end, address + size);
+        address = previous_end;
+    }
+    vm_size_t largest = 0;
+    for (const auto &hole : holes) largest = std::max(largest, hole.second);
+    largest -= largest % step;
+    const size_t fit = std::min<size_t>(wanted, largest);
+    fprintf(stderr, "[iDeck Wine JIT] free runs >= 64 MiB above 0x119000000: %zu, largest %lu MiB -> pool %zu MiB\n",
+            holes.size(), static_cast<unsigned long>(largest >> 20), fit >> 20);
+    if (!placeholder || fit == 0) return fit;
+    const bool above_fits = std::any_of(holes.begin(), holes.end(), [&](const auto &hole) {
+        return hole.first + hole.second > placeholder && hole.second >= fit;
+    });
+    if (!above_fits) return fit;
+    for (const auto &hole : holes) {
+        if (hole.first + hole.second > placeholder || hole.second < fit) continue;
+        vm_address_t plug = hole.first;
+        if (vm_allocate(mach_task_self(), &plug, hole.second, VM_FLAGS_FIXED) == KERN_SUCCESS) {
+            if (plug == hole.first) {
+                wine_pool_plugs.emplace_back(plug, hole.second);
+                fprintf(stderr, "[iDeck Wine JIT] plugged lower run 0x%lx+%lu MiB so the pool lands above the window\n",
+                        static_cast<unsigned long>(plug), static_cast<unsigned long>(hole.second >> 20));
+            } else {
+                vm_deallocate(mach_task_self(), plug, hole.second);
+            }
+        }
+    }
+    return fit;
+}
+
+void release_pool_plugs() {
+    for (const auto &plug : wine_pool_plugs) vm_deallocate(mach_task_self(), plug.first, plug.second);
+    wine_pool_plugs.clear();
 }
 
 void prepare_wine_pool_frontier() {
@@ -412,7 +499,16 @@ extern "C" bool ideck_wine_jit_pool_prepare(void) {
     // progressively smaller allocations rather than treating that as a
     // permanent launch failure. Never create a non-executable substitute.
     constexpr size_t MiB = 1024ULL * 1024;
-    for (size_t size : wine_pool_candidates()) {
+    std::vector<size_t> candidates = wine_pool_candidates();
+    // Ask only for what fits a free run: a larger request is a debugger round
+    // trip that cannot succeed. The largest fitting size goes first.
+    if (const size_t fit = release_placeholder_and_plug(candidates.empty() ? 0 : candidates.front())) {
+        std::vector<size_t> fitted {fit};
+        for (size_t size : candidates) if (size < fit) fitted.push_back(size);
+        candidates.swap(fitted);
+    }
+    struct PlugRelease { ~PlugRelease() { release_pool_plugs(); } } plug_release;
+    for (size_t size : candidates) {
         // Every jit26_prepare_region call triggers BRK #0xf00d.
         // A detached debugger here would make the call process-fatal.
         if (!debugger_attached()) {
@@ -421,22 +517,27 @@ extern "C" bool ideck_wine_jit_pool_prepare(void) {
             return false;
         }
         fprintf(stderr, "[iDeck Wine JIT] requesting %zu MiB RX from StikDebug\n", size / MiB);
-        void *result = nullptr;
-        if (const uintptr_t low = reserve_low_pool(size)) {
-            result = jit26_prepare_region(reinterpret_cast<void *>(low), size);
-            if (reinterpret_cast<uintptr_t>(result) != low) {
-                fprintf(stderr, "[iDeck Wine JIT] debugger did not prepare the low reservation 0x%" PRIxPTR
-                                "; letting it choose the address\n", low);
-                vm_deallocate(mach_task_self(), static_cast<vm_address_t>(low), size);
-                result = nullptr;
-            }
-        }
-        if (result == nullptr) {
+        // As Madeira: the debugger places the pool first-fit, which the
+        // released placeholder and the plugs steer above the window. Only if
+        // that lands where Wine cannot use it (iPadOS 27 can place it above
+        // 0x7000000000) is a reservation below that limit prepared instead.
+        void *result = jit26_prepare_region(nullptr, size);
+        if (result != nullptr && !acceptable_pool(reinterpret_cast<uintptr_t>(result), size)) {
+            fprintf(stderr, "[iDeck Wine JIT] first-fit RX at 0x%" PRIxPTR " is unusable; trying a low reservation\n",
+                    reinterpret_cast<uintptr_t>(result));
+            // Never deallocate an unvalidated debugger pointer (see below).
+            result = nullptr;
             if (!debugger_attached()) {
                 record_wine_pool_failure(1);
                 return false;
             }
-            result = jit26_prepare_region(nullptr, size);
+            if (const uintptr_t low = reserve_low_pool(size)) {
+                result = jit26_prepare_region(reinterpret_cast<void *>(low), size);
+                if (reinterpret_cast<uintptr_t>(result) != low) {
+                    vm_deallocate(mach_task_self(), static_cast<vm_address_t>(low), size);
+                    result = nullptr;
+                }
+            }
         }
         const uintptr_t rx = reinterpret_cast<uintptr_t>(result);
         if (rx == 0) {
