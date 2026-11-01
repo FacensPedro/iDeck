@@ -18,7 +18,7 @@ class AutomaticIPAReleaseTests(unittest.TestCase):
     def test_pr_final_job_runs_but_cannot_publish_a_github_release(self):
         release = WORKFLOW.split("\n  release:\n", 1)[1]
         self.assertIn("github.event_name == 'workflow_dispatch'", release)
-        self.assertIn("github.event_name == 'push'", release)
+        self.assertNotIn("github.event_name == 'push'", release)
         self.assertIn("github.event_name == 'pull_request'", release)
         self.assertIn("permissions:\n      contents: write", release)
         self.assertIn("if: ${{ github.event_name == 'pull_request' }}", release)
@@ -26,6 +26,11 @@ class AutomaticIPAReleaseTests(unittest.TestCase):
         self.assertIn("name: Provide verified IPA to pull request", release)
         self.assertIn("A pull request does not create a public GitHub Release.", release)
         self.assertIn("needs.build.outputs.ipa_artifact_url", release)
+        self.assertIn(
+            "github.event_name == 'workflow_dispatch' && inputs.release_tag != ''",
+            release,
+        )
+        self.assertNotIn("format('ideck-ci-", release)
         self.assertIn('test -s iDeck.ipa', release)
         self.assertIn('unzip -tq iDeck.ipa', release)
 
