@@ -109,3 +109,29 @@ class SteamConnectionSpeedTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class GOGContentSystemTests(unittest.TestCase):
+    """GOG games are installed from Galaxy's content system, not an installer."""
+
+    def test_galaxy_v2_endpoints_and_chunk_checks(self):
+        content = read("iDeck/GOGContentSystem.swift")
+        self.assertIn("/os/windows/builds?generation=2", content)
+        self.assertIn("https://gog-cdn-fastly.gog.com/content-system/v2/meta/", content)
+        self.assertIn("/secure_link?generation=2&path=/&_version=2", content)
+        self.assertIn("Insecure.MD5.hash(data: data)", content)
+        self.assertIn("smallFilesContainer", content)
+        self.assertIn('!parts.contains("..")', content)
+
+    def test_install_goes_to_gog_games_with_installer_fallback(self):
+        gog = read("iDeck/GOGLibrary.swift")
+        self.assertIn('"drive_c/GOG Games"', gog)
+        self.assertIn("catch GOGContentError.noBuild", gog)
+        self.assertIn("try await installer.install(plan, into: staging)", gog)
+        main = read("iDeck/MainView.swift")
+        self.assertIn("gogLibrary.install(game, prefixPath: prefixPath)", main)
+
+    def test_content_source_is_in_the_xcode_project(self):
+        project = read("iDeck.xcodeproj/project.pbxproj")
+        self.assertEqual(project.count("path = GOGContentSystem.swift;"), 1)
+        self.assertEqual(project.count("/* GOGContentSystem.swift in Sources */,"), 1)
