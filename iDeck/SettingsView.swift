@@ -199,7 +199,7 @@ struct SettingsView: View {
             } header: {
                 Text(tr("Steam client"))
             } footer: {
-                Text(tr("Games with Steam DRM start through Valve's own Windows client (Madeira Dock): turn on \"Start through the Steam client\" in the game's settings. The components (about 72 MB) come from Valve's update server and are checked against pinned checksums."))
+                Text(tr("Steam games start through Valve's own Windows client (Madeira Dock) automatically once these components are installed; they download when you sign in to Steam. The components (about 72 MB) come from Valve's update server and are checked against pinned checksums."))
             }
         }
         .navigationTitle("Steam")

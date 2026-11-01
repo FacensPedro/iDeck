@@ -877,7 +877,10 @@ class SystemCoordinator: ObservableObject {
         if isMetalFXEnabled { effectiveProfile.metalFXEnabled = true }
         windowsEnvironment.applyGameProfile(effectiveProfile)
         activeWindowsProfile = effectiveProfile
-        if profile.launchThroughSteam {
+        // Steam games start through Valve's client (Madeira Dock) on their
+        // own whenever its components are installed and supported; the
+        // components install automatically when the Steam account signs in.
+        if MadeiraDock.bundled && MadeiraDock.clientInstalled && MadeiraDock.clientSupported {
             launchThroughDock(game: game, profile: profile, prefixPath: prefixPath)
             return
         }

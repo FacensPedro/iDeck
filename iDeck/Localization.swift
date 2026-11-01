@@ -452,6 +452,7 @@ enum Translations {
         "Clear logs": ["pt": "Limpar logs", "es": "Borrar registros"],
         "Logs cleared.": ["pt": "Logs apagados.", "es": "Registros borrados."],
         "Could not remove this game's files.": ["pt": "Não foi possível remover os arquivos deste jogo.", "es": "No se pudieron eliminar los archivos de este juego."],
+        "Steam games start through Valve's own Windows client (Madeira Dock) automatically once these components are installed; they download when you sign in to Steam. The components (about 72 MB) come from Valve's update server and are checked against pinned checksums.": ["pt": "Os jogos Steam iniciam automaticamente pelo cliente Windows da própria Valve (Madeira Dock) assim que estes componentes estão instalados; eles são baixados quando você entra na Steam. Os componentes (cerca de 72 MB) vêm do servidor de atualização da Valve e são conferidos com checksums fixos.", "es": "Los juegos de Steam se inician automáticamente con el cliente de Windows de Valve (Madeira Dock) en cuanto estos componentes están instalados; se descargan al iniciar sesión en Steam. Los componentes (unos 72 MB) vienen del servidor de actualizaciones de Valve y se comprueban con checksums fijos."],
         "Games: %d": ["pt": "Jogos: %d", "es": "Juegos: %d"],
         "Owned games: %d": ["pt": "Jogos na conta: %d", "es": "Juegos en la cuenta: %d"],
         "App ID: %u": ["pt": "ID do aplicativo: %u", "es": "ID de la aplicación: %u"],
