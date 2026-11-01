@@ -1859,16 +1859,8 @@ private struct SteamProgramDetailsView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .center, spacing: 18) {
-                    ZStack {
-                        SteamGameBannerView(game: game)
-                            .frame(height: 250)
-                        SteamGameArtworkView(game: game)
-                            .frame(width: 160, height: 220)
-                            .background(Color.black.opacity(0.65))
-                            .clipShape(RoundedRectangle(cornerRadius: 11))
-                            .shadow(color: .black.opacity(0.4), radius: 12)
-                    }
-                    .frame(maxWidth: .infinity)
+                    SteamGameBannerView(game: game)
+                        .frame(maxWidth: .infinity)
                     Text(game.name)
                         .font(.title2.bold())
                         .foregroundColor(.white)
@@ -2204,19 +2196,12 @@ private struct WindowsGameProfileForm: View {
                 DetailToggleRow(title: tr("Keep helper processes running"),
                                 isOn: $profile.keepChildProcessesRunning,
                                 icon: "square.stack.3d.up.fill", iconColor: .gray)
-                if profile.id.hasPrefix("steam:") {
-                    DetailToggleRow(title: tr("Start through the Steam client"), isOn: $profile.launchThroughSteam,
-                                icon: "play.rectangle.fill", iconColor: .blue)
-                }
                 DetailButtonRow(title: tr("Reset to Recommended"), systemImage: "arrow.counterclockwise",
                                 showsDivider: false) {
                     GameRecommendations.applySwitches(for: profile.id, to: &profile)
                 }
             }
-            DetailCard(title: tr("Launch arguments"),
-                       footer: profile.id.hasPrefix("steam:")
-                           ? tr("Start through the Steam client for games with Steam DRM (Madeira Dock).")
-                           : nil) {
+            DetailCard(title: tr("Launch arguments")) {
                 TextField(tr("Example: -windowed"), text: $profile.arguments)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
@@ -2291,18 +2276,9 @@ private struct StoreGameDetailsView<Extra: View>: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .center, spacing: 18) {
-                    ZStack {
-                        GOGArtworkView(urls: banners + covers, fallbackColor: Color.white.opacity(0.06))
-                            .frame(height: 220)
-                            .frame(maxWidth: .infinity)
-                            .opacity(0.85)
-                        GOGArtworkView(urls: covers, fallbackColor: Color.black.opacity(0.65))
-                            .frame(width: 160, height: 220)
-                            .clipShape(RoundedRectangle(cornerRadius: 11))
-                            .shadow(color: .black.opacity(0.4), radius: 12)
-                    }
-                    .frame(height: 250)
-                    .frame(maxWidth: .infinity)
+                    GOGArtworkView(urls: banners + covers, fallbackColor: Color.white.opacity(0.06))
+                        .frame(height: 220)
+                        .frame(maxWidth: .infinity)
                     HStack(spacing: 8) {
                         Text(title)
                             .font(.title2.bold())
