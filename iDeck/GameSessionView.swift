@@ -532,22 +532,27 @@ private struct IDeckTouchGamepadOverlay: View {
             )
     }
 
-    /// Xbox layout: triggers and bumpers in the top corners, View and Menu
-    /// at the top centre, left stick and D-pad bottom left, face buttons
-    /// and right stick bottom right. The middle of the screen stays free.
+    /// Triggers, bumpers, View and Menu in the bottom centre; left stick
+    /// and D-pad bottom left; face buttons and right stick bottom right.
+    /// The top of the screen stays free.
+    private var centerCluster: some View {
+        VStack(spacing: 10) {
+            HStack(spacing: 8) {
+                if preset == "xbox" { trigger("LT", right: false) }
+                control("LB", bit: 0x0100)
+                control("RB", bit: 0x0200)
+                if preset == "xbox" { trigger("RT", right: true) }
+            }
+            HStack(spacing: 18) {
+                control("⧉", bit: 0x0020)
+                control("≡", bit: 0x0010)
+            }
+        }
+    }
+
     var body: some View {
         let full = preset == "xbox"
         VStack(spacing: 0) {
-            HStack(spacing: 8) {
-                if full { trigger("LT", right: false) }
-                control("LB", bit: 0x0100)
-                Spacer(minLength: 0)
-                control("⧉", bit: 0x0020)
-                control("≡", bit: 0x0010)
-                Spacer(minLength: 0)
-                control("RB", bit: 0x0200)
-                if full { trigger("RT", right: true) }
-            }
             Spacer(minLength: 0)
             HStack(alignment: .bottom, spacing: 0) {
                 VStack(alignment: .leading, spacing: 14) {
@@ -564,6 +569,8 @@ private struct IDeckTouchGamepadOverlay: View {
                         .padding(.leading, 70)
                     }
                 }
+                Spacer(minLength: 0)
+                centerCluster
                 Spacer(minLength: 0)
                 VStack(alignment: .trailing, spacing: 14) {
                     VStack(spacing: 2) {

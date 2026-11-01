@@ -30,8 +30,6 @@ struct SettingsView: View {
     @State private var isGOGSignInPresented = false
     @State private var isEpicSignInPresented = false
     @State private var isPairingImporterPresented = false
-    @State private var steamComponentsStatus: String?
-    @State private var steamComponentsBusy = false
     @AppStorage(AppLanguage.storageKey) private var appLanguage = AppLanguage.system.rawValue
 
     var body: some View {
@@ -182,42 +180,13 @@ struct SettingsView: View {
                                value: MadeiraDock.clientInstalled
                                    ? tr(MadeiraDock.clientSupported ? "Ready" : "Unsupported build")
                                    : tr("Not downloaded"))
-                if MadeiraDock.bundled && !MadeiraDock.clientInstalled {
-                    Button {
-                        downloadSteamComponents()
-                    } label: {
-                        HStack {
-                            Text(tr("Download Steam's components"))
-                            if steamComponentsBusy { Spacer(); ProgressView() }
-                        }
-                    }
-                    .disabled(steamComponentsBusy)
-                }
-                if let steamComponentsStatus {
-                    Text(steamComponentsStatus).font(.caption).foregroundStyle(.secondary)
-                }
             } header: {
                 Text(tr("Steam client"))
             } footer: {
-                Text(tr("Steam games start through Valve's own Windows client (Madeira Dock) automatically once these components are installed; they download when you sign in to Steam. The components (about 72 MB) come from Valve's update server and are checked against pinned checksums."))
+                Text(tr("Steam games start through Valve's own Windows client (Madeira Dock). Its components install automatically the first time the Madeira workspace opens. They (about 72 MB) come from Valve's update server and are checked against pinned checksums."))
             }
         }
         .navigationTitle("Steam")
-    }
-
-    private func downloadSteamComponents() {
-        steamComponentsBusy = true
-        steamComponentsStatus = nil
-        Task {
-            do {
-                try await SteamRuntimeInstaller.shared.prepare(prefix: MadeiraDock.prefix) { message in
-                    await MainActor.run { steamComponentsStatus = message }
-                }
-            } catch {
-                steamComponentsStatus = error.localizedDescription
-            }
-            steamComponentsBusy = false
-        }
     }
 
     private var gogPage: some View {

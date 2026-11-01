@@ -206,6 +206,33 @@ struct SteamGameArtworkView: View {
     }
 }
 
+/// A GOG or Epic game's banner, drawn exactly like SteamGameBannerView:
+/// the whole image fitted in a 220-point rounded panel.
+struct StoreBannerView: View {
+    let urls: [URL]
+    @State private var imageIndex = 0
+
+    var body: some View {
+        AsyncImage(url: imageIndex < urls.count ? urls[imageIndex] : nil) { phase in
+            if let image = phase.image {
+                image.resizable().scaledToFit()
+            } else if phase.error != nil || urls.isEmpty {
+                Color.white.opacity(0.06)
+                    .onAppear { if imageIndex + 1 < urls.count { imageIndex += 1 } }
+            } else {
+                ZStack {
+                    Color.white.opacity(0.06)
+                    ProgressView().tint(.gray)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 220)
+        .background(Color.white.opacity(0.04))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+    }
+}
+
 struct SteamGameBannerView: View {
     let game: SteamAppInfo
     @State private var imageIndex = 0
@@ -2256,9 +2283,7 @@ private struct StoreGameDetailsView<Extra: View>: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .center, spacing: 18) {
-                    GOGArtworkView(urls: banners + covers, fallbackColor: Color.white.opacity(0.06))
-                        .frame(height: 220)
-                        .frame(maxWidth: .infinity)
+                    StoreBannerView(urls: banners + covers)
                     HStack(spacing: 8) {
                         Text(title)
                             .font(.title2.bold())
