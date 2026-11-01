@@ -210,6 +210,16 @@ struct SteamGameArtworkView: View {
 
 /// A GOG or Epic game's banner, drawn exactly like SteamGameBannerView:
 /// the whole image fitted in a 220-point rounded panel.
+private struct GameDetailsBannerFrame: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .frame(maxWidth: .infinity)
+            .frame(height: 220)
+            .background(Color.white.opacity(0.04))
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+    }
+}
+
 struct StoreBannerView: View {
     let urls: [URL]
     @State private var imageIndex = 0
@@ -228,10 +238,7 @@ struct StoreBannerView: View {
                 }
             }
         }
-        .frame(maxWidth: .infinity)
-        .frame(height: 220)
-        .background(Color.white.opacity(0.04))
-        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .modifier(GameDetailsBannerFrame())
     }
 }
 
@@ -272,10 +279,7 @@ struct SteamGameBannerView: View {
                 }
             }
         }
-        .frame(maxWidth: .infinity)
-        .frame(height: 220)
-        .background(Color.white.opacity(0.04))
-        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .modifier(GameDetailsBannerFrame())
         .task(id: game.appID) { imageIndex = 0 }
     }
 }
