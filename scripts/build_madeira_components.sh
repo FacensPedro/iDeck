@@ -316,7 +316,20 @@ if [[ "$REBUILD" == "1" ]]; then
     # Upstream's i386 Wine farm and the distinct FEX WOW64 translator.
     # Unlike xtajit64.dll, xtajit.dll executes PE32 x86 guest code.
     bash "$MD/build/fex-wow64/build.sh"
-    bash "$MD/build/wine-i386/build.sh"
+    # The i386 farm (719 modules, ~10 min) depends only on the pinned Madeira
+    # sources and iDeck's patches; CI restores it from IDECK_I386_FARM_CACHE.
+    I386_CACHE="${IDECK_I386_FARM_CACHE:-}"
+    if [[ -n "$I386_CACHE" && -s "$I386_CACHE/kernel32.dll" && -s "$I386_CACHE/d3d11.dll" ]]; then
+      mkdir -p "$MD/app/Madeira/i386-windows"
+      cp -R "$I386_CACHE/." "$MD/app/Madeira/i386-windows/"
+      echo "Restored the compiled i386 Wine farm from $I386_CACHE"
+    else
+      bash "$MD/build/wine-i386/build.sh"
+      if [[ -n "$I386_CACHE" ]]; then
+        mkdir -p "$I386_CACHE"
+        cp -R "$MD/app/Madeira/i386-windows/." "$I386_CACHE/"
+      fi
+    fi
   fi
 
   if [[ "$GRAPHICS" == "d3d12" ]]; then
