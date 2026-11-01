@@ -89,6 +89,7 @@
 		F3A000000000000000000004 /* ExternalDrives.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000004 /* ExternalDrives.swift */; };
 		F3A000000000000000000003 /* BackgroundDownloads.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000003 /* BackgroundDownloads.swift */; };
 		F3A000000000000000000002 /* GOGLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000002 /* GOGLibrary.swift */; };
+		F3A000000000000000000014 /* GOGContentSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000014 /* GOGContentSystem.swift */; };
 		F3A000000000000000000001 /* BugReportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000001 /* BugReportView.swift */; };
 		999999999999999999999915 /* Localization.swift in Sources */ = {isa = PBXBuildFile; fileRef = 999999999999999999999907 /* Localization.swift */; };
 		999999999999999999999911 /* PacketTunnelProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 999999999999999999999901 /* PacketTunnelProvider.swift */; };
@@ -192,6 +193,7 @@
 		F4A000000000000000000004 /* ExternalDrives.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExternalDrives.swift; sourceTree = "<group>"; };
 		F4A000000000000000000003 /* BackgroundDownloads.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundDownloads.swift; sourceTree = "<group>"; };
 		F4A000000000000000000002 /* GOGLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GOGLibrary.swift; sourceTree = "<group>"; };
+		F4A000000000000000000014 /* GOGContentSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GOGContentSystem.swift; sourceTree = "<group>"; };
 		F4A000000000000000000001 /* BugReportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BugReportView.swift; sourceTree = "<group>"; };
 		999999999999999999999907 /* Localization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Localization.swift; sourceTree = "<group>"; };
 		999999999999999999999901 /* PacketTunnelProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PacketTunnelProvider.swift; sourceTree = "<group>"; };
@@ -334,6 +336,7 @@
 				F3A000000000000000000004 /* ExternalDrives.swift in Sources */,
 				F3A000000000000000000003 /* BackgroundDownloads.swift in Sources */,
 				F3A000000000000000000002 /* GOGLibrary.swift in Sources */,
+				F3A000000000000000000014 /* GOGContentSystem.swift in Sources */,
 				F3A000000000000000000001 /* BugReportView.swift in Sources */,
 				999999999999999999999915 /* Localization.swift in Sources */,
 				111111111111111111111124 /* AppManager.swift in Sources */,
@@ -463,6 +466,7 @@
 				F4A000000000000000000004 /* ExternalDrives.swift */,
 				F4A000000000000000000003 /* BackgroundDownloads.swift */,
 				F4A000000000000000000002 /* GOGLibrary.swift */,
+				F4A000000000000000000014 /* GOGContentSystem.swift */,
 				F4A000000000000000000001 /* BugReportView.swift */,
 				999999999999999999999907 /* Localization.swift */,
 				222222222222222222222236 /* AppManager.swift */,
