@@ -8,7 +8,7 @@ RUNTIME = (ROOT / "iDeck/NativeRuntime/MadeiraRuntimeBridge.mm").read_text(encod
 COORDINATOR = (ROOT / "iDeck/SystemCoordinator.swift").read_text(encoding="utf-8")
 BRIDGE = (ROOT / "iDeck/iDeck-Bridging-Header.h").read_text(encoding="utf-8")
 HEADER = (ROOT / "iDeck/NativeRuntime/MadeiraRuntimeBridge.h").read_text(encoding="utf-8")
-JIT_SCRIPT = (ROOT / "scripts/jit/universal.js").read_text(encoding="utf-8")
+JIT_SCRIPT = (ROOT / "scripts/jit/universal.jitscript").read_text(encoding="utf-8")
 
 
 class FEXJITGuardTests(unittest.TestCase):

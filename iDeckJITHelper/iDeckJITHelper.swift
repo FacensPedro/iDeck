@@ -4,7 +4,7 @@
 // iDeck's built-in JIT helper, ported from Madeira's MadeiraJITHelper: a classic app
 // extension that iDeck starts by its bundle ID (iDeck/JITBuiltInHost.swift), so a
 // sideloader's renamed install still finds it. It attaches StikJIT's debugger to iDeck
-// through LocalDevVPN and runs iDeck's universal.js script.
+// through LocalDevVPN and runs iDeck's universal.jitscript (JavaScript) script.
 // One MadeiraJITRequest per extension request, answered when the request completes.
 
 import Foundation

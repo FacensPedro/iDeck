@@ -46,14 +46,14 @@ class DistributionAuditTests(unittest.TestCase):
         self.make_ipa({"Payload/iDeck.app/Plugins/extra.js": b"console.log('review');"})
         report = audit.inspect_ipa(self.ipa, self.sources)
         self.assertEqual(report["archive_sha256"], audit.hash_file(self.ipa))
-        self.assertEqual(len(report["verified_jit_scripts"]), 3)
-        self.assertEqual(len(report["embedded_script_inventory"]), 4)
+        self.assertEqual(len(report["verified_jit_scripts"]), 1)
+        self.assertEqual(len(report["embedded_script_inventory"]), 2)
         self.assertEqual(report["security_verdict"].split(";")[0], "NOT_SCANNED")
-        self.assertEqual(report["embedded_script_inventory"][3]["review"],
+        self.assertEqual(report["embedded_script_inventory"][1]["review"],
                          "matches-repository-source")
 
     def test_rejects_modified_jit_script(self):
-        self.make_ipa({"Payload/iDeck.app/universal.js": b"modified"})
+        self.make_ipa({"Payload/iDeck.app/universal.jitscript": b"modified"})
         with self.assertRaisesRegex(ValueError, "differs from reviewed source"):
             audit.inspect_ipa(self.ipa, self.sources)
 
@@ -63,7 +63,7 @@ class DistributionAuditTests(unittest.TestCase):
             audit.inspect_ipa(self.ipa, self.sources)
         self.make_ipa()
         with zipfile.ZipFile(self.ipa, "a") as archive:
-            archive.writestr("Payload/iDeck.app/universal.js", b"second")
+            archive.writestr("Payload/iDeck.app/universal.jitscript", b"second")
         with self.assertRaisesRegex(ValueError, "Duplicate"):
             audit.inspect_ipa(self.ipa, self.sources)
 
