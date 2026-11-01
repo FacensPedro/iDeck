@@ -63,7 +63,7 @@ class SteamIPRoutingTests(unittest.TestCase):
         self.assertIn("constexpr size_t allowed[] = {1152, 896, 768, 640, 512, 384, 256, 192, 128, 96, 64}", FEX)
         self.assertIn('sysctlbyname("hw.memsize"', FEX)
         self.assertIn("if (candidate <= preferred) sizes.push_back(candidate * MiB);", FEX)
-        self.assertIn("for (size_t size : wine_pool_candidates())", FEX)
+        self.assertIn("std::vector<size_t> candidates = wine_pool_candidates();", FEX)
         self.assertIn('getenv("IDECK_WINE_JIT_MIB")', FEX)
         self.assertIn('if (!debugger_attached())', FEX)
         self.assertIn('vm_remap(mach_task_self()', FEX)

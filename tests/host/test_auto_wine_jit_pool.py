@@ -14,7 +14,7 @@ class AutomaticWineJITPoolTests(unittest.TestCase):
         self.assertIn('if (value == candidate)', FEX)
         self.assertIn("*end == '\\0'", FEX)
         self.assertNotIn("*end == '\\\\0'", FEX)
-        self.assertIn('for (size_t size : wine_pool_candidates())', FEX)
+        self.assertIn('std::vector<size_t> candidates = wine_pool_candidates();', FEX)
 
     def test_no_unvalidated_executable_mapping(self):
         self.assertIn('if (!debugger_attached())', FEX)

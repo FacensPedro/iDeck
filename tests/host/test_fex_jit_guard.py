@@ -49,7 +49,7 @@ class FEXJITGuardTests(unittest.TestCase):
         self.assertIn("switch ideck_wine_jit_pool_failure_stage()", COORDINATOR)
         self.assertIn('jit26_prepare_region(nullptr, size)', FEX)
         self.assertIn('constexpr size_t allowed[] = {1152, 896, 768, 640, 512, 384, 256, 192, 128, 96, 64}', FEX)
-        self.assertIn('for (size_t size : wine_pool_candidates())', FEX)
+        self.assertIn('std::vector<size_t> candidates = wine_pool_candidates();', FEX)
         self.assertIn('static_cast<vm_address_t>(0x300000000ULL)', FEX)
         self.assertIn('vm_remap failed size=', FEX)
         self.assertIn('vm_protect(RW) failed size=', FEX)
