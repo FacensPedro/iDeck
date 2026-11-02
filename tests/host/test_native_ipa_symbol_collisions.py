@@ -2,6 +2,7 @@
 import importlib.util
 from pathlib import Path
 import shutil
+import sys
 import subprocess
 import tempfile
 import unittest
@@ -13,6 +14,7 @@ SOURCE_LINKER = (ROOT / "scripts/link_madeira_native.sh").read_text(encoding="ut
 HEADER = (ROOT / "iDeck/SwiftSteam/zstd_edu.h").read_text(encoding="utf-8")
 ZSTD_SOURCE = ROOT / "iDeck/SwiftSteam/zstd_edu.c"
 
+sys.path.insert(0, str(ROOT / "scripts"))
 spec = importlib.util.spec_from_file_location("wine_link_prep", SCRIPT)
 wine = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(wine)
