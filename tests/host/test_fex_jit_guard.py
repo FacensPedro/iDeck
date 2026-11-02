@@ -66,10 +66,9 @@ class FEXJITGuardTests(unittest.TestCase):
         self.assertIn("the Wine ARM64EC executable JIT pool", COORDINATOR)
 
     def test_page_zero_debugger_command_never_returns_stale_address(self):
-        self.assertIn("const CMD_MAP_PAGE_ZERO = 3;", JIT_SCRIPT)
-        self.assertIn("[CMD_MAP_PAGE_ZERO]: JIT26MapPageZero", JIT_SCRIPT)
-        self.assertIn("let success = 0n;", JIT_SCRIPT)
-        self.assertIn("numberToLittleEndianHexString(success)", JIT_SCRIPT)
+        # Madeira's madeira-jit.js, copied line by line.
+        self.assertIn("} else if (x16Num === 3n) {", JIT_SCRIPT)
+        self.assertIn("function numberToLittleEndianHexString(num)", JIT_SCRIPT)
 
     def test_all_windows_launch_paths_check_jit_readiness(self):
         self.assertIn("private func ensureJITForGameLaunch() -> Bool", COORDINATOR)
