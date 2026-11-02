@@ -100,16 +100,14 @@ struct MainView: View {
                         .scaledToFit()
                         .frame(width: 140, height: 140)
                     Button {
-                        // Defer Steam Keychain and native JIT reads until the
-                        // user explicitly opens Madeira, not at app launch.
+                        // Opening the Madeira library must not request JIT.
+                        // Authorization is checked when a game actually starts.
                         coordinator.configureNativeHostIfNeeded()
                         coordinator.loadSteamAccountIfNeeded()
                         if steamLibrary == nil { steamLibrary = SteamOwnedGamesModel() }
                         selectedWorkspace = .pc
                         if !coordinator.isContainerReady {
-                            coordinator.forceJITAndStartWindows()
-                        } else {
-                            coordinator.reconnectStikDebugForWineIfNeeded()
+                            coordinator.openMadeiraWorkspace()
                         }
                     } label: {
                         modeTile(title: tr("Madeira"), symbol: "gamecontroller.fill")
