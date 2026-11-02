@@ -433,6 +433,22 @@ final class GOGLibraryModel: ObservableObject {
                 outcome = .completed
                 refreshInstalled(prefixPath: prefixPath)
                 completion(.installed)
+            } catch GOGError.http(404) {
+                // An unavailable Galaxy v2 chunk may be gone permanently,
+                // even after refreshing its signed CDN URL and trying every
+                // provider. Do not loop indefinitely or claim installation
+                // completed: retrieve GOG's own offline setup instead.
+                guard !Task.isCancelled else { completion(.failed); return }
+                AppLog.record("[gog] Galaxy chunk or manifest returned HTTP 404 for game \(game.id); trying the official offline Windows installer")
+                fallback = true
+                BackgroundDownloads.gog.ended(name: game.title, outcome: .paused, queueEmpty: true)
+                downloadProgress[game.id] = nil
+                DispatchQueue.main.async {
+                    self.downloadInstaller(game, prefixPath: prefixPath) { setup in
+                        completion(setup.map { .installer($0) } ?? .failed)
+                    }
+                }
+                return
             } catch is CancellationError {
                 completion(.failed)
             } catch {

@@ -300,22 +300,35 @@ class SystemCoordinator: ObservableObject {
         startLiveContainer()
     }
 
-    func reconnectStikDebugForWineIfNeeded() {
-        refreshJITStatus()
-        // When the user explicitly opens Madeira, request JIT even if
-        // CS_DEBUGGED is still OFF. Previously this path only reconnected
-        // *already enabled* processes, so a fresh iPad install silently
-        // entered the library without requesting the permission at all.
-        // A detached debugger also needs the bundled BRK handler unless
-        // the Wine executable pool was already prepared.
-        if !isJITEnabled || (!isStikDebugAttached && !isWineJITPrepared) {
-            requestStikDebugJIT()
-        }
+    /// Opening the Madeira library never requests JIT. Authorization is
+    /// checked only after the user explicitly launches a Windows program.
+    func openMadeiraWorkspace() {
+        startWindows()
     }
 
-    func forceJITAndStartWindows() {
-        startWindows()
-        reconnectStikDebugForWineIfNeeded()
+    /// Avoid repeated StikDebug prompts when CS_DEBUGGED is already enabled
+    /// for this iDeck PID. Permission alone does not prepare Wine's RX pool:
+    /// that still requires a live BRK-capable debugger, and a failed RX
+    /// allocation must be surfaced rather than disguised as a JIT prompt.
+    @discardableResult
+    private func ensureJITForGameLaunch() -> Bool {
+        refreshJITStatus()
+        if ideck_wine_jit_pool_ready() { return true }
+        let authorized = ideck_process_has_jit_permission() || ideck_jit_debugger_attached()
+        guard authorized else {
+            setWindowsStatus("JIT is not enabled for this iDeck process. Enable StikDebug for iDeck before launching the game.")
+            requestStikDebugJIT()
+            return false
+        }
+        guard ideck_jit_debugger_attached() else {
+            setWindowsStatus("JIT is enabled, but Wine's executable RX pool is not prepared. Reconnect StikDebug manually in Settings › JIT so it can handle the Madeira BRK request; no new authorization was requested.")
+            return false
+        }
+        guard ideck_fex_jit_ready() else {
+            setWindowsStatus("FEX JIT is not initialized despite an active debugger. Review native JIT diagnostics.")
+            return false
+        }
+        return true
     }
     
     private func startLiveContainer() {
@@ -535,13 +548,8 @@ class SystemCoordinator: ObservableObject {
             setWindowsStatus(MadeiraBundleIdentity.missingRuntimeMessage)
             return
         }
-        guard isJITEnabled && isContainerReady else { return }
-        guard ideck_fex_jit_ready() &&
-              (ideck_wine_jit_pool_ready() || ideck_jit_debugger_attached()) else {
-            setWindowsStatus("Cannot launch: StikDebug must remain attached to iDeck with the Madeira JIT script until FEX memory is prepared.")
-            requestStikDebugJIT()
-            return
-        }
+        guard isContainerReady else { return }
+        guard ensureJITForGameLaunch() else { return }
 
         setWindowsStatus("Downloading Steam...")
         containerHost.mountEnvironment { [weak self] mountPath in
@@ -798,16 +806,7 @@ class SystemCoordinator: ObservableObject {
                     destination = candidate
                 }
 
-                guard self.isJITEnabled else {
-                    self.setWindowsStatus("Executable is in the library. Enable JIT in Settings before launching.")
-                    return
-                }
-                guard ideck_fex_jit_ready() &&
-                      (ideck_wine_jit_pool_ready() || ideck_jit_debugger_attached()) else {
-                    self.setWindowsStatus("Executable imported. JIT permission is present but StikDebug is no longer attached. Attach it to iDeck with the Madeira JIT script and retry.")
-                    self.requestStikDebugJIT()
-                    return
-                }
+                guard self.ensureJITForGameLaunch() else { return }
 
                 let launchPrepared: () -> Void = { [weak self] in
                     guard let self else { return }
@@ -954,12 +953,7 @@ class SystemCoordinator: ObservableObject {
             return
         }
 
-        guard ideck_fex_jit_ready() &&
-              (ideck_wine_jit_pool_ready() || ideck_jit_debugger_attached()) else {
-            setWindowsStatus("FEX/Wine JIT is not ready. Request StikDebug with universal.js from Madeira and retry.")
-            requestStikDebugJIT()
-            return
-        }
+        guard ensureJITForGameLaunch() else { return }
         if prepareVisualCRuntimeIfNeeded(prefix: prefixPath, resume: { [weak self] in
             self?.launchSteamGame(game: game, profile: profile, prefixPath: prefixPath, skipSteamClient: skipSteamClient)
         }) { return }
@@ -1083,8 +1077,7 @@ class SystemCoordinator: ObservableObject {
     /// attachment, so this runs again right before the client starts.
     private func launchThroughDock(game: SteamAppInfo, profile: WindowsGameProfile, prefixPath: URL) {
         guard ideck_wine_jit_pool_ready() || ideck_jit_debugger_attached() else {
-            setWindowsStatus("Cannot launch: StikDebug detached while Steam's client was being prepared. Enable JIT in StikDebug again and start the game.")
-            requestStikDebugJIT()
+            setWindowsStatus("JIT is already enabled, but Steam needs a prepared Wine RX pool. Reconnect StikDebug manually to complete executable-memory preparation.")
             return
         }
         setWindowsStatus("Preparing JIT...")

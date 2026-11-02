@@ -33,10 +33,18 @@ class MadeiraUIJITUpstreamTests(unittest.TestCase):
         self.assertIn('GCController.controllers()', INPUT)
         self.assertIn('DispatchQueue.main.async', INPUT)
 
-    def test_external_stikdebug_reconnects_with_script(self):
-        self.assertIn('reconnectStikDebugForWineIfNeeded()', MAIN)
-        self.assertIn('func reconnectStikDebugForWineIfNeeded()', COORDINATOR)
-        self.assertIn('!isStikDebugAttached && !isWineJITPrepared', COORDINATOR)
+    def test_stikdebug_only_requested_when_launching_without_jit(self):
+        home = MAIN.split('private var homeView:', 1)[1].split('private func modeTile', 1)[0]
+        self.assertIn('coordinator.openMadeiraWorkspace()', home)
+        self.assertNotIn('requestStikDebugJIT()', home)
+        self.assertNotIn('reconnectStikDebugForWineIfNeeded()', home)
+        self.assertIn('func ensureJITForGameLaunch() -> Bool', COORDINATOR)
+        guard = COORDINATOR.split('private func ensureJITForGameLaunch() -> Bool {', 1)[1].split('\n    }', 1)[0]
+        self.assertIn('if ideck_wine_jit_pool_ready() { return true }', guard)
+        self.assertIn('ideck_process_has_jit_permission()', guard)
+        self.assertIn('guard authorized else {', guard)
+        self.assertEqual(guard.count('requestStikDebugJIT()'), 1)
+        self.assertIn('no new authorization was requested', guard)
         self.assertIn('URLQueryItem(name: "script-data"', COORDINATOR)
         self.assertIn('coordinator.isJITEnabled ? "Reconnect JIT debugger" : "Enable JIT"', SETTINGS)
 
