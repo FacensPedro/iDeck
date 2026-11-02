@@ -207,7 +207,11 @@ class SystemCoordinator: ObservableObject {
         switch status {
         case "Wine started; waiting for game...": BenchmarkSession.mark("wine_started")
         case "Running", "Steam Running": BenchmarkSession.mark("running")
-        case "Windows Ready": BenchmarkSession.finish(kind: "game", outcome: "closed")
+        case "Windows Ready":
+            BenchmarkSession.finish(kind: "game", outcome: "closed")
+            if WindowsEnvironment.sessionsThisRun > 0 {
+                DispatchQueue.main.async { MainActor.assumeIsolated { ResourceGovernor.shared.releaseAfterSession() } }
+            }
         default:
             if status.hasPrefix("Execution Error") || status.hasPrefix("Cannot launch") {
                 BenchmarkSession.finish(kind: "game", outcome: "failed: " + status)
@@ -311,17 +315,48 @@ class SystemCoordinator: ObservableObject {
     /// that still requires a live BRK-capable debugger, and a failed RX
     /// allocation must be surfaced rather than disguised as a JIT prompt.
     @discardableResult
+    /// The launch to continue once StikDebug is attached (set by the caller
+    /// right before `ensureJITForGameLaunch()`), as Madeira's jitReadyForLaunch(then:).
+    private var jitResume: (() -> Void)?
+    private var jitWaitGeneration = 0
+
+    /// Waits for StikDebug's debugger, checking four times a second (the app
+    /// becoming active is checked at once), then continues the launch.
+    private func waitForDebuggerThenResume(_ resume: @escaping () -> Void) {
+        jitWaitGeneration += 1
+        let generation = jitWaitGeneration
+        let started = Date()
+        func poll() {
+            guard generation == jitWaitGeneration else { return }
+            if ideck_jit_debugger_attached() || ideck_wine_jit_pool_ready() {
+                AppLog.record(String(format: "[jit] debugger attached after %.1f s; continuing the launch", Date().timeIntervalSince(started)))
+                refreshJITStatus()
+                resume()
+                return
+            }
+            guard Date().timeIntervalSince(started) < 120 else {
+                setWindowsStatus("JIT was not enabled in time. Enable JIT in StikDebug and start the game again.")
+                return
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25, execute: poll)
+        }
+        poll()
+    }
+
     private func ensureJITForGameLaunch() -> Bool {
+        let resume = jitResume
+        jitResume = nil
         refreshJITStatus()
         if ideck_wine_jit_pool_ready() { return true }
-        let authorized = ideck_process_has_jit_permission() || ideck_jit_debugger_attached()
-        guard authorized else {
-            setWindowsStatus("JIT is not enabled for this iDeck process. Enable StikDebug for iDeck before launching the game.")
-            requestStikDebugJIT()
-            return false
-        }
         guard ideck_jit_debugger_attached() else {
-            setWindowsStatus("JIT is enabled, but Wine's executable RX pool is not prepared. Reconnect StikDebug manually in Settings › JIT so it can handle the Madeira BRK request; no new authorization was requested.")
+            // As Madeira: without a live debugger (none yet, or CS_DEBUGGED left
+            // behind by an earlier attach, where no new authorization was requested
+            // before) StikDebug is opened and the launch continues once it is attached.
+            setWindowsStatus(ideck_process_has_jit_permission()
+                ? "JIT is enabled, but Wine's executable RX pool is not prepared. Reconnecting StikDebug..."
+                : "JIT is not enabled for this iDeck process. Opening StikDebug...")
+            requestStikDebugJIT()
+            if let resume { waitForDebuggerThenResume(resume) }
             return false
         }
         guard ideck_fex_jit_ready() else {
@@ -802,8 +837,6 @@ class SystemCoordinator: ObservableObject {
                     destination = candidate
                 }
 
-                guard self.ensureJITForGameLaunch() else { return }
-
                 let launchPrepared: () -> Void = { [weak self] in
                     guard let self else { return }
                     guard self.windowsEnvironment.hasRuntime(in: mountPath) else {
@@ -815,6 +848,8 @@ class SystemCoordinator: ObservableObject {
                     if self.prepareVisualCRuntimeIfNeeded(prefix: prefix, resume: { [weak self] in
                         self?.launchWindowsExecutable(at: destination, profile: profile)
                     }) { return }
+                    self.jitResume = { [weak self] in self?.launchWindowsExecutable(at: destination, profile: profile) }
+                    guard self.ensureJITForGameLaunch() else { return }
                     self.windowsEnvironment.configureWine(prefix: mountPath)
                     self.mountExternalDrives(prefix: mountPath)
                     var effectiveProfile = profile ?? WindowsGameProfile(id: destination.path, title: destination.deletingPathExtension().lastPathComponent)
@@ -949,10 +984,20 @@ class SystemCoordinator: ObservableObject {
             return
         }
 
-        guard ensureJITForGameLaunch() else { return }
+        // Downloads first (Visual C++, Steam's client components), JIT last: the
+        // debugger must be attached only for the launch itself. A StikDebug
+        // session that ends during a long download takes iDeck down with it.
         if prepareVisualCRuntimeIfNeeded(prefix: prefixPath, resume: { [weak self] in
             self?.launchSteamGame(game: game, profile: profile, prefixPath: prefixPath, skipSteamClient: skipSteamClient)
         }) { return }
+        if !skipSteamClient && MadeiraDock.bundled && !MadeiraDock.clientInstalled {
+            installSteamComponentsThenLaunch(game: game, profile: profile, prefixPath: prefixPath)
+            return
+        }
+        jitResume = { [weak self] in
+            self?.launchSteamGame(game: game, profile: profile, prefixPath: prefixPath, skipSteamClient: skipSteamClient)
+        }
+        guard ensureJITForGameLaunch() else { return }
         windowsEnvironment.configureWine(prefix: prefixPath.path)
         mountExternalDrives(prefix: prefixPath.path)
         windowsEnvironment.graphicsConfig.applyGraphicsEnvironment()
@@ -1072,10 +1117,8 @@ class SystemCoordinator: ObservableObject {
     /// large enough. The components download can outlast StikDebug's
     /// attachment, so this runs again right before the client starts.
     private func launchThroughDock(game: SteamAppInfo, profile: WindowsGameProfile, prefixPath: URL) {
-        guard ideck_wine_jit_pool_ready() || ideck_jit_debugger_attached() else {
-            setWindowsStatus("JIT is already enabled, but Steam needs a prepared Wine RX pool. Reconnect StikDebug manually to complete executable-memory preparation.")
-            return
-        }
+        jitResume = { [weak self] in self?.launchThroughDock(game: game, profile: profile, prefixPath: prefixPath) }
+        guard ensureJITForGameLaunch() else { return }
         setWindowsStatus("Preparing JIT...")
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             let ready = ideck_wine_jit_pool_ready() || (ideck_wine_jit_pool_prepare() && ideck_wine_jit_pool_ready())

@@ -42,7 +42,7 @@ class MadeiraUIJITUpstreamTests(unittest.TestCase):
         guard = COORDINATOR.split('private func ensureJITForGameLaunch() -> Bool {', 1)[1].split('\n    }', 1)[0]
         self.assertIn('if ideck_wine_jit_pool_ready() { return true }', guard)
         self.assertIn('ideck_process_has_jit_permission()', guard)
-        self.assertIn('guard authorized else {', guard)
+        self.assertIn('waitForDebuggerThenResume(resume)', guard)
         self.assertEqual(guard.count('requestStikDebugJIT()'), 1)
         self.assertIn('no new authorization was requested', guard)
         self.assertIn('URLQueryItem(name: "script-data"', COORDINATOR)

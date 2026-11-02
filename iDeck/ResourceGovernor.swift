@@ -78,6 +78,16 @@ final class ResourceGovernor {
 
     static func availableMiB() -> Int { Int(os_proc_available_memory() >> 20) }
 
+    /// After a game session: what iDeck rebuilds on demand is dropped, so the
+    /// next session (after the restart Madeira requires) and the library start
+    /// from a smaller footprint.
+    func releaseAfterSession() {
+        let before = Self.footprintMiB()
+        URLCache.shared.removeAllCachedResponses()
+        NotificationCenter.default.post(name: Self.releaseCachesNotification, object: nil)
+        AppLog.record("[memory] session ended: footprint \(before) MiB -> \(Self.footprintMiB()) MiB, \(Self.availableMiB()) MiB left")
+    }
+
     private func memoryPressure(_ event: DispatchSource.MemoryPressureEvent) {
         let level = event.contains(.critical) ? "critical" : "warning"
         let before = Self.footprintMiB()

@@ -4815,7 +4815,18 @@ final class SteamOwnedGamesModel: ObservableObject {
         }
 
         do {
-            let fresh = try await fetcher.fetchOwnedApps().sorted {
+            // The first connection after the app opens can time out while the
+            // network (or LocalDevVPN) is still coming up; a reload then works.
+            // One automatic retry after two seconds does that reload.
+            let owned: [SteamAppInfo]
+            do {
+                owned = try await fetcher.fetchOwnedApps()
+            } catch SteamError.connectionTimeout {
+                SteamLog.event("[steam-library] connection timed out; retrying once")
+                try await Task.sleep(nanoseconds: 2_000_000_000)
+                owned = try await fetcher.fetchOwnedApps()
+            }
+            let fresh = owned.sorted {
                 $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
             }
             guard SteamSignIn.accountName == account else { return }
