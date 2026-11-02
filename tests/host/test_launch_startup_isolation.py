@@ -41,11 +41,13 @@ class LaunchStartupIsolationTests(unittest.TestCase):
         self.assertIn("await steamLibrary.refresh()", main)
         self.assertIn("selectedWorkspace == .pc && coordinator.isSteamConnected", main)
 
-    def test_madeira_still_loads_steam_and_jit_when_requested(self):
+    def test_madeira_loads_library_without_requesting_jit(self):
         home = MAIN.split("private var homeView:", 1)[1].split("private func modeTile", 1)[0]
         self.assertIn("coordinator.loadSteamAccountIfNeeded()", home)
-        self.assertIn("coordinator.forceJITAndStartWindows()", home)
-        self.assertIn("coordinator.reconnectStikDebugForWineIfNeeded()", home)
+        self.assertIn("coordinator.openMadeiraWorkspace()", home)
+        self.assertNotIn("coordinator.forceJITAndStartWindows()", home)
+        self.assertNotIn("coordinator.reconnectStikDebugForWineIfNeeded()", home)
+        self.assertIn("guard ensureJITForGameLaunch() else { return }", COORDINATOR)
 
 
 if __name__ == "__main__":
