@@ -182,6 +182,7 @@ struct SettingsView: View {
             } footer: {
                 Text(tr("Steam games start through Valve's own Windows client (Madeira Dock). Its components install automatically the first time the Madeira workspace opens. They (about 72 MB) come from Valve's update server and are checked against pinned checksums."))
             }
+            IRelaySettingsSection()
         }
         .navigationTitle("Steam")
     }

@@ -277,8 +277,35 @@ final class DepotDownloader {
             peer = await lanPeerSource(appID: app.appID, currentBuild: installedBuild == app.buildID ? 0 : installedBuild,
                                        depots: Set(plans.map(\.depotID)))
         }
+        // iDeck: iRelay, a PC downloading this install's chunks alongside it
+        // (IRelayClient). It gets the whole list first and serves the chunks
+        // as they arrive; whatever it cannot serve comes from Steam.
+        var startedRelay: IRelayClient?
+        if !work.allSatisfy(\.isEmpty), let configured = IRelayClient.configured() {
+            do {
+                _ = try await configured.ping()
+                var depots: [IRelayClient.JobDepot] = []
+                for (index, plan) in plans.enumerated() where !work[index].isEmpty {
+                    depots.append(IRelayClient.JobDepot(depotId: plan.depotID, hosts: plan.hosts, auth: plan.auth,
+                        chunks: work[index].map { plan.manifest.files[$0.file].chunks[$0.chunk].shaHex }))
+                }
+                try await configured.startJob(appID: app.appID, title: app.name, depots: depots)
+                startedRelay = configured
+                SteamLog.event("[irelay] on host=\(configured.base.absoluteString) app=\(app.appID) chunks=\(depots.reduce(0) { $0 + $1.chunks.count })")
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                SteamLog.event("[irelay] unavailable: \(error.localizedDescription)")
+            }
+        }
+        let relay = startedRelay
+        defer {
+            if let relay {
+                SteamLog.event("[irelay] done app=\(app.appID) chunks=\(relay.chunks) bytes=\(relay.bytes) failures=\(relay.failures)")
+            }
+        }
         let peerStarted = Date()
-        state.pcName = peer?.name
+        state.pcName = peer?.name ?? relay?.name
         defer {
             if let peer {
                 peer.close()
@@ -295,7 +322,7 @@ final class DepotDownloader {
             let work = work[index]
             let paths = prepared.paths[index]
             // A PC answers many requests on one connection at once.
-            let maximum = peer?.usable == true ? 16 : maxConcurrentChunks, attempts = attemptsPerChunk
+            let maximum = peer?.usable == true || relay != nil ? 16 : maxConcurrentChunks, attempts = attemptsPerChunk
             try await withThrowingTaskGroup(of: (UInt64, UInt64, Bool).self) { group in
                 var next = 0
                 func enqueue() {
@@ -304,7 +331,7 @@ final class DepotDownloader {
                     let chunk = plan.manifest.files[item.file].chunks[item.chunk]
                     let path = paths[item.file]
                     group.addTask {
-                        try await Self.fetchChunk(chunk, plan: plan, peer: peer, path: path, attempts: attempts, seed: item.file &+ item.chunk)
+                        try await Self.fetchChunk(chunk, plan: plan, peer: peer, relay: relay, path: path, attempts: attempts, seed: item.file &+ item.chunk)
                         return (item.key, UInt64(chunk.compressedSize) | (UInt64(chunk.uncompressedSize) << 32), false)
                     }
                 }
@@ -639,7 +666,27 @@ final class DepotDownloader {
     // MARK: - Chunks
 
     private nonisolated static func fetchChunk(_ chunk: DepotManifest.ChunkEntry, plan: DepotPlan, peer: SteamPeerChunkSource? = nil,
+                                               relay: IRelayClient? = nil,
                                                path: String, attempts: Int, seed: Int) async throws {
+        // iDeck: iRelay sends the content server's own bytes, checked and
+        // decrypted here exactly like a content server's answer.
+        if let relay, relay.usable {
+            do {
+                let encrypted = try await relay.chunk(depotID: plan.depotID, shaHex: chunk.shaHex)
+                let data = try ContentDecryptor.processChunk(encryptedData: encrypted, depotKey: plan.key,
+                                                             expectedCRC: chunk.crc,
+                                                             expectedSize: Int(chunk.uncompressedSize))
+                guard data.count == Int(chunk.uncompressedSize) else { throw SteamError.checksumMismatch }
+                try write(data, to: path, offset: chunk.offset)
+                relay.recordSuccess(bytes: encrypted.count)
+                return
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                if Task.isCancelled { throw CancellationError() }
+                if relay.recordFailure() { SteamLog.event("[irelay] off after repeated failures: \(error.localizedDescription)") }
+            }
+        }
         if let peer, peer.serves(plan.depotID) {
             do {
                 try await fetchChunkFromPeer(chunk, plan: plan, peer: peer, path: path)
