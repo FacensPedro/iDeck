@@ -45,18 +45,14 @@ bool ideck_wineserver_initialize(const char *wine_prefix) {
         StartFn start = (StartFn)dlsym(RTLD_DEFAULT, "wineserver_start");
 #endif
         if (start == NULL || start(wine_prefix) != 0) return false;
-        // Wine generally initializes its registry in tens of milliseconds.
-        // Poll rapidly for the first 250 ms instead of waiting a whole 25 ms
-        // for each check, then back off without shortening the 5 s cap.
-        for (unsigned int attempt = 0; attempt < 50; ++attempt) {
-            if (ideck_wineserver_ready()) return true;
-            usleep(5000);
+        // As Madeira's launch (MADEIRA_FAST_SERVER_START): Wine starts as soon
+        // as the wineserver is ready, waiting at most 2 s, and then starts
+        // anyway while the server is still running.
+        for (unsigned int attempt = 0; attempt < 200; ++attempt) {
+            if (ideck_wineserver_ready() || !ideck_wineserver_running()) break;
+            usleep(10000);
         }
-        for (unsigned int attempt = 0; attempt < 190; ++attempt) {
-            if (ideck_wineserver_ready()) return true;
-            usleep(25000);
-        }
-        return false;
+        return ideck_wineserver_running();
     }
 }
 

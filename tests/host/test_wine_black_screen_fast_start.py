@@ -50,10 +50,9 @@ class WineBlackScreenAndFastStartupTests(unittest.TestCase):
         self.assertIn("WindowsRendererView.isReadyForFrames", COORDINATOR)
 
     def test_wine_startup_paths_keep_safety_and_improve_response(self):
-        self.assertIn("for (unsigned int attempt = 0; attempt < 50; ++attempt)", SERVER)
-        self.assertIn("usleep(5000)", SERVER)
-        self.assertIn("for (unsigned int attempt = 0; attempt < 190; ++attempt)", SERVER)
-        self.assertIn("usleep(25000)", SERVER)
+        # As Madeira: at most 2 s for the server, then Wine starts anyway.
+        self.assertIn("for (unsigned int attempt = 0; attempt < 200; ++attempt)", SERVER)
+        self.assertIn("return ideck_wineserver_running();", SERVER)
         self.assertIn("DispatchQueue.global(qos: .userInitiated).async { [weak self] in", PREFIX)
         self.assertIn("steamRegistryInitializedPrefixes = Set<String>()", ENVIRONMENT)
         self.assertIn("steamRegistryInitializedPrefixes.insert(prefix)", ENVIRONMENT)

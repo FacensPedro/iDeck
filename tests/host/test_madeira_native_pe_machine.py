@@ -94,8 +94,7 @@ class NativePEMachineTests(unittest.TestCase):
     def test_session_releases_input_and_waits_for_guest_readiness(self):
         wine = (ROOT / "iDeck/NativeRuntime/WineProcessBridge.mm").read_text()
         bridge = BRIDGE.read_text()
-        self.assertIn("for (unsigned int attempt = 0; attempt < 50; ++attempt)", wine)
-        self.assertIn("if (ideck_wineprocess_running()) return 0;", wine)
+        self.assertIn("return start(wine_prefix) == 0 ? 0 : EIO;", wine)
         self.assertIn("ideck_gamepad_end_session();\n    ideck_session_stop();", bridge)
         self.assertIn("ideck_wineprocess_thread_finished()", bridge)
 
