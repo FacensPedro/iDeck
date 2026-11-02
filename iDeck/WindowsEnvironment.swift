@@ -386,7 +386,7 @@ class WindowsEnvironment {
         architectureTranslator.translateAndRun(
             executablePath: binary.path,
             arguments: launchArguments,
-            environment: winePrefixPath,
+            environment: self.winePrefixPath,
             is32Bit: needsWoW64,
             isSteam: isSteam,
             steamAppID: steamAppID,
