@@ -382,6 +382,28 @@ class WindowsEnvironment {
         }
     }
 
+    static let swapKey = "resources.swapMB"
+    static let swapChoices = [0, 1024, 2048, 4096, 8192]
+
+    /// Madeira's file-backed guest memory tier ("userspace swap", madeira.cfg
+    /// `swap-mb`, build/ntdll-unix/virtual_ios.c ml1077): large writable guest
+    /// allocations are mapped from a sparse file in tmp. iOS writes those pages
+    /// back to the file and evicts them, and they do not count toward the memory
+    /// limit the system kills apps at. Used only with room left on the device:
+    /// the file needs up to the chosen size plus 2 GB free.
+    static func swapMegabytes() -> Int? {
+        let chosen = UserDefaults.standard.object(forKey: swapKey) as? Int ?? 2048
+        guard chosen >= 64 else { return nil }
+        let tmp = URL(fileURLWithPath: NSTemporaryDirectory())
+        let free = (try? tmp.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey]))?
+            .volumeAvailableCapacityForImportantUsage ?? 0
+        guard free >= Int64(chosen + 2048) << 20 else {
+            SteamLog.event("[wine-launch] RAM swap \(chosen) MB skipped: \(free >> 20) MB free")
+            return nil
+        }
+        return chosen
+    }
+
     /// Whether this IPA carries vkd3d-proton (build/vkd3d-proton/build.sh output).
     static var hasVKD3DProton: Bool {
         let bundle = Bundle.main.bundleURL
@@ -560,6 +582,7 @@ class WindowsEnvironment {
         case "OpenGL ES": lines.append("gl-backend = gles")
         default: break
         }
+        if let swap = Self.swapMegabytes() { lines.append("swap-mb = \(swap)") }
         if lines.count == 1 {
             unsetenv("MADEIRA_CFG_GAME")
             return
