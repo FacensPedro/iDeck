@@ -322,10 +322,24 @@ class WindowsEnvironment {
         url.path.withCString { ideck_native_pe_machine($0) == 0x014c }
     }
     
+    /// Wine sessions started in this app run (Madeira's LibraryModel.sessionsThisRun).
+    /// A second one cannot start in the same process: the wineserver's permanent
+    /// objects from the first session are still there and init_registry aborts on
+    /// "\Registry". iDeck asks for a restart instead, as Madeira does.
+    /// madeira.cfg env.MADEIRA_ONE_SESSION_PER_RUN = 0 lets the launch go ahead.
+    static var sessionsThisRun = 0
+    static let sessionAlreadyRan = Int32(EALREADY)
+    static var oneSessionPerRun: Bool { MadeiraConfig.flag("MADEIRA_ONE_SESSION_PER_RUN") }
+
     func execute(binary: URL, arguments: String = "", is32Bit: Bool = false, isSteam: Bool = false,
                  steamAppID: UInt32? = nil, steamInstallDirectory: URL? = nil,
                  steamWorkingDirectory: URL? = nil,
                  jitEnabler: JITEnabler, completion: @escaping (Int) -> Void) {
+        guard Self.sessionsThisRun == 0 || !Self.oneSessionPerRun else {
+            SteamLog.event("[session-once] launch held: \(Self.sessionsThisRun) session(s) already ran in this app run")
+            completion(Int(EALREADY))
+            return
+        }
         guard FileManager.default.fileExists(atPath: binary.path),
               binary.path.withCString({ ideck_native_validate_pe($0) }),
               let parsedArguments = BoxTranslator.parseArguments(arguments) else {
@@ -369,6 +383,7 @@ class WindowsEnvironment {
             jitEnabler: jitEnabler
         ) { status in
             if status != 0 { SteamLog.event("[wine-launch] native launch failure code=\(status)") }
+            else { Self.sessionsThisRun += 1 }
             completion(status)
         }
     }
@@ -560,6 +575,18 @@ class WindowsEnvironment {
         case "OpenGL ES": lines.append("gl-backend = gles")
         default: break
         }
+        // As Madeira (DockInstallers.applyInstallSessionConfig): a session of
+        // one-time installs leaves out the game's address-space layout lines.
+        // MADEIRA_DOCK_INSTALL_LAYOUT = 0 keeps every line.
+        if getenv("MADEIRA_DOCK_INSTALLS_SESSION").map({ String(cString: $0) }) == "1",
+           MadeiraConfig.flag("MADEIRA_DOCK_INSTALL_LAYOUT") {
+            let before = lines.count
+            lines.removeAll { line in
+                let key = line.split(separator: "=", maxSplits: 1).first.map { $0.trimmingCharacters(in: .whitespaces) } ?? ""
+                return IDeckSteamDockInstallers.installSessionDroppedKeys.contains(key)
+            }
+            if lines.count != before { SteamLog.event("[dock-installers] install session leaves out \(before - lines.count) layout line(s)") }
+        }
         if lines.count == 1 {
             unsetenv("MADEIRA_CFG_GAME")
             return
@@ -585,6 +612,7 @@ class WindowsEnvironment {
     private func applyMadeiraLaunchEnvironment(_ profile: WindowsGameProfile) {
         unsetenv("MADEIRA_GDI_SHARED_SECTION")   // a Dock launch sets it again
         unsetenv("MADEIRA_MADSYNC_SESSION")      // an installer session sets it again
+        unsetenv("MADEIRA_DOCK_INSTALLS_SESSION")
         setenv("FEX_X87REDUCEDPRECISION", profile.reducedX87 ? "1" : "0", 1)
         if (1..<64).contains(profile.cpuCount) { setenv("MADEIRA_CPU_COUNT", String(profile.cpuCount), 1) }
         else { unsetenv("MADEIRA_CPU_COUNT") }

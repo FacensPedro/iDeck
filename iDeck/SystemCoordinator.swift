@@ -1180,6 +1180,13 @@ class SystemCoordinator: ObservableObject {
             // As Madeira (DockInstallers.serverSync): a session of one-time
             // installers runs with madsync off, for that session only.
             setenv("MADEIRA_MADSYNC_SESSION", "0", 1)
+            // As Madeira (DockInstallers): this session runs only the installs, and
+            // the game's address-space layout lines are left out for it.
+            setenv("MADEIRA_DOCK_INSTALLS_SESSION", "1", 1)
+            let fusion = IDeckSteamDockInstallers.placeDotNetFusion(
+                drive: prefixPath.appendingPathComponent("drive_c", isDirectory: true),
+                source: Bundle.main.resourceURL?.appendingPathComponent("i386-windows/fusion.dll"))
+            SteamLog.event("[dock-installers] app=\(stage.appID) dotnet-fusion=\(fusion)")
             self.windowsEnvironment.execute(binary: stage.command, arguments: arguments, jitEnabler: self.jitEnabler) { [weak self] status in
                 DispatchQueue.main.async {
                     guard let self else { return }
@@ -1433,6 +1440,8 @@ class SystemCoordinator: ObservableObject {
         setWindowsStatus(reason)
     }
 
+    static let restartMessage = "Execution Error: restart iDeck to start another game: swipe iDeck away in the app switcher, then open it again."
+
     private func nativeLaunchFailure(_ status: Int) -> String {
         if status == 0 || status == Int(EAGAIN) {
             var exitCode: Int32 = 0
@@ -1440,6 +1449,9 @@ class SystemCoordinator: ObservableObject {
             let code = ideck_wineprocess_last_exit_code(&exitCode) ? exitCode : nil
             let ntstatus = ideck_wineprocess_last_ntstatus(&crashStatus) ? crashStatus : nil
             return WineExitDiagnostics.message(exitCode: code, crashStatus: ntstatus)
+        }
+        if status == Int(EALREADY) {
+            return Self.restartMessage
         }
         if status == Int(ENOTSUP) {
             return "Execution Error: 32-bit Windows support (WoW64) is missing from this IPA."
