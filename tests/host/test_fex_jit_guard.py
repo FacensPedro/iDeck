@@ -72,9 +72,13 @@ class FEXJITGuardTests(unittest.TestCase):
         self.assertIn("numberToLittleEndianHexString(success)", JIT_SCRIPT)
 
     def test_all_windows_launch_paths_check_jit_readiness(self):
-        self.assertGreaterEqual(COORDINATOR.count("ideck_fex_jit_ready()"), 3)
-        self.assertIn("StikDebug must remain attached", COORDINATOR)
-        self.assertIn("JIT permission is present but StikDebug is no longer attached", COORDINATOR)
+        self.assertIn("private func ensureJITForGameLaunch() -> Bool", COORDINATOR)
+        self.assertGreaterEqual(COORDINATOR.count("ensureJITForGameLaunch()"), 4)
+        self.assertIn("ideck_fex_jit_ready()", COORDINATOR)
+        self.assertIn("ideck_process_has_jit_permission()", COORDINATOR)
+        self.assertIn("JIT is already enabled, but Wine's executable RX pool", COORDINATOR)
+        # Only the central JIT authorization gate requests StikDebug automatically.
+        self.assertEqual(COORDINATOR.count("requestStikDebugJIT()"), 1)
 
 
 if __name__ == "__main__":
