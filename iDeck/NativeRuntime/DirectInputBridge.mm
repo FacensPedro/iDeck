@@ -1,4 +1,5 @@
 #import "RuntimeSupport.h"
+#include "GamepadResponse.h"
 #import <Foundation/Foundation.h>
 #import <GameController/GameController.h>
 #import <UIKit/UIKit.h>
@@ -48,6 +49,7 @@ static id g_connectObserver;
 static id g_disconnectObserver;
 static id g_backgroundObserver;
 static id g_foregroundObserver;
+static id g_settingsObserver;
 static dispatch_source_t g_sampleTimer;
 static BOOL g_sessionActive = NO;
 static BOOL g_appActive = YES;
@@ -58,6 +60,9 @@ static BOOL g_hasOutput = NO;
 static BOOL g_observing = NO;
 static BOOL g_touchEnabled = NO;
 static IDeckGamepad g_touchState = {};
+static float g_leftSensitivity = 1.0f;
+static float g_rightSensitivity = 1.0f;
+static float g_stickDeadzone = 0.10f;
 
 static void *pad_symbol(const char *name) {
     return dlsym(RTLD_DEFAULT, name);
@@ -96,10 +101,18 @@ static void zero_vibration(int index) {
 static uint8_t trigger(float value) {
     return isfinite(value) ? (uint8_t)lrintf(fmaxf(0, fminf(1, value)) * 255) : 0;
 }
-static int16_t axis(float value) {
-    if (!isfinite(value)) return 0;
-    float v = fmaxf(-1, fminf(1, value));
-    return (int16_t)lrintf(v * (v < 0 ? 32768.0f : 32767.0f));
+// Cache persisted settings instead of querying NSUserDefaults at 125 Hz.
+static void load_controller_response(void) {
+    NSUserDefaults *defaults = NSUserDefaults.standardUserDefaults;
+    NSNumber *left = [defaults objectForKey:@"controllerLeftSensitivity"];
+    NSNumber *right = [defaults objectForKey:@"controllerRightSensitivity"];
+    NSNumber *deadzone = [defaults objectForKey:@"controllerDeadzone"];
+    g_leftSensitivity = left && isfinite(left.floatValue)
+        ? ideck_pad_limit(left.floatValue, 0.25f, 2.0f) : 1.0f;
+    g_rightSensitivity = right && isfinite(right.floatValue)
+        ? ideck_pad_limit(right.floatValue, 0.25f, 2.0f) : 1.0f;
+    g_stickDeadzone = deadzone && isfinite(deadzone.floatValue)
+        ? ideck_pad_limit(deadzone.floatValue, 0.0f, 0.35f) : 0.10f;
 }
 static uint16_t buttons_for_pad(GCExtendedGamepad *pad) {
     uint16_t buttons = 0;
@@ -165,10 +178,14 @@ static void sample_gamepads(void) {
             state.buttons = buttons_for_pad(pad);
             state.left_trigger = trigger(pad.leftTrigger.value);
             state.right_trigger = trigger(pad.rightTrigger.value);
-            state.lx = axis(pad.leftThumbstick.xAxis.value);
-            state.ly = axis(pad.leftThumbstick.yAxis.value);
-            state.rx = axis(pad.rightThumbstick.xAxis.value);
-            state.ry = axis(pad.rightThumbstick.yAxis.value);
+            IDeckPadStick left = ideck_pad_stick(pad.leftThumbstick.xAxis.value,
+                                                 pad.leftThumbstick.yAxis.value,
+                                                 g_leftSensitivity, g_stickDeadzone);
+            IDeckPadStick right = ideck_pad_stick(pad.rightThumbstick.xAxis.value,
+                                                  pad.rightThumbstick.yAxis.value,
+                                                  g_rightSensitivity, g_stickDeadzone);
+            state.lx = left.x; state.ly = left.y;
+            state.rx = right.x; state.ry = right.y;
         }
         if (i == 0 && g_hidEnabled) {
             IDeckHIDPad hid = {};
@@ -188,7 +205,8 @@ static void sample_gamepads(void) {
             if (g_appActive && touch.isPressed) hid.buttons |= IDECK_HID_TOUCHPAD;
             hid.battery = 0xff;
             GCDeviceBattery *battery = controller.battery;
-            if (battery && battery.batteryState != GCDeviceBatteryStateUnknown) {
+            if (battery && battery.batteryState != GCDeviceBatteryStateUnknown &&
+                isfinite(battery.batteryLevel)) {
                 hid.battery = (uint8_t)lrintf(fmaxf(0, fminf(1, battery.batteryLevel)) * 100);
                 hid.charging = battery.batteryState == GCDeviceBatteryStateCharging ? 1 :
                                battery.batteryState == GCDeviceBatteryStateFull ? 2 : 0;
@@ -286,7 +304,11 @@ static void begin_native_gamepads(void) {
     g_hasOutput = allowOutput;
     output_config(xinputOutput ? 1 : 0, (g_hidEnabled && hidOutput) ? 1 : 0);
     g_appActive = UIApplication.sharedApplication.applicationState == UIApplicationStateActive;
+    load_controller_response();
     g_sessionActive = YES;
+    // Output effects must be enabled on the FIRST foreground start as well:
+    // previously they were only re-enabled by DidBecomeActive after resume.
+    output_active(g_appActive);
     if (!g_observing) {
         NSNotificationCenter *center = NSNotificationCenter.defaultCenter;
         g_connectObserver = [center addObserverForName:GCControllerDidConnectNotification object:nil
@@ -307,6 +329,13 @@ static void begin_native_gamepads(void) {
                                                    queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *n) {
             g_appActive = YES; output_active(YES); refresh_controllers();
         }];
+        // Settings may change while a game is running; updates apply at the
+        // next sample without restarting Wine or re-enumerating XInput slots.
+        g_settingsObserver = [center addObserverForName:NSUserDefaultsDidChangeNotification object:nil
+                                              queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *n) {
+            load_controller_response();
+            sample_gamepads();
+        }];
         g_observing = YES;
     }
     refresh_controllers();
@@ -323,9 +352,10 @@ static void stop_native_gamepads(void) {
     if (g_sampleTimer) { dispatch_source_cancel(g_sampleTimer); g_sampleTimer = nil; }
     if (g_observing) {
         NSNotificationCenter *center = NSNotificationCenter.defaultCenter;
-        for (id observer in @[g_connectObserver, g_disconnectObserver, g_backgroundObserver, g_foregroundObserver])
+        for (id observer in @[g_connectObserver, g_disconnectObserver, g_backgroundObserver,
+                              g_foregroundObserver, g_settingsObserver])
             [center removeObserver:observer];
-        g_connectObserver = g_disconnectObserver = g_backgroundObserver = g_foregroundObserver = nil;
+        g_connectObserver = g_disconnectObserver = g_backgroundObserver = g_foregroundObserver = g_settingsObserver = nil;
         g_observing = NO;
     }
     output_active(NO);

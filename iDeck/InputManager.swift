@@ -21,7 +21,10 @@ final class InputManager: ObservableObject {
             DispatchQueue.main.async { [weak self] in self?.refreshControllers() }
             return
         }
-        let connected = GCController.controllers()
+        // Wine's native XInput/HID bridge only accepts extended gamepads.
+        // Do not show a remote or micro-gamepad as supported when it has no
+        // matching virtual Windows controller slot.
+        let connected = GCController.controllers().filter { $0.extendedGamepad != nil }
         let first = connected.first
         isControllerConnected = first != nil
         controllerName = first?.vendorName ?? "None"
