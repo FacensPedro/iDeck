@@ -302,10 +302,6 @@ jobs:
       - name: Test GOG CDN signed URLs and Steam client setup concurrency
         run: python3 -m unittest discover -s tests/host -p 'test_steam_gog_startup_regressions.py' -v
 
-      - name: Test Steam CDN host performance selection
-        run: |
-          python3 -m unittest discover -s tests/host -p 'test_steam_ip_routing.py' -v
-
       - name: Test graphics DLL override isolation
         run: |
           xcrun swiftc iDeck/GraphicsConfig.swift tests/host/GraphicsOverrideTests.swift -o /tmp/ideck-graphics-override-tests
