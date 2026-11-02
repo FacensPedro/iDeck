@@ -157,6 +157,13 @@ final class WindowsLibraryStore: ObservableObject {
         } catch {
             executableURLs = []
         }
+        // Programs a setup (.exe installer) put in the prefix: the shortcuts it
+        // created in the Start Menu and on the Desktop name their executables.
+        let drive = prefixPath.appendingPathComponent("drive_c", isDirectory: true)
+        let known = Set(executableURLs.map { $0.standardizedFileURL.path.lowercased() })
+        let installed = WindowsShortcutScanner.programs(in: drive)
+            .filter { !known.contains($0.standardizedFileURL.path.lowercased()) }
+        executableURLs += installed
     }
 
     func profileID(for url: URL) -> String {
@@ -479,4 +486,83 @@ enum WindowsPEIcon {
 
 struct SelectedEpicGame: Identifiable {
     let id: String
+}
+
+
+/// Executables named by Windows shortcuts (.lnk) in the prefix's Start Menu and
+/// Desktop folders: what an installer leaves for the programs it installed.
+enum WindowsShortcutScanner {
+    static func programs(in drive: URL) -> [URL] {
+        let fm = FileManager.default
+        var roots = ["ProgramData/Microsoft/Windows/Start Menu/Programs", "users/Public/Desktop"]
+        if let users = try? fm.contentsOfDirectory(atPath: drive.appendingPathComponent("users").path) {
+            for user in users {
+                roots.append("users/\(user)/AppData/Roaming/Microsoft/Windows/Start Menu/Programs")
+                roots.append("users/\(user)/Desktop")
+            }
+        }
+        var found: [String: URL] = [:]
+        for root in roots {
+            guard let walker = fm.enumerator(at: drive.appendingPathComponent(root, isDirectory: true),
+                                             includingPropertiesForKeys: nil) else { continue }
+            var count = 0
+            while let item = walker.nextObject() as? URL, count < 2000 {
+                count += 1
+                guard item.pathExtension.lowercased() == "lnk",
+                      let target = target(of: item), let exe = hostURL(target, drive: drive) else { continue }
+                let name = exe.lastPathComponent.lowercased()
+                guard !name.hasPrefix("unins"), !name.contains("uninstall"), name != "winhlp32.exe",
+                      !exe.path.lowercased().contains("/windows/") else { continue }
+                found[exe.standardizedFileURL.path.lowercased()] = exe
+            }
+        }
+        return found.values.sorted { $0.lastPathComponent.localizedCaseInsensitiveCompare($1.lastPathComponent) == .orderedAscending }
+    }
+
+    /// C:\... -> the file under drive_c, matched without case; nil when missing or not an .exe.
+    static func hostURL(_ windowsPath: String, drive: URL) -> URL? {
+        let path = windowsPath.replacingOccurrences(of: "\\", with: "/")
+        guard path.lowercased().hasPrefix("c:/"), path.lowercased().hasSuffix(".exe"), !path.contains("..") else { return nil }
+        let relative = String(path.dropFirst(3))
+        let direct = drive.appendingPathComponent(relative)
+        if FileManager.default.fileExists(atPath: direct.path) { return direct }
+        return SteamInstallFiles.resolveLaunchPath(relative, root: drive, executable: true)
+    }
+
+    /// The target path of a Shell Link ([MS-SHLLINK]): LinkInfo's local base
+    /// path, otherwise the working directory joined with the relative path.
+    static func target(of url: URL) -> String? {
+        guard let data = try? Data(contentsOf: url), data.count > 0x4C, data.count < 1 << 20 else { return nil }
+        let bytes = [UInt8](data)
+        func u16(_ o: Int) -> Int { o + 2 <= bytes.count ? Int(bytes[o]) | Int(bytes[o + 1]) << 8 : 0 }
+        func u32(_ o: Int) -> Int { u16(o) | u16(o + 2) << 16 }
+        guard u32(0) == 0x4C else { return nil }
+        let flags = u32(0x14)
+        var offset = 0x4C
+        if flags & 0x1 != 0 { offset += 2 + u16(offset) }
+        if flags & 0x2 != 0 {
+            let start = offset, size = u32(start)
+            let base = u32(start + 16)
+            if base > 0, start + base < bytes.count {
+                var end = start + base
+                while end < bytes.count, bytes[end] != 0 { end += 1 }
+                if let text = String(bytes: bytes[(start + base)..<end], encoding: .windowsCP1252), !text.isEmpty { return text }
+            }
+            offset = start + size
+        }
+        // StringData: name, relative path, working directory (counted strings).
+        let unicode = flags & 0x80 != 0
+        var strings: [Int: String] = [:]
+        for (bit, key) in [(0x4, 0), (0x8, 1), (0x10, 2)] where flags & bit != 0 {
+            let count = u16(offset); offset += 2
+            let length = unicode ? count * 2 : count
+            guard offset + length <= bytes.count else { return nil }
+            let slice = Data(bytes[offset..<(offset + length)])
+            strings[key] = String(data: slice, encoding: unicode ? .utf16LittleEndian : .windowsCP1252)
+            offset += length
+        }
+        guard let relative = strings[1], let directory = strings[2] else { return nil }
+        let name = relative.split(separator: "\\").last.map(String.init) ?? relative
+        return directory.hasSuffix("\\") ? directory + name : directory + "\\" + name
+    }
 }
