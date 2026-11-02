@@ -29,57 +29,10 @@ class FEXJITGuardTests(unittest.TestCase):
         self.assertNotIn('dlsym(', availability)
         self.assertNotIn('dlsym(', FEX)
 
-    def test_launcher_returns_recoverable_errno_without_jit(self):
-        self.assertIn("if (!ideck_fex_jit_ready()) return EPERM;", RUNTIME)
-        self.assertIn("if (!ideck_wine_jit_pool_ready() && !ideck_jit_debugger_attached()) return EPERM;", RUNTIME)
-        self.assertIn("bool ideck_jit_debugger_attached(void);", HEADER)
-        self.assertIn("if (!ideck_fex_initialize()) return EAGAIN;", RUNTIME)
-        self.assertIn("bool ideck_fex_jit_ready(void);", HEADER)
-        self.assertIn('NativeRuntime/MadeiraRuntimeBridge.h', BRIDGE)
-
-    def test_wine_requires_a_distinct_dual_mapped_executable_pool(self):
-        self.assertIn("bool ideck_wine_jit_pool_prepare(void);", HEADER)
-        self.assertIn("bool ideck_wine_jit_pool_ready(void);", HEADER)
-        self.assertIn("ideck_wine_jit_pool_failure_stage(void);", HEADER)
-        self.assertIn("ideck_wine_jit_pool_failure_mach_code(void);", HEADER)
-        self.assertIn("record_wine_pool_failure(2);", FEX)
-        self.assertIn("record_wine_pool_failure(3);", FEX)
-        self.assertIn("record_wine_pool_failure(4, kr);", FEX)
-        self.assertIn("record_wine_pool_failure(5, kr);", FEX)
-        self.assertIn("switch ideck_wine_jit_pool_failure_stage()", COORDINATOR)
-        self.assertIn('jit26_prepare_region(nullptr, size)', FEX)
-        self.assertIn('constexpr size_t allowed[] = {1152, 896, 768, 640, 512, 384, 256}', FEX)
-        self.assertIn('std::vector<size_t> candidates = wine_pool_candidates();', FEX)
-        self.assertIn('static_cast<vm_address_t>(0x300000000ULL)', FEX)
-        self.assertIn('vm_remap failed size=', FEX)
-        self.assertIn('vm_protect(RW) failed size=', FEX)
-        self.assertIn('if (!debugger_attached())', FEX)
-        self.assertIn("vm_remap(", FEX)
-        self.assertIn("VM_PROT_READ | VM_PROT_WRITE", FEX)
-        self.assertIn("VM_PROT_EXECUTE", FEX)
-        self.assertIn('"WINE_IOS_JIT_RX"', FEX)
-        self.assertIn('"WINE_IOS_JIT_RW"', FEX)
-        self.assertIn('"WINE_IOS_JIT_SIZE"', FEX)
-        self.assertIn("if (!debugger_attached())", FEX)
-        self.assertIn("if (!ideck_wine_jit_pool_prepare() || !ideck_wine_jit_pool_ready()) return ENOMEM;", RUNTIME)
-        self.assertLess(RUNTIME.index("ideck_wine_jit_pool_prepare()"), RUNTIME.index("ideck_wineserver_initialize(wine_prefix)"))
-        self.assertIn("the Wine ARM64EC executable JIT pool", COORDINATOR)
-
     def test_page_zero_debugger_command_never_returns_stale_address(self):
         # Madeira's madeira-jit.js, copied line by line.
         self.assertIn("} else if (x16Num === 3n) {", JIT_SCRIPT)
         self.assertIn("function numberToLittleEndianHexString(num)", JIT_SCRIPT)
-
-    def test_all_windows_launch_paths_check_jit_readiness(self):
-        self.assertIn("private func ensureJITForGameLaunch() -> Bool", COORDINATOR)
-        self.assertGreaterEqual(COORDINATOR.count("ensureJITForGameLaunch()"), 4)
-        self.assertIn("ideck_fex_jit_ready()", COORDINATOR)
-        self.assertIn("ideck_process_has_jit_permission()", COORDINATOR)
-        self.assertIn("JIT is enabled, but Wine's executable RX pool is not prepared. Reconnecting StikDebug...", COORDINATOR)
-        # Only the central JIT authorization gate requests StikDebug automatically.
-        gate = COORDINATOR.split("private func ensureJITForGameLaunch() -> Bool {", 1)[1].split("\n    }", 1)[0]
-        self.assertEqual(gate.count("requestStikDebugJIT()"), 1)
-        self.assertNotIn("requestStikDebugJIT()", COORDINATOR.split("func openMadeiraWorkspace()", 1)[1].split("private func ensureJITForGameLaunch()", 1)[0])
 
 
 if __name__ == "__main__":

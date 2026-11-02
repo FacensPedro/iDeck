@@ -19,5 +19,6 @@
 #import "GraphicsAPIScan.h"
 #import "SteamNativeCore.h"
 #import "NativeRuntime/WineLogTriage.h"
+#import "MadeiraJIT/JITAllocator.h"
 
 #endif /* iDeck_Bridging_Header_h */

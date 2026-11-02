@@ -328,6 +328,8 @@ class WindowsEnvironment {
     /// "\Registry". iDeck asks for a restart instead, as Madeira does.
     /// madeira.cfg env.MADEIRA_ONE_SESSION_PER_RUN = 0 lets the launch go ahead.
     static var sessionsThisRun = 0
+    /// Why Madeira's StikJITHelper could not allocate the pool (its poolFailure).
+    static var lastPoolFailure: String?
     static let sessionAlreadyRan = Int32(EALREADY)
     static var oneSessionPerRun: Bool { MadeiraConfig.flag("MADEIRA_ONE_SESSION_PER_RUN") }
 
@@ -371,6 +373,16 @@ class WindowsEnvironment {
         let engineSwitch = prepareGraphicsAPI(binary: binary)
         let launchArguments = parsedArguments + engineSwitch.filter { !parsedArguments.contains($0) }
         let architectureTranslator = BoxTranslator()
+        // As Madeira's launch: the JIT pool from StikJITHelper, exported, and the
+        // debugger detached, before the wineserver and Wine start.
+        DispatchQueue.global(qos: .userInitiated).async {
+          if let failure = MadeiraWinePool.prepare() {
+            Self.lastPoolFailure = failure
+            SteamLog.event("[wine-launch] JIT pool: " + failure)
+            DispatchQueue.main.async { completion(Int(ENOMEM)) }
+            return
+          }
+          DispatchQueue.main.async {
         architectureTranslator.translateAndRun(
             executablePath: binary.path,
             arguments: launchArguments,
@@ -385,6 +397,8 @@ class WindowsEnvironment {
             if status != 0 { SteamLog.event("[wine-launch] native launch failure code=\(status)") }
             else { Self.sessionsThisRun += 1 }
             completion(status)
+        }
+          }
         }
     }
 

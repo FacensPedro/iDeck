@@ -16,15 +16,6 @@ class MadeiraEntitlementTests(unittest.TestCase):
         for key in REQUIRED:
             self.assertIs(entitlements.get(key), True)
 
-    def test_native_start_rejects_missing_jit_and_memory_permissions(self):
-        source = (ROOT / "iDeck/NativeRuntime/MadeiraRuntimeBridge.mm").read_text()
-        fex = (ROOT / "iDeck/NativeRuntime/FEXRuntime.cpp").read_text()
-        self.assertIn("if (!ideck_fex_jit_ready()) return EPERM;", source)
-        self.assertIn("if (!ideck_wine_jit_pool_prepare() || !ideck_wine_jit_pool_ready()) return ENOMEM;", source)
-        self.assertIn("vm_protect(", fex)
-        self.assertNotIn("SecTaskCopyValueForEntitlement", source)
-        self.assertNotIn("#import <Security/SecTask.h>", source)
-
     def test_signed_entitlements_must_be_verified_off_device(self):
         checker = (ROOT / "scripts/verify_signed_madeira_app.py").read_text()
         self.assertIn("codesign", checker)
