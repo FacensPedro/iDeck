@@ -11,6 +11,7 @@
 #include <cstdlib>
 #include <atomic>
 #include <algorithm>
+#include <functional>
 #include <vector>
 
 namespace {
@@ -399,9 +400,11 @@ bool acceptable_pool(uintptr_t address, size_t size) {
         return false;
     }
     const uintptr_t end = address + size;
-    // Do not place the JIT mapping inside Wine's PE image window or
-    // outside the supported guest/host VM layout.
-    if (end > 0x7000000000ULL) {
+    // As Madeira's StikJITHelper: only the guest window [0x7000000000,
+    // 0x8000000000) is refused. A pool above it is host memory Wine never
+    // hands out, and on iPadOS 27 that is where the large free runs are: the
+    // runs below 0x7000000000 are what capped the pool at 256 MiB.
+    if (address < 0x8000000000ULL && end > 0x7000000000ULL) {
         wine_pool_last_rx_detail.store(3);
         return false;
     }
@@ -520,10 +523,14 @@ extern "C" bool ideck_wine_jit_pool_prepare(void) {
     std::vector<size_t> candidates = wine_pool_candidates();
     // Ask only for what fits a free run: a larger request is a debugger round
     // trip that cannot succeed. The largest fitting size goes first.
+    // The low runs' fit is one more candidate, not a ceiling: the preferred
+    // sizes are still asked for first, and first-fit may place them above
+    // the guest window (accepted, as in Madeira).
     if (const size_t fit = release_placeholder_and_plug(candidates.empty() ? 0 : candidates.front())) {
-        std::vector<size_t> fitted {fit};
-        for (size_t size : candidates) if (size < fit) fitted.push_back(size);
-        candidates.swap(fitted);
+        if (std::find(candidates.begin(), candidates.end(), fit) == candidates.end()) {
+            candidates.push_back(fit);
+            std::sort(candidates.begin(), candidates.end(), std::greater<size_t>());
+        }
     }
     struct PlugRelease { ~PlugRelease() { release_pool_plugs(); } } plug_release;
     for (size_t size : candidates) {
