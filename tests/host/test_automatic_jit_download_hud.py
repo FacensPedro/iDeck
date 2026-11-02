@@ -15,7 +15,7 @@ class AutomaticJITAndDownloadHUDTests(unittest.TestCase):
         self.assertIn("wineJITAttemptedDuringAttachment", COORDINATOR)
         self.assertIn("else if detected && !wineReady", COORDINATOR)
         self.assertIn("if native.fex_linked && native.launcher_linked", COORDINATOR)
-        self.assertIn("let prepared = ideck_wine_jit_pool_prepare()", COORDINATOR)
+        self.assertIn("let prepared = ideck_fex_initialize() && ideck_wine_jit_pool_prepare()", COORDINATOR)
         self.assertIn("if !debuggerAttached {", COORDINATOR)
         self.assertIn("DispatchQueue.global(qos: .userInitiated)", COORDINATOR)
         # The main thread never waits on the pool mutex: snapshot try-locks.

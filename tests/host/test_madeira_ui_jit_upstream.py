@@ -40,13 +40,25 @@ class MadeiraUIJITUpstreamTests(unittest.TestCase):
         self.assertNotIn('reconnectStikDebugForWineIfNeeded()', home)
         self.assertIn('func ensureJITForGameLaunch() -> Bool', COORDINATOR)
         guard = COORDINATOR.split('private func ensureJITForGameLaunch() -> Bool {', 1)[1].split('\n    }', 1)[0]
-        self.assertIn('if ideck_wine_jit_pool_ready() { return true }', guard)
+        self.assertIn('snapshot.wine_pool_prepared && ideck_fex_jit_ready() { return true }', guard)
         self.assertIn('ideck_process_has_jit_permission()', guard)
         self.assertIn('waitForDebuggerThenResume(resume)', guard)
         self.assertEqual(guard.count('requestStikDebugJIT()'), 1)
         self.assertIn('no new authorization was requested', guard)
         self.assertIn('URLQueryItem(name: "script-data"', COORDINATOR)
         self.assertIn('coordinator.isJITEnabled ? "Reconnect JIT debugger" : "Enable JIT"', SETTINGS)
+
+    def test_launch_waits_for_pool_completion_without_blocking_ui(self):
+        wait = COORDINATOR.split('private func waitForDebuggerThenResume(', 1)[1].split('@discardableResult', 1)[0]
+        self.assertNotIn('ideck_wine_jit_pool_ready()', wait)
+        self.assertIn('!wineJITPreparationInFlight && !snapshot.wine_state_busy', wait)
+        self.assertIn('snapshot.wine_pool_prepared && ideck_fex_jit_ready()', wait)
+        self.assertNotIn('ideck_jit_debugger_attached() ||', wait)
+        self.assertIn('!reconnected', wait)
+        self.assertIn('reconnected = true', wait)
+        self.assertIn('setWindowsStatus(nativeLaunchFailure(Int(ENOMEM)))', wait)
+        self.assertIn('guard generation == jitWaitGeneration else { return }', wait)
+        self.assertIn('ideck_fex_initialize() && ideck_wine_jit_pool_prepare()', COORDINATOR)
 
     def test_wine_jit_inspects_split_executable_rx_safely(self):
         self.assertIn('void prepare_wine_pool_frontier()', FEX)
