@@ -12,7 +12,7 @@ on:
       - "tests/host/test_madeira_arm_host_features.py"
       - "tests/host/test_madeira_native_kit.py"
       - "iDeck/NativeRuntime/FEXRuntime.cpp"
-      - "tests/host/test_auto_wine_jit_pool.py"
+      - "tests/host/test_madeira_jit_verbatim.py"
       - "tests/host/test_fex_jit_guard.py"
       - ".github/workflows/arm-host-features.yml"
   workflow_dispatch:
@@ -32,5 +32,5 @@ jobs:
         run: python3 -m unittest discover -s tests/host -p 'test_madeira_native_kit.py' -v
       - name: Validate Wine JIT safeguards
         run: |
-          python3 -m unittest discover -s tests/host -p 'test_auto_wine_jit_pool.py' -v
+          python3 -m unittest discover -s tests/host -p 'test_madeira_jit_verbatim.py' -v
           python3 -m unittest discover -s tests/host -p 'test_fex_jit_guard.py' -v

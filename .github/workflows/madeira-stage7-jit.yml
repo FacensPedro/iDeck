@@ -46,7 +46,7 @@ jobs:
           set -euo pipefail
           python3 -m unittest discover -s tests/host -p 'test_madeira_jit_stage7.py' -v
           python3 -m unittest discover -s tests/host -p 'test_fex_jit_guard.py' -v
-          python3 -m unittest discover -s tests/host -p 'test_auto_wine_jit_pool.py' -v
+          python3 -m unittest discover -s tests/host -p 'test_madeira_jit_verbatim.py' -v
           python3 -m unittest discover -s tests/host -p 'test_madeira_ui_jit_upstream.py' -v
 
   ios:
