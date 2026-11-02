@@ -642,7 +642,7 @@ enum IDeckSteamDockInstallers {
             // Madeira #511: .NET Framework 2.0-4.x setups do not finish under Wine's
             // own .NET (Mono) and held the game's start; they are left out.
             // env.MADEIRA_INSTALL_SKIP_DOTNET = 0 runs them too.
-            if MadeiraConfig.flag("MADEIRA_INSTALL_SKIP_DOTNET") && Self.isDotNetFramework(process) {
+            if (ProcessInfo.processInfo.environment["MADEIRA_INSTALL_SKIP_DOTNET"] ?? "1") != "0" && Self.isDotNetFramework(process) {
                 return "Wine's own .NET is used"
             }
             if process.executable.lowercased().hasSuffix(".msi") && !msiexec { return "Wine msiexec.exe missing" }
