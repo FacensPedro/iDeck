@@ -2219,6 +2219,26 @@ private struct WindowsGameProfileForm: View {
                                 choices: ["Automatic", "XInput", "XInput + DirectInput", "HID", "DualSense HID", "Generic HID"],
                                 showsDivider: false, icon: "gamecontroller.fill", iconColor: .green)
             }
+            DetailCard(title: tr("Performance")) {
+                DetailPickerRow(title: tr("CPU cores"), selection: Binding(
+                                    get: { profile.cpuCount == 0 ? tr("All") : String(profile.cpuCount) },
+                                    set: { profile.cpuCount = Int($0) ?? 0 }),
+                                choices: WindowsGameProfile.cpuCounts.map { $0 == 0 ? tr("All") : String($0) },
+                                icon: "cpu", iconColor: .blue)
+                DetailPickerRow(title: tr("Anisotropic filtering (D3D9)"), selection: Binding(
+                                    get: { profile.anisotropyLimit == 0 ? tr("Game") : "\(profile.anisotropyLimit)x" },
+                                    set: { profile.anisotropyLimit = Int($0.dropLast()) ?? 0 }),
+                                choices: WindowsGameProfile.anisotropyLimits.map { $0 == 0 ? tr("Game") : "\($0)x" },
+                                icon: "square.grid.3x3.fill", iconColor: .teal)
+                DetailToggleRow(title: tr("Fast synchronization"), isOn: $profile.fastSync,
+                                icon: "bolt.fill", iconColor: .yellow)
+                DetailToggleRow(title: tr("Reduced-precision x87"), isOn: $profile.reducedX87,
+                                icon: "function", iconColor: .orange)
+                DetailToggleRow(title: tr("Frame generation"), isOn: $profile.frameGeneration,
+                                icon: "film.stack", iconColor: .purple)
+                DetailToggleRow(title: tr("Report an NVIDIA GPU"), isOn: $profile.reportNVIDIA, showsDivider: false,
+                                icon: "display", iconColor: .green)
+            }
             DetailCard(title: tr("Compatibility"),
                        footer: tr("Games iDeck recognises get the settings they were tested with.")) {
                 DetailToggleRow(title: tr("Use recommended settings"), isOn: $profile.useRecommended,

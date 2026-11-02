@@ -382,28 +382,6 @@ class WindowsEnvironment {
         }
     }
 
-    static let swapKey = "resources.swapMB"
-    static let swapChoices = [0, 1024, 2048, 4096, 8192]
-
-    /// Madeira's file-backed guest memory tier ("userspace swap", madeira.cfg
-    /// `swap-mb`, build/ntdll-unix/virtual_ios.c ml1077): large writable guest
-    /// allocations are mapped from a sparse file in tmp. iOS writes those pages
-    /// back to the file and evicts them, and they do not count toward the memory
-    /// limit the system kills apps at. Used only with room left on the device:
-    /// the file needs up to the chosen size plus 2 GB free.
-    static func swapMegabytes() -> Int? {
-        let chosen = UserDefaults.standard.object(forKey: swapKey) as? Int ?? 2048
-        guard chosen >= 64 else { return nil }
-        let tmp = URL(fileURLWithPath: NSTemporaryDirectory())
-        let free = (try? tmp.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey]))?
-            .volumeAvailableCapacityForImportantUsage ?? 0
-        guard free >= Int64(chosen + 2048) << 20 else {
-            SteamLog.event("[wine-launch] RAM swap \(chosen) MB skipped: \(free >> 20) MB free")
-            return nil
-        }
-        return chosen
-    }
-
     /// Whether this IPA carries vkd3d-proton (build/vkd3d-proton/build.sh output).
     static var hasVKD3DProton: Bool {
         let bundle = Bundle.main.bundleURL
@@ -582,7 +560,6 @@ class WindowsEnvironment {
         case "OpenGL ES": lines.append("gl-backend = gles")
         default: break
         }
-        if let swap = Self.swapMegabytes() { lines.append("swap-mb = \(swap)") }
         if lines.count == 1 {
             unsetenv("MADEIRA_CFG_GAME")
             return
@@ -601,7 +578,40 @@ class WindowsEnvironment {
         }
     }
 
+    /// Madeira's per-launch environment (LibraryEntry.applyEnvironment, line by
+    /// line), with the defaults of the per-game choices iDeck does not offer:
+    /// set or unset every time, so one game's value never leaks into the next.
+    /// Keys madeira.cfg sets still apply (WineProcessBridge's ml1184 rules).
+    private func applyMadeiraLaunchEnvironment(_ profile: WindowsGameProfile) {
+        unsetenv("MADEIRA_GDI_SHARED_SECTION")   // a Dock launch sets it again
+        unsetenv("MADEIRA_MADSYNC_SESSION")      // an installer session sets it again
+        setenv("FEX_X87REDUCEDPRECISION", profile.reducedX87 ? "1" : "0", 1)
+        if (1..<64).contains(profile.cpuCount) { setenv("MADEIRA_CPU_COUNT", String(profile.cpuCount), 1) }
+        else { unsetenv("MADEIRA_CPU_COUNT") }
+        if [1, 2, 4, 8].contains(profile.anisotropyLimit) { setenv("DXMT_D9_ANISO_LIMIT", String(profile.anisotropyLimit), 1) }
+        else { unsetenv("DXMT_D9_ANISO_LIMIT") }
+        if profile.frameGeneration { setenv("MADEIRA_FRAMEGEN", "1", 1) } else { unsetenv("MADEIRA_FRAMEGEN") }
+        if profile.reportNVIDIA {
+            setenv("DXMT_ENABLE_NVEXT", "1", 1)
+            setenv("DXMT_WSI_MONITOR_IDENTITY", "1", 1)
+            setenv("DXMT_WSI_MODE_TABLE", "1", 1)
+        } else {
+            unsetenv("DXMT_ENABLE_NVEXT")
+            unsetenv("DXMT_WSI_MONITOR_IDENTITY")
+            unsetenv("DXMT_WSI_MODE_TABLE")
+        }
+        // Fastsync's per-game switches, only when Settings chose Fastsync.
+        if MadeiraSyncEngine.current == .fastsync {
+            let mode = MadeiraConfig.get("env.MADEIRA_FASTSYNC") ?? "auto"
+            setenv("MADEIRA_FASTSYNC", profile.fastSync ? mode : "0", 1)
+            unsetenv("MADEIRA_FASTSYNC_SEM")
+        } else {
+            unsetenv("MADEIRA_FASTSYNC")
+        }
+    }
+
     func applyGameProfile(_ profile: WindowsGameProfile) {
+        applyMadeiraLaunchEnvironment(profile)
         // A previous Madeira Dock launch leaves its host switches in the
         // process environment; only a new Dock launch sets them again.
         for key in ["MADEIRA_STEAM_HOST_PROBE", "MADEIRA_STEAM_HOST_SESSION", "MADEIRA_STEAM_HOST_LOGIN",

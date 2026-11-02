@@ -19,7 +19,6 @@ struct SettingsView: View {
     @State private var winePoolChangeRequiresRestart = false
     @AppStorage("showGamePerformanceOverlay") private var showGamePerformanceOverlay = false
     @AppStorage(ResourceGovernor.pauseInBackgroundKey) private var pauseGamesInBackground = true
-    @AppStorage(WindowsEnvironment.swapKey) private var swapMB = 2048
     @StateObject private var updater = UpdateChecker()
     @State private var isSteamSignInPresented = false
     @ObservedObject private var gogLibrary = GOGLibraryModel.shared
@@ -342,11 +341,6 @@ struct SettingsView: View {
                 toggleRow(title: tr("MetalFX Upscaling"), isOn: $coordinator.isMetalFXEnabled)
                 toggleRow(title: tr("Hold Display at Maximum Rate"), isOn: $coordinator.isMaxRefreshRateEnabled)
                 toggleRow(title: tr("Pause games in the background"), isOn: $pauseGamesInBackground)
-                Picker(tr("RAM swap"), selection: $swapMB) {
-                    ForEach(WindowsEnvironment.swapChoices, id: \.self) { size in
-                        Text(size == 0 ? tr("Off") : "\(size / 1024) GB").tag(size)
-                    }
-                }
                 toggleRow(title: tr("Show FPS, CPU & GPU overlay"), isOn: $showGamePerformanceOverlay)
                 toggleRow(title: tr("D3DMetal Rendering"), isOn: $coordinator.isD3DMetalEnabled)
             }
@@ -354,6 +348,7 @@ struct SettingsView: View {
             } footer: {
                 Text(tr("Graphics changes apply when you launch the next game."))
             }
+            MadeiraMemorySyncSettings()
         }
         .navigationTitle(tr("Graphics & Performance"))
     }
