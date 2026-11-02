@@ -15,6 +15,7 @@ C_TEST = r"""
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include "GamepadResponse.h"
 
 int main(void) {
