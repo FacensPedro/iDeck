@@ -314,7 +314,6 @@ class SystemCoordinator: ObservableObject {
     /// for this iDeck PID. Permission alone does not prepare Wine's RX pool:
     /// that still requires a live BRK-capable debugger, and a failed RX
     /// allocation must be surfaced rather than disguised as a JIT prompt.
-    @discardableResult
     /// The launch to continue once StikDebug is attached (set by the caller
     /// right before `ensureJITForGameLaunch()`), as Madeira's jitReadyForLaunch(then:).
     private var jitResume: (() -> Void)?
@@ -343,6 +342,7 @@ class SystemCoordinator: ObservableObject {
         poll()
     }
 
+    @discardableResult
     private func ensureJITForGameLaunch() -> Bool {
         let resume = jitResume
         jitResume = nil
