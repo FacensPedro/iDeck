@@ -37,11 +37,8 @@ static inline IDeckPadStick ideck_pad_stick(float x, float y,
 
     // Remap the active radius to [0,1], then apply sensitivity. Clamp the
     // resulting magnitude (not each axis independently) to preserve angle.
-    float response = fminf(1.0f,
-                          fminf(magnitude, 1.0f) - deadzone > 0.0f
-                              ? ((fminf(magnitude, 1.0f) - deadzone) /
-                                 (1.0f - deadzone)) * sensitivity
-                              : 0.0f);
+    float normalized = (fminf(magnitude, 1.0f) - deadzone) / (1.0f - deadzone);
+    float response = fminf(1.0f, fmaxf(0.0f, normalized * sensitivity));
     float scale = response / magnitude;
     IDeckPadStick calibrated = {
         ideck_pad_axis(x * scale),
