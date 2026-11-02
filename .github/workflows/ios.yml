@@ -367,6 +367,9 @@ jobs:
       - name: Test on-screen XInput/HID controller presets, native slots and cleanup
         run: python3 -m unittest discover -s tests/host -p 'test_madeira_touch_virtual_controller.py' -v
 
+      - name: Test real controller calibration, safe HID state and initial rumble
+        run: python3 -m unittest discover -s tests/host -p 'test_controller_calibration.py' -v
+
       - name: Test Madeira XInput/HID controller integration and repeat Wine sessions
         run: |
           python3 -m unittest discover -s tests/host -p 'test_madeira_xinput_hid_restart.py' -v
