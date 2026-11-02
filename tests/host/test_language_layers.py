@@ -30,15 +30,6 @@ class LanguageLayerTests(unittest.TestCase):
 class WineJITPoolMatchesMadeiraTests(unittest.TestCase):
     CPP = (ROOT / "iDeck/NativeRuntime/FEXRuntime.cpp").read_text()
 
-    def test_pool_uses_madeira_session_size(self):
-        self.assertIn("constexpr size_t allowed[] = {1152, 896, 768, 640, 512, 384, 256};", self.CPP)
-        self.assertIn("if (physical_bytes >= 6ULL * 1024 * MiB) preferred = 896;", self.CPP)
-
-    def test_executable_window_is_held_before_rx(self):
-        self.assertIn('setenv("WINE_IOS_EXE_WINDOW", "140000000:8000000", 1)', self.CPP)
-        frontier = self.CPP.index("void prepare_wine_pool_frontier() {")
-        self.assertIn("reserve_exe_window();", self.CPP[frontier:frontier + 200])
-
 
 if __name__ == "__main__":
     unittest.main()

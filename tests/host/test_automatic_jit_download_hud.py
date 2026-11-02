@@ -10,31 +10,6 @@ DEPOT = (ROOT / "iDeck/SteamDepotDownloader.swift").read_text(encoding="utf-8")
 
 
 class AutomaticJITAndDownloadHUDTests(unittest.TestCase):
-    def test_wine_jit_auto_prepare_only_with_live_debugger_and_real_runtime(self):
-        self.assertIn("wineJITPreparationInFlight", COORDINATOR)
-        self.assertIn("wineJITAttemptedDuringAttachment", COORDINATOR)
-        self.assertIn("else if detected && !wineReady", COORDINATOR)
-        self.assertIn("if native.fex_linked && native.launcher_linked", COORDINATOR)
-        self.assertIn("let prepared = ideck_fex_initialize() && ideck_wine_jit_pool_prepare()", COORDINATOR)
-        self.assertIn("if !debuggerAttached {", COORDINATOR)
-        self.assertIn("DispatchQueue.global(qos: .userInitiated)", COORDINATOR)
-        # The main thread never waits on the pool mutex: snapshot try-locks.
-        self.assertIn("(wineJITPreparationInFlight || snapshot.wine_state_busy)", COORDINATOR)
-        self.assertIn("? isWineJITPrepared : snapshot.wine_pool_prepared", COORDINATOR)
-        # The last working pool size is tried first next time.
-        self.assertIn('getenv("IDECK_WINE_JIT_LAST_GOOD_MIB")', (ROOT / "iDeck/NativeRuntime/FEXRuntime.cpp").read_text())
-        self.assertIn('UserDefaults.standard.set(poolMiB, forKey: Self.lastGoodPoolKey)', COORDINATOR)
-        # A pool-size preference was added after the original automatic-JIT
-        # test. It is safe because it only configures the native allocation
-        # before preparation; the app must not resize an executable JIT pool.
-        self.assertIn('Text(tr("Wine JIT pool"))', SETTINGS)
-        self.assertIn('@AppStorage("wineJITPoolMiB")', SETTINGS)
-        self.assertIn('ForEach([384, 512, 640, 768, 896, 1152]', SETTINGS)
-        self.assertIn('updateWineJITPoolPreference(selected)', SETTINGS)
-        self.assertIn('guard !wineJITPreparationInFlight && !ideck_wine_jit_pool_ready()', COORDINATOR)
-        self.assertIn('setenv("IDECK_WINE_JIT_MIB", String(sizeMiB), 1)', COORDINATOR)
-        self.assertIn('unsetenv("IDECK_WINE_JIT_MIB")', COORDINATOR)
-
     def test_updates_settings_hide_unnecessary_release_messages(self):
         self.assertNotIn('actionButton(title: tr("Update iDeck %@", update.latest ?? "")', SETTINGS)
         for literal in (

@@ -59,16 +59,6 @@ class SteamIPRoutingTests(unittest.TestCase):
         self.assertIn("plan.health.recordFailure(host)", DEPOT)
         self.assertIn("let attempts = attemptsPerChunk", DEPOT)
 
-    def test_jit_pool_retries_are_bounded_and_debugger_protected(self):
-        self.assertIn("constexpr size_t allowed[] = {1152, 896, 768, 640, 512, 384, 256}", FEX)
-        self.assertIn('sysctlbyname("hw.memsize"', FEX)
-        self.assertIn("if (candidate <= preferred) sizes.push_back(candidate * MiB);", FEX)
-        self.assertIn("std::vector<size_t> candidates = wine_pool_candidates();", FEX)
-        self.assertIn('getenv("IDECK_WINE_JIT_MIB")', FEX)
-        self.assertIn('if (!debugger_attached())', FEX)
-        self.assertIn('vm_remap(mach_task_self()', FEX)
-        self.assertIn("vm_deallocate(mach_task_self()", FEX)
-
 
 if __name__ == "__main__":
     unittest.main()

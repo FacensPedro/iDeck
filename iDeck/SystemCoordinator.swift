@@ -258,31 +258,9 @@ class SystemCoordinator: ObservableObject {
             } else if detected && !wineReady &&
                       !self.wineJITPreparationInFlight &&
                       !self.wineJITAttemptedDuringAttachment {
-                let native = ideck_native_capabilities()
-                if native.fex_linked && native.launcher_linked {
-                    self.wineJITAttemptedDuringAttachment = true
-                    self.wineJITPreparationInFlight = true
-                    DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-                        let started = Date()
-                        let prepared = ideck_fex_initialize() && ideck_wine_jit_pool_prepare()
-                        let poolMiB = Int(ideck_jit_snapshot().wine_pool_mib)
-                        AppLog.record(String(format: "[iDeck Wine JIT] pool %@ in %.1f s (%d MiB)",
-                                             prepared ? "prepared" : "not prepared",
-                                             Date().timeIntervalSince(started), poolMiB))
-                        if prepared && poolMiB > 0 {
-                            UserDefaults.standard.set(poolMiB, forKey: Self.lastGoodPoolKey)
-                            Self.exportLastGoodPool()
-                        }
-                        DispatchQueue.main.async {
-                            guard let self else { return }
-                            self.wineJITPreparationInFlight = false
-                            self.isWineJITPrepared = prepared && ideck_wine_jit_pool_ready()
-                            if !prepared {
-                                SteamLog.event("[iDeck Wine JIT] automatic preparation failed; see native JIT diagnostics")
-                            }
-                        }
-                    }
-                }
+                // As Madeira: the pool is allocated at launch (MadeiraWinePool),
+                // not when the debugger attaches.
+                self.wineJITAttemptedDuringAttachment = true
             }
             if !detected && (self.currentStatus == "JIT confirmed via StikDebug" || self.currentStatus == "Ready") {
                 self.currentStatus = "JIT not detected. Enable it in StikDebug and return to iDeck."
@@ -319,84 +297,48 @@ class SystemCoordinator: ObservableObject {
     private var jitResume: (() -> Void)?
     private var jitWaitGeneration = 0
 
-    /// Wait for executable memory, not merely P_TRACED. Never block the
-    /// main thread on the native allocator's mutex during debugger round trips.
+    /// The launch that continues when StikDebug reports the debugger attached
+    /// (StikJITHelper.waitForDebugger), as Madeira's jitReadyForLaunch(then:).
+    private var pendingJITLaunch: (() -> Void)?
+
     private func waitForDebuggerThenResume(_ resume: @escaping () -> Void) {
-        jitWaitGeneration += 1
-        let generation = jitWaitGeneration
-        let started = Date()
-        var sawAttachment = ideck_jit_debugger_attached()
-        var reconnected = false
-        func poll() {
-            guard generation == jitWaitGeneration else { return }
-            let snapshot = ideck_jit_snapshot()
-            if !wineJITPreparationInFlight && !snapshot.wine_state_busy &&
-                snapshot.wine_pool_prepared && ideck_fex_jit_ready() {
-                jitWaitGeneration += 1
-                AppLog.record("[jit] executable pools ready; continuing the launch")
-                resume()
-                return
-            }
-            guard Date().timeIntervalSince(started) < 120 else {
-                setWindowsStatus("JIT was not enabled in time. Enable JIT in StikDebug and start the game again.")
-                return
-            }
-            let attached = ideck_jit_debugger_attached()
-            if sawAttachment && !attached && !wineJITPreparationInFlight &&
-                !snapshot.wine_state_busy && !reconnected {
-                reconnected = true
-                reconnectDebuggerForPendingLaunch()
-            }
-            sawAttachment = sawAttachment || attached
-            if attached && !wineJITPreparationInFlight && !snapshot.wine_state_busy &&
-                wineJITAttemptedDuringAttachment && !snapshot.wine_pool_prepared {
-                setWindowsStatus(nativeLaunchFailure(Int(ENOMEM)))
-                return
-            }
-            refreshJITStatus()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25, execute: poll)
-        }
-        poll()
+        pendingJITLaunch = resume
     }
 
+    /// Madeira's readiness: StikJITHelper.ready (CS_DEBUGGED and a live
+    /// debugger) or a pool already exported. The pool itself is allocated at
+    /// launch (MadeiraWinePool), followed by Madeira's early detach.
     @discardableResult
     private func ensureJITForGameLaunch() -> Bool {
         let resume = jitResume
         jitResume = nil
-        jitWaitGeneration += 1
-        if !wineJITPreparationInFlight { wineJITAttemptedDuringAttachment = false }
         refreshJITStatus()
-        let snapshot = ideck_jit_snapshot()
-        if !wineJITPreparationInFlight && !snapshot.wine_state_busy &&
-            snapshot.wine_pool_prepared && ideck_fex_jit_ready() { return true }
-        if wineJITPreparationInFlight || snapshot.wine_state_busy {
-            if let resume { waitForDebuggerThenResume(resume) }
-            return false
-        }
-        guard ideck_jit_debugger_attached() else {
-            // As Madeira: without a live debugger (none yet, or CS_DEBUGGED left
-            // behind by an earlier attach, where no new authorization was requested
-            // before) StikDebug is opened and the launch continues once it is attached.
-            setWindowsStatus(ideck_process_has_jit_permission()
-                ? "JIT is enabled, but Wine's executable RX pool is not prepared. Reconnecting StikDebug..."
-                : "JIT is not enabled for this iDeck process. Opening StikDebug...")
-            requestStikDebugJIT()
-            if let resume { waitForDebuggerThenResume(resume) }
-            return false
-        }
-        guard ideck_fex_jit_ready() else {
-            setWindowsStatus("FEX JIT is not initialized despite an active debugger. Review native JIT diagnostics.")
-            return false
-        }
+        if ideck_wine_jit_pool_ready() || StikJITHelper.ready { return true }
+        // As Madeira: without a live debugger (none yet, or CS_DEBUGGED left
+        // behind by an earlier attach, where no new authorization was requested
+        // before) StikDebug is opened and the launch continues once it is attached.
+        setWindowsStatus(ideck_process_has_jit_permission()
+            ? "JIT is enabled, but Wine's executable RX pool is not prepared. Reconnecting StikDebug..."
+            : "JIT is not enabled for this iDeck process. Opening StikDebug...")
         if let resume { waitForDebuggerThenResume(resume) }
+        requestStikDebugJIT()
         return false
     }
 
-    private func reconnectDebuggerForPendingLaunch() {
-        setWindowsStatus("JIT is enabled, but Wine's executable RX pool is not prepared. Reconnecting StikDebug...")
-        requestStikDebugJIT()
+    /// Runs the pending launch once the debugger is attached, or reports why not.
+    private func finishJITRequest(_ result: Result<Void, Error>) {
+        refreshJITStatus()
+        let launch = pendingJITLaunch
+        pendingJITLaunch = nil
+        switch result {
+        case .success:
+            AppLog.record("[jit] debugger attached; continuing the launch")
+            launch?()
+        case .failure(let error):
+            if launch != nil { setWindowsStatus(error.localizedDescription) }
+        }
     }
-    
+
     private func startLiveContainer() {
         setLiveContainerStatus("Initializing LiveContainer...")
         containerHost.setupContainer(injectHooks: isGuestHooksEnabled) { [weak self] success in
@@ -491,42 +433,15 @@ class SystemCoordinator: ObservableObject {
     func requestStikDebugJIT() {
         if jitMethod == "builtIn", FileManager.default.fileExists(atPath: pairingFileURL.path), MainActor.assumeIsolated({ IDeckBuiltInJIT.isAvailable }) {
             requestBuiltInJIT()
-            return
-        }
-        guard let bundleID = Bundle.main.bundleIdentifier, !bundleID.isEmpty else {
-            setWindowsStatus("Cannot request JIT: missing iDeck bundle identifier.")
-            return
-        }
-        // iOS does not expose SecTaskCreateFromSelf through the public Swift SDK.
-        // StikDebug validates the target's get-task-allow entitlement when
-        // attaching. A URL request must not be mistaken for JIT authorization.
-        var components = URLComponents()
-        components.scheme = "stikdebug"
-        components.host = "enable-jit"
-        components.queryItems = [
-            URLQueryItem(name: "bundle-id", value: bundleID),
-            URLQueryItem(name: "pid", value: String(getpid()))
-        ]
-        if #available(iOS 26.0, *) {
-            guard let scriptURL = Bundle.main.url(forResource: "universal", withExtension: "jitscript"),
-                  let scriptData = try? Data(contentsOf: scriptURL),
-                  !scriptData.isEmpty else {
-                setWindowsStatus("Cannot request JIT: the bundled universal.js debugger script is missing.")
-                return
+            StikJITHelper.waitForDebugger { [weak self] result in
+                DispatchQueue.main.async { self?.finishJITRequest(result) }
             }
-            // As Madeira's StikJITHelper, line for line: the script as plain
-            // base64 in script-data.
-            components.queryItems?.append(URLQueryItem(name: "script-data", value: scriptData.base64EncodedString()))
-        }
-        guard let url = components.url else {
-            setWindowsStatus("Cannot create StikDebug request.")
             return
         }
-        UIApplication.shared.open(url, options: [:]) { [weak self] opened in
-            guard let self else { return }
-            self.setWindowsStatus(opened
-                ? "StikDebug requested. Return to iDeck after JIT is enabled; FEX must still prepare its executable memory."
-                : "StikDebug could not be opened. Install and configure StikDebug first.")
+        // Madeira's StikJITHelper.enableJIT, verbatim: stikdebug://enable-jit with
+        // the bundle ID, this PID and the script, then a wait for the debugger.
+        StikJITHelper.enableJIT { [weak self] result in
+            DispatchQueue.main.async { self?.finishJITRequest(result) }
         }
     }
 
@@ -1150,24 +1065,7 @@ class SystemCoordinator: ObservableObject {
     private func launchThroughDock(game: SteamAppInfo, profile: WindowsGameProfile, prefixPath: URL) {
         jitResume = { [weak self] in self?.launchThroughDock(game: game, profile: profile, prefixPath: prefixPath) }
         guard ensureJITForGameLaunch() else { return }
-        setWindowsStatus("Preparing JIT...")
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            let ready = ideck_wine_jit_pool_ready() || (ideck_wine_jit_pool_prepare() && ideck_wine_jit_pool_ready())
-            let poolMiB = ideck_jit_snapshot().wine_pool_mib
-            DispatchQueue.main.async {
-                guard let self, self.windowsStatus == "Preparing JIT..." else { return }
-                guard ready else {
-                    self.setWindowsStatus("Execution Error: StikDebug could not allocate the Wine executable RX region, including smaller pools. Keep the debugger attached and check available virtual memory.")
-                    return
-                }
-                guard poolMiB >= Self.dockMinimumPoolMiB else {
-                    AppLog.record("[dock-launch] JIT pool \(poolMiB) MiB is below Steam's client minimum (\(Self.dockMinimumPoolMiB) MiB)")
-                    self.setWindowsStatus("Cannot launch Steam through Madeira Dock: the Wine JIT pool is only \(poolMiB) MiB; at least \(Self.dockMinimumPoolMiB) MiB is required. Select Automatic or at least 512 MiB in Settings, fully close and reopen iDeck, then enable StikDebug from iDeck. Reattaching alone cannot resize an existing pool.")
-                    return
-                }
-                self.startDockSession(game: game, profile: profile, prefixPath: prefixPath)
-            }
-        }
+        startDockSession(game: game, profile: profile, prefixPath: prefixPath)
     }
 
     private func startDockSession(game: SteamAppInfo, profile: WindowsGameProfile, prefixPath: URL) {
@@ -1536,6 +1434,9 @@ class SystemCoordinator: ObservableObject {
             return isSteamSession
                 ? "Execution Error: invalid Windows launch request (code 22). Check the executable format, Steam game metadata and launch arguments. The iDeck console identifies rejected native parameters under [iDeck native launch] EINVAL or [wine-launch]."
                 : "Execution Error: invalid Windows launch request (code 22). Check the executable format and launch arguments. The iDeck console identifies rejected native parameters under [iDeck native launch] EINVAL or [wine-launch]."
+        }
+        if status == Int(ENOMEM), let reason = WindowsEnvironment.lastPoolFailure {
+            return "Execution Error: " + reason
         }
         if status == Int(ENOMEM) {
             let machCode = ideck_wine_jit_pool_failure_mach_code()

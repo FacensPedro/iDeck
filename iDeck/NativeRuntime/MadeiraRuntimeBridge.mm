@@ -50,17 +50,11 @@ extern "C" int32_t ideck_runtime_prepare(const char *wine_prefix) {
 #if defined(IDECK_MADEIRA_D3D12_ENABLED) && IDECK_MADEIRA_D3D12_ENABLED
     if (!ideck_d3d12_available()) return ENOSYS;
 #endif
-    // CS_DEBUGGED alone can remain set after the JIT debugger detaches.
-    // Never enter upstream BRK #0xf00d without a live debugger or FEX pool.
-    if (!ideck_fex_jit_ready()) return EPERM;
-    if (!ideck_fex_initialize()) return EAGAIN;
-    // FEX may already have initialized its own pool even if StikDebug later
-    // detached; a new Wine pool still requires the live BRK handler. Report
-    // a permissions/debugger error instead of incorrectly calling this OOM.
-    if (!ideck_wine_jit_pool_ready() && !ideck_jit_debugger_attached()) return EPERM;
-    // Upstream Madeira requires RX/RW pool environment exports before __wine_main.
-    // Without these the first ARM64EC dispatcher faults on a non-executable PE page.
-    if (!ideck_wine_jit_pool_prepare() || !ideck_wine_jit_pool_ready()) return ENOMEM;
+    // As Madeira: the Wine pool (StikJITHelper.allocatePool, exported as
+    // WINE_IOS_JIT_*) exists before Wine starts, and the debugger has already
+    // detached (Madeira's early detach). FEX takes its code buffers from that
+    // pool inside Wine; no separate FEX pool is prepared here.
+    if (!ideck_wine_jit_pool_ready()) return ENOMEM;
     // HID devices must be published before wineserver loads its registry and
     // enumerates Plug and Play devices, not after Wine has started.
     ideck_gamepad_begin_session();
