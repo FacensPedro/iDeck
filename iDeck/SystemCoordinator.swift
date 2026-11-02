@@ -448,13 +448,9 @@ class SystemCoordinator: ObservableObject {
                 setWindowsStatus("Cannot request JIT: the bundled universal.js debugger script is missing.")
                 return
             }
-            // base64url: StikDebug decodes it, and it carries no "+", "/" or
-            // "=" that URL handling could reinterpret on the way.
-            let base64url = scriptData.base64EncodedString()
-                .replacingOccurrences(of: "+", with: "-")
-                .replacingOccurrences(of: "/", with: "_")
-                .replacingOccurrences(of: "=", with: "")
-            components.queryItems?.append(URLQueryItem(name: "script-data", value: base64url))
+            // As Madeira's StikJITHelper, line for line: the script as plain
+            // base64 in script-data.
+            components.queryItems?.append(URLQueryItem(name: "script-data", value: scriptData.base64EncodedString()))
         }
         guard let url = components.url else {
             setWindowsStatus("Cannot create StikDebug request.")

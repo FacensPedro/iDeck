@@ -1,304 +1,39 @@
-// Universal JIT Script, last updated 2026-29-03 (YYYY-DD-MM)
-/*
- // JIT "syscalls"
- __attribute__((noinline,optnone,naked))
- void JIT26Detach(void) {
-     asm("mov x16, #0 \n"
-         "brk #0xf00d \n"
-         "ret");
- }
- __attribute__((noinline,optnone,naked))
- void* JIT26PrepareRegion(void *addr, size_t len) {
-     asm("mov x16, #1 \n"
-         "brk #0xf00d \n"
-         "ret");
- }
+// Madeira JIT Script for StikDebug
+// Handles BRK #0xf00d (universal protocol) with x16-based command dispatch.
+//
+// ml346 (v2): soft-signal stops (EXC_SOFT_SIGNAL) forward the ORIGINAL signo
+// from medata[1] and are never guarded; raw fault stops forward a mapped
+// signal with a kill-not-detach last resort (detach leaves the task port
+// registered but unserviced -> parked threads).
+// ml345: only genuine BRK instructions are skipped (pc+4). The debugger holds
+// the TASK-level exception port, so every fault the app's own Mach handler
+// declines (KERN_FAILURE) lands HERE — the old "ALWAYS advance PC" behavior
+// skip-stepped real crashes instruction by instruction (and zeroed x0),
+// silently corrupting threads until they wandered into data (ml344: a
+// 4,000-fault +4 walk through shared-cache data ending in a bogus guest
+// exception). Non-BRK stops are now handed back to the process as a unix
+// signal so wine's sigaction handlers run; if the signal cannot be delivered
+// the script detaches so the process dies visibly instead of wandering.
 
- __attribute__((noinline,optnone,naked))
-void BreakSendJITScript(char* script, size_t len) {
-    asm("mov x16, #2 \n"
-        "brk #0xf00d \n"
-        "ret");
-}
- */
-const CMD_DETACH = 0;
-const CMD_PREPARE_REGION = 1;
-const CMD_NEW_BREAKPOINTS = 2;
-const CMD_MAP_PAGE_ZERO = 3;
-const commands = {
-    [CMD_DETACH]: JIT26Detach,
-    [CMD_PREPARE_REGION]: JIT26PrepareRegion,
-    [CMD_NEW_BREAKPOINTS]: JIT26NewBreakpoints,
-    [CMD_MAP_PAGE_ZERO]: JIT26MapPageZero
-};
-const legacyCommands = {
-    [0x68]: JIT26NewBreakpoints,
-    [0x69]: JIT26HandleBrk0x69,
-    [0xf00d]: JIT26HandleBrk0xf00d
-};
-
-// Log levels
-//const LOG_NONE = 0;
-const LOG_INFO = 1;
-const LOG_VERBOSE = 2;
-let logLevel = LOG_INFO;
-function log_verbose(msg) {
-    if (logLevel >= LOG_VERBOSE) {
-        log(msg);
-    }
-}
-
-// To avoid having to re-parse these in each function, we save some registers here
-let tid, x0, x1, x16, pc;
-let detached = false;
-let continuesWithSignal = true;
-let pid = get_pid();
-let attachResponse = send_command(`vAttach;${pid.toString(16)}`);
-
-log(`pid = ${pid}`);
-log(`attach_response = ${attachResponse}`);
-
-// Only BRK stops need this script. Wine signals constantly (thread suspend
-// and resume) and FEX relies on faults; making the debugger stop on each of
-// them costs several protocol round trips per event and, under load, lets
-// iOS's watchdog kill StikDebug (0x8BADF00D), taking the game down with it.
-// Both packets are best-effort (Madeira's madeira-jit.js does the same):
-//   QSetIgnoredExceptions: Mach faults go to the app's own handlers.
-//   QPassSignals: signals reach the process without stopping. SIGTRAP (5)
-//     is excluded because BRK arrives as SIGTRAP.
-{
-    const ignored = send_command(`QSetIgnoredExceptions:EXC_BAD_ACCESS;EXC_BAD_INSTRUCTION`);
-    log(`QSetIgnoredExceptions -> ${ignored || "(unsupported)"}`);
-    const signals = [];
-    for (let signal = 1; signal <= 31; signal++) {
-        if (signal !== 5) signals.push(signal.toString(16));
-    }
-    const passed = send_command(`QPassSignals:${signals.join(";")}`);
-    log(`QPassSignals -> ${passed || "(unsupported)"}`);
-}
-
-// Each log() line redraws StikDebug's UI; inside the stop loop use ulog(),
-// which stops printing after a fixed number of lines.
-let logBudget = 40;
-function ulog(msg) {
-    if (logBudget > 0) {
-        logBudget--;
-        log(msg);
-    }
-}
-
-function looksLikeStop(response) {
-    return typeof response === "string" && /^[TSWX]/.test(response);
-}
-
-// A stop packet returned by a continue we already sent (vCont;C answers
-// with the next stop, so it must not be followed by another `c`).
-let pending = null;
-    
-let totalBreakpoints = 0;
-while (!detached) {
-    totalBreakpoints++;
-    log_verbose(`Handling stop ${totalBreakpoints}`);
-
-    let brkResponse = pending !== null ? pending : send_command(`c`);
-    pending = null;
-    log_verbose(`brkResponse = ${brkResponse}`);
-    if (/^[WX]/.test(brkResponse || "")) {
-        log(`Process exited: ${brkResponse}`);
-        break;
-    }
-    
-    // extract tid, pc, x16
-    let tmpMatch = /T[0-9a-f]+thread:(?<tid>[0-9a-f]+);/.exec(brkResponse);
-    tid = tmpMatch ? tmpMatch.groups['tid'] : null;
-    tmpMatch = /20:(?<reg>[0-9a-f]{16});/.exec(brkResponse);
-    pc = tmpMatch ? tmpMatch.groups['reg'] : null;
-    tmpMatch = /10:(?<reg>[0-9a-f]{16});/.exec(brkResponse);
-    x16 = tmpMatch ? tmpMatch.groups['reg'] : null;
-    if (!tid || !pc || !x16) {
-        ulog(`Failed to extract registers: tid=${tid}, pc=${pc}, x16=${x16}`);
-        continue;
-    }
-    pc = littleEndianHexStringToNumber(pc);
-    x16 = littleEndianHexStringToNumber(x16);
-    
-    let instructionResponse = send_command(`m${pc.toString(16)},4`);
-    log_verbose(`instruction at pc: ${instructionResponse}`);
-    let instrU32 = littleEndianHexToU32(instructionResponse);
-
-    // check if this is a brk
-    if ((instrU32 & 0xFFE0001F)>>>0 != 0xD4200000) {
-        log_verbose(`Skipping: instruction was not a brk (was 0x${instrU32.toString(16)})`);
-        if (continuesWithSignal) {
-            let signum = /^T(?<sig>[a-z0-9;]{2})/.exec(brkResponse);
-            signum = signum ? signum.groups['sig'] : null;
-            if (!signum) {
-                ulog(`Failed to extract signal number: ${signum}`);
-                continue;
-            }
-            log_verbose(`Continuing with signal 0x${signum}`);
-            // Continue (not single-step) with the signal; the reply is the
-            // next stop, which the loop handles without another `c`.
-            const resumed = send_command(`vCont;C${signum}:${tid};c`);
-            if (looksLikeStop(resumed)) pending = resumed;
-        }
-        continue;
-    }
-    
-    let brkImmediate = extractBrkImmediate(instrU32);
-    log_verbose(`BRK immediate: 0x${brkImmediate.toString(16)} (${brkImmediate})`);
-    if (legacyCommands[brkImmediate] != undefined) {
-        // when we find a valid brk immediate command, parse x0 and x1
-        tmpMatch = /00:(?<reg>[0-9a-f]{16});/.exec(brkResponse);
-        x0 = tmpMatch ? tmpMatch.groups['reg'] : null;
-        tmpMatch = /01:(?<reg>[0-9a-f]{16});/.exec(brkResponse);
-        x1 = tmpMatch ? tmpMatch.groups['reg'] : null;
-        if (!x0 || !x1) {
-            ulog(`Failed to extract registers: x0=${x0}, x1=${x1}`);
-            continue;
-        }
-        x0 = littleEndianHexStringToNumber(x0);
-        x1 = littleEndianHexStringToNumber(x1);
-        
-        // jump over brk
-        let pcPlus4 = numberToLittleEndianHexString(pc + 4n);
-        let pcPlus4Response = send_command(`P20=${pcPlus4};thread:${tid};`);
-        log_verbose(`pcPlus4Response = ${pcPlus4Response}`);
-        
-        // dispatch brk-immediate command
-        const command = legacyCommands[brkImmediate];
-        command(brkResponse);
-    } else {
-        ulog(`Skipping breakpoint: brk immediate 0x${brkImmediate.toString(16)} was not handled by this script. You could add it by evaluating legacyCommands[0x${brkImmediate.toString(16)}] = yourFunction;`);
-        continue;
-    }
-}
-
-function JIT26Detach() {
-    let detachResponse = send_command(`D`);
-    log_verbose(`detachResponse = ${detachResponse}`);
-    detached = true;
-}
-
-// brk 0x68
-function JIT26NewBreakpoints(brkResponse) {
-    let instructionResponse = send_command(`m${pc.toString(16)},4`);
-    log_verbose(`instruction at pc: ${instructionResponse}`);
-    let instrU32 = littleEndianHexToU32(instructionResponse);
-    let brkImmediate = extractBrkImmediate(instrU32);
-    
-    let memResponse = send_command(`m${x0.toString(16)},${x1}`);
-
-    let scriptText = hexToAscii(memResponse);
-    log_verbose(`Script text: ${scriptText}`);
-
-    const res = runScriptAndCapture(scriptText);
-    if (res.ok) {
-        log('Script succeeded:', res.value);
-    } else {
-        log('Script failed:', res.name, res.message);
-        log(res.stack);
-    }
-}
-
-// brk 0x69
-function JIT26HandleBrk0x69(brkResponse) {
-    // in the old script we chose 0x69, so now we check here and return error
-    // if you wish to keep using this, you can set your own handler like `legacyCommands[0x69] = yourHandler;` using BreakSendJITScript
-    log(`Error: It seems you are using legacy breakpoint 0x69. Please set your legacy handler using \`legacyCommands[0x69] = yourHandler;\` or migrate to universal jitcalls to use this script. The function will now return 0xE0000069.`);
-    let putX0Response = send_command(`P0=E0000069;thread:${tid};`);
-    log(`putX0Response = ${putX0Response}`);
-}
-
-// brk 0xf00d
-function JIT26HandleBrk0xf00d(brkResponse) {
-    // dispatch command via x16
-    const command = commands[x16];
-    if (command === undefined) {
-        log(`Unknown command ${x16.toString(16)}`);
-        return;
-    }
-    log_verbose(`Invoking command ${x16.toString(16)}`);
-    command(brkResponse);
-}
-
-function JIT26PrepareRegion(brkResponse) {
-    let jitPageAddress = x0;
-    if (x0 === 0n && x1 > 0n) {
-        const response = send_command(`_M${x1.toString(16)},rx`);
-        const address = typeof response === "string" ? response.trim().replace(/^0x/i, "") : "";
-        if (/^[0-9a-fA-F]{1,16}$/.test(address)) {
-            const candidate = BigInt("0x" + address);
-            // StikDebug's _M may return a GDB error such as E22. Never
-            // interpret it as a successful tiny address or return stale x0.
-            if (candidate >= 0x100000000n && candidate % 0x4000n === 0n) {
-                jitPageAddress = candidate;
-            }
-        }
-        if (jitPageAddress === 0n) {
-            log(`Failed to allocate JIT RX for size 0x${x1.toString(16)} (debugger reply: ${response})`);
-        }
-    }
-
-    if (jitPageAddress !== 0n && x1 > 0n) {
-        try {
-            const result = prepare_memory_region(jitPageAddress, x1);
-            log_verbose(`prepare_memory_region returned ${result}`);
-            if (result === false ||
-                (typeof result === "string" && /^E[0-9a-f]+$/i.test(result))) {
-                log(`Failed to prepare RX memory: debugger replied ${result}`);
-                jitPageAddress = 0n;
-            }
-        } catch (error) {
-            // Never return an RX address when the debugger explicitly failed
-            // to prepare that memory. The host must not attempt to use it.
-            log(`Failed to prepare RX memory: ${error}`);
-            jitPageAddress = 0n;
-        }
-    }
-
-    const reply = send_command(`P0=${numberToLittleEndianHexString(jitPageAddress)};thread:${tid};`);
-    log_verbose(`JIT allocation RX=0x${jitPageAddress.toString(16)} reply=${reply}`);
-}
-
-// Madeira's ARM64EC init_syscall_frame requests command 3. Never leave x0
-// unchanged: a stale address would be mistaken for a successful page-zero map.
-function JIT26MapPageZero(brkResponse) {
-    let success = 0n;
-    if (x0 !== 0n && x1 !== 0n) {
-        const tebOffset = x0 & 0x3fffn;
-        const tebData = send_command(`m${x0.toString(16)},100`);
-        if (/^(?:[a-fA-F0-9]{2})+$/.test(tebData) && tebData.length === 0x200) {
-            const response = send_command(`M${tebOffset.toString(16)},100:${tebData}`);
-            if (response === "OK") success = 1n;
-        }
-    }
-    send_command(`P0=${numberToLittleEndianHexString(success)};thread:${tid};`);
-    log(`Madeira page-zero request: success=${success}`);
-}
-
-// utilities
 function littleEndianHexStringToNumber(hexStr) {
-    if (!/^[0-9a-fA-F]{16}$/.test(hexStr)) {
-        throw new Error("Expected exactly eight register bytes");
+    const bytes = [];
+    for (let i = 0; i < hexStr.length; i += 2) {
+        bytes.push(parseInt(hexStr.substr(i, 2), 16));
     }
-    let value = 0n;
+    let num = 0n;
     for (let i = 7; i >= 0; i--) {
-        value = (value << 8n) | BigInt(parseInt(hexStr.slice(i * 2, i * 2 + 2), 16));
+        num = (num << 8n) | BigInt(bytes[i] || 0);
     }
-    return value;
+    return num;
 }
 
-function numberToLittleEndianHexString(value) {
-    if (typeof value !== "bigint" || value < 0n || value > 0xffffffffffffffffn) {
-        throw new Error("Register value must be an unsigned 64-bit bigint");
-    }
+function numberToLittleEndianHexString(num) {
     const bytes = [];
     for (let i = 0; i < 8; i++) {
-        bytes.push(Number(value & 0xffn).toString(16).padStart(2, "0"));
-        value >>= 8n;
+        bytes.push(Number(num & 0xFFn));
+        num >>= 8n;
     }
-    return bytes.join("");
+    return bytes.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
 function littleEndianHexToU32(hexStr) {
@@ -309,58 +44,288 @@ function extractBrkImmediate(u32) {
     return (u32 >> 5) & 0xFFFF;
 }
 
-function hexToAscii(hexStr) {
-    let str = '';
-    for (let i = 0; i < hexStr.length; i += 2) {
-        const byte = parseInt(hexStr.substr(i, 2), 16);
-        if (byte === 0) break;
-        str += String.fromCharCode(byte);
-    }
-    return str;
-}
+let pid = get_pid();
+log(`Madeira JIT: pid = ${pid}`);
+let attachResponse = send_command(`vAttach;${pid.toString(16)}`);
+log(`Madeira JIT: attached = ${attachResponse}`);
 
-function runScriptAndCapture(scriptText) {
-    try {
-        const value = eval(scriptText);
-        return { ok: true, value };
-    } catch (err) {
-        return {
-            ok: false,
-            name: err && err.name,
-            message: err && err.message,
-            stack: err && err.stack
-        };
-    }
-}
-
-// For making your own script / adding your own breakpoints. you can send this string to BreakSendJITScript and it'll add it for any subsequent breakpoints
-// x0, x1, x16, pc and tid are global variables. If you need more registers, parse them like:
-// tmpMatch = /02:(?<reg>[0-9a-f]{16});/.exec(brkResponse); // x2
-// let x2 = tmpMatch ? tmpMatch.groups['reg'] : null;
-// if (!x2) {
-//     log(`Failed to extract registers: x2=${x2}`);
-//     return;
-// }
-// x2 = littleEndianHexStringToNumber(x2);
+// ml355: STOP SERVICING ANYTHING BUT BRK.
 //
-/*
-commands[3] = wowBreakPoint;
+// Every signal and fault stop costs several synchronous protocol round-trips
+// on StikDebug's side. Wine signals constantly (thread suspend/resume), so the
+// v2 script burned 27s CPU in ~60s and iOS killed StikDebug itself with the
+// scene-update watchdog (0x8BADF00D) — which tore down the debug session and
+// left Madeira to be SIGKILLed with no crash report. That is the "instant
+// vanish, empty StikDebug log" the user kept seeing.
+//
+// Both packets below are best-effort; on an older stub they simply fail and
+// the fault/signal paths further down still work as before.
+//   QSetIgnoredExceptions — debugserver stops intercepting these Mach
+//     exceptions, so they reach the app's OWN handlers (wine registers
+//     thread-level ports for BAD_ACCESS+BAD_INSTRUCTION, and anything it
+//     declines becomes a normal BSD signal into wine's sigaction handlers).
+//   QPassSignals — deliver signals to the inferior without stopping. SIGTRAP
+//     is deliberately EXCLUDED: BRK arrives that way and is our whole job.
+{
+    let ign = send_command(`QSetIgnoredExceptions:EXC_BAD_ACCESS;EXC_BAD_INSTRUCTION`);
+    log(`Madeira JIT: QSetIgnoredExceptions -> ${ign || '(unsupported)'}`);
+    let sigs = [];
+    for (let s = 1; s <= 31; s++) if (s !== 5) sigs.push(s.toString(16));
+    let pass = send_command(`QPassSignals:${sigs.join(';')}`);
+    log(`Madeira JIT: QPassSignals -> ${pass || '(unsupported)'}`);
+}
 
-function wowBreakPoint(brekpoint) {
-    let instructionResponse = send_command(`m${pc.toString(16)},4`);
-    log_verbose(`instruction at pc: ${instructionResponse}`);
-    let instrU32 = littleEndianHexToU32(instructionResponse);
-    let brkImmediate = extractBrkImmediate(instrU32);
-    
-    if (x0 == 0n && x1 == 0n) {
-        return;
+let detached = false;
+let pending = null;        // stop packet returned by a continue we already sent
+let lastFaultKey = null;   // "tid:pc" of the last non-BRK stop
+let faultRepeats = 0;
+let faultLogs = 0;
+let sigLogs = 0;
+// Hard ceiling on UI log lines: each log() drives a SwiftUI update, and it is
+// scene-update stalls that the watchdog kills for. Use ulog() everywhere
+// inside the stop loop; bare log() only for the few startup lines.
+let logBudget = 40;
+function ulog(msg) { if (logBudget > 0) { logBudget--; log(msg); } }
+
+function looksLikeStop(resp) {
+    return typeof resp === 'string' && /^[TSWX]/.test(resp);
+}
+
+// Forward a unix signal to the stopped thread and remember the next stop.
+// Returns true if the continue was accepted.
+function forwardSignal(sig, tid) {
+    let sigHex = sig.toString(16).padStart(2, '0');
+    let resp = send_command(`vCont;C${sigHex}:${tid};c`);
+    if (!looksLikeStop(resp)) {
+        resp = send_command(`C${sigHex}`);
+    }
+    if (looksLikeStop(resp)) {
+        pending = resp;
+        return true;
+    }
+    return false;
+}
+
+while (!detached) {
+    let brkResponse = pending !== null ? pending : send_command(`c`);
+    pending = null;
+
+    // W/X = inferior exited; nothing left to debug.
+    if (typeof brkResponse === 'string' && /^[WX]/.test(brkResponse)) {
+        ulog(`Madeira JIT: inferior exited (${brkResponse})`);
+        detached = true;
+        continue;
     }
 
-    let jitPageAddress = x0;
-    let prepareJITPageResponse = prepare_memory_region(jitPageAddress, x1);
-    log(`prepareJITPageResponse = ${prepareJITPageResponse}`);
+    let tidMatch = /T[0-9a-f]+thread:(?<tid>[0-9a-f]+);/.exec(brkResponse);
+    let tid = tidMatch ? tidMatch.groups['tid'] : null;
+    let pcMatch = /20:(?<reg>[0-9a-f]{16});/.exec(brkResponse);
+    let pc = pcMatch ? pcMatch.groups['reg'] : null;
 
-    let putX0Response = send_command(`P0=${numberToLittleEndianHexString(jitPageAddress)};thread:${tid};`);
-    log(`putX0Response = ${putX0Response}`);
+    if (!tid || !pc) {
+        ulog(`Madeira JIT: failed to parse, continuing`);
+        continue;
+    }
+
+    let pcNum = littleEndianHexStringToNumber(pc);
+
+    // medata values are hex WITHOUT 0x prefix (ml345 run: EXC_SOFT_SIGNAL
+    // printed as "10003"). metype is a small integer, same either way.
+    let metypeMatch = /metype:([0-9a-f]+);/.exec(brkResponse);
+    let metype = metypeMatch ? parseInt(metypeMatch[1], 16) : 0;
+    let medata = [];
+    let mre = /medata:([0-9a-fx]+);/g, mm;
+    while ((mm = mre.exec(brkResponse)) !== null) medata.push(parseInt(mm[1], 16));
+
+    // EXC_SOFTWARE / EXC_SOFT_SIGNAL (metype 5, medata[0]=0x10003): the
+    // kernel is routing a unix SIGNAL through the debugger — pthread_kill,
+    // wine's suspend signals, fault-conversion signals, all of it. This is
+    // not a fault and not ours to judge: forward the ORIGINAL signo
+    // (medata[1]) untouched, never count repeats (wine legitimately retries
+    // same-pc faults), never detach. v1 misdelivered these as SIGSEGV and
+    // then detached on wine's boot-time retry loop (ml345).
+    if (metype === 5) {
+        let signo = (medata.length > 1 && medata[1] >= 1 && medata[1] <= 31) ? medata[1] : 0;
+        if (sigLogs < 8 || (sigLogs % 500) === 0) {
+            ulog(`Madeira JIT: soft-signal tid=${tid} pc=0x${pcNum.toString(16)} ` +
+                `signo=${signo || '?'} (#${sigLogs})`);
+        }
+        sigLogs++;
+        if (signo === 0 || !forwardSignal(signo, tid)) {
+            // Unknown signo or C unsupported: plain continue and trust the
+            // stub to deliver the pending signal on resume.
+            let resp = send_command(`c`);
+            if (looksLikeStop(resp)) pending = resp;
+        }
+        continue;
+    }
+
+    let instrHex = send_command(`m${pcNum.toString(16)},4`);
+    let insnOk = typeof instrHex === 'string' && /^[0-9a-fA-F]{8}$/.test(instrHex);
+    let instrU32 = insnOk ? littleEndianHexToU32(instrHex) : 0;
+    // BRK #imm16 = 1101 0100 001 imm16 00000
+    let isBrk = insnOk && ((instrU32 & 0xFFE0001F) >>> 0) === 0xD4200000;
+
+    if (!isBrk) {
+        // A raw fault stop escalated past the app's Mach handler. Never skip
+        // it. Deliver it back to the process as a unix signal so the app's
+        // sigaction handlers (wine segv/bus/ill) get an honest shot at it.
+        let key = `${tid}:${pc}`;
+        faultRepeats = (key === lastFaultKey) ? faultRepeats + 1 : 1;
+        lastFaultKey = key;
+
+        let kcode = medata.length > 0 ? medata[0] : 0;
+
+        // EXC_RESOURCE (metype 11) is a task-level advisory, not a thread
+        // fault — MEMORY/HIGH_WATERMARK fires when phys_footprint crosses
+        // the jetsam limit (kcode bits 12:0 = limit in MB; ml359 saw 4096).
+        // The old default injected SIGSEGV into whatever thread the stop
+        // named, crashing an innocent thread at the worst moment. Log and
+        // resume with no signal.
+        if (metype === 11) {
+            ulog(`Madeira JIT: EXC_RESOURCE tid=${tid} kcode=${kcode.toString(16)} ` +
+                `(memory HWM ${kcode & 0x1fff} MB?) — continuing, no signal`);
+            let resp = send_command(`c`);
+            if (looksLikeStop(resp)) pending = resp;
+            continue;
+        }
+
+        let sig = 11;                                  // SIGSEGV default
+        if (metype === 1) sig = (kcode === 1) ? 11 : 10; // BAD_ACCESS: INVALID→SEGV, PROT→BUS
+        else if (metype === 2) sig = 4;                // BAD_INSTRUCTION → SIGILL
+        else if (metype === 3) sig = 8;                // ARITHMETIC → SIGFPE
+        else if (metype === 6) sig = 5;                // BREAKPOINT (non-BRK) → SIGTRAP
+
+        if (faultLogs < 16) {
+            faultLogs++;
+            ulog(`Madeira JIT: fault (not BRK) tid=${tid} pc=0x${pcNum.toString(16)} ` +
+                `insn=${insnOk ? instrU32.toString(16).padStart(8, '0') : `<${instrHex}>`} ` +
+                `metype=${metype} kcode=${kcode.toString(16)} -> sig ${sig} (repeat ${faultRepeats})`);
+        }
+
+        // NEVER detach here: with the StikDebug window still open the task
+        // exception port stays registered but unserviced, and every later
+        // escalated fault parks its thread forever (ml345 wedged steam.exe's
+        // main thread exactly this way). If the fault truly cannot be
+        // delivered, kill the inferior — a visible death with logs intact.
+        if (faultRepeats >= 8) {
+            ulog(`Madeira JIT: fault at pc=0x${pcNum.toString(16)} undeliverable after ` +
+                `${faultRepeats} tries — killing inferior (visible death beats a parked thread)`);
+            send_command(`k`);
+            detached = true;
+            continue;
+        }
+
+        if (!forwardSignal(sig, tid)) {
+            // Forwarding rejected: plain continue; if the same stop recurs
+            // the guard above eventually kills.
+            let resp = send_command(`c`);
+            if (looksLikeStop(resp)) pending = resp;
+        }
+        continue;
+    }
+
+    // Genuine BRK from here on — the protocol path.
+    lastFaultKey = null;
+    faultRepeats = 0;
+
+    let brkImm = extractBrkImmediate(instrU32);
+
+    // Advance PC past the BRK so it cannot re-fire
+    let pcPlus4 = numberToLittleEndianHexString(pcNum + 4n);
+    send_command(`P20=${pcPlus4};thread:${tid};`);
+
+    let x16Match = /10:(?<reg>[0-9a-f]{16});/.exec(brkResponse);
+    let x16 = x16Match ? x16Match.groups['reg'] : null;
+
+    // Skip unknown BRK immediates (PC already advanced)
+    if ((brkImm !== 0xf00d && brkImm !== 0x69) || !x16) {
+        // Set x0=0 (failure/skip indicator) so app's SIGTRAP fallback works
+        send_command(`P0=${numberToLittleEndianHexString(0n)};thread:${tid};`);
+        continue;
+    }
+
+    ulog(`Madeira JIT: BRK #0x${brkImm.toString(16)}`);
+
+    // Parse x0 and x1
+    let x0Match = /00:(?<reg>[0-9a-f]{16});/.exec(brkResponse);
+    let x1Match = /01:(?<reg>[0-9a-f]{16});/.exec(brkResponse);
+    let x0 = x0Match ? littleEndianHexStringToNumber(x0Match.groups['reg']) : 0n;
+    let x1 = x1Match ? littleEndianHexStringToNumber(x1Match.groups['reg']) : 0n;
+    let x16Num = littleEndianHexStringToNumber(x16);
+
+    if (brkImm === 0xf00d) {
+        ulog(`Madeira JIT: x16 = ${x16Num}`);
+
+        if (x16Num === 0n) {
+            // CMD_DETACH
+            ulog(`Madeira JIT: detach`);
+            send_command(`D`);
+            detached = true;
+
+        } else if (x16Num === 1n) {
+            // CMD_PREPARE_REGION
+            ulog(`Madeira JIT: prepare addr=0x${x0.toString(16)} size=0x${x1.toString(16)}`);
+
+            let addr = x0;
+            if (x0 === 0n && x1 !== 0n) {
+                let allocResp = send_command(`_M${x1.toString(16)},rx`);
+                if (allocResp && allocResp.length > 0) {
+                    addr = BigInt(`0x${allocResp}`);
+                    ulog(`Madeira JIT: allocated at 0x${addr.toString(16)}`);
+                }
+            }
+
+            if (addr !== 0n && x1 !== 0n) {
+                let prepResp = prepare_memory_region(addr, x1);
+                ulog(`Madeira JIT: prepared = ${prepResp}`);
+            }
+
+            send_command(`P0=${numberToLittleEndianHexString(addr)};thread:${tid};`);
+
+        } else if (x16Num === 3n) {
+            // CMD_MAP_PAGE_ZERO: Map a page at address 0 with TEB data.
+            // x0 = TEB address, x1 = size (0x4000 = 16KB iOS page)
+            // The app can't map page 0 itself (kernel refuses). The debugger
+            // may have different privileges to create this mapping.
+            ulog(`Madeira JIT: map page zero, TEB=0x${x0.toString(16)} size=0x${x1.toString(16)}`);
+
+            let success = 0n;
+
+            // Try allocating RW memory at address 0 via _M with fixed address
+            // StikDebug's _M command: _M<size>,<perms> — but doesn't support fixed addr
+            // Try GDB memory allocation: mmap via the debugger's task port
+            // Use vCont or direct Mach calls if available
+
+            // Approach 1: Try writing TEB data to address 0 directly.
+            // If the hardware zero page is writable via the debugger, this works.
+            if (x0 !== 0n && x1 !== 0n) {
+                // Read TEB data from the app's memory
+                let tebPage = x0 & ~0x3FFFn;  // align to 16KB page
+                let tebOff = x0 - tebPage;
+
+                // Try to write TEB data at address 0 via GDB M command
+                // Read 256 bytes from TEB (enough for PEB pointer at offset 0x60)
+                let tebData = send_command(`m${x0.toString(16)},100`);
+                if (tebData && tebData.length > 0) {
+                    // Write it to address 0+tebOff
+                    let writeResp = send_command(`M${tebOff.toString(16)},${(tebData.length/2).toString(16)}:${tebData}`);
+                    ulog(`Madeira JIT: write TEB to page0 offset 0x${tebOff.toString(16)}: ${writeResp}`);
+                    if (writeResp === 'OK') {
+                        success = 1n;
+                    }
+                }
+            }
+
+            send_command(`P0=${numberToLittleEndianHexString(success)};thread:${tid};`);
+        }
+
+    } else if (brkImm === 0x69) {
+        // Legacy protocol
+        ulog(`Madeira JIT: legacy BRK 0x69, x0=0x${x0.toString(16)}`);
+        if (x0 !== 0n) {
+            prepare_memory_region(x0, x0);
+        }
+        send_command(`P0=${numberToLittleEndianHexString(x0)};thread:${tid};`);
+    }
 }
-*/
