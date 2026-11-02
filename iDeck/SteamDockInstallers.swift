@@ -472,6 +472,31 @@ enum DockInstallScripts {
 // Steam game loads. Only exit codes 0, 3010 and 1641 are recorded as done.
 // A session must finish and the wineserver must stop before .reg files change.
 enum IDeckSteamDockInstallers {
+    /// Ported from Madeira's DockInstallers.placeDotNetFusion: an installer with a
+    /// managed step (DirectX setup's is one) loads fusion.dll from the .NET 2.0
+    /// framework folder through mscoree. Wine normally gets that file from its Mono
+    /// package; without it such a setup ended with -9. Before a session that runs
+    /// installers, Wine's own builtin 32-bit fusion.dll is placed there, only when
+    /// missing. Returns "placed", "present", "no-source" or "failed".
+    static func placeDotNetFusion(drive: URL, source: URL?) -> String {
+        let fm = FileManager.default
+        let folder = drive.appendingPathComponent("windows/Microsoft.NET/Framework/v2.0.50727", isDirectory: true)
+        let target = folder.appendingPathComponent("fusion.dll")
+        if fm.fileExists(atPath: target.path) { return "present" }
+        guard let source, fm.fileExists(atPath: source.path) else { return "no-source" }
+        do {
+            try fm.createDirectory(at: folder, withIntermediateDirectories: true)
+            try fm.copyItem(at: source, to: target)
+            return "placed"
+        } catch { return "failed" }
+    }
+
+    /// Madeira's installSessionDroppedKeys: the game's lines a session of one-time
+    /// installs runs without. Social Club's layout 2 and RDR2's hold take the 4 GB
+    /// slots 32-bit programs run in, so the Visual C++ setups' second 32-bit
+    /// process could not start.
+    static let installSessionDroppedKeys: Set<String> = ["env.MADEIRA_SC_PA_POOLS", "env.MADEIRA_RDR2_VA_HOLD"]
+
     struct Stage {
         let command: URL
         let appID: UInt32

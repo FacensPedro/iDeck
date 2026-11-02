@@ -523,6 +523,7 @@ enum Translations {
         "Reduced-precision x87": ["pt": "x87 de precisão reduzida", "es": "x87 de precisión reducida"],
         "Frame generation": ["pt": "Geração de quadros", "es": "Generación de fotogramas"],
         "Report an NVIDIA GPU": ["pt": "Informar GPU NVIDIA", "es": "Informar GPU NVIDIA"],
+        "Execution Error: restart iDeck to start another game: swipe iDeck away in the app switcher, then open it again.": ["pt": "Erro de execução: reinicie o iDeck para abrir outro jogo: feche o iDeck no alternador de apps e abra de novo.", "es": "Error de ejecución: reinicia iDeck para abrir otro juego: cierra iDeck en el selector de apps y vuelve a abrirlo."],
         "Pause games in the background": ["pt": "Pausar jogos em segundo plano", "es": "Pausar juegos en segundo plano"],
         "Direct3D 12": ["pt": "Direct3D 12", "es": "Direct3D 12"],
         "OpenGL": ["pt": "OpenGL", "es": "OpenGL"],
