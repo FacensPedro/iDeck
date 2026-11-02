@@ -36,6 +36,8 @@ struct SteamDownloadProgress: Equatable, Sendable {
     var pcDropped = false
     /// Bytes the PC has sent so far in this run.
     var pcBytes: UInt64 = 0
+    /// iDeck: uncompressed bytes of the game on disk so far (the real installed size).
+    var installedBytes: UInt64 = 0
 
     var fraction: Double { totalBytes > 0 ? min(1, Double(doneBytes) / Double(totalBytes)) : 0 }
 }
@@ -97,11 +99,16 @@ final class DepotDownloader {
     /// the calling task is cancelled; completed chunks stay journaled.
     func install(_ app: SteamAppInfo, steamApps: URL,
                  ownedDepots: @escaping () async -> Set<UInt32>? = { nil },
+                 onlyDLC: Set<UInt32> = [],
                  progress report: @escaping (SteamDownloadProgress) -> Void) async throws -> URL {
+        // iDeck: `onlyDLC` installs just those DLC apps' depots into an installed game.
+        let dlcOnly = !onlyDLC.isEmpty
         // DLC depots come along when the account's licenses include them.
         var ownedDLC: Set<UInt32> = []
         if app.depots.contains(where: { $0.dlcAppID != nil }) { ownedDLC = await ownedDepots() ?? [] }
-        let depots = app.installDepots(ownedDLC: ownedDLC)
+        let depots = dlcOnly
+            ? app.installDepots(ownedDLC: ownedDLC.union(onlyDLC)).filter { $0.dlcAppID.map(onlyDLC.contains) == true }
+            : app.installDepots(ownedDLC: ownedDLC)
         guard !depots.isEmpty else { throw SteamError.depotNotFound(app.appID) }
         // Before the key requests, so a refused depot still has its selection logged.
         SteamLog.event("[steam-depot] selection app=\(app.appID) build=\(app.branchBuildID) branch=\(app.branch) language=\(app.depotLanguage)/\(app.gameLanguage) \(app.depotSelectionSummary(ownedDLC: ownedDLC))")
@@ -170,7 +177,7 @@ final class DepotDownloader {
         // into the owner's own folder, as Valve's client installs them. Optional:
         // a depot that cannot be planned is logged and left out.
         var redistDepots: [SteamAppInfo.DepotInfo] = []
-        for depot in app.redistDepots() {
+        for depot in (dlcOnly ? [] : app.redistDepots()) {
             try Task.checkCancellation()
             guard let gid = depot.publicManifestID, let ownerID = depot.fromApp,
                   let owner = app.sharedOwners[ownerID] else { continue }
@@ -227,6 +234,7 @@ final class DepotDownloader {
             + "parse-ms=\(ms(stats.parseSeconds)) files-ms=\(ms(Date().timeIntervalSince(filesStarted))) files=\(prepared.fileCount)")
         state.totalBytes = prepared.totalBytes
         state.doneBytes = prepared.doneBytes
+        state.installedBytes = prepared.totalUncompressed &- prepared.remainingUncompressed
         state.phase = .downloading
         report(state)
         SteamLog.event("[steam-depot] install begin app=\(app.appID) depots=\(plans.count) files=\(prepared.fileCount) resume=\(prepared.doneBytes > 0 ? 1 : 0)")
@@ -249,6 +257,12 @@ final class DepotDownloader {
         // only the chunks that do not match are downloaded below.
         var work = prepared.pending
         try await checkExisting(plans: plans, prepared: prepared, work: &work, state: &state, report: report)
+        // iDeck: what remains to write after the check, uncompressed.
+        var pendingUncompressed: UInt64 = 0
+        for (index, plan) in plans.enumerated() {
+            for item in work[index] { pendingUncompressed += UInt64(plan.manifest.files[item.file].chunks[item.chunk].uncompressedSize) }
+        }
+        state.installedBytes = prepared.totalUncompressed &- min(pendingUncompressed, prepared.totalUncompressed)
 
         // 3. Chunks: from a PC on this network first when one answers
         // (SteamLANPeer), from the content servers for the rest. Speed counts
@@ -291,12 +305,14 @@ final class DepotDownloader {
                     let path = paths[item.file]
                     group.addTask {
                         try await Self.fetchChunk(chunk, plan: plan, peer: peer, path: path, attempts: attempts, seed: item.file &+ item.chunk)
-                        return (item.key, UInt64(chunk.compressedSize), false)
+                        return (item.key, UInt64(chunk.compressedSize) | (UInt64(chunk.uncompressedSize) << 32), false)
                     }
                 }
                 for _ in 0..<min(maximum, work.count) { enqueue() }
-                for try await (key, bytes, reused) in group {
+                for try await (key, sizes, reused) in group {
                     journal.append(key)
+                    let bytes = sizes & 0xFFFF_FFFF
+                    state.installedBytes += sizes >> 32
                     state.doneBytes += bytes
                     if reused { state.reusedBytes += bytes }
                     let now = Date()
@@ -343,6 +359,24 @@ final class DepotDownloader {
                 .map { $0.filename.replacingOccurrences(of: "/", with: "\\") }
         }
         if !custom.isEmpty { SteamLog.event("[steam-record] custom-executables app=\(app.appID) custom=\(custom.count)") }
+        if dlcOnly {
+            // iDeck: the game's own record stays; the DLC is recorded beside it.
+            let common = steamApps.appendingPathComponent("common", isDirectory: true).standardizedFileURL.path
+            var files: [String] = []
+            for index in plans.indices {
+                for fileIndex in prepared.paths[index].indices {
+                    let path = prepared.paths[index][fileIndex]
+                    guard !path.isEmpty, !prepared.existing[index][fileIndex], path.hasPrefix(common + "/") else { continue }
+                    files.append(String(path.dropFirst(common.count + 1)))
+                }
+            }
+            for dlcID in onlyDLC {
+                try SteamDLCRecords.markInstalled(parentID: app.appID, dlcID: dlcID, files: files, steamApps: steamApps)
+            }
+            try? FileManager.default.removeItem(at: journalDir)
+            SteamLog.event("[steam-dlc] dlc-only install complete app=\(app.appID) dlc=\(onlyDLC.sorted())")
+            return installURL
+        }
         try AppManifestWriter.writeManifest(
             appID: app.appID, name: app.name, installDir: folderName, buildID: app.branchBuildID,
             steamID: accountID, sizeOnDisk: prepared.totalUncompressed,

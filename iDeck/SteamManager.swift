@@ -396,7 +396,9 @@ final class SteamOwnedGamesModel: ObservableObject {
             try Task.checkCancellation()
             outcome = .completed
             installedApps.insert(appID)
-            
+            if let measuredSize = downloadProgress[appID]?.installedBytes, measuredSize > 0 {
+                installedSizes[appID] = measuredSize
+            }
             downloadErrors[appID] = nil
         } catch {
             let cancelled = Task.isCancelled || error is CancellationError
@@ -462,6 +464,7 @@ final class SteamOwnedGamesModel: ObservableObject {
             try FileManager.default.createDirectory(at: steamApps, withIntermediateDirectories: true)
             _ = try await downloader.install(app, steamApps: steamApps,
                 ownedDepots: { [weak self] in try? await self?.fetcher.ownedDepotIDs() },
+                onlyDLC: [dlcAppID],
                 progress: { [weak self] progress in
                     self?.downloadProgress[appID] = progress
                     BackgroundDownloads.steam.progress(done: progress.doneBytes, total: progress.totalBytes)
