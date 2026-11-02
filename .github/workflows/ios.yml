@@ -156,6 +156,7 @@ jobs:
         run: |
           bash -n scripts/link_madeira_native.sh
           python3 -m unittest discover -s tests/host -p 'test_madeira_native_duplicate_symbols.py' -v
+          python3 -m unittest discover -s tests/host -p 'test_native_ipa_symbol_collisions.py' -v
 
 
       - name: Test native performance C++ modules
