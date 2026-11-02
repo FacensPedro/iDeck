@@ -507,6 +507,17 @@ jobs:
         if: ${{ env.IDECK_NATIVE_BUILD == '1' && steps.madeira_kit.outputs.available != 'true' }}
         run: bash scripts/ensure_metal_toolchain.sh
 
+      - name: Provide llvm-objcopy for Wine link preparation
+        if: ${{ env.IDECK_NATIVE_BUILD == '1' }}
+        run: |
+          set -euo pipefail
+          if command -v llvm-objcopy >/dev/null 2>&1 || xcrun -f llvm-objcopy >/dev/null 2>&1 \
+             || ls /opt/homebrew/opt/llvm*/bin/llvm-objcopy >/dev/null 2>&1; then
+            exit 0
+          fi
+          HOMEBREW_NO_AUTO_UPDATE=1 brew install llvm
+          echo "IDECK_LLVM_OBJCOPY=$(brew --prefix llvm)/bin/llvm-objcopy" >> "$GITHUB_ENV"
+
       - name: Install Madeira native build dependencies
         if: ${{ env.IDECK_NATIVE_BUILD == '1' && steps.madeira_kit.outputs.available != 'true' }}
         run: |

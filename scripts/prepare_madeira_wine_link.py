@@ -70,17 +70,39 @@ def run_nm(archive: Path) -> dict[str, set[str]]:
     return symbols_from_nm(result.stdout, archive.name)
 
 
+def xcrun_tool(name: str) -> str | None:
+    try:
+        result = subprocess.run(["xcrun", "-f", name], capture_output=True, text=True, check=False)
+    except OSError:
+        return None
+    return result.stdout.strip() if result.returncode == 0 else None
+
+
+def brew_llvm_tools(name: str) -> list[str]:
+    found: list[str] = []
+    try:
+        result = subprocess.run(["brew", "--prefix", "llvm"], capture_output=True, text=True, check=False)
+        if result.returncode == 0:
+            found.append(str(Path(result.stdout.strip()) / "bin" / name))
+    except OSError:
+        pass
+    for root in ("/opt/homebrew/opt", "/usr/local/opt"):
+        found += sorted((str(p) for p in Path(root).glob(f"llvm*/bin/{name}")), reverse=True)
+    return found
+
+
 def locate_objcopy() -> str:
-    preferred = Path("vendor/Madeira/toolchains/llvm-mingw-20260421-ucrt-macos-universal/bin/llvm-objcopy")
-    candidates = [
-        os.environ.get("IDECK_LLVM_OBJCOPY"),
-        str(preferred) if preferred.is_file() else None,
-        shutil.which("llvm-objcopy"),
-    ]
+    """llvm-objcopy, or llvm-objcopy's --redefine-syms equivalent from any
+    LLVM on the runner: the Madeira toolchain (any llvm-mingw release), Xcode,
+    Homebrew's llvm (macOS runners ship versioned llvm@N kegs) or PATH."""
+    vendor = sorted((str(p) for p in Path("vendor/Madeira/toolchains").glob("llvm-mingw-*/bin/llvm-objcopy")), reverse=True)
+    candidates = [os.environ.get("IDECK_LLVM_OBJCOPY"), *vendor,
+                  shutil.which("llvm-objcopy"), xcrun_tool("llvm-objcopy"), *brew_llvm_tools("llvm-objcopy")]
     for candidate in candidates:
         if candidate and Path(candidate).is_file() and os.access(candidate, os.X_OK):
             return candidate
-    raise LinkArchiveError("llvm-objcopy is required to namespace Wine server archives")
+    raise LinkArchiveError("llvm-objcopy is required to namespace Wine server archives "
+                           "(set IDECK_LLVM_OBJCOPY or install Homebrew llvm)")
 
 
 def prepare(archives: Path) -> Path | None:
