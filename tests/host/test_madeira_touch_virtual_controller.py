@@ -17,30 +17,16 @@ class MadeiraTouchVirtualControllerTests(unittest.TestCase):
         self.assertIn("(hasController || g_touchEnabled)", native)
         self.assertIn("static IDeckGamepad g_touchState = {}", native)
 
-    def test_touch_preset_is_persisted_and_distinct_from_native_controller_mode(self):
-        profile = (ROOT / "iDeck/WindowsLibraryModels.swift").read_text()
-        self.assertIn('var touchControlPreset: String = "xbox"', profile)
-        self.assertIn("decodeIfPresent(String.self, forKey: .touchControlPreset)", profile)
-        self.assertIn('["xbox", "minimal", "off"]', profile)
-        self.assertIn("controllerAPI", profile)
-        view = (ROOT / "iDeck/MainView.swift").read_text()
-        self.assertIn('selection: $profile.touchControlPreset', view)
-        self.assertIn('choices: ["xbox", "minimal", "off"]', view)
-        env = (ROOT / "iDeck/WindowsEnvironment.swift").read_text()
-        self.assertIn('setenv("IDECK_TOUCH_CONTROLS_ACTIVE"', env)
-
-    def test_analog_and_buttons_are_sent_into_native_slot_on_touch(self):
+    def test_touch_controls_are_removed(self):
         session = (ROOT / "iDeck/GameSessionView.swift").read_text()
-        self.assertIn("IDeckTouchGamepadOverlay(preset: preset)", session)
-        self.assertIn("DragGesture(minimumDistance: 0)", session)
-        self.assertIn("ideck_touch_gamepad_set_state(", session)
-        self.assertIn("ideck_touch_gamepad_set_enabled(1)", session)
-        self.assertIn("ideck_touch_gamepad_set_enabled(0)", session)
-        self.assertIn("pad.buttons |= bit", session)
-        self.assertIn("pad.buttons &= ~bit", session)
-        header = (ROOT / "iDeck/NativeRuntime/RuntimeSupport.h").read_text()
-        self.assertIn("void ideck_touch_gamepad_set_state(", header)
-        self.assertIn("void ideck_touch_gamepad_set_enabled(", header)
+        self.assertNotIn("IDeckTouchGamepadOverlay", session)
+        self.assertNotIn("ideck_touch_gamepad_set_state(", session)
+        settings = (ROOT / "iDeck/SettingsView.swift").read_text()
+        self.assertNotIn('tr("Show touch controls")', settings)
+        view = (ROOT / "iDeck/MainView.swift").read_text()
+        self.assertNotIn("$profile.touchControlPreset", view)
+        env = (ROOT / "iDeck/WindowsEnvironment.swift").read_text()
+        self.assertIn('setenv("IDECK_TOUCH_CONTROLS_ACTIVE", "0", 1)', env)
 
     def test_session_release_clears_virtual_and_hardware_slots(self):
         native = (ROOT / "iDeck/NativeRuntime/DirectInputBridge.mm").read_text()

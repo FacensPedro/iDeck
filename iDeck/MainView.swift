@@ -2217,10 +2217,7 @@ private struct WindowsGameProfileForm: View {
             DetailCard(title: tr("Controls")) {
                 DetailPickerRow(title: tr("Controller API"), selection: $profile.controllerAPI,
                                 choices: ["Automatic", "XInput", "XInput + DirectInput", "HID", "DualSense HID", "Generic HID"],
-                                icon: "gamecontroller.fill", iconColor: .green)
-                DetailPickerRow(title: tr("Touch controls"), selection: $profile.touchControlPreset,
-                                choices: ["xbox", "minimal", "off"], showsDivider: false,
-                                icon: "hand.tap.fill", iconColor: .pink)
+                                showsDivider: false, icon: "gamecontroller.fill", iconColor: .green)
             }
             DetailCard(title: tr("Compatibility"),
                        footer: tr("Games iDeck recognises get the settings they were tested with.")) {

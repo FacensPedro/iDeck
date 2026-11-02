@@ -54,7 +54,7 @@ class WineGamepadViewLifecycleTests(unittest.TestCase):
         self.assertIn("g_appActive = YES; output_active(YES); refresh_controllers();", PAD)
 
     def test_virtual_gamepad_disappearance_and_full_shutdown_both_release_buttons(self):
-        self.assertIn("ideck_touch_gamepad_set_enabled(0)", SESSION)
+        self.assertNotIn("IDeckTouchGamepadOverlay", SESSION)  # touch controls removed
         disable = PAD.split('extern "C" void ideck_touch_gamepad_set_enabled(int enabled)', 1)[1].split(
             'extern "C" void ideck_touch_gamepad_set_state', 1
         )[0]

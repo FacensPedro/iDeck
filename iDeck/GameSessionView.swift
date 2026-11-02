@@ -85,10 +85,9 @@ private final class GameRuntimeMetrics: ObservableObject {
 struct GameSessionView: View {
     @ObservedObject var coordinator: SystemCoordinator
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     @StateObject private var metrics = GameRuntimeMetrics()
     @AppStorage("showGamePerformanceOverlay") private var showGamePerformanceOverlay = false
-    @AppStorage("touchControls.enabled") private var touchControlsEnabled = true
-    @AppStorage("touchControls.hideWithController") private var touchControlsHideWithController = true
     @ObservedObject private var inputManager = InputManager.shared
     @State private var recentWineLogFinding: String?
     @State private var logCopyMessage: String?
@@ -182,22 +181,14 @@ struct GameSessionView: View {
         ZStack {
             Color.black.ignoresSafeArea()
 
+            // Edge to edge: on iPhones the safe area (Dynamic Island, notch,
+            // home indicator) would otherwise shrink the game image; the
+            // surface mode letterboxes it within the whole screen.
             GeometryReader { geometry in
                 WindowsRendererView()
                     .frame(width: geometry.size.width, height: geometry.size.height)
             }
-            .ignoresSafeArea(edges: .bottom)
-
-            if touchControlsEnabled,
-               let preset = coordinator.activeWindowsProfile?.touchControlPreset,
-               preset != "off", !coordinator.isClosingWindowsSession,
-               !(touchControlsHideWithController && inputManager.isControllerConnected) {
-                IDeckTouchGamepadOverlay(preset: preset)
-                    .padding(.horizontal, 20)
-                    .padding(.top, 64)
-                    .padding(.bottom, 20)
-                    .transition(.opacity)
-            }
+            .ignoresSafeArea()
 
             VStack {
                 HStack(alignment: .top) {
@@ -437,195 +428,5 @@ struct GameSessionView: View {
         } message: {
             Text(tr(coordinator.windowsCloseWarning ?? ""))
         }
-    }
-}
-
-private struct IDeckVirtualGamepadState {
-    var buttons: UInt16 = 0
-    var lx: Int16 = 0
-    var ly: Int16 = 0
-    var rx: Int16 = 0
-    var ry: Int16 = 0
-    var leftTrigger: UInt8 = 0
-    var rightTrigger: UInt8 = 0
-}
-
-private struct IDeckTouchGamepadOverlay: View {
-    let preset: String
-    @AppStorage("touchControls.opacity") private var controlOpacity = 0.8
-    @AppStorage("touchControls.haptics") private var controlHaptics = true
-    @State private var pad = IDeckVirtualGamepadState()
-
-    private func publish() {
-        ideck_touch_gamepad_set_state(pad.buttons, pad.lx, pad.ly, pad.rx, pad.ry,
-                                     pad.leftTrigger, pad.rightTrigger)
-    }
-
-    private func setButton(_ bit: UInt16, pressed: Bool) {
-        if pressed { pad.buttons |= bit }
-        else { pad.buttons &= ~bit }
-        publish()
-    }
-
-    /// Face buttons carry the Xbox letter colours; the rest are neutral.
-    private func tint(for label: String) -> Color {
-        switch label {
-        case "A": return Color(red: 0.36, green: 0.72, blue: 0.27)
-        case "B": return Color(red: 0.86, green: 0.24, blue: 0.20)
-        case "X": return Color(red: 0.20, green: 0.48, blue: 0.90)
-        case "Y": return Color(red: 0.95, green: 0.74, blue: 0.16)
-        default: return .white
-        }
-    }
-
-    private func control(_ label: String, bit: UInt16) -> some View {
-        let held = pad.buttons & bit != 0
-        let face = ["A", "B", "X", "Y"].contains(label)
-        let size: CGFloat = face ? 54 : 44
-        return Text(label)
-            .font(face ? .title3.bold() : .subheadline.bold())
-            .foregroundColor(face ? tint(for: label) : .white)
-            .frame(width: size, height: size)
-            .background(Circle().fill(Color.black.opacity(held ? 0.55 : 0.30)))
-            .overlay(Circle().stroke(tint(for: label).opacity(held ? 0.95 : 0.45), lineWidth: 2))
-            .scaleEffect(held ? 0.92 : 1)
-            .opacity(controlOpacity)
-            .contentShape(Circle())
-            .gesture(
-                DragGesture(minimumDistance: 0)
-                    .onChanged { _ in
-                        if pad.buttons & bit == 0 {
-                            setButton(bit, pressed: true)
-                            if controlHaptics { UIImpactFeedbackGenerator(style: .light).impactOccurred() }
-                        }
-                    }
-                    .onEnded { _ in setButton(bit, pressed: false) }
-            )
-    }
-
-    private func analog(_ right: Bool) -> some View {
-        GeometryReader { geometry in
-            let width = geometry.size.width
-            let height = geometry.size.height
-            let x = CGFloat(right ? pad.rx : pad.lx) / 32767.0
-            let y = -CGFloat(right ? pad.ry : pad.ly) / 32767.0
-            ZStack {
-                Circle().stroke(Color.white.opacity(0.5), lineWidth: 2)
-                Circle().fill(Color.white.opacity(0.65))
-                    .frame(width: 29, height: 29)
-                    .offset(x: x * width * 0.3, y: y * height * 0.3)
-            }
-            .contentShape(Circle())
-            .gesture(
-                DragGesture(minimumDistance: 0)
-                    .onChanged { value in
-                        let dx = (value.location.x - width / 2) / max(1, width * 0.35)
-                        let dy = (height / 2 - value.location.y) / max(1, height * 0.35)
-                        let axisX = Int16((min(1, max(-1, dx)) * 32767).rounded())
-                        let axisY = Int16((min(1, max(-1, dy)) * 32767).rounded())
-                        if right { pad.rx = axisX; pad.ry = axisY }
-                        else { pad.lx = axisX; pad.ly = axisY }
-                        publish()
-                    }
-                    .onEnded { _ in
-                        if right { pad.rx = 0; pad.ry = 0 }
-                        else { pad.lx = 0; pad.ly = 0 }
-                        publish()
-                    }
-            )
-        }
-        .frame(width: 124, height: 124)
-        .opacity(controlOpacity)
-    }
-
-    private func trigger(_ label: String, right: Bool) -> some View {
-        let held = (right ? pad.rightTrigger : pad.leftTrigger) > 0
-        return Text(label)
-            .font(.caption.bold())
-            .foregroundColor(.white)
-            .frame(width: 58, height: 36)
-            .background(Color.white.opacity(held ? 0.55 : 0.18), in: RoundedRectangle(cornerRadius: 10))
-            .opacity(controlOpacity)
-            .contentShape(RoundedRectangle(cornerRadius: 10))
-            .gesture(
-                DragGesture(minimumDistance: 0)
-                    .onChanged { _ in
-                        guard !held else { return }
-                        if right { pad.rightTrigger = 255 } else { pad.leftTrigger = 255 }
-                        publish()
-                    }
-                    .onEnded { _ in
-                        if right { pad.rightTrigger = 0 } else { pad.leftTrigger = 0 }
-                        publish()
-                    }
-            )
-    }
-
-    /// Triggers, bumpers, View and Menu in the bottom centre; left stick
-    /// and D-pad bottom left; face buttons and right stick bottom right.
-    /// The top of the screen stays free.
-    private var centerCluster: some View {
-        VStack(spacing: 10) {
-            HStack(spacing: 8) {
-                if preset == "xbox" { trigger("LT", right: false) }
-                control("LB", bit: 0x0100)
-                control("RB", bit: 0x0200)
-                if preset == "xbox" { trigger("RT", right: true) }
-            }
-            HStack(spacing: 18) {
-                control("⧉", bit: 0x0020)
-                control("≡", bit: 0x0010)
-            }
-        }
-    }
-
-    var body: some View {
-        let full = preset == "xbox"
-        VStack(spacing: 0) {
-            Spacer(minLength: 0)
-            HStack(alignment: .bottom, spacing: 0) {
-                VStack(alignment: .leading, spacing: 14) {
-                    analog(false)
-                    if full {
-                        VStack(spacing: 2) {
-                            control("↑", bit: 0x0001)
-                            HStack(spacing: 40) {
-                                control("←", bit: 0x0004)
-                                control("→", bit: 0x0008)
-                            }
-                            control("↓", bit: 0x0002)
-                        }
-                        .padding(.leading, 70)
-                    }
-                }
-                Spacer(minLength: 0)
-                centerCluster
-                Spacer(minLength: 0)
-                VStack(alignment: .trailing, spacing: 14) {
-                    VStack(spacing: 2) {
-                        control("Y", bit: 0x8000)
-                        HStack(spacing: 40) {
-                            control("X", bit: 0x4000)
-                            control("B", bit: 0x2000)
-                        }
-                        control("A", bit: 0x1000)
-                    }
-                    if full {
-                        analog(true)
-                            .padding(.trailing, 70)
-                    }
-                }
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .onAppear {
-            ideck_touch_gamepad_set_enabled(1)
-            publish()
-        }
-        .onDisappear {
-            ideck_touch_gamepad_set_enabled(0)
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(tr("Touch controls"))
     }
 }
