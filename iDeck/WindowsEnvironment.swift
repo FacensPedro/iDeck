@@ -578,7 +578,30 @@ class WindowsEnvironment {
         }
     }
 
+    /// Madeira's per-launch environment (LibraryEntry.applyEnvironment, line by
+    /// line), with the defaults of the per-game choices iDeck does not offer:
+    /// set or unset every time, so one game's value never leaks into the next.
+    /// Keys madeira.cfg sets still apply (WineProcessBridge's ml1184 rules).
+    private func applyMadeiraLaunchEnvironment() {
+        unsetenv("MADEIRA_GDI_SHARED_SECTION")   // a Dock launch sets it again
+        setenv("FEX_X87REDUCEDPRECISION", "0", 1)
+        unsetenv("MADEIRA_CPU_COUNT")
+        unsetenv("DXMT_D9_ANISO_LIMIT")
+        unsetenv("MADEIRA_FRAMEGEN")
+        unsetenv("DXMT_ENABLE_NVEXT")
+        unsetenv("DXMT_WSI_MONITOR_IDENTITY")
+        unsetenv("DXMT_WSI_MODE_TABLE")
+        // Fastsync's switches, only with Fastsync (Madeira's default engine).
+        if MadeiraSyncEngine.current == .fastsync {
+            setenv("MADEIRA_FASTSYNC", MadeiraConfig.get("env.MADEIRA_FASTSYNC") ?? "auto", 1)
+            unsetenv("MADEIRA_FASTSYNC_SEM")
+        } else {
+            unsetenv("MADEIRA_FASTSYNC")
+        }
+    }
+
     func applyGameProfile(_ profile: WindowsGameProfile) {
+        applyMadeiraLaunchEnvironment()
         // A previous Madeira Dock launch leaves its host switches in the
         // process environment; only a new Dock launch sets them again.
         for key in ["MADEIRA_STEAM_HOST_PROBE", "MADEIRA_STEAM_HOST_SESSION", "MADEIRA_STEAM_HOST_LOGIN",

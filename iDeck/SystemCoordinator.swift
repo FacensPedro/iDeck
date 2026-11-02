@@ -1121,6 +1121,12 @@ class SystemCoordinator: ObservableObject {
             setWindowsStatus("Cannot launch: " + error.localizedDescription)
             return
         }
+        // As Madeira (ContentView, Dock launch): a Dock session starts 64-bit, but
+        // the programs Valve's client starts later are often 32-bit. win32u decides
+        // once whether the GDI handle table is a section every 32-bit program can
+        // map; left private, 32-bit gdi32 truncates its address and faults on its
+        // first GDI handle. madeira.cfg env.MADEIRA_GDI_SHARED_SECTION = 0 still wins.
+        setenv("MADEIRA_GDI_SHARED_SECTION", "1", 1)
         currentSteamLaunchUsesDock = true
         dockLaunchAccepted = false
         steamDockLaunchStage = "Starting Madeira Dock..."

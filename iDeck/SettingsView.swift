@@ -348,6 +348,7 @@ struct SettingsView: View {
             } footer: {
                 Text(tr("Graphics changes apply when you launch the next game."))
             }
+            MadeiraMemorySyncSettings()
         }
         .navigationTitle(tr("Graphics & Performance"))
     }
