@@ -76,7 +76,7 @@ class FEXJITGuardTests(unittest.TestCase):
         self.assertGreaterEqual(COORDINATOR.count("ensureJITForGameLaunch()"), 4)
         self.assertIn("ideck_fex_jit_ready()", COORDINATOR)
         self.assertIn("ideck_process_has_jit_permission()", COORDINATOR)
-        self.assertIn("JIT is already enabled, but Wine's executable RX pool", COORDINATOR)
+        self.assertIn("JIT is enabled, but Wine's executable RX pool is not prepared", COORDINATOR)
         # Only the central JIT authorization gate requests StikDebug automatically.
         gate = COORDINATOR.split("private func ensureJITForGameLaunch() -> Bool {", 1)[1].split("\n    }", 1)[0]
         self.assertEqual(gate.count("requestStikDebugJIT()"), 1)
