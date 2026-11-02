@@ -85,6 +85,7 @@ private final class GameRuntimeMetrics: ObservableObject {
 struct GameSessionView: View {
     @ObservedObject var coordinator: SystemCoordinator
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     @StateObject private var metrics = GameRuntimeMetrics()
     @AppStorage("showGamePerformanceOverlay") private var showGamePerformanceOverlay = false
     @AppStorage("touchControls.enabled") private var touchControlsEnabled = true
@@ -182,20 +183,23 @@ struct GameSessionView: View {
         ZStack {
             Color.black.ignoresSafeArea()
 
+            // Edge to edge: on iPhones the safe area (Dynamic Island, notch,
+            // home indicator) would otherwise shrink the game image; the
+            // surface mode letterboxes it within the whole screen.
             GeometryReader { geometry in
                 WindowsRendererView()
                     .frame(width: geometry.size.width, height: geometry.size.height)
             }
-            .ignoresSafeArea(edges: .bottom)
+            .ignoresSafeArea()
 
             if touchControlsEnabled,
                let preset = coordinator.activeWindowsProfile?.touchControlPreset,
                preset != "off", !coordinator.isClosingWindowsSession,
                !(touchControlsHideWithController && inputManager.isControllerConnected) {
                 IDeckTouchGamepadOverlay(preset: preset)
-                    .padding(.horizontal, 20)
-                    .padding(.top, 64)
-                    .padding(.bottom, 20)
+                    .padding(.horizontal, horizontalSizeClass == .compact || verticalSizeClass == .compact ? 8 : 20)
+                    .padding(.top, verticalSizeClass == .compact ? 52 : 64)
+                    .padding(.bottom, verticalSizeClass == .compact ? 6 : 20)
                     .transition(.opacity)
             }
 
@@ -579,9 +583,39 @@ private struct IDeckTouchGamepadOverlay: View {
         }
     }
 
+    /// The layout's natural size: the widest row (left stick + D-pad, centre
+    /// cluster, face buttons + right stick) and the tallest column. Smaller
+    /// screens (iPhone SE and mini in landscape, every iPhone in portrait)
+    /// scale the whole pad down so no control overlaps another or the edge.
+    static let naturalSize = CGSize(width: 680, height: 300)
+
+    static func scale(for size: CGSize) -> CGFloat {
+        guard size.width > 0, size.height > 0 else { return 1 }
+        return max(0.45, min(1, size.width / naturalSize.width, size.height / naturalSize.height))
+    }
+
     var body: some View {
+        GeometryReader { geometry in
+            let scale = Self.scale(for: geometry.size)
+            layout
+                .frame(width: geometry.size.width / scale, height: geometry.size.height / scale)
+                .scaleEffect(scale)
+                .frame(width: geometry.size.width, height: geometry.size.height)
+        }
+        .onAppear {
+            ideck_touch_gamepad_set_enabled(1)
+            publish()
+        }
+        .onDisappear {
+            ideck_touch_gamepad_set_enabled(0)
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(tr("Touch controls"))
+    }
+
+    private var layout: some View {
         let full = preset == "xbox"
-        VStack(spacing: 0) {
+        return VStack(spacing: 0) {
             Spacer(minLength: 0)
             HStack(alignment: .bottom, spacing: 0) {
                 VStack(alignment: .leading, spacing: 14) {
@@ -618,14 +652,5 @@ private struct IDeckTouchGamepadOverlay: View {
             }
         }
         .frame(maxWidth: .infinity)
-        .onAppear {
-            ideck_touch_gamepad_set_enabled(1)
-            publish()
-        }
-        .onDisappear {
-            ideck_touch_gamepad_set_enabled(0)
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(tr("Touch controls"))
     }
 }
