@@ -52,7 +52,7 @@ actor SteamConnection {
     private var webSocketTask: URLSessionWebSocketTask?
     private var urlSession: URLSession?
     private let wsDelegate = SteamWebSocketDelegate()
-    private let serverList = CMServerList()
+    private let serverList = CMServerList.shared
     private var currentEndpoint: String?
     private var activeConnect: UUID?
     private var messageHandler: ((Data) -> Void)?
@@ -64,7 +64,122 @@ actor SteamConnection {
 
     // MARK: - Connect
 
+    /// iDeck: how many CM servers are dialled at once.
+    private static let raceWidth = 3
+
+    /// iDeck: dials the best few servers at once (lowest measured ping first)
+    /// and keeps the first whose WebSocket answers a ping, which is the one
+    /// with the lowest ping right now; the others are closed. A failed round
+    /// tries the next servers.
     func connect() async throws {
+        disconnect()
+        let generation = UUID()
+        activeConnect = generation
+        var tried = Set<String>()
+        var lastFailure: Error?
+        for round in 1...3 {
+            try Task.checkCancellation()
+            guard activeConnect == generation else { throw CancellationError() }
+            let candidates: [CMServerList.CMServer]
+            do { candidates = try await serverList.candidates(Self.raceWidth, excluding: tried) }
+            catch { throw lastFailure ?? error }
+            for server in candidates { tried.insert(server.endpoint) }
+            SteamLog.trace("Connecting to CM (round \(round)): " + candidates.map(\.endpoint).joined(separator: ", "))
+            let winner = await Self.race(candidates, delegate: wsDelegate)
+            guard activeConnect == generation else {
+                winner.socket?.task.cancel(with: .goingAway, reason: nil)
+                winner.socket?.session.invalidateAndCancel()
+                throw CancellationError()
+            }
+            for endpoint in winner.failed { await serverList.markFailed(endpoint: endpoint) }
+            if let socket = winner.socket {
+                urlSession = socket.session
+                webSocketTask = socket.task
+                currentEndpoint = socket.server.endpoint
+                await serverList.markSuccess(endpoint: socket.server.endpoint)
+                await serverList.recordLatency(endpoint: socket.server.endpoint, milliseconds: socket.milliseconds)
+                scheduleReceive(socket.task)
+                SteamLog.trace(String(format: "WebSocket connected to %@ in %.0f ms", socket.server.endpoint, socket.milliseconds))
+                return
+            }
+            lastFailure = winner.error.map { SteamCMTransportPolicy.sanitized($0) } ?? SteamError.connectionTimeout
+            SteamLog.event("[steam-cm-transport] round=\(round) failed=\(winner.failed.count)")
+        }
+        throw lastFailure ?? SteamError.noServersAvailable
+    }
+
+    private struct OpenSocket: @unchecked Sendable {
+        let server: CMServerList.CMServer
+        let session: URLSession
+        let task: URLSessionWebSocketTask
+        let milliseconds: Double
+    }
+
+    private struct RaceResult: @unchecked Sendable {
+        var socket: OpenSocket?
+        var failed: [String] = []
+        var error: Error?
+    }
+
+    /// iDeck: every candidate at once; the first socket whose ping is answered wins.
+    private static func race(_ servers: [CMServerList.CMServer], delegate: SteamWebSocketDelegate) async -> RaceResult {
+        await withTaskGroup(of: (CMServerList.CMServer, OpenSocket?, Error?).self) { group in
+            for server in servers {
+                group.addTask {
+                    let started = Date()
+                    let config = URLSessionConfiguration.default
+                    config.timeoutIntervalForRequest = 20
+                    config.waitsForConnectivity = false
+                    let session = URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
+                    let task = session.webSocketTask(with: server.url, protocols: ["steamdataport"])
+                    task.resume()
+                    do {
+                        try await withThrowingTaskGroup(of: Void.self) { ping in
+                            ping.addTask {
+                                try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
+                                    task.sendPing { error in
+                                        if let error { cont.resume(throwing: error) } else { cont.resume() }
+                                    }
+                                }
+                            }
+                            ping.addTask {
+                                try await Task.sleep(nanoseconds: 6_000_000_000)
+                                throw SteamError.connectionTimeout
+                            }
+                            try await ping.next()
+                            ping.cancelAll()
+                        }
+                        try Task.checkCancellation()
+                        return (server, OpenSocket(server: server, session: session, task: task,
+                                                   milliseconds: Date().timeIntervalSince(started) * 1000), nil)
+                    } catch {
+                        task.cancel(with: .goingAway, reason: nil)
+                        session.invalidateAndCancel()
+                        return (server, nil, error)
+                    }
+                }
+            }
+            var result = RaceResult()
+            for await (server, socket, error) in group {
+                if let socket {
+                    if result.socket == nil {
+                        result.socket = socket
+                        group.cancelAll()
+                    } else {
+                        socket.task.cancel(with: .goingAway, reason: nil)
+                        socket.session.invalidateAndCancel()
+                    }
+                } else if result.socket == nil, !(error is CancellationError) {
+                    result.failed.append(server.endpoint)
+                    result.error = error ?? result.error
+                }
+            }
+            return result
+        }
+    }
+
+    /// Madeira's one-server-at-a-time connect, kept for reference.
+    private func connectSequentially() async throws {
         disconnect()
         let generation = UUID()
         activeConnect = generation

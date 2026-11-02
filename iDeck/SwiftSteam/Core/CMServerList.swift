@@ -11,6 +11,37 @@ import Foundation
 
 /// Discovers and manages Steam CM (Connection Manager) WebSocket endpoints.
 actor CMServerList {
+    /// iDeck: one list for the whole app, so failures and measured pings carry
+    /// over to every later connection.
+    static let shared = CMServerList()
+    /// iDeck: the last measured WebSocket handshake + ping time per endpoint, in ms.
+    private var latencyMS: [String: Double] = (UserDefaults.standard.dictionary(forKey: "swiftsteam_cm_latency_ms") as? [String: Double]) ?? [:]
+
+    /// iDeck: the best `count` servers to race: healthy ones first, then the
+    /// lowest measured ping, then Steam's own order for servers not measured yet.
+    func candidates(_ count: Int, excluding: Set<String>) async throws -> [CMServer] {
+        if servers.isEmpty || isListStale { try await refreshServerList() }
+        let available = servers.enumerated().filter { !excluding.contains($0.element.endpoint) }
+        guard !available.isEmpty else { throw SteamError.noServersAvailable }
+        let ranked = available.sorted { a, b in
+            if a.element.isHealthy != b.element.isHealthy { return a.element.isHealthy }
+            let la = latencyMS[a.element.endpoint], lb = latencyMS[b.element.endpoint]
+            switch (la, lb) {
+            case let (x?, y?): return x < y
+            case (.some, nil): return true
+            case (nil, .some): return false
+            default: return a.offset < b.offset
+            }
+        }
+        return Array(ranked.prefix(max(1, count)).map(\.element))
+    }
+
+    /// iDeck: records a server's handshake + ping time.
+    func recordLatency(endpoint: String, milliseconds: Double) {
+        latencyMS[endpoint] = milliseconds
+        UserDefaults.standard.set(latencyMS, forKey: "swiftsteam_cm_latency_ms")
+    }
+
     /// A CM server endpoint (WebSocket)
     struct CMServer: Codable, Sendable {
         let host: String

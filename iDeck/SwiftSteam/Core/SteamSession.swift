@@ -37,7 +37,9 @@ class SteamSession {
     private let maxReconnectAttempts = 5
     private var idleDisconnectTask: Task<Void, Never>?
     /// How long to stay connected after the last activity before auto-disconnecting (seconds)
-    private let idleTimeout: TimeInterval = 60
+    /// iDeck: ten minutes (Madeira: 60 s), so actions after an idle minute
+    /// do not pay a full reconnect and logon.
+    private let idleTimeout: TimeInterval = 600
     private var jobIDCounter: UInt64 = 0
     private var pendingJobs: [UInt64: CheckedContinuation<SteamMessageCodec.IncomingMessage, Error>] = [:]
     private var messageHandlers: [UInt32: (SteamMessageCodec.IncomingMessage) -> Void] = [:]

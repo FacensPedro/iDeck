@@ -2094,9 +2094,9 @@ private struct SteamProgramDetailsView: View {
                  tr("Installing %d%%", Int(((progress?.fraction ?? 0) * 100).rounded())))
                 .font(.caption)
                 .foregroundColor(.white)
-            if let progress, progress.doneBytes > 0 {
+            if let progress, progress.installedBytes > 0 {
                 Text(tr("Installed: %@", ByteCountFormatter.string(
-                    fromByteCount: Int64(clamping: progress.doneBytes), countStyle: .file)))
+                    fromByteCount: Int64(clamping: progress.installedBytes), countStyle: .file)))
                     .font(.caption2)
                     .foregroundColor(.green)
             }
@@ -2113,6 +2113,15 @@ private struct SteamProgramDetailsView: View {
         }
     }
 
+    /// A DLC's size: its own depots in the game's app info (where Steam lists
+    /// DLC content), else the DLC app's own download size.
+    private func dlcSize(_ id: UInt32) -> String? {
+        var bytes = game.depots.filter { $0.dlcAppID == id }.reduce(UInt64(0)) { $0 + max($1.maxSize, $1.publicSizeBytes) }
+        if bytes == 0 { bytes = steamLibrary.dlcMetadata[id]?.downloadSize(for: "windows") ?? 0 }
+        guard bytes > 0 else { return nil }
+        return ByteCountFormatter.string(fromByteCount: Int64(clamping: bytes), countStyle: .file)
+    }
+
     private var dlcList: some View {
         VStack(spacing: 0) {
             let ids = steamLibrary.availableDLC[game.appID] ?? []
@@ -2121,13 +2130,28 @@ private struct SteamProgramDetailsView: View {
             }
             ForEach(ids, id: \.self) { id in
                 HStack(spacing: 12) {
-                    SteamGameArtworkView(game: steamLibrary.dlcMetadata[id] ?? SteamAppInfo(appID: id))
-                        .frame(width: 40, height: 54)
+                    SteamDLCArtworkView(appID: id)
+                        .frame(width: 92, height: 43)
                         .clipShape(RoundedRectangle(cornerRadius: 6))
-                    Text(steamLibrary.dlcMetadata[id]?.name ?? "DLC \(id)")
-                        .font(.subheadline)
-                        .foregroundColor(.white)
-                        .lineLimit(2)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(steamLibrary.dlcMetadata[id]?.name ?? "DLC \(id)")
+                            .font(.subheadline)
+                            .foregroundColor(.white)
+                            .lineLimit(2)
+                        if let size = dlcSize(id) {
+                            Text(size)
+                                .font(.caption2)
+                                .foregroundColor(.gray)
+                        }
+                        if steamLibrary.installingDLC[game.appID] == id {
+                            let fraction = steamLibrary.downloadProgress[game.appID]?.fraction ?? 0
+                            ProgressView(value: fraction)
+                                .tint(.blue)
+                            Text(tr("Installing %d%%", Int((fraction * 100).rounded())))
+                                .font(.caption2)
+                                .foregroundColor(.white)
+                        }
+                    }
                     Spacer(minLength: 6)
                     if steamLibrary.installingDLC[game.appID] == id {
                         Button(role: .destructive) {
@@ -2537,5 +2561,30 @@ private struct EpicGameDetailsSheet: View {
             }
         }
         .task(id: appName) { await epic.loadSize(appName) }
+    }
+}
+
+
+/// A DLC's own cover: its store header first (DLC rarely have a library capsule).
+struct SteamDLCArtworkView: View {
+    let appID: UInt32
+    @State private var index = 0
+
+    private var candidates: [URL] {
+        ["header.jpg", "capsule_231x87.jpg", "capsule_616x353.jpg", "library_600x900.jpg"].compactMap {
+            URL(string: "https://cdn.cloudflare.steamstatic.com/steam/apps/\(appID)/\($0)")
+        }
+    }
+
+    var body: some View {
+        AsyncImage(url: index < candidates.count ? candidates[index] : nil) { phase in
+            if let image = phase.image {
+                image.resizable().scaledToFill()
+            } else if phase.error != nil {
+                Color.white.opacity(0.08).onAppear { if index < candidates.count { index += 1 } }
+            } else {
+                Color.white.opacity(0.08)
+            }
+        }
     }
 }
