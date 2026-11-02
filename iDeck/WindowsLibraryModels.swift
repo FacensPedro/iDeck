@@ -23,6 +23,21 @@ struct WindowsGameProfile: Codable, Equatable, Identifiable {
     /// Direct3D 12 renderer: "Madeira D3D12" (Metal, default) or "VKD3D-Proton"
     /// (vkd3d-proton on Vulkan/MoltenVK, Madeira's `d3d12 = vkd3d`; x64 only).
     var d3d12Renderer: String = "Madeira D3D12"
+    // Madeira's per-game choices (LibraryEntry, applied by applyEnvironment).
+    /// "Reduced-precision x87": FEX_X87REDUCEDPRECISION.
+    var reducedX87: Bool = false
+    /// CPU cores the game sees (MADEIRA_CPU_COUNT); 0 = all.
+    var cpuCount: Int = 0
+    static let cpuCounts = [0, 2, 4, 6, 8]
+    /// Direct3D 9 anisotropic filtering limit (DXMT_D9_ANISO_LIMIT); 0 = the game's.
+    var anisotropyLimit: Int = 0
+    static let anisotropyLimits = [0, 1, 2, 4, 8]
+    /// MADEIRA_FRAMEGEN.
+    var frameGeneration: Bool = false
+    /// "Report an NVIDIA GPU": DXMT's vendor extension and monitor/mode table.
+    var reportNVIDIA: Bool = false
+    /// Fastsync for this game (with the Fastsync engine); off exports 0.
+    var fastSync: Bool = true
     static let d3d12Renderers = ["Madeira D3D12", "VKD3D-Proton"]
     var touchControlPreset: String = "xbox"
     var metalFXEnabled: Bool = false
@@ -41,7 +56,7 @@ struct WindowsGameProfile: Codable, Equatable, Identifiable {
     var updatedAt: Date = Date()
 
     private enum CodingKeys: String, CodingKey {
-        case id, title, arguments, resolution, surfaceScaling, graphicsAPI, controllerAPI, touchControlPreset, metalFXEnabled, fpsLimit, avxEnabled, keepChildProcessesRunning, artworkFilename, updatedAt, vulkanMode, openGLBackend, useRecommended, launchThroughSteam, codeChecks, d3d12Renderer
+        case id, title, arguments, resolution, surfaceScaling, graphicsAPI, controllerAPI, touchControlPreset, metalFXEnabled, fpsLimit, avxEnabled, keepChildProcessesRunning, artworkFilename, updatedAt, vulkanMode, openGLBackend, useRecommended, launchThroughSteam, codeChecks, d3d12Renderer, reducedX87, cpuCount, anisotropyLimit, frameGeneration, reportNVIDIA, fastSync
     }
 
     static let vulkanModes = ["Automatic", "On", "Off"]
@@ -96,6 +111,14 @@ struct WindowsGameProfile: Codable, Equatable, Identifiable {
         openGLBackend = Self.openGLBackends.contains(savedGL) ? savedGL : "Automatic"
         let savedD3D12 = (try? values.decodeIfPresent(String.self, forKey: .d3d12Renderer)) ?? "Madeira D3D12"
         d3d12Renderer = Self.d3d12Renderers.contains(savedD3D12) ? savedD3D12 : "Madeira D3D12"
+        reducedX87 = (try? values.decodeIfPresent(Bool.self, forKey: .reducedX87)) ?? false
+        let savedCPU = (try? values.decodeIfPresent(Int.self, forKey: .cpuCount)) ?? 0
+        cpuCount = Self.cpuCounts.contains(savedCPU) ? savedCPU : 0
+        let savedAniso = (try? values.decodeIfPresent(Int.self, forKey: .anisotropyLimit)) ?? 0
+        anisotropyLimit = Self.anisotropyLimits.contains(savedAniso) ? savedAniso : 0
+        frameGeneration = (try? values.decodeIfPresent(Bool.self, forKey: .frameGeneration)) ?? false
+        reportNVIDIA = (try? values.decodeIfPresent(Bool.self, forKey: .reportNVIDIA)) ?? false
+        fastSync = (try? values.decodeIfPresent(Bool.self, forKey: .fastSync)) ?? true
     }
 }
 

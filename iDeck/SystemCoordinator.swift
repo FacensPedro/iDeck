@@ -1177,6 +1177,9 @@ class SystemCoordinator: ObservableObject {
                 return
             }
             let arguments = "/c C:\\ideck-dock-installers-\(stage.appID).cmd"
+            // As Madeira (DockInstallers.serverSync): a session of one-time
+            // installers runs with madsync off, for that session only.
+            setenv("MADEIRA_MADSYNC_SESSION", "0", 1)
             self.windowsEnvironment.execute(binary: stage.command, arguments: arguments, jitEnabler: self.jitEnabler) { [weak self] status in
                 DispatchQueue.main.async {
                     guard let self else { return }

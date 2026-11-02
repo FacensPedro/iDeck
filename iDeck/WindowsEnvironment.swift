@@ -582,18 +582,28 @@ class WindowsEnvironment {
     /// line), with the defaults of the per-game choices iDeck does not offer:
     /// set or unset every time, so one game's value never leaks into the next.
     /// Keys madeira.cfg sets still apply (WineProcessBridge's ml1184 rules).
-    private func applyMadeiraLaunchEnvironment() {
+    private func applyMadeiraLaunchEnvironment(_ profile: WindowsGameProfile) {
         unsetenv("MADEIRA_GDI_SHARED_SECTION")   // a Dock launch sets it again
-        setenv("FEX_X87REDUCEDPRECISION", "0", 1)
-        unsetenv("MADEIRA_CPU_COUNT")
-        unsetenv("DXMT_D9_ANISO_LIMIT")
-        unsetenv("MADEIRA_FRAMEGEN")
-        unsetenv("DXMT_ENABLE_NVEXT")
-        unsetenv("DXMT_WSI_MONITOR_IDENTITY")
-        unsetenv("DXMT_WSI_MODE_TABLE")
-        // Fastsync's switches, only with Fastsync (Madeira's default engine).
+        unsetenv("MADEIRA_MADSYNC_SESSION")      // an installer session sets it again
+        setenv("FEX_X87REDUCEDPRECISION", profile.reducedX87 ? "1" : "0", 1)
+        if (1..<64).contains(profile.cpuCount) { setenv("MADEIRA_CPU_COUNT", String(profile.cpuCount), 1) }
+        else { unsetenv("MADEIRA_CPU_COUNT") }
+        if [1, 2, 4, 8].contains(profile.anisotropyLimit) { setenv("DXMT_D9_ANISO_LIMIT", String(profile.anisotropyLimit), 1) }
+        else { unsetenv("DXMT_D9_ANISO_LIMIT") }
+        if profile.frameGeneration { setenv("MADEIRA_FRAMEGEN", "1", 1) } else { unsetenv("MADEIRA_FRAMEGEN") }
+        if profile.reportNVIDIA {
+            setenv("DXMT_ENABLE_NVEXT", "1", 1)
+            setenv("DXMT_WSI_MONITOR_IDENTITY", "1", 1)
+            setenv("DXMT_WSI_MODE_TABLE", "1", 1)
+        } else {
+            unsetenv("DXMT_ENABLE_NVEXT")
+            unsetenv("DXMT_WSI_MONITOR_IDENTITY")
+            unsetenv("DXMT_WSI_MODE_TABLE")
+        }
+        // Fastsync's per-game switches, only when Settings chose Fastsync.
         if MadeiraSyncEngine.current == .fastsync {
-            setenv("MADEIRA_FASTSYNC", MadeiraConfig.get("env.MADEIRA_FASTSYNC") ?? "auto", 1)
+            let mode = MadeiraConfig.get("env.MADEIRA_FASTSYNC") ?? "auto"
+            setenv("MADEIRA_FASTSYNC", profile.fastSync ? mode : "0", 1)
             unsetenv("MADEIRA_FASTSYNC_SEM")
         } else {
             unsetenv("MADEIRA_FASTSYNC")
@@ -601,7 +611,7 @@ class WindowsEnvironment {
     }
 
     func applyGameProfile(_ profile: WindowsGameProfile) {
-        applyMadeiraLaunchEnvironment()
+        applyMadeiraLaunchEnvironment(profile)
         // A previous Madeira Dock launch leaves its host switches in the
         // process environment; only a new Dock launch sets them again.
         for key in ["MADEIRA_STEAM_HOST_PROBE", "MADEIRA_STEAM_HOST_SESSION", "MADEIRA_STEAM_HOST_LOGIN",
