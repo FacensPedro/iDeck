@@ -495,6 +495,16 @@ enum IDeckSteamDockInstallers {
     /// installs runs without. Social Club's layout 2 and RDR2's hold take the 4 GB
     /// slots 32-bit programs run in, so the Visual C++ setups' second 32-bit
     /// process could not start.
+    /// Madeira's DockInstallers.isDotNetFramework: a .NET Framework 2.0-4.x setup,
+    /// by its file name (as Microsoft and Steam's _CommonRedist\DotNet ship them)
+    /// or the Framework's own setup key as the entry's HasRunKey.
+    static func isDotNetFramework(_ process: SteamInstallProcess) -> Bool {
+        let file = process.executable.split(separator: "\\").last.map { $0.lowercased() } ?? ""
+        if file.hasPrefix("dotnetfx") || (file.hasPrefix("ndp") && file.hasSuffix(".exe")) { return true }
+        let key = process.run.key.lowercased()
+        return key.contains("\\net framework setup\\ndp") || key.contains("\\commonredist\\dotnet\\")
+    }
+
     static let installSessionDroppedKeys: Set<String> = ["env.MADEIRA_SC_PA_POOLS", "env.MADEIRA_RDR2_VA_HOLD"]
 
     struct Stage {
@@ -629,6 +639,12 @@ enum IDeckSteamDockInstallers {
         let plan = DockInstallScripts.plan(found, done: { run in
             DockInstallScripts.marked(run, in: run.hive == .machine ? machineRegistry : userRegistry)
         }, exists: { resolve($0, drive: drive) != nil }, runnable: { process in
+            // Madeira #511: .NET Framework 2.0-4.x setups do not finish under Wine's
+            // own .NET (Mono) and held the game's start; they are left out.
+            // env.MADEIRA_INSTALL_SKIP_DOTNET = 0 runs them too.
+            if MadeiraConfig.flag("MADEIRA_INSTALL_SKIP_DOTNET") && Self.isDotNetFramework(process) {
+                return "Wine's own .NET is used"
+            }
             if process.executable.lowercased().hasSuffix(".msi") && !msiexec { return "Wine msiexec.exe missing" }
             guard let file = resolve(process.executable, drive: drive) else { return "Invalid installer path" }
             if file.pathExtension.lowercased() == "exe" {

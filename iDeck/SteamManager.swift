@@ -2967,7 +2967,9 @@ class SteamSession: SteamCMSession {
     private let maxReconnectAttempts = 5
     private var idleDisconnectTask: Task<Void, Never>?
     /// How long to stay connected after the last activity before auto-disconnecting (seconds)
-    private let idleTimeout: TimeInterval = 60
+    /// Ten minutes instead of Madeira's 60 s: every action after an idle minute
+    /// paid a full reconnect and logon, which is what made Steam feel slow to connect.
+    private let idleTimeout: TimeInterval = 600
     private var jobIDCounter: UInt64 = 0
     private var pendingJobs: [UInt64: CheckedContinuation<SteamMessageCodec.IncomingMessage, Error>] = [:]
     private var messageHandlers: [UInt32: (SteamMessageCodec.IncomingMessage) -> Void] = [:]
@@ -3041,10 +3043,10 @@ class SteamSession: SteamCMSession {
             if let tokens = SteamSignIn.credentialsForDock() {
                 var lastError: Error = SteamError.connectionTimeout
                 var loggedIn = false
-                for attempt in 1...2 {
+                for attempt in 1...3 {
                     do {
                         if attempt > 1 {
-                            SteamLog.trace("Logon attempt \(attempt)/2 — reconnecting to different CM server")
+                            SteamLog.trace("Logon attempt \(attempt)/3 — reconnecting to different CM server")
                             try await connection.reconnect()
                             connectionState = .connected
                             let helloRetry = SteamMessageCodec.encodeClientMessage(
@@ -3311,14 +3313,15 @@ class SteamSession: SteamCMSession {
                 }
             }
 
-            // 20-second timeout — if server doesn't respond after 20s, try different CM.
+            // 10-second timeout — a CM that accepted the socket but does not answer
+            // the logon is given up sooner, and the next CM is tried.
             // The resume guard (not a messageHandlers TOCTOU check) is what prevents a
             // double-resume if the logon response landed at the same moment.
             Task {
-                try? await Task.sleep(nanoseconds: 20_000_000_000)
+                try? await Task.sleep(nanoseconds: 10_000_000_000)
                 cleanupHandlers()
                 if resumeOnce.claim() {
-                    SteamLog.trace("ClientLogon timed out after 20s: no response from the server")
+                    SteamLog.trace("ClientLogon timed out after 10s: no response from the server")
                     continuation.resume(throwing: SteamError.connectionTimeout)
                 }
             }
