@@ -14,7 +14,6 @@
 		F5A000000000000000000007 /* iDeckJITHelper.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = iDeckJITHelper.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		F5A000000000000000000008 /* StikJIT.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; path = Frameworks/StikJIT.xcframework; sourceTree = SOURCE_ROOT; };
 
-		E10000000000000000000002 /* SteamChunkCodecs.c in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000002 /* SteamChunkCodecs.c */; };
 		E10000000000000000000010 /* SteamDepotRegionPolicy.c in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000010 /* SteamDepotRegionPolicy.c */; };
 		E10000000000000000000012 /* SteamDiskIO.c in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000012 /* SteamDiskIO.c */; };
 		F7A000000000000000000001 /* ZipNative.c in Sources */ = {isa = PBXBuildFile; fileRef = F8A000000000000000000001 /* ZipNative.c */; };
@@ -285,7 +284,6 @@
 		DEAD00000000000000000072 /* VisualCRuntimeBootstrap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisualCRuntimeBootstrap.swift; sourceTree = "<group>"; };
 		A70200000000000000000001 /* WineExitDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WineExitDiagnostics.swift; sourceTree = "<group>"; };
 		A20000000000000000000005 /* SteamInstall.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamInstall.swift; sourceTree = "<group>"; };
-		E20000000000000000000002 /* SteamChunkCodecs.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = SteamChunkCodecs.c; sourceTree = "<group>"; };
 		E20000000000000000000010 /* SteamDepotRegionPolicy.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = SteamDepotRegionPolicy.c; sourceTree = "<group>"; };
 		E20000000000000000000011 /* SteamDepotRegionPolicy.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SteamDepotRegionPolicy.h; sourceTree = "<group>"; };
 		E20000000000000000000012 /* SteamDiskIO.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = SteamDiskIO.c; sourceTree = "<group>"; };
@@ -308,7 +306,6 @@
 		E20000000000000000000015 /* SteamNativeCore.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SteamNativeCore.h; sourceTree = "<group>"; };
 		F40000000000000000000007 /* WineLogTriage.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = NativeRuntime/WineLogTriage.c; sourceTree = "<group>"; };
 		F40000000000000000000008 /* WineLogTriage.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = NativeRuntime/WineLogTriage.h; sourceTree = "<group>"; };
-		E20000000000000000000003 /* SteamChunkCodecs.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SteamChunkCodecs.h; sourceTree = "<group>"; };
 		E20000000000000000000004 /* LzmaDec.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = SteamLZMA/LzmaDec.c; sourceTree = "<group>"; };
 		E20000000000000000000005 /* LzmaDec.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SteamLZMA/LzmaDec.h; sourceTree = "<group>"; };
 		E20000000000000000000006 /* 7zTypes.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SteamLZMA/7zTypes.h; sourceTree = "<group>"; };
@@ -448,7 +445,6 @@
 				AC100000000000000000016 /* qtmd.c in Sources */,
 				AC100000000000000000017 /* crc32.c in Sources */,
 				A10000000000000000000005 /* SteamInstall.swift in Sources */,
-				E10000000000000000000002 /* SteamChunkCodecs.c in Sources */,
 				E10000000000000000000010 /* SteamDepotRegionPolicy.c in Sources */,
 				E10000000000000000000012 /* SteamDiskIO.c in Sources */,
 				F7A000000000000000000001 /* ZipNative.c in Sources */,
@@ -608,7 +604,6 @@
 				AC200000000000000000016 /* qtmd.c */,
 				AC200000000000000000017 /* crc32.c */,
 				A20000000000000000000005 /* SteamInstall.swift */,
-				E20000000000000000000002 /* SteamChunkCodecs.c */,
 				E20000000000000000000010 /* SteamDepotRegionPolicy.c */,
 				E20000000000000000000011 /* SteamDepotRegionPolicy.h */,
 				E20000000000000000000012 /* SteamDiskIO.c */,
@@ -631,7 +626,6 @@
 				F8C000000000000000000003 /* EpicChunkBridge.h */,
 				F8C000000000000000000002 /* EpicChunkCodec.cpp */,
 				F8C000000000000000000001 /* EpicChunkCodec.hpp */,
-				E20000000000000000000003 /* SteamChunkCodecs.h */,
 				E20000000000000000000004 /* LzmaDec.c */,
 				E20000000000000000000005 /* LzmaDec.h */,
 				E20000000000000000000006 /* 7zTypes.h */,

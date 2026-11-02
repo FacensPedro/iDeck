@@ -9,7 +9,6 @@
 #import "NativeRuntime/RuntimeSupport.h"
 #import "NativeRuntime/VCArchiveExtractor.h"
 
-#import "SteamChunkCodecs.h"
 #import "SteamDepotRegionPolicy.h"
 #import "SteamDiskIO.h"
 #import "ZipNative.h"
