@@ -59,7 +59,8 @@ class NativeIPADuplicateSymbolsTests(unittest.TestCase):
         self.assertIn('normalized = archive_root / "archives/libwineserver_ideck_link.a"', KIT)
         self.assertIn('subprocess.run(', KIT)
         self.assertIn('temp.replace(output)', KIT)
-        self.assertLess(KIT.index("temp.replace(output)"), KIT.index("prepare_madeira_wine_link.py"))
+        self.assertIn("prepare_wine_link(output)", KIT)
+        self.assertLess(KIT.index("temp.replace(output)"), KIT.index("        prepare_wine_link(output)"))
         self.assertIn('os.replace(output, destination)', SCRIPT.read_text())
 
     def test_educational_zstd_does_not_export_libraries_zstd_functions(self):
