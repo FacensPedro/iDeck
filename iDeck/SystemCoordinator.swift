@@ -264,7 +264,7 @@ class SystemCoordinator: ObservableObject {
                     self.wineJITPreparationInFlight = true
                     DispatchQueue.global(qos: .userInitiated).async { [weak self] in
                         let started = Date()
-                        let prepared = ideck_wine_jit_pool_prepare()
+                        let prepared = ideck_fex_initialize() && ideck_wine_jit_pool_prepare()
                         let poolMiB = Int(ideck_jit_snapshot().wine_pool_mib)
                         AppLog.record(String(format: "[iDeck Wine JIT] pool %@ in %.1f s (%d MiB)",
                                              prepared ? "prepared" : "not prepared",
@@ -319,17 +319,21 @@ class SystemCoordinator: ObservableObject {
     private var jitResume: (() -> Void)?
     private var jitWaitGeneration = 0
 
-    /// Waits for StikDebug's debugger, checking four times a second (the app
-    /// becoming active is checked at once), then continues the launch.
+    /// Wait for executable memory, not merely P_TRACED. Never block the
+    /// main thread on the native allocator's mutex during debugger round trips.
     private func waitForDebuggerThenResume(_ resume: @escaping () -> Void) {
         jitWaitGeneration += 1
         let generation = jitWaitGeneration
         let started = Date()
+        var sawAttachment = ideck_jit_debugger_attached()
+        var reconnected = false
         func poll() {
             guard generation == jitWaitGeneration else { return }
-            if ideck_jit_debugger_attached() || ideck_wine_jit_pool_ready() {
-                AppLog.record(String(format: "[jit] debugger attached after %.1f s; continuing the launch", Date().timeIntervalSince(started)))
-                refreshJITStatus()
+            let snapshot = ideck_jit_snapshot()
+            if !wineJITPreparationInFlight && !snapshot.wine_state_busy &&
+                snapshot.wine_pool_prepared && ideck_fex_jit_ready() {
+                jitWaitGeneration += 1
+                AppLog.record("[jit] executable pools ready; continuing the launch")
                 resume()
                 return
             }
@@ -337,6 +341,19 @@ class SystemCoordinator: ObservableObject {
                 setWindowsStatus("JIT was not enabled in time. Enable JIT in StikDebug and start the game again.")
                 return
             }
+            let attached = ideck_jit_debugger_attached()
+            if sawAttachment && !attached && !wineJITPreparationInFlight &&
+                !snapshot.wine_state_busy && !reconnected {
+                reconnected = true
+                reconnectDebuggerForPendingLaunch()
+            }
+            sawAttachment = sawAttachment || attached
+            if attached && !wineJITPreparationInFlight && !snapshot.wine_state_busy &&
+                wineJITAttemptedDuringAttachment && !snapshot.wine_pool_prepared {
+                setWindowsStatus(nativeLaunchFailure(Int(ENOMEM)))
+                return
+            }
+            refreshJITStatus()
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.25, execute: poll)
         }
         poll()
@@ -346,8 +363,16 @@ class SystemCoordinator: ObservableObject {
     private func ensureJITForGameLaunch() -> Bool {
         let resume = jitResume
         jitResume = nil
+        jitWaitGeneration += 1
+        if !wineJITPreparationInFlight { wineJITAttemptedDuringAttachment = false }
         refreshJITStatus()
-        if ideck_wine_jit_pool_ready() { return true }
+        let snapshot = ideck_jit_snapshot()
+        if !wineJITPreparationInFlight && !snapshot.wine_state_busy &&
+            snapshot.wine_pool_prepared && ideck_fex_jit_ready() { return true }
+        if wineJITPreparationInFlight || snapshot.wine_state_busy {
+            if let resume { waitForDebuggerThenResume(resume) }
+            return false
+        }
         guard ideck_jit_debugger_attached() else {
             // As Madeira: without a live debugger (none yet, or CS_DEBUGGED left
             // behind by an earlier attach, where no new authorization was requested
@@ -363,7 +388,13 @@ class SystemCoordinator: ObservableObject {
             setWindowsStatus("FEX JIT is not initialized despite an active debugger. Review native JIT diagnostics.")
             return false
         }
-        return true
+        if let resume { waitForDebuggerThenResume(resume) }
+        return false
+    }
+
+    private func reconnectDebuggerForPendingLaunch() {
+        setWindowsStatus("JIT is enabled, but Wine's executable RX pool is not prepared. Reconnecting StikDebug...")
+        requestStikDebugJIT()
     }
     
     private func startLiveContainer() {
