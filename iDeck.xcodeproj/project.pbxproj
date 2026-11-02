@@ -31,8 +31,6 @@
 		E10000000000000000000003 /* libzstd in Frameworks */ = {isa = PBXBuildFile; productRef = E40000000000000000000001 /* libzstd */; };
 		D10000000000000000000001 /* RuntimeLifecycle.mm in Sources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000001 /* RuntimeLifecycle.mm */; };
 		D10000000000000000000002 /* FEXMemoryManager.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000002 /* FEXMemoryManager.cpp */; };
-		D10000000000000000000003 /* WineEnvironmentManager.c in Sources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000003 /* WineEnvironmentManager.c */; };
-		D10000000000000000000004 /* WineDLLLoader.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000004 /* WineDLLLoader.cpp */; };
 		D10000000000000000000005 /* WindowsFileSystem.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000005 /* WindowsFileSystem.cpp */; };
 		D10000000000000000000006 /* MetalSwapchain.mm in Sources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000006 /* MetalSwapchain.mm */; };
 		D10000000000000000000007 /* MetalShaderManager.mm in Sources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000007 /* MetalShaderManager.mm */; };
@@ -137,8 +135,6 @@
 
 		D20000000000000000000001 /* RuntimeLifecycle.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = NativeRuntime/RuntimeLifecycle.mm; sourceTree = "<group>"; };
 		D20000000000000000000002 /* FEXMemoryManager.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = NativeRuntime/FEXMemoryManager.cpp; sourceTree = "<group>"; };
-		D20000000000000000000003 /* WineEnvironmentManager.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = NativeRuntime/WineEnvironmentManager.c; sourceTree = "<group>"; };
-		D20000000000000000000004 /* WineDLLLoader.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = NativeRuntime/WineDLLLoader.cpp; sourceTree = "<group>"; };
 		D20000000000000000000005 /* WindowsFileSystem.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = NativeRuntime/WindowsFileSystem.cpp; sourceTree = "<group>"; };
 		D20000000000000000000006 /* MetalSwapchain.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = NativeRuntime/MetalSwapchain.mm; sourceTree = "<group>"; };
 		D20000000000000000000007 /* MetalShaderManager.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = NativeRuntime/MetalShaderManager.mm; sourceTree = "<group>"; };
@@ -310,8 +306,6 @@
 				F50000000000000000000002 /* NativeMemoryPressure.mm in Sources */,
 				D10000000000000000000001 /* RuntimeLifecycle.mm in Sources */,
 				D10000000000000000000002 /* FEXMemoryManager.cpp in Sources */,
-				D10000000000000000000003 /* WineEnvironmentManager.c in Sources */,
-				D10000000000000000000004 /* WineDLLLoader.cpp in Sources */,
 				D10000000000000000000005 /* WindowsFileSystem.cpp in Sources */,
 				D10000000000000000000006 /* MetalSwapchain.mm in Sources */,
 				D10000000000000000000007 /* MetalShaderManager.mm in Sources */,
@@ -451,8 +445,6 @@
 				F60000000000000000000003 /* NativeMemoryManager.h */,
 				D20000000000000000000001 /* RuntimeLifecycle.mm */,
 				D20000000000000000000002 /* FEXMemoryManager.cpp */,
-				D20000000000000000000003 /* WineEnvironmentManager.c */,
-				D20000000000000000000004 /* WineDLLLoader.cpp */,
 				D20000000000000000000005 /* WindowsFileSystem.cpp */,
 				D20000000000000000000006 /* MetalSwapchain.mm */,
 				D20000000000000000000007 /* MetalShaderManager.mm */,

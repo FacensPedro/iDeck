@@ -47,16 +47,10 @@ extern "C" int32_t ideck_wineprocess_start(const char *wine_prefix) {
     auto start = reinterpret_cast<Start>(dlsym(RTLD_DEFAULT, "wine_process_start"));
 #endif
     if (start == nullptr) return ENOSYS;
-    int result = start(wine_prefix);
-    if (result != 0) return EIO;
-    // Madeira may publish the Wine guest pthread asynchronously. A single
-    // immediate is_running() check can falsely report failure before the
-    // thread has entered its Wine main loop. Never start a second thread.
-    for (unsigned int attempt = 0; attempt < 50; ++attempt) {
-        if (ideck_wineprocess_running()) return 0;
-        usleep(10000);
-    }
-    return EAGAIN;
+    // As Madeira's startWineProcess: wine_process_start returning 0 means the
+    // Wine thread was launched; its state is followed afterwards, not judged
+    // within the first half second.
+    return start(wine_prefix) == 0 ? 0 : EIO;
 }
 
 extern "C" bool ideck_wineprocess_last_exit_code(int32_t *code) {
