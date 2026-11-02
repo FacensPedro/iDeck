@@ -206,6 +206,9 @@ final class BugReportModel: ObservableObject {
             lines.append((2, "Wine JIT pool error: \(reason)" + (mach != 0 ? " (Mach code \(mach))" : "") +
                           ", pool \(snapshot.wine_pool_mib) MiB."))
         }
+        if stage == 0, let failure = StikJITHelper.poolFailure {
+            lines.append((2, "Wine JIT pool error: \(failure)"))
+        }
         return lines.map { severity, line in
             LogIssue(id: "JIT-live:" + line, source: .jit, severity: severity, line: line, count: 1)
         }

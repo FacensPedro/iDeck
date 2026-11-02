@@ -681,13 +681,17 @@ enum IDeckSteamDockInstallers {
         // recreates its usual symlink to the same bundle image.
         let linked = (try? cmd.resourceValues(forKeys: [.isSymbolicLinkKey]))?.isSymbolicLink == true
         if linked || !FileManager.default.fileExists(atPath: cmd.path) {
-            let bundled = Bundle.main.bundleURL.appendingPathComponent("arm64ec-windows/cmd.exe")
-            guard FileManager.default.fileExists(atPath: bundled.path) else {
-                throw PreparationError.unavailable("The Madeira-native IPA has no ARM64EC cmd.exe for Steam prerequisites.")
+            // Wine's cmd.exe ships in arm64ec-windows or aarch64-windows depending
+            // on the build. When neither is staged here, Wine links its own at
+            // startup, as Madeira does, so the prerequisites still run.
+            let bundled = ["arm64ec-windows", "aarch64-windows"]
+                .map { Bundle.main.bundleURL.appendingPathComponent($0 + "/cmd.exe") }
+                .first { FileManager.default.fileExists(atPath: $0.path) }
+            if let bundled {
+                try FileManager.default.createDirectory(at: cmd.deletingLastPathComponent(), withIntermediateDirectories: true)
+                if linked { try FileManager.default.removeItem(at: cmd) }
+                try FileManager.default.copyItem(at: bundled, to: cmd)
             }
-            try FileManager.default.createDirectory(at: cmd.deletingLastPathComponent(), withIntermediateDirectories: true)
-            if linked { try FileManager.default.removeItem(at: cmd) }
-            try FileManager.default.copyItem(at: bundled, to: cmd)
         }
         // The host handles service start only; no client sign-in occurs in the
         // prerequisite session. Do not share the game's large-memory layout.

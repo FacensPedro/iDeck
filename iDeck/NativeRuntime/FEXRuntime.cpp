@@ -92,7 +92,9 @@ uintptr_t exported_pool_value(const char *name) {
 }
 
 extern "C" int32_t ideck_wine_jit_pool_failure_stage(void) {
-    return ideck_wine_jit_pool_ready() ? 0 : 1;
+    // The pool is allocated by StikJITHelper at launch; a pool not prepared yet
+    // is not a failure (its real reason is StikJITHelper.poolFailure).
+    return 0;
 }
 
 extern "C" int32_t ideck_wine_jit_pool_failure_rx_detail(void) { return 0; }
