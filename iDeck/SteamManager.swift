@@ -4,14 +4,6 @@ import UIKit
 
 // iDeck's Steam library models and helpers over Madeira's SwiftSteam backend (iDeck/SwiftSteam, verbatim).
 #if os(iOS)
-enum SteamFileError: LocalizedError {
-    case invalid(String)
-
-    var errorDescription: String? {
-        if case .invalid(let reason) = self { return reason }
-        return nil
-    }
-}
 
 @MainActor
 final class SteamOwnedGamesModel: ObservableObject {
@@ -359,8 +351,7 @@ final class SteamOwnedGamesModel: ObservableObject {
         var ownsIncompleteInstall = false
         do {
             try Task.checkCancellation()
-            guard let app = try await fetcher.fetchInstallInfo(
-                appID: appID, cached: games.first(where: { $0.appID == appID })) else {
+            guard let app = try await fetcher.fetchInstallInfo(appID: appID) else {
                 throw SteamError.depotNotFound(appID)
             }
             installFolder = SteamInstallFiles.safeFolderName(
@@ -405,9 +396,7 @@ final class SteamOwnedGamesModel: ObservableObject {
             try Task.checkCancellation()
             outcome = .completed
             installedApps.insert(appID)
-            if let measuredSize = downloadProgress[appID]?.installedBytes {
-                installedSizes[appID] = measuredSize
-            }
+            
             downloadErrors[appID] = nil
         } catch {
             let cancelled = Task.isCancelled || error is CancellationError
@@ -457,8 +446,7 @@ final class SteamOwnedGamesModel: ObservableObject {
         }
         do {
             try Task.checkCancellation()
-            guard let app = try await fetcher.fetchInstallInfo(
-                appID: appID, cached: games.first(where: { $0.appID == appID })),
+            guard let app = try await fetcher.fetchInstallInfo(appID: appID),
                   app.appID == appID,
                   app.installableOnWindows,
                   availableDLC[appID]?.contains(dlcAppID) == true,
@@ -474,8 +462,6 @@ final class SteamOwnedGamesModel: ObservableObject {
             try FileManager.default.createDirectory(at: steamApps, withIntermediateDirectories: true)
             _ = try await downloader.install(app, steamApps: steamApps,
                 ownedDepots: { [weak self] in try? await self?.fetcher.ownedDepotIDs() },
-                includedDLC: [dlcAppID],
-                dlcOnly: true,
                 progress: { [weak self] progress in
                     self?.downloadProgress[appID] = progress
                     BackgroundDownloads.steam.progress(done: progress.doneBytes, total: progress.totalBytes)
@@ -483,9 +469,7 @@ final class SteamOwnedGamesModel: ObservableObject {
             try Task.checkCancellation()
             outcome = .completed
             installedApps.insert(appID)
-            if let measuredSize = downloadProgress[appID]?.installedBytes {
-                installedSizes[appID] = measuredSize
-            }
+            
             refreshInstalledDLC(appID: appID, prefixPath: prefixPath)
         } catch {
             if Task.isCancelled || error is CancellationError {
