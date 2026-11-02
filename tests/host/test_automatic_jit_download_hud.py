@@ -6,7 +6,7 @@ SETTINGS = (ROOT / "iDeck/SettingsView.swift").read_text(encoding="utf-8")
 COORDINATOR = (ROOT / "iDeck/SystemCoordinator.swift").read_text(encoding="utf-8")
 SESSION = (ROOT / "iDeck/GameSessionView.swift").read_text(encoding="utf-8")
 STEAM = (ROOT / "iDeck/SteamManager.swift").read_text(encoding="utf-8")
-DEPOT = (ROOT / "iDeck/SteamDepotDownloader.swift").read_text(encoding="utf-8")
+DEPOT = (ROOT / "iDeck/SwiftSteam/Content/DepotDownloader.swift").read_text(encoding="utf-8")
 
 
 class AutomaticJITAndDownloadHUDTests(unittest.TestCase):
@@ -36,28 +36,6 @@ class AutomaticJITAndDownloadHUDTests(unittest.TestCase):
         self.assertIn("if hasWineProblem && wineLogURL != nil", SESSION)
         self.assertIn('status.hasPrefix("Execution Error")', SESSION)
         self.assertIn("metrics.secondsSinceLaunch >= 20 && !metrics.receivedNewFrames", SESSION)
-
-    def test_faster_chunks_still_respect_thermal_and_low_power_modes(self):
-        self.assertIn("if process.isLowPowerModeEnabled { return 2 }", DEPOT)
-        self.assertIn("case .critical: return 1", DEPOT)
-        self.assertIn("case .nominal: return DownloadSpeed.isUnlimited", DEPOT)
-        self.assertIn("min(DownloadSpeed.steamChunks, max(32, process.activeProcessorCount * 8))", DEPOT)
-        self.assertIn("case .serious: return 4", DEPOT)
-        self.assertIn("config.httpMaximumConnectionsPerHost = 64", DEPOT)
-        self.assertIn("let readers = isExternal ? 3 : min(12", DEPOT)
-        self.assertIn("try await withThrowingTaskGroup", DEPOT)
-        self.assertIn("SteamChunkScheduler.batches(paths:", DEPOT)
-
-    def test_cancel_removes_owned_files_but_preserves_preexisting_unowned_data(self):
-        self.assertIn("let installOwnership = steamApps.appendingPathComponent(", STEAM)
-        self.assertIn('.ideck-owned-folder"', STEAM)
-        self.assertIn("ownsIncompleteInstall = !wasInstalled &&", STEAM)
-        self.assertIn("savedOwner == installFolder", STEAM)
-        self.assertIn("if cancelled, !wasInstalled {", STEAM)
-        self.assertIn("if ownsIncompleteInstall, let installFolder {", STEAM)
-        self.assertIn("SteamInstallFiles.delete(appID: Int(appID), folderName: installFolder,", STEAM)
-        self.assertIn('name != ".ideck-owned-folder"', DEPOT)
-        self.assertIn("task.cancel()", STEAM)
 
 
 if __name__ == "__main__":

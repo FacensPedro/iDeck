@@ -185,7 +185,6 @@ class SystemCoordinator: ObservableObject {
         if isSteamConnected {
             // Rank CM servers while the library view loads, so the first
             // Steam request does not wait for the directory round trip.
-            Task.detached(priority: .utility) { _ = try? await CMServerList.shared.candidates(1) }
         }
     }
 

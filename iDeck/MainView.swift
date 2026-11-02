@@ -1198,7 +1198,7 @@ struct WindowsWorkspaceView: View {
     private func steamProgressAction(for game: SteamAppInfo) -> some View {
         let progress = steamLibrary.downloadProgress[game.appID]
         let checking = progress?.phase == .checking
-        let fraction = checking ? (progress?.checkFraction ?? 0) : (progress?.fraction ?? 0)
+        let fraction = checking ? (progress.map { $0.checkTotal > 0 ? min(1, Double($0.checkDone) / Double($0.checkTotal)) : 0 } ?? 0) : (progress?.fraction ?? 0)
         let percent = Int((fraction * 100).rounded())
         let label: String
         switch progress?.phase {
@@ -2046,8 +2046,7 @@ private struct SteamProgramDetailsView: View {
     private var installedSizeText: String? {
         var bytes: UInt64 = 0
         if installed { bytes = steamLibrary.installedSizes[game.appID] ?? 0 }
-        if bytes == 0 { bytes = game.installedSize(for: "windows") }
-        if bytes == 0 { bytes = game.downloadSize(for: "windows") }
+                if bytes == 0 { bytes = game.downloadSize(for: "windows") }
         guard bytes > 0 else { return nil }
         return ByteCountFormatter.string(fromByteCount: Int64(clamping: bytes), countStyle: .file)
     }
@@ -2087,17 +2086,17 @@ private struct SteamProgramDetailsView: View {
         let stopping = steamLibrary.cancellingApps.contains(game.appID)
         return VStack(spacing: 10) {
             ProgressView(value: progress?.phase == .checking
-                         ? (progress?.checkFraction ?? 0)
+                         ? (progress.map { $0.checkTotal > 0 ? min(1, Double($0.checkDone) / Double($0.checkTotal)) : 0 } ?? 0)
                          : (progress?.fraction ?? 0))
             Text(progress?.phase == .preparing ? tr("Preparing download...") :
-                 progress?.phase == .checking ? tr("Checking existing files %d%%", Int(((progress?.checkFraction ?? 0) * 100).rounded())) :
+                 progress?.phase == .checking ? tr("Checking existing files %d%%", Int(((progress.map { $0.checkTotal > 0 ? min(1, Double($0.checkDone) / Double($0.checkTotal)) : 0 } ?? 0) * 100).rounded())) :
                  progress?.phase == .finishing ? tr("Finishing installation...") :
                  tr("Installing %d%%", Int(((progress?.fraction ?? 0) * 100).rounded())))
                 .font(.caption)
                 .foregroundColor(.white)
-            if let progress, progress.installedBytes > 0 {
+            if let progress, progress.doneBytes > 0 {
                 Text(tr("Installed: %@", ByteCountFormatter.string(
-                    fromByteCount: Int64(clamping: progress.installedBytes), countStyle: .file)))
+                    fromByteCount: Int64(clamping: progress.doneBytes), countStyle: .file)))
                     .font(.caption2)
                     .foregroundColor(.green)
             }

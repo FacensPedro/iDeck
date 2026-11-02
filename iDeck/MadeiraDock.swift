@@ -408,7 +408,7 @@ enum MadeiraDock {
               folder == SteamInstallFiles.safeFolderName(folder),
               (state["StateFlags"]?.string.flatMap { UInt32($0) } ?? 0) & 4 != 0 else { return nil }
         return DockGame(id: Int(appID), installDir: folder, library: SteamInstallPaths.libraryRelative,
-                        customExecutables: state["CheckGuid"]?.fields?.isEmpty == false)
+                        customExecutables: state["CheckGuid"].map { !$0.fields.isEmpty } ?? false)
     }
 
     /// Copies the bundled host to C:\windows\system32\dockhost.exe when it changed.

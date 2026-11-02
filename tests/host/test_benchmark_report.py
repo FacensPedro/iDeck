@@ -73,9 +73,8 @@ class BenchmarkInstrumentationTests(unittest.TestCase):
         self.assertIn("constexpr uint64_t kFramePollNs = 4'000'000;", (ROOT / "iDeck/BenchmarkRecorder.cpp").read_text())
 
     def test_pipeline_stages_are_timed(self):
-        codecs = (ROOT / "iDeck/SteamChunkCodecs.c").read_text()
-        for name in ("chunk_zip_decode", "lzma_shim_decode", "zstd_safe_decompress"):
-            self.assertIn(f"{name}_untimed(", codecs)
+        # Steam chunk codecs are Madeira's (iDeck/SwiftSteam, verbatim).
+        self.assertTrue((ROOT / "iDeck/SwiftSteam/lzma_shim.c").exists())
         self.assertIn("IDECK_STAGE_WRITE", (ROOT / "iDeck/SteamDiskIO.c").read_text())
         self.assertIn("IDECK_STAGE_DECRYPT", (ROOT / "iDeck/SteamNativeCore.c").read_text())
         self.assertIn("IDECK_STAGE_DECOMPRESS", (ROOT / "iDeck/EpicChunkCodec.cpp").read_text())

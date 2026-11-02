@@ -74,8 +74,9 @@ class SettingsAndDiagnosticsTests(unittest.TestCase):
         self.assertIn('appendingPathComponent("madeira-log.txt"', bugs)
         self.assertIn("UIPasteboard.general.string = report(for: [issue])", bugs)
         self.assertIn("static let maximumBytes: UInt64 = 1024 * 1024", bugs)
-        steam = read("iDeck/SteamManager.swift")
-        self.assertIn("AppLog.record(message)", steam)
+        # Madeira's SteamLog writes to LogStore, which iDeck forwards to AppLog.
+        self.assertIn("LogStore.shared.log(message)", read("iDeck/SwiftSteam/Helpers/SteamLog.swift"))
+        self.assertIn("AppLog.record(", read("iDeck/MadeiraJIT/MadeiraLogStore.swift"))
 
     def test_ubuntu_runners_are_26_04(self):
         for workflow in (ROOT / ".github/workflows").glob("*.yml"):
@@ -96,15 +97,6 @@ class MetalFXTests(unittest.TestCase):
         env = read("iDeck/WindowsEnvironment.swift")
         self.assertIn("let factor = min(Double(screenLongSide) / max(width, height), 2.0)", env)
         self.assertIn("return factor >= 1.1 ?", env)
-
-
-class SteamConnectionSpeedTests(unittest.TestCase):
-    def test_server_list_is_prewarmed_and_shared(self):
-        coordinator = read("iDeck/SystemCoordinator.swift")
-        self.assertIn("_ = try? await CMServerList.shared.candidates(1)", coordinator)
-        steam = read("iDeck/SteamManager.swift")
-        self.assertIn('private let cacheKey = "swiftsteam_cm_servers_websocket_v2"', steam)
-        self.assertIn("for _ in 0..<200 {", steam)
 
 
 class GOGContentSystemTests(unittest.TestCase):

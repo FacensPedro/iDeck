@@ -37,18 +37,7 @@ struct DepotManifest {
 
         /// Hex string of SHA hash (used in CDN URLs)
         var shaHex: String {
-            // The native encoder avoids 20 Foundation formatter allocations
-            // for every SHA-1 chunk ID requested from the Steam CDN.
-            guard sha.count == 20 else { return "" }
-            var output = [CChar](repeating: 0, count: 41)
-            let ok = sha.withUnsafeBytes { bytes in
-                output.withUnsafeMutableBufferPointer { target in
-                    ideck_steam_hex_encode(
-                        bytes.bindMemory(to: UInt8.self).baseAddress, bytes.count,
-                        target.baseAddress, target.count)
-                }
-            }
-            return ok ? String(cString: output) : ""
+            sha.map { String(format: "%02x", $0) }.joined()
         }
     }
 
@@ -199,7 +188,7 @@ struct DepotManifest {
             }
         }
 
-        guard sha.count == 20 else { return nil }
+        guard !sha.isEmpty else { return nil }
 
         return ChunkEntry(
             sha: sha,
