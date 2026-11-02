@@ -411,6 +411,15 @@ def link_flags(archive_root: Path) -> str:
     return " ".join(flags) + "\n"
 
 
+def prepare_wine_link(output: Path) -> None:
+    """Inspect real Mach-O Wine archives and make a link-only copy if needed."""
+    subprocess.run(
+        [sys.executable, str(Path(__file__).resolve().parent / "prepare_madeira_wine_link.py"),
+         "--archives", str(output / "archives")],
+        check=True,
+    )
+
+
 def install(archive: Path, output: Path, wow64: bool, mono: bool, graphics: str = "d3d12") -> None:
     bundle, metadata = inspect(archive, wow64, mono, graphics)
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -437,11 +446,7 @@ def install(archive: Path, output: Path, wow64: bool, mono: bool, graphics: str 
         temp = None
         # Apply a *link-only* Mach-O namespacing copy after checking every
         # native kit digest, never modify the archived or verified originals.
-        subprocess.run(
-            [sys.executable, str(ROOT / "scripts/prepare_madeira_wine_link.py"),
-             "--archives", str(output / "archives")],
-            check=True,
-        )
+        prepare_wine_link(output)
         out_flags = ROOT / "build/madeira-native/link-flags.txt"
         out_flags.parent.mkdir(parents=True, exist_ok=True)
         out_flags.write_text(link_flags(output), encoding="utf-8")
