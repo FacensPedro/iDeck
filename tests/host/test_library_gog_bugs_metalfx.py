@@ -127,6 +127,15 @@ class GOGContentSystemTests(unittest.TestCase):
         main = read("iDeck/MainView.swift")
         self.assertIn("gogLibrary.install(game, prefixPath: prefixPath)", main)
 
+    def test_galaxy_404_uses_verified_offline_installer_fallback(self):
+        gog = read("iDeck/GOGLibrary.swift")
+        self.assertIn("catch GOGError.http(404)", gog)
+        self.assertIn("guard !Task.isCancelled", gog)
+        self.assertIn('outcome: .paused', gog)
+        self.assertIn("self.downloadInstaller(game, prefixPath: prefixPath)", gog)
+        self.assertIn("completion(setup.map { .installer($0) } ?? .failed)", gog)
+        self.assertIn("fallback = true", gog)
+
     def test_content_source_is_in_the_xcode_project(self):
         project = read("iDeck.xcodeproj/project.pbxproj")
         self.assertEqual(project.count("path = GOGContentSystem.swift;"), 1)
