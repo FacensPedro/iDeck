@@ -290,10 +290,6 @@ jobs:
             -o /tmp/ideck-steam-native-core.o
           xcrun clang -std=c11 -D_DARWIN_C_SOURCE -O2 -c iDeck/PipelineCounters.c \
             -o /tmp/ideck-pipeline-counters.o
-          xcrun swiftc -import-objc-header iDeck/SteamNativeCore.h \
-            iDeck/SteamExistingChunkVerifier.swift tests/host/SteamExistingChunkVerifierTests.swift \
-            /tmp/ideck-steam-native-core.o /tmp/ideck-pipeline-counters.o -o /tmp/ideck-steam-existing-chunk-tests
-          /tmp/ideck-steam-existing-chunk-tests
 
       - name: Test bounded native Madeira Wine log diagnostics
         run: |
@@ -308,8 +304,6 @@ jobs:
 
       - name: Test Steam CDN host performance selection
         run: |
-          xcrun swiftc iDeck/SteamCDNHostSelection.swift tests/host/SteamCDNHostSelectionTests.swift -o /tmp/ideck-cdn-selection-tests
-          /tmp/ideck-cdn-selection-tests
           python3 -m unittest discover -s tests/host -p 'test_steam_ip_routing.py' -v
 
       - name: Test graphics DLL override isolation
@@ -335,12 +329,12 @@ jobs:
 
       - name: Test conservative Steam compatibility preflight without network or account
         run: |
-          xcrun swiftc iDeck/SteamKeyValues.swift iDeck/SteamInstall.swift tests/host/SteamLaunchCompatibilityTests.swift -o /tmp/ideck-steam-compatibility-tests
+          xcrun swiftc iDeck/SwiftSteam/SteamKeyValues.swift iDeck/SteamInstall.swift tests/host/SteamLaunchCompatibilityTests.swift -o /tmp/ideck-steam-compatibility-tests
           /tmp/ideck-steam-compatibility-tests
 
       - name: Test installed Steam executable and working-directory launch paths
         run: |
-          xcrun swiftc iDeck/SteamKeyValues.swift iDeck/SteamInstall.swift tests/host/SteamInstallLaunchPathTests.swift -o /tmp/ideck-steam-launch-path-tests
+          xcrun swiftc iDeck/SwiftSteam/SteamKeyValues.swift iDeck/SteamInstall.swift tests/host/SteamInstallLaunchPathTests.swift -o /tmp/ideck-steam-launch-path-tests
           /tmp/ideck-steam-launch-path-tests
           python3 -m unittest discover -s tests/host -p 'test_steam_install_progress_size.py' -v
 

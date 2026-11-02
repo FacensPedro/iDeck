@@ -1012,7 +1012,7 @@
 				INFOPLIST_FILE = iDeck/Info.plist;
 				SWIFT_OBJC_BRIDGING_HEADER = "iDeck/iDeck-Bridging-Header.h";
 				HEADER_SEARCH_PATHS = ("$(inherited)", "$(SRCROOT)/iDeck/ThirdParty/libmspack");
-				OTHER_LDFLAGS = "$(inherited) -lz $(IDECK_NATIVE_LINK_FLAGS)";
+				OTHER_LDFLAGS = "$(inherited) -lz -llzma $(IDECK_NATIVE_LINK_FLAGS)";
 				OTHER_CFLAGS = "$(inherited) $(IDECK_NATIVE_CFLAGS)";
 				OTHER_CPLUSPLUSFLAGS = "$(inherited) $(IDECK_NATIVE_CFLAGS)";
 				CURRENT_PROJECT_VERSION = 1;
@@ -1049,7 +1049,7 @@
 				INFOPLIST_FILE = iDeck/Info.plist;
 				SWIFT_OBJC_BRIDGING_HEADER = "iDeck/iDeck-Bridging-Header.h";
 				HEADER_SEARCH_PATHS = ("$(inherited)", "$(SRCROOT)/iDeck/ThirdParty/libmspack");
-				OTHER_LDFLAGS = "$(inherited) -lz $(IDECK_NATIVE_LINK_FLAGS)";
+				OTHER_LDFLAGS = "$(inherited) -lz -llzma $(IDECK_NATIVE_LINK_FLAGS)";
 				OTHER_CFLAGS = "$(inherited) $(IDECK_NATIVE_CFLAGS)";
 				OTHER_CPLUSPLUSFLAGS = "$(inherited) $(IDECK_NATIVE_CFLAGS)";
 				CURRENT_PROJECT_VERSION = 1;
