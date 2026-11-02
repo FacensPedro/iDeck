@@ -11,8 +11,15 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
-OBJECT_HEADER = re.compile(r"^(?P<file>.+\.a)\((?P<member>[^)]+)\):\s*$")
+# Archive member headers and per-line archive prefixes in the forms Apple's and
+# LLVM's nm print: "lib.a(member.o):", "lib.a[3](member.o):" and, with -A,
+# "lib.a:member.o: <value> <type> <symbol>" or "lib.a(member.o): ...".
+OBJECT_HEADER = re.compile(r"^(?P<file>.+?\.a)(?:\[\d+\])?(?:\((?P<member>[^)]+)\)|:(?P<member2>[^:\s]+\.o)):\s*$")
 INLINE_SYMBOL = re.compile(
+    r"^(?P<file>.+?\.a)(?:\[\d+\])?(?:\((?P<member>[^)]+)\)|:(?P<member2>[^:\s]+\.o)):\s*"
+    r"(?P<value>[0-9A-Fa-f]+)\s+(?P<type>[A-Za-z])\s+(?P<symbol>\S+)\s*$"
+)
+SYMBOL = re.compile(
     r"^(?P<location>.+\.a\([^)]+\)):\s*"
     r"(?P<value>[0-9A-Fa-f]+)\s+(?P<type>[A-Z])\s+(?P<symbol>\S+)\s*$"
 )
@@ -25,12 +32,14 @@ def parse_defined_symbols(output: str, archive: str):
     for line in output.splitlines():
         entry = OBJECT_HEADER.match(line)
         if entry:
-            current = f"{Path(entry.group('file')).name}({entry.group('member')})"
+            member = entry.group("member") or entry.group("member2")
+            current = f"{Path(entry.group('file')).name}({member})"
             continue
         inline = INLINE_SYMBOL.match(line)
         if inline:
             if inline.group("type") in STRONG:
-                yield inline.group("symbol"), Path(inline.group("location")).name
+                member = inline.group("member") or inline.group("member2")
+                yield inline.group("symbol"), f"{Path(inline.group('file')).name}({member})"
             continue
         symbol = SYMBOL.match(line.strip())
         if symbol and symbol.group(1) in STRONG:

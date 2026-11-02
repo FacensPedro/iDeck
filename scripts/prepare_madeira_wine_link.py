@@ -60,7 +60,10 @@ def conflicts_to_namespace(ntdll: dict[str, set[str]],
 
 
 def run_nm(archive: Path) -> dict[str, set[str]]:
-    command = ["xcrun", "--sdk", "iphoneos", "nm", "-gU", str(archive)]
+    # -A names the archive member on every line, whatever header format this
+    # Xcode's nm prints (Xcode 27's headers were not recognised: every symbol
+    # was attributed to the bare archive, failing the namespacing check).
+    command = ["xcrun", "--sdk", "iphoneos", "nm", "-gUA", str(archive)]
     result = subprocess.run(command, capture_output=True, text=True, check=False)
     if result.returncode:
         raise LinkArchiveError(f"Mach-O nm failed for {archive.name}: {result.stderr.strip()}")
