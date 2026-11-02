@@ -10,6 +10,18 @@
 
 #include <stddef.h>   /* size_t */
 
+/*
+ * The educational decoder ships with its own ZSTD_* implementations.
+ * Native Madeira kits also bring a full libzstd.o; those global identifiers
+ * otherwise collide in the final iOS app (notably ZSTD_decompress).
+ * Namespace only this decoder's C API, keeping zstd_safe_decompress as the
+ * stable Swift Steam caller entry point. This header is included by its
+ * implementation and all its in-tree clients.
+ */
+#define ZSTD_decompress ideck_edu_zstd_decompress
+#define ZSTD_decompress_with_dict ideck_edu_zstd_decompress_with_dict
+#define ZSTD_get_decompressed_size ideck_edu_zstd_get_decompressed_size
+
 /******* EXPOSED TYPES ********************************************************/
 /*
 * Contains the parsed contents of a dictionary

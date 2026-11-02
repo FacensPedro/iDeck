@@ -23,8 +23,14 @@ class MadeiraNativeKitTests(unittest.TestCase):
         self.root = pathlib.Path(self.temp.name)
         self.original_root = kit.ROOT
         kit.ROOT = self.root
+        # Unit test archives are synthetic markers, not Mach-O objects;
+        # mock only the real Wine symbol-rewrite subprocess here. Production
+        # install still invokes it unconditionally on verified native kits.
+        self.link_prepare_patch = mock.patch.object(kit, "prepare_wine_link")
+        self.link_prepare_patch.start()
 
     def tearDown(self):
+        self.link_prepare_patch.stop()
         kit.ROOT = self.original_root
         self.temp.cleanup()
 

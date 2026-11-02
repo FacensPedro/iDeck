@@ -148,12 +148,21 @@ if [[ "$GRAPHICS" == "d3d12" ]] &&
   exit 2
 fi
 
+# A real in-process Wine runtime embeds both ntdll's client-side server.o
+# and wineserver's request/registry objects in the same Mach-O image.
+# Namespace only verified private duplicates in a COPY of the server archive
+# so that the two implementations keep separate globals.
+python3 "$ROOT/scripts/prepare_madeira_wine_link.py" --archives "$APP"
+if [[ -s "$APP/libwineserver_ideck_link.a" ]]; then
+  ARCHIVES[8]="$APP/libwineserver_ideck_link.a"
+fi
+
 # Report the remaining strong-symbol overlaps before the Xcode link. This
 # analysis is diagnostic: a member that is never extracted from its archive
 # cannot actually collide, so reporting a candidate must not break the build.
 python3 "$ROOT/scripts/report_madeira_symbol_collisions.py" \
   "$OUT/libideck_madeira_upstream_bridges.a" \
-  "$APP/libwineserver.a" "$APP/libntdll_unix.a" \
+  "${ARCHIVES[8]}" "$APP/libntdll_unix.a" \
   "$APP/libwin32u_unix.a" "$APP/libdxmt_combined.a" || true
 
 FLAGS=( -lz -lc++ -lsqlite3 -llzma

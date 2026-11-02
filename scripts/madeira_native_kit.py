@@ -393,6 +393,12 @@ def link_flags(archive_root: Path) -> str:
         raise KitError("An expected native linker archive was not extracted")
     if any(" " in str(file) for file in libs):
         raise KitError("Native linker paths cannot contain spaces")
+    # The source-kit manifest and SHA-256 remain unchanged. Link only against
+    # an inspected, separate Wine server archive when exact private overlaps
+    # with ntdll's Unix archive require namespacing.
+    normalized = archive_root / "archives/libwineserver_ideck_link.a"
+    if normalized.is_file() and normalized.stat().st_size:
+        libs[8] = normalized.resolve()
     flags = ["-lz", "-lc++", "-lsqlite3", "-llzma"]
     for name in FRAMEWORKS:
         flags.extend(("-framework", name))
@@ -403,6 +409,15 @@ def link_flags(archive_root: Path) -> str:
             flags.append(str(file))
     flags.extend(("-lcurses", "-lxml2"))
     return " ".join(flags) + "\n"
+
+
+def prepare_wine_link(output: Path) -> None:
+    """Inspect real Mach-O Wine archives and make a link-only copy if needed."""
+    subprocess.run(
+        [sys.executable, str(Path(__file__).resolve().parent / "prepare_madeira_wine_link.py"),
+         "--archives", str(output / "archives")],
+        check=True,
+    )
 
 
 def install(archive: Path, output: Path, wow64: bool, mono: bool, graphics: str = "d3d12") -> None:
@@ -429,6 +444,9 @@ def install(archive: Path, output: Path, wow64: bool, mono: bool, graphics: str 
             shutil.rmtree(output)
         temp.replace(output)
         temp = None
+        # Apply a *link-only* Mach-O namespacing copy after checking every
+        # native kit digest, never modify the archived or verified originals.
+        prepare_wine_link(output)
         out_flags = ROOT / "build/madeira-native/link-flags.txt"
         out_flags.parent.mkdir(parents=True, exist_ok=True)
         out_flags.write_text(link_flags(output), encoding="utf-8")
