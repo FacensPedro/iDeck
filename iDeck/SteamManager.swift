@@ -41,6 +41,18 @@ final class SteamOwnedGamesModel: ObservableObject {
     /// Display a lightweight cached library immediately while PICS refreshes.
     /// Cached preview entries contain no depot metadata: installing a game
     /// still requires fresh Steam metadata and authorization.
+    /// Madeira Dock is about to sign Valve's client in: iDeck's own connection
+    /// logs off and stays closed (no refresh, no reconnect) until `releaseDock()`.
+    func holdForDock() async {
+        await session.suspend()
+        SteamLog.event("[dock-launch] iDeck's Steam connection logged off for the Dock session")
+    }
+
+    /// The Dock session ended (or its start failed): iDeck may connect again.
+    func releaseDock() {
+        session.resume()
+    }
+
     func refresh(force: Bool = false) async {
         guard SteamSignIn.isSignedIn, let account = SteamSignIn.accountName,
               !account.isEmpty else {
