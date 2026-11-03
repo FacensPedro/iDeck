@@ -729,7 +729,9 @@ class WindowsEnvironment {
             unsetenv("MADEIRA_WAIT_CHILDREN")
         }
 
-        if profile.avxEnabled {
+        // AVX/AVX2 translation: when a game's recommendation asks for it, or
+        // automatically after the game stopped on an AVX instruction (AVXAuto).
+        if profile.avxEnabled || AVXAuto.isOn(profile.id) {
             setenv("MADEIRA_FEX_AVX", "1", 1)
         } else {
             unsetenv("MADEIRA_FEX_AVX")
@@ -835,5 +837,27 @@ private class BoxTranslator {
                 completion(Int(status))
             }
         }
+    }
+}
+
+
+/// Games that need AVX/AVX2 translation, found when one stops on an illegal
+/// instruction (0xC000001D); kept per game, by its profile ID.
+enum AVXAuto {
+    private static let key = "avxAutoGames"
+
+    static func isOn(_ game: String) -> Bool {
+        (UserDefaults.standard.stringArray(forKey: key) ?? []).contains(game)
+    }
+
+    /// True when it was off before.
+    @discardableResult
+    static func enable(_ game: String) -> Bool {
+        var games = UserDefaults.standard.stringArray(forKey: key) ?? []
+        guard !games.contains(game) else { return false }
+        games.append(game)
+        UserDefaults.standard.set(games, forKey: key)
+        AppLog.record("[avx] \(game) stopped on an illegal instruction: AVX/AVX2 translation on for it")
+        return true
     }
 }

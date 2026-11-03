@@ -92,6 +92,7 @@ struct GameSessionView: View {
     @State private var recentWineLogFinding: String?
     @State private var logCopyMessage: String?
     @State private var isCopyingWineLog = false
+    @State private var showControlsSheet = false
 
     private var gameLoading: (progress: Double, stage: String)? {
         let status = coordinator.windowsStatus
@@ -201,6 +202,14 @@ struct GameSessionView: View {
                     }
                     .disabled(coordinator.isClosingWindowsSession)
                     .accessibilityLabel(tr("Close Wine and return to the library"))
+                    Button { showControlsSheet = true } label: {
+                        Image(systemName: "gamecontroller.fill")
+                            .font(.system(size: 22))
+                            .foregroundColor(.white.opacity(0.85))
+                            .frame(width: 44, height: 44)
+                            .padding(.vertical, 8)
+                    }
+                    .accessibilityLabel(tr("Controls"))
                     // The Metal layer sits directly over the SwiftUI content
                     // outside this top strip. Keep first-frame failures and
                     // shutdown progress VISIBLE even when the drawable is black.
@@ -377,7 +386,12 @@ struct GameSessionView: View {
             }
         }
         .modifier(WineGamepadEventClaim())
+        .sheet(isPresented: $showControlsSheet) { SessionControlsSheet() }
+        .onChange(of: showGamePerformanceOverlay) { _, on in
+            metrics.sample(collectPerformance: on)
+        }
         .onAppear {
+            TouchController.shared.sessionStarted()
             WineInputBridge.shared.startBridging()
             metrics.sample(collectPerformance: showGamePerformanceOverlay)
             updateRecentWineLogFinding()
@@ -416,6 +430,7 @@ struct GameSessionView: View {
             coordinator.refreshWindowsSessionHealth()
         }
         .onDisappear {
+            TouchController.shared.sessionEnded()
             WineInputBridge.shared.stopBridging()
         }
         .alert(tr("Wine did not close"), isPresented: Binding(

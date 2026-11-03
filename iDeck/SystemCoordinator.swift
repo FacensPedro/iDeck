@@ -1398,6 +1398,7 @@ class SystemCoordinator: ObservableObject {
         guard windowsStatus == "Running" || windowsStatus == "Steam Running" ||
               windowsStatus == "Wine started; waiting for game..." else { return }
         guard !ideck_wineprocess_running() else { return }
+        let endedGame = activeWindowsProfile?.id ?? activeSteamGameID.map { "steam:\($0)" }
         activeSteamGameID = nil
         activeSteamPrefix = nil
         pendingSteamGameID = nil
@@ -1419,7 +1420,12 @@ class SystemCoordinator: ObservableObject {
         var crashStatus: UInt32 = 0
         let code = ideck_wineprocess_last_exit_code(&exitCode) ? exitCode : nil
         let ntstatus = ideck_wineprocess_last_ntstatus(&crashStatus) ? crashStatus : nil
-        let reason = WineExitDiagnostics.message(exitCode: code, crashStatus: ntstatus)
+        var reason = WineExitDiagnostics.message(exitCode: code, crashStatus: ntstatus)
+        // An illegal instruction (0xC000001D) is what a game built for AVX
+        // processors hits without AVX translation: it is turned on for that game.
+        if ntstatus == 0xC000001D, let endedGame, AVXAuto.enable(endedGame) {
+            reason += " AVX/AVX2 translation is now on for this game: restart iDeck and start it again."
+        }
         SteamLog.event("[wine-exit] \(reason)")
         setWindowsStatus(reason)
     }

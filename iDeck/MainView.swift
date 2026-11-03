@@ -317,8 +317,10 @@ struct WindowsWorkspaceView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
-    private let panelColor = Color(red: 0.105, green: 0.105, blue: 0.115)
-    private let secondaryColor = Color(red: 0.16, green: 0.16, blue: 0.17)
+    // Same palette as iRelay (panel #0b0b0d, card #111114, line #1f1f24).
+    private let panelColor = Color(red: 0x0b/255, green: 0x0b/255, blue: 0x0d/255)
+    private let secondaryColor = Color(red: 0x11/255, green: 0x11/255, blue: 0x14/255)
+    private let lineColor = Color(red: 0x1f/255, green: 0x1f/255, blue: 0x24/255)
 
     private var filteredSteamGames: [SteamAppInfo] {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -790,6 +792,7 @@ struct WindowsWorkspaceView: View {
         .padding(.horizontal, isCompact ? 14 : 24)
         .padding(.vertical, 10)
         .background(Color.black)
+        .overlay(alignment: .bottom) { lineColor.frame(height: 1) }
     }
 
     /// One game in the combined library, from whichever store owns it.
@@ -1980,7 +1983,7 @@ private struct SteamProgramDetailsView: View {
                         steamCloudControls
                     }
                     if installed {
-                        DetailCard(title: tr("DLC for this game")) {
+                        DetailCard(title: tr("DLCs")) {
                             dlcList
                         }
                     }
@@ -1990,6 +1993,12 @@ private struct SteamProgramDetailsView: View {
             .background(Color.black.ignoresSafeArea())
             .navigationTitle(tr("Game details"))
             .navigationBarTitleDisplayMode(.inline)
+            .onReceive(NotificationCenter.default.publisher(for: IRelayDeviceService.installedNotification)) { _ in
+                if let prefixPath { steamLibrary.refreshInstalledDLC(appID: game.appID, prefixPath: prefixPath) }
+            }
+            .onChange(of: steamLibrary.installingDLC[game.appID]) { _, now in
+                if now == nil, let prefixPath { steamLibrary.refreshInstalledDLC(appID: game.appID, prefixPath: prefixPath) }
+            }
             .task(id: game.appID) {
                 await steamLibrary.loadDLC(appID: game.appID)
                 guard !Task.isCancelled else { return }
@@ -2256,8 +2265,6 @@ private struct WindowsGameProfileForm: View {
                 DetailPickerRow(title: tr("Code checks"), selection: $profile.codeChecks,
                                 choices: WindowsGameProfile.codeCheckModes,
                                 icon: "checkmark.shield.fill", iconColor: .orange)
-                DetailToggleRow(title: tr("Enable AVX/AVX2 translation"), isOn: $profile.avxEnabled,
-                                icon: "cpu.fill", iconColor: .gray)
                 DetailToggleRow(title: tr("Keep helper processes running"),
                                 isOn: $profile.keepChildProcessesRunning,
                                 icon: "square.stack.3d.up.fill", iconColor: .gray)

@@ -463,19 +463,27 @@ final class SteamOwnedGamesModel: ObservableObject {
         }
         do {
             try Task.checkCancellation()
+            // iRelay can ask before the game's page loaded its DLC list.
+            if availableDLC[appID] == nil { await loadDLC(appID: appID) }
             guard let app = try await fetcher.fetchInstallInfo(appID: appID),
                   app.appID == appID,
                   app.installableOnWindows,
-                  availableDLC[appID]?.contains(dlcAppID) == true,
-                  app.depots.contains(where: {
-                      $0.dlcAppID == dlcAppID &&
-                      $0.publicManifestID != nil &&
-                      $0.supports(os: "windows")
-                  }) else {
+                  availableDLC[appID]?.contains(dlcAppID) == true else {
                 throw SteamError.depotNotFound(dlcAppID)
             }
             let steamApps = SteamInstallPaths.steamApps(
                 drive: prefixPath.appendingPathComponent("drive_c", isDirectory: true))
+            // A DLC with no files of its own (a licence that unlocks content the
+            // game already has) is installed as soon as it is recorded.
+            guard app.depots.contains(where: {
+                $0.dlcAppID == dlcAppID && $0.publicManifestID != nil && $0.supports(os: "windows")
+            }) else {
+                try SteamDLCRecords.markInstalled(parentID: appID, dlcID: dlcAppID, files: [], steamApps: steamApps)
+                outcome = .completed
+                downloadProgress.removeValue(forKey: appID)
+                refreshInstalledDLC(appID: appID, prefixPath: prefixPath)
+                return
+            }
             try FileManager.default.createDirectory(at: steamApps, withIntermediateDirectories: true)
             _ = try await downloader.install(app, steamApps: steamApps,
                 ownedDepots: { [weak self] in try? await self?.fetcher.ownedDepotIDs() },
@@ -487,7 +495,7 @@ final class SteamOwnedGamesModel: ObservableObject {
             try Task.checkCancellation()
             outcome = .completed
             installedApps.insert(appID)
-            
+            downloadProgress.removeValue(forKey: appID)
             refreshInstalledDLC(appID: appID, prefixPath: prefixPath)
         } catch {
             if Task.isCancelled || error is CancellationError {
