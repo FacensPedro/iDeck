@@ -629,6 +629,8 @@ class SystemCoordinator: ObservableObject {
         if legacyVisualCRuntimeTask != nil { return true }
         let prefix = prefix.standardizedFileURL
         let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
+        // Visual C++ built into the app: in place without installing anything.
+        if let documents { VisualCRuntimeBootstrap.installBundled(documents: documents) }
         if VisualCRuntimeBootstrap.installed(in: prefix, documents: documents) {
             // Visual C++ 2005-2013 and the 32-bit runtimes, once, for users who
             // accepted Microsoft's runtime (it is in Documents/vcruntime).
@@ -1107,6 +1109,8 @@ class SystemCoordinator: ObservableObject {
                 }
                 try MadeiraDock.writeHandoff(account: signIn.accountName, token: signIn.refreshToken, appID: dockGame.id)
                 MadeiraDock.configure(dockGame, launchOption: 0, arguments: profile.arguments)
+                // Visual C++ is built into iDeck: Steam's Visual C++ installers count as run.
+                MadeiraDock.markBundledVisualCRuns(dockGame)
                 DockInstallers.prepare(dockGame, drive: drive, prefix: MadeiraDock.prefix,
                                        others: MadeiraDock.games(drive: drive))
                 if DockInstallers.installsOnly, let script = DockInstallers.script {

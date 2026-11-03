@@ -16,7 +16,41 @@ extension ExternalDrives {
 extension MadeiraDock {
     /// The installed Steam game Madeira Dock can start, by App ID.
     static func game(appID: UInt32) -> DockGame? {
-        games(drive: drive).first { $0.id == Int(appID) }
+        linkPrefix()
+        return games(drive: drive).first { $0.id == Int(appID) }
+    }
+
+    /// Madeira's prefix is Documents/wine; iDeck's is Documents/VirtualRoot.
+    /// Documents/wine is made a link to iDeck's prefix, so Madeira's code (kept
+    /// verbatim) finds the games, the Steam client and the sign-in transfer there.
+    static func linkPrefix() {
+        let fm = FileManager.default
+        guard let documents = fm.urls(for: .documentDirectory, in: .userDomainMask).first else { return }
+        let link = documents.appendingPathComponent("wine")
+        let target = documents.appendingPathComponent("VirtualRoot", isDirectory: true)
+        if let existing = try? fm.destinationOfSymbolicLink(atPath: link.path) {
+            if existing == target.path || existing == "VirtualRoot" { return }
+            try? fm.removeItem(at: link)
+        } else if fm.fileExists(atPath: link.path) {
+            // A real folder from an earlier build: set aside, never deleted.
+            try? fm.moveItem(at: link, to: documents.appendingPathComponent("wine.old-\(Int(Date().timeIntervalSince1970))"))
+        }
+        try? fm.createSymbolicLink(atPath: link.path, withDestinationPath: "VirtualRoot")
+    }
+
+    /// Marks the Visual C++ programs of a game's Steam install script as run
+    /// when Visual C++ is built into iDeck (VisualCRuntimeBootstrap.installBundled).
+    static func markBundledVisualCRuns(_ game: DockGame) {
+        guard VisualCRuntimeBootstrap.bundled else { return }
+        let runs = DockInstallers.found(game, drive: drive).processes
+            .filter { process in
+                let program = process.executable.lowercased()
+                return program.contains("vcredist") || program.contains("vc_redist")
+            }
+            .map(\.run)
+        guard !runs.isEmpty else { return }
+        let marked = (try? SteamInstallScripts.mark(runs, prefix: prefix)) ?? 0
+        SteamLog.event("[dock-installers] Visual C++ is built into iDeck: \(marked) Steam Visual C++ install(s) marked as run")
     }
 
     /// steamclient64.dll is the build the Dock host verifies.
