@@ -215,6 +215,29 @@ struct GameSessionView: View {
                             .padding(.vertical, 8)
                     }
                     .accessibilityLabel(tr("Settings"))
+                    // The game's Metal surface covers everything below the
+                    // top strip, so the startup progress lives up here.
+                    if let loading = gameLoading {
+                        VStack(alignment: .leading, spacing: 5) {
+                            HStack {
+                                Text(tr(loading.stage))
+                                    .lineLimit(1)
+                                    .truncationMode(.tail)
+                                Spacer(minLength: 6)
+                                Text("\(Int(loading.progress * 100))%")
+                                    .monospacedDigit()
+                            }
+                            .font(.system(size: 12, weight: .medium))
+                            ProgressView(value: loading.progress, total: 1)
+                                .tint(.blue)
+                        }
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 8)
+                        .frame(maxWidth: 380)
+                        .background(.black.opacity(0.8), in: RoundedRectangle(cornerRadius: 10))
+                        .padding(.top, 8)
+                    }
                     // The Metal layer sits directly over the SwiftUI content
                     // outside this top strip. Keep first-frame failures and
                     // shutdown progress VISIBLE even when the drawable is black.
@@ -276,28 +299,6 @@ struct GameSessionView: View {
                         ProgressView()
                         Text(tr("Closing Wine and wineserver..."))
                             .font(.subheadline.weight(.medium))
-                    }
-                    .foregroundColor(.white)
-                    .padding(12)
-                    .background(.black.opacity(0.8), in: RoundedRectangle(cornerRadius: 10))
-                    .padding(.horizontal, 14)
-                }
-                if let loading = gameLoading {
-                    VStack(alignment: .leading, spacing: 7) {
-                        HStack {
-                            Text(loading.stage)
-                            Spacer()
-                            Text("\(Int(loading.progress * 100))%")
-                                .monospacedDigit()
-                        }
-                        .font(.system(size: 13, weight: .medium))
-                        ProgressView(value: loading.progress, total: 1)
-                            .tint(.blue)
-                        if !metrics.receivedNewFrames {
-                            Text("Startup milestone, not the game's internal loading percentage.")
-                                .font(.system(size: 10))
-                                .foregroundColor(.gray)
-                        }
                     }
                     .foregroundColor(.white)
                     .padding(12)
