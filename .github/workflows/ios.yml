@@ -309,6 +309,13 @@ jobs:
           /tmp/ideck-graphics-override-tests
           python3 -m unittest discover -s tests/host -p 'test_wine_11_4_d3d12_dxvk_hud.py' -v
 
+      - name: Build Visual C++ bundle (extracted, never run)
+        run: |
+          mkdir -p /tmp/vcrt-app
+          bash scripts/bundle_vcruntime.sh /tmp/vcrt-app
+          test -f /tmp/vcrt-app/vcruntime-bundle/vcruntime140.dll
+          test -f /tmp/vcrt-app/vcruntime-bundle/x86/msvcp140.dll
+
       - name: Verify no second Wine launch before guest and wineserver exit
         run: python3 -m unittest discover -s tests/host -p 'test_madeira_second_launch_close_contract.py' -v
 
