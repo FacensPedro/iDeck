@@ -351,7 +351,9 @@ class WindowsEnvironment {
         }
 
         let actualMachine = binary.path.withCString { ideck_native_pe_machine($0) }
-        guard actualMachine == 0x014c || actualMachine == 0x8664 else {
+        // Wine's own cmd.exe may be an ARM64 build: allowed for Steam's one-time installs only.
+        let nativeShell = actualMachine == 0xAA64 && binary.lastPathComponent.lowercased() == "cmd.exe"
+        guard actualMachine == 0x014c || actualMachine == 0x8664 || nativeShell else {
             SteamLog.event("[wine-launch] unsupported or truncated PE image")
             completion(Int(EINVAL))
             return

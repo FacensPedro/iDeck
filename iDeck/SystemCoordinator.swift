@@ -1116,18 +1116,24 @@ class SystemCoordinator: ObservableObject {
                 MadeiraDock.markBundledVisualCRuns(dockGame)
                 DockInstallers.prepare(dockGame, drive: drive, prefix: MadeiraDock.prefix,
                                        others: MadeiraDock.games(drive: drive))
+                if DockInstallers.script != nil, MadeiraDock.stageCommandShell() == nil {
+                    let skipped = MadeiraDock.skipInstalls(dockGame)
+                    SteamLog.event("[dock-installers] no cmd.exe in this build: \(skipped) one-time install(s) recorded as run; starting the game")
+                    DockInstallers.prepare(dockGame, drive: drive, prefix: MadeiraDock.prefix,
+                                           others: MadeiraDock.games(drive: drive))
+                }
                 if DockInstallers.installsOnly, let script = DockInstallers.script {
                     // No host runs in this session: nothing will take the sign-in transfer.
                     MadeiraDock.cleanup()
                     setenv("MADEIRA_DOCK_INSTALLS_SESSION", "1", 1)
-                    program = try MadeiraDock.stageCommandShell()
+                    program = try MadeiraDock.stageCommandShell().orThrow(DockError.message("This build has no cmd.exe for Steam's one-time installs."))
                     arguments = "/c call " + script
                     SteamLog.event("[madeira-dock] app \(dockGame.id): this session runs only the one-time installs")
                 } else {
                     unsetenv("MADEIRA_DOCK_INSTALLS_SESSION")
                     let host = try MadeiraDock.stageHost()
                     if let script = DockInstallers.script {
-                        program = try MadeiraDock.stageCommandShell()
+                        program = try MadeiraDock.stageCommandShell().orThrow(DockError.message("This build has no cmd.exe for Steam's one-time installs."))
                         arguments = "/c call \(script) & \(MadeiraDock.executable)"
                     } else {
                         program = host
