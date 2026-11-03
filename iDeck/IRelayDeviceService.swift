@@ -186,34 +186,61 @@ final class IRelayDeviceService: @unchecked Sendable {
     private static func library() async -> [String: Any] {
         let steam = SteamOwnedGamesModel.shared
         let prefix = Self.prefix
+        let drive = Self.drive
         if SteamSignIn.isSignedIn && steam.games.isEmpty { await steam.refresh() }
         steam.refreshInstalledApps(prefixPath: prefix)
-        let steamGames: [[String: Any]] = steam.games.filter { $0.type == .game }.map { game in
-            [
-                "appId": game.appID, "name": game.name, "installDir": game.installDir,
-                "installed": steam.installedApps.contains(game.appID),
-                "dlc": (steam.availableDLC[game.appID] ?? []).map { id in
-                    ["appId": id, "name": steam.dlcMetadata[id]?.name ?? "DLC \(id)",
-                     "installed": steam.installedDLC[game.appID]?.contains(id) == true] as [String: Any]
-                },
-            ]
+        // What is installed is read from the device's own folders every time
+        // (not from the views' state), so games copied earlier, by any version
+        // of iRelay, are always found.
+        let steamApps = SteamInstallPaths.steamApps(drive: drive)
+        let records = Set(((try? FileManager.default.contentsOfDirectory(atPath: steamApps.path)) ?? []).compactMap { name -> UInt32? in
+            guard name.hasPrefix("appmanifest_"), name.hasSuffix(".acf") else { return nil }
+            return UInt32(name.dropFirst("appmanifest_".count).dropLast(4))
+        })
+        func dlc(_ appID: UInt32) -> [[String: Any]] {
+            (steam.availableDLC[appID] ?? []).map { id in
+                ["appId": id, "name": steam.dlcMetadata[id]?.name ?? "DLC \(id)",
+                 "installed": SteamDLCRecords.isInstalled(parentID: appID, dlcID: id, steamApps: steamApps)] as [String: Any]
+            }
+        }
+        var steamGames: [[String: Any]] = steam.games.filter { $0.type == .game }.map { game in
+            ["appId": game.appID, "name": game.name, "installDir": game.installDir,
+             "installed": records.contains(game.appID), "dlc": dlc(game.appID)]
+        }
+        // Installed games the owned list does not have (not loaded yet, or another account's).
+        let listed = Set(steam.games.map(\.appID))
+        for id in records.sorted() where !listed.contains(id) {
+            let dir = SteamInstallFiles.installDirectoryName(appID: Int(id), steamApps: steamApps) ?? ""
+            let name = MadeiraDock.games(drive: drive).first { $0.id == Int(id) }?.name ?? (dir.isEmpty ? "App \(id)" : dir)
+            steamGames.append(["appId": id, "name": name, "installDir": dir, "installed": true, "dlc": dlc(id)])
         }
         let gog = GOGLibraryModel.shared
         gog.refreshInstalled(prefixPath: prefix)
-        let gogGames: [[String: Any]] = gog.games.filter(\.worksOnWindows).map { game in
+        let gogInstalled = await Task.detached(priority: .userInitiated) { GOGInstallScanner.installed(in: drive) }.value
+        var gogGames: [[String: Any]] = gog.games.filter(\.worksOnWindows).map { game in
             ["id": game.id, "title": game.title, "cover": game.artworkCandidates.first?.absoluteString ?? "",
-             "installed": gog.installed[game.id] != nil]
+             "installed": gogInstalled[game.id] != nil]
+        }
+        let gogListed = Set(gog.games.map(\.id))
+        for (id, game) in gogInstalled where !gogListed.contains(id) {
+            gogGames.append(["id": id, "title": game.name, "cover": "", "installed": true])
         }
         let epic = EpicLibrary.shared
-        let epicGames: [[String: Any]] = epic.owned.map { game in
+        epic.reloadInstalled()
+        var epicGames: [[String: Any]] = epic.owned.map { game in
             ["appName": game.appName, "title": game.title, "namespace": game.namespace,
              "catalogItemId": game.catalogItemID, "cover": game.cover?.absoluteString ?? "",
              "folderName": game.folderName, "installed": epic.installed[game.appName] != nil]
         }
+        let epicListed = Set(epic.owned.map(\.appName))
+        for (app, game) in epic.installed where !epicListed.contains(app) {
+            epicGames.append(["appName": app, "title": game.title, "namespace": game.namespace,
+                              "catalogItemId": game.catalogItemID, "cover": "", "folderName": "", "installed": true])
+        }
         return [
-            "steam": ["signedIn": SteamSignIn.isSignedIn, "account": SteamSignIn.accountName ?? "", "games": steamGames],
-            "gog": ["signedIn": gog.isSignedIn, "games": gogGames],
-            "epic": ["signedIn": epic.signedIn, "games": epicGames],
+            "steam": ["signedIn": SteamSignIn.isSignedIn || !records.isEmpty, "account": SteamSignIn.accountName ?? "", "games": steamGames],
+            "gog": ["signedIn": gog.isSignedIn || !gogInstalled.isEmpty, "games": gogGames],
+            "epic": ["signedIn": epic.signedIn || !epic.installed.isEmpty, "games": epicGames],
         ]
     }
 
