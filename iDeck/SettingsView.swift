@@ -29,6 +29,8 @@ struct SettingsView: View {
     @State private var isPairingImporterPresented = false
     @AppStorage(AppLanguage.storageKey) private var appLanguage = AppLanguage.system.rawValue
 
+    @AppStorage(IRelaySetting.enabledKey) private var irelayEnabled = false
+
     var body: some View {
         NavigationStack {
             Form {
@@ -49,6 +51,13 @@ struct SettingsView: View {
                         SettingsRow(icon: "e.square.fill", color: Color(white: 0.22), title: "Epic Games",
                                     value: epicLibrary.signedIn ? (epicLibrary.accountName ?? tr("Connected")) : tr("Not connected"),
                                     asset: "StoreBadgeEpic")
+                    }
+                }
+
+                Section(tr("PC")) {
+                    NavigationLink { irelayPage } label: {
+                        SettingsRow(icon: "cable.connector", color: .blue, title: "iRelay",
+                                    value: irelayEnabled ? tr("On") : tr("Off"))
                     }
                 }
 
@@ -153,6 +162,13 @@ struct SettingsView: View {
 
     // MARK: Accounts
 
+    private var irelayPage: some View {
+        Form {
+            IRelaySettingsSection()
+        }
+        .navigationTitle("iRelay")
+    }
+
     private var steamPage: some View {
         Form {
             settingsSection(title: tr("Steam")) {
@@ -182,7 +198,6 @@ struct SettingsView: View {
             } footer: {
                 Text(tr("Steam games start through Valve's own Windows client (Madeira Dock). Its components install automatically the first time the Madeira workspace opens. They (about 72 MB) come from Valve's update server and are checked against pinned checksums."))
             }
-            IRelaySettingsSection()
         }
         .navigationTitle("Steam")
     }
