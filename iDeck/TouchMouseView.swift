@@ -1,0 +1,57 @@
+import SwiftUI
+import UIKit
+import Darwin
+
+/// The screen as a mouse: a finger moves the Windows cursor and holds the
+/// left button while it is down (Madeira's winios touch bridge).
+struct TouchMouseView: UIViewRepresentable {
+    func makeUIView(context: Context) -> TouchMouseSurface { TouchMouseSurface() }
+    func updateUIView(_ uiView: TouchMouseSurface, context: Context) {}
+}
+
+final class TouchMouseSurface: UIView {
+    private typealias Post = @convention(c) (Int32, Int32) -> Void
+    private static func symbol(_ name: String) -> Post? {
+        dlsym(UnsafeMutableRawPointer(bitPattern: -2), name).map { unsafeBitCast($0, to: Post.self) }
+    }
+    private static let down = symbol("winios_post_touch_down")
+    private static let move = symbol("winios_post_touch_move")
+    private static let up = symbol("winios_post_touch_up")
+
+    private weak var tracked: UITouch?
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        backgroundColor = .clear
+        isMultipleTouchEnabled = false
+    }
+    required init?(coder: NSCoder) { nil }
+
+    private func guest(_ touch: UITouch) -> (Int32, Int32)? {
+        guard let window else { return nil }
+        let point = touch.location(in: window)
+        guard let g = WindowsRendererView.guestPoint(fromWindow: point) else { return nil }
+        return (Int32(g.x.rounded()), Int32(g.y.rounded()))
+    }
+
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        guard tracked == nil, let touch = touches.first, let p = guest(touch) else { return }
+        tracked = touch
+        Self.down?(p.0, p.1)
+    }
+
+    override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
+        guard let touch = tracked, touches.contains(touch), let p = guest(touch) else { return }
+        Self.move?(p.0, p.1)
+    }
+
+    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
+        guard let touch = tracked, touches.contains(touch) else { return }
+        tracked = nil
+        if let p = guest(touch) { Self.up?(p.0, p.1) }
+    }
+
+    override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
+        touchesEnded(touches, with: event)
+    }
+}

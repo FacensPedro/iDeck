@@ -93,6 +93,7 @@ struct GameSessionView: View {
     @State private var logCopyMessage: String?
     @State private var isCopyingWineLog = false
     @State private var showControlsSheet = false
+    @AppStorage("touchMouseEnabled") private var touchMouseEnabled = true
 
     private var gameLoading: (progress: Double, stage: String)? {
         let status = coordinator.windowsStatus
@@ -191,6 +192,10 @@ struct GameSessionView: View {
             }
             .ignoresSafeArea()
 
+            if touchMouseEnabled {
+                TouchMouseView().ignoresSafeArea()
+            }
+
             VStack {
                 HStack(alignment: .top) {
                     Button(action: coordinator.requestCloseWindowsSession) {
@@ -203,13 +208,13 @@ struct GameSessionView: View {
                     .disabled(coordinator.isClosingWindowsSession)
                     .accessibilityLabel(tr("Close Wine and return to the library"))
                     Button { showControlsSheet = true } label: {
-                        Image(systemName: "speedometer")
+                        Image(systemName: "gearshape.fill")
                             .font(.system(size: 22))
                             .foregroundColor(.white.opacity(0.85))
                             .frame(width: 44, height: 44)
                             .padding(.vertical, 8)
                     }
-                    .accessibilityLabel(tr("Controls"))
+                    .accessibilityLabel(tr("Settings"))
                     // The Metal layer sits directly over the SwiftUI content
                     // outside this top strip. Keep first-frame failures and
                     // shutdown progress VISIBLE even when the drawable is black.

@@ -1111,7 +1111,7 @@ class SystemCoordinator: ObservableObject {
                     throw DockError.message("Sign in to Steam to start games through Steam.")
                 }
                 try MadeiraDock.writeHandoff(account: signIn.accountName, token: signIn.refreshToken, appID: dockGame.id)
-                MadeiraDock.configure(dockGame, launchOption: 0, arguments: profile.arguments)
+                MadeiraDock.configure(dockGame, launchOption: self.gameLaunchOption(game, prefixPath: prefixPath), arguments: profile.arguments)
                 // Visual C++ is built into iDeck: Steam's Visual C++ installers count as run.
                 MadeiraDock.markBundledVisualCRuns(dockGame)
                 DockInstallers.prepare(dockGame, drive: drive, prefix: MadeiraDock.prefix,
@@ -1495,6 +1495,38 @@ class SystemCoordinator: ObservableObject {
         let message = status > 0 && status < 256
             ? String(cString: strerror(Int32(status))) : "unknown native error"
         return "Execution Error: Madeira launch failed (code \(status): \(message))."
+    }
+
+    /// Steam's launch option for the game itself. When Steam's default option
+    /// opens a launcher, the first Windows option that starts the game's own
+    /// executable (installed in the game folder) is used instead.
+    func gameLaunchOption(_ game: SteamAppInfo, prefixPath: URL) -> UInt32 {
+        let windows = game.launches.filter { option in
+            let platforms = option.oslist.lowercased()
+                .split(whereSeparator: { $0 == "," || $0 == " " || $0 == ";" })
+            return (platforms.isEmpty || platforms.contains("windows")) && (option.requiredDLC?.isEmpty != false)
+        }
+        func isLauncher(_ option: SteamLaunchOption) -> Bool {
+            let exe = option.executable.replacingOccurrences(of: "\\", with: "/")
+                .split(separator: "/").last.map { $0.lowercased() } ?? ""
+            return option.type.lowercased().contains("launcher") || exe.contains("launcher")
+        }
+        guard let first = windows.first, isLauncher(first) else { return 0 }
+        let drive = prefixPath.appendingPathComponent("drive_c", isDirectory: true)
+        let steamApps = SteamInstallPaths.steamApps(drive: drive)
+        let name = SteamInstallFiles.installDirectoryName(appID: Int(game.appID), steamApps: steamApps) ??
+            SteamInstallFiles.safeFolderName(game.installDir)
+        let root = SteamInstallPaths.common(drive: drive).appendingPathComponent(name, isDirectory: true)
+            .resolvingSymlinksInPath().standardizedFileURL
+        let special = ["vr", "server", "editor", "tool"]
+        let direct = windows.filter { option in
+            !isLauncher(option) && option.index != nil &&
+            !special.contains(where: { option.type.lowercased().contains($0) }) &&
+            SteamInstallFiles.resolveLaunchPath(option.executable, root: root, executable: true) != nil
+        }.sorted { ($0.osarch == "64" ? 0 : 1) < ($1.osarch == "64" ? 0 : 1) }
+        guard let pick = direct.first, let index = pick.index else { return 0 }
+        SteamLog.event("[steam-compat] app=\(game.appID) launcher skipped; launch option \(index) (\(pick.executable))")
+        return index
     }
 
     /// Reads only metadata already available to iDeck and filenames inside
