@@ -280,6 +280,8 @@ final class BugReportModel: ObservableObject {
 struct BugReportView: View {
     @StateObject private var model = BugReportModel()
     @State private var expanded: Set<String> = []
+    @State private var bugsOpen = false
+    @State private var jitOpen = false
     @AppStorage("diagnostics.detailed") private var detailedDiagnostics = false
     @AppStorage(BenchmarkSession.enabledKey) private var recordBenchmarks = false
     @State private var benchmarkReports: [URL] = []
@@ -296,8 +298,17 @@ struct BugReportView: View {
                 }
                 let jitIssues = model.issues.filter { $0.source == .jit }
                 if !jitIssues.isEmpty {
-                    Section(tr("JIT") + " (\(jitIssues.count))") {
-                        ForEach(jitIssues) { issue in issueRow(issue) }
+                    Section {
+                        if jitOpen { ForEach(jitIssues) { issue in issueRow(issue) } }
+                    } header: {
+                        Button { withAnimation { jitOpen.toggle() } } label: {
+                            HStack {
+                                Text(tr("JIT") + " (\(jitIssues.count))")
+                                Spacer()
+                                Image(systemName: "chevron.down").rotationEffect(.degrees(jitOpen ? 0 : -90))
+                            }
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
                 Section {
@@ -306,13 +317,23 @@ struct BugReportView: View {
                     } else if model.issues.isEmpty {
                         Label(tr("No bugs found in the logs."), systemImage: "checkmark.seal")
                             .foregroundColor(.green)
-                    } else {
+                    } else if bugsOpen {
                         ForEach(model.issues.filter { $0.source != .jit }) { issue in issueRow(issue) }
                     }
                 } header: {
-                    Text(tr("Bugs found") + (model.issues.isEmpty ? "" : " (\(model.issues.count))"))
-                } footer: {
-                    Text(tr("Tap a bug to see it in full. Copied reports include the iDeck version and device, never your Steam or GOG account."))
+                    // Bugs start hidden; the header shows or hides them.
+                    Button {
+                        withAnimation { bugsOpen.toggle() }
+                    } label: {
+                        HStack {
+                            Text(tr("Bugs found") + (model.issues.isEmpty ? "" : " (\(model.issues.count))"))
+                            Spacer()
+                            if !model.issues.isEmpty {
+                                Image(systemName: "chevron.down").rotationEffect(.degrees(bugsOpen ? 0 : -90))
+                            }
+                        }
+                    }
+                    .buttonStyle(.plain)
                 }
                 Section {
                     Toggle(tr("Detailed diagnostics"), isOn: $detailedDiagnostics)

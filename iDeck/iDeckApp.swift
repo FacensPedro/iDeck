@@ -13,6 +13,7 @@ struct iDeckApp: App {
         // The prefix is Documents/wine (Madeira's); earlier builds' moves first.
         MadeiraDock.linkPrefix()
         IRelayRuntime.start()
+        JITPoolList.ensureFile()
         NSLog("[iDeck startup] SwiftUI App initialized without native runtime setup")
     }
 
