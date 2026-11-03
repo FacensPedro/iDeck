@@ -9,6 +9,8 @@ struct iDeckApp: App {
         // Metal HUD insights; madeira.cfg values exported later win.
         setenv("MTL_HUD_INSIGHTS_ENABLED", "0", 0)
         setenv("MADEIRA_WGI_HOST_PADS", "1", 0)
+        // iRelay over the USB cable: listen from launch so the PC is ready by the first download.
+        if IRelaySetting.enabled && IRelaySetting.cable { IRelayUSBTunnel.shared.start() }
         NSLog("[iDeck startup] SwiftUI App initialized without native runtime setup")
     }
 
