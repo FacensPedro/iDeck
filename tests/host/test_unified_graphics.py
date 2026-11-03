@@ -79,8 +79,8 @@ class UnifiedProfileTests(unittest.TestCase):
 
     def test_workflow_defaults_to_unified_and_checks_both_backends(self):
         workflow = (ROOT / ".github/workflows/ios.yml").read_text()
-        self.assertIn("options: [unified]", workflow)
-        self.assertIn("inputs.graphics_profile || 'unified'", workflow)
+        self.assertNotIn("graphics_profile:", workflow)
+        self.assertIn("IDECK_GRAPHICS_PROFILE: unified", workflow)
         self.assertIn('flags.get("d3d11Available") is not True', workflow)
 
     def test_api_preference_uses_engine_switch_never_translation(self):

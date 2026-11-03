@@ -118,6 +118,11 @@ final class IRelayDeviceService: @unchecked Sendable {
             }
         case ("GET", "/installs"):
             return .json(await Self.installs())
+        case ("DELETE", "/logs"):
+            // iRelay's "Clear" on iDeck bugs: the same as Bugs & logs › Clear logs.
+            AppLog.clear()
+            if let wine = await MainActor.run(body: { BugReportModel.wineLogURL }) { try? FileManager.default.removeItem(at: wine) }
+            return .json(["ok": true])
         case ("GET", "/logs"):
             return .json(await Self.logs())
         case ("GET", "/library"):
