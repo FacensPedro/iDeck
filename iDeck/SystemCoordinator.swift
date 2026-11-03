@@ -208,11 +208,13 @@ class SystemCoordinator: ObservableObject {
         case "Running", "Steam Running": BenchmarkSession.mark("running")
         case "Windows Ready":
             BenchmarkSession.finish(kind: "game", outcome: "closed")
+            DispatchQueue.main.async { MainActor.assumeIsolated { SteamOwnedGamesModel.shared.releaseDock() } }
             if WindowsEnvironment.sessionsThisRun > 0 {
                 DispatchQueue.main.async { MainActor.assumeIsolated { ResourceGovernor.shared.releaseAfterSession() } }
             }
         default:
             if status.hasPrefix("Execution Error") || status.hasPrefix("Cannot launch") {
+                DispatchQueue.main.async { MainActor.assumeIsolated { SteamOwnedGamesModel.shared.releaseDock() } }
                 BenchmarkSession.finish(kind: "game", outcome: "failed: " + status)
             }
         }
@@ -1101,6 +1103,19 @@ class SystemCoordinator: ObservableObject {
         let standardizedPrefix = prefixPath.standardizedFileURL.path
         pendingSteamGameID = game.appID
         setWindowsStatus("Launching Steam game...")
+        // As Madeira (SteamConnectionGate.holdForDock): Valve's client must be the
+        // only connection logged on with this account. iDeck's own connection was
+        // still up (library, iRelay, ten-minute idle) and logged on again, so
+        // Steam ended the client's logon with LogonSessionReplaced (34) before
+        // it confirmed the license, and the game never started.
+        Task { @MainActor [weak self] in
+            await SteamOwnedGamesModel.shared.holdForDock()
+            guard let self else { return }
+            self.continueDockSession(game: game, host: host, standardizedPrefix: standardizedPrefix)
+        }
+    }
+
+    private func continueDockSession(game: SteamAppInfo, host: URL, standardizedPrefix: String) {
         withPreparedMetalDisplay(expectedStatus: "Launching Steam game...") { [weak self] in
             guard let self, self.pendingSteamGameID == game.appID else { return }
             guard !ideck_wineprocess_running() else {
