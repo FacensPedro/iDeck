@@ -76,9 +76,8 @@ final class TouchController: ObservableObject {
         controller?.disconnect()
         controller = nil
         guard active && enabled else { return }
-        let cfg = GCVirtualController.Configuration()
-        cfg.elements = Set(Element.allCases.filter(isShown).flatMap(\.gcElements))
-        let vc = GCVirtualController(configuration: cfg)
+        let elements = Set(Element.allCases.filter(isShown).flatMap(\.gcElements))
+        guard let vc = IDeckMakeVirtualController(elements) else { return }
         vc.connect()
         controller = vc
     }
