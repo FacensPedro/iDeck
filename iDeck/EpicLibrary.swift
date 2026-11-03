@@ -207,6 +207,12 @@ struct EpicInstalledGame: Codable, Sendable {
         installed = records.filter { FileManager.default.fileExists(atPath: Self.drive.appendingPathComponent($0.value.programPath).path) }
     }
 
+    /// A game iRelay copied from the PC's Epic Games Launcher, files already in place.
+    func registerTransferred(_ game: EpicInstalledGame) {
+        installed[game.appName] = game
+        writeInstalled()
+    }
+
     private func writeInstalled() {
         try? FileManager.default.createDirectory(at: Self.support, withIntermediateDirectories: true)
         let encoder = JSONEncoder(); encoder.outputFormatting = [.prettyPrinted, .sortedKeys]

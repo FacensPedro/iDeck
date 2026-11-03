@@ -104,7 +104,7 @@ struct MainView: View {
                         // Authorization is checked when a game actually starts.
                         coordinator.configureNativeHostIfNeeded()
                         coordinator.loadSteamAccountIfNeeded()
-                        if steamLibrary == nil { steamLibrary = SteamOwnedGamesModel() }
+                        if steamLibrary == nil { steamLibrary = SteamOwnedGamesModel.shared }
                         selectedWorkspace = .pc
                         if !coordinator.isContainerReady {
                             coordinator.openMadeiraWorkspace()
@@ -115,7 +115,7 @@ struct MainView: View {
                     .buttonStyle(.plain)
                     Button {
                         coordinator.configureNativeHostIfNeeded()
-                        if steamLibrary == nil { steamLibrary = SteamOwnedGamesModel() }
+                        if steamLibrary == nil { steamLibrary = SteamOwnedGamesModel.shared }
                         selectedWorkspace = .liveContainer
                     } label: {
                         modeTile(title: tr("LiveContainer"), symbol: "square.stack.3d.up.fill")

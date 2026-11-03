@@ -1,60 +1,36 @@
 import Foundation
 import Network
 import SwiftUI
+import UIKit
 
-/// iRelay (github.com/FacensPedro/iRelay): a Windows program that downloads a
-/// Steam game's chunks on a PC while iDeck installs it, and hands them to iDeck
-/// over the local network as soon as each one arrives.
+/// iRelay (github.com/FacensPedro/iRelay): a Windows program connected to this
+/// iPad by USB cable. It works two ways:
 ///
-/// iDeck talks to it directly over HTTP (port 27090 by default):
-/// - `GET /ping`: name and version; checks the pairing code.
-/// - `POST /jobs`: the chunks iDeck still needs, per depot, in the order it will
-///   ask for them, with the content servers and their authorization. iRelay
-///   starts downloading all of them at the PC's speed.
-/// - `GET /depot/<id>/chunk/<sha>`: one chunk exactly as a content server sends
-///   it (still encrypted and compressed). iRelay answers from its cache, waits
-///   for a chunk being downloaded or fetches it at once. iDeck checks and
-///   decrypts it as it does a content server's answer.
+/// 1. Games installed on the PC (Steam, GOG, Epic) are copied into iDeck's own
+///    folders (`IRelayDeviceService`, port 27093): iRelay lists iDeck's
+///    libraries, compares files and sends what is missing.
+/// 2. While iDeck itself downloads a Steam game, iRelay downloads the same
+///    chunks on the PC and hands each one over as it arrives (`IRelayClient`,
+///    through `IRelayUSBTunnel`):
+///    - `GET /ping`
+///    - `POST /jobs`: the chunks iDeck still needs, per depot, in order, with
+///      the content servers and their authorization.
+///    - `GET /depot/<id>/chunk/<sha>`: one chunk as a content server sends it,
+///      checked and decrypted here like a content server's answer.
 ///
-/// Every request carries the pairing code shown in iRelay's window
-/// (`X-iRelay-Code`). Any failure falls back to Steam's content servers.
+/// The cable is the only connection: usbmux reaches only a PC this iPad trusts.
 enum IRelaySetting {
     static let enabledKey = "ideck.irelay.enabled"
-    static let hostKey = "ideck.irelay.host"
-    static let codeKey = "ideck.irelay.code"
-    static let cableKey = "ideck.irelay.cable"
-    static let defaultPort = 27090
-
     static var enabled: Bool { UserDefaults.standard.bool(forKey: enabledKey) }
-    /// USB cable (default) or the local network.
-    static var cable: Bool { UserDefaults.standard.object(forKey: cableKey) as? Bool ?? true }
-    static var host: String {
-        (UserDefaults.standard.string(forKey: hostKey) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-    static var code: String {
-        (UserDefaults.standard.string(forKey: codeKey) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    /// "192.168.0.10", "192.168.0.10:27090" or "http://pc.local:27090".
-    static func baseURL(_ host: String) -> URL? {
-        var text = host
-        if !text.contains("://") { text = "http://" + text }
-        guard var parts = URLComponents(string: text), parts.host?.isEmpty == false else { return nil }
-        if parts.port == nil { parts.port = defaultPort }
-        parts.path = ""
-        return parts.url
-    }
 }
 
 enum IRelayError: LocalizedError {
-    case badAddress, unauthorized, status(Int), offline
+    case status(Int), notConnected
 
     var errorDescription: String? {
         switch self {
-        case .badAddress: return "The iRelay address is not valid."
-        case .unauthorized: return "iRelay refused the pairing code."
         case .status(let code): return "iRelay answered HTTP \(code)."
-        case .offline: return "iRelay stopped answering; using Steam's servers."
+        case .notConnected: return "iRelay is not connected over the USB cable."
         }
     }
 }
@@ -71,8 +47,7 @@ final class IRelayClient: @unchecked Sendable {
         let chunks: [String]
     }
 
-    let base: URL
-    private let code: String
+    let base = URL(string: "http://127.0.0.1:\(IRelayUSBTunnel.localPort)")!
     private let lock = NSLock()
     private var failureCount = 0
     private var chunkCount = 0
@@ -87,21 +62,11 @@ final class IRelayClient: @unchecked Sendable {
         return URLSession(configuration: configuration)
     }()
 
-    init?(host: String, code: String) {
-        guard let base = IRelaySetting.baseURL(host) else { return nil }
-        self.base = base
-        self.code = code
-    }
-
-    /// The iRelay set in Settings › Steam, when it is on.
+    /// The iRelay on the cable, when it is turned on in Settings.
     static func configured() -> IRelayClient? {
         guard IRelaySetting.enabled else { return nil }
-        if IRelaySetting.cable {
-            IRelayUSBTunnel.shared.start()
-            return IRelayClient(host: "127.0.0.1:\(IRelayUSBTunnel.localPort)", code: IRelaySetting.code)
-        }
-        guard !IRelaySetting.host.isEmpty else { return nil }
-        return IRelayClient(host: IRelaySetting.host, code: IRelaySetting.code)
+        IRelayUSBTunnel.shared.start()
+        return IRelayClient()
     }
 
     var usable: Bool { lock.withLock { failureCount < 5 } }
@@ -112,7 +77,6 @@ final class IRelayClient: @unchecked Sendable {
     private func request(_ path: String, method: String = "GET", body: Data? = nil, timeout: TimeInterval = 90) -> URLRequest {
         var request = URLRequest(url: base.appendingPathComponent(path), timeoutInterval: timeout)
         request.httpMethod = method
-        request.setValue(code, forHTTPHeaderField: "X-iRelay-Code")
         if let body {
             request.httpBody = body
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -122,16 +86,20 @@ final class IRelayClient: @unchecked Sendable {
 
     private static func check(_ response: URLResponse) throws {
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-        if status == 401 { throw IRelayError.unauthorized }
         guard (200...299).contains(status) else { throw IRelayError.status(status) }
     }
 
     func ping() async throws -> Info {
-        let (data, response) = try await Self.session.data(for: request("ping", timeout: 10))
-        try Self.check(response)
-        let info = try JSONDecoder().decode(Info.self, from: data)
-        lock.withLock { name = info.machine.map { "iRelay (\($0))" } ?? info.name }
-        return info
+        do {
+            let (data, response) = try await Self.session.data(for: request("ping", timeout: 10))
+            try Self.check(response)
+            let info = try JSONDecoder().decode(Info.self, from: data)
+            lock.withLock { name = info.machine.map { "iRelay (\($0))" } ?? info.name }
+            return info
+        } catch {
+            if !IRelayUSBTunnel.shared.pcConnected { throw IRelayError.notConnected }
+            throw error
+        }
     }
 
     /// Hands iRelay the whole list so the PC downloads ahead of this device.
@@ -159,64 +127,51 @@ final class IRelayClient: @unchecked Sendable {
     }
 }
 
-
 /// Settings › Steam › iRelay.
 struct IRelaySettingsSection: View {
     @AppStorage(IRelaySetting.enabledKey) private var enabled = false
-    @AppStorage(IRelaySetting.hostKey) private var host = ""
-    @AppStorage(IRelaySetting.codeKey) private var code = ""
-    @AppStorage(IRelaySetting.cableKey) private var cable = true
     @State private var status: String?
     @State private var testing = false
 
     var body: some View {
         Section {
-            Toggle(tr("Download through iRelay"), isOn: $enabled)
-            Picker(tr("Connection"), selection: $cable) {
-                Text(tr("USB cable")).tag(true)
-                Text(tr("Wi-Fi")).tag(false)
-            }
-            if !cable {
-                TextField(tr("PC address (e.g. 192.168.0.10)"), text: $host)
-                    .keyboardType(.URL)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-            }
-            TextField(tr("Pairing code"), text: $code)
-                .keyboardType(.numberPad)
+            Toggle(tr("Use iRelay (USB cable)"), isOn: $enabled)
+                .onChange(of: enabled) { _, on in if on { IRelayRuntime.start() } }
             Button(testing ? tr("Connecting…") : tr("Test connection")) { test() }
-                .disabled(testing || (!cable && host.trimmingCharacters(in: .whitespaces).isEmpty))
+                .disabled(testing || !enabled)
             if let status {
                 Text(status).font(.caption).foregroundStyle(.secondary)
             }
         } header: {
             Text("iRelay")
         } footer: {
-            Text(tr("iRelay runs on a Windows PC. While iDeck installs a Steam game, the PC downloads it too and sends each piece to iDeck as soon as it arrives. USB cable: connect the iPad to the PC, tap Trust on the iPad, and keep the Apple Devices app (or iTunes) installed on the PC. Enter the pairing code shown in iRelay's window. If the PC stops answering, the download continues from Steam."))
-                .onAppear { if enabled && cable { IRelayUSBTunnel.shared.start() } }
+            Text(tr("iRelay runs on a Windows PC connected to this iPad by USB cable. It installs your Steam, GOG and Epic games on the PC and copies them into iDeck, and speeds up downloads started here. Connect the cable, tap Trust on the iPad, keep the Apple Devices app (or iTunes) and iRelay on the PC, and keep iDeck open during transfers."))
         }
+        .onAppear { if enabled { IRelayRuntime.start() } }
     }
 
     private func test() {
-        if cable { IRelayUSBTunnel.shared.start() }
-        let target = cable ? "127.0.0.1:\(IRelayUSBTunnel.localPort)" : host
-        guard let client = IRelayClient(host: target, code: code.trimmingCharacters(in: .whitespaces)) else {
-            status = IRelayError.badAddress.localizedDescription
-            return
-        }
+        IRelayRuntime.start()
         testing = true
         status = nil
         Task {
             do {
-                let info = try await client.ping()
+                let info = try await IRelayClient().ping()
                 status = tr("Connected to %@ (version %d).", info.machine ?? info.name, info.version)
             } catch {
-                status = cable && !IRelayUSBTunnel.shared.pcConnected
-                    ? tr("iRelay is not connected over the cable. Check the cable, tap Trust on the iPad and open iRelay on the PC.")
-                    : error.localizedDescription
+                status = error.localizedDescription
             }
             testing = false
         }
+    }
+}
+
+/// Starts everything iRelay needs on this device.
+enum IRelayRuntime {
+    static func start() {
+        guard IRelaySetting.enabled else { return }
+        IRelayUSBTunnel.shared.start()
+        IRelayDeviceService.shared.start()
     }
 }
 
