@@ -121,6 +121,7 @@
 		F3A000000000000000000018 /* StikJITHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000018 /* StikJITHelper.swift */; };
 		F3A000000000000000000017 /* MadeiraRuntimeSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000017 /* MadeiraRuntimeSettings.swift */; };
 		F3A000000000000000000016 /* MadeiraConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000016 /* MadeiraConfig.swift */; };
+		F3A0000000000000000000A1 /* IRelayClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A0000000000000000000A1 /* IRelayClient.swift */; };
 		F3A000000000000000000015 /* ResourceGovernor.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000015 /* ResourceGovernor.swift */; };
 		F3A000000000000000000014 /* GOGContentSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000014 /* GOGContentSystem.swift */; };
 		F3A000000000000000000001 /* BugReportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000001 /* BugReportView.swift */; };
@@ -254,6 +255,7 @@
 		F4A000000000000000000018 /* StikJITHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MadeiraJIT/StikJITHelper.swift"; sourceTree = "<group>"; };
 		F4A000000000000000000017 /* MadeiraRuntimeSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MadeiraRuntimeSettings.swift; sourceTree = "<group>"; };
 		F4A000000000000000000016 /* MadeiraConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MadeiraConfig.swift; sourceTree = "<group>"; };
+		F4A0000000000000000000A1 /* IRelayClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IRelayClient.swift; sourceTree = "<group>"; };
 		F4A000000000000000000015 /* ResourceGovernor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResourceGovernor.swift; sourceTree = "<group>"; };
 		F4A000000000000000000014 /* GOGContentSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GOGContentSystem.swift; sourceTree = "<group>"; };
 		F4A000000000000000000001 /* BugReportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BugReportView.swift; sourceTree = "<group>"; };
@@ -423,6 +425,7 @@
 				F3A000000000000000000018 /* StikJITHelper.swift in Sources */,
 				F3A000000000000000000017 /* MadeiraRuntimeSettings.swift in Sources */,
 				F3A000000000000000000016 /* MadeiraConfig.swift in Sources */,
+				F3A0000000000000000000A1 /* IRelayClient.swift in Sources */,
 				F3A000000000000000000015 /* ResourceGovernor.swift in Sources */,
 				F3A000000000000000000014 /* GOGContentSystem.swift in Sources */,
 				F3A000000000000000000001 /* BugReportView.swift in Sources */,
@@ -580,6 +583,7 @@
 				F4A000000000000000000018 /* StikJITHelper.swift */,
 				F4A000000000000000000017 /* MadeiraRuntimeSettings.swift */,
 				F4A000000000000000000016 /* MadeiraConfig.swift */,
+				F4A0000000000000000000A1 /* IRelayClient.swift */,
 				F4A000000000000000000015 /* ResourceGovernor.swift */,
 				F4A000000000000000000014 /* GOGContentSystem.swift */,
 				F4A000000000000000000001 /* BugReportView.swift */,
