@@ -9,6 +9,11 @@ struct iDeckApp: App {
         // Metal HUD insights; madeira.cfg values exported later win.
         setenv("MTL_HUD_INSIGHTS_ENABLED", "0", 0)
         setenv("MADEIRA_WGI_HOST_PADS", "1", 0)
+        // MP4/MOV video (Media Foundation's source on winegstreamer: FFmpeg,
+        // VideoToolbox) for 64-bit games too; Madeira gives them only WMA by
+        // default, so a game's intro videos failed (0xc00d36bb).
+        // madeira.cfg env.MADEIRA_WG_64BIT = 0 turns it off again.
+        setenv("MADEIRA_WG_64BIT", "1", 0)
         // iRelay over the USB cable: listen from launch so the PC finds iDeck at once.
         // The prefix is Documents/wine (Madeira's); earlier builds' moves first.
         MadeiraDock.linkPrefix()
