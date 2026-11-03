@@ -31,6 +31,13 @@ final class ResourceGovernor {
         UserDefaults.standard.object(forKey: pauseInBackgroundKey) as? Bool ?? true
     }
 
+    /// A game session is closing (the close button): Wine and the wineserver
+    /// must finish writing before iOS may suspend iDeck. Set by SystemCoordinator.
+    static var closingSession = false {
+        didSet { if !closingSession { shared.endCloseTask() } }
+    }
+    private var closeTask: UIBackgroundTaskIdentifier = .invalid
+
     private var pressure: DispatchSourceMemoryPressure?
     private var observers: [NSObjectProtocol] = []
     private(set) var pausedForBackground = false
@@ -100,8 +107,25 @@ final class ResourceGovernor {
 
     // MARK: - Background
 
+    private func endCloseTask() {
+        guard closeTask != .invalid else { return }
+        UIApplication.shared.endBackgroundTask(closeTask)
+        closeTask = .invalid
+    }
+
     private func enteredBackground() {
         onActivityChange?()
+        // Leaving iDeck while a game closes: keep running until Wine has exited,
+        // instead of suspending mid-shutdown (iOS then ended iDeck).
+        if Self.closingSession {
+            if closeTask == .invalid {
+                closeTask = UIApplication.shared.beginBackgroundTask(withName: "iDeck.closeSession") { [weak self] in
+                    self?.endCloseTask()
+                }
+            }
+            AppLog.record("[resources] left iDeck while the game closes: finishing the close first")
+            return
+        }
         guard Self.pauseInBackground, Self.gameRunning else { return }
         do {
             try AVAudioSession.sharedInstance().setActive(false, options: [.notifyOthersOnDeactivation])

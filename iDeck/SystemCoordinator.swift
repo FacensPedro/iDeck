@@ -207,6 +207,7 @@ class SystemCoordinator: ObservableObject {
         case "Wine started; waiting for game...": BenchmarkSession.mark("wine_started")
         case "Running", "Steam Running": BenchmarkSession.mark("running")
         case "Windows Ready":
+            DispatchQueue.main.async { MainActor.assumeIsolated { ResourceGovernor.closingSession = false } }
             BenchmarkSession.finish(kind: "game", outcome: "closed")
             DispatchQueue.main.async { MainActor.assumeIsolated { SteamOwnedGamesModel.shared.releaseDock() } }
             if WindowsEnvironment.sessionsThisRun > 0 {
@@ -1077,6 +1078,8 @@ class SystemCoordinator: ObservableObject {
     /// start with installs runs only them (madeira-bcd: DockInstallers.installsOnly);
     /// the game starts after a restart of iDeck.
     private func startDockSession(game: SteamAppInfo, profile: WindowsGameProfile, prefixPath: URL) {
+        // The JIT pool list (Documents/jit-pool.txt) names games by App ID and program.
+        setenv("IDECK_JIT_GAME_STEAM", String(game.appID), 1)
         let drive = MadeiraDock.drive
         guard let dockGame = MadeiraDock.game(appID: game.appID) else {
             setWindowsStatus("Cannot launch: Steam's completed appmanifest was not found.")
@@ -1270,6 +1273,7 @@ class SystemCoordinator: ObservableObject {
             legacyVisualCRuntimeAttempted = false
         }
         isClosingWindowsSession = true
+        MainActor.assumeIsolated { ResourceGovernor.closingSession = true }
         windowsCloseWarning = nil
         windowsCloseWarningWasShown = false
         windowsCloseRequestedAt = ProcessInfo.processInfo.systemUptime

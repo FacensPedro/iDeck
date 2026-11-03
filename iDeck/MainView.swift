@@ -855,7 +855,9 @@ struct WindowsWorkspaceView: View {
         return notices
     }
 
+    /// Libraries › reload: Steam, GOG and Epic Games lists and what is installed.
     private func refreshAllLibraries() {
+        reloadInstalledGames()
         if coordinator.isSteamConnected { Task { await steamLibrary.refresh(force: true) } }
         if gogLibrary.isSignedIn { Task { await gogLibrary.refresh() } }
         if epicLibrary.signedIn { Task { await epicLibrary.refreshLibrary() } }
@@ -1813,27 +1815,6 @@ private struct WindowsExecutableDetailsView: View {
                     .frame(maxWidth: .infinity)
                     WindowsGameProfileForm(profile: $profile,
                                            globalMetalFXEnabled: $coordinator.isMetalFXEnabled)
-                    Button {
-                        guard coordinator.isJITEnabled else {
-                            errorMessage = tr("Activate JIT with StikDebug, then confirm it in Settings.")
-                            showError = true
-                            return
-                        }
-                        guard let prefixPath, coordinator.windowsEnvironment.hasRuntime(in: prefixPath.path) else {
-                            errorMessage = tr("The native Madeira runtime is not linked into this build yet.")
-                            showError = true
-                            return
-                        }
-                        library.save(profile)
-                        coordinator.launchWindowsExecutable(at: executableURL, profile: profile)
-                        dismiss()
-                    } label: {
-                        Label(tr("Launch"), systemImage: "play.fill")
-                            .font(.headline)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
-                    }
-                    .buttonStyle(.borderedProminent)
                     Button(role: .destructive) {
                         guard let prefixPath else {
                             errorMessage = tr("Windows environment is not ready.")
@@ -1956,42 +1937,6 @@ private struct SteamProgramDetailsView: View {
                     if installing {
                         downloadStatus
                     } else if installed {
-                        Button {
-                            coordinator.refreshJITStatus()
-                            guard coordinator.isJITEnabled else {
-                                presentError(tr("JIT is not available. Activate it for iDeck in StikDebug."))
-                                return
-                            }
-                            guard let prefixPath else {
-                                presentError(tr("Windows environment is not ready."))
-                                return
-                            }
-                            library.save(profile)
-                            Task {
-                                if autoSaveEnabled {
-                                    await steamLibrary.syncCloud(appID: game.appID, prefixPath: prefixPath)
-                                    if steamLibrary.cloudConflicts.contains(game.appID) {
-                                        presentError(tr("Steam Cloud has conflicting saves. Resolve them before playing, or turn off Auto Save."))
-                                        return
-                                    }
-                                }
-                                coordinator.launchSteamGame(game: game, profile: profile, prefixPath: prefixPath)
-                                if coordinator.windowsStatus.hasPrefix("Cannot launch") ||
-                                   coordinator.windowsStatus.hasPrefix("Madeira runtime missing") {
-                                    presentError(trStatus(coordinator.windowsStatus))
-                                } else {
-                                    dismiss()
-                                }
-                            }
-                            return
-
-                        } label: {
-                            Label(tr("Launch"), systemImage: "play.fill")
-                                .font(.headline)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 14)
-                        }
-                        .buttonStyle(.borderedProminent)
                         Button(role: .destructive) {
                             guard let prefixPath else { return }
                             if steamLibrary.uninstall(appID: game.appID, prefixPath: prefixPath) {
@@ -2479,17 +2424,6 @@ private struct StoreGameDetailsView<Extra: View>: View {
                 .buttonStyle(.bordered)
             }
         } else if installed {
-            Button {
-                library.save(profile)
-                dismiss()
-                onLaunch()
-            } label: {
-                Label(tr("Launch"), systemImage: "play.fill")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-            }
-            .buttonStyle(.borderedProminent)
             if onUninstall != nil {
                 Button(role: .destructive) { confirmUninstall = true } label: {
                     Label(tr("Uninstall"), systemImage: "trash")

@@ -240,7 +240,8 @@ final class IRelayDeviceService: @unchecked Sendable {
     private static func installs() -> [String: Any] {
         var list: [[String: Any]] = []
         let steam = SteamOwnedGamesModel.shared
-        for (id, progress) in steam.downloadProgress {
+        // A finished install keeps its last progress in the model: only running ones count.
+        for (id, progress) in steam.downloadProgress where steam.installingApps.contains(id) || steam.installingDLC[id] != nil {
             let name = steam.games.first { $0.appID == id }?.name ?? "App \(id)"
             list.append(["store": "steam", "id": id, "title": name, "phase": progress.phase.rawValue,
                          "done": progress.doneBytes, "total": progress.totalBytes,
@@ -315,10 +316,11 @@ final class IRelayDeviceService: @unchecked Sendable {
         }
         // Installed games the owned list does not have (not loaded yet, or another account's).
         let listed = Set(steam.games.map(\.appID))
-        for id in records.sorted() where !listed.contains(id) {
-            let dir = SteamInstallFiles.installDirectoryName(appID: Int(id), steamApps: steamApps) ?? ""
-            let name = MadeiraDock.games(drive: drive).first { $0.id == Int(id) }?.name ?? (dir.isEmpty ? "App \(id)" : dir)
-            steamGames.append(["appId": id, "name": name, "installDir": dir, "installed": true, "dlc": dlc(id)])
+        // Only games Madeira Dock can start: not Steamworks redistributables
+        // (228980) or other records that only lend depots.
+        for game in MadeiraDock.games(drive: drive) where !listed.contains(UInt32(game.id)) {
+            let id = UInt32(game.id)
+            steamGames.append(["appId": id, "name": game.name, "installDir": game.installDir, "installed": true, "dlc": dlc(id)])
         }
         let gog = GOGLibraryModel.shared
         gog.refreshInstalled(prefixPath: prefix)

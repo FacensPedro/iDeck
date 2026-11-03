@@ -365,6 +365,11 @@ class WindowsEnvironment {
             completion(Int(ENOTSUP))
             return
         }
+        // iDeck: the JIT pool list matches games by program name too.
+        if binary.lastPathComponent.lowercased() != "dockhost.exe" && binary.lastPathComponent.lowercased() != "cmd.exe" {
+            setenv("IDECK_JIT_GAME_EXE", binary.lastPathComponent, 1)
+            if let steamAppID { setenv("IDECK_JIT_GAME_STEAM", String(steamAppID), 1) } else { unsetenv("IDECK_JIT_GAME_STEAM") }
+        }
         writeSessionGraphicsConfig(binary: binary, is32Bit: needsWoW64,
                                    steamAppID: steamAppID, steamInstallDirectory: steamInstallDirectory)
 
