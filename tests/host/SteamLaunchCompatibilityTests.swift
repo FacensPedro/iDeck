@@ -11,7 +11,7 @@ struct SteamLaunchCompatibilityTests {
         let launcher = SteamLaunchCompatibility.classify(
             executable: "GameStarter.exe", launchType: "launcher")
         assert(launcher.kind == .launcherChild)
-        assert(launcher.warning?.contains("another game process") == true)
+        assert(launcher.warning == nil)
 
         let byName = SteamLaunchCompatibility.classify(executable: "Launcher.exe")
         assert(byName.kind == .launcherChild)
