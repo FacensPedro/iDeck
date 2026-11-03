@@ -62,40 +62,27 @@ enum MadeiraWinePool {
     }
 }
 
-/// iDeck: Documents/jit-pool.txt, a list anyone can edit in the Files app
-/// (On My iPad › iDeck): the JIT pool size each game starts with.
+/// iDeck: jit-pool.txt, the JIT pool size each game starts with. The list is
+/// the repository's jit-pool.txt (top level on GitHub), built into the app; a
+/// jit-pool.txt the user puts in Files › On My iPad › iDeck overrides its lines.
 ///
-///     # Steam App ID or the game's .exe name = size in MB (256 to 1152)
-///     268910 = 512    # Cuphead
+///     <Steam App ID or .exe name> = <MB>    # comment
+///     268910 = 512                          # Cuphead
 ///
 /// The launch names the running game in IDECK_JIT_GAME_STEAM (Steam App ID)
-/// and IDECK_JIT_GAME_EXE (program file name); the first matching line wins.
+/// and IDECK_JIT_GAME_EXE (program file name).
 enum JITPoolList {
     static let fileName = "jit-pool.txt"
-    static let defaultText = """
-    # iDeck JIT pool list
-    # The JIT pool memory each game starts with, in MB (256 to 1152).
-    # One game per line: its Steam App ID or its .exe name, "=", the size.
-    # Anything after # is a comment. Changes apply at the next game start.
-    #
-    268910 = 512    # Cuphead
 
-    """
-
-    static var url: URL? {
+    static var bundled: URL? { Bundle.main.url(forResource: "jit-pool", withExtension: "txt") }
+    static var userFile: URL? {
         FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.appendingPathComponent(fileName)
     }
 
-    /// Writes the list with its built-in entries the first time.
-    static func ensureFile() {
-        guard let url, !FileManager.default.fileExists(atPath: url.path) else { return }
-        try? defaultText.write(to: url, atomically: true, encoding: .utf8)
-    }
+    /// Nothing is written: the device copy is optional.
+    static func ensureFile() {}
 
-    /// key (lowercased App ID or exe name) -> MB.
-    static func entries() -> [String: Int] {
-        ensureFile()
-        guard let url, let text = try? String(contentsOf: url, encoding: .utf8) else { return [:] }
+    static func parse(_ text: String) -> [String: Int] {
         var result: [String: Int] = [:]
         for raw in text.components(separatedBy: .newlines) {
             let line = raw.split(separator: "#", maxSplits: 1, omittingEmptySubsequences: false).first.map(String.init) ?? ""
@@ -106,12 +93,21 @@ enum JITPoolList {
         return result
     }
 
+    /// key (lowercased App ID or exe name) -> MB: the app's list, then the device's lines.
+    static func entries() -> [String: Int] {
+        var list: [String: Int] = [:]
+        for url in [bundled, userFile].compactMap({ $0 }) {
+            if let text = try? String(contentsOf: url, encoding: .utf8) { list.merge(parse(text)) { $1 } }
+        }
+        return list
+    }
+
     static func size(forCurrentGame _: Void) -> Int? {
         let list = entries()
         let env = ProcessInfo.processInfo.environment
         for key in [env["IDECK_JIT_GAME_STEAM"], env["IDECK_JIT_GAME_EXE"]] {
             if let key, !key.isEmpty, let mb = list[key.lowercased()] {
-                LogStore.shared.log("[jit-pool-list] \(key): \(mb) MB (Documents/\(fileName))")
+                LogStore.shared.log("[jit-pool-list] \(key): \(mb) MB (jit-pool.txt)")
                 return mb
             }
         }
