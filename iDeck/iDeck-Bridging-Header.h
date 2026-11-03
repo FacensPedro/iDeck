@@ -24,4 +24,6 @@
 #import "SwiftSteam/zstd_edu.h"
 #import "SwiftSteam/chunk_zip.h"
 
+#import "VirtualControllerBridge.h"
+
 #endif /* iDeck_Bridging_Header_h */
