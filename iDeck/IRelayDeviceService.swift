@@ -116,6 +116,15 @@ final class IRelayDeviceService: @unchecked Sendable {
             } catch {
                 return .error(422, error.localizedDescription)
             }
+        case ("POST", "/uninstall"):
+            guard let body = request.body,
+                  let json = try? JSONSerialization.jsonObject(with: body) as? [String: Any] else { return .status(400) }
+            do {
+                try await MainActor.run { try Self.uninstall(json) }
+                return .json(["ok": true])
+            } catch {
+                return .error(422, error.localizedDescription)
+            }
         case ("GET", "/installs"):
             return .json(await Self.installs())
         case ("DELETE", "/logs"):
@@ -309,15 +318,15 @@ final class IRelayDeviceService: @unchecked Sendable {
             guard name.hasPrefix("appmanifest_"), name.hasSuffix(".acf") else { return nil }
             return UInt32(name.dropFirst("appmanifest_".count).dropLast(4))
         })
-        func dlc(_ appID: UInt32) -> [[String: Any]] {
-            (steam.availableDLC[appID] ?? []).map { id in
-                ["appId": id, "name": steam.dlcMetadata[id]?.name ?? "DLC \(id)",
-                 "installed": SteamDLCRecords.isInstalled(parentID: appID, dlcID: id, steamApps: steamApps)] as [String: Any]
-            }
-        }
+        func dlc(_ appID: UInt32) -> [[String: Any]] { dlcEntries(appID, steamApps: steamApps) }
         var steamGames: [[String: Any]] = steam.games.filter { $0.type == .game }.map { game in
-            ["appId": game.appID, "name": game.name, "installDir": game.installDir,
-             "installed": records.contains(game.appID), "dlc": dlc(game.appID)]
+            let installed = records.contains(game.appID)
+            let build = installed ? SteamInstallFiles.buildID(appID: Int(game.appID), steamApps: steamApps) : nil
+            // An update only when Steam's current build differs from the installed record's.
+            let update = installed && game.buildID != 0 && build != nil && build != Int(game.buildID)
+            let size = installed ? (steam.installedSizes[game.appID] ?? 0) : game.downloadSize(for: "windows")
+            return ["appId": game.appID, "name": game.name, "installDir": game.installDir,
+                    "installed": installed, "update": update, "size": size, "dlc": dlc(game.appID)]
         }
         // Installed games the owned list does not have (not loaded yet, or another account's).
         let listed = Set(steam.games.map(\.appID))
@@ -362,10 +371,50 @@ final class IRelayDeviceService: @unchecked Sendable {
         let steam = SteamOwnedGamesModel.shared
         await steam.loadDLC(appID: appID)
         steam.refreshInstalledDLC(appID: appID, prefixPath: prefix)
-        return ["dlc": (steam.availableDLC[appID] ?? []).map { id in
-            ["appId": id, "name": steam.dlcMetadata[id]?.name ?? "DLC \(id)",
-             "installed": steam.installedDLC[appID]?.contains(id) == true] as [String: Any]
-        }]
+        return ["dlc": dlcEntries(appID, steamApps: SteamInstallPaths.steamApps(drive: drive))]
+    }
+
+    /// A game's DLC with their installed state and size (bytes, 0 = unknown).
+    @MainActor
+    private static func dlcEntries(_ appID: UInt32, steamApps: URL) -> [[String: Any]] {
+        let steam = SteamOwnedGamesModel.shared
+        let parent = steam.games.first { $0.appID == appID }
+        return (steam.availableDLC[appID] ?? []).map { id in
+            var bytes = parent?.depots.filter { $0.dlcAppID == id }.reduce(UInt64(0)) { $0 + max($1.maxSize, $1.publicSizeBytes) } ?? 0
+            if bytes == 0 { bytes = steam.dlcMetadata[id]?.downloadSize(for: "windows") ?? 0 }
+            return ["appId": id, "name": steam.dlcMetadata[id]?.name ?? "DLC \(id)", "size": bytes,
+                    "installed": SteamDLCRecords.isInstalled(parentID: appID, dlcID: id, steamApps: steamApps)] as [String: Any]
+        }
+    }
+
+    /// Uninstalls a game (or a Steam DLC) iRelay names.
+    @MainActor
+    private static func uninstall(_ json: [String: Any]) throws {
+        let prefix = Self.prefix
+        var removed = false
+        switch json["store"] as? String {
+        case "steam":
+            guard let appID = (json["appId"] as? NSNumber)?.uint32Value else { break }
+            let steam = SteamOwnedGamesModel.shared
+            if let dlc = (json["dlcId"] as? NSNumber)?.uint32Value {
+                removed = steam.uninstallDLC(appID: appID, dlcAppID: dlc, prefixPath: prefix)
+            } else {
+                removed = steam.uninstall(appID: appID, prefixPath: prefix)
+            }
+            steam.refreshInstalledApps(prefixPath: prefix)
+        case "gog":
+            if let id = (json["id"] as? NSNumber)?.intValue {
+                removed = GOGLibraryModel.shared.uninstall(id, prefixPath: prefix)
+            }
+        case "epic":
+            if let app = json["appName"] as? String, EpicLibrary.shared.installed[app] != nil {
+                EpicLibrary.shared.uninstall(app)
+                removed = true
+            }
+        default: break
+        }
+        guard removed else { throw FinishError(errorDescription: "Nothing to uninstall.") }
+        NotificationCenter.default.post(name: installedNotification, object: nil)
     }
 
     struct FinishError: LocalizedError {
