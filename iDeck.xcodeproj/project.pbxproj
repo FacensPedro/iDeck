@@ -73,8 +73,6 @@
 		F3A000000000000000000011 /* LiveContainerSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000011 /* LiveContainerSettings.swift */; };
 		F3A000000000000000000010 /* JITBuiltInHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000010 /* JITBuiltInHost.swift */; };
 		F3A00000000000000000000F /* JITBuiltInMessages.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A00000000000000000000F /* JITBuiltInMessages.swift */; };
-		F3A00000000000000000000E /* MadeiraDock.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A00000000000000000000E /* MadeiraDock.swift */; };
-		FE0100000000000000000101 /* SteamDockInstallers.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE0100000000000000000102 /* SteamDockInstallers.swift */; };
 		F3A00000000000000000000D /* EpicGames.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A00000000000000000000D /* EpicGames.swift */; };
 		F3A00000000000000000000C /* EpicLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A00000000000000000000C /* EpicLibrary.swift */; };
 		F3A00000000000000000000B /* EpicCloud.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A00000000000000000000B /* EpicCloud.swift */; };
@@ -122,6 +120,13 @@
 		F3A000000000000000000017 /* MadeiraRuntimeSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000017 /* MadeiraRuntimeSettings.swift */; };
 		F3A000000000000000000016 /* MadeiraConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000016 /* MadeiraConfig.swift */; };
 		F3A0000000000000000000A2 /* IRelayDeviceService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A0000000000000000000A2 /* IRelayDeviceService.swift */; };
+		F3A0000000000000000000B0 /* MadeiraDock.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A0000000000000000000B0 /* MadeiraDock.swift */; };
+		F3A0000000000000000000B1 /* DockInstallers.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A0000000000000000000B1 /* DockInstallers.swift */; };
+		F3A0000000000000000000B2 /* DockReset.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A0000000000000000000B2 /* DockReset.swift */; };
+		F3A0000000000000000000B3 /* DockStartProgram.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A0000000000000000000B3 /* DockStartProgram.swift */; };
+		F3A0000000000000000000B4 /* SteamRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A0000000000000000000B4 /* SteamRuntime.swift */; };
+		F3A0000000000000000000B5 /* IDeckDockGlue.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A0000000000000000000B5 /* IDeckDockGlue.swift */; };
+		F3A0000000000000000000B6 /* MadeiraDockInterfaceStubs.c in Sources */ = {isa = PBXBuildFile; fileRef = F4A0000000000000000000B6 /* MadeiraDockInterfaceStubs.c */; };
 		F3A0000000000000000000A1 /* IRelayClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A0000000000000000000A1 /* IRelayClient.swift */; };
 		F3A000000000000000000015 /* ResourceGovernor.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000015 /* ResourceGovernor.swift */; };
 		F3A000000000000000000014 /* GOGContentSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000014 /* GOGContentSystem.swift */; };
@@ -208,8 +213,6 @@
 		F4A000000000000000000011 /* LiveContainerSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveContainerSettings.swift; sourceTree = "<group>"; };
 		F4A000000000000000000010 /* JITBuiltInHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JITBuiltInHost.swift; sourceTree = "<group>"; };
 		F4A00000000000000000000F /* JITBuiltInMessages.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JITBuiltInMessages.swift; sourceTree = "<group>"; };
-		F4A00000000000000000000E /* MadeiraDock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MadeiraDock.swift; sourceTree = "<group>"; };
-		FE0100000000000000000102 /* SteamDockInstallers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamDockInstallers.swift; sourceTree = "<group>"; };
 		F4A00000000000000000000D /* EpicGames.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EpicGames.swift; sourceTree = "<group>"; };
 		F4A00000000000000000000C /* EpicLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EpicLibrary.swift; sourceTree = "<group>"; };
 		F4A00000000000000000000B /* EpicCloud.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EpicCloud.swift; sourceTree = "<group>"; };
@@ -257,6 +260,13 @@
 		F4A000000000000000000017 /* MadeiraRuntimeSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MadeiraRuntimeSettings.swift; sourceTree = "<group>"; };
 		F4A000000000000000000016 /* MadeiraConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MadeiraConfig.swift; sourceTree = "<group>"; };
 		F4A0000000000000000000A2 /* IRelayDeviceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IRelayDeviceService.swift; sourceTree = "<group>"; };
+		F4A0000000000000000000B0 /* MadeiraDock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MadeiraDock/MadeiraDock.swift"; sourceTree = "<group>"; };
+		F4A0000000000000000000B1 /* DockInstallers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MadeiraDock/DockInstallers.swift"; sourceTree = "<group>"; };
+		F4A0000000000000000000B2 /* DockReset.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MadeiraDock/DockReset.swift"; sourceTree = "<group>"; };
+		F4A0000000000000000000B3 /* DockStartProgram.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MadeiraDock/DockStartProgram.swift"; sourceTree = "<group>"; };
+		F4A0000000000000000000B4 /* SteamRuntime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MadeiraDock/SteamRuntime.swift"; sourceTree = "<group>"; };
+		F4A0000000000000000000B5 /* IDeckDockGlue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MadeiraDock/IDeckDockGlue.swift"; sourceTree = "<group>"; };
+		F4A0000000000000000000B6 /* MadeiraDockInterfaceStubs.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = "MadeiraDock/MadeiraDockInterfaceStubs.c"; sourceTree = "<group>"; };
 		F4A0000000000000000000A1 /* IRelayClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IRelayClient.swift; sourceTree = "<group>"; };
 		F4A000000000000000000015 /* ResourceGovernor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResourceGovernor.swift; sourceTree = "<group>"; };
 		F4A000000000000000000014 /* GOGContentSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GOGContentSystem.swift; sourceTree = "<group>"; };
@@ -379,8 +389,6 @@
 				F3A000000000000000000011 /* LiveContainerSettings.swift in Sources */,
 				F3A000000000000000000010 /* JITBuiltInHost.swift in Sources */,
 				F3A00000000000000000000F /* JITBuiltInMessages.swift in Sources */,
-				F3A00000000000000000000E /* MadeiraDock.swift in Sources */,
-				FE0100000000000000000101 /* SteamDockInstallers.swift in Sources */,
 				F3A00000000000000000000D /* EpicGames.swift in Sources */,
 				F3A00000000000000000000C /* EpicLibrary.swift in Sources */,
 				F3A00000000000000000000B /* EpicCloud.swift in Sources */,
@@ -428,6 +436,13 @@
 				F3A000000000000000000017 /* MadeiraRuntimeSettings.swift in Sources */,
 				F3A000000000000000000016 /* MadeiraConfig.swift in Sources */,
 				F3A0000000000000000000A2 /* IRelayDeviceService.swift in Sources */,
+				F3A0000000000000000000B0 /* MadeiraDock.swift in Sources */,
+				F3A0000000000000000000B1 /* DockInstallers.swift in Sources */,
+				F3A0000000000000000000B2 /* DockReset.swift in Sources */,
+				F3A0000000000000000000B3 /* DockStartProgram.swift in Sources */,
+				F3A0000000000000000000B4 /* SteamRuntime.swift in Sources */,
+				F3A0000000000000000000B5 /* IDeckDockGlue.swift in Sources */,
+				F3A0000000000000000000B6 /* MadeiraDockInterfaceStubs.c in Sources */,
 				F3A0000000000000000000A1 /* IRelayClient.swift in Sources */,
 				F3A000000000000000000015 /* ResourceGovernor.swift in Sources */,
 				F3A000000000000000000014 /* GOGContentSystem.swift in Sources */,
@@ -538,8 +553,6 @@
 				F4A000000000000000000011 /* LiveContainerSettings.swift */,
 				F4A000000000000000000010 /* JITBuiltInHost.swift */,
 				F4A00000000000000000000F /* JITBuiltInMessages.swift */,
-				F4A00000000000000000000E /* MadeiraDock.swift */,
-				FE0100000000000000000102 /* SteamDockInstallers.swift */,
 				F4A00000000000000000000D /* EpicGames.swift */,
 				F4A00000000000000000000C /* EpicLibrary.swift */,
 				F4A00000000000000000000B /* EpicCloud.swift */,
@@ -587,6 +600,13 @@
 				F4A000000000000000000017 /* MadeiraRuntimeSettings.swift */,
 				F4A000000000000000000016 /* MadeiraConfig.swift */,
 				F4A0000000000000000000A2 /* IRelayDeviceService.swift */,
+				F4A0000000000000000000B0 /* MadeiraDock.swift */,
+				F4A0000000000000000000B1 /* DockInstallers.swift */,
+				F4A0000000000000000000B2 /* DockReset.swift */,
+				F4A0000000000000000000B3 /* DockStartProgram.swift */,
+				F4A0000000000000000000B4 /* SteamRuntime.swift */,
+				F4A0000000000000000000B5 /* IDeckDockGlue.swift */,
+				F4A0000000000000000000B6 /* MadeiraDockInterfaceStubs.c */,
 				F4A0000000000000000000A1 /* IRelayClient.swift */,
 				F4A000000000000000000015 /* ResourceGovernor.swift */,
 				F4A000000000000000000014 /* GOGContentSystem.swift */,

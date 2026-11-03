@@ -636,6 +636,10 @@ struct WindowsWorkspaceView: View {
             resolvePrefixPath()
             appManager.refreshInstalledApps()
         }
+        // iRelay copied a game from the PC.
+        .onReceive(NotificationCenter.default.publisher(for: IRelayDeviceService.installedNotification)) { _ in
+            reloadInstalledGames()
+        }
         // A finished Wine session may have installed a game (a GOG installer,
         // a setup program): look for new installs whenever Wine stops.
         .onChange(of: coordinator.windowsStatus) { _, _ in
@@ -860,9 +864,12 @@ struct WindowsWorkspaceView: View {
     @ViewBuilder
     private var mixedLibraryContent: some View {
         if coordinator.isSteamConnected || gogLibrary.isSignedIn || epicLibrary.signedIn {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(spacing: 10) {
-                    ownedHeader(tr("Games: %d", mixedLibraryCount), collapsed: $steamOwnedCollapsed)
+            VStack(alignment: .leading, spacing: 22) {
+                HStack {
+                    Text(tr("Libraries"))
+                        .font(.headline)
+                        .foregroundColor(.white)
+                    Spacer()
                     Button { refreshAllLibraries() } label: {
                         Image(systemName: "arrow.clockwise")
                             .font(.headline)
@@ -872,37 +879,55 @@ struct WindowsWorkspaceView: View {
                     .disabled(mixedLibraryLoading)
                     .accessibilityLabel(tr("Refresh"))
                 }
-                if !steamOwnedCollapsed {
-                    ForEach(Array(mixedLibraryNotices.enumerated()), id: \.offset) { _, notice in
-                        HStack(spacing: 8) {
-                            if notice.isError {
-                                Image(systemName: "exclamationmark.triangle.fill").foregroundColor(.orange)
-                            } else {
-                                ProgressView().tint(.white)
-                            }
-                            Text(notice.text)
-                                .font(.caption)
-                                .foregroundColor(notice.isError ? .orange : .gray)
-                                .lineLimit(2)
-                        }
+                if coordinator.isSteamConnected {
+                    storeSection("Steam", count: steamLibrary.games.count, collapsed: $steamOwnedCollapsed,
+                                 loading: steamLibrary.isLoading, error: steamLibrary.errorMessage.map { tr($0) },
+                                 entries: filteredSteamGames.map { .steam($0) })
+                }
+                if epicLibrary.signedIn {
+                    storeSection("Epic Games", count: epicLibrary.owned.count, collapsed: $epicOwnedCollapsed,
+                                 loading: epicLibrary.refreshing, error: epicLibrary.error,
+                                 entries: filteredEpicGames.map { .epic($0) })
+                }
+                if gogLibrary.isSignedIn {
+                    storeSection("GOG", count: gogLibrary.games.count, collapsed: $gogOwnedCollapsed,
+                                 loading: gogLibrary.isLoading, error: gogLibrary.errorMessage.map { tr($0) },
+                                 entries: filteredGOGGames.map { .gog($0) })
+                }
+            }
+        }
+    }
+
+    /// One store's games, under a header that hides or shows them.
+    @ViewBuilder
+    private func storeSection(_ name: String, count: Int, collapsed: Binding<Bool>, loading: Bool, error: String?,
+                              entries: [MixedLibraryEntry]) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            ownedHeader("\(name) · \(count)", collapsed: collapsed)
+            if !collapsed.wrappedValue {
+                if loading {
+                    ProgressView().tint(.white)
+                } else if let error {
+                    Label(error, systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption)
+                        .foregroundColor(.orange)
+                        .lineLimit(2)
+                }
+                let sorted = entries.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+                if sorted.isEmpty {
+                    if !loading {
+                        Text(count == 0 ? tr("No games") : tr("No games match this search"))
+                            .font(.subheadline)
+                            .foregroundColor(.gray)
+                            .padding(.vertical, 8)
                     }
-                    let entries = mixedLibraryEntries
-                    if entries.isEmpty {
-                        if !mixedLibraryLoading {
-                            Text(mixedLibraryCount == 0 ? tr("No owned games found yet.") : tr("No games match this search"))
-                                .font(.subheadline)
-                                .foregroundColor(.gray)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 32)
-                        }
-                    } else {
-                        LazyVGrid(columns: columns, spacing: 14) {
-                            ForEach(entries) { entry in
-                                switch entry {
-                                case .steam(let game): gameCard(game)
-                                case .gog(let game): gogCard(game)
-                                case .epic(let game): epicCard(game)
-                                }
+                } else {
+                    LazyVGrid(columns: columns, spacing: 14) {
+                        ForEach(sorted) { entry in
+                            switch entry {
+                            case .steam(let game): gameCard(game)
+                            case .gog(let game): gogCard(game)
+                            case .epic(let game): epicCard(game)
                             }
                         }
                     }
@@ -1235,12 +1260,29 @@ struct WindowsWorkspaceView: View {
         }
     }
 
+    /// Looks again for installed games of every store and Windows programs.
+    private func reloadInstalledGames() {
+        resolvePrefixPath()
+        guard let prefixPath else { return }
+        steamLibrary.refreshInstalledApps(prefixPath: prefixPath)
+        gogLibrary.refreshInstalled(prefixPath: prefixPath)
+        epicLibrary.reloadInstalled()
+        windowsLibrary.refresh(prefixPath: prefixPath)
+    }
+
     private var installedProgramsContent: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
                 Text(tr("Installed games"))
                     .font(.headline)
                     .foregroundColor(.white)
+                Button { reloadInstalledGames() } label: {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(width: 30, height: 30)
+                }
+                .buttonStyle(.bordered)
+                .accessibilityLabel(tr("Reload installed games"))
                 Spacer()
                 Text(tr("%d installed", windowsLibrary.executableURLs.count + installedSteamGames.count + installedGOGGames.count + installedEpicGames.count
                         + installingGOGGames.count + installingEpicGames.count))

@@ -200,6 +200,9 @@ struct EpicInstalledGame: Codable, Sendable {
             .write(to: Self.cacheURL, options: .atomic)
     }
 
+    /// Reads the install records again (games added from outside, by iRelay say).
+    func reloadInstalled() { loadInstalled() }
+
     private func loadInstalled() {
         guard let data = try? Data(contentsOf: Self.installedURL),
               let records = try? JSONDecoder().decode([String: EpicInstalledGame].self, from: data) else { return }

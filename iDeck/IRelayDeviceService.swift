@@ -104,6 +104,8 @@ final class IRelayDeviceService: @unchecked Sendable {
             let name = await MainActor.run { UIDevice.current.name }
             let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
             return .json(["name": name, "app": "iDeck", "version": version, "protocol": 2, "freeBytes": free])
+        case ("GET", "/logs"):
+            return .json(await Self.logs())
         case ("GET", "/library"):
             return .json(await Self.library())
         case ("POST", "/steam/dlc"):
@@ -156,6 +158,26 @@ final class IRelayDeviceService: @unchecked Sendable {
                           "m": Int(values.contentModificationDate?.timeIntervalSince1970 ?? 0)])
         }
         return files
+    }
+
+    // MARK: Logs
+
+    /// iDeck's problems for iRelay's "iDeck bugs" view: the same scan as the
+    /// bug report, over iDeck's log and the last Wine log, plus the log's tail.
+    private static func logs() async -> [String: Any] {
+        let wineURL = await MainActor.run { BugReportModel.wineLogURL }
+        func tail(_ url: URL?, _ bytes: Int) -> String {
+            guard let url, let handle = try? FileHandle(forReadingFrom: url) else { return "" }
+            defer { try? handle.close() }
+            let size = (try? handle.seekToEnd()) ?? 0
+            try? handle.seek(toOffset: size > UInt64(bytes) ? size - UInt64(bytes) : 0)
+            return String(decoding: handle.readDataToEndOfFile(), as: UTF8.self)
+        }
+        let app = tail(AppLog.fileURL, 512 << 10)
+        let wine = tail(wineURL, 2 << 20)
+        let issues = LogIssueScanner.scan(app, source: .app) + LogIssueScanner.scan(wine, source: .wine)
+        let recent = app.split(whereSeparator: \.isNewline).suffix(300).joined(separator: "\n")
+        return ["issues": issues.prefix(300).map(\.copyText), "log": recent]
     }
 
     // MARK: Libraries

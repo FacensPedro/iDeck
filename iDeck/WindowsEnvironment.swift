@@ -597,7 +597,7 @@ class WindowsEnvironment {
             let before = lines.count
             lines.removeAll { line in
                 let key = line.split(separator: "=", maxSplits: 1).first.map { $0.trimmingCharacters(in: .whitespaces) } ?? ""
-                return IDeckSteamDockInstallers.installSessionDroppedKeys.contains(key)
+                return DockInstallers.installSessionDroppedKeys.contains(key)
             }
             if lines.count != before { SteamLog.event("[dock-installers] install session leaves out \(before - lines.count) layout line(s)") }
         }
