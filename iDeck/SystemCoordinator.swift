@@ -1069,33 +1069,24 @@ class SystemCoordinator: ObservableObject {
         startDockSession(game: game, profile: profile, prefixPath: prefixPath)
     }
 
+    /// Madeira's Dock start (ContentView.startDock), with Madeira's own files
+    /// (MadeiraDock/): validation, the app's connection logged off, the sign-in
+    /// transfer, the host's environment, then the game's one-time installs. A
+    /// start with installs runs only them (madeira-bcd: DockInstallers.installsOnly);
+    /// the game starts after a restart of iDeck.
     private func startDockSession(game: SteamAppInfo, profile: WindowsGameProfile, prefixPath: URL) {
-        let host: URL
+        let drive = MadeiraDock.drive
+        guard let dockGame = MadeiraDock.game(appID: game.appID) else {
+            setWindowsStatus("Cannot launch: Steam's completed appmanifest was not found.")
+            return
+        }
         do {
-            if let previous = try IDeckSteamDockInstallers.absorb(appID: game.appID, prefix: prefixPath) {
-                SteamLog.event("[dock-installers] previous result: \(previous)")
-            }
-            guard let dockGame = MadeiraDock.game(appID: game.appID) else {
-                setWindowsStatus("Cannot launch: Steam's completed appmanifest was not found.")
-                return
-            }
-            if let stage = try IDeckSteamDockInstallers.stage(appID: game.appID, game: dockGame, prefix: prefixPath) {
-                startSteamPrerequisiteSession(stage, prefixPath: prefixPath)
-                return
-            }
-            host = try MainActor.assumeIsolated {
-                try MadeiraDock.prepareLaunch(appID: game.appID, arguments: profile.arguments)
-            }
+            try MadeiraDock.validate(dockGame, drive: drive)
+            guard SteamSignIn.isSignedIn else { throw DockError.message("Sign in to Steam to start games through Steam.") }
         } catch {
             setWindowsStatus("Cannot launch: " + error.localizedDescription)
             return
         }
-        // As Madeira (ContentView, Dock launch): a Dock session starts 64-bit, but
-        // the programs Valve's client starts later are often 32-bit. win32u decides
-        // once whether the GDI handle table is a section every 32-bit program can
-        // map; left private, 32-bit gdi32 truncates its address and faults on its
-        // first GDI handle. madeira.cfg env.MADEIRA_GDI_SHARED_SECTION = 0 still wins.
-        setenv("MADEIRA_GDI_SHARED_SECTION", "1", 1)
         currentSteamLaunchUsesDock = true
         dockLaunchAccepted = false
         steamDockLaunchStage = "Starting Madeira Dock..."
@@ -1104,18 +1095,60 @@ class SystemCoordinator: ObservableObject {
         pendingSteamGameID = game.appID
         setWindowsStatus("Launching Steam game...")
         // As Madeira (SteamConnectionGate.holdForDock): Valve's client must be the
-        // only connection logged on with this account. iDeck's own connection was
-        // still up (library, iRelay, ten-minute idle) and logged on again, so
-        // Steam ended the client's logon with LogonSessionReplaced (34) before
-        // it confirmed the license, and the game never started.
+        // only connection logged on with this account; iDeck's own logs off first.
         Task { @MainActor [weak self] in
             await SteamOwnedGamesModel.shared.holdForDock()
             guard let self else { return }
-            self.continueDockSession(game: game, host: host, standardizedPrefix: standardizedPrefix)
+            let program: URL
+            let arguments: String
+            do {
+                guard let signIn = SteamSignIn.credentialsForDock() else {
+                    throw DockError.message("Sign in to Steam to start games through Steam.")
+                }
+                try MadeiraDock.writeHandoff(account: signIn.accountName, token: signIn.refreshToken, appID: dockGame.id)
+                MadeiraDock.configure(dockGame, launchOption: 0, arguments: profile.arguments)
+                DockInstallers.prepare(dockGame, drive: drive, prefix: MadeiraDock.prefix,
+                                       others: MadeiraDock.games(drive: drive))
+                if DockInstallers.installsOnly, let script = DockInstallers.script {
+                    // No host runs in this session: nothing will take the sign-in transfer.
+                    MadeiraDock.cleanup()
+                    setenv("MADEIRA_DOCK_INSTALLS_SESSION", "1", 1)
+                    program = try MadeiraDock.stageCommandShell()
+                    arguments = "/c call " + script
+                    SteamLog.event("[madeira-dock] app \(dockGame.id): this session runs only the one-time installs")
+                } else {
+                    unsetenv("MADEIRA_DOCK_INSTALLS_SESSION")
+                    let host = try MadeiraDock.stageHost()
+                    if let script = DockInstallers.script {
+                        program = try MadeiraDock.stageCommandShell()
+                        arguments = "/c call \(script) & \(MadeiraDock.executable)"
+                    } else {
+                        program = host
+                        arguments = ""
+                    }
+                }
+            } catch {
+                MadeiraDock.cleanup()
+                SteamOwnedGamesModel.shared.releaseDock()
+                self.pendingSteamGameID = nil
+                self.setWindowsStatus("Cannot launch: " + error.localizedDescription)
+                return
+            }
+            if DockInstallers.serverSync { setenv("MADEIRA_MADSYNC_SESSION", "0", 1) } else { unsetenv("MADEIRA_MADSYNC_SESSION") }
+            // As Madeira: a Dock session's later programs are often 32-bit and need the
+            // GDI handle table as a shared section. madeira.cfg can still turn it off.
+            setenv("MADEIRA_GDI_SHARED_SECTION", "1", 1)
+            if DockInstallers.installsOnly {
+                self.activeSteamInstallerAppID = game.appID
+                self.steamPrerequisiteProgress = DockInstallers.note ?? "Running Steam's one-time installs..."
+            }
+            self.continueDockSession(game: game, program: program, arguments: arguments,
+                                     installsOnly: DockInstallers.installsOnly, standardizedPrefix: standardizedPrefix)
         }
     }
 
-    private func continueDockSession(game: SteamAppInfo, host: URL, standardizedPrefix: String) {
+    private func continueDockSession(game: SteamAppInfo, program: URL, arguments: String, installsOnly: Bool,
+                                     standardizedPrefix: String) {
         withPreparedMetalDisplay(expectedStatus: "Launching Steam game...") { [weak self] in
             guard let self, self.pendingSteamGameID == game.appID else { return }
             guard !ideck_wineprocess_running() else {
@@ -1123,73 +1156,30 @@ class SystemCoordinator: ObservableObject {
                 self.setWindowsStatus("Execution Error: another Wine process started during game preparation.")
                 return
             }
-            self.windowsEnvironment.execute(binary: host, arguments: "", jitEnabler: self.jitEnabler) { [weak self] status in
+            self.windowsEnvironment.execute(binary: program, arguments: arguments, jitEnabler: self.jitEnabler) { [weak self] status in
                 DispatchQueue.main.async {
                     guard let self else { return }
                     self.pendingSteamGameID = nil
                     let running = status == 0 && ideck_wineprocess_running()
                     self.activeSteamGameID = running ? game.appID : nil
                     self.activeSteamPrefix = running ? standardizedPrefix : nil
-                    self.dockSessionActive = running
-                    if running { self.watchDockReport() }
+                    self.dockSessionActive = running && !installsOnly
+                    if running && !installsOnly { self.watchDockReport() }
                     if self.windowsStatus == "Launching Steam game..." {
-                        self.setWindowsStatus(running ? "Wine started; waiting for game..." : self.nativeLaunchFailure(status))
+                        self.setWindowsStatus(running
+                            ? (installsOnly ? "Installing Steam prerequisites..." : "Wine started; waiting for game...")
+                            : self.nativeLaunchFailure(status))
                     }
                 }
             }
         }
     }
 
-    /// Run Steam's installscript.vdf programs in a separate Wine session.
-    /// Wine installers and the Steam client must not compete for the JIT pool;
-    /// the game starts on a subsequent Play action after the guest exits.
-    private func startSteamPrerequisiteSession(_ stage: IDeckSteamDockInstallers.Stage, prefixPath: URL) {
-        currentSteamLaunchUsesDock = false
-        dockLaunchAccepted = false
-        steamDockLaunchStage = nil
-        activeSteamInstallerAppID = stage.appID
-        steamPrerequisiteProgress = "Preparing \(stage.count) Steam prerequisite installer(s)..."
-        pendingSteamGameID = stage.appID
-        setWindowsStatus("Installing Steam prerequisites...")
-        let prefixString = prefixPath.standardizedFileURL.path
-        withPreparedMetalDisplay(expectedStatus: "Installing Steam prerequisites...") { [weak self] in
-            guard let self, self.pendingSteamGameID == stage.appID else { return }
-            guard !ideck_wineprocess_running() else {
-                self.setWindowsStatus("Execution Error: Wine is already running; cannot start prerequisite installers.")
-                return
-            }
-            let arguments = "/c C:\\ideck-dock-installers-\(stage.appID).cmd"
-            // As Madeira (DockInstallers.serverSync): a session of one-time
-            // installers runs with madsync off, for that session only.
-            setenv("MADEIRA_MADSYNC_SESSION", "0", 1)
-            // As Madeira (DockInstallers): this session runs only the installs, and
-            // the game's address-space layout lines are left out for it.
-            setenv("MADEIRA_DOCK_INSTALLS_SESSION", "1", 1)
-            let fusion = IDeckSteamDockInstallers.placeDotNetFusion(
-                drive: prefixPath.appendingPathComponent("drive_c", isDirectory: true),
-                source: Bundle.main.resourceURL?.appendingPathComponent("i386-windows/fusion.dll"))
-            SteamLog.event("[dock-installers] app=\(stage.appID) dotnet-fusion=\(fusion)")
-            self.windowsEnvironment.execute(binary: stage.command, arguments: arguments, jitEnabler: self.jitEnabler) { [weak self] status in
-                DispatchQueue.main.async {
-                    guard let self else { return }
-                    self.pendingSteamGameID = nil
-                    if status == 0 {
-                        self.activeSteamGameID = stage.appID
-                        self.activeSteamPrefix = prefixString
-                        SteamLog.event("[dock-installers] installer session started app=\(stage.appID)")
-                    } else {
-                        self.setWindowsStatus(self.nativeLaunchFailure(status))
-                    }
-                }
-            }
-        }
-    }
-
-    /// Only after both Wine and wineserver exit may the host write completed
-    /// installer markers to Wine's on-disk registry.
+    /// The session of one-time installs ended (Wine and wineserver both exited,
+    /// so the registry is on disk): Madeira's restart notice.
     @discardableResult
     private func finishSteamPrerequisiteSession() -> Bool {
-        guard let appID = activeSteamInstallerAppID,
+        guard activeSteamInstallerAppID != nil,
               !ideck_wineprocess_running(), !ideck_wineserver_running(),
               ideck_wineprocess_thread_finished(), ideck_runtime_complete_session() else { return false }
         activeSteamInstallerAppID = nil
@@ -1197,15 +1187,12 @@ class SystemCoordinator: ObservableObject {
         activeSteamGameID = nil
         activeSteamPrefix = nil
         activeWindowsProfile = nil
-        let message: String
-        do {
-            message = try IDeckSteamDockInstallers.absorb(appID: appID, prefix: MadeiraDock.prefix)
-                ?? "Steam prerequisite installer session finished without a report."
-        } catch {
-            message = "Steam prerequisite installation failed: \(error.localizedDescription)"
-        }
+        let ended = MainActor.assumeIsolated { DockInstallers.poll(drive: MadeiraDock.drive) }
+        let message = MainActor.assumeIsolated { DockInstallers.restartNotice(ended) }
+            .replacingOccurrences(of: "Madeira", with: "iDeck")
         steamPrerequisiteProgress = nil
-        SteamLog.event("[dock-installers] app=\(appID) \(message)")
+        SteamOwnedGamesModel.shared.releaseDock()
+        SteamLog.event("[dock-installers] \(message)")
         isClosingWindowsSession = false
         windowsCloseRequestedAt = nil
         windowsCloseWarning = nil
@@ -1383,7 +1370,8 @@ class SystemCoordinator: ObservableObject {
 
     func refreshWindowsSessionHealth() {
         if let appID = activeSteamInstallerAppID {
-            steamPrerequisiteProgress = IDeckSteamDockInstallers.progress(appID: appID, prefix: MadeiraDock.prefix)
+            _ = appID
+            steamPrerequisiteProgress = MainActor.assumeIsolated { DockInstallers.poll(drive: MadeiraDock.drive) }
                 ?? steamPrerequisiteProgress
             if !ideck_wineprocess_running() {
                 if ideck_wineserver_running() && ideck_wineprocess_thread_finished() {

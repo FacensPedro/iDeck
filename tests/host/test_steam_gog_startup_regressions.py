@@ -8,24 +8,10 @@ import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 GOG = ROOT / "iDeck/GOGContentSystem.swift"
-STEAM = ROOT / "iDeck/MadeiraDock.swift"
 COORD = ROOT / "iDeck/SystemCoordinator.swift"
 
 
 class SteamSetupAndGOGCDNTests(unittest.TestCase):
-    def test_steam_concurrent_requests_share_one_operation(self):
-        source = STEAM.read_text(encoding="utf-8")
-        self.assertIn("private var inFlight: Task<Void, Error>?", source)
-        self.assertIn("if let running = inFlight {", source)
-        self.assertIn("try await running.value", source)
-        self.assertIn("inFlightPrefix == path", source)
-        self.assertIn("try await operation.value", source)
-        self.assertIn("private func prepareOnce(", source)
-        self.assertNotIn("guard !busy, !ideck_wineprocess_running()", source)
-        self.assertIn("ideck_wineserver_stop_if_idle()", source)
-        # No attempt to change registry while Wine is running.
-        self.assertIn("guard !ideck_wineprocess_running(), !ideck_wineserver_running() else", source)
-
     def test_gog_rotates_providers_and_never_retries_cancellation(self):
         source = GOG.read_text(encoding="utf-8")
         self.assertIn('let providers: [SignedCDN] = urls.compactMap', source)

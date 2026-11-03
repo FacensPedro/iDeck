@@ -72,8 +72,8 @@ def check(root: pathlib.Path) -> list[str]:
 
     # 6. No hand-written zlib/inflate in Swift.
     for path in sources:
-        # iDeck/SwiftSteam is Madeira's Steam backend, copied verbatim.
-        if "SwiftSteam" in path.parts:
+        # iDeck/SwiftSteam and iDeck/MadeiraDock are Madeira's, copied verbatim.
+        if "SwiftSteam" in path.parts or "MadeiraDock" in path.parts:
             continue
         if path.suffix == ".swift" and re.search(r"\binflate(Init|Init2_|End)?\s*\(\s*&", path.read_text(errors="replace")):
             problems.append(f"{path.relative_to(root)} drives zlib directly; use the C/C++ codecs")

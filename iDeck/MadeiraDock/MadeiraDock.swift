@@ -1,429 +1,179 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Madeira Dock for iDeck: start an installed Steam game through Valve's
-// genuine Windows Steam client, without its desktop window.
-// SteamRuntimeFiles/SteamRuntimeInstaller and MadeiraDock are ported from
-// Madeira's SteamRuntime.swift and MadeiraDock.swift
-// (GPL-3.0-or-later, Copyright 2026 125hz, Madeira Converter Exception).
-// dockhost.exe is built from the madeira-dock submodule by
-// scripts/build_madeira_dock.sh into the bundle's arm64ec-windows folder.
+// Copyright 2026 125hz
+// Madeira Converter Exception: see LICENSE-EXCEPTION.md
 
 import Foundation
+import Darwin
 import Network
-import zlib
-#if canImport(CryptoKit)
-import CryptoKit
-#endif
 
-// Valve's client components for Madeira Dock, fetched from Valve's own update
-// CDN (one host, HTTPS) and checked against pinned sizes and SHA-256 sums; the
-// unpacked steamclient64.dll must be the client build the Dock host supports.
-// Pins never follow a moving client manifest. No Valve binary is bundled.
-enum SteamRuntimeFiles {
-    struct Package: Sendable {
-        let file: String
-        let bytes: Int
-        let sha256: String
-    }
-    static let origin = "https://client-update.akamai.steamstatic.com/"
-    static let packages = [
-        Package(file: "bins_win32.zip.23e34a6d4b10596a44561a5100dac5585d2517da", bytes: 59_544_006,
-                sha256: "8b712b2a3412a9066b7725f4e1c5cef9a7ca5b187b6585a5b92d25d09df0ba62"),
-        Package(file: "bins_win64_win32.zip.f29d67dc38a4be027f1734802697c668621a6da1", bytes: 10_509_550,
-                sha256: "345f6e4bdc19b27ae53bf752c21e2d894e0e899d94823222fb426e890d1226b5"),
-        Package(file: "steam_win32.zip.3e96965d109fc2d4cc14206b2fc4ec960a746ed3", bytes: 2_307_664,
-                sha256: "1369615c795b60de822876b4dc4042186cf58d0dc8f63ea1371167f667e16925")
-    ]
-    static let clientSHA256 = "71b391fe9f3e2006cbc81a5c75eef3eb4186012deabfdb2c8b7e8d4850ecf640"
-    static let relativeRoot = "Program Files (x86)/Steam"
-    static let windowsRoot = "C:\\Program Files (x86)\\Steam"
+/// JIT pool size of a Dock session. A Dock session runs no desktop Steam
+/// client (no Chromium helper fan-out), so it can live with a smaller pool.
+/// Opt-in per launch (the Dock sheet's toggle, default from
+/// `env.MADEIRA_DOCK_COMPACT_POOL`, off unless set to 1). It never applies
+/// outside a Dock launch, and an explicit madeira.cfg `pool` still wins
+/// because the caller applies that afterwards.
+enum DockPerformancePolicy {
+    static let compactPoolMB = 512
 
-    enum Failure: LocalizedError {
-        case invalidPackage, conflict, activeSession, prefixMissing
-        var errorDescription: String? {
-            switch self {
-            case .invalidPackage: return "Steam's components could not be verified. Try downloading them again."
-            case .conflict: return "Existing Steam files need attention. They were kept. Use the desktop setup option."
-            case .activeSession: return "Close the running session before preparing Steam's components."
-            case .prefixMissing: return "Prepare the Windows environment first: start any Windows program once."
-            }
-        }
-    }
-
-    static func validPath(_ name: String) -> Bool {
-        guard !name.isEmpty, name.utf8.count < 240,
-              !name.contains("\\"), !name.contains(":"),
-              !name.unicodeScalars.contains(where: { $0.value < 32 }) else { return false }
-        return !name.split(separator: "/", omittingEmptySubsequences: false)
-            .contains { $0.isEmpty || $0 == "." || $0 == ".." || $0.hasSuffix(".") || $0.hasSuffix(" ") }
-    }
-
-    static func destination(_ relative: String, under drive: URL) throws -> URL {
-        guard validPath(relative) else { throw Failure.conflict }
-        let fm = FileManager.default
-        var result = drive
-        for component in relative.split(separator: "/") {
-            if fm.fileExists(atPath: result.path) {
-                let matches = try fm.contentsOfDirectory(atPath: result.path)
-                    .filter { $0.caseInsensitiveCompare(String(component)) == .orderedSame }
-                guard matches.isEmpty || matches == [String(component)] else { throw Failure.conflict }
-            }
-            result.appendPathComponent(String(component))
-            guard result.standardizedFileURL.path == result.resolvingSymlinksInPath().standardizedFileURL.path else {
-                throw Failure.conflict
-            }
-        }
-        return result
-    }
-
-    // Parse the central directory, then validate each local header. ZIP64,
-    // encryption, symlinks and duplicate/case-colliding names are rejected.
-    // Called only AFTER the whole archive's pinned SHA-256 has been checked.
-    static func unpack(_ data: Data, write: (String, Data) throws -> Void) throws {
-        func need(_ condition: Bool) throws { if !condition { throw Failure.invalidPackage } }
-        try need(data.count >= 22 && data.count <= 64 * 1024 * 1024)
-        func u16(_ p: Int) -> Int { Int(data[p]) | Int(data[p + 1]) << 8 }
-        func u32(_ p: Int) -> Int { u16(p) | u16(p + 2) << 16 }
-        guard let end = stride(from: data.count - 22, through: max(0, data.count - 65557), by: -1)
-            .first(where: { u32($0) == 0x06054b50 && $0 + 22 + u16($0 + 20) == data.count }) else {
-            throw Failure.invalidPackage
-        }
-        let count = u16(end + 10), central = u32(end + 16), centralSize = u32(end + 12)
-        try need(u16(end + 4) == 0 && u16(end + 6) == 0 && u16(end + 8) == count && count <= 256)
-        try need(central <= end && centralSize == end - central)
-        var cursor = central, total = 0
-        var seen = Set<String>()
-        for _ in 0..<count {
-            try Task.checkCancellation()
-            try need(cursor + 46 <= end && u32(cursor) == 0x02014b50)
-            let flags = u16(cursor + 8), method = u16(cursor + 10)
-            let crc = UInt32(u32(cursor + 16)), compressed = u32(cursor + 20), size = u32(cursor + 24)
-            let nameLength = u16(cursor + 28), local = u32(cursor + 42)
-            let next = cursor + 46 + nameLength + u16(cursor + 30) + u16(cursor + 32)
-            let kind = (u32(cursor + 38) >> 16) & 0xf000
-            try need(next <= end && flags & 1 == 0 && (method == 0 || method == 8))
-            try need(kind == 0 || kind == 0x8000 || kind == 0x4000)
-            guard let rawName = String(data: data.subdata(in: cursor + 46..<cursor + 46 + nameLength), encoding: .utf8) else {
-                throw Failure.invalidPackage
-            }
-            // Valve's Windows packages use backslashes. Normalize BEFORE all
-            // traversal/duplicate checks, but compare local headers verbatim.
-            let normalizedName = rawName.replacingOccurrences(of: "\\", with: "/")
-            let directory = normalizedName.hasSuffix("/")
-            let name = directory ? String(normalizedName.dropLast()) : normalizedName
-            try need(validPath(name) && seen.insert(name.lowercased()).inserted)
-            try need(size <= 64 * 1024 * 1024 && local + 30 <= central && u32(local) == 0x04034b50)
-            try need(u16(local + 6) == flags && u16(local + 8) == method && u16(local + 26) == nameLength)
-            let body = local + 30 + nameLength + u16(local + 28)
-            try need(body <= central && compressed <= central - body)
-            try need(data.subdata(in: local + 30..<local + 30 + nameLength) == Data(rawName.utf8))
-            if flags & 8 == 0 { try need(u32(local + 18) == compressed && u32(local + 22) == size) }
-            total += size
-            try need(total <= 256 * 1024 * 1024)
-            if directory { try need(size == 0 && compressed == 0); cursor = next; continue }
-            let encoded = data.subdata(in: body..<body + compressed)
-            var decoded: Data
-            if method == 0 {
-                try need(compressed == size); decoded = encoded
-            } else {
-                decoded = Data(count: max(size, 1))
-                var produced = 0, used = 0, status = Int(IDECK_ZIP_INVALID)
-                encoded.withUnsafeBytes { source in
-                    decoded.withUnsafeMutableBytes { destination in
-                        status = Int(ideck_zip_inflate_raw(source.bindMemory(to: UInt8.self).baseAddress, compressed,
-                                                           destination.bindMemory(to: UInt8.self).baseAddress, max(size, 1),
-                                                           &produced, &used))
-                    }
-                }
-                let valid = status == Int(IDECK_ZIP_OK) && used == compressed && produced == size
-                try need(valid); decoded.count = size
-            }
-            let actualCRC = decoded.withUnsafeBytes { crc32(0, $0.bindMemory(to: UInt8.self).baseAddress, UInt32(size)) }
-            try need(UInt32(actualCRC) == crc)
-            try write(name, decoded)
-            cursor = next
-        }
-        try need(cursor == end)
-    }
-
-    /// The registry value or file that stopped the last setup, for the log.
-    nonisolated(unsafe) static var lastConflict: String?
-
-    /// A REG_SZ line's value, unescaped ("C:\\\\Steam" in the hive is C:\Steam), or nil.
-    static func stringValue(_ line: String, after prefix: String) -> String? {
-        let rest = line.dropFirst(prefix.count)
-        guard rest.hasPrefix("\""), rest.hasSuffix("\""), rest.count >= 2 else { return nil }
-        return String(rest.dropFirst().dropLast())
-            .replacingOccurrences(of: "\\\\", with: "\u{0}").replacingOccurrences(of: "\u{0}", with: "\\")
-    }
-
-    // Only fixed client-discovery paths are written. Never write user IDs,
-    // licenses, login cache, tokens, or a value asserting ownership.
-    // - stale: whether a value already there names a Steam client that is not
-    //   on the drive (a C:\ path, unescaped). A Steam emulator shipped with a
-    //   game, or a client removed since, leaves SteamPath / SteamClientDll64
-    //   pointing at a folder without Steam: such a value is replaced (both hives
-    //   keep their .dock-setup-bak copy), and any other differing value is kept.
-    static func registry(_ text: String, machine: Bool, stale: (String) -> Bool = { _ in false }) throws -> String {
-        guard text.hasPrefix("WINE REGISTRY Version 2") else { throw Failure.prefixMissing }
-        let root = windowsRoot.replacingOccurrences(of: "\\", with: "\\\\")
-        let sections: [(String, [(String, String)])] = machine
-            ? [("Software\\\\Valve\\\\Steam", [("InstallPath", root)]),
-               ("Software\\\\Wow6432Node\\\\Valve\\\\Steam", [("InstallPath", root)])]
-            : [("Software\\\\Valve\\\\Steam", [("SteamPath", root), ("SteamExe", root + "\\\\steam.exe")]),
-               ("Software\\\\Valve\\\\Steam\\\\ActiveProcess",
-                [("SteamClientDll", root + "\\\\steamclient.dll"), ("SteamClientDll64", root + "\\\\steamclient64.dll")])]
-        var lines = text.components(separatedBy: "\n")
-        for (key, values) in sections {
-            let header = "[\(key)]"
-            let starts = lines.indices.filter { lines[$0].lowercased().hasPrefix(header.lowercased()) }
-            guard starts.count <= 1 else { throw Failure.conflict }
-            if let start = starts.first {
-                let end = lines[(start + 1)...].firstIndex { $0.hasPrefix("[") } ?? lines.count
-                var additions: [String] = []
-                for (name, value) in values {
-                    let prefix = "\"\(name)\"="
-                    let found = lines[(start + 1)..<end].indices.filter { lines[$0].lowercased().hasPrefix(prefix.lowercased()) }
-                    let expected = prefix + "\"\(value)\""
-                    if found.count == 1, lines[found[0]] != expected, let old = stringValue(lines[found[0]], after: prefix),
-                       stale(old) {
-                        lines[found[0]] = expected
-                        continue
-                    }
-                    guard found.isEmpty || found.map({ lines[$0] }) == [expected] else {
-                        lastConflict = "\(key)\\\(name)"
-                        throw Failure.conflict
-                    }
-                    if found.isEmpty { additions.append(expected) }
-                }
-                lines.insert(contentsOf: additions, at: end)
-            } else {
-                lines += ["", header] + values.map { "\"\($0.0)\"=\"\($0.1)\"" } + [""]
-            }
-        }
-        return lines.joined(separator: "\n")
+    static func sessionPoolMB(standard: Int, dock: Bool, compact: Bool) -> Int {
+        dock && compact ? min(standard, compactPoolMB) : standard
     }
 }
-
-#if canImport(CryptoKit)
-private final class SteamRuntimeRedirects: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
-    func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
-                    newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {
-        let url = request.url
-        let allowed = url?.scheme == "https" && url?.host == "client-update.akamai.steamstatic.com"
-            && (url?.port == nil || url?.port == 443) && url?.user == nil && url?.password == nil
-        completionHandler(allowed ? request : nil)
-    }
-}
-
-actor SteamRuntimeInstaller {
-    static let shared = SteamRuntimeInstaller()
-    // Coalesce concurrent workspace prefetch and foreground Play requests.
-    // A second caller must await the same verified Valve downloads instead of
-    // reporting a fictitious active Wine session while the actor is busy.
-    private var inFlight: Task<Void, Error>?
-    private var inFlightPrefix: String?
-
-    func prepare(prefix: URL, progress: @Sendable @escaping (String) async -> Void) async throws {
-        let path = prefix.standardizedFileURL.path
-        if let running = inFlight {
-            guard inFlightPrefix == path else { throw SteamRuntimeFiles.Failure.activeSession }
-            try await running.value
-            await progress("Steam components are ready.")
-            return
-        }
-        let operation = Task { try await self.prepareOnce(prefix: prefix, progress: progress) }
-        inFlight = operation
-        inFlightPrefix = path
-        defer { inFlight = nil; inFlightPrefix = nil }
-        try await operation.value
-    }
-
-    // Only the first caller performs writes; another request waits for it.
-    private func prepareOnce(prefix: URL, progress: @Sendable (String) async -> Void) async throws {
-        // Wine can leave an idle wineserver behind after a failed launch.
-        // Stop it only if its guest thread has finished; never edit a live hive.
-        if !ideck_wineprocess_running(), ideck_wineserver_running(),
-           ideck_wineprocess_thread_finished() {
-            _ = ideck_wineserver_stop_if_idle()
-        }
-        guard !ideck_wineprocess_running(), !ideck_wineserver_running() else {
-            throw SteamRuntimeFiles.Failure.activeSession
-        }
-        SteamRuntimeFiles.lastConflict = nil
-        let fm = FileManager.default
-        // iDeck's prefix comes from its own template (PrefixInstaller); the
-        // registry hives must exist before the discovery values are added.
-        guard ["system.reg", "user.reg"].allSatisfy({ fm.fileExists(atPath: prefix.appendingPathComponent($0).path) }) else {
-            throw SteamRuntimeFiles.Failure.prefixMissing
-        }
-        let drive = prefix.appendingPathComponent("drive_c")
-        let root = drive.appendingPathComponent(SteamRuntimeFiles.relativeRoot)
-        guard root.standardizedFileURL.path == root.resolvingSymlinksInPath().standardizedFileURL.path else {
-            SteamRuntimeFiles.lastConflict = "a linked Steam folder"
-            throw SteamRuntimeFiles.Failure.conflict
-        }
-        // Existing installs are retained; this trial prepares missing files.
-        if fm.fileExists(atPath: root.appendingPathComponent("steam.exe").path) {
-            // Already prepared (or a desktop Steam install of the supported build).
-            if MadeiraDock.clientSupported { await progress("Steam components are ready."); return }
-            SteamRuntimeFiles.lastConflict = "steam.exe already there"
-            throw SteamRuntimeFiles.Failure.conflict
-        }
-        let stage = fm.temporaryDirectory.appendingPathComponent("ideck-steam-runtime-" + UUID().uuidString)
-        try fm.createDirectory(at: stage, withIntermediateDirectories: true)
-        defer { try? fm.removeItem(at: stage) }
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.httpCookieStorage = nil; configuration.urlCredentialStorage = nil
-        configuration.timeoutIntervalForRequest = 60; configuration.timeoutIntervalForResource = 900
-        let session = URLSession(configuration: configuration, delegate: SteamRuntimeRedirects(), delegateQueue: nil)
-        defer { session.invalidateAndCancel() }
-        var names = Set<String>(), files: [String] = []
-        for (index, package) in SteamRuntimeFiles.packages.enumerated() {
-            try Task.checkCancellation()
-            await progress("Downloading Steam components (\(index + 1) of \(SteamRuntimeFiles.packages.count))…")
-            let url = URL(string: SteamRuntimeFiles.origin + package.file)!
-            let (temporary, response) = try await session.download(from: url)
-            defer { try? fm.removeItem(at: temporary) }
-            guard let http = response as? HTTPURLResponse, http.statusCode == 200,
-                  http.url?.host == url.host, http.url?.scheme == "https",
-                  (try temporary.resourceValues(forKeys: [.fileSizeKey])).fileSize == package.bytes else {
-                throw SteamRuntimeFiles.Failure.invalidPackage
-            }
-            let archive = try Data(contentsOf: temporary, options: .mappedIfSafe)
-            guard Self.hash(archive) == package.sha256 else { throw SteamRuntimeFiles.Failure.invalidPackage }
-            await progress("Verifying Steam components…")
-            try SteamRuntimeFiles.unpack(archive) { name, bytes in
-                guard names.insert(name.lowercased()).inserted else { throw SteamRuntimeFiles.Failure.invalidPackage }
-                let file = stage.appendingPathComponent(name)
-                try fm.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
-                try bytes.write(to: file, options: .atomic)
-                files.append(name)
-            }
-        }
-        guard Self.hash(try Data(contentsOf: stage.appendingPathComponent("steamclient64.dll"))) == SteamRuntimeFiles.clientSHA256,
-              files.contains("steam.exe") else { throw SteamRuntimeFiles.Failure.invalidPackage }
-        try Task.checkCancellation()
-        guard !ideck_wineprocess_running(), !ideck_wineserver_running() else { throw SteamRuntimeFiles.Failure.activeSession }
-        await progress("Preparing the Windows environment…")
-        try Task.checkCancellation()
-        guard !ideck_wineprocess_running(), !ideck_wineserver_running() else { throw SteamRuntimeFiles.Failure.activeSession }
-        // Preflight all destinations and both hives before publishing anything.
-        // A discovery value naming a C:\ folder (or a file in one) without steam.exe
-        // points at no Steam client: an emulator's or a removed client's leftover.
-        let stale: (String) -> Bool = { value in
-            guard value.lowercased().hasPrefix("c:\\") else { return false }
-            var folder = drive.appendingPathComponent(value.dropFirst(3).replacingOccurrences(of: "\\", with: "/"))
-            if [".exe", ".dll"].contains(where: value.lowercased().hasSuffix) { folder.deleteLastPathComponent() }
-            return !fm.fileExists(atPath: folder.appendingPathComponent("steam.exe").path)
-        }
-        var pending: [(URL, Data)] = []
-        for (file, machine) in [("system.reg", true), ("user.reg", false)] {
-            let url = prefix.appendingPathComponent(file)
-            guard url.standardizedFileURL.path == url.resolvingSymlinksInPath().standardizedFileURL.path else {
-                throw SteamRuntimeFiles.Failure.conflict
-            }
-            let text = try String(contentsOf: url, encoding: .utf8)
-            pending.append((url, Data(try SteamRuntimeFiles.registry(text, machine: machine, stale: stale).utf8)))
-        }
-        for name in files {
-            let target = try SteamRuntimeFiles.destination(SteamRuntimeFiles.relativeRoot + "/" + name, under: drive)
-            if fm.fileExists(atPath: target.path), !fm.contentsEqual(atPath: target.path, andPath: stage.appendingPathComponent(name).path) {
-                SteamRuntimeFiles.lastConflict = name
-                throw SteamRuntimeFiles.Failure.conflict
-            }
-        }
-        try Task.checkCancellation()
-        // No suspension during commit. steam.exe is last, so a check for an installed
-        // client never mistakes a partial package for one. A retry accepts
-        // identical files left by an interrupted commit, never replaces others.
-        for (url, bytes) in pending {
-            let backup = url.appendingPathExtension("dock-setup-bak")
-            if !fm.fileExists(atPath: backup.path) { try fm.copyItem(at: url, to: backup) }
-            try bytes.write(to: url, options: .atomic)
-        }
-        for name in files.sorted(by: { $0 == "steam.exe" ? false : ($1 == "steam.exe" ? true : $0 < $1) }) {
-            let target = try SteamRuntimeFiles.destination(SteamRuntimeFiles.relativeRoot + "/" + name, under: drive)
-            if fm.fileExists(atPath: target.path) { continue }
-            try fm.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try fm.moveItem(at: stage.appendingPathComponent(name), to: target)
-        }
-        await progress("Steam components are ready.")
-    }
-
-    private static func hash(_ data: Data) -> String { SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined() }
-}
-#endif
-
-
 
 enum DockError: LocalizedError {
     case message(String)
     var errorDescription: String? { if case .message(let text) = self { return text }; return nil }
 }
 
-/// A Steam game installed in the client's library, as Dock needs it.
-struct DockGame: Equatable, Sendable {
-    let id: Int
-    let installDir: String
-    let library: String
-    let customExecutables: Bool
+/// A game Steam's client has installed in the prefix, read from its
+/// `steamapps/appmanifest_<appid>.acf`.
+struct DockGame: Identifiable, Equatable, Sendable, Codable {
+    let id: Int                 // App ID
+    let name: String
+    let installDir: String      // one folder name under <library>/common
+    let library: String         // drive-relative steamapps folder
+    let installed: Bool         // StateFlags has "fully installed"
+    let customExecutables: Bool // the install record lists per-user executables (CheckGuid)
 
+    /// Windows path of the game's folder, which Dock requires Valve's client to resolve to.
     var windowsInstallPath: String {
         "C:\\" + (library + "/common/" + installDir).replacingOccurrences(of: "/", with: "\\")
     }
 }
 
+/// Madeira Dock: a small headless host (madeira-dock, built by
+/// build/madeira-dock/build.sh into arm64ec-windows/dockhost.exe) that loads
+/// Valve's genuine Windows Steam client inside the Wine session, signs in
+/// with the user's own refresh token and asks the client to start an
+/// installed game with Valve's own LaunchApp. Valve's client performs the
+/// online authentication and licence checks; the game and its DRM are
+/// untouched. The host drives undocumented client interfaces and supports
+/// only client builds it has verified by SHA-256; anything else fails closed
+/// with a report code.
+///
+/// The app side is this contract: environment variables, a one-use sign-in
+/// transfer file and a numeric report file (C:\madeira-dock.txt).
 enum MadeiraDock {
-    static var bundledURL: URL? {
-        Bundle.main.url(forResource: "dockhost", withExtension: "exe", subdirectory: "arm64ec-windows")
+    /// `env.MADEIRA_DOCK = 0` hides Dock. Without a built dockhost.exe it is hidden too.
+    static var enabled: Bool { SteamSignIn.flag("MADEIRA_DOCK", default: true) && bundled }
+    static var bundled: Bool {
+        Bundle.main.url(forResource: "dockhost", withExtension: "exe", subdirectory: "arm64ec-windows") != nil
     }
-    static var bundled: Bool { bundledURL != nil }
+    static let executable = "C:\\windows\\system32\\dockhost.exe"
 
     static var prefix: URL {
-        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("VirtualRoot", isDirectory: true)
+        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!.appendingPathComponent("wine")
     }
-    static var drive: URL { prefix.appendingPathComponent("drive_c", isDirectory: true) }
+    static var drive: URL { prefix.appendingPathComponent("drive_c") }
     static var clientRoot: URL { drive.appendingPathComponent(SteamRuntimeFiles.relativeRoot, isDirectory: true) }
     static var clientInstalled: Bool {
         FileManager.default.fileExists(atPath: clientRoot.appendingPathComponent("steamclient64.dll").path)
     }
-    /// steamclient64.dll is the build the Dock host verifies.
-    static var clientSupported: Bool {
-        guard let data = try? Data(contentsOf: clientRoot.appendingPathComponent("steamclient64.dll"), options: .mappedIfSafe) else {
-            return false
-        }
-        return SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined() == SteamRuntimeFiles.clientSHA256
-    }
+
+    // MARK: Installed games
 
     static func validAppID(_ value: Int) -> Bool { value > 0 && UInt64(value) < UInt64(UInt32.max) }
 
-    /// The Dock description of a game iDeck installed, from its install record.
-    static func game(appID: UInt32) -> DockGame? {
-        let steamApps = SteamInstallPaths.steamApps(drive: drive)
-        let record = steamApps.appendingPathComponent("appmanifest_\(appID).acf")
-        guard let data = try? Data(contentsOf: record), data.count <= 1 << 20,
-              var parser = try? SteamKeyValues(data), let root = try? parser.read(),
-              let state = root["AppState"], let folder = state["installdir"]?.string,
-              folder == SteamInstallFiles.safeFolderName(folder),
-              (state["StateFlags"]?.string.flatMap { UInt32($0) } ?? 0) & 4 != 0 else { return nil }
-        return DockGame(id: Int(appID), installDir: folder, library: SteamInstallPaths.libraryRelative,
-                        customExecutables: state["CheckGuid"].map { !$0.fields.isEmpty } ?? false)
+    /// One folder name: no separators, drive letters, parent references or control characters.
+    static func validFolderName(_ name: String) -> Bool {
+        !name.isEmpty && name.utf8.count <= 240 && name != "." && name != ".." &&
+            !name.contains("/") && !name.contains("\\") && !name.contains(":") && !name.contains("\"") &&
+            !name.unicodeScalars.contains { $0.value < 32 } && !name.hasSuffix(" ") && !name.hasSuffix(".")
     }
 
-    /// Copies the bundled host to C:\windows\system32\dockhost.exe when it changed.
-    static func stageHost() throws -> URL {
-        guard let source = bundledURL else {
-            throw DockError.message("Madeira Dock is not built into this IPA.")
+    /// The game an app manifest describes, or nil when it is not one Dock can start.
+    static func game(manifest data: Data, library: String) -> DockGame? {
+        guard data.count <= 1 << 20, var parser = try? SteamKeyValues(data), let root = try? parser.read(),
+              let state = root["AppState"], let appID = state["appid"]?.string.flatMap({ Int($0) }), validAppID(appID),
+              let folder = state["installdir"]?.string, validFolderName(folder) else { return nil }
+        let flags = state["StateFlags"]?.string.flatMap { UInt32($0) } ?? 0
+        let name = state["name"]?.string.map { String($0.prefix(200)) } ?? ""
+        return DockGame(id: appID, name: name.isEmpty ? "App \(appID)" : name, installDir: folder, library: library,
+                        installed: flags & 4 != 0, customExecutables: !(state["CheckGuid"]?.fields.isEmpty ?? true))
+    }
+
+    /// A record's depots: the ones it lends from each owner app (`SharedDepots`, depot -> owner)
+    /// and the ones installed for the app itself (`InstalledDepots`).
+    static func depots(manifest data: Data) -> (lent: [Int: Set<String>], installed: Set<String>) {
+        guard data.count <= 1 << 20, var parser = try? SteamKeyValues(data), let root = try? parser.read(),
+              let state = root["AppState"], let appID = state["appid"]?.string.flatMap({ Int($0) }) else { return ([:], []) }
+        var lent: [Int: Set<String>] = [:]
+        for (depot, owner) in (state["SharedDepots"]?.fields ?? [:]).prefix(64) {
+            guard let ownerID = owner.string.flatMap({ Int($0) }), validAppID(ownerID), ownerID != appID else { continue }
+            lent[ownerID, default: []].insert(depot)
         }
-        let target = drive.appendingPathComponent("windows/system32/dockhost.exe")
+        return (lent, Set((state["InstalledDepots"]?.fields ?? [:]).keys.prefix(256)))
+    }
+
+    /// Installed games in the client's own library (`<client>/steamapps`) and the other
+    /// libraries on C: that its `libraryfolders.vdf` lists. Read-only.
+    static func games(drive: URL) -> [DockGame] {
         let fm = FileManager.default
-        if !fm.contentsEqual(atPath: source.path, andPath: target.path) {
-            try fm.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try? fm.removeItem(at: target)
-            try fm.copyItem(at: source, to: target)
+        let clientLibrary = SteamRuntimeFiles.relativeRoot + "/steamapps"
+        var libraries = [clientLibrary]
+        if let data = try? Data(contentsOf: drive.appendingPathComponent(clientLibrary + "/libraryfolders.vdf")),
+           data.count <= 1 << 20, var parser = try? SteamKeyValues(data), let root = try? parser.read() {
+            for (_, entry) in (root["libraryfolders"]?.fields ?? [:]).sorted(by: { $0.key < $1.key }) {
+                guard let path = entry["path"]?.string?.replacingOccurrences(of: "\\\\", with: "\\"),
+                      let relative = libraryRelative(path) else { continue }
+                if !libraries.contains(where: { $0.caseInsensitiveCompare(relative) == .orderedSame }) { libraries.append(relative) }
+            }
         }
-        return target
+        // Libraries on external drives (ExternalDrives.swift). They are reached
+        // through drive_c/External/<name> links, so they resolve outside drive_c.
+        let external = ExternalDrives.steamLibraries
+        for library in external where !libraries.contains(where: { $0.caseInsensitiveCompare(library) == .orderedSame }) {
+            libraries.append(library)
+        }
+        var result: [DockGame] = []
+        // Apps that only lend depots to another install ("Shared Only", e.g. GTA V
+        // Enhanced's RGL/SC 1899670) have a record but nothing to start. A game that
+        // lends depots but has its own installed too (a base game whose depots its
+        // expansions share) stays: the same test as the uninstall (SteamInstall.swift).
+        var lent: [Int: Set<String>] = [:], installed: [Int: Set<String>] = [:]
+        for library in libraries.prefix(32) {
+            let folder = drive.appendingPathComponent(library, isDirectory: true)
+            let isExternal = external.contains { $0.caseInsensitiveCompare(library) == .orderedSame }
+            guard isExternal || folder.resolvingSymlinksInPath().path.hasPrefix(drive.resolvingSymlinksInPath().path + "/"),
+                  let names = try? fm.contentsOfDirectory(atPath: folder.path) else { continue }
+            for file in names.sorted().prefix(2000) where file.hasPrefix("appmanifest_") && file.hasSuffix(".acf") {
+                guard let data = try? Data(contentsOf: folder.appendingPathComponent(file)) else { continue }
+                let held = depots(manifest: data)
+                lent.merge(held.lent) { $0.union($1) }
+                guard let game = game(manifest: data, library: library),
+                      !result.contains(where: { $0.id == game.id }) else { continue }
+                installed[game.id] = held.installed
+                result.append(game)
+            }
+        }
+        result.removeAll { game in lent[game.id].map { installed[game.id, default: []].isSubset(of: $0) } ?? false }
+        return result.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
+    /// "C:\\Games\\SteamLibrary" -> "Games/SteamLibrary/steamapps" (C: only).
+    static func libraryRelative(_ windowsPath: String) -> String? {
+        let path = windowsPath.replacingOccurrences(of: "\\", with: "/")
+        guard path.lowercased().hasPrefix("c:/") else { return nil }
+        let parts = path.dropFirst(3).split(separator: "/").map(String.init)
+        guard !parts.isEmpty, parts.count <= 16, parts.allSatisfy(validFolderName) else { return nil }
+        return (parts + ["steamapps"]).joined(separator: "/")
+    }
+
+    /// Everything a launch needs, checked before any sign-in is handed over.
+    static func validate(_ game: DockGame, drive: URL, bundled: Bool = MadeiraDock.bundled) throws {
+        guard bundled else { throw DockError.message("Madeira Dock is not built into this app. Run build/madeira-dock/build.sh.") }
+        guard validAppID(game.id), validFolderName(game.installDir) else {
+            throw DockError.message("This game's Steam install record is invalid.")
+        }
+        guard FileManager.default.fileExists(atPath: drive.appendingPathComponent(SteamRuntimeFiles.relativeRoot + "/steamclient64.dll").path) else {
+            throw DockError.message("Steam's client files are missing. Download Valve's client components first.")
+        }
+        var isFolder: ObjCBool = false
+        guard game.installed,
+              FileManager.default.fileExists(atPath: drive.appendingPathComponent(game.library + "/common/" + game.installDir).path, isDirectory: &isFolder),
+              isFolder.boolValue else {
+            throw DockError.message("Steam does not list this game as fully installed.")
+        }
     }
 
     // MARK: Sign-in transfer
@@ -437,7 +187,7 @@ enum MadeiraDock {
               secret.allSatisfy({ (65...90).contains($0) || (97...122).contains($0) || (48...57).contains($0) || [45, 46, 95].contains($0) }),
               steamID >> 56 == 1, (steamID >> 52) & 15 == 1, (steamID >> 32) & 0xfffff == 1,
               steamID & 0xffffffff != 0, validAppID(appID) else {
-            throw DockError.message("Your Steam sign-in cannot be handed to Dock. Sign in to Steam again in iDeck.")
+            throw DockError.message("Your Steam sign-in cannot be handed to Dock. Sign in to Steam again in Madeira.")
         }
         var data = Data("MDOCK001".utf8)
         func append(_ value: UInt64, bytes: Int) {
@@ -649,7 +399,7 @@ enum MadeiraDock {
 
     private static var transferURL: URL? {
         FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?
-            .appendingPathComponent("iDeckDock", isDirectory: true).appendingPathComponent("launch.auth")
+            .appendingPathComponent("MadeiraDock", isDirectory: true).appendingPathComponent("launch.auth")
     }
 
     /// Removes an unconsumed transfer (session end, sign-out, app start).
@@ -681,7 +431,7 @@ enum MadeiraDock {
         var values = URLResourceValues(); values.isExcludedFromBackup = true
         try folder.setResourceValues(values)
         let descriptor = open(url.path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0o600)
-        guard descriptor >= 0 else { throw DockError.message("iDeck could not create Dock's private sign-in transfer.") }
+        guard descriptor >= 0 else { throw DockError.message("Madeira could not create Dock's private sign-in transfer.") }
         let file = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
         do {
             try fm.setAttributes([.protectionKey: FileProtectionType.complete], ofItemAtPath: url.path)
@@ -707,7 +457,7 @@ enum MadeiraDock {
         else { setenv("MADEIRA_STEAM_HOST_ARGUMENTS", arguments, 1) }
         // The install record lists per-user executables: Dock asks Valve's client to prepare
         // them before it launches. env.MADEIRA_DOCK_CEG = 0 never asks.
-        if game.customExecutables && true {
+        if game.customExecutables && SteamSignIn.flag("MADEIRA_DOCK_CEG", default: true) {
             setenv("MADEIRA_STEAM_HOST_CEG", "1", 1)
         } else {
             unsetenv("MADEIRA_STEAM_HOST_CEG")
@@ -720,7 +470,7 @@ enum MadeiraDock {
         // fresh code instead of the unloaded one's translation. Dock sessions turn it on;
         // an engine without the switch ignores the variable. env.MADEIRA_DOCK_IMAGE_RETIRE = 0
         // leaves it off, and an explicit env.MADEIRA_JIT_IMAGE_RETIRE in madeira.cfg still wins.
-        let retire = true
+        let retire = SteamSignIn.flag("MADEIRA_DOCK_IMAGE_RETIRE", default: true)
         if retire { setenv("MADEIRA_JIT_IMAGE_RETIRE", "1", 1) }
         SteamLog.event("[dock-launch] image-retire=\(retire ? 1 : 0)")
         // While the loader loads Valve's client and its many imports, the emulator's
@@ -730,30 +480,32 @@ enum MadeiraDock {
         // every other session) keeps the emulator's own memory calls un-notified there, as
         // on the syscall path. Dock sessions turn it on; ntdll without the switch ignores it.
         // env.MADEIRA_DOCK_IMAGE_MAP_GUARD = 0 leaves it off.
-        let guardMap = true
+        let guardMap = SteamSignIn.flag("MADEIRA_DOCK_IMAGE_MAP_GUARD", default: true)
         if guardMap { setenv("MADEIRA_IMAGE_MAP_GUARD", "1", 1) }
         SteamLog.event("[dock-launch] image-map-guard=\(guardMap ? 1 : 0)")
         DockOffline.configure(appID: game.id)
     }
 
-    /// Sets everything for one launch: the host, the sign-in transfer and its
-    /// environment. Returns the program to start (dockhost.exe).
-    @MainActor static func prepareLaunch(appID: UInt32, arguments: String) throws -> URL {
-        guard bundled else { throw DockError.message("Madeira Dock is not built into this IPA.") }
-        guard clientInstalled else {
-            throw DockError.message("Steam's client components are missing. Download them in Settings › Steam.")
-        }
-        guard let game = game(appID: appID) else {
-            throw DockError.message("Steam does not list this game as fully installed.")
-        }
-        guard let credentials = SteamSignIn.credentialsForDock() else {
-            throw DockError.message("Sign in to Steam to start games through Steam.")
-        }
-        let host = try stageHost()
-        try writeHandoff(account: credentials.accountName, token: credentials.refreshToken, appID: game.id)
-        configure(game, arguments: arguments)
-        SteamLog.event("[dock-launch] app=\(appID)")
-        return host
+    /// Wine's explorer opens a virtual desktop and starts the host in it. With
+    /// `installers` (DockInstallers.script), cmd.exe first runs the game's one-time
+    /// installs in the same session, then the host. No token is quoted: MADEIRA_ARGS is
+    /// split at spaces and passed on as is, so quote characters would reach Wine
+    /// literally, and none of these paths contains a space.
+    /// madeira-bcd: `host` false runs only the installers; the session ends after them
+    /// (DockInstallers.installsOnly).
+    static func launchArguments(width: Int, height: Int, installers: String? = nil, host: Bool = true) -> String {
+        guard let installers else { return "/desktop=madeira,\(width)x\(height) \(executable)" }
+        guard host else { return "/desktop=madeira,\(width)x\(height) C:\\windows\\system32\\cmd.exe /c call \(installers)" }
+        return "/desktop=madeira,\(width)x\(height) C:\\windows\\system32\\cmd.exe /c call \(installers) & \(executable)"
+    }
+
+    /// Set on the main actor right before a Dock launch; read (and cleared) once by the
+    /// launch worker, so only that launch sees it.
+    nonisolated(unsafe) private static var launchRequest: (dock: Bool, compact: Bool) = (false, false)
+    static func requestLaunch(compactPool: Bool) { launchRequest = (true, compactPool) }
+    static func takeLaunchRequest() -> (dock: Bool, compact: Bool) {
+        defer { launchRequest = (false, false) }
+        return launchRequest
     }
 }
 
@@ -781,7 +533,7 @@ enum MadeiraDock {
 /// `env.MADEIRA_DOCK_OFFLINE_LOGON = 0` removes the feature in the app and in
 /// the host (which reads the same variable).
 enum DockOffline {
-    static let enabled = true
+    static let enabled = SteamSignIn.flag("MADEIRA_DOCK_OFFLINE_LOGON", default: true)
 
     private static let monitor = NWPathMonitor()
     private static var started = false
@@ -790,7 +542,7 @@ enum DockOffline {
     static func begin() {
         guard enabled, !started else { return }
         started = true
-        monitor.start(queue: DispatchQueue(label: "ideck.dock-offline.path"))
+        monitor.start(queue: DispatchQueue(label: "madeira.dock-offline.path"))
     }
     /// No usable network path right now. False until the monitor has started.
     static var networkDown: Bool { started && monitor.currentPath.status != .satisfied }
