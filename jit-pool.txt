@@ -1,0 +1,13 @@
+# iDeck JIT pool list
+#
+# The JIT pool memory each game starts with, in MB (256 to 1152).
+# Games without a line use 896 MB (or Settings › JIT).
+#
+# One game per line:  <Steam App ID or .exe name> = <MB>    # comment
+# Find a game's Steam App ID in its store link: store.steampowered.com/app/<ID>/
+#
+# This file is built into iDeck. To change it, edit it here on GitHub and
+# build iDeck again. A copy in Files › On My iPad › iDeck › jit-pool.txt,
+# if you make one, overrides these lines on that device.
+
+268910 = 512    # Cuphead

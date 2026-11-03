@@ -9,9 +9,9 @@ on:
         required: false
         default: true
       graphics_profile:
-        description: "Native renderers: unified = DXMT (D3D11) + Madeira D3D12 in one IPA; d3d11 = DXMT only, without the Apple Metal Shader Converter; d3d12 = legacy name of unified"
+        description: "Native renderers: unified = DXMT (D3D11) + Madeira D3D12 in one IPA"
         type: choice
-        options: [unified, d3d11, d3d12]
+        options: [unified]
         default: unified
       accept_converter_license:
         description: "I have reviewed the Metal Shader Converter terms and have permission to package the converter in this IPA"
@@ -431,8 +431,7 @@ jobs:
       IDECK_NATIVE_BUILD: ${{ ((github.event_name == 'workflow_dispatch' && inputs.require_madeira) || (github.event_name == 'push' && vars.IDECK_NATIVE_DISTRIBUTION_APPROVED == 'true')) && '1' || '0' }}
       IDECK_BUILD_WOW64: ${{ ((github.event_name == 'workflow_dispatch' && inputs.require_madeira && inputs.build_wow64) || (github.event_name == 'push' && vars.IDECK_NATIVE_DISTRIBUTION_APPROVED == 'true')) && '1' || '0' }}
       IDECK_BUNDLE_WINE_MONO: ${{ github.event_name == 'workflow_dispatch' && inputs.require_madeira && inputs.bundle_wine_mono && '1' || '0' }}
-      # The profile name (unified / d3d11 / d3d12) and the payload it builds:
-      # unified and d3d12 both build DXMT + Madeira D3D12 ("d3d12" payload).
+      # The profile (always unified): DXMT + Madeira D3D12 ("d3d12" payload).
       IDECK_GRAPHICS_PROFILE: ${{ github.event_name == 'workflow_dispatch' && inputs.graphics_profile || 'unified' }}
       IDECK_MADEIRA_GRAPHICS: ${{ (github.event_name == 'workflow_dispatch' && inputs.graphics_profile == 'd3d11') && 'd3d11' || 'd3d12' }}
       IDECK_ACCEPT_METAL_CONVERTER_LICENSE: ${{ (((github.event_name == 'workflow_dispatch' && inputs.accept_converter_license) || (github.event_name == 'push' && vars.IDECK_NATIVE_DISTRIBUTION_APPROVED == 'true')) && (github.event_name != 'workflow_dispatch' || inputs.graphics_profile != 'd3d11')) && '1' || '0' }}
