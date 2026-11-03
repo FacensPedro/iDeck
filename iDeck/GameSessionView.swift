@@ -203,7 +203,7 @@ struct GameSessionView: View {
                     .disabled(coordinator.isClosingWindowsSession)
                     .accessibilityLabel(tr("Close Wine and return to the library"))
                     Button { showControlsSheet = true } label: {
-                        Image(systemName: "gamecontroller.fill")
+                        Image(systemName: "speedometer")
                             .font(.system(size: 22))
                             .foregroundColor(.white.opacity(0.85))
                             .frame(width: 44, height: 44)
@@ -391,7 +391,6 @@ struct GameSessionView: View {
             metrics.sample(collectPerformance: on)
         }
         .onAppear {
-            TouchController.shared.sessionStarted()
             WineInputBridge.shared.startBridging()
             metrics.sample(collectPerformance: showGamePerformanceOverlay)
             updateRecentWineLogFinding()
@@ -430,7 +429,6 @@ struct GameSessionView: View {
             coordinator.refreshWindowsSessionHealth()
         }
         .onDisappear {
-            TouchController.shared.sessionEnded()
             WineInputBridge.shared.stopBridging()
         }
         .alert(tr("Wine did not close"), isPresented: Binding(
