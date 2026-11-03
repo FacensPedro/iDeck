@@ -9,7 +9,7 @@ final class TouchController: ObservableObject {
     static let shared = TouchController()
 
     enum Element: String, CaseIterable, Identifiable {
-        case leftStick, rightStick, dpad, faceButtons, shoulders, triggers, menu
+        case leftStick, rightStick, dpad, faceButtons, shoulders, triggers
         var id: String { rawValue }
         var title: String {
             switch self {
@@ -19,7 +19,6 @@ final class TouchController: ObservableObject {
             case .faceButtons: return "A / B / X / Y"
             case .shoulders: return "LB / RB"
             case .triggers: return "LT / RT"
-            case .menu: return "Menu / View"
             }
         }
         var gcElements: [String] {
@@ -30,7 +29,6 @@ final class TouchController: ObservableObject {
             case .faceButtons: return [GCInputButtonA, GCInputButtonB, GCInputButtonX, GCInputButtonY]
             case .shoulders: return [GCInputLeftShoulder, GCInputRightShoulder]
             case .triggers: return [GCInputLeftTrigger, GCInputRightTrigger]
-            case .menu: return [GCInputButtonMenu, GCInputButtonOptions]
             }
         }
     }
