@@ -34,10 +34,10 @@ final class IRelayDeviceService: @unchecked Sendable {
     private let queue = DispatchQueue(label: "ideck.irelay.service", qos: .userInitiated)
     private var listener: NWListener?
 
-    /// Documents/VirtualRoot/drive_c (as EpicLibrary.drive, usable off the main actor).
+    /// Documents/wine/drive_c (as EpicLibrary.drive, usable off the main actor).
     static var drive: URL {
         FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("VirtualRoot/drive_c", isDirectory: true)
+            .appendingPathComponent("wine/drive_c", isDirectory: true)
     }
     static var prefix: URL { drive.deletingLastPathComponent() }
 

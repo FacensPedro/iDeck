@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright 2026 Akshay CM
 // Ported from Madeira's EpicLibrary.swift; iDeck keeps installed games in its
-// own Wine prefix (Documents/VirtualRoot/drive_c).
+// own Wine prefix (Documents/wine/drive_c).
 // Madeira Converter Exception: see LICENSE-EXCEPTION.md
 
 import CryptoKit
@@ -128,7 +128,7 @@ struct EpicInstalledGame: Codable, Sendable {
 
     static var drive: URL {
         FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("VirtualRoot/drive_c", isDirectory: true)
+            .appendingPathComponent("wine/drive_c", isDirectory: true)
     }
 
     /// drive_c/users/<name>: the Wine user's folder, once a prefix exists.

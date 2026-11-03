@@ -16,26 +16,32 @@ extension ExternalDrives {
 extension MadeiraDock {
     /// The installed Steam game Madeira Dock can start, by App ID.
     static func game(appID: UInt32) -> DockGame? {
-        linkPrefix()
-        return games(drive: drive).first { $0.id == Int(appID) }
+        games(drive: drive).first { $0.id == Int(appID) }
     }
 
-    /// Madeira's prefix is Documents/wine; iDeck's is Documents/VirtualRoot.
-    /// Documents/wine is made a link to iDeck's prefix, so Madeira's code (kept
-    /// verbatim) finds the games, the Steam client and the sign-in transfer there.
+    /// iDeck's Wine prefix is Madeira's, Documents/wine (MadeiraDock.prefix).
+    /// Earlier builds kept it in Documents/VirtualRoot, and one build linked
+    /// Documents/wine to it; Madeira's Steam setup refuses linked folders
+    /// ("Existing Steam files need attention"). The folder is moved, once,
+    /// before anything uses it. A real Documents/wine is set aside, never deleted.
     static func linkPrefix() {
         let fm = FileManager.default
         guard let documents = fm.urls(for: .documentDirectory, in: .userDomainMask).first else { return }
-        let link = documents.appendingPathComponent("wine")
-        let target = documents.appendingPathComponent("VirtualRoot", isDirectory: true)
-        if let existing = try? fm.destinationOfSymbolicLink(atPath: link.path) {
-            if existing == target.path || existing == "VirtualRoot" { return }
-            try? fm.removeItem(at: link)
-        } else if fm.fileExists(atPath: link.path) {
-            // A real folder from an earlier build: set aside, never deleted.
-            try? fm.moveItem(at: link, to: documents.appendingPathComponent("wine.old-\(Int(Date().timeIntervalSince1970))"))
+        let prefix = documents.appendingPathComponent("wine", isDirectory: true)
+        let old = documents.appendingPathComponent("VirtualRoot", isDirectory: true)
+        if (try? fm.destinationOfSymbolicLink(atPath: prefix.path)) != nil { try? fm.removeItem(at: prefix) }
+        var isDirectory: ObjCBool = false
+        guard fm.fileExists(atPath: old.path, isDirectory: &isDirectory), isDirectory.boolValue,
+              (try? fm.destinationOfSymbolicLink(atPath: old.path)) == nil else { return }
+        if fm.fileExists(atPath: prefix.path) {
+            try? fm.moveItem(at: prefix, to: documents.appendingPathComponent("wine.old-\(Int(Date().timeIntervalSince1970))"))
         }
-        try? fm.createSymbolicLink(atPath: link.path, withDestinationPath: "VirtualRoot")
+        do {
+            try fm.moveItem(at: old, to: prefix)
+            SteamLog.event("[prefix] moved Documents/VirtualRoot to Documents/wine")
+        } catch {
+            SteamLog.event("[prefix] could not move VirtualRoot: \(error.localizedDescription)")
+        }
     }
 
     /// Marks the Visual C++ programs of a game's Steam install script as run
