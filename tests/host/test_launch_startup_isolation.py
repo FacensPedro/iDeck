@@ -37,7 +37,7 @@ class LaunchStartupIsolationTests(unittest.TestCase):
         self.assertIn('NSLog("[iDeck startup] Home view ready', main)
         self.assertIn("@State private var steamLibrary: SteamOwnedGamesModel?", main)
         self.assertNotIn("private struct WorkspaceHostView: View", MAIN)
-        self.assertEqual(MAIN.count("if steamLibrary == nil { steamLibrary = SteamOwnedGamesModel() }"), 2)
+        self.assertEqual(MAIN.count("if steamLibrary == nil { steamLibrary = SteamOwnedGamesModel.shared }"), 2)
         self.assertIn("await steamLibrary.refresh()", main)
         self.assertIn("selectedWorkspace == .pc && coordinator.isSteamConnected", main)
 

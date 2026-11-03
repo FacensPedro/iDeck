@@ -7,6 +7,9 @@ import UIKit
 
 @MainActor
 final class SteamOwnedGamesModel: ObservableObject {
+    /// iDeck's one Steam library (the views and iRelay share it).
+    static let shared = SteamOwnedGamesModel()
+
     @Published private(set) var games: [SteamAppInfo] = []
     @Published private(set) var isLoading = false
     @Published private(set) var errorMessage: String?
