@@ -235,6 +235,8 @@ struct GameSessionView: View {
                         .padding(.horizontal, 10)
                         .padding(.vertical, 8)
                         .frame(maxWidth: 380)
+                        .accessibilityElement(children: .combine)
+                        .accessibilityHint(Text("Startup milestone, not the game's internal loading percentage."))
                         .background(.black.opacity(0.8), in: RoundedRectangle(cornerRadius: 10))
                         .padding(.top, 8)
                     }
