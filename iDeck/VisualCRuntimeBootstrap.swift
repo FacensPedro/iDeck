@@ -11,6 +11,36 @@ enum VisualCRuntimeBootstrap {
         "vcruntime140_threads.dll", "mfc140.dll", "mfc140u.dll"
     ]
 
+    /// Visual C++ built into the app (scripts/bundle_vcruntime.sh): copied into
+    /// Documents/vcruntime once per app build, so no install or download is needed.
+    @discardableResult
+    static func installBundled(documents: URL) -> Bool {
+        guard let bundle = Bundle.main.resourceURL?.appendingPathComponent("vcruntime-bundle", isDirectory: true),
+              FileManager.default.fileExists(atPath: bundle.path) else { return false }
+        let fm = FileManager.default
+        let live = documents.appendingPathComponent("vcruntime", isDirectory: true)
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "0"
+        let marker = live.appendingPathComponent(".bundled-\(build)")
+        if fm.fileExists(atPath: marker.path) { return true }
+        guard let walker = fm.enumerator(at: bundle, includingPropertiesForKeys: [.isRegularFileKey]) else { return false }
+        let base = bundle.standardizedFileURL.path + "/"
+        for case let file as URL in walker {
+            guard (try? file.resourceValues(forKeys: [.isRegularFileKey]))?.isRegularFile == true else { continue }
+            let relative = String(file.standardizedFileURL.path.dropFirst(base.count))
+            let target = live.appendingPathComponent(relative)
+            try? fm.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try? fm.removeItem(at: target)
+            guard (try? fm.copyItem(at: file, to: target)) != nil else { return false }
+        }
+        fm.createFile(atPath: marker.path, contents: Data())
+        return true
+    }
+
+    /// Whether this build carries Visual C++ (then Steam's Visual C++ installers are not run).
+    static var bundled: Bool {
+        Bundle.main.resourceURL.map { FileManager.default.fileExists(atPath: $0.appendingPathComponent("vcruntime-bundle").path) } ?? false
+    }
+
     static func hasCompleteRuntime(in directory: URL) -> Bool {
         requiredDLLs.allSatisfy { name in
             let path = directory.appendingPathComponent(name)

@@ -11,6 +11,8 @@ struct iDeckApp: App {
         setenv("MADEIRA_WGI_HOST_PADS", "1", 0)
         // iRelay over the USB cable: listen from launch so the PC finds iDeck at once.
         IRelayRuntime.start()
+        // Madeira Dock's files (verbatim) use Documents/wine as the prefix.
+        MadeiraDock.linkPrefix()
         NSLog("[iDeck startup] SwiftUI App initialized without native runtime setup")
     }
 

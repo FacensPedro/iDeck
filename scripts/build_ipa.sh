@@ -184,6 +184,11 @@ done
 if [ "${IDECK_REQUIRE_MADEIRA:-0}" = "1" ]; then
   IDECK_MADEIRA_APP_ROOT="$NATIVE_ASSET_SOURCE" \
     bash scripts/stage_madeira_payload.sh "$APP"
+  # Microsoft's Visual C++ runtimes, extracted at build time: no install on
+  # the device. IDECK_BUNDLE_VCRUNTIME=0 leaves them out.
+  if [[ "${IDECK_BUNDLE_VCRUNTIME:-1}" != "0" ]]; then
+    bash scripts/bundle_vcruntime.sh "$APP"
+  fi
   # Native builds use the Debug configuration (upstream Madeira's guest code
   # is unreliable in Release). Drop only the debugger's STABS debug map from
   # the executables: exported and global symbols stay for dlsym and crash logs.
