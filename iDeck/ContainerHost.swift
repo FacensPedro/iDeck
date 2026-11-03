@@ -26,7 +26,7 @@ class ContainerHost {
             return
         }
         isMounted = true
-        completion(documentDirectory.appendingPathComponent("VirtualRoot", isDirectory: true).path)
+        completion(documentDirectory.appendingPathComponent("wine", isDirectory: true).path)
     }
 
     private func setupVirtualFileSystem() -> Bool {
@@ -34,7 +34,7 @@ class ContainerHost {
         guard let documentDirectory = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first else {
             return false
         }
-        let virtualRoot = documentDirectory.appendingPathComponent("VirtualRoot", isDirectory: true)
+        let virtualRoot = documentDirectory.appendingPathComponent("wine", isDirectory: true)
         let directories = [
             virtualRoot,
             virtualRoot.appendingPathComponent("Library", isDirectory: true),
