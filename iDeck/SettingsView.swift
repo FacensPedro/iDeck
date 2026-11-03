@@ -29,8 +29,6 @@ struct SettingsView: View {
     @State private var isPairingImporterPresented = false
     @AppStorage(AppLanguage.storageKey) private var appLanguage = AppLanguage.system.rawValue
 
-    @AppStorage(IRelaySetting.enabledKey) private var irelayEnabled = false
-
     var body: some View {
         NavigationStack {
             Form {
@@ -57,7 +55,7 @@ struct SettingsView: View {
                 Section(tr("PC")) {
                     NavigationLink { irelayPage } label: {
                         SettingsRow(icon: "cable.connector", color: .blue, title: "iRelay",
-                                    value: irelayEnabled ? tr("On") : tr("Off"))
+                                    value: tr("Automatic"))
                     }
                 }
 

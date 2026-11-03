@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import Network
 import UIKit
@@ -104,6 +105,19 @@ final class IRelayDeviceService: @unchecked Sendable {
             let name = await MainActor.run { UIDevice.current.name }
             let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
             return .json(["name": name, "app": "iDeck", "version": version, "protocol": 2, "freeBytes": free])
+        case ("PUT", "/write"):
+            return Self.write(request)
+        case ("POST", "/install"):
+            guard let body = request.body,
+                  let json = try? JSONSerialization.jsonObject(with: body) as? [String: Any] else { return .status(400) }
+            do {
+                try await Self.install(json)
+                return .json(["ok": true])
+            } catch {
+                return .error(422, error.localizedDescription)
+            }
+        case ("GET", "/installs"):
+            return .json(await Self.installs())
         case ("GET", "/logs"):
             return .json(await Self.logs())
         case ("GET", "/library"):
@@ -158,6 +172,98 @@ final class IRelayDeviceService: @unchecked Sendable {
                           "m": Int(values.contentModificationDate?.timeIntervalSince1970 ?? 0)])
         }
         return files
+    }
+
+    // MARK: Downloads iRelay starts
+
+    /// One chunk iRelay downloaded and decoded: written at its offset in a
+    /// file of a game being installed, after checking its SHA-1.
+    private static func write(_ request: IRelayHTTPRequest) -> IRelayHTTPResponse {
+        guard let root = request.query["root"], let path = request.query["path"],
+              let url = file(root: root, path: path),
+              let offset = request.query["offset"].flatMap(UInt64.init),
+              let sha = request.query["sha"]?.lowercased(), sha.count == 40,
+              let body = request.body else { return .status(400) }
+        let digest = Insecure.SHA1.hash(data: body).map { String(format: "%02x", $0) }.joined()
+        guard digest == sha else { return .error(409, "SHA-1 mismatch") }
+        do {
+            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            let fd = open(url.path, O_WRONLY | O_CREAT, 0o644)
+            guard fd >= 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+            defer { close(fd) }
+            if let size = request.query["size"].flatMap(Int64.init) {
+                var info = stat()
+                if fstat(fd, &info) == 0, info.st_size < size { _ = ftruncate(fd, off_t(size)) }
+            }
+            let written = body.withUnsafeBytes { pwrite(fd, $0.baseAddress, body.count, off_t(offset)) }
+            guard written == body.count else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+            return .json(["ok": true])
+        } catch {
+            return .error(507, error.localizedDescription)
+        }
+    }
+
+    /// Starts iDeck's own install of a game (or a Steam DLC) from iRelay. Steam
+    /// installs then hand their chunks to iRelay (DepotDownloader.processOnPC).
+    @MainActor
+    private static func install(_ json: [String: Any]) async throws {
+        let prefix = Self.prefix
+        switch json["store"] as? String {
+        case "steam":
+            guard let appID = (json["appId"] as? NSNumber)?.uint32Value else { throw FinishError(errorDescription: "Missing app.") }
+            let steam = SteamOwnedGamesModel.shared
+            if let dlc = (json["dlcId"] as? NSNumber)?.uint32Value {
+                steam.startDLCInstall(appID: appID, dlcAppID: dlc, prefixPath: prefix)
+            } else {
+                steam.startInstall(appID: appID, prefixPath: prefix)
+            }
+        case "gog":
+            guard let id = (json["id"] as? NSNumber)?.intValue,
+                  let game = GOGLibraryModel.shared.games.first(where: { $0.id == id }) else {
+                throw FinishError(errorDescription: "GOG game not found in iDeck's library.")
+            }
+            GOGLibraryModel.shared.install(game, prefixPath: prefix) { _ in
+                NotificationCenter.default.post(name: installedNotification, object: nil)
+            }
+        case "epic":
+            guard let app = json["appName"] as? String, EpicLibrary.shared.game(app) != nil else {
+                throw FinishError(errorDescription: "Epic game not found in iDeck's library.")
+            }
+            EpicLibrary.shared.install(app)
+        default:
+            throw FinishError(errorDescription: "Unknown store.")
+        }
+    }
+
+    /// iDeck's own downloads, for iRelay's Transfers.
+    @MainActor
+    private static func installs() -> [String: Any] {
+        var list: [[String: Any]] = []
+        let steam = SteamOwnedGamesModel.shared
+        for (id, progress) in steam.downloadProgress {
+            let name = steam.games.first { $0.appID == id }?.name ?? "App \(id)"
+            list.append(["store": "steam", "id": id, "title": name, "phase": progress.phase.rawValue,
+                         "done": progress.doneBytes, "total": progress.totalBytes,
+                         "error": steam.downloadErrors[id] ?? ""])
+        }
+        for (id, error) in steam.downloadErrors where steam.downloadProgress[id] == nil {
+            let name = steam.games.first { $0.appID == id }?.name ?? "App \(id)"
+            list.append(["store": "steam", "id": id, "title": name, "phase": "failed", "done": 0, "total": 0, "error": error])
+        }
+        let gog = GOGLibraryModel.shared
+        for (id, fraction) in gog.downloadProgress {
+            list.append(["store": "gog", "id": id, "title": gog.games.first { $0.id == id }?.title ?? "GOG \(id)",
+                         "phase": "downloading", "done": Int(fraction * 1000), "total": 1000,
+                         "error": gog.downloadErrors[id] ?? ""])
+        }
+        let epic = EpicLibrary.shared
+        for (app, download) in epic.downloads {
+            var error = ""
+            if case .failed(let reason) = download.state { error = reason }
+            list.append(["store": "epic", "id": app, "title": epic.game(app)?.title ?? app, "phase": "\(download.state)",
+                         "done": download.progress.fraction * 1000, "total": 1000, "error": error])
+        }
+        return ["installs": list]
     }
 
     // MARK: Logs
