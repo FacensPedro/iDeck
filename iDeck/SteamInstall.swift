@@ -46,8 +46,9 @@ enum SteamLaunchCompatibility {
         }
         let kind = launchType.lowercased()
         if kind.contains("launcher") || name.contains("launcher") {
-            return Finding(kind: .launcherChild,
-                           warning: "This Steam launcher may start another game process. Enable child processes only if needed.")
+            // The game's own launch option is picked automatically
+            // (SystemCoordinator.gameLaunchOption): no warning.
+            return Finding(kind: .launcherChild, warning: nil)
         }
         if name == "steam.exe" || files.contains("steamclient.dll") {
             return Finding(kind: .steamClient,
