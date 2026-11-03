@@ -10,15 +10,7 @@ import Foundation
 extension ExternalDrives {
     /// Madeira lists Steam libraries on external drives here; iDeck keeps its
     /// games in the prefix's own library.
-    static var steamLibraries: [String] { [] }
-}
-
-extension MadeiraConfig {
-    /// The running game's own lines (Madeira's MadeiraConfig.gameURL).
-    static var gameURL: URL? {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?
-            .appendingPathComponent("madeira-game.cfg")
-    }
+    nonisolated static var steamLibraries: [String] { [] }
 }
 
 extension MadeiraDock {

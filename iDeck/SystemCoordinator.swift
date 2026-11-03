@@ -1191,7 +1191,7 @@ class SystemCoordinator: ObservableObject {
         let message = MainActor.assumeIsolated { DockInstallers.restartNotice(ended) }
             .replacingOccurrences(of: "Madeira", with: "iDeck")
         steamPrerequisiteProgress = nil
-        SteamOwnedGamesModel.shared.releaseDock()
+        MainActor.assumeIsolated { SteamOwnedGamesModel.shared.releaseDock() }
         SteamLog.event("[dock-installers] \(message)")
         isClosingWindowsSession = false
         windowsCloseRequestedAt = nil
