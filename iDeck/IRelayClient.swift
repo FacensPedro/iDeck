@@ -20,8 +20,8 @@ import UIKit
 ///
 /// The cable is the only connection: usbmux reaches only a PC this iPad trusts.
 enum IRelaySetting {
-    static let enabledKey = "ideck.irelay.enabled"
-    static var enabled: Bool { UserDefaults.standard.bool(forKey: enabledKey) }
+    /// iRelay connects by itself: nothing to turn on.
+    static var enabled: Bool { true }
 }
 
 enum IRelayError: LocalizedError {
@@ -64,9 +64,10 @@ final class IRelayClient: @unchecked Sendable {
 
     /// The iRelay on the cable, when it is turned on in Settings.
     static func configured() -> IRelayClient? {
-        guard IRelaySetting.enabled else { return nil }
         IRelayUSBTunnel.shared.start()
-        return IRelayClient()
+        // Only when iRelay keeps connections open over the cable: a download
+        // without a PC never waits for one.
+        return IRelayUSBTunnel.shared.pcConnected ? IRelayClient() : nil
     }
 
     var usable: Bool { lock.withLock { failureCount < 5 } }
@@ -117,6 +118,48 @@ final class IRelayClient: @unchecked Sendable {
         return data
     }
 
+    // MARK: Processing on the PC
+
+    struct ProcessChunk: Encodable, Sendable { let sha: String; let offset: UInt64; let size: UInt32; let compressed: UInt32; let crc: UInt32 }
+    struct ProcessFile: Encodable, Sendable { let path: String; let size: UInt64; var chunks: [ProcessChunk] }
+    struct ProcessDepot: Encodable, Sendable {
+        let depotId: UInt32
+        let key: String
+        let hosts: [String]
+        let auth: [String: String]
+        /// The install folder, relative to drive_c.
+        let root: String
+        let files: [ProcessFile]
+    }
+    struct ProcessStatus: Decodable, Sendable {
+        var finished = false
+        var chunksDone = 0
+        var bytesDone: UInt64 = 0
+        var compressedDone: UInt64 = 0
+        var failed: [String] = []
+    }
+
+    /// iRelay downloads, decrypts, decompresses and checks these chunks and
+    /// writes them into this device's files. Returns the job's ID.
+    func startProcess(appID: UInt32, title: String, depots: [ProcessDepot]) async throws -> String {
+        struct Job: Encodable { let appId: UInt32; let name: String; let depots: [ProcessDepot] }
+        struct Started: Decodable { let id: String }
+        let body = try JSONEncoder().encode(Job(appId: appID, name: title, depots: depots))
+        let (data, response) = try await Self.session.data(for: request("process", method: "POST", body: body, timeout: 60))
+        try Self.check(response)
+        return try JSONDecoder().decode(Started.self, from: data).id
+    }
+
+    func processStatus(_ id: String) async throws -> ProcessStatus {
+        let (data, response) = try await Self.session.data(for: request("process/\(id)", timeout: 20))
+        try Self.check(response)
+        return try JSONDecoder().decode(ProcessStatus.self, from: data)
+    }
+
+    func cancelProcess(_ id: String) async {
+        _ = try? await Self.session.data(for: request("process/\(id)", method: "DELETE", timeout: 10))
+    }
+
     func recordSuccess(bytes: Int) {
         lock.withLock { chunkCount += 1; byteCount += bytes; failureCount = 0 }
     }
@@ -127,25 +170,23 @@ final class IRelayClient: @unchecked Sendable {
     }
 }
 
-/// Settings › iRelay (its own page, under PC).
+/// Settings › iRelay (its own page, under PC): the connection's state. iRelay
+/// connects by itself whenever the iPad is cabled to a PC running it.
 struct IRelaySettingsSection: View {
-    @AppStorage(IRelaySetting.enabledKey) private var enabled = false
     @State private var status: String?
     @State private var testing = false
 
     var body: some View {
         Section {
-            Toggle(tr("Use iRelay (USB cable)"), isOn: $enabled)
-                .onChange(of: enabled) { _, on in if on { IRelayRuntime.start() } }
             Button(testing ? tr("Connecting…") : tr("Test connection")) { test() }
-                .disabled(testing || !enabled)
+                .disabled(testing)
             if let status {
                 Text(status).font(.caption).foregroundStyle(.secondary)
             }
         } header: {
             Text("iRelay")
         }
-        .onAppear { if enabled { IRelayRuntime.start() } }
+        .onAppear { IRelayRuntime.start() }
     }
 
     private func test() {

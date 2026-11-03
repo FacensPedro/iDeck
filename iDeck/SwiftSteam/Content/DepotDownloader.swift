@@ -277,27 +277,23 @@ final class DepotDownloader {
             peer = await lanPeerSource(appID: app.appID, currentBuild: installedBuild == app.buildID ? 0 : installedBuild,
                                        depots: Set(plans.map(\.depotID)))
         }
-        // iDeck: iRelay, a PC downloading this install's chunks alongside it
-        // (IRelayClient). It gets the whole list first and serves the chunks
-        // as they arrive; whatever it cannot serve comes from Steam.
-        var startedRelay: IRelayClient?
-        if !work.allSatisfy(\.isEmpty), let configured = IRelayClient.configured() {
+        // iDeck: iRelay, the PC connected by USB, does this download: it fetches,
+        // decrypts, decompresses and checks every chunk at the PC's speed and
+        // writes it into the game's files here (IRelayDeviceService, PUT /write,
+        // which checks each chunk's SHA-1 again). Chunks it could not deliver
+        // stay in `work` and come from Steam's content servers below.
+        if !work.allSatisfy(\.isEmpty), let pc = IRelayClient.configured() {
             do {
-                _ = try await configured.ping()
-                var depots: [IRelayClient.JobDepot] = []
-                for (index, plan) in plans.enumerated() where !work[index].isEmpty {
-                    depots.append(IRelayClient.JobDepot(depotId: plan.depotID, hosts: plan.hosts, auth: plan.auth,
-                        chunks: work[index].map { plan.manifest.files[$0.file].chunks[$0.chunk].shaHex }))
-                }
-                try await configured.startJob(appID: app.appID, title: app.name, depots: depots)
-                startedRelay = configured
-                SteamLog.event("[irelay] on host=\(configured.base.absoluteString) app=\(app.appID) chunks=\(depots.reduce(0) { $0 + $1.chunks.count })")
+                _ = try await pc.ping()
+                work = try await processOnPC(pc, app: app, plans: plans, prepared: prepared, work: work,
+                                             steamApps: steamApps, state: &state, report: report)
             } catch is CancellationError {
                 throw CancellationError()
             } catch {
-                SteamLog.event("[irelay] unavailable: \(error.localizedDescription)")
+                SteamLog.event("[irelay] not used: \(error.localizedDescription)")
             }
         }
+        let startedRelay: IRelayClient? = nil
         let relay = startedRelay
         defer {
             if let relay {
@@ -664,6 +660,66 @@ final class DepotDownloader {
     }
 
     // MARK: - Chunks
+
+    /// iDeck: hands the pending chunks to iRelay and follows its progress.
+    /// Returns what is still to fetch: the chunks iRelay could not deliver.
+    private func processOnPC(_ pc: IRelayClient, app: SteamAppInfo, plans: [DepotPlan], prepared: Prepared,
+                             work: [[WorkItem]], steamApps: URL, state: inout SteamDownloadProgress,
+                             report: @escaping (SteamDownloadProgress) -> Void) async throws -> [[WorkItem]] {
+        // drive_c: steamApps is <drive>/Program Files (x86)/Steam/steamapps.
+        let drive = steamApps.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .standardizedFileURL.path + "/"
+        var depots: [IRelayClient.ProcessDepot] = []
+        for (index, plan) in plans.enumerated() where !work[index].isEmpty {
+            let root = plan.installURL.standardizedFileURL.path
+            guard root.hasPrefix(drive) else { continue }
+            var files: [Int: IRelayClient.ProcessFile] = [:]
+            for item in work[index] {
+                let path = prepared.paths[index][item.file]
+                guard !path.isEmpty, path.hasPrefix(root + "/") else { continue }
+                let entry = plan.manifest.files[item.file]
+                let chunk = entry.chunks[item.chunk]
+                var file = files[item.file] ?? IRelayClient.ProcessFile(path: String(path.dropFirst(root.count + 1)),
+                                                                        size: entry.size, chunks: [])
+                file.chunks.append(IRelayClient.ProcessChunk(sha: chunk.shaHex, offset: chunk.offset,
+                                                             size: chunk.uncompressedSize, compressed: chunk.compressedSize,
+                                                             crc: chunk.crc))
+                files[item.file] = file
+            }
+            depots.append(IRelayClient.ProcessDepot(depotId: plan.depotID, key: plan.key.map { String(format: "%02x", $0) }.joined(),
+                                                    hosts: plan.hosts, auth: plan.auth,
+                                                    root: String(root.dropFirst(drive.count)),
+                                                    files: files.keys.sorted().compactMap { files[$0] }))
+        }
+        guard !depots.isEmpty else { return work }
+        let job = try await pc.startProcess(appID: app.appID, title: app.name, depots: depots)
+        SteamLog.event("[irelay] processing on the PC app=\(app.appID) job=\(job) chunks=\(depots.reduce(0) { $0 + $1.files.reduce(0) { $0 + $1.chunks.count } })")
+        state.pcName = pc.name
+        let baseDone = state.doneBytes, baseInstalled = state.installedBytes
+        let started = Date()
+        var status = IRelayClient.ProcessStatus()
+        do {
+            while true {
+                try Task.checkCancellation()
+                try await Task.sleep(nanoseconds: 1_000_000_000)
+                status = try await pc.processStatus(job)
+                state.doneBytes = baseDone + status.compressedDone
+                state.installedBytes = baseInstalled + status.bytesDone
+                state.bytesPerSecond = Double(status.compressedDone) / max(Date().timeIntervalSince(started), 0.001)
+                report(state)
+                if status.finished { break }
+            }
+        } catch {
+            await pc.cancelProcess(job)
+            throw error
+        }
+        let failed = Set(status.failed)
+        SteamLog.event("[irelay] PC done app=\(app.appID) chunks=\(status.chunksDone) failed=\(failed.count)")
+        state.pcName = nil
+        return work.enumerated().map { index, items in
+            items.filter { failed.contains(plans[index].manifest.files[$0.file].chunks[$0.chunk].shaHex) }
+        }
+    }
 
     private nonisolated static func fetchChunk(_ chunk: DepotManifest.ChunkEntry, plan: DepotPlan, peer: SteamPeerChunkSource? = nil,
                                                relay: IRelayClient? = nil,
