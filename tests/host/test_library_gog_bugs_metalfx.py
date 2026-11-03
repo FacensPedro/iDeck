@@ -49,8 +49,11 @@ class LibraryPresentationTests(unittest.TestCase):
         view = read("iDeck/MainView.swift")
         self.assertIn('@AppStorage("library.steamOwnedCollapsed")', view)
         self.assertIn('@AppStorage("library.gogOwnedCollapsed")', view)
-        self.assertIn("if !steamOwnedCollapsed {", view)
-        self.assertIn("if !gogOwnedCollapsed {", view)
+        self.assertIn('@AppStorage("library.epicOwnedCollapsed")', view)
+        self.assertIn("collapsed: $steamOwnedCollapsed", view)
+        self.assertIn("collapsed: $gogOwnedCollapsed", view)
+        self.assertIn("collapsed: $epicOwnedCollapsed", view)
+        self.assertIn("if !collapsed.wrappedValue {", view)
 
     def test_installing_cards_keep_installed_size(self):
         view = read("iDeck/MainView.swift")

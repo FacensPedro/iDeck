@@ -195,8 +195,6 @@ struct SettingsView: View {
                                    : tr("Not downloaded"))
             } header: {
                 Text(tr("Steam client"))
-            } footer: {
-                Text(tr("Steam games start through Valve's own Windows client (Madeira Dock). Its components install automatically the first time the Madeira workspace opens. They (about 72 MB) come from Valve's update server and are checked against pinned checksums."))
             }
         }
         .navigationTitle("Steam")
@@ -229,8 +227,6 @@ struct SettingsView: View {
                 }
             } header: {
                 Text("Epic Games")
-            } footer: {
-                Text(tr("Games download from Epic's servers and start with a one-use Epic sign-in code. The Epic launcher is not installed."))
             }
             if epicLibrary.signedIn {
                 Section(tr("Cloud saves")) {
@@ -260,8 +256,6 @@ struct SettingsView: View {
                 }
             } header: {
                 Text(tr("Activation"))
-            } footer: {
-                Text(tr("Built-in: iDeck's own helper attaches the debugger through LocalDevVPN with your pairing file, without opening another app. StikDebug: iDeck asks StikDebug to attach."))
             }
             Section {
                 Picker(selection: $wineJITPoolMiB) {
@@ -277,8 +271,6 @@ struct SettingsView: View {
                         .font(.caption)
                         .foregroundStyle(.orange)
                 }
-            } footer: {
-                Text(tr("Wine JIT pool size is selected before allocation and cannot change while mapped."))
             }
         }
         .navigationTitle(tr("JIT & Debugging"))
@@ -361,8 +353,6 @@ struct SettingsView: View {
                 toggleRow(title: tr("D3DMetal Rendering"), isOn: $coordinator.isD3DMetalEnabled)
             }
             Section {
-            } footer: {
-                Text(tr("Graphics changes apply when you launch the next game."))
             }
             MadeiraGraphicsSettings()
             MadeiraMemorySyncSettings()
@@ -391,9 +381,6 @@ struct SettingsView: View {
                 toggleRow(title: tr("Unlimited download speed"), isOn: $unlimitedDownloadSpeed)
             } header: {
                 Text(tr("Downloads"))
-            } footer: {
-                Text(tr("Off: games download with a few parallel connections, leaving bandwidth for other apps. On: as many connections as the device handles while it stays cool, for the fastest installs.")
-                     + "\n\n" + tr("iOS shows the download's progress while iDeck is in the background. If iOS stops it, the download pauses and continues when you return."))
             }
         }
         .navigationTitle(tr("Storage & Downloads"))

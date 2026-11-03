@@ -102,15 +102,7 @@ struct MadeiraMemorySyncSettings: View {
                 _ = MadeiraConfig.set("eco", on ? "1" : nil)
                 AppLog.record("[runtime-settings] eco=\(on ? 1 : 0)")
             }))
-        } header: { Text(tr("Memory & sync")) } footer: {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(tr("Video memory is how much graphics memory games are told they have. Automatic sizes it from the memory free at launch. Too high can get iDeck closed for using too much memory; too low makes games keep reloading textures."))
-                Text(tr("Swap tier moves game data to a file on this device's storage when memory runs short, up to the chosen size, at some speed cost. Coverage decides which allocations it moves: large ones only (8 MB and up, the default), every allocation of 1 MB and up, or those plus allocations that overflow the game's address range. Broad backs every new reservation of 4 MB and up."))
-                Text(tr("Sync engine: Fastsync (the default) handles events and semaphores in-process. Madsync is the older in-process engine. Wine standard sync uses neither."))
-                Text(tr("Eco mode starts every game with its threads at a low priority, which saves power but makes games run slower."))
-                if changed { Text(tr("Restart iDeck (close it from the app switcher) for these changes to apply.")).foregroundStyle(.orange) }
-            }
-        }
+        } header: { Text(tr("Memory & sync")) }
     }
 }
 
@@ -267,9 +259,7 @@ struct MadeiraGraphicsSettings: View {
                 reload()
             }
             .disabled(!anySet)
-        } header: { Text("Graphics") } footer: {
-            Text("These write d3d9 / d3d11 / d3d12 / vulkan into madeira.cfg; changes apply at the next session start. A game's own settings still win for that game.")
-        }
+        } header: { Text("Graphics") }
         .onChange(of: refresh) { _, _ in reload() }
     }
 }

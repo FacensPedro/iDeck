@@ -144,8 +144,6 @@ struct IRelaySettingsSection: View {
             }
         } header: {
             Text("iRelay")
-        } footer: {
-            Text(tr("iRelay runs on a Windows PC connected to this iPad by USB cable. It installs your Steam, GOG and Epic games on the PC and copies them into iDeck, and speeds up downloads started here. Connect the cable, tap Trust on the iPad, keep the Apple Devices app (or iTunes) and iRelay on the PC, and keep iDeck open during transfers."))
         }
         .onAppear { if enabled { IRelayRuntime.start() } }
     }
