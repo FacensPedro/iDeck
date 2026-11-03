@@ -127,7 +127,7 @@ final class IRelayClient: @unchecked Sendable {
     }
 }
 
-/// Settings › Steam › iRelay.
+/// Settings › iRelay (its own page, under PC).
 struct IRelaySettingsSection: View {
     @AppStorage(IRelaySetting.enabledKey) private var enabled = false
     @State private var status: String?
