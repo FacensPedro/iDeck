@@ -79,7 +79,7 @@ class UnifiedProfileTests(unittest.TestCase):
 
     def test_workflow_defaults_to_unified_and_checks_both_backends(self):
         workflow = (ROOT / ".github/workflows/ios.yml").read_text()
-        self.assertIn("options: [unified, d3d11, d3d12]", workflow)
+        self.assertIn("options: [unified]", workflow)
         self.assertIn("inputs.graphics_profile || 'unified'", workflow)
         self.assertIn('flags.get("d3d11Available") is not True', workflow)
 
