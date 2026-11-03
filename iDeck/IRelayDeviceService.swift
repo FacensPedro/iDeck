@@ -287,9 +287,9 @@ final class IRelayDeviceService: @unchecked Sendable {
         }
         let app = tail(AppLog.fileURL, 512 << 10)
         let wine = tail(wineURL, 2 << 20)
-        let issues = LogIssueScanner.scan(app, source: .app) + LogIssueScanner.scan(wine, source: .wine)
+        let issues = LogIssueScanner.scan(app, source: .app, limit: 5000) + LogIssueScanner.scan(wine, source: .wine, limit: 5000)
         let recent = app.split(whereSeparator: \.isNewline).suffix(300).joined(separator: "\n")
-        return ["issues": issues.prefix(300).map(\.copyText), "log": recent]
+        return ["issues": issues.map(\.copyText), "log": recent]
     }
 
     // MARK: Libraries

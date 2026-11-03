@@ -84,21 +84,32 @@ extension MadeiraDock {
 
     /// The program a session of one-time installs runs: Wine's cmd.exe, staged
     /// from the bundle into system32 (the launch checks a real PE file there).
-    static func stageCommandShell() throws -> URL {
+    /// nil when this build has none: the installs are then skipped.
+    static func stageCommandShell() -> URL? {
         let target = drive.appendingPathComponent("windows/system32/cmd.exe")
         let fm = FileManager.default
         let linked = (try? target.resourceValues(forKeys: [.isSymbolicLinkKey]))?.isSymbolicLink == true
-        if linked || !fm.fileExists(atPath: target.path) {
-            guard let source = ["arm64ec-windows", "x86_64-windows"]
-                .map({ Bundle.main.bundleURL.appendingPathComponent($0 + "/cmd.exe") })
-                .first(where: { fm.fileExists(atPath: $0.path) }) else {
-                throw DockError.message("This build has no cmd.exe for Steam's one-time installs.")
-            }
+        if !linked, fm.fileExists(atPath: target.path) { return target }
+        guard let source = ["arm64ec-windows", "x86_64-windows", "aarch64-windows"]
+            .map({ Bundle.main.bundleURL.appendingPathComponent($0 + "/cmd.exe") })
+            .first(where: { fm.fileExists(atPath: $0.path) }) else { return nil }
+        do {
             try fm.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
             if linked { try fm.removeItem(at: target) }
             try fm.copyItem(at: source, to: target)
+            return target
+        } catch {
+            return nil
         }
-        return target
+    }
+
+    /// No cmd.exe to run a game's one-time installs: they are recorded as run
+    /// (Visual C++ is built in; DirectX and the rest come with Wine) and the
+    /// game starts.
+    static func skipInstalls(_ game: DockGame) -> Int {
+        let runs = DockInstallers.found(game, drive: drive).processes.map(\.run)
+        guard !runs.isEmpty else { return 0 }
+        return (try? SteamInstallScripts.mark(runs, prefix: prefix)) ?? 0
     }
 }
 
@@ -129,5 +140,13 @@ enum IDeckDockStartStatus {
         }
         if fields["probe-start-bits"] != nil { return "Loading the Steam client..." }
         return waited >= 30 ? "Still initializing Madeira Dock..." : "Starting Madeira Dock..."
+    }
+}
+
+extension Optional {
+    /// The value, or `error` thrown.
+    func orThrow(_ error: @autoclosure () -> Error) throws -> Wrapped {
+        guard let self else { throw error() }
+        return self
     }
 }
