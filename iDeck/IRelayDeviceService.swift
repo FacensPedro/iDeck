@@ -27,13 +27,17 @@ final class IRelayDeviceService: @unchecked Sendable {
     static let roots = [
         SteamInstallPaths.libraryRelative + "/common/",
         "GOG Games/",
-        EpicLibrary.installRoot + "/",
+        "Program Files/Epic Games/",
     ]
 
     private let queue = DispatchQueue(label: "ideck.irelay.service", qos: .userInitiated)
     private var listener: NWListener?
 
-    static var drive: URL { EpicLibrary.drive }
+    /// Documents/VirtualRoot/drive_c (as EpicLibrary.drive, usable off the main actor).
+    static var drive: URL {
+        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("VirtualRoot/drive_c", isDirectory: true)
+    }
     static var prefix: URL { drive.deletingLastPathComponent() }
 
     func start() {
