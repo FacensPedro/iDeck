@@ -282,6 +282,8 @@ enum Translations {
         "SideStore or AltStore is required to install the signed update. Opening GitHub Releases instead.": ["pt": "É necessário usar SideStore ou AltStore para instalar a atualização assinada. Abrindo as versões do GitHub.", "es": "Se necesita SideStore o AltStore para instalar la actualización firmada. Se abrirán las versiones de GitHub."],
         "iPadOS requires a signed IPA installation through SideStore, AltStore or another compatible installer. iDeck cannot replace its own app binary. Keep the same app identifier and signing identity to preserve existing app data when supported.": ["pt": "O iPadOS exige uma IPA assinada instalada pelo SideStore, AltStore ou outro instalador compatível. O iDeck não pode substituir o próprio aplicativo. Mantenha o identificador e a assinatura para preservar os dados existentes quando possível.", "es": "iPadOS requiere instalar una IPA firmada mediante SideStore, AltStore u otro instalador compatible. iDeck no puede reemplazar su propia aplicación. Mantén el identificador y la firma para conservar los datos cuando sea posible."],
         "Touch screen as mouse": ["pt": "Toque na tela como mouse", "es": "Pantalla táctil como ratón"],
+        "Touch screen": ["pt": "Toque na tela", "es": "Pantalla táctil"],
+        "MetalFX takes effect the next time this game starts.": ["pt": "O MetalFX vale a partir da próxima vez que este jogo abrir.", "es": "MetalFX se aplica la próxima vez que se inicie este juego."],
         "Show FPS": ["pt": "Mostrar FPS", "es": "Mostrar FPS"],
         "Touch controller": ["pt": "Controle na tela", "es": "Control táctil"],
         "Controls": ["pt": "Controles", "es": "Controles"],

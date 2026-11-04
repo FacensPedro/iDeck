@@ -2,8 +2,8 @@ import SwiftUI
 import UIKit
 import Darwin
 
-/// The screen as a mouse: a finger moves the Windows cursor and holds the
-/// left button while it is down (Madeira's winios touch bridge).
+/// Direct touch: a finger presses where it touches, with no cursor drawn
+/// (Madeira's winios touch bridge).
 struct TouchMouseView: UIViewRepresentable {
     func makeUIView(context: Context) -> TouchMouseSurface { TouchMouseSurface() }
     func updateUIView(_ uiView: TouchMouseSurface, context: Context) {}
@@ -56,7 +56,7 @@ final class TouchMouseSurface: UIView {
     }
 }
 
-/// The Windows cursor Madeira draws: hidden while the touch mouse is off.
+/// The Windows cursor Madeira draws over dialogs: kept hidden, touch is direct.
 enum TouchMouseCursor {
     private typealias Show = @convention(c) (Int32) -> Void
 
