@@ -411,7 +411,8 @@ struct WindowsWorkspaceView: View {
 
     /// Download progress in the same footprint as the Launch button: a bar
     /// with the percentage, and a stop button. Details are in the game sheet.
-    private func progressAction(fraction: Double, label: String, onStop: (() -> Void)?, stopping: Bool = false) -> some View {
+    private func progressAction(fraction: Double, label: String, onPause: (() -> Void)? = nil,
+                                onStop: (() -> Void)?, stopping: Bool = false) -> some View {
         HStack(spacing: 6) {
             ZStack(alignment: .leading) {
                 RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.1))
@@ -426,6 +427,17 @@ struct WindowsWorkspaceView: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
                     .frame(maxWidth: .infinity)
+            }
+            if let onPause {
+                Button(action: onPause) {
+                    Image(systemName: "pause.fill")
+                        .font(.caption)
+                        .frame(width: cardActionHeight, height: cardActionHeight)
+                        .background(Color.white.opacity(0.1))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                }
+                .disabled(stopping)
+                .accessibilityLabel(tr("Pause download"))
             }
             if let onStop {
                 Button(role: .destructive, action: onStop) {
@@ -839,6 +851,10 @@ struct WindowsWorkspaceView: View {
                 Button { launchSteamGame(game) } label: {
                     cardActionLabel(tr("Launch"), systemImage: "play.fill")
                 }
+            } else if steamLibrary.pausedInstalls.contains(game.appID) {
+                Button { steamLibrary.resumeInstall(appID: game.appID) } label: {
+                    cardActionLabel(tr("Resume"), systemImage: "play.circle.fill")
+                }
             } else if steamLibrary.installingApps.contains(game.appID) {
                 steamProgressAction(for: game)
             } else {
@@ -956,9 +972,14 @@ struct WindowsWorkspaceView: View {
                 Button { launchGOGGame(installed) } label: {
                     cardActionLabel(tr("Launch"), systemImage: "play.fill")
                 }
+            } else if gogLibrary.pausedDownloads.contains(game.id) {
+                Button { gogLibrary.resumeDownload(game) } label: {
+                    cardActionLabel(tr("Resume"), systemImage: "play.circle.fill")
+                }
             } else if let fraction = gogLibrary.downloadProgress[game.id] {
                 progressAction(fraction: fraction,
                                label: tr("Installing %d%%", Int((fraction * 100).rounded())),
+                               onPause: { gogLibrary.pauseDownload(game) },
                                onStop: { gogLibrary.cancelDownload(game) })
             } else if game.worksOnWindows {
                 Button { downloadGOGInstaller(game) } label: {
@@ -1072,7 +1093,8 @@ struct WindowsWorkspaceView: View {
                 default:
                     progressAction(fraction: download.progress.fraction,
                                    label: tr("Installing %d%%", Int((download.progress.fraction * 100).rounded())),
-                                   onStop: { epicLibrary.pause(game.appName) })
+                                   onPause: { epicLibrary.pause(game.appName) },
+                                   onStop: { epicLibrary.cancel(game.appName) })
                 }
             } else if let installed {
                 Button { launchEpicGame(installed) } label: {
@@ -1122,6 +1144,7 @@ struct WindowsWorkspaceView: View {
         }
         let canStop = steamLibrary.canCancelInstall(appID: game.appID)
         return progressAction(fraction: fraction, label: label,
+                              onPause: canStop ? { steamLibrary.pauseInstall(appID: game.appID) } : nil,
                               onStop: canStop ? { steamLibrary.cancelInstall(appID: game.appID) } : nil,
                               stopping: steamLibrary.cancellingApps.contains(game.appID))
     }
@@ -1668,7 +1691,25 @@ private struct SteamProgramDetailsView: View {
                             DetailChip(text: size, systemImage: "internaldrive", tint: .gray)
                         }
                     }
-                    if installing {
+                    if steamLibrary.pausedInstalls.contains(game.appID) {
+                        VStack(spacing: 10) {
+                            Text(tr("Download paused")).foregroundColor(.white)
+                            Button {
+                                steamLibrary.resumeInstall(appID: game.appID)
+                            } label: {
+                                Label(tr("Resume"), systemImage: "play.fill")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            Button(role: .destructive) {
+                                steamLibrary.cancelInstall(appID: game.appID)
+                            } label: {
+                                Label(tr("Stop download"), systemImage: "stop.fill")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.bordered)
+                        }
+                    } else if installing {
                         downloadStatus
                     } else if installed {
                         Button(role: .destructive) {
@@ -1827,6 +1868,14 @@ private struct SteamProgramDetailsView: View {
                     .foregroundColor(.green)
             }
             if steamLibrary.canCancelInstall(appID: game.appID) {
+                Button {
+                    steamLibrary.pauseInstall(appID: game.appID)
+                } label: {
+                    Label(tr("Pause download"), systemImage: "pause.fill")
+                        .frame(maxWidth: .infinity)
+                }
+                .disabled(stopping)
+                .buttonStyle(.bordered)
                 Button(role: .destructive) {
                     steamLibrary.cancelInstall(appID: game.appID)
                 } label: {
@@ -2025,6 +2074,7 @@ private struct StoreGameDetailsView<Extra: View>: View {
     let canInstall: Bool
     let onLaunch: () -> Void
     let onInstall: () -> Void
+    let onPause: (() -> Void)?
     let onStop: () -> Void
     let onUninstall: (() -> Bool)?
     @ObservedObject var library: WindowsLibraryStore
@@ -2038,7 +2088,7 @@ private struct StoreGameDetailsView<Extra: View>: View {
     init(title: String, store: GameStore, profileID: String, covers: [URL], banners: [URL],
          installed: Bool, progress: Double?, paused: Bool = false, sizeText: String?, errorText: String?,
          canInstall: Bool, onLaunch: @escaping () -> Void, onInstall: @escaping () -> Void,
-         onStop: @escaping () -> Void, onUninstall: (() -> Bool)?,
+         onPause: (() -> Void)? = nil, onStop: @escaping () -> Void, onUninstall: (() -> Bool)?,
          library: WindowsLibraryStore, coordinator: SystemCoordinator,
          @ViewBuilder extra: () -> Extra) {
         self.title = title
@@ -2054,6 +2104,7 @@ private struct StoreGameDetailsView<Extra: View>: View {
         self.canInstall = canInstall
         self.onLaunch = onLaunch
         self.onInstall = onInstall
+        self.onPause = onPause
         self.onStop = onStop
         self.onUninstall = onUninstall
         self.library = library
@@ -2142,6 +2193,13 @@ private struct StoreGameDetailsView<Extra: View>: View {
                 Text(tr("Installing %d%%", Int((progress * 100).rounded())))
                     .font(.caption)
                     .foregroundColor(.white)
+                if let onPause {
+                    Button(action: onPause) {
+                        Label(tr("Pause download"), systemImage: "pause.fill")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                }
                 Button(role: .destructive, action: onStop) {
                     Label(tr("Stop download"), systemImage: "stop.fill")
                         .frame(maxWidth: .infinity)
@@ -2195,10 +2253,15 @@ private struct GOGGameDetailsSheet: View {
             title: game.title, store: .gog, profileID: "gog:\(game.id)",
             covers: game.artworkCandidates, banners: GOGLibraryModel.bannerCandidates(game),
             installed: installed != nil, progress: gog.downloadProgress[game.id],
+            paused: gog.pausedDownloads.contains(game.id),
             sizeText: sizeText, errorText: gog.downloadErrors[game.id].map { tr($0) },
             canInstall: game.worksOnWindows && prefixPath != nil,
             onLaunch: { if let installed { launch(installed) } },
-            onInstall: { install(game) },
+            onInstall: {
+                if gog.pausedDownloads.contains(game.id) { gog.resumeDownload(game) }
+                else { install(game) }
+            },
+            onPause: { gog.pauseDownload(game) },
             onStop: { gog.cancelDownload(game) },
             onUninstall: prefixPath.map { prefix in { gog.uninstall(game.id, prefixPath: prefix) } },
             library: library, coordinator: coordinator
@@ -2237,7 +2300,8 @@ private struct EpicGameDetailsSheet: View {
             canInstall: true,
             onLaunch: { if let installed { launch(installed) } },
             onInstall: { epic.install(appName) },
-            onStop: { epic.pause(appName) },
+            onPause: { epic.pause(appName) },
+            onStop: { epic.cancel(appName) },
             onUninstall: (epic.sessionRunning || EpicCloud.shared.isBusy) ? nil : { epic.uninstall(appName); return true },
             library: library, coordinator: coordinator
         ) {
