@@ -24,6 +24,7 @@ final class SteamOwnedGamesModel: ObservableObject {
     @Published private(set) var installedDLC: [UInt32: Set<UInt32>] = [:]
     @Published private(set) var cancellingApps: Set<UInt32> = []
     @Published private(set) var pausedInstalls: Set<UInt32> = []
+    private var stoppingPausedInstalls: Set<UInt32> = []
     @Published private(set) var installingDLC: [UInt32: UInt32] = [:]
     @Published private(set) var cancellingDLC: Set<UInt32> = []
     @Published private(set) var cloudMessages: [UInt32: String] = [:]
@@ -188,7 +189,8 @@ final class SteamOwnedGamesModel: ObservableObject {
     }
 
     func startInstall(appID: UInt32, prefixPath: URL) {
-        guard installTasks[appID] == nil, !cancellingApps.contains(appID) else { return }
+        guard installTasks[appID] == nil, !cancellingApps.contains(appID),
+              !stoppingPausedInstalls.contains(appID) else { return }
         attachBackgroundDownloads()
         installPrefixes[appID] = prefixPath
         installTasks[appID] = Task { @MainActor in
@@ -205,14 +207,16 @@ final class SteamOwnedGamesModel: ObservableObject {
 
     /// A user pause keeps the Steam journal and all verified chunks on disk.
     func pauseInstall(appID: UInt32) {
-        guard let task = installTasks[appID], let prefix = installPrefixes[appID] else { return }
+        guard !stoppingPausedInstalls.contains(appID),
+              let task = installTasks[appID], let prefix = installPrefixes[appID] else { return }
         userPausedPrefixes[appID] = prefix
         pausedInstalls.insert(appID)
         task.cancel()
     }
 
     func resumeInstall(appID: UInt32) {
-        guard let prefix = userPausedPrefixes[appID] else { return }
+        guard !stoppingPausedInstalls.contains(appID),
+              let prefix = userPausedPrefixes[appID] else { return }
         let previous = installTasks[appID]
         Task { @MainActor in
             await previous?.value
@@ -225,12 +229,13 @@ final class SteamOwnedGamesModel: ObservableObject {
 
     func cancelInstall(appID: UInt32) {
         if let prefix = userPausedPrefixes.removeValue(forKey: appID) {
-            pausedInstalls.remove(appID)
+            stoppingPausedInstalls.insert(appID)
             cancellingApps.insert(appID)
             let previous = installTasks[appID]
             previous?.cancel()
             Task { @MainActor in
                 await previous?.value
+                pausedInstalls.remove(appID)
                 if !isInstalled(appID: appID, prefixPath: prefix) {
                     let drive = prefix.appendingPathComponent("drive_c", isDirectory: true)
                     let steamApps = SteamInstallPaths.steamApps(drive: drive)
@@ -245,6 +250,7 @@ final class SteamOwnedGamesModel: ObservableObject {
                 }
                 downloadProgress.removeValue(forKey: appID)
                 cancellingApps.remove(appID)
+                stoppingPausedInstalls.remove(appID)
             }
             return
         }
@@ -609,6 +615,7 @@ final class SteamOwnedGamesModel: ObservableObject {
     }
 
     func disconnect() {
+        stoppingPausedInstalls.removeAll()
         pausedInstalls.removeAll()
         userPausedPrefixes.removeAll()
         for task in dlcTasks.values { task.cancel() }
