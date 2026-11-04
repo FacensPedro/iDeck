@@ -326,6 +326,7 @@ final class GOGLibraryModel: ObservableObject {
     @Published private(set) var installed: [Int: GOGInstalledGame] = [:]
     @Published private(set) var downloadProgress: [Int: Double] = [:]
     @Published private(set) var downloadErrors: [Int: String] = [:]
+    @Published private(set) var pausedDownloads: Set<Int> = []
     /// Download size of each game's Windows installer, from GOG; 0 = unknown.
     @Published private(set) var downloadSizes: [Int: Int64] = [:]
     /// Size on disk of installed games, measured from their install folder.
@@ -361,6 +362,8 @@ final class GOGLibraryModel: ObservableObject {
     /// a Galaxy build fall back to the offline installer.
     func install(_ game: GOGGame, prefixPath: URL, completion: @escaping (InstallOutcome) -> Void) {
         guard downloadTasks[game.id] == nil else { return }
+        pausedDownloads.remove(game.id)
+        resumeDownloads[game.id] = { [weak self] in self?.install(game, prefixPath: prefixPath, completion: completion) }
         downloadErrors[game.id] = nil
         downloadProgress[game.id] = 0
         let games = prefixPath.appendingPathComponent("drive_c/GOG Games", isDirectory: true)
@@ -397,6 +400,7 @@ final class GOGLibraryModel: ObservableObject {
                 let name = GOGContentSystem.safePath(plan.installDirectory)?.replacingOccurrences(of: "/", with: " ")
                     ?? "Game \(game.id)"
                 let staging = games.appendingPathComponent(".downloading/\(name)", isDirectory: true)
+                stagingFolders[game.id] = staging
                 let final = games.appendingPathComponent(name, isDirectory: true)
                 let total = max(plan.downloadBytes, 1)
                 downloadSizes[game.id] = plan.installBytes
@@ -486,6 +490,8 @@ final class GOGLibraryModel: ObservableObject {
     }
 
     private var downloadTasks: [Int: Task<Void, Never>] = [:]
+    private var resumeDownloads: [Int: () -> Void] = [:]
+    private var stagingFolders: [Int: URL] = [:]
     private let cacheURL = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
         .appendingPathComponent("iDeck-gog-library.json")
 
@@ -590,6 +596,8 @@ final class GOGLibraryModel: ObservableObject {
     /// folder, where it shows up as a Windows app to run.
     func downloadInstaller(_ game: GOGGame, prefixPath: URL, completion: @escaping (URL?) -> Void) {
         guard downloadTasks[game.id] == nil else { return }
+        pausedDownloads.remove(game.id)
+        resumeDownloads[game.id] = { [weak self] in self?.downloadInstaller(game, prefixPath: prefixPath, completion: completion) }
         downloadErrors[game.id] = nil
         downloadProgress[game.id] = 0
         let folder = prefixPath.appendingPathComponent("drive_c/WindowsDownloads", isDirectory: true)
@@ -656,8 +664,36 @@ final class GOGLibraryModel: ObservableObject {
         }
     }
 
+    /// Pause cancels network activity while retaining GOG's staged files.
+    func pauseDownload(_ game: GOGGame) {
+        guard let task = downloadTasks[game.id] else { return }
+        pausedDownloads.insert(game.id)
+        task.cancel()
+    }
+
+    func resumeDownload(_ game: GOGGame) {
+        guard pausedDownloads.contains(game.id) else { return }
+        let previous = downloadTasks[game.id]
+        Task { @MainActor in
+            await previous?.value
+            guard pausedDownloads.contains(game.id) else { return }
+            pausedDownloads.remove(game.id)
+            resumeDownloads[game.id]?()
+        }
+    }
+
     func cancelDownload(_ game: GOGGame) {
-        downloadTasks[game.id]?.cancel()
+        let previous = downloadTasks[game.id]
+        previous?.cancel()
+        pausedDownloads.remove(game.id)
+        resumeDownloads.removeValue(forKey: game.id)
+        Task { @MainActor in
+            await previous?.value
+            if let staging = stagingFolders.removeValue(forKey: game.id) {
+                try? FileManager.default.removeItem(at: staging)
+            }
+            downloadProgress.removeValue(forKey: game.id)
+        }
     }
 
     /// `manualUrl` answers with a redirect to a signed CDN URL; URLSession
