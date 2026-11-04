@@ -586,6 +586,23 @@ class WindowsEnvironment {
         default:
             break
         }
+        // Lighter sessions for heavy games (Madeira's own switches):
+        // quiet-log drops the Direct3D 12 census frames and OutputDebugString
+        // per log line (each froze the game 1-2 s / cost ~0.5 ms); ring-share
+        // returns argument-buffer memory as soon as the GPU is done with it
+        // (RDR2 kept 1.5 GB with it off).
+        lines.append("quiet-log = 1")
+        lines.append("ring-share = 1")
+        // Session FPS limit (game settings sheet): a fixed cap, or "Auto",
+        // which holds CPU power near 1.5 W by moving the cap between 60 and 20.
+        switch UserDefaults.standard.integer(forKey: SessionFPSLimit.key) {
+        case SessionFPSLimit.auto:
+            lines.append("env.MADEIRA_FPS_GOV_MW = 1500")
+        case let fps where (20...120).contains(fps):
+            lines.append("env.MADEIRA_FPS_CAP = \(fps)")
+        default:
+            break
+        }
         // madeira-d3d12 reads its MetalFX factor from the game's config lines;
         // DXMT gets the same factor through DXMT_CONFIG (applyGameProfile).
         if let factor = sessionMetalFXFactor {
@@ -859,5 +876,21 @@ enum AVXAuto {
         UserDefaults.standard.set(games, forKey: key)
         AppLog.record("[avx] \(game) stopped on an illegal instruction: AVX/AVX2 translation on for it")
         return true
+    }
+}
+
+
+/// The FPS limit chosen in the in-game settings (UserDefaults "sessionFPSLimit"):
+/// 0 = none, -1 = automatic (power governor), otherwise a fixed cap.
+enum SessionFPSLimit {
+    static let key = "sessionFPSLimit"
+    static let auto = -1
+    static let choices: [Int] = [0, auto, 30, 40, 60]
+    static func title(_ value: Int) -> String {
+        switch value {
+        case 0: return "Off"
+        case auto: return "Auto (save power)"
+        default: return "\(value) FPS"
+        }
     }
 }
