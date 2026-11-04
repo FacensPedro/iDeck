@@ -384,18 +384,14 @@ struct WindowsWorkspaceView: View {
     private var artworkWidth: CGFloat { isCompact ? 112 : 148 }
     private var artworkHeight: CGFloat { isCompact ? 168 : 222 }
 
-    private func cardTitle(_ title: String, store: GameStore? = nil) -> some View {
-        HStack(spacing: 4) {
-            Text(title)
-                .font(.subheadline.weight(.medium))
-                .foregroundColor(textColor)
-                .lineLimit(1)
-                .truncationMode(.tail)
-            if let store {
-                StoreBadge(store: store).fixedSize()
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
+    private func cardTitle(_ title: String) -> some View {
+        Text(title)
+            .font(.subheadline.weight(.medium))
+            .foregroundColor(textColor)
+            .lineLimit(2)
+            .multilineTextAlignment(.center)
+            .truncationMode(.tail)
+            .frame(maxWidth: .infinity, alignment: .center)
     }
 
     /// The shared look of a card's primary action, at `cardActionHeight`.
@@ -841,7 +837,7 @@ struct WindowsWorkspaceView: View {
                 VStack(alignment: .center, spacing: 9) {
                     SteamGameArtworkView(game: game)
                         .frame(width: artworkWidth, height: artworkHeight)
-                    cardTitle(game.name.isEmpty ? tr("Untitled Steam app") : game.name, store: .steam)
+                    cardTitle(game.name.isEmpty ? tr("Untitled Steam app") : game.name)
                 }
                 .contentShape(Rectangle())
             }
@@ -957,7 +953,7 @@ struct WindowsWorkspaceView: View {
                 VStack(alignment: .center, spacing: 9) {
                     GOGArtworkView(urls: game.artworkCandidates, fallbackColor: secondaryColor)
                         .frame(width: artworkWidth, height: artworkHeight)
-                    cardTitle(game.title, store: .gog)
+                    cardTitle(game.title)
                 }
                 .contentShape(Rectangle())
             }
@@ -1074,7 +1070,7 @@ struct WindowsWorkspaceView: View {
                 VStack(alignment: .center, spacing: 9) {
                     GOGArtworkView(urls: [game.cover].compactMap { $0 }, fallbackColor: secondaryColor)
                         .frame(width: artworkWidth, height: artworkHeight)
-                    cardTitle(game.title, store: .epic)
+                    cardTitle(game.title)
                 }
             }
             .buttonStyle(.plain)
@@ -2119,14 +2115,11 @@ private struct StoreGameDetailsView<Extra: View>: View {
             ScrollView {
                 VStack(alignment: .center, spacing: 18) {
                     StoreBannerView(urls: banners + covers)
-                    HStack(spacing: 8) {
-                        Text(title)
-                            .font(.title2.bold())
-                            .foregroundColor(.white)
-                            .multilineTextAlignment(.center)
-                        StoreBadge(store: store).fixedSize()
-                    }
-                    .frame(maxWidth: .infinity)
+                    Text(title)
+                        .font(.title2.bold())
+                        .foregroundColor(.white)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: .infinity, alignment: .center)
                     HStack(spacing: 8) {
                         DetailChip(text: installed ? tr("Installed") : tr("Not installed"),
                                    systemImage: installed ? "checkmark.circle.fill" : "arrow.down.circle",
@@ -2426,6 +2419,7 @@ extension WindowsWorkspaceView {
                     .scaleEffect(selected ? 1.08 : 1)
                     .shadow(color: selected ? accentColor.opacity(0.45) : .clear, radius: 10)
                 Text(shelfTitle(item))
+                    .multilineTextAlignment(.center)
                     .font(.system(size: 10, weight: selected ? .semibold : .regular))
                     .foregroundColor(selected ? textColor : faintColor)
                     .lineLimit(1)
@@ -2643,6 +2637,7 @@ extension WindowsWorkspaceView {
                 .foregroundColor(textColor)
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
+                .frame(maxWidth: .infinity, alignment: .center)
             HStack(spacing: 10) {
                 gameAction(item)
                     .frame(maxWidth: 320)
