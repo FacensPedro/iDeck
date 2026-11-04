@@ -376,9 +376,10 @@ final class GOGLibraryModel: ObservableObject {
             defer {
                 downloadTasks[game.id] = nil
                 if !fallback {
-                    downloadProgress[game.id] = nil
+                    if !pausedDownloads.contains(game.id) { downloadProgress[game.id] = nil }
                     BackgroundDownloads.gog.ended(name: game.title, outcome: outcome, queueEmpty: downloadTasks.isEmpty)
                 }
+                if !pausedDownloads.contains(game.id) { resumeDownloads.removeValue(forKey: game.id) }
             }
             do {
                 let tokens = try await tokens()
@@ -453,13 +454,15 @@ final class GOGLibraryModel: ObservableObject {
                     }
                 }
                 return
-            } catch is CancellationError {
-                completion(.failed)
             } catch {
-                downloadErrors[game.id] = error.localizedDescription
-                outcome = .failed(error.localizedDescription)
-                AppLog.record("[gog] install failed for game \(game.id): \(error.localizedDescription)")
-                completion(.failed)
+                if Task.isCancelled || error is CancellationError || (error as? URLError)?.code == .cancelled {
+                    completion(.failed)
+                } else {
+                    downloadErrors[game.id] = error.localizedDescription
+                    outcome = .failed(error.localizedDescription)
+                    AppLog.record("[gog] install failed for game \(game.id): \(error.localizedDescription)")
+                    completion(.failed)
+                }
             }
         }
     }
@@ -608,7 +611,8 @@ final class GOGLibraryModel: ObservableObject {
             var outcome = BackgroundDownloads.Outcome.paused
             defer {
                 downloadTasks[game.id] = nil
-                downloadProgress[game.id] = nil
+                if !pausedDownloads.contains(game.id) { downloadProgress[game.id] = nil }
+                if !pausedDownloads.contains(game.id) { resumeDownloads.removeValue(forKey: game.id) }
                 BackgroundDownloads.gog.ended(name: game.title, outcome: outcome, queueEmpty: downloadTasks.isEmpty)
             }
             do {
@@ -631,12 +635,12 @@ final class GOGLibraryModel: ObservableObject {
                 AppLog.record("[gog] installer downloaded for game \(game.id)")
                 outcome = .completed
                 completion(setup)
-            } catch is CancellationError {
-                completion(nil)
             } catch {
-                downloadErrors[game.id] = error.localizedDescription
-                outcome = .failed(error.localizedDescription)
-                AppLog.record("[gog] installer download failed for game \(game.id): \(error.localizedDescription)")
+                if !(Task.isCancelled || error is CancellationError || (error as? URLError)?.code == .cancelled) {
+                    downloadErrors[game.id] = error.localizedDescription
+                    outcome = .failed(error.localizedDescription)
+                    AppLog.record("[gog] installer download failed for game \(game.id): \(error.localizedDescription)")
+                }
                 completion(nil)
             }
         }
