@@ -710,7 +710,11 @@ final class DepotDownloader {
                 if status.finished { break }
             }
         } catch {
-            await pc.cancelProcess(job)
+            // The install task is cancelled here, and a cancelled task's
+            // URLSession request fails at once: send the stop from a task of
+            // its own so iRelay actually receives it.
+            await Task.detached { await pc.cancelProcess(job) }.value
+            SteamLog.event("[irelay] asked the PC to stop app=\(app.appID) job=\(job)")
             throw error
         }
         let failed = Set(status.failed)
