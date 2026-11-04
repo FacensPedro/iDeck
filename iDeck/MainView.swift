@@ -290,6 +290,8 @@ struct WindowsWorkspaceView: View {
 
     @State private var isSettingsPresented = false
     @State private var searchText = ""
+    /// The selected tile of the console-style shelf (a store or a game).
+    @State var shelf: ShelfItem = .store(.steam)
     @State private var prefixPath: URL?
     @StateObject private var appManager = AppManager()
     @StateObject private var windowsLibrary = WindowsLibraryStore()
@@ -306,7 +308,6 @@ struct WindowsWorkspaceView: View {
     @State private var showingSteamCompatibilityWarning = false
     @ObservedObject private var gogLibrary = GOGLibraryModel.shared
     @State private var isGOGSignInPresented = false
-    @AppStorage("library.steamOwnedCollapsed") private var steamOwnedCollapsed = false
     @AppStorage("library.gogOwnedCollapsed") private var gogOwnedCollapsed = false
     @ObservedObject private var epicLibrary = EpicLibrary.shared
     @State private var isEpicSignInPresented = false
@@ -471,68 +472,13 @@ struct WindowsWorkspaceView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 22) {
                         if mode == .pc {
-                        Group {
-                            if !isCompact && !dynamicTypeSize.isAccessibilitySize {
                             HStack(alignment: .center, spacing: 14) {
                                 libraryHeading
                                 Spacer(minLength: 8)
                                 steamConnectButton
                             }
-                            } else {
-                            VStack(alignment: .leading, spacing: 14) {
-                                libraryHeading
-                                steamConnectButton
-                            }
-                            }
-                        }
-
-                        HStack(spacing: 10) {
-                            Image(systemName: "magnifyingglass")
-                                .foregroundColor(.gray)
-                            TextField(tr("Search your games"), text: $searchText)
-                                .textInputAutocapitalization(.never)
-                                .autocorrectionDisabled()
-                                .foregroundColor(.white)
-                            if !searchText.isEmpty {
-                                Button { searchText = "" } label: {
-                                    Image(systemName: "xmark.circle.fill").foregroundColor(.gray)
-                                }
-                            }
-                        }
-                        .padding(.horizontal, 13)
-                        .padding(.vertical, 12)
-                        .background(panelColor)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-
-                        installedProgramsContent
-
-                        mixedLibraryContent
-
-                        if !coordinator.isSteamConnected {
-                            VStack(alignment: .leading, spacing: 10) {
-                                Label(tr("Connect Steam to continue"), systemImage: "steam")
-                                    .font(.headline)
-                                    .foregroundColor(.white)
-                                Text(tr("Sign in directly with Steam. iDeck does not store your password; the sign-in token is saved in this device's Keychain."))
-                                    .font(.subheadline)
-                                    .foregroundColor(.gray)
-                                Text(tr("Sign in to load the Steam game library."))
-                                    .font(.subheadline)
-                                    .foregroundColor(.gray)
-                            }
-                            .padding(18)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(panelColor)
-                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(lineColor, lineWidth: 1))
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                        }
-                        if !gogLibrary.isSignedIn {
-                            gogContent
-                        }
-                        if !epicLibrary.signedIn {
-                            epicContent
-                        }
-
+                            consoleShelf
+                            shelfContent
                         } else {
                             liveContainerContent
                         }
@@ -873,82 +819,6 @@ struct WindowsWorkspaceView: View {
         if epicLibrary.signedIn { Task { await epicLibrary.refreshLibrary() } }
     }
 
-    @ViewBuilder
-    private var mixedLibraryContent: some View {
-        if coordinator.isSteamConnected || gogLibrary.isSignedIn || epicLibrary.signedIn {
-            VStack(alignment: .leading, spacing: 22) {
-                HStack {
-                    Text(tr("Libraries").uppercased())
-                        .font(.system(size: 11, weight: .semibold))
-                        .tracking(0.8)
-                        .foregroundColor(faintColor)
-                    Spacer()
-                    Button { refreshAllLibraries() } label: {
-                        Image(systemName: "arrow.clockwise")
-                            .font(.headline)
-                            .frame(width: 32, height: 32)
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(mixedLibraryLoading)
-                    .accessibilityLabel(tr("Refresh"))
-                }
-                if coordinator.isSteamConnected {
-                    storeSection("Steam", count: steamLibrary.games.count, collapsed: $steamOwnedCollapsed,
-                                 loading: steamLibrary.isLoading, error: steamLibrary.errorMessage.map { tr($0) },
-                                 entries: filteredSteamGames.map { .steam($0) })
-                }
-                if epicLibrary.signedIn {
-                    storeSection("Epic Games", count: epicLibrary.owned.count, collapsed: $epicOwnedCollapsed,
-                                 loading: epicLibrary.refreshing, error: epicLibrary.error,
-                                 entries: filteredEpicGames.map { .epic($0) })
-                }
-                if gogLibrary.isSignedIn {
-                    storeSection("GOG", count: gogLibrary.games.count, collapsed: $gogOwnedCollapsed,
-                                 loading: gogLibrary.isLoading, error: gogLibrary.errorMessage.map { tr($0) },
-                                 entries: filteredGOGGames.map { .gog($0) })
-                }
-            }
-        }
-    }
-
-    /// One store's games, under a header that hides or shows them.
-    @ViewBuilder
-    private func storeSection(_ name: String, count: Int, collapsed: Binding<Bool>, loading: Bool, error: String?,
-                              entries: [MixedLibraryEntry]) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            ownedHeader("\(name) · \(count)", collapsed: collapsed)
-            if !collapsed.wrappedValue {
-                if loading {
-                    ProgressView().tint(.white)
-                } else if let error {
-                    Label(error, systemImage: "exclamationmark.triangle.fill")
-                        .font(.caption)
-                        .foregroundColor(.orange)
-                        .lineLimit(2)
-                }
-                let sorted = entries.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
-                if sorted.isEmpty {
-                    if !loading {
-                        Text(count == 0 ? tr("No games") : tr("No games match this search"))
-                            .font(.subheadline)
-                            .foregroundColor(.gray)
-                            .padding(.vertical, 8)
-                    }
-                } else {
-                    LazyVGrid(columns: columns, spacing: 14) {
-                        ForEach(sorted) { entry in
-                            switch entry {
-                            case .steam(let game): gameCard(game)
-                            case .gog(let game): gogCard(game)
-                            case .epic(let game): epicCard(game)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
     private func gameCard(_ game: SteamAppInfo) -> some View {
         let installed = steamLibrary.installedApps.contains(game.appID)
 
@@ -1286,160 +1156,6 @@ struct WindowsWorkspaceView: View {
         gogLibrary.refreshInstalled(prefixPath: prefixPath)
         epicLibrary.reloadInstalled()
         windowsLibrary.refresh(prefixPath: prefixPath)
-    }
-
-    private var installedProgramsContent: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                Text(tr("Installed games"))
-                    .font(.headline)
-                    .foregroundColor(.white)
-                Button { reloadInstalledGames() } label: {
-                    Image(systemName: "arrow.clockwise")
-                        .font(.subheadline.weight(.semibold))
-                        .frame(width: 30, height: 30)
-                }
-                .buttonStyle(.bordered)
-                .accessibilityLabel(tr("Reload installed games"))
-                Spacer()
-                Text(tr("%d installed", windowsLibrary.executableURLs.count + installedSteamGames.count + installedGOGGames.count + installedEpicGames.count
-                        + installingGOGGames.count + installingEpicGames.count))
-                    .font(.caption)
-                    .foregroundColor(.gray)
-            }
-
-            if windowsLibrary.executableURLs.isEmpty && installedSteamGames.isEmpty && installedGOGGames.isEmpty && installedEpicGames.isEmpty
-                && installingGOGGames.isEmpty && installingEpicGames.isEmpty {
-                HStack(spacing: 12) {
-                    Image(systemName: "square.grid.2x2")
-                        .font(.title2)
-                        .foregroundColor(.gray)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(tr("Your installed games will appear here"))
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundColor(.white)
-}
-                    Spacer(minLength: 0)
-                }
-                .padding(16)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(panelColor)
-                .overlay(RoundedRectangle(cornerRadius: 10).stroke(lineColor, lineWidth: 1))
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-            } else {
-                LazyVGrid(columns: columns, spacing: 14) {
-                    ForEach(installedSteamGames, id: \.appID) { game in
-                        VStack(spacing: 8) {
-                        Button {
-                            selectedSteamGame = SelectedSteamGame(game: game)
-                        } label: {
-                            VStack(alignment: .center, spacing: 9) {
-                                SteamGameArtworkView(game: game)
-                                    .frame(width: artworkWidth, height: artworkHeight)
-                                cardTitle(game.name.isEmpty ? tr("Untitled Steam app") : game.name, store: .steam)
-                            }
-                            .padding(10)
-                            .frame(maxWidth: .infinity, alignment: .center)
-                            .background(panelColor)
-                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(lineColor, lineWidth: 1))
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                        }
-                        .buttonStyle(.plain)
-                        if steamLibrary.installingApps.contains(game.appID) {
-                            steamProgressAction(for: game)
-                        } else {
-                            Button { launchSteamGame(game) } label: {
-                                cardActionLabel(tr("Launch"), systemImage: "play.fill")
-                            }
-                        }
-                        }
-                    }
-
-                    ForEach(installingGOGGames, id: \.id) { game in
-                        gogCard(game)
-                    }
-
-                    ForEach(installingEpicGames, id: \.appName) { game in
-                        epicCard(game)
-                    }
-
-                    ForEach(installedGOGGames, id: \.gameID) { game in
-                        VStack(spacing: 8) {
-                            VStack(alignment: .center, spacing: 9) {
-                                GOGArtworkView(urls: gogLibrary.games.first { $0.id == game.gameID }?.artworkCandidates ?? [],
-                                               fallbackColor: panelColor)
-                                    .frame(width: artworkWidth, height: artworkHeight)
-                                cardTitle(game.name, store: .gog)
-                            }
-                            .padding(10)
-                            .frame(maxWidth: .infinity, alignment: .center)
-                            .background(panelColor)
-                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(lineColor, lineWidth: 1))
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                            Button { launchGOGGame(game) } label: {
-                                cardActionLabel(tr("Launch"), systemImage: "play.fill")
-                            }
-                        }
-                    }
-
-                    ForEach(installedEpicGames, id: \.appName) { game in
-                        VStack(spacing: 8) {
-                            Button {
-                                selectedEpicGame = SelectedEpicGame(id: game.appName)
-                            } label: {
-                                VStack(alignment: .center, spacing: 9) {
-                                    GOGArtworkView(urls: [epicLibrary.game(game.appName)?.cover].compactMap { $0 },
-                                                   fallbackColor: panelColor)
-                                        .frame(width: artworkWidth, height: artworkHeight)
-                                    cardTitle(game.title, store: .epic)
-                                }
-                                .padding(10)
-                                .frame(maxWidth: .infinity, alignment: .center)
-                                .background(panelColor)
-                                .overlay(RoundedRectangle(cornerRadius: 10).stroke(lineColor, lineWidth: 1))
-                                .clipShape(RoundedRectangle(cornerRadius: 10))
-                            }
-                            .buttonStyle(.plain)
-                            Button { launchEpicGame(game) } label: {
-                                cardActionLabel(tr("Launch"), systemImage: "play.fill")
-                            }
-                        }
-                    }
-
-                    ForEach(windowsLibrary.executableURLs, id: \.path) { executableURL in
-                        VStack(spacing: 8) {
-                        Button {
-                            selectedExecutable = SelectedLibraryURL(url: executableURL)
-                        } label: {
-                            VStack(alignment: .center, spacing: 9) {
-                                WindowsExecutableArtworkView(executableURL: executableURL, library: windowsLibrary, fallbackColor: panelColor)
-                                    .frame(width: artworkWidth, height: artworkHeight)
-                                cardTitle(executableURL.deletingPathExtension().lastPathComponent)
-                                Text(tr("Windows app"))
-                                    .font(.caption)
-                                    .foregroundColor(.gray)
-                            }
-                            .padding(10)
-                            .frame(maxWidth: .infinity, alignment: .center)
-                            .background(panelColor)
-                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(lineColor, lineWidth: 1))
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                        }
-                        .buttonStyle(.plain)
-                        Button {
-                            guard requireJIT() else { return }
-                            let profile = windowsLibrary.profile(
-                                for: windowsLibrary.profileID(for: executableURL),
-                                title: executableURL.deletingPathExtension().lastPathComponent)
-                            coordinator.launchWindowsExecutable(at: executableURL, profile: profile)
-                        } label: {
-                            cardActionLabel(tr("Launch"), systemImage: "play.fill")
-                        }
-                        }
-                    }
-                }
-            }
-        }
     }
 
     /// JIT must be on before any Windows program starts.
@@ -2570,6 +2286,385 @@ struct SteamDLCArtworkView: View {
             } else {
                 Color.white.opacity(0.08)
             }
+        }
+    }
+}
+
+// MARK: - Console-style home (PS-like shelf)
+
+/// One tile of the top shelf: a store, or a game that is installed or installing.
+enum ShelfItem: Hashable {
+    case store(GameStore)
+    case steam(UInt32)
+    case gog(Int)
+    case gogInstalling(Int)
+    case epic(String)
+    case epicInstalling(String)
+    case exe(String)
+}
+
+extension WindowsWorkspaceView {
+    /// The games on the shelf, installing ones included, after the stores.
+    var shelfGames: [ShelfItem] {
+        installedSteamGames.map { .steam($0.appID) }
+            + installingGOGGames.map { .gogInstalling($0.id) }
+            + installedGOGGames.map { .gog($0.gameID) }
+            + installingEpicGames.map { .epicInstalling($0.appName) }
+            + installedEpicGames.map { .epic($0.appName) }
+            + windowsLibrary.executableURLs.map { .exe($0.path) }
+    }
+
+    /// The selected tile, or the Steam store when it no longer exists.
+    var currentShelf: ShelfItem {
+        if case .store = shelf { return shelf }
+        return shelfGames.contains(shelf) ? shelf : .store(.steam)
+    }
+
+    var consoleShelf: some View {
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(alignment: .top, spacing: isCompact ? 10 : 14) {
+                    ForEach([GameStore.steam, .gog, .epic], id: \.self) { store in
+                        shelfTile(.store(store))
+                    }
+                    if !shelfGames.isEmpty {
+                        Rectangle().fill(lineColor).frame(width: 1, height: shelfTileHeight * 0.7)
+                            .padding(.top, shelfTileHeight * 0.15)
+                    }
+                    ForEach(shelfGames, id: \.self) { item in
+                        shelfTile(item)
+                    }
+                }
+                .padding(.vertical, 10)
+                .padding(.horizontal, 2)
+            }
+            .onChange(of: shelf) { _, item in
+                withAnimation(.easeInOut(duration: 0.2)) { proxy.scrollTo(item, anchor: .center) }
+            }
+        }
+    }
+
+    private var shelfTileWidth: CGFloat { isCompact ? 64 : 78 }
+    private var shelfTileHeight: CGFloat { isCompact ? 86 : 104 }
+
+    private func shelfTile(_ item: ShelfItem) -> some View {
+        let selected = currentShelf == item
+        return Button {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { shelf = item }
+        } label: {
+            VStack(spacing: 6) {
+                shelfArtwork(item)
+                    .frame(width: shelfTileWidth, height: shelfTileHeight)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .overlay(RoundedRectangle(cornerRadius: 12)
+                        .stroke(selected ? textColor : lineColor, lineWidth: selected ? 2 : 1))
+                    .overlay(alignment: .bottom) { shelfProgress(item) }
+                    .scaleEffect(selected ? 1.08 : 1)
+                    .shadow(color: selected ? accentColor.opacity(0.45) : .clear, radius: 10)
+                Text(shelfTitle(item))
+                    .font(.system(size: 10, weight: selected ? .semibold : .regular))
+                    .foregroundColor(selected ? textColor : faintColor)
+                    .lineLimit(1)
+                    .frame(width: shelfTileWidth + 8)
+            }
+        }
+        .buttonStyle(.plain)
+        .id(item)
+        .accessibilityLabel(shelfTitle(item))
+    }
+
+    @ViewBuilder
+    private func shelfArtwork(_ item: ShelfItem) -> some View {
+        switch item {
+        case .store(let store):
+            ZStack {
+                panelColor
+                Image(storeAsset(store))
+                    .renderingMode(store == .steam ? .original : .template)
+                    .resizable()
+                    .scaledToFit()
+                    .foregroundColor(textColor)
+                    .padding(shelfTileWidth * 0.22)
+            }
+        case .steam(let id):
+            if let game = steamLibrary.games.first(where: { $0.appID == id }) {
+                SteamGameArtworkView(game: game)
+            } else { panelColor }
+        case .gog(let id), .gogInstalling(let id):
+            GOGArtworkView(urls: gogLibrary.games.first { $0.id == id }?.artworkCandidates ?? [], fallbackColor: panelColor)
+        case .epic(let app), .epicInstalling(let app):
+            GOGArtworkView(urls: [epicLibrary.game(app)?.cover].compactMap { $0 }, fallbackColor: panelColor)
+        case .exe(let path):
+            WindowsExecutableArtworkView(executableURL: URL(fileURLWithPath: path), library: windowsLibrary, fallbackColor: panelColor)
+        }
+    }
+
+    /// A thin bar on a tile whose game is downloading.
+    @ViewBuilder
+    private func shelfProgress(_ item: ShelfItem) -> some View {
+        if let fraction = shelfDownloadFraction(item) {
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    Rectangle().fill(Color.black.opacity(0.6))
+                    Rectangle().fill(accentColor).frame(width: geometry.size.width * min(max(fraction, 0), 1))
+                }
+            }
+            .frame(height: 4)
+            .clipShape(Capsule())
+            .padding(6)
+        }
+    }
+
+    private func shelfDownloadFraction(_ item: ShelfItem) -> Double? {
+        switch item {
+        case .steam(let id):
+            guard steamLibrary.installingApps.contains(id) else { return nil }
+            guard let progress = steamLibrary.downloadProgress[id], progress.totalBytes > 0 else { return 0 }
+            return Double(progress.doneBytes) / Double(progress.totalBytes)
+        case .gogInstalling, .epicInstalling:
+            return 0.5
+        default:
+            return nil
+        }
+    }
+
+    private func storeAsset(_ store: GameStore) -> String {
+        switch store {
+        case .steam: return "StoreBadgeSteam"
+        case .gog: return "StoreBadgeGOG"
+        case .epic: return "StoreBadgeEpic"
+        }
+    }
+
+    private func shelfTitle(_ item: ShelfItem) -> String {
+        switch item {
+        case .store(.steam): return "Steam"
+        case .store(.gog): return "GOG"
+        case .store(.epic): return "Epic Games"
+        case .steam(let id): return steamLibrary.games.first { $0.appID == id }?.name ?? "Steam"
+        case .gog(let id): return gogLibrary.installed[id]?.name ?? "GOG"
+        case .gogInstalling(let id): return gogLibrary.games.first { $0.id == id }?.title ?? "GOG"
+        case .epic(let app): return epicLibrary.installed[app]?.title ?? "Epic"
+        case .epicInstalling(let app): return epicLibrary.game(app)?.title ?? "Epic"
+        case .exe(let path): return URL(fileURLWithPath: path).deletingPathExtension().lastPathComponent
+        }
+    }
+
+    // MARK: Content under the shelf
+
+    @ViewBuilder
+    var shelfContent: some View {
+        switch currentShelf {
+        case .store(let store): storePage(store)
+        default: gamePage(currentShelf)
+        }
+    }
+
+    private var searchField: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "magnifyingglass").foregroundColor(.gray)
+            TextField(tr("Search your games"), text: $searchText)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .foregroundColor(.white)
+            if !searchText.isEmpty {
+                Button { searchText = "" } label: {
+                    Image(systemName: "xmark.circle.fill").foregroundColor(.gray)
+                }
+            }
+        }
+        .padding(.horizontal, 13)
+        .padding(.vertical, 11)
+        .background(panelColor)
+        .overlay(RoundedRectangle(cornerRadius: 9).stroke(lineColor, lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 9))
+    }
+
+    /// A store: its games to install, and their DLC in the game's page.
+    @ViewBuilder
+    private func storePage(_ store: GameStore) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 10) {
+                searchField
+                Button { refreshAllLibraries() } label: {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.headline)
+                        .foregroundColor(textColor)
+                        .frame(width: 42, height: 42)
+                        .background(panelColor)
+                        .overlay(RoundedRectangle(cornerRadius: 9).stroke(lineColor, lineWidth: 1))
+                        .clipShape(RoundedRectangle(cornerRadius: 9))
+                }
+                .disabled(mixedLibraryLoading)
+                .accessibilityLabel(tr("Refresh"))
+            }
+            switch store {
+            case .steam:
+                if coordinator.isSteamConnected {
+                    storeGrid(loading: steamLibrary.isLoading, error: steamLibrary.errorMessage.map { tr($0) },
+                              count: steamLibrary.games.count, entries: filteredSteamGames.map { .steam($0) })
+                } else {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Label(tr("Connect Steam to continue"), systemImage: "steam")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                        Text(tr("Sign in directly with Steam. iDeck does not store your password; the sign-in token is saved in this device's Keychain."))
+                            .font(.subheadline)
+                            .foregroundColor(.gray)
+                    }
+                    .padding(18)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(panelColor)
+                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(lineColor, lineWidth: 1))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                }
+            case .gog:
+                if gogLibrary.isSignedIn {
+                    storeGrid(loading: gogLibrary.isLoading, error: gogLibrary.errorMessage.map { tr($0) },
+                              count: gogLibrary.games.count, entries: filteredGOGGames.map { .gog($0) })
+                } else {
+                    gogContent
+                }
+            case .epic:
+                if epicLibrary.signedIn {
+                    storeGrid(loading: epicLibrary.refreshing, error: epicLibrary.error,
+                              count: epicLibrary.owned.count, entries: filteredEpicGames.map { .epic($0) })
+                } else {
+                    epicContent
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func storeGrid(loading: Bool, error: String?, count: Int, entries: [MixedLibraryEntry]) -> some View {
+        if loading { ProgressView().tint(.white) }
+        if let error {
+            Label(error, systemImage: "exclamationmark.triangle.fill")
+                .font(.caption)
+                .foregroundColor(.orange)
+                .lineLimit(2)
+        }
+        let sorted = entries.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+        if sorted.isEmpty {
+            if !loading {
+                Text(count == 0 ? tr("No games") : tr("No games match this search"))
+                    .font(.subheadline)
+                    .foregroundColor(.gray)
+            }
+        } else {
+            LazyVGrid(columns: columns, spacing: 14) {
+                ForEach(sorted) { entry in
+                    switch entry {
+                    case .steam(let game): gameCard(game)
+                    case .gog(let game): gogCard(game)
+                    case .epic(let game): epicCard(game)
+                    }
+                }
+            }
+        }
+    }
+
+    /// An installed (or installing) game: big art, Play and its settings.
+    @ViewBuilder
+    private func gamePage(_ item: ShelfItem) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            gameHero(item)
+                .frame(maxWidth: .infinity)
+                .frame(height: isCompact ? 180 : 260)
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+                .overlay(RoundedRectangle(cornerRadius: 14).stroke(lineColor, lineWidth: 1))
+            Text(shelfTitle(item))
+                .font(.system(size: isCompact ? 22 : 28, weight: .semibold))
+                .foregroundColor(textColor)
+                .lineLimit(2)
+            HStack(spacing: 10) {
+                gameAction(item)
+                    .frame(maxWidth: 320)
+                if hasSettings(item) {
+                    Button { openSettings(item) } label: {
+                        Image(systemName: "gearshape.fill")
+                            .font(.headline)
+                            .foregroundColor(textColor)
+                            .frame(width: cardActionHeight, height: cardActionHeight)
+                            .background(panelColor)
+                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(lineColor, lineWidth: 1))
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                    .accessibilityLabel(tr("Settings"))
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func gameHero(_ item: ShelfItem) -> some View {
+        switch item {
+        case .steam(let id):
+            if let game = steamLibrary.games.first(where: { $0.appID == id }) {
+                SteamGameBannerView(game: game)
+            } else { panelColor }
+        default:
+            shelfArtwork(item)
+        }
+    }
+
+    @ViewBuilder
+    private func gameAction(_ item: ShelfItem) -> some View {
+        switch item {
+        case .steam(let id):
+            if let game = steamLibrary.games.first(where: { $0.appID == id }) {
+                if steamLibrary.installingApps.contains(id) {
+                    steamProgressAction(for: game)
+                } else {
+                    Button { launchSteamGame(game) } label: { cardActionLabel(tr("Launch"), systemImage: "play.fill") }
+                }
+            }
+        case .gog(let id):
+            if let game = gogLibrary.installed[id] {
+                Button { launchGOGGame(game) } label: { cardActionLabel(tr("Launch"), systemImage: "play.fill") }
+            }
+        case .gogInstalling(let id):
+            if let game = gogLibrary.games.first(where: { $0.id == id }) { gogCard(game) }
+        case .epic(let app):
+            if let game = epicLibrary.installed[app] {
+                Button { launchEpicGame(game) } label: { cardActionLabel(tr("Launch"), systemImage: "play.fill") }
+            }
+        case .epicInstalling(let app):
+            if let game = epicLibrary.owned.first(where: { $0.appName == app }) { epicCard(game) }
+        case .exe(let path):
+            Button {
+                guard requireJIT() else { return }
+                let url = URL(fileURLWithPath: path)
+                let profile = windowsLibrary.profile(for: windowsLibrary.profileID(for: url),
+                                                     title: url.deletingPathExtension().lastPathComponent)
+                coordinator.launchWindowsExecutable(at: url, profile: profile)
+            } label: { cardActionLabel(tr("Launch"), systemImage: "play.fill") }
+        case .store:
+            EmptyView()
+        }
+    }
+
+    private func hasSettings(_ item: ShelfItem) -> Bool {
+        switch item {
+        case .steam, .epic, .exe: return true
+        case .gog(let id): return gogLibrary.games.contains { $0.id == id }
+        default: return false
+        }
+    }
+
+    private func openSettings(_ item: ShelfItem) {
+        switch item {
+        case .steam(let id):
+            if let game = steamLibrary.games.first(where: { $0.appID == id }) { selectedSteamGame = SelectedSteamGame(game: game) }
+        case .gog(let id):
+            selectedGOGGame = gogLibrary.games.first { $0.id == id }
+        case .epic(let app):
+            selectedEpicGame = SelectedEpicGame(id: app)
+        case .exe(let path):
+            selectedExecutable = SelectedLibraryURL(url: URL(fileURLWithPath: path))
+        default:
+            break
         }
     }
 }
