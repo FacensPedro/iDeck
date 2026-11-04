@@ -62,7 +62,9 @@ class WineBlackScreenAndFastStartupTests(unittest.TestCase):
         self.assertIn('setenv("DXVK_HUD", "devinfo,fps", 0)', GRAPHICS)
         self.assertNotIn('toggleRow(title: tr("Metal diagnostics HUD")', SETTINGS)
         self.assertNotIn('toggleRow(title: tr("DXVK HUD")', SETTINGS)
-        self.assertIn('toggleRow(title: tr("Show FPS, CPU & GPU overlay")', SETTINGS)
+        # The FPS overlay is switched from the in-game settings sheet.
+        sheet = (ROOT / "iDeck/SessionControlsSheet.swift").read_text()
+        self.assertIn('Toggle(tr("Show FPS"), isOn: $showFPS)', sheet)
 
 
 if __name__ == "__main__":

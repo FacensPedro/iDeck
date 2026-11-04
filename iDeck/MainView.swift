@@ -1834,8 +1834,7 @@ private struct WindowsExecutableDetailsView: View {
                             .textSelection(.enabled)
                     }
                     .frame(maxWidth: .infinity)
-                    WindowsGameProfileForm(profile: $profile,
-                                           globalMetalFXEnabled: $coordinator.isMetalFXEnabled)
+                    WindowsGameProfileForm(profile: $profile)
                     Button(role: .destructive) {
                         guard let prefixPath else {
                             errorMessage = tr("Windows environment is not ready.")
@@ -1923,7 +1922,6 @@ private struct SteamProgramDetailsView: View {
         self.steamLibrary = steamLibrary
         self.coordinator = coordinator
         var initial = library.profile(for: "steam:\(game.appID)", title: game.name)
-        if coordinator.isMetalFXEnabled { initial.metalFXEnabled = true }
         _profile = State(initialValue: initial)
     }
 
@@ -1993,8 +1991,7 @@ private struct SteamProgramDetailsView: View {
                             .foregroundColor(.red)
                             .font(.caption)
                     }
-                    WindowsGameProfileForm(profile: $profile,
-                                           globalMetalFXEnabled: $coordinator.isMetalFXEnabled)
+                    WindowsGameProfileForm(profile: $profile)
                     DetailCard(title: tr("Steam Cloud saves"),
                                footer: steamLibrary.cloudMessages[game.appID]
                                    ?? tr("Automatically sync Steam Cloud saves before playing when available. Conflicting saves are never overwritten.")) {
@@ -2223,7 +2220,6 @@ private struct SteamProgramDetailsView: View {
 
 private struct WindowsGameProfileForm: View {
     @Binding var profile: WindowsGameProfile
-    @Binding var globalMetalFXEnabled: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 22) {
@@ -2235,9 +2231,9 @@ private struct WindowsGameProfileForm: View {
                                 choices: ["fit", "fill", "stretch", "aspect"],
                                 icon: "arrow.up.left.and.arrow.down.right", iconColor: .blue)
                 DetailPickerRow(title: tr("Frame rate limit"), selection: $profile.fpsLimit,
-                                choices: ["30", "40", "60", "Uncapped"],
+                                choices: WindowsGameProfile.fpsLimits,
                                 icon: "speedometer", iconColor: .orange)
-                DetailToggleRow(title: tr("MetalFX upscaling"), isOn: $globalMetalFXEnabled, showsDivider: false,
+                DetailToggleRow(title: tr("MetalFX upscaling"), isOn: $profile.metalFXEnabled, showsDivider: false,
                                 icon: "sparkles", iconColor: .purple)
             }
             DetailCard(title: tr("Graphics"),
@@ -2262,19 +2258,10 @@ private struct WindowsGameProfileForm: View {
                                     set: { profile.cpuCount = Int($0) ?? 0 }),
                                 choices: WindowsGameProfile.cpuCounts.map { $0 == 0 ? tr("All") : String($0) },
                                 icon: "cpu", iconColor: .blue)
-                DetailPickerRow(title: tr("Anisotropic filtering (D3D9)"), selection: Binding(
-                                    get: { profile.anisotropyLimit == 0 ? tr("Game") : "\(profile.anisotropyLimit)x" },
-                                    set: { profile.anisotropyLimit = Int($0.dropLast()) ?? 0 }),
-                                choices: WindowsGameProfile.anisotropyLimits.map { $0 == 0 ? tr("Game") : "\($0)x" },
-                                icon: "square.grid.3x3.fill", iconColor: .teal)
                 DetailToggleRow(title: tr("Fast synchronization"), isOn: $profile.fastSync,
                                 icon: "bolt.fill", iconColor: .yellow)
-                DetailToggleRow(title: tr("Reduced-precision x87"), isOn: $profile.reducedX87,
-                                icon: "function", iconColor: .orange)
-                DetailToggleRow(title: tr("Frame generation"), isOn: $profile.frameGeneration,
+                DetailToggleRow(title: tr("Frame generation"), isOn: $profile.frameGeneration, showsDivider: false,
                                 icon: "film.stack", iconColor: .purple)
-                DetailToggleRow(title: tr("Report an NVIDIA GPU"), isOn: $profile.reportNVIDIA, showsDivider: false,
-                                icon: "display", iconColor: .green)
             }
             DetailCard(title: tr("Compatibility"),
                        footer: tr("Games iDeck recognises get the settings they were tested with.")) {
@@ -2358,7 +2345,6 @@ private struct StoreGameDetailsView<Extra: View>: View {
         self.coordinator = coordinator
         self.extra = extra()
         var initial = library.profile(for: profileID, title: title)
-        if coordinator.isMetalFXEnabled { initial.metalFXEnabled = true }
         _profile = State(initialValue: initial)
     }
 
@@ -2389,8 +2375,7 @@ private struct StoreGameDetailsView<Extra: View>: View {
                             .foregroundColor(.red)
                             .font(.caption)
                     }
-                    WindowsGameProfileForm(profile: $profile,
-                                           globalMetalFXEnabled: $coordinator.isMetalFXEnabled)
+                    WindowsGameProfileForm(profile: $profile)
                     extra
                 }
                 .padding(22)

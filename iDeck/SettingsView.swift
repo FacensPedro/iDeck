@@ -344,13 +344,8 @@ struct SettingsView: View {
     private var graphicsPage: some View {
         Form {
             settingsSection(title: tr("Graphics & Performance")) {
-                toggleRow(title: tr("MetalFX Upscaling"), isOn: $coordinator.isMetalFXEnabled)
                 toggleRow(title: tr("Hold Display at Maximum Rate"), isOn: $coordinator.isMaxRefreshRateEnabled)
                 toggleRow(title: tr("Pause games in the background"), isOn: $pauseGamesInBackground)
-                toggleRow(title: tr("Show FPS, CPU & GPU overlay"), isOn: $showGamePerformanceOverlay)
-                toggleRow(title: tr("D3DMetal Rendering"), isOn: $coordinator.isD3DMetalEnabled)
-            }
-            Section {
             }
             MadeiraGraphicsSettings()
             MadeiraMemorySyncSettings()

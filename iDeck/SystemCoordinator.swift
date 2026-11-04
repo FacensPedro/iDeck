@@ -803,7 +803,6 @@ class SystemCoordinator: ObservableObject {
                     self.windowsEnvironment.configureWine(prefix: mountPath)
                     self.mountExternalDrives(prefix: mountPath)
                     var effectiveProfile = profile ?? WindowsGameProfile(id: destination.path, title: destination.deletingPathExtension().lastPathComponent)
-                    if self.isMetalFXEnabled { effectiveProfile.metalFXEnabled = true }
                     self.windowsEnvironment.applyGameProfile(effectiveProfile)
                     self.activeWindowsProfile = effectiveProfile
                     self.setWindowsStatus("Launching Windows app...")
@@ -952,7 +951,6 @@ class SystemCoordinator: ObservableObject {
         mountExternalDrives(prefix: prefixPath.path)
         windowsEnvironment.graphicsConfig.applyGraphicsEnvironment()
         var effectiveProfile = profile
-        if isMetalFXEnabled { effectiveProfile.metalFXEnabled = true }
         windowsEnvironment.applyGameProfile(effectiveProfile)
         activeWindowsProfile = effectiveProfile
         // Steam games start through Valve's client (Madeira Dock) on their

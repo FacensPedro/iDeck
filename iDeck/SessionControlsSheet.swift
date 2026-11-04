@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// Sheet opened from the session's gear button: FPS, touch and MetalFX.
+/// Sheet opened from the session's gear button: FPS, touch, MetalFX and the
+/// running game's frame-rate limit.
 struct SessionControlsSheet: View {
     @ObservedObject var coordinator: SystemCoordinator
     @StateObject private var library = WindowsLibraryStore()
@@ -12,15 +13,13 @@ struct SessionControlsSheet: View {
         coordinator.activeWindowsProfile.map { library.profile(for: $0.id, title: $0.title) }
     }
 
-    private var metalFX: Binding<Bool> {
+    private func binding<Value>(_ path: WritableKeyPath<WindowsGameProfile, Value>, _ fallback: Value) -> Binding<Value> {
         Binding(
-            get: { coordinator.isMetalFXEnabled || (profile?.metalFXEnabled ?? false) },
-            set: { on in
-                if var current = profile {
-                    current.metalFXEnabled = on
-                    library.save(current)
-                }
-                if !on { coordinator.isMetalFXEnabled = false }
+            get: { profile?[keyPath: path] ?? fallback },
+            set: { value in
+                guard var current = profile else { return }
+                current[keyPath: path] = value
+                library.save(current)
             })
     }
 
@@ -32,11 +31,14 @@ struct SessionControlsSheet: View {
                     Toggle(tr("Touch screen"), isOn: $touch)
                 }
                 Section {
-                    Toggle(tr("MetalFX Upscaling"), isOn: metalFX)
-                        .disabled(profile == nil && !coordinator.isMetalFXEnabled)
+                    Toggle(tr("MetalFX Upscaling"), isOn: binding(\.metalFXEnabled, false))
+                    Picker(tr("Frame rate limit"), selection: binding(\.fpsLimit, "60")) {
+                        ForEach(WindowsGameProfile.fpsLimits, id: \.self) { Text(tr($0)).tag($0) }
+                    }
                 } footer: {
-                    Text(tr("MetalFX takes effect the next time this game starts."))
+                    Text(tr("MetalFX and the FPS limit take effect the next time a game starts. A lower limit uses less CPU, GPU and battery."))
                 }
+                .disabled(profile == nil)
             }
             .navigationTitle(tr("Settings"))
             .navigationBarTitleDisplayMode(.inline)
