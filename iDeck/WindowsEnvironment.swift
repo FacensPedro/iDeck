@@ -593,16 +593,6 @@ class WindowsEnvironment {
         // (RDR2 kept 1.5 GB with it off).
         lines.append("quiet-log = 1")
         lines.append("ring-share = 1")
-        // Session FPS limit (game settings sheet): a fixed cap, or "Auto",
-        // which holds CPU power near 1.5 W by moving the cap between 60 and 20.
-        switch UserDefaults.standard.integer(forKey: SessionFPSLimit.key) {
-        case SessionFPSLimit.auto:
-            lines.append("env.MADEIRA_FPS_GOV_MW = 1500")
-        case let fps where (20...120).contains(fps):
-            lines.append("env.MADEIRA_FPS_CAP = \(fps)")
-        default:
-            break
-        }
         // madeira-d3d12 reads its MetalFX factor from the game's config lines;
         // DXMT gets the same factor through DXMT_CONFIG (applyGameProfile).
         if let factor = sessionMetalFXFactor {
@@ -726,12 +716,24 @@ class WindowsEnvironment {
         // Avoid carrying the previous game's HID identity into this launch.
         unsetenv("MADEIRA_HIDPAD")
         unsetenv("MADEIRA_HIDPAD_NAME")
-        if profile.resolution == "Device native" {
+        // The game's screen: the active window scene's (UIScreen.main is deprecated).
+        let screen: CGSize = Thread.isMainThread
+            ? MainActor.assumeIsolated {
+                UIApplication.shared.connectedScenes
+                    .compactMap { ($0 as? UIWindowScene)?.screen.nativeBounds.size }
+                    .first ?? CGSize(width: 2732, height: 2048)
+            }
+            : CGSize(width: 2732, height: 2048)
+        // MetalFX at "Device native": the game renders at 2/3 of the screen
+        // and MetalFX enlarges it 1.5x, about 55% fewer pixels for the GPU to
+        // shade with little visible loss.
+        let resolution = Self.renderResolution(profile.resolution, metalFX: profile.metalFXEnabled, screen: screen)
+        if resolution == "Device native" {
             unsetenv("MADEIRA_SCREEN_W")
             unsetenv("MADEIRA_SCREEN_H")
             unsetenv("MADEIRA_SCREEN_SRC")
         } else {
-            let parts = profile.resolution.split(separator: "x")
+            let parts = resolution.split(separator: "x")
             if parts.count == 2, let width = Int(parts[0]), let height = Int(parts[1]),
                (320...7680).contains(width), (240...4320).contains(height) {
                 setenv("MADEIRA_SCREEN_W", String(width), 1)
@@ -754,16 +756,8 @@ class WindowsEnvironment {
             unsetenv("MADEIRA_FEX_AVX")
         }
 
-        // The game's screen: the active window scene's (UIScreen.main is deprecated).
-        let screen: CGSize = Thread.isMainThread
-            ? MainActor.assumeIsolated {
-                UIApplication.shared.connectedScenes
-                    .compactMap { ($0 as? UIWindowScene)?.screen.nativeBounds.size }
-                    .first ?? CGSize(width: 2732, height: 2048)
-            }
-            : CGSize(width: 2732, height: 2048)
         sessionMetalFXFactor = profile.metalFXEnabled
-            ? Self.metalFXFactor(resolution: profile.resolution, screenLongSide: max(screen.width, screen.height))
+            ? Self.metalFXFactor(resolution: resolution, screenLongSide: max(screen.width, screen.height))
             : nil
         if let factor = sessionMetalFXFactor {
             // DXMT only builds its MetalFX swapchain when this is set.
@@ -777,7 +771,15 @@ class WindowsEnvironment {
         }
 
         setenv("IDECK_FPS_LIMIT", profile.fpsLimit, 1)
-        let limit = profile.fpsLimit == "Uncapped" ? 0 : RuntimeConfiguration.settings(for: profile).framesPerSecond
+        // "Auto": Madeira's frame-cap governor holds the CPU near 1.5 W by
+        // moving the cap between 60 and 20 fps (read at session start).
+        if profile.fpsLimit == "Auto" {
+            setenv("MADEIRA_FPS_GOV_MW", "1500", 1)
+        } else {
+            unsetenv("MADEIRA_FPS_GOV_MW")
+        }
+        let limit = profile.fpsLimit == "Uncapped" ? 0
+            : profile.fpsLimit == "Auto" ? 60 : RuntimeConfiguration.settings(for: profile).framesPerSecond
         let managed: Set<String> = ["d3d11.preferredMaxFrameRate", "d3d11.metalSpatialUpscaleFactor"]
         let existing = getenv("DXMT_CONFIG").map { String(cString: $0) } ?? ""
         var options = existing.split(separator: ";").map(String.init).filter {
@@ -788,6 +790,16 @@ class WindowsEnvironment {
             options.append(String(format: "d3d11.metalSpatialUpscaleFactor = %.2f", factor))
         }
         setenv("DXMT_CONFIG", options.joined(separator: ";"), 1)
+    }
+
+    /// The resolution the game renders at: "Device native" with MetalFX on
+    /// becomes 2/3 of the screen (landscape, even sizes), for MetalFX to enlarge.
+    static func renderResolution(_ resolution: String, metalFX: Bool, screen: CGSize) -> String {
+        guard metalFX, resolution == "Device native", screen.width > 0, screen.height > 0 else { return resolution }
+        let long = max(screen.width, screen.height), short = min(screen.width, screen.height)
+        let width = Int(long * 2 / 3) & ~1, height = Int(short * 2 / 3) & ~1
+        guard (320...7680).contains(width), (240...4320).contains(height) else { return resolution }
+        return "\(width)x\(height)"
     }
 
     /// How much MetalFX should enlarge a game rendering at `resolution` to fill
@@ -880,17 +892,3 @@ enum AVXAuto {
 }
 
 
-/// The FPS limit chosen in the in-game settings (UserDefaults "sessionFPSLimit"):
-/// 0 = none, -1 = automatic (power governor), otherwise a fixed cap.
-enum SessionFPSLimit {
-    static let key = "sessionFPSLimit"
-    static let auto = -1
-    static let choices: [Int] = [0, auto, 30, 40, 60]
-    static func title(_ value: Int) -> String {
-        switch value {
-        case 0: return "Off"
-        case auto: return "Auto (save power)"
-        default: return "\(value) FPS"
-        }
-    }
-}
