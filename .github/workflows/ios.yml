@@ -29,7 +29,7 @@ on:
         required: false
         default: false
       release_tag:
-        description: "Optional version/tag for publishing a release (e.g. v0.1.0); leave empty to build IPA only"
+        description: "Optional version/tag for publishing a release (e.g. v1.0.0); leave empty to build IPA only"
         required: false
         default: ""
   push:
@@ -997,10 +997,9 @@ jobs:
               echo "::error::Native release missing an audited graphics profile."; exit 2;
             }
             TITLE="iDeck $TAG — Native Madeira $GRAPHICS"
-            NOTES="Verified native IPA with FEX, Wine and DXMT ($GRAPHICS). Device/JIT compatibility and signing still require validation."
           else
             TITLE="iDeck $TAG — Interface Only (No Windows Games)"
-            NOTES="CI prerelease of the iDeck interface only. This IPA does NOT include Wine, FEX, DXMT or D3D12 and cannot run Windows games."
+
           fi
 
           if gh release view "$TAG" >/dev/null 2>&1; then
@@ -1010,7 +1009,7 @@ jobs:
             fi
             gh release upload "$TAG" iDeck.ipa iDeck.ipa.sha256 iDeck-distribution-audit.json --clobber
           else
-            OPTIONS=(--target "$GITHUB_SHA" --title "$TITLE" --notes "$NOTES")
+            OPTIONS=(--target "$GITHUB_SHA" --title "$TITLE" --notes-file RELEASE_NOTES.md)
             gh release create "$TAG" iDeck.ipa iDeck.ipa.sha256 iDeck-distribution-audit.json "${OPTIONS[@]}"
           fi
           echo "Published $KIND IPA under GitHub Release $TAG" >> "$GITHUB_STEP_SUMMARY"
