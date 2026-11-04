@@ -1,16 +1,11 @@
 import Foundation
 
-/// Settings › Downloads › "Unlimited download speed". Off by default: game
-/// downloads use a moderate number of parallel connections, leaving
-/// bandwidth for the rest of the device. On: as many as the device can
-/// handle while it stays cool.
+/// iDeck uses a bounded, predictable download queue. Download acceleration
+/// and server prioritization are managed by the separately installed iRelay.
 enum DownloadSpeed {
-    static let key = "downloads.unlimitedSpeed"
+    /// Parallel Steam chunk requests on the device.
+    static let steamChunks = 8
 
-    static var isUnlimited: Bool { UserDefaults.standard.bool(forKey: key) }
-
-    /// Parallel Steam chunk requests when the device is cool.
-    static var steamChunks: Int { isUnlimited ? 64 : 8 }
     /// Epic chunks fetched ahead of the writer.
-    static var epicWindow: Int { isUnlimited ? 48 : 8 }
+    static let epicWindow = 8
 }

@@ -122,6 +122,8 @@ enum Translations {
         "Madeira": ["pt": "Madeira", "es": "Madeira"],
         "Installed games": ["pt": "Jogos instalados", "es": "Juegos instalados"],
         "Your installed games will appear here": ["pt": "Seus jogos instalados aparecerão aqui", "es": "Tus juegos instalados aparecerán aquí"],
+        "Pause download": ["pt": "Pausar download", "es": "Pausar descarga"],
+        "Download paused": ["pt": "Download pausado", "es": "Descarga pausada"],
         "Stop download": ["pt": "Parar download", "es": "Detener descarga"],
         "Stopping...": ["pt": "Parando...", "es": "Deteniendo..."],
         "Preparing download...": ["pt": "Preparando download...", "es": "Preparando descarga..."],

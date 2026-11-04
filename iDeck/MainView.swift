@@ -384,18 +384,14 @@ struct WindowsWorkspaceView: View {
     private var artworkWidth: CGFloat { isCompact ? 112 : 148 }
     private var artworkHeight: CGFloat { isCompact ? 168 : 222 }
 
-    private func cardTitle(_ title: String, store: GameStore? = nil) -> some View {
-        HStack(spacing: 4) {
-            Text(title)
-                .font(.subheadline.weight(.medium))
-                .foregroundColor(textColor)
-                .lineLimit(1)
-                .truncationMode(.tail)
-            if let store {
-                StoreBadge(store: store).fixedSize()
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
+    private func cardTitle(_ title: String) -> some View {
+        Text(title)
+            .font(.subheadline.weight(.medium))
+            .foregroundColor(textColor)
+            .lineLimit(2)
+            .multilineTextAlignment(.center)
+            .truncationMode(.tail)
+            .frame(maxWidth: .infinity, alignment: .center)
     }
 
     /// The shared look of a card's primary action, at `cardActionHeight`.
@@ -411,7 +407,8 @@ struct WindowsWorkspaceView: View {
 
     /// Download progress in the same footprint as the Launch button: a bar
     /// with the percentage, and a stop button. Details are in the game sheet.
-    private func progressAction(fraction: Double, label: String, onStop: (() -> Void)?, stopping: Bool = false) -> some View {
+    private func progressAction(fraction: Double, label: String, onPause: (() -> Void)? = nil,
+                                onStop: (() -> Void)?, stopping: Bool = false) -> some View {
         HStack(spacing: 6) {
             ZStack(alignment: .leading) {
                 RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.1))
@@ -426,6 +423,17 @@ struct WindowsWorkspaceView: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
                     .frame(maxWidth: .infinity)
+            }
+            if let onPause {
+                Button(action: onPause) {
+                    Image(systemName: "pause.fill")
+                        .font(.caption)
+                        .frame(width: cardActionHeight, height: cardActionHeight)
+                        .background(Color.white.opacity(0.1))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                }
+                .disabled(stopping)
+                .accessibilityLabel(tr("Pause download"))
             }
             if let onStop {
                 Button(role: .destructive, action: onStop) {
@@ -829,7 +837,7 @@ struct WindowsWorkspaceView: View {
                 VStack(alignment: .center, spacing: 9) {
                     SteamGameArtworkView(game: game)
                         .frame(width: artworkWidth, height: artworkHeight)
-                    cardTitle(game.name.isEmpty ? tr("Untitled Steam app") : game.name, store: .steam)
+                    cardTitle(game.name.isEmpty ? tr("Untitled Steam app") : game.name)
                 }
                 .contentShape(Rectangle())
             }
@@ -838,6 +846,10 @@ struct WindowsWorkspaceView: View {
             if installed {
                 Button { launchSteamGame(game) } label: {
                     cardActionLabel(tr("Launch"), systemImage: "play.fill")
+                }
+            } else if steamLibrary.pausedInstalls.contains(game.appID) {
+                Button { steamLibrary.resumeInstall(appID: game.appID) } label: {
+                    cardActionLabel(tr("Resume"), systemImage: "play.circle.fill")
                 }
             } else if steamLibrary.installingApps.contains(game.appID) {
                 steamProgressAction(for: game)
@@ -941,7 +953,7 @@ struct WindowsWorkspaceView: View {
                 VStack(alignment: .center, spacing: 9) {
                     GOGArtworkView(urls: game.artworkCandidates, fallbackColor: secondaryColor)
                         .frame(width: artworkWidth, height: artworkHeight)
-                    cardTitle(game.title, store: .gog)
+                    cardTitle(game.title)
                 }
                 .contentShape(Rectangle())
             }
@@ -956,9 +968,14 @@ struct WindowsWorkspaceView: View {
                 Button { launchGOGGame(installed) } label: {
                     cardActionLabel(tr("Launch"), systemImage: "play.fill")
                 }
+            } else if gogLibrary.pausedDownloads.contains(game.id) {
+                Button { gogLibrary.resumeDownload(game) } label: {
+                    cardActionLabel(tr("Resume"), systemImage: "play.circle.fill")
+                }
             } else if let fraction = gogLibrary.downloadProgress[game.id] {
                 progressAction(fraction: fraction,
                                label: tr("Installing %d%%", Int((fraction * 100).rounded())),
+                               onPause: { gogLibrary.pauseDownload(game) },
                                onStop: { gogLibrary.cancelDownload(game) })
             } else if game.worksOnWindows {
                 Button { downloadGOGInstaller(game) } label: {
@@ -1053,7 +1070,7 @@ struct WindowsWorkspaceView: View {
                 VStack(alignment: .center, spacing: 9) {
                     GOGArtworkView(urls: [game.cover].compactMap { $0 }, fallbackColor: secondaryColor)
                         .frame(width: artworkWidth, height: artworkHeight)
-                    cardTitle(game.title, store: .epic)
+                    cardTitle(game.title)
                 }
             }
             .buttonStyle(.plain)
@@ -1072,7 +1089,8 @@ struct WindowsWorkspaceView: View {
                 default:
                     progressAction(fraction: download.progress.fraction,
                                    label: tr("Installing %d%%", Int((download.progress.fraction * 100).rounded())),
-                                   onStop: { epicLibrary.pause(game.appName) })
+                                   onPause: { epicLibrary.pause(game.appName) },
+                                   onStop: { epicLibrary.cancel(game.appName) })
                 }
             } else if let installed {
                 Button { launchEpicGame(installed) } label: {
@@ -1122,6 +1140,7 @@ struct WindowsWorkspaceView: View {
         }
         let canStop = steamLibrary.canCancelInstall(appID: game.appID)
         return progressAction(fraction: fraction, label: label,
+                              onPause: canStop ? { steamLibrary.pauseInstall(appID: game.appID) } : nil,
                               onStop: canStop ? { steamLibrary.cancelInstall(appID: game.appID) } : nil,
                               stopping: steamLibrary.cancellingApps.contains(game.appID))
     }
@@ -1668,7 +1687,25 @@ private struct SteamProgramDetailsView: View {
                             DetailChip(text: size, systemImage: "internaldrive", tint: .gray)
                         }
                     }
-                    if installing {
+                    if steamLibrary.pausedInstalls.contains(game.appID) {
+                        VStack(spacing: 10) {
+                            Text(tr("Download paused")).foregroundColor(.white)
+                            Button {
+                                steamLibrary.resumeInstall(appID: game.appID)
+                            } label: {
+                                Label(tr("Resume"), systemImage: "play.fill")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            Button(role: .destructive) {
+                                steamLibrary.cancelInstall(appID: game.appID)
+                            } label: {
+                                Label(tr("Stop download"), systemImage: "stop.fill")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.bordered)
+                        }
+                    } else if installing {
                         downloadStatus
                     } else if installed {
                         Button(role: .destructive) {
@@ -1827,6 +1864,14 @@ private struct SteamProgramDetailsView: View {
                     .foregroundColor(.green)
             }
             if steamLibrary.canCancelInstall(appID: game.appID) {
+                Button {
+                    steamLibrary.pauseInstall(appID: game.appID)
+                } label: {
+                    Label(tr("Pause download"), systemImage: "pause.fill")
+                        .frame(maxWidth: .infinity)
+                }
+                .disabled(stopping)
+                .buttonStyle(.bordered)
                 Button(role: .destructive) {
                     steamLibrary.cancelInstall(appID: game.appID)
                 } label: {
@@ -2025,6 +2070,7 @@ private struct StoreGameDetailsView<Extra: View>: View {
     let canInstall: Bool
     let onLaunch: () -> Void
     let onInstall: () -> Void
+    let onPause: (() -> Void)?
     let onStop: () -> Void
     let onUninstall: (() -> Bool)?
     @ObservedObject var library: WindowsLibraryStore
@@ -2038,7 +2084,7 @@ private struct StoreGameDetailsView<Extra: View>: View {
     init(title: String, store: GameStore, profileID: String, covers: [URL], banners: [URL],
          installed: Bool, progress: Double?, paused: Bool = false, sizeText: String?, errorText: String?,
          canInstall: Bool, onLaunch: @escaping () -> Void, onInstall: @escaping () -> Void,
-         onStop: @escaping () -> Void, onUninstall: (() -> Bool)?,
+         onPause: (() -> Void)? = nil, onStop: @escaping () -> Void, onUninstall: (() -> Bool)?,
          library: WindowsLibraryStore, coordinator: SystemCoordinator,
          @ViewBuilder extra: () -> Extra) {
         self.title = title
@@ -2054,6 +2100,7 @@ private struct StoreGameDetailsView<Extra: View>: View {
         self.canInstall = canInstall
         self.onLaunch = onLaunch
         self.onInstall = onInstall
+        self.onPause = onPause
         self.onStop = onStop
         self.onUninstall = onUninstall
         self.library = library
@@ -2068,14 +2115,11 @@ private struct StoreGameDetailsView<Extra: View>: View {
             ScrollView {
                 VStack(alignment: .center, spacing: 18) {
                     StoreBannerView(urls: banners + covers)
-                    HStack(spacing: 8) {
-                        Text(title)
-                            .font(.title2.bold())
-                            .foregroundColor(.white)
-                            .multilineTextAlignment(.center)
-                        StoreBadge(store: store).fixedSize()
-                    }
-                    .frame(maxWidth: .infinity)
+                    Text(title)
+                        .font(.title2.bold())
+                        .foregroundColor(.white)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: .infinity, alignment: .center)
                     HStack(spacing: 8) {
                         DetailChip(text: installed ? tr("Installed") : tr("Not installed"),
                                    systemImage: installed ? "checkmark.circle.fill" : "arrow.down.circle",
@@ -2142,6 +2186,13 @@ private struct StoreGameDetailsView<Extra: View>: View {
                 Text(tr("Installing %d%%", Int((progress * 100).rounded())))
                     .font(.caption)
                     .foregroundColor(.white)
+                if let onPause {
+                    Button(action: onPause) {
+                        Label(tr("Pause download"), systemImage: "pause.fill")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                }
                 Button(role: .destructive, action: onStop) {
                     Label(tr("Stop download"), systemImage: "stop.fill")
                         .frame(maxWidth: .infinity)
@@ -2195,10 +2246,15 @@ private struct GOGGameDetailsSheet: View {
             title: game.title, store: .gog, profileID: "gog:\(game.id)",
             covers: game.artworkCandidates, banners: GOGLibraryModel.bannerCandidates(game),
             installed: installed != nil, progress: gog.downloadProgress[game.id],
+            paused: gog.pausedDownloads.contains(game.id),
             sizeText: sizeText, errorText: gog.downloadErrors[game.id].map { tr($0) },
             canInstall: game.worksOnWindows && prefixPath != nil,
             onLaunch: { if let installed { launch(installed) } },
-            onInstall: { install(game) },
+            onInstall: {
+                if gog.pausedDownloads.contains(game.id) { gog.resumeDownload(game) }
+                else { install(game) }
+            },
+            onPause: { gog.pauseDownload(game) },
             onStop: { gog.cancelDownload(game) },
             onUninstall: prefixPath.map { prefix in { gog.uninstall(game.id, prefixPath: prefix) } },
             library: library, coordinator: coordinator
@@ -2237,7 +2293,8 @@ private struct EpicGameDetailsSheet: View {
             canInstall: true,
             onLaunch: { if let installed { launch(installed) } },
             onInstall: { epic.install(appName) },
-            onStop: { epic.pause(appName) },
+            onPause: { epic.pause(appName) },
+            onStop: { epic.cancel(appName) },
             onUninstall: (epic.sessionRunning || EpicCloud.shared.isBusy) ? nil : { epic.uninstall(appName); return true },
             library: library, coordinator: coordinator
         ) {
@@ -2362,6 +2419,7 @@ extension WindowsWorkspaceView {
                     .scaleEffect(selected ? 1.08 : 1)
                     .shadow(color: selected ? accentColor.opacity(0.45) : .clear, radius: 10)
                 Text(shelfTitle(item))
+                    .multilineTextAlignment(.center)
                     .font(.system(size: 10, weight: selected ? .semibold : .regular))
                     .foregroundColor(selected ? textColor : faintColor)
                     .lineLimit(1)
@@ -2579,6 +2637,7 @@ extension WindowsWorkspaceView {
                 .foregroundColor(textColor)
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
+                .frame(maxWidth: .infinity, alignment: .center)
             HStack(spacing: 10) {
                 gameAction(item)
                     .frame(maxWidth: 320)
@@ -2617,7 +2676,11 @@ extension WindowsWorkspaceView {
         switch item {
         case .steam(let id):
             if let game = steamLibrary.games.first(where: { $0.appID == id }) {
-                if steamLibrary.installingApps.contains(id) {
+                if steamLibrary.pausedInstalls.contains(id) {
+                    Button { steamLibrary.resumeInstall(appID: id) } label: {
+                        cardActionLabel(tr("Resume"), systemImage: "play.circle.fill")
+                    }
+                } else if steamLibrary.installingApps.contains(id) {
                     steamProgressAction(for: game)
                 } else {
                     Button { launchSteamGame(game) } label: { cardActionLabel(tr("Launch"), systemImage: "play.fill") }

@@ -410,7 +410,25 @@ final class GOGContentInstaller: @unchecked Sendable {
                 return SignedCDN(format: format, parameters: parameters)
             }
             guard !providers.isEmpty else { throw GOGContentError.invalidManifest }
-            let entry = SecureLinkCache.Entry(providers: providers, fetched: Date())
+            // Only the CDN origins are ranked on iRelay. Signed URL templates,
+            // product tokens and query parameters never leave this device.
+            let candidateURLs = providers.compactMap {
+                GOGContentSystem.signedChunkURL(format: $0.format, parameters: $0.parameters, hash: hash)
+            }
+            let ordered = await IRelayClient.rankedCDNURLs(store: "gog", urls: candidateURLs)
+            var rank: [String: Int] = [:]
+            for (index, url) in ordered.enumerated() {
+                if let host = url.host?.lowercased(), rank[host] == nil { rank[host] = index }
+            }
+            let candidates = providers.enumerated().sorted { left, right in
+                let leftHost = GOGContentSystem.signedChunkURL(
+                    format: left.element.format, parameters: left.element.parameters, hash: hash)?.host?.lowercased() ?? ""
+                let rightHost = GOGContentSystem.signedChunkURL(
+                    format: right.element.format, parameters: right.element.parameters, hash: hash)?.host?.lowercased() ?? ""
+                let a = rank[leftHost] ?? Int.max, b = rank[rightHost] ?? Int.max
+                return a == b ? left.offset < right.offset : a < b
+            }.map(\.element)
+            let entry = SecureLinkCache.Entry(providers: candidates, fetched: Date())
             await linkCache.store(entry, for: productID)
             saved = entry
         }

@@ -7,7 +7,6 @@ struct SettingsView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dismiss) private var dismiss
     @StateObject private var inputManager = InputManager.shared
-    @AppStorage(DownloadSpeed.key) private var unlimitedDownloadSpeed = false
     @AppStorage("controllerLeftSensitivity") private var controllerLeftSensitivity = 1.0
     @AppStorage("controllerRightSensitivity") private var controllerRightSensitivity = 1.0
     @AppStorage("controllerDeadzone") private var controllerDeadzone = 0.10
@@ -370,7 +369,6 @@ struct SettingsView: View {
             Section {
                 toggleRow(title: tr("Continue downloads in the background"), isOn: $continueDownloadsInBackground)
                 toggleRow(title: tr("Download notifications"), isOn: $downloadNotifications)
-                toggleRow(title: tr("Unlimited download speed"), isOn: $unlimitedDownloadSpeed)
             } header: {
                 Text(tr("Downloads"))
             }

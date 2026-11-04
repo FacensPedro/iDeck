@@ -37,13 +37,16 @@ class GOGIntegrationTests(unittest.TestCase):
 
 
 class LibraryPresentationTests(unittest.TestCase):
-    def test_store_badges_next_to_names(self):
+    def test_game_names_are_centered_without_store_badges(self):
         view = read("iDeck/MainView.swift")
-        self.assertIn("private func cardTitle(_ title: String, store: GameStore? = nil)", view)
-        self.assertGreaterEqual(view.count("store: .steam)"), 1)
-        self.assertGreaterEqual(view.count("store: .gog)"), 1)
-        badge = read("iDeck/GOGLibrary.swift")
-        self.assertIn('UIImage(named: assetName) != nil', badge)
+        self.assertIn("private func cardTitle(_ title: String)", view)
+        self.assertIn("cardTitle(game.title)", view)
+        self.assertIn('cardTitle(game.name.isEmpty ? tr("Untitled Steam app") : game.name)', view)
+        self.assertIn(".multilineTextAlignment(.center)", view)
+        self.assertIn(".frame(maxWidth: .infinity, alignment: .center)", view)
+        self.assertNotIn("StoreBadge(store: store).fixedSize()", view)
+        # Store artwork still appears in the store shelf and sign-in settings.
+        self.assertIn("Image(storeAsset(store))", view)
 
     def test_console_shelf_lists_stores_then_games(self):
         view = read("iDeck/MainView.swift")

@@ -104,7 +104,7 @@ final class IRelayDeviceService: @unchecked Sendable {
             let free: Int64 = values?.volumeAvailableCapacityForImportantUsage ?? 0
             let name = await MainActor.run { UIDevice.current.name }
             let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
-            return .json(["name": name, "app": "iDeck", "version": version, "protocol": 2, "freeBytes": free])
+            return .json(["name": name, "app": "iDeck", "version": version, "protocol": 3, "freeBytes": free])
         case ("PUT", "/write"):
             return Self.write(request)
         case ("POST", "/install"):
@@ -127,6 +127,15 @@ final class IRelayDeviceService: @unchecked Sendable {
             }
         case ("GET", "/installs"):
             return .json(await Self.installs())
+        case ("POST", "/downloads/control"):
+            guard let body = request.body,
+                  let json = try? JSONSerialization.jsonObject(with: body) as? [String: Any] else { return .status(400) }
+            do {
+                try await MainActor.run { try Self.downloadControl(json) }
+                return .json(["ok": true])
+            } catch {
+                return .error(422, error.localizedDescription)
+            }
         case ("DELETE", "/logs"):
             // iRelay's "Clear" on iDeck bugs: the same as Bugs & logs › Clear logs.
             AppLog.clear()
@@ -249,17 +258,68 @@ final class IRelayDeviceService: @unchecked Sendable {
         }
     }
 
+    /// Transfer controls are executed by the owning store on iDeck, not by
+    /// killing the PC-side worker. This also stops iDeck's own HTTP downloads.
+    @MainActor
+    private static func downloadControl(_ json: [String: Any]) throws {
+        guard let store = json["store"] as? String,
+              let action = json["action"] as? String,
+              ["pause", "resume", "stop"].contains(action) else {
+            throw FinishError(errorDescription: "Invalid download control.")
+        }
+        switch store {
+        case "steam":
+            guard let id = (json["id"] as? NSNumber)?.uint32Value else {
+                throw FinishError(errorDescription: "Invalid Steam app ID.")
+            }
+            let steam = SteamOwnedGamesModel.shared
+            switch action {
+            case "pause": steam.pauseInstall(appID: id)
+            case "resume": steam.resumeInstall(appID: id)
+            default: steam.cancelInstall(appID: id)
+            }
+        case "gog":
+            guard let id = (json["id"] as? NSNumber)?.intValue,
+                  let game = GOGLibraryModel.shared.games.first(where: { $0.id == id }) else {
+                throw FinishError(errorDescription: "GOG game not found.")
+            }
+            let gog = GOGLibraryModel.shared
+            switch action {
+            case "pause": gog.pauseDownload(game)
+            case "resume": gog.resumeDownload(game)
+            default: gog.cancelDownload(game)
+            }
+        case "epic":
+            guard let app = json["id"] as? String, EpicLibrary.shared.game(app) != nil else {
+                throw FinishError(errorDescription: "Epic game not found.")
+            }
+            switch action {
+            case "pause": EpicLibrary.shared.pause(app)
+            case "resume": EpicLibrary.shared.install(app)
+            default: EpicLibrary.shared.cancel(app)
+            }
+        default:
+            throw FinishError(errorDescription: "Unknown game store.")
+        }
+    }
+
     /// iDeck's own downloads, for iRelay's Transfers.
     @MainActor
     private static func installs() -> [String: Any] {
         var list: [[String: Any]] = []
         let steam = SteamOwnedGamesModel.shared
         // A finished install keeps its last progress in the model: only running ones count.
-        for (id, progress) in steam.downloadProgress where steam.installingApps.contains(id) || steam.installingDLC[id] != nil {
+        for (id, progress) in steam.downloadProgress where steam.installingApps.contains(id) || steam.installingDLC[id] != nil || steam.pausedInstalls.contains(id) {
             let name = steam.games.first { $0.appID == id }?.name ?? "App \(id)"
-            list.append(["store": "steam", "id": id, "title": name, "phase": progress.phase.rawValue,
+            list.append(["store": "steam", "id": id, "title": name,
+                         "phase": steam.pausedInstalls.contains(id) ? "paused" : progress.phase.rawValue,
                          "done": progress.doneBytes, "total": progress.totalBytes,
                          "error": steam.downloadErrors[id] ?? ""])
+        }
+        for id in steam.pausedInstalls where steam.downloadProgress[id] == nil {
+            let name = steam.games.first { $0.appID == id }?.name ?? "App \(id)"
+            list.append(["store": "steam", "id": id, "title": name, "phase": "paused",
+                         "done": 0, "total": 0, "error": ""])
         }
         for (id, error) in steam.downloadErrors where steam.downloadProgress[id] == nil {
             let name = steam.games.first { $0.appID == id }?.name ?? "App \(id)"
@@ -268,14 +328,20 @@ final class IRelayDeviceService: @unchecked Sendable {
         let gog = GOGLibraryModel.shared
         for (id, fraction) in gog.downloadProgress {
             list.append(["store": "gog", "id": id, "title": gog.games.first { $0.id == id }?.title ?? "GOG \(id)",
-                         "phase": "downloading", "done": Int(fraction * 1000), "total": 1000,
+                         "phase": gog.pausedDownloads.contains(id) ? "paused" : "downloading",
+                         "done": Int(fraction * 1000), "total": 1000,
                          "error": gog.downloadErrors[id] ?? ""])
+        }
+        for id in gog.pausedDownloads where gog.downloadProgress[id] == nil {
+            list.append(["store": "gog", "id": id,
+                         "title": gog.games.first { $0.id == id }?.title ?? "GOG \(id)",
+                         "phase": "paused", "done": 0, "total": 0, "error": ""])
         }
         let epic = EpicLibrary.shared
         for (app, download) in epic.downloads {
             var error = ""
             if case .failed(let reason) = download.state { error = reason }
-            list.append(["store": "epic", "id": app, "title": epic.game(app)?.title ?? app, "phase": "\(download.state)",
+            list.append(["store": "epic", "id": app, "title": epic.game(app)?.title ?? app, "phase": download.state == .paused ? "paused" : "\(download.state)",
                          "done": download.progress.fraction * 1000, "total": 1000, "error": error])
         }
         return ["installs": list]
