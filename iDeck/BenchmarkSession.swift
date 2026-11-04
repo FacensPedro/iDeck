@@ -88,7 +88,6 @@ enum BenchmarkSession {
             "graphicsBackend": runtime["graphicsBackend"] as? String ?? "unknown",
             "wineJITPoolMiB": jit.wine_pool_mib,
             "detailedDiagnostics": UserDefaults.standard.bool(forKey: "diagnostics.detailed"),
-            "unlimitedDownloadSpeed": DownloadSpeed.isUnlimited,
         ]
     }
 
