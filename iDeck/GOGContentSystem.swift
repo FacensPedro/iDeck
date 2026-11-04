@@ -412,10 +412,10 @@ final class GOGContentInstaller: @unchecked Sendable {
             guard !providers.isEmpty else { throw GOGContentError.invalidManifest }
             // Only the CDN origins are ranked on iRelay. Signed URL templates,
             // product tokens and query parameters never leave this device.
-            let urls = providers.compactMap {
+            let candidateURLs = providers.compactMap {
                 GOGContentSystem.signedChunkURL(format: $0.format, parameters: $0.parameters, hash: hash)
             }
-            let ordered = await IRelayClient.rankedCDNURLs(store: "gog", urls: urls)
+            let ordered = await IRelayClient.rankedCDNURLs(store: "gog", urls: candidateURLs)
             var rank: [String: Int] = [:]
             for (index, url) in ordered.enumerated() {
                 if let host = url.host?.lowercased(), rank[host] == nil { rank[host] = index }
