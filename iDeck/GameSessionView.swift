@@ -394,15 +394,13 @@ struct GameSessionView: View {
             }
         }
         .modifier(WineGamepadEventClaim())
-        .sheet(isPresented: $showControlsSheet) { SessionControlsSheet() }
+        .sheet(isPresented: $showControlsSheet) { SessionControlsSheet(coordinator: coordinator) }
         .onChange(of: showGamePerformanceOverlay) { _, on in
             metrics.sample(collectPerformance: on)
         }
-        .onChange(of: touchMouseEnabled) { _, on in
-            TouchMouseCursor.apply(enabled: on)
-        }
         .onAppear {
-            TouchMouseCursor.apply(enabled: touchMouseEnabled)
+            // Touch is direct: no Windows mouse cursor is drawn.
+            TouchMouseCursor.apply(enabled: false)
             WineInputBridge.shared.startBridging()
             metrics.sample(collectPerformance: showGamePerformanceOverlay)
             updateRecentWineLogFinding()

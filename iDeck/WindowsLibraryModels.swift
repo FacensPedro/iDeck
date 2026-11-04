@@ -134,8 +134,21 @@ final class WindowsLibraryStore: ObservableObject {
             .appendingPathComponent("iDeck-game-profiles.json")
     }
 
+    /// Posted after any store saves a profile, so other stores reload it.
+    static let profilesChanged = Notification.Name("WindowsLibraryStore.profilesChanged")
+    private var observer: NSObjectProtocol?
+
     init() {
         loadProfiles()
+        observer = NotificationCenter.default.addObserver(
+            forName: Self.profilesChanged, object: nil, queue: .main) { [weak self] note in
+            guard let self, note.object as AnyObject? !== self else { return }
+            self.loadProfiles()
+        }
+    }
+
+    deinit {
+        if let observer { NotificationCenter.default.removeObserver(observer) }
     }
 
     func refresh(prefixPath: URL?) {
@@ -213,6 +226,7 @@ final class WindowsLibraryStore: ObservableObject {
         do {
             let data = try JSONEncoder().encode(profiles)
             try data.write(to: profileURL, options: .atomic)
+            NotificationCenter.default.post(name: Self.profilesChanged, object: self)
         } catch {
             NSLog("iDeck: unable to save game profile: %@", error.localizedDescription)
         }
