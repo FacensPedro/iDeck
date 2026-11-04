@@ -10,6 +10,8 @@ EPIC = (ROOT / "iDeck/EpicLibrary.swift").read_text(encoding="utf-8")
 GOG = (ROOT / "iDeck/GOGContentSystem.swift").read_text(encoding="utf-8")
 WORKFLOW = (ROOT / ".github/workflows/ios.yml").read_text(encoding="utf-8")
 NOTES = (ROOT / "RELEASE_NOTES.md").read_text(encoding="utf-8")
+SETTINGS = (ROOT / "iDeck/SettingsView.swift").read_text(encoding="utf-8")
+DOWNLOAD_SPEED = (ROOT / "iDeck/DownloadSpeed.swift").read_text(encoding="utf-8")
 
 
 class ReleaseInterfaceCDNTests(unittest.TestCase):
@@ -27,6 +29,13 @@ class ReleaseInterfaceCDNTests(unittest.TestCase):
     def test_auto_save_default_remains_off(self):
         self.assertIn('@AppStorage(SteamCloudAutoSave.key) private var autoSave = false', SAVE)
         self.assertIn('@AppStorage(SteamCloudAutoSave.key) private var autoSaveEnabled = false', VIEW)
+
+    def test_download_speed_acceleration_is_removed_from_ideck(self):
+        self.assertNotIn("Unlimited download speed", SETTINGS)
+        self.assertNotIn("unlimitedDownloadSpeed", SETTINGS)
+        self.assertNotIn("isUnlimited", DOWNLOAD_SPEED)
+        self.assertIn("static let steamChunks = 8", DOWNLOAD_SPEED)
+        self.assertIn("static let epicWindow = 8", DOWNLOAD_SPEED)
 
     def test_irelay_reorders_only_official_cdn_origins(self):
         self.assertIn('relay.request("servers/rank"', RELAY)
