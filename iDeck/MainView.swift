@@ -2681,7 +2681,11 @@ extension WindowsWorkspaceView {
         switch item {
         case .steam(let id):
             if let game = steamLibrary.games.first(where: { $0.appID == id }) {
-                if steamLibrary.installingApps.contains(id) {
+                if steamLibrary.pausedInstalls.contains(id) {
+                    Button { steamLibrary.resumeInstall(appID: id) } label: {
+                        cardActionLabel(tr("Resume"), systemImage: "play.circle.fill")
+                    }
+                } else if steamLibrary.installingApps.contains(id) {
                     steamProgressAction(for: game)
                 } else {
                     Button { launchSteamGame(game) } label: { cardActionLabel(tr("Launch"), systemImage: "play.fill") }
