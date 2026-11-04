@@ -93,6 +93,7 @@ class MadeiraNativeKitTests(unittest.TestCase):
             "arm64ec_context_patch_sha256": kit.ARM64EC_CONTEXT_PATCH_SHA256,
             "arm_host_feature_patch_sha256": kit.ARM_HOST_FEATURE_PATCH_SHA256,
             "repeat_wine_session_patch_sha256": kit.REPEAT_WINE_SESSION_PATCH_SHA256,
+            "early_jit_patch_sha256": kit.EARLY_JIT_PATCH_SHA256,
             "dcomp_backport_sha256": kit.DCOMP_BACKPORT_SHA256,
             "luajit_backport_sha256": kit.LUAJIT_BACKPORT_SHA256,
             "gl_vulkan_runtime": kit.GL_VULKAN_RUNTIME,
@@ -193,6 +194,19 @@ class MadeiraNativeKitTests(unittest.TestCase):
         with self.assertRaisesRegex(kit.KitError, "ARM64EC Mach return opcode missing"):
             kit.install(path, self.root / "old-code", False, False)
         self.assertFalse((self.root / "old-code").exists())
+
+    def test_rejects_old_early_jit_reservation(self):
+        path = self.save(self.entries())
+        with zipfile.ZipFile(path) as archive:
+            meta = json.loads(archive.read("metadata.json"))
+            files = {name: archive.read(name) for name in archive.namelist() if name != "metadata.json"}
+        del meta["early_jit_patch_sha256"]
+        with zipfile.ZipFile(path, "w") as archive:
+            archive.writestr("metadata.json", json.dumps(meta))
+            for name, data in files.items():
+                archive.writestr(name, data)
+        with self.assertRaisesRegex(kit.KitError, "Early JIT reservation patch mismatch"):
+            kit.inspect(path, False, False)
 
     def test_rejects_old_or_wrong_arm64ec_runtime(self):
         entries = self.entries()

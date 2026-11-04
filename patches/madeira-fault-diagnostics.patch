@@ -1,0 +1,41 @@
+--- a/build/ntdll-unix/signal_arm64_ios.c
++++ b/build/ntdll-unix/signal_arm64_ios.c
+@@ -10686,7 +10686,8 @@
+                         ERR("  [operand] ml1200 [addr-16 .. addr+31]: %s\n", hex);
+                         ERR("  [operand] ml1200 memory now holds %016llx at addr; register x%u holds %016llx -> %s\n",
+                             (unsigned long long)now8, rt, (unsigned long long)base,
+-                            now8 == base ? "SAME: the bad value is in memory, trace its writer"
++                            redefined ? "NOT COMPARABLE: arithmetic changed the register after this load"
++                            : now8 == base ? "SAME: the bad value is in memory, trace its writer"
+                                          : "DIFFERENT: memory changed since the load, or the load did not return memory");
+                     }
+                     else
+--- a/wine/dlls/ntdll/signal_arm64ec.c
++++ b/wine/dlls/ntdll/signal_arm64ec.c
+@@ -3620,7 +3620,7 @@
+                  * side, and it generalises to any foreign mapping. */
+                 if (ripq < 8 && grip > 0x1000)
+                 {
+-                    MEMORY_BASIC_INFORMATION mbi;
++                    MEMORY_BASIC_INFORMATION mbi = {0};
+                     SIZE_T len = 0;
+                     ripq++;
+                     NTSTATUS qst = NtQueryVirtualMemory( NtCurrentProcess(),
+@@ -3639,7 +3639,7 @@
+                              grip, mbi.BaseAddress, mbi.AllocationBase,
+                              (ULONG64)mbi.RegionSize, mbi.State, mbi.Protect,
+                              mbi.AllocationProtect, mbi.Type,
+-                             mbi.State != MEM_COMMIT      ? "<-- NOT COMMITTED (jumped into nothing)" :
++                             mbi.State != MEM_COMMIT      ? "<-- not committed in Wine VM metadata; native/JIT mapping requires host validation" :
+                              !(mbi.Protect & (PAGE_EXECUTE | PAGE_EXECUTE_READ |
+                                               PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY))
+                                                           ? "<-- COMMITTED but NOT EXECUTABLE"
+@@ -3653,7 +3653,7 @@
+                      * pointer aimed at heap DATA, not a lost W^X flip. Dump the top of the
+                      * guest stack and reverse-translate each slot, so the calling module is
+                      * named instead of guessed. */
+-                    if (mbi.State == MEM_COMMIT &&
++                    if (!qst && mbi.State == MEM_COMMIT &&
+                         !(mbi.Protect & (PAGE_EXECUTE | PAGE_EXECUTE_READ |
+                                          PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY)))
+                     {

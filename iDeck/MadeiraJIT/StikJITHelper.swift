@@ -286,6 +286,10 @@ enum StikJITHelper {
     /// Allocate a JIT memory pool via BRK #0xf00d WITHOUT detaching the debugger.
     /// The debugger stays attached so Wine can use BRK to prepare PE code pages.
     static func allocatePool(poolSize requestedPoolSize: Int = 128 * 1024 * 1024) -> (rx: UnsafeMutableRawPointer, rw: UnsafeMutableRawPointer, size: Int)? {
+        guard isDebuggerAttached() else {
+            poolFailure = noDebuggerMessage
+            return nil
+        }
         var poolSize = requestedPoolSize      // ml1036: may shrink to fit, see the hole census below
         poolFailure = nil
         LogStore.shared.log("Allocating \(poolSize / 1024 / 1024)MB JIT pool via debugger...")
@@ -496,8 +500,6 @@ enum StikJITHelper {
         }
 
         let goodLow = 0x119000000
-        let guestLo = 0x7000000000
-        let guestHi = 0x8000000000
 
         // ml1036: HOLE CENSUS, then size the pool to what can actually be placed.
         //
@@ -585,27 +587,17 @@ enum StikJITHelper {
             LogStore.shared.log("[exe-window] exe-window-mb = \(exeWinWantedMB) ignored: the executable window is not held", level: .error)
         }
         do {
-            var holes: [(base: vm_address_t, size: vm_address_t)] = []
-            var addr = vm_address_t(goodLow)
-            var prevEnd = vm_address_t(goodLow)
-            while addr < vm_address_t(guestLo) {
-                var rsize: vm_size_t = 0
-                var info = vm_region_basic_info_data_64_t()
-                var cnt = mach_msg_type_number_t(MemoryLayout<vm_region_basic_info_data_64_t>.size / MemoryLayout<Int32>.size)
-                var obj: mach_port_t = 0
-                let kr = withUnsafeMutablePointer(to: &info) {
-                    $0.withMemoryRebound(to: Int32.self, capacity: Int(cnt)) {
-                        vm_region_64(mach_task_self_, &addr, &rsize, VM_REGION_BASIC_INFO_64, $0, &cnt, &obj)
-                    }
+            // VM availability alone is insufficient: a failed executable-window
+            // reservation must never make that window a JIT candidate.
+            let holes = freeRuns(vm_address_t(goodLow), 0x180000000, minSize: 0x4000).flatMap { run in
+                [false, true].compactMap { above -> (base: vm_address_t, size: vm_address_t)? in
+                    let safe = ideck_jit_pool_run(UInt64(run.base), UInt64(run.size),
+                                                 UInt64(exeWinBase), UInt64(exeWinSize), above)
+                    return safe.size >= 64 << 20 ? (vm_address_t(safe.base), vm_address_t(safe.size)) : nil
                 }
-                if kr != KERN_SUCCESS { break }
-                let start = min(addr, vm_address_t(guestLo))
-                if start > prevEnd && start - prevEnd >= 64 << 20 { holes.append((prevEnd, start - prevEnd)) }
-                prevEnd = max(prevEnd, addr + vm_address_t(rsize))
-                addr = prevEnd
             }
             let desc = holes.map { String(format: "0x%lx+%luMB", Int($0.base), Int($0.size >> 20)) }.joined(separator: " ")
-            LogStore.shared.log("ml1036: free holes >=64MB in [0x119000000,0x7000000000) with the window held: "
+            LogStore.shared.log("ml1036: free holes >=64MB in [0x119000000,0x180000000), excluding the executable window: "
                 + (desc.isEmpty ? "NONE" : desc))
             let largest = holes.map { $0.size }.max() ?? 0
             // madeira-bcd pool-pair (pool-split only): two runs ABOVE the window, split
@@ -736,6 +728,30 @@ enum StikJITHelper {
             }
         }
 
+        // Steer first-fit even when the early window/placeholder could not be
+        // reserved. Plug every free prefix below a safe landing site, including
+        // short prefixes adjoining it; a size-only filter misses those prefixes.
+        let candidates = freeRuns(vm_address_t(goodLow), 0x180000000, minSize: 0x4000).flatMap { run in
+            [false, true].compactMap { above -> vm_address_t? in
+                let safe = ideck_jit_pool_run(UInt64(run.base), UInt64(run.size),
+                                             UInt64(exeWinBase), UInt64(exeWinSize), above)
+                return safe.size >= UInt64(poolSize) ? vm_address_t(safe.base) : nil
+            }
+        }
+        guard let target = pairA?.base ?? candidates.first else {
+            for (a, sz) in plugs { vm_deallocate(mach_task_self_, a, sz) }
+            poolFailure = "No safe address range can hold the Wine JIT pool. Close and reopen iDeck, then enable JIT again."
+            LogStore.shared.log(poolFailure!, level: .error)
+            return nil
+        }
+        for run in freeRuns(0x100000000, target, minSize: 0x4000) {
+            var address = run.base
+            if vm_allocate(mach_task_self_, &address, vm_size_t(run.size), 0) == KERN_SUCCESS {
+                plugs.append((address, vm_size_t(run.size)))
+                _ = vm_protect(mach_task_self_, address, vm_size_t(run.size), 0, VM_PROT_NONE)
+            }
+        }
+
         var rxPtrOpt: UnsafeMutableRawPointer? = nil
         var requestUnanswered = false
         for attempt in 0..<3 {
@@ -745,11 +761,10 @@ enum StikJITHelper {
                 break
             }
             let a = Int(bitPattern: p)
-            let inGuestWindow = a + poolSize > guestLo && a < guestHi
             // ml1034: a pool covering 0x140000000 displaces a non-relocatable
             // main image, which is fatal later and unrecoverable.
             let hitsExeWindow = overlapsExeWindow(vm_address_t(a), vm_address_t(poolSize))
-            if a >= goodLow && !inGuestWindow && !hitsExeWindow {
+            if ideck_jit_pool_placement_valid(UInt64(UInt(bitPattern: p)), UInt64(poolSize), UInt64(exeWinBase), UInt64(exeWinSize)) {
                 rxPtrOpt = p
                 break
             }
@@ -757,7 +772,7 @@ enum StikJITHelper {
                                        a,
                                        a < goodLow ? "mode A low"
                                          : (hitsExeWindow ? "swallows the 0x140000000 executable window"
-                                                          : "guest 64G window"),
+                                                          : "outside the supported low JIT band"),
                                        attempt), level: .error)
             let dkr = vm_deallocate(mach_task_self_, vm_address_t(a), vm_size_t(poolSize))
             LogStore.shared.log(dkr == KERN_SUCCESS
@@ -801,8 +816,7 @@ enum StikJITHelper {
                     var replaced = false
                     if let q = jit26_prepare_region(nil, pairSingle), q != UnsafeMutableRawPointer(bitPattern: 0) {
                         let qa = Int(bitPattern: q)
-                        let qGuest = qa + pairSingle > guestLo && qa < guestHi
-                        if qa >= goodLow && !qGuest && !overlapsExeWindow(vm_address_t(qa), vm_address_t(pairSingle)) {
+                        if ideck_jit_pool_placement_valid(UInt64(UInt(bitPattern: q)), UInt64(pairSingle), UInt64(exeWinBase), UInt64(exeWinSize)) {
                             if let old = rxPtrOpt { vm_deallocate(mach_task_self_, vm_address_t(bitPattern: old), vm_size_t(poolSize)) }
                             rxPtrOpt = q
                             poolSize = pairSingle
@@ -840,11 +854,7 @@ enum StikJITHelper {
             poolFailure = requestUnanswered
                 ? "The debugger could not allocate the JIT memory. Restart Madeira, enable JIT and try again."
                 : "The JIT memory landed at an address Madeira cannot use. Restart Madeira, enable JIT and try again."
-            LogStore.shared.log("BAD POOL: no valid placement after retries. Killing in 10s — please relaunch.", level: .error)
-            DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + 10) {
-                LogStore.shared.log("BAD POOL — exiting now. Relaunch the app.", level: .error)
-                exit(0)
-            }
+            LogStore.shared.log("BAD POOL: no valid placement after retries. Wine was not started; iDeck remains open.", level: .error)
             return nil
         }
         let rxAddr = Int(bitPattern: rxPtr)
@@ -1303,10 +1313,17 @@ enum StikJITHelper {
                     vm_region_64(mach_task_self_, &addr, &rsize, VM_REGION_BASIC_INFO_64, $0, &cnt, &obj)
                 }
             }
+            if obj != 0 { mach_port_deallocate(mach_task_self_, obj) }
+            // A failed query is not evidence of free memory. Only the end of
+            // the VM map (KERN_INVALID_ADDRESS) permits a trailing free run.
+            guard kr == KERN_SUCCESS || kr == KERN_INVALID_ADDRESS else { break }
             let start = kr == KERN_SUCCESS ? min(addr, hi) : hi
             if start > prevEnd && start - prevEnd >= minSize { runs.append((prevEnd, start - prevEnd)) }
             if kr != KERN_SUCCESS || addr >= hi || rsize == 0 { break }
-            prevEnd = max(prevEnd, addr + vm_address_t(rsize))
+            guard vm_address_t(rsize) <= vm_address_t.max - addr else { break }
+            let next = addr + vm_address_t(rsize)
+            guard next > prevEnd else { break }
+            prevEnd = next
         }
         return runs
     }

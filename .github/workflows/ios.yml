@@ -186,6 +186,7 @@ jobs:
           /tmp/ideck-fex-jit-guard-tests
           python3 -m unittest discover -s tests/host -p 'test_fex_jit_guard.py' -v
           python3 -m unittest discover -s tests/host -p 'test_madeira_jit_verbatim.py' -v
+          python3 -m unittest discover -s tests/host -p 'test_jit_pool_placement.py' -v
           python3 -m unittest discover -s tests/host -p 'test_madeira_arm_host_features.py' -v
           python3 -m unittest discover -s tests/host -p 'test_madeira_ui_jit_upstream.py' -v
           python3 -m unittest discover -s tests/host -p 'test_madeira_jit_stage7.py' -v

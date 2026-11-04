@@ -18,6 +18,20 @@ git -C "$DEST" submodule sync --recursive
 git -C "$DEST" submodule update --init --recursive --jobs 8 --filter=blob:none
 python3 "$ROOT/scripts/verify_madeira_sources.py" --root "$DEST" --revision "$REV"
 
+# Reserve the largest safe early JIT hole even if a small mapping blocks
+# the address immediately above the executable window.
+EARLY_JIT_PATCH="$ROOT/patches/madeira-jit-early-hole.patch"
+if ! git -C "$DEST" apply --reverse --check "$EARLY_JIT_PATCH" >/dev/null 2>&1; then
+  git -C "$DEST" apply --check "$EARLY_JIT_PATCH"
+  git -C "$DEST" apply "$EARLY_JIT_PATCH"
+fi
+
+FAULT_DIAGNOSTICS_PATCH="$ROOT/patches/madeira-fault-diagnostics.patch"
+if ! git -C "$DEST" apply --reverse --check "$FAULT_DIAGNOSTICS_PATCH" >/dev/null 2>&1; then
+  git -C "$DEST" apply --check "$FAULT_DIAGNOSTICS_PATCH"
+  git -C "$DEST" apply "$FAULT_DIAGNOSTICS_PATCH"
+fi
+
 # The pinned Madeira script says it builds the ARM64EC PE ntdll, but
 # `make -C dlls/ntdll` also links the host ntdll.so. That Unix target
 # references Madeira's iOS-only ios_avail_phys hook and fails on macOS.

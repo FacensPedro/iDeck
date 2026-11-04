@@ -1,0 +1,55 @@
+diff --git a/app/Madeira/JITAllocator.c b/app/Madeira/JITAllocator.c
+index b73123b..dfb79cf 100644
+--- a/app/Madeira/JITAllocator.c
++++ b/app/Madeira/JITAllocator.c
+@@ -946,6 +946,40 @@ __attribute__((constructor(101), used)) static void madeira_early_va_claim(void)
+             break;
+         }
+     }
++    /* iDeck: a small mapping at the window end must not discard the entire
++     * band. Find the largest remaining hole without replacing any mapping. */
++    if (!madeira_early_pool_base) {
++        const vm_address_t ceiling = 0x180000000ul;
++        vm_address_t cursor = win + winsz, best = 0;
++        vm_size_t best_size = 0;
++        while (cursor < ceiling) {
++            vm_address_t region = cursor;
++            vm_size_t region_size = 0;
++            natural_t depth = 0;
++            vm_region_submap_info_data_64_t info;
++            mach_msg_type_number_t count = VM_REGION_SUBMAP_INFO_COUNT_64;
++            kern_return_t kr = vm_region_recurse_64(mach_task_self(), &region,
++                &region_size, &depth, (vm_region_recurse_info_t)&info, &count);
++            if (kr != KERN_SUCCESS && kr != KERN_INVALID_ADDRESS) break;
++            vm_address_t end = kr == KERN_SUCCESS && region < ceiling ? region : ceiling;
++            vm_size_t available = end > cursor ? (end - cursor) & ~((16ul << 20) - 1) : 0;
++            if (available > best_size) { best = cursor; best_size = available; }
++            if (kr != KERN_SUCCESS || region >= ceiling || !region_size ||
++                region_size > ceiling - region) break;
++            vm_address_t next = region + region_size;
++            if (next <= cursor) break;
++            cursor = next;
++        }
++        if (best_size >= (256ul << 20)) {
++            a = best;
++            if (vm_allocate(mach_task_self(), &a, best_size, VM_FLAGS_FIXED) == KERN_SUCCESS) {
++                if (a == best && vm_protect(mach_task_self(), a, best_size, 0, VM_PROT_NONE) == KERN_SUCCESS) {
++                    madeira_early_pool_base = a;
++                    madeira_early_pool_size = best_size;
++                } else vm_deallocate(mach_task_self(), a, best_size);
++            }
++        }
++    }
+     /* ml1135: NAME what blocked it. ph-rdr90 got no placeholder because a ~31MB
+      * mapping already sat at ~0x157d00000 before this constructor ran, leaving
+      * 253MB above the window; the pool fell back to a 432MB hole below it and FEX
+@@ -956,7 +990,8 @@ __attribute__((constructor(101), used)) static void madeira_early_va_claim(void)
+      * RDR2's build 470 run a 71MB mapping at 0x159d00000 cut it to 272MB and the
+      * pool to 604MB). */
+     {
+-        vm_address_t ra = win + winsz + (vm_address_t)madeira_early_pool_size;
++        vm_address_t ra = madeira_early_pool_base
++            ? madeira_early_pool_base + madeira_early_pool_size : win + winsz;
+         vm_size_t rs = 0;
+         natural_t depth = 0;
+         vm_region_submap_info_data_64_t info;

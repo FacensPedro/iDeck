@@ -411,3 +411,37 @@ For a new device trace, look for
 `[arm64ec-context] restored #1 ... (Mach, no SIGUSR2)`. If the game still
 fails, collect the subsequent native Wine/FEX log rather than inferring
 success from Wineserver startup.
+
+## November 4, 2026: JIT placement and Crash Bandicoot report
+
+The pool census excludes the executable window even if its early reservation
+failed. RX candidates are limited to `[0x119000000, 0x180000000)` and lower free
+prefixes are temporarily reserved to steer the debugger's first-fit allocation.
+A small mapping at `0x148000000` no longer prevents the early allocator from
+reserving a larger hole farther up the band. Existing mappings are never replaced.
+Failed allocation leaves the app open and does not start Wine. A debugger must
+be attached before any pool reservations change.
+
+The early allocator and fault-diagnostic overlays are included in the native
+kit fingerprint. Rebuild the native runtime; an older kit is rejected even if
+it has the same upstream Madeira revision. Interface-only CI does not validate
+these changes on iPadOS.
+
+The report also contains an independent guest read of `0xffffffffffffffe8`
+(`-24`). The x86 sequence calculates an indexed address from a null base and a
+negative index. The log does not establish where those inputs became invalid.
+The operand tracer no longer interprets an arithmetic-modified register as
+proof that an earlier load returned the wrong value. Wine VM metadata alone
+also does not establish whether a native FEX code address is executable.
+No exception is suppressed and no game instruction is skipped.
+
+On-device acceptance still requires a newly built native IPA: verify pool
+placement with JIT attached, then reproduce app 731490 from a fresh session and
+collect its complete Wine log. `env.MADEIRA_BLOCK_RING = 1` in the game's Madeira
+configuration enables the existing FEX block history for a diagnostic run; set
+it before the first Wine launch in the app process. Verify installed depot
+files and the selected working directory before attributing `update.pak not
+found` to the runtime. The log does not prove that this file is mandatory.
+`SDL3.dll` returning `c000007b` also requires inspecting that installed DLL and
+its dependencies; no replacement DLL or speculative compatibility override is
+bundled by this change. Crash Bandicoot gameplay is not yet verified.
