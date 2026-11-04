@@ -160,6 +160,39 @@ final class IRelayClient: @unchecked Sendable {
         _ = try? await Self.session.data(for: request("process/\(id)", method: "DELETE", timeout: 10))
     }
 
+    /// Let the connected PC measure HTTPS round-trip latency for approved CDN
+    /// hosts. Keep the original signed URLs, query strings and fallback order
+    /// on the device; only bare HTTPS origins are sent to iRelay.
+    static func rankedCDNURLs(store: String, urls: [URL]) async -> [URL] {
+        guard urls.count > 1, let relay = configured() else { return urls }
+        let origins = urls.compactMap { url -> String? in
+            guard url.scheme?.lowercased() == "https", let host = url.host,
+                  url.port == nil else { return nil }
+            return "https://\(host.lowercased())"
+        }
+        guard origins.count == urls.count else { return urls }
+        do {
+            struct Request: Encodable { let store: String; let urls: [String] }
+            struct Response: Decodable { let urls: [String] }
+            let payload = try JSONEncoder().encode(Request(store: store, urls: origins))
+            let (data, response) = try await Self.session.data(
+                for: relay.request("servers/rank", method: "POST", body: payload, timeout: 8))
+            try Self.check(response)
+            let ranked = try JSONDecoder().decode(Response.self, from: data).urls
+            var priorities: [String: Int] = [:]
+            for (index, origin) in ranked.enumerated() where priorities[origin] == nil {
+                priorities[origin] = index
+            }
+            return urls.enumerated().sorted { left, right in
+                let a = priorities[origins[left.offset]] ?? (urls.count + left.offset)
+                let b = priorities[origins[right.offset]] ?? (urls.count + right.offset)
+                return a == b ? left.offset < right.offset : a < b
+            }.map(\.element)
+        } catch {
+            return urls
+        }
+    }
+
     func recordSuccess(bytes: Int) {
         lock.withLock { chunkCount += 1; byteCount += bytes; failureCount = 0 }
     }
