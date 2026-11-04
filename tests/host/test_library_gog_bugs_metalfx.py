@@ -40,20 +40,19 @@ class LibraryPresentationTests(unittest.TestCase):
     def test_store_badges_next_to_names(self):
         view = read("iDeck/MainView.swift")
         self.assertIn("private func cardTitle(_ title: String, store: GameStore? = nil)", view)
-        self.assertGreaterEqual(view.count("store: .steam)"), 2)
-        self.assertGreaterEqual(view.count("store: .gog)"), 2)
+        self.assertGreaterEqual(view.count("store: .steam)"), 1)
+        self.assertGreaterEqual(view.count("store: .gog)"), 1)
         badge = read("iDeck/GOGLibrary.swift")
         self.assertIn('UIImage(named: assetName) != nil', badge)
 
-    def test_owned_lists_collapse_and_remember(self):
+    def test_console_shelf_lists_stores_then_games(self):
         view = read("iDeck/MainView.swift")
-        self.assertIn('@AppStorage("library.steamOwnedCollapsed")', view)
-        self.assertIn('@AppStorage("library.gogOwnedCollapsed")', view)
-        self.assertIn('@AppStorage("library.epicOwnedCollapsed")', view)
-        self.assertIn("collapsed: $steamOwnedCollapsed", view)
-        self.assertIn("collapsed: $gogOwnedCollapsed", view)
-        self.assertIn("collapsed: $epicOwnedCollapsed", view)
-        self.assertIn("if !collapsed.wrappedValue {", view)
+        self.assertIn("enum ShelfItem: Hashable", view)
+        self.assertIn("ForEach([GameStore.steam, .gog, .epic], id: \\.self)", view)
+        self.assertIn("consoleShelf", view)
+        self.assertIn("shelfContent", view)
+        # Collapsible per-store lists were replaced by the shelf.
+        self.assertNotIn('@AppStorage("library.steamOwnedCollapsed")', view)
 
     def test_installing_cards_keep_installed_size(self):
         view = read("iDeck/MainView.swift")
