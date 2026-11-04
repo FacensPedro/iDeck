@@ -437,7 +437,11 @@ struct EpicInstalledGame: Codable, Sendable {
             }) else { throw EpicAPIError.invalid("unknown-game") }
             let asset = EpicAsset(appName: game.appName, labelName: "Live", buildVersion: game.buildVersion,
                                   catalogItemId: game.catalogItemID, namespace: game.namespace)
-            let location = try await api.manifestLocation(asset)
+            var location = try await api.manifestLocation(asset)
+            // iRelay benchmarks the official CDN hosts over HTTPS on the PC.
+            // When unplugged, keep the provider's original routing order.
+            location.manifestURLs = await IRelayClient.rankedCDNURLs(store: "epic", urls: location.manifestURLs)
+            location.baseURLs = await IRelayClient.rankedCDNURLs(store: "epic", urls: location.baseURLs)
             downloader.window = DownloadSpeed.epicWindow
             let data = try await api.manifest(location)
             let manifest = try await Task.detached(priority: .userInitiated) { try EpicManifest.parse(data, secrets: location.secrets) }.value
