@@ -39,7 +39,6 @@ struct WindowsGameProfile: Codable, Equatable, Identifiable {
     /// Fastsync for this game (with the Fastsync engine); off exports 0.
     var fastSync: Bool = true
     static let d3d12Renderers = ["Madeira D3D12", "VKD3D-Proton"]
-    var touchControlPreset: String = "xbox"
     var metalFXEnabled: Bool = false
     var fpsLimit: String = "60"
     /// The frame-rate limits a game can use; "Auto" lets Madeira's power
@@ -59,13 +58,13 @@ struct WindowsGameProfile: Codable, Equatable, Identifiable {
     var updatedAt: Date = Date()
 
     private enum CodingKeys: String, CodingKey {
-        case id, title, arguments, resolution, surfaceScaling, graphicsAPI, controllerAPI, touchControlPreset, metalFXEnabled, fpsLimit, avxEnabled, keepChildProcessesRunning, artworkFilename, updatedAt, vulkanMode, openGLBackend, useRecommended, launchThroughSteam, codeChecks, d3d12Renderer, reducedX87, cpuCount, anisotropyLimit, frameGeneration, reportNVIDIA, fastSync
+        case id, title, arguments, resolution, surfaceScaling, graphicsAPI, controllerAPI, metalFXEnabled, fpsLimit, avxEnabled, keepChildProcessesRunning, artworkFilename, updatedAt, vulkanMode, openGLBackend, useRecommended, launchThroughSteam, codeChecks, d3d12Renderer, reducedX87, cpuCount, anisotropyLimit, frameGeneration, reportNVIDIA, fastSync
     }
 
     static let vulkanModes = ["Automatic", "On", "Off"]
     static let openGLBackends = ["Automatic", "Desktop OpenGL", "OpenGL ES"]
 
-    init(id: String, title: String, arguments: String = "", resolution: String = "960x540", surfaceScaling: String = "fit", graphicsAPI: String = "Automatic", controllerAPI: String = "Automatic", touchControlPreset: String = "xbox", metalFXEnabled: Bool = false, fpsLimit: String = "60", avxEnabled: Bool = false, keepChildProcessesRunning: Bool = false, artworkFilename: String? = nil, updatedAt: Date = Date(), vulkanMode: String = "Automatic", openGLBackend: String = "Automatic") {
+    init(id: String, title: String, arguments: String = "", resolution: String = "960x540", surfaceScaling: String = "fit", graphicsAPI: String = "Automatic", controllerAPI: String = "Automatic", metalFXEnabled: Bool = false, fpsLimit: String = "60", avxEnabled: Bool = false, keepChildProcessesRunning: Bool = false, artworkFilename: String? = nil, updatedAt: Date = Date(), vulkanMode: String = "Automatic", openGLBackend: String = "Automatic") {
         self.id = id
         self.title = title
         self.arguments = arguments
@@ -73,7 +72,6 @@ struct WindowsGameProfile: Codable, Equatable, Identifiable {
         self.surfaceScaling = ["fit", "fill", "stretch", "aspect"].contains(surfaceScaling) ? surfaceScaling : "fit"
         self.graphicsAPI = graphicsAPI
         self.controllerAPI = controllerAPI
-        self.touchControlPreset = ["xbox", "minimal", "off"].contains(touchControlPreset) ? touchControlPreset : "xbox"
         self.metalFXEnabled = metalFXEnabled
         self.fpsLimit = fpsLimit
         self.avxEnabled = avxEnabled
@@ -96,8 +94,6 @@ struct WindowsGameProfile: Codable, Equatable, Identifiable {
         }()
         graphicsAPI = Self.normalizedGraphicsAPI(try values.decodeIfPresent(String.self, forKey: .graphicsAPI))
         controllerAPI = try values.decodeIfPresent(String.self, forKey: .controllerAPI) ?? "Automatic"
-        let savedTouchPreset = try values.decodeIfPresent(String.self, forKey: .touchControlPreset) ?? "xbox"
-        touchControlPreset = ["xbox", "minimal", "off"].contains(savedTouchPreset) ? savedTouchPreset : "xbox"
         metalFXEnabled = try values.decodeIfPresent(Bool.self, forKey: .metalFXEnabled) ?? false
         fpsLimit = try values.decodeIfPresent(String.self, forKey: .fpsLimit) ?? "60"
         avxEnabled = try values.decodeIfPresent(Bool.self, forKey: .avxEnabled) ?? false

@@ -17,7 +17,6 @@ struct SettingsView: View {
     @AppStorage(BackgroundDownloads.notificationsKey) private var downloadNotifications = true
     @AppStorage(SystemCoordinator.jitMethodKey) private var jitMethod = "stikdebug"
     @State private var winePoolChangeRequiresRestart = false
-    @AppStorage("showGamePerformanceOverlay") private var showGamePerformanceOverlay = false
     @AppStorage(ResourceGovernor.pauseInBackgroundKey) private var pauseGamesInBackground = true
     @StateObject private var updater = UpdateChecker()
     @State private var isSteamSignInPresented = false

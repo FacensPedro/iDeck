@@ -13,25 +13,6 @@ class SystemCoordinator: ObservableObject {
     @Published var windowsStatus: String = "Ready"
     @Published var liveContainerStatus: String = "Ready"
     @Published var isSteamConnected: Bool = false
-    
-    @Published var isHUDEnabled: Bool = false {
-        didSet {
-            windowsEnvironment.graphicsConfig.isHUDEnabled = isHUDEnabled
-        }
-    }
-    
-    @Published var isMetalFXEnabled: Bool = UserDefaults.standard.bool(forKey: "metalFXEnabled") {
-        didSet {
-            UserDefaults.standard.set(isMetalFXEnabled, forKey: "metalFXEnabled")
-        }
-    }
-    
-    @Published var isD3DMetalEnabled: Bool = false {
-        didSet {
-            windowsEnvironment.graphicsConfig.useD3DMetal = isD3DMetalEnabled
-        }
-    }
-    
     @Published var hasPairingFile: Bool = false
     @Published var isGuestHooksEnabled: Bool = true
     
@@ -312,6 +293,12 @@ class SystemCoordinator: ObservableObject {
     /// launch (MadeiraWinePool), followed by Madeira's early detach.
     @discardableResult
     private func ensureJITForGameLaunch() -> Bool {
+        guard AddressSpaceCheck.hasGuestWindow else {
+            jitResume = nil
+            AppLog.record("[address-space] no mapping at 0x7000000000: extended virtual addressing is not active")
+            setWindowsStatus(AddressSpaceCheck.message)
+            return false
+        }
         let resume = jitResume
         jitResume = nil
         refreshJITStatus()

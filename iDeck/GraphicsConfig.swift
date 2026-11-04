@@ -13,7 +13,6 @@ func appendEnvironmentList(_ key: String, _ value: String) {
 
 class GraphicsConfig {
     var isHUDEnabled: Bool = false
-    var useD3DMetal: Bool = false
     
     func applyGraphicsEnvironment() {
         // DXVK reads DXVK_HUD only when its D3D9/D3D10/D3D11
@@ -31,8 +30,10 @@ class GraphicsConfig {
         setenv("MVK_CONFIG_FULL_IMAGE_VIEW_SWIZZLE", "1", 1)
         setenv("MVK_ALLOW_METAL_FENCES", "1", 1)
         
+        // Native D3D overrides (dxgi/d3d1x=n) never belong to a launch here:
+        // strip any a previous game left in WINEDLLOVERRIDES.
         let current = getenv("WINEDLLOVERRIDES").map { String(cString: $0) }
-        if let overrides = Self.d3dOverrides(current: current, enabled: useD3DMetal) {
+        if let overrides = Self.d3dOverrides(current: current, enabled: false) {
             setenv("WINEDLLOVERRIDES", overrides, 1)
         } else {
             unsetenv("WINEDLLOVERRIDES")

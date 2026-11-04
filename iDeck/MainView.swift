@@ -1476,8 +1476,7 @@ struct WindowsWorkspaceView: View {
                 return
             }
             let profile = WindowsGameProfile(id: "gog-setup:\(game.id)", title: game.title,
-                                             arguments: GOGLibraryModel.silentInstallArguments(for: game),
-                                             touchControlPreset: "off")
+                                             arguments: GOGLibraryModel.silentInstallArguments(for: game))
             coordinator.launchWindowsExecutable(at: setup, profile: profile)
         }
     }
@@ -2050,7 +2049,7 @@ private struct SteamProgramDetailsView: View {
         .preferredColorScheme(.dark)
     }
 
-    @AppStorage("iDeck.steamCloud.autoSaveEnabled") private var autoSaveEnabled = true
+    @AppStorage(SteamCloudAutoSave.key) private var autoSaveEnabled = false
 
     /// Size on disk when installed; otherwise what the account's own
     /// edition takes once installed (or, failing that, its download size).

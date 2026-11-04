@@ -20,7 +20,9 @@ class AutomaticJITAndDownloadHUDTests(unittest.TestCase):
             self.assertNotIn(literal, SETTINGS)
 
     def test_overlay_defaults_off_and_never_claims_gpu_utilization(self):
-        self.assertIn('@AppStorage("showGamePerformanceOverlay") private var showGamePerformanceOverlay = false', SETTINGS)
+        # The overlay is switched in the in-game sheet, defaulting off.
+        sheet = (Path(__file__).resolve().parents[2] / "iDeck/SessionControlsSheet.swift").read_text()
+        self.assertIn('@AppStorage("showGamePerformanceOverlay") private var showFPS = false', sheet)
         self.assertIn('@AppStorage("showGamePerformanceOverlay") private var showGamePerformanceOverlay = false', SESSION)
         self.assertIn('coordinator.windowsStatus == "Running"', SESSION)
         self.assertIn("metrics.receivedNewFrames", SESSION)
