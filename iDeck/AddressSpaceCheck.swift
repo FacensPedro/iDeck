@@ -5,13 +5,13 @@ import Darwin
 /// virtual addressing entitlement the process stops at 64 GB, the guest
 /// window cannot exist and wineserver crashes right after Wine starts.
 enum AddressSpaceCheck {
-    static let guestWindow: mach_vm_address_t = 0x70_0000_0000
+    static let guestWindow: vm_address_t = 0x70_0000_0000
 
     static let hasGuestWindow: Bool = {
         var address = guestWindow
-        let size = mach_vm_size_t(vm_page_size)
-        let result = mach_vm_allocate(mach_task_self_, &address, size, VM_FLAGS_FIXED)
-        if result == KERN_SUCCESS { mach_vm_deallocate(mach_task_self_, address, size) }
+        let size = vm_size_t(vm_page_size)
+        let result = vm_allocate(mach_task_self_, &address, size, VM_FLAGS_FIXED)
+        if result == KERN_SUCCESS { vm_deallocate(mach_task_self_, address, size) }
         // Only "address out of range" proves the window is missing; a mapping
         // already there (the pool or Wine) or another error is not taken as one.
         return result != KERN_INVALID_ADDRESS
