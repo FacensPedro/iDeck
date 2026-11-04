@@ -697,8 +697,6 @@ class WindowsEnvironment {
         sessionD3D12Renderer = profile.d3d12Renderer
         sessionOpenGLBackend = profile.openGLBackend
         setenv("IDECK_DISPLAY_SCALING", RuntimeConfiguration.SurfaceMode(saved: profile.surfaceScaling).rawValue, 1)
-        // No touch controls: games read only physical controllers.
-        setenv("IDECK_TOUCH_CONTROLS_ACTIVE", "0", 1)
         let controllerMode = profile.controllerAPI == "Automatic"
             ? (UserDefaults.standard.string(forKey: "wineControllerAPI") ?? "XInput")
             : profile.controllerAPI

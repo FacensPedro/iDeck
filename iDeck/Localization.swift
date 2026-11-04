@@ -103,7 +103,7 @@ enum Translations {
         "This Steam launcher may start another game process. Enable child processes only if needed.": ["pt": "Este inicializador Steam pode abrir outro processo do jogo. Ative os processos filhos somente se necessário.", "es": "Este iniciador de Steam puede abrir otro proceso del juego. Activa procesos secundarios solo si es necesario."],
         "This game may require the Windows Steam client or Steam DRM.": ["pt": "Este jogo pode exigir o cliente Steam para Windows ou DRM da Steam.", "es": "Este juego puede requerir el cliente de Steam para Windows o su DRM."],
         "Steam Cloud saves": ["pt": "Saves do Steam Cloud", "es": "Guardados de Steam Cloud"],
-        "Auto Save": ["pt": "Auto Save", "es": "Guardado automático"],
+        "Auto Save": ["pt": "Salvamento automático", "es": "Guardado automático"],
         "Automatically sync Steam Cloud saves before playing when available. Conflicting saves are never overwritten.": ["pt": "Sincroniza os saves com o Steam Cloud antes de jogar, quando disponível. Saves em conflito não serão sobrescritos automaticamente.", "es": "Sincroniza los guardados con Steam Cloud antes de jugar cuando esté disponible. No sobrescribe conflictos automáticamente."],
         "Sync saves now": ["pt": "Sincronizar saves agora", "es": "Sincronizar guardados ahora"],
         "Conflicting saves: choose which copy to keep. The replaced copy will be backed up.": ["pt": "Saves em conflito: escolha qual cópia manter. A cópia substituída será salva em backup.", "es": "Guardados en conflicto: elige qué copia conservar. Se hará una copia de seguridad de la reemplazada."],

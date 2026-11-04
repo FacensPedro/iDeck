@@ -422,7 +422,7 @@ struct GameSessionView: View {
         }
         .onAppear {
             // Touch is direct: no Windows mouse cursor is drawn.
-            TouchMouseCursor.apply(enabled: false)
+            TouchMouseCursor.hide()
             WineInputBridge.shared.startBridging()
             metrics.sample(collectPerformance: showGamePerformanceOverlay)
             updateRecentWineLogFinding()

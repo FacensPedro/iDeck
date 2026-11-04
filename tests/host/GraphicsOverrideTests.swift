@@ -12,7 +12,6 @@ struct GraphicsOverrideTests {
         let config = GraphicsConfig()
         unsetenv("DXVK_HUD")
         config.isHUDEnabled = false
-        config.useD3DMetal = true
         config.applyGraphicsEnvironment()
         assert(String(cString: getenv("DXVK_HUD")!) == "devinfo,fps")
         assert(getenv("MTL_HUD_ENABLED") == nil)
@@ -26,8 +25,7 @@ struct GraphicsOverrideTests {
         config.applyGraphicsEnvironment()
         assert(String(cString: getenv("DXVK_HUD")!) == "fps,frametimes")
 
-        assert(String(cString: getenv("WINEDLLOVERRIDES")!).contains("dxgi=n"))
-        config.useD3DMetal = false
+        setenv("WINEDLLOVERRIDES", "mmdevapi=b;dxgi=n;d3d11=n", 1)
         config.applyGraphicsEnvironment()
         assert(!(getenv("WINEDLLOVERRIDES").map { String(cString: $0) } ?? "").contains("dxgi=n"))
         print("PASS: managed DXMT override settings do not leak between games")

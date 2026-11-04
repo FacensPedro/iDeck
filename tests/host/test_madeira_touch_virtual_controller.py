@@ -26,7 +26,7 @@ class MadeiraTouchVirtualControllerTests(unittest.TestCase):
         view = (ROOT / "iDeck/MainView.swift").read_text()
         self.assertNotIn("$profile.touchControlPreset", view)
         env = (ROOT / "iDeck/WindowsEnvironment.swift").read_text()
-        self.assertIn('setenv("IDECK_TOUCH_CONTROLS_ACTIVE", "0", 1)', env)
+        self.assertNotIn("IDECK_TOUCH_CONTROLS_ACTIVE", env)
 
     def test_session_release_clears_virtual_and_hardware_slots(self):
         native = (ROOT / "iDeck/NativeRuntime/DirectInputBridge.mm").read_text()
@@ -41,9 +41,9 @@ class MadeiraTouchVirtualControllerTests(unittest.TestCase):
 
     def test_metal_does_not_steal_on_screen_controller_touches(self):
         renderer = (ROOT / "iDeck/WindowsRendererView.swift").read_text()
-        self.assertIn("IDECK_TOUCH_CONTROLS_ACTIVE", renderer)
-        self.assertIn("controlsHeight", renderer)
-        self.assertIn("frame.height - toolbar - controlsHeight", renderer)
+        # No on-screen controller band: the surface fills all below the toolbar.
+        self.assertNotIn("IDECK_TOUCH_CONTROLS_ACTIVE", renderer)
+        self.assertIn("frame.height - toolbar", renderer)
         self.assertNotIn("isUserInteractionEnabled = true", renderer)
 
 

@@ -7,6 +7,7 @@ struct SessionControlsSheet: View {
     @StateObject private var library = WindowsLibraryStore()
     @AppStorage("showGamePerformanceOverlay") private var showFPS = false
     @AppStorage("touchMouseEnabled") private var touch = true
+    @AppStorage(SteamCloudAutoSave.key) private var autoSave = false
     @Environment(\.dismiss) private var dismiss
 
     private var profile: WindowsGameProfile? {
@@ -29,6 +30,7 @@ struct SessionControlsSheet: View {
                 Section {
                     Toggle(tr("Show FPS"), isOn: $showFPS)
                     Toggle(tr("Touch screen"), isOn: $touch)
+                    Toggle(tr("Auto Save"), isOn: $autoSave)
                 }
                 Section {
                     Toggle(tr("MetalFX Upscaling"), isOn: binding(\.metalFXEnabled, false))
@@ -50,4 +52,9 @@ struct SessionControlsSheet: View {
         }
         .presentationDetents([.medium, .large])
     }
+}
+
+/// Steam Cloud "Auto Save": sync a game's saves when its page opens. Off by default.
+enum SteamCloudAutoSave {
+    static let key = "iDeck.steamCloud.autoSaveEnabled"
 }
