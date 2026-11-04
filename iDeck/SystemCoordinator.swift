@@ -1111,7 +1111,9 @@ class SystemCoordinator: ObservableObject {
                     throw DockError.message("Sign in to Steam to start games through Steam.")
                 }
                 try MadeiraDock.writeHandoff(account: signIn.accountName, token: signIn.refreshToken, appID: dockGame.id)
-                MadeiraDock.configure(dockGame, launchOption: self.gameLaunchOption(game, prefixPath: prefixPath), arguments: profile.arguments)
+                let launchOption = self.gameLaunchOption(game, prefixPath: prefixPath)
+                if launchOption == 0 { self.skipGameLauncher(game, prefixPath: prefixPath) }
+                MadeiraDock.configure(dockGame, launchOption: launchOption, arguments: profile.arguments)
                 // Visual C++ is built into iDeck: Steam's Visual C++ installers count as run.
                 MadeiraDock.markBundledVisualCRuns(dockGame)
                 DockInstallers.prepare(dockGame, drive: drive, prefix: MadeiraDock.prefix,
@@ -1527,6 +1529,49 @@ class SystemCoordinator: ObservableObject {
         guard let pick = direct.first, let index = pick.index else { return 0 }
         SteamLog.event("[steam-compat] app=\(game.appID) launcher skipped; launch option \(index) (\(pick.executable))")
         return index
+    }
+
+    /// When Steam can only start a game through its launcher (Skyrim SE's
+    /// SkyrimSELauncher.exe, Fallout 4's Fallout4Launcher.exe), the launcher
+    /// file is replaced by a copy of the game's own executable next to it
+    /// (the original is kept as `<name>.ideck-launcher`). Steam then starts
+    /// the game directly and no launcher window stays on screen.
+    func skipGameLauncher(_ game: SteamAppInfo, prefixPath: URL) {
+        let windows = game.launches.filter { option in
+            let platforms = option.oslist.lowercased()
+                .split(whereSeparator: { $0 == "," || $0 == " " || $0 == ";" })
+            return (platforms.isEmpty || platforms.contains("windows")) && (option.requiredDLC?.isEmpty != false)
+        }
+        guard let first = windows.first else { return }
+        let drive = prefixPath.appendingPathComponent("drive_c", isDirectory: true)
+        let steamApps = SteamInstallPaths.steamApps(drive: drive)
+        let name = SteamInstallFiles.installDirectoryName(appID: Int(game.appID), steamApps: steamApps) ??
+            SteamInstallFiles.safeFolderName(game.installDir)
+        let root = SteamInstallPaths.common(drive: drive).appendingPathComponent(name, isDirectory: true)
+            .resolvingSymlinksInPath().standardizedFileURL
+        guard let launcher = SteamInstallFiles.resolveLaunchPath(first.executable, root: root, executable: true) else { return }
+        let file = launcher.lastPathComponent
+        guard let range = file.range(of: "launcher", options: .caseInsensitive) else { return }
+        var gameName = file
+        gameName.removeSubrange(range)
+        let folder = launcher.deletingLastPathComponent()
+        let fm = FileManager.default
+        guard gameName.lowercased().hasSuffix(".exe"), gameName.count > 4,
+              let gameFile = ((try? fm.contentsOfDirectory(atPath: folder.path)) ?? [])
+                .first(where: { $0.caseInsensitiveCompare(gameName) == .orderedSame }) else { return }
+        let gameExe = folder.appendingPathComponent(gameFile)
+        let backup = folder.appendingPathComponent(file + ".ideck-launcher")
+        do {
+            if fm.contentsEqual(atPath: gameExe.path, andPath: launcher.path) { return }
+            // An update restored the real launcher: keep that one as the backup.
+            if fm.fileExists(atPath: backup.path) { try fm.removeItem(at: backup) }
+            try fm.moveItem(at: launcher, to: backup)
+            try fm.copyItem(at: gameExe, to: launcher)
+            SteamLog.event("[steam-compat] app=\(game.appID) launcher \(file) now starts \(gameFile)")
+        } catch {
+            if !fm.fileExists(atPath: launcher.path) { try? fm.moveItem(at: backup, to: launcher) }
+            SteamLog.event("[steam-compat] app=\(game.appID) launcher skip failed: \(error.localizedDescription)")
+        }
     }
 
     /// Reads only metadata already available to iDeck and filenames inside

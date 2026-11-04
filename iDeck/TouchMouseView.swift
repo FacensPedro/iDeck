@@ -55,3 +55,16 @@ final class TouchMouseSurface: UIView {
         touchesEnded(touches, with: event)
     }
 }
+
+/// The Windows cursor Madeira draws: hidden while the touch mouse is off.
+enum TouchMouseCursor {
+    private typealias Show = @convention(c) (Int32) -> Void
+
+    static func apply(enabled: Bool) {
+        // Madeira reads this each time it would place the game-mode cursor.
+        setenv("MADEIRA_GAME_DIALOG_CURSOR", enabled ? "1" : "0", 1)
+        if let symbol = dlsym(UnsafeMutableRawPointer(bitPattern: -2), "winios_cursor_show") {
+            unsafeBitCast(symbol, to: Show.self)(enabled ? 1 : 0)
+        }
+    }
+}
