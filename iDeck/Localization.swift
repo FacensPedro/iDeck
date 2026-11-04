@@ -529,6 +529,8 @@ enum Translations {
         "Reduced-precision x87": ["pt": "x87 de precisão reduzida", "es": "x87 de precisión reducida"],
         "Frame generation": ["pt": "Geração de quadros", "es": "Generación de fotogramas"],
         "Report an NVIDIA GPU": ["pt": "Informar GPU NVIDIA", "es": "Informar GPU NVIDIA"],
+        "A Windows session is already running. Close it before starting another game.": ["pt": "Já existe uma sessão Windows em execução. Feche-a antes de iniciar outro jogo.", "es": "Ya hay una sesión de Windows en ejecución. Ciérrala antes de iniciar otro juego."],
+        "No safe address range can hold the Wine JIT pool. Close and reopen iDeck, then enable JIT again.": ["pt": "Nenhuma faixa de endereços segura comporta o pool JIT do Wine. Feche e reabra o iDeck e ative o JIT novamente.", "es": "Ningún intervalo de direcciones seguro admite el pool JIT de Wine. Cierra y vuelve a abrir iDeck y activa JIT de nuevo."],
         "Execution Error: restart iDeck to start another game: swipe iDeck away in the app switcher, then open it again.": ["pt": "Erro de execução: reinicie o iDeck para abrir outro jogo: feche o iDeck no alternador de apps e abra de novo.", "es": "Error de ejecución: reinicia iDeck para abrir otro juego: cierra iDeck en el selector de apps y vuelve a abrirlo."],
         "Pause games in the background": ["pt": "Pausar jogos em segundo plano", "es": "Pausar juegos en segundo plano"],
         "Direct3D 12": ["pt": "Direct3D 12", "es": "Direct3D 12"],

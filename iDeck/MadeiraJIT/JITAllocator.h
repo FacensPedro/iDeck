@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
+#include "JITPoolPlacement.h"
 
 #ifdef __cplusplus
 extern "C" {

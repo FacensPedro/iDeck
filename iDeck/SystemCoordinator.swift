@@ -1234,6 +1234,13 @@ class SystemCoordinator: ObservableObject {
     // Reject a new launch before any prefix/JIT/Metal preparation until the
     // pinned Wine worker and the in-app wineserver have both exited.
     private func previousWineSessionStillFinishing() -> Bool {
+        if ideck_wineprocess_running() {
+            setWindowsStatus("A Windows session is already running. Close it before starting another game.")
+            return true
+        }
+        if ideck_wineprocess_thread_finished() && ideck_wineserver_running() {
+            _ = ideck_wineserver_stop_if_idle()
+        }
         let stillBusy = !ideck_wineprocess_running() &&
             (ideck_wineserver_running() || !ideck_wineprocess_thread_finished())
         if stillBusy {
@@ -1428,7 +1435,9 @@ class SystemCoordinator: ObservableObject {
             return WineExitDiagnostics.message(exitCode: code, crashStatus: ntstatus)
         }
         if status == Int(EALREADY) {
-            return Self.restartMessage
+            return ideck_wineprocess_running()
+                ? "A Windows session is already running. Close it before starting another game."
+                : "Cannot start another Windows game: native Wine session cleanup is still in progress."
         }
         if status == Int(ENOTSUP) {
             return "Execution Error: 32-bit Windows support (WoW64) is missing from this IPA."

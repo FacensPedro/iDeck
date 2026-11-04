@@ -29,6 +29,10 @@ ARM_HOST_FEATURE_PATCH_SHA256 = hashlib.sha256(
     (Path(__file__).resolve().parents[1] /
      "patches/madeira-arm-host-feature-probe.patch").read_bytes()
 ).hexdigest()
+EARLY_JIT_PATCH_SHA256 = hashlib.sha256(
+    (ROOT / "patches/madeira-jit-early-hole.patch").read_bytes() +
+    (ROOT / "patches/madeira-fault-diagnostics.patch").read_bytes()
+).hexdigest()
 REPEAT_WINE_SESSION_PATCH_SHA256 = hashlib.sha256(
     (Path(__file__).resolve().parents[1] / "patches/madeira-repeat-wine-sessions.patch").read_bytes()
 ).hexdigest()
@@ -278,6 +282,7 @@ def build_kit(output: Path, madeira: Path, bridge: Path, wow64: bool, mono: bool
                 "arm64ec_context_patch_sha256": ARM64EC_CONTEXT_PATCH_SHA256,
                 "arm_host_feature_patch_sha256": ARM_HOST_FEATURE_PATCH_SHA256,
                 "repeat_wine_session_patch_sha256": REPEAT_WINE_SESSION_PATCH_SHA256,
+                "early_jit_patch_sha256": EARLY_JIT_PATCH_SHA256,
                 "dcomp_backport_sha256": DCOMP_BACKPORT_SHA256,
                 "luajit_backport_sha256": LUAJIT_BACKPORT_SHA256,
                 "gl_vulkan_runtime": GL_VULKAN_RUNTIME,
@@ -336,6 +341,8 @@ def inspect(archive: Path, wow64: bool, mono: bool, graphics: str = "d3d12"):
             raise KitError("ARM64EC Mach context patch mismatch; rebuild the Madeira native kit")
         if metadata.get("arm_host_feature_patch_sha256") != ARM_HOST_FEATURE_PATCH_SHA256:
             raise KitError("ARM host feature patch mismatch; rebuild the Madeira native kit")
+        if metadata.get("early_jit_patch_sha256") != EARLY_JIT_PATCH_SHA256:
+            raise KitError("Early JIT reservation patch mismatch; rebuild the Madeira native kit")
         if metadata.get("repeat_wine_session_patch_sha256") != REPEAT_WINE_SESSION_PATCH_SHA256:
             raise KitError("Repeat Wine session patch mismatch; rebuild the Madeira native kit")
         if metadata.get("dcomp_backport_sha256") != DCOMP_BACKPORT_SHA256:
