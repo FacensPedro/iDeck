@@ -69,6 +69,11 @@ jobs:
           node --version
           node -e 'if (Number(process.versions.node.split(".")[0]) !== 24) process.exit(2)'
 
+      - name: Test download controls, version UI and CDN selection
+        run: |
+          python3 -m unittest discover -s tests/host -p 'test_download_pause_contract.py' -v
+          python3 -m unittest discover -s tests/host -p 'test_release_ui_and_cdn.py' -v
+
       - name: Test Metal Toolchain bootstrap
         run: |
           bash -n scripts/ensure_metal_toolchain.sh
