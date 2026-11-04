@@ -321,6 +321,9 @@ struct WindowsWorkspaceView: View {
     private let panelColor = Color(red: 0x0b/255, green: 0x0b/255, blue: 0x0d/255)
     private let secondaryColor = Color(red: 0x11/255, green: 0x11/255, blue: 0x14/255)
     private let lineColor = Color(red: 0x1f/255, green: 0x1f/255, blue: 0x24/255)
+    private let accentColor = Color(red: 0x3b/255, green: 0x82/255, blue: 0xf6/255)
+    private let textColor = Color(red: 0xf4/255, green: 0xf4/255, blue: 0xf5/255)
+    private let faintColor = Color(red: 0x71/255, green: 0x71/255, blue: 0x7a/255)
 
     private var filteredSteamGames: [SteamAppInfo] {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -383,16 +386,15 @@ struct WindowsWorkspaceView: View {
     private func cardTitle(_ title: String, store: GameStore? = nil) -> some View {
         HStack(spacing: 4) {
             Text(title)
-                .font(.subheadline.weight(.semibold))
-                .foregroundColor(.white)
+                .font(.subheadline.weight(.medium))
+                .foregroundColor(textColor)
                 .lineLimit(1)
                 .truncationMode(.tail)
-                .multilineTextAlignment(.center)
             if let store {
                 StoreBadge(store: store).fixedSize()
             }
         }
-        .frame(maxWidth: .infinity, alignment: .center)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     /// The shared look of a card's primary action, at `cardActionHeight`.
@@ -402,8 +404,8 @@ struct WindowsWorkspaceView: View {
             .foregroundColor(.white)
             .frame(maxWidth: .infinity)
             .frame(height: cardActionHeight)
-            .background(Color(red: 0.12, green: 0.35, blue: 0.65))
-            .clipShape(RoundedRectangle(cornerRadius: 9))
+            .background(accentColor)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 
     /// Download progress in the same footprint as the Launch button: a bar
@@ -411,10 +413,10 @@ struct WindowsWorkspaceView: View {
     private func progressAction(fraction: Double, label: String, onStop: (() -> Void)?, stopping: Bool = false) -> some View {
         HStack(spacing: 6) {
             ZStack(alignment: .leading) {
-                RoundedRectangle(cornerRadius: 9).fill(Color.white.opacity(0.1))
+                RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.1))
                 GeometryReader { geometry in
-                    RoundedRectangle(cornerRadius: 9)
-                        .fill(Color(red: 0.12, green: 0.35, blue: 0.65))
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(accentColor)
                         .frame(width: geometry.size.width * min(max(fraction, 0), 1))
                 }
                 Text(label)
@@ -430,7 +432,7 @@ struct WindowsWorkspaceView: View {
                         .font(.caption)
                         .frame(width: cardActionHeight, height: cardActionHeight)
                         .background(Color.white.opacity(0.1))
-                        .clipShape(RoundedRectangle(cornerRadius: 9))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
                 .disabled(stopping)
                 .accessibilityLabel(stopping ? tr("Stopping...") : tr("Stop download"))
@@ -445,9 +447,10 @@ struct WindowsWorkspaceView: View {
             withAnimation(.easeInOut(duration: 0.2)) { collapsed.wrappedValue.toggle() }
         } label: {
             HStack {
-                Text(title)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundColor(.white)
+                Text(title.uppercased())
+                    .font(.system(size: 11, weight: .semibold))
+                    .tracking(0.8)
+                    .foregroundColor(faintColor)
                 Spacer()
                 Image(systemName: "chevron.down")
                     .font(.subheadline.weight(.semibold))
@@ -520,7 +523,8 @@ struct WindowsWorkspaceView: View {
                             .padding(18)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .background(panelColor)
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(lineColor, lineWidth: 1))
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
                         }
                         if !gogLibrary.isSignedIn {
                             gogContent
@@ -696,7 +700,8 @@ struct WindowsWorkspaceView: View {
                         .padding(10)
                         .frame(maxWidth: .infinity)
                         .background(panelColor)
-                        .clipShape(RoundedRectangle(cornerRadius: 13))
+                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(lineColor, lineWidth: 1))
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
                     }
                 }
             }
@@ -721,7 +726,7 @@ struct WindowsWorkspaceView: View {
     private var libraryHeading: some View {
         VStack(alignment: .leading, spacing: 5) {
             Text(tr("Game Library"))
-                .font(.system(size: isCompact ? 25 : 29, weight: .bold, design: .rounded))
+                .font(.system(size: 22, weight: .semibold))
                 .foregroundColor(.white)
             Text(tr("%d installed", windowsLibrary.executableURLs.count + installedSteamGames.count
                     + installedGOGGames.count + installedEpicGames.count))
@@ -757,8 +762,9 @@ struct WindowsWorkspaceView: View {
                         .font(.headline)
                         .foregroundColor(.white)
                         .frame(width: 42, height: 42)
-                        .background(secondaryColor)
-                        .clipShape(Circle())
+                        .background(panelColor)
+                        .overlay(RoundedRectangle(cornerRadius: 9).stroke(lineColor, lineWidth: 1))
+                        .clipShape(RoundedRectangle(cornerRadius: 9))
                 }
                 .accessibilityLabel(tr("Home"))
             }
@@ -784,8 +790,9 @@ struct WindowsWorkspaceView: View {
                     .font(.title3)
                     .foregroundColor(.white)
                     .frame(width: 42, height: 42)
-                    .background(secondaryColor)
-                    .clipShape(Circle())
+                    .background(panelColor)
+                    .overlay(RoundedRectangle(cornerRadius: 9).stroke(lineColor, lineWidth: 1))
+                    .clipShape(RoundedRectangle(cornerRadius: 9))
             }
             .accessibilityLabel(tr("Settings"))
         }
@@ -871,9 +878,10 @@ struct WindowsWorkspaceView: View {
         if coordinator.isSteamConnected || gogLibrary.isSignedIn || epicLibrary.signedIn {
             VStack(alignment: .leading, spacing: 22) {
                 HStack {
-                    Text(tr("Libraries"))
-                        .font(.headline)
-                        .foregroundColor(.white)
+                    Text(tr("Libraries").uppercased())
+                        .font(.system(size: 11, weight: .semibold))
+                        .tracking(0.8)
+                        .foregroundColor(faintColor)
                     Spacer()
                     Button { refreshAllLibraries() } label: {
                         Image(systemName: "arrow.clockwise")
@@ -986,7 +994,8 @@ struct WindowsWorkspaceView: View {
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(panelColor)
-        .clipShape(RoundedRectangle(cornerRadius: 13))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(lineColor, lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
     }
 
     @ViewBuilder
@@ -1048,7 +1057,8 @@ struct WindowsWorkspaceView: View {
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(panelColor)
-            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(lineColor, lineWidth: 1))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
         }
     }
 
@@ -1095,7 +1105,8 @@ struct WindowsWorkspaceView: View {
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(panelColor)
-        .clipShape(RoundedRectangle(cornerRadius: 13))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(lineColor, lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
     }
 
     @ViewBuilder
@@ -1157,7 +1168,8 @@ struct WindowsWorkspaceView: View {
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(panelColor)
-            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(lineColor, lineWidth: 1))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
         }
     }
 
@@ -1205,7 +1217,8 @@ struct WindowsWorkspaceView: View {
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(panelColor)
-        .clipShape(RoundedRectangle(cornerRadius: 13))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(lineColor, lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
     }
 
     private func launchEpicGame(_ game: EpicInstalledGame) {
@@ -1311,7 +1324,8 @@ struct WindowsWorkspaceView: View {
                 .padding(16)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(panelColor)
-                .clipShape(RoundedRectangle(cornerRadius: 14))
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(lineColor, lineWidth: 1))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
             } else {
                 LazyVGrid(columns: columns, spacing: 14) {
                     ForEach(installedSteamGames, id: \.appID) { game in
@@ -1327,7 +1341,8 @@ struct WindowsWorkspaceView: View {
                             .padding(10)
                             .frame(maxWidth: .infinity, alignment: .center)
                             .background(panelColor)
-                            .clipShape(RoundedRectangle(cornerRadius: 13))
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(lineColor, lineWidth: 1))
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
                         }
                         .buttonStyle(.plain)
                         if steamLibrary.installingApps.contains(game.appID) {
@@ -1359,7 +1374,8 @@ struct WindowsWorkspaceView: View {
                             .padding(10)
                             .frame(maxWidth: .infinity, alignment: .center)
                             .background(panelColor)
-                            .clipShape(RoundedRectangle(cornerRadius: 13))
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(lineColor, lineWidth: 1))
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
                             Button { launchGOGGame(game) } label: {
                                 cardActionLabel(tr("Launch"), systemImage: "play.fill")
                             }
@@ -1380,7 +1396,8 @@ struct WindowsWorkspaceView: View {
                                 .padding(10)
                                 .frame(maxWidth: .infinity, alignment: .center)
                                 .background(panelColor)
-                                .clipShape(RoundedRectangle(cornerRadius: 13))
+                                .overlay(RoundedRectangle(cornerRadius: 10).stroke(lineColor, lineWidth: 1))
+                                .clipShape(RoundedRectangle(cornerRadius: 10))
                             }
                             .buttonStyle(.plain)
                             Button { launchEpicGame(game) } label: {
@@ -1405,7 +1422,8 @@ struct WindowsWorkspaceView: View {
                             .padding(10)
                             .frame(maxWidth: .infinity, alignment: .center)
                             .background(panelColor)
-                            .clipShape(RoundedRectangle(cornerRadius: 13))
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(lineColor, lineWidth: 1))
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
                         }
                         .buttonStyle(.plain)
                         Button {

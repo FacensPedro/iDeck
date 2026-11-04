@@ -155,15 +155,25 @@ final class SteamOwnedGamesModel: ObservableObject {
                 availableDLC[appID] = []
                 return
             }
-            let ids = Array(Set(info.depots.compactMap { depot -> UInt32? in
+            var found = Set(info.depots.compactMap { depot -> UInt32? in
                 guard depot.publicManifestID != nil,
                       depot.supports(os: "windows"),
                       let dlc = depot.dlcAppID,
                       dlc != appID else { return nil }
                 return dlc
-            })).sorted()
+            })
+            // DLC the account owns that belong to this game but have no
+            // downloadable depot of their own here (editions and upgrades such
+            // as Skyrim's Anniversary content, or licence-only DLC).
+            let listed = Set(info.knownDLC)
+            for dlc in fetcher.ownedDLC where dlc.appID != appID &&
+                (dlc.parentID == appID || listed.contains(dlc.appID)) {
+                found.insert(dlc.appID)
+                if dlcMetadata[dlc.appID] == nil { dlcMetadata[dlc.appID] = dlc }
+            }
+            let ids = found.sorted()
             availableDLC[appID] = ids
-            for id in ids.prefix(32) where dlcMetadata[id] == nil {
+            for id in ids.prefix(256) where dlcMetadata[id] == nil {
                 guard !Task.isCancelled else { return }
                 if let details = try? await fetcher.fetchAppInfo(appID: id), details.appID == id {
                     guard !Task.isCancelled else { return }

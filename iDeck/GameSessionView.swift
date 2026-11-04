@@ -398,7 +398,11 @@ struct GameSessionView: View {
         .onChange(of: showGamePerformanceOverlay) { _, on in
             metrics.sample(collectPerformance: on)
         }
+        .onChange(of: touchMouseEnabled) { _, on in
+            TouchMouseCursor.apply(enabled: on)
+        }
         .onAppear {
+            TouchMouseCursor.apply(enabled: touchMouseEnabled)
             WineInputBridge.shared.startBridging()
             metrics.sample(collectPerformance: showGamePerformanceOverlay)
             updateRecentWineLogFinding()
