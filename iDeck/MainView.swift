@@ -2568,7 +2568,7 @@ extension WindowsWorkspaceView {
     /// An installed (or installing) game: big art, Play and its settings.
     @ViewBuilder
     private func gamePage(_ item: ShelfItem) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .center, spacing: 16) {
             gameHero(item)
                 .frame(maxWidth: .infinity)
                 .frame(height: isCompact ? 180 : 260)
@@ -2577,6 +2577,7 @@ extension WindowsWorkspaceView {
             Text(shelfTitle(item))
                 .font(.system(size: isCompact ? 22 : 28, weight: .semibold))
                 .foregroundColor(textColor)
+                .multilineTextAlignment(.center)
                 .lineLimit(2)
             HStack(spacing: 10) {
                 gameAction(item)
@@ -2594,7 +2595,9 @@ extension WindowsWorkspaceView {
                     .accessibilityLabel(tr("Settings"))
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .center)
         }
+        .frame(maxWidth: .infinity, alignment: .center)
     }
 
     @ViewBuilder
