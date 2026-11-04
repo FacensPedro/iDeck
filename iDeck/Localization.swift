@@ -284,6 +284,7 @@ enum Translations {
         "MetalFX and the FPS limit take effect the next time a game starts. A lower limit uses less CPU, GPU and battery.": ["pt": "O MetalFX e o limite de FPS valem a partir da próxima vez que um jogo abrir. Um limite menor usa menos CPU, GPU e bateria.", "es": "MetalFX y el límite de FPS se aplican la próxima vez que se inicie un juego. Un límite menor usa menos CPU, GPU y batería."],
         "Touch screen": ["pt": "Toque na tela", "es": "Pantalla táctil"],
         "Auto": ["pt": "Automático", "es": "Automático"],
+        "The game showed no image with MetalFX, so MetalFX is now off for it. Close the game and open it again.": ["pt": "O jogo não mostrou imagem com o MetalFX, então o MetalFX foi desligado para ele. Feche o jogo e abra de novo.", "es": "El juego no mostró imagen con MetalFX, así que MetalFX se desactivó para él. Cierra el juego y ábrelo de nuevo."],
         "Show FPS": ["pt": "Mostrar FPS", "es": "Mostrar FPS"],
         "Copy Wine log": ["pt": "Copiar log do Wine", "es": "Copiar registro de Wine"],
         "Wine log copied to the clipboard.": ["pt": "Log do Wine copiado para a área de transferência.", "es": "Registro de Wine copiado al portapapeles."],
