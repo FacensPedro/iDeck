@@ -94,6 +94,7 @@ struct GameSessionView: View {
     @State private var isCopyingWineLog = false
     @State private var showControlsSheet = false
     @AppStorage("touchMouseEnabled") private var touchMouseEnabled = true
+    @State private var metalFXTurnedOff = false
 
     private var gameLoading: (progress: Double, stage: String)? {
         let status = coordinator.windowsStatus
@@ -177,6 +178,22 @@ struct GameSessionView: View {
         recentWineLogFinding = BugReportModel.finding(for: diagnosis)
     }
 
+    /// MetalFX can leave some games black (Skyrim SE on DXMT presented
+    /// nothing with it on, 60 fps with it off). When a MetalFX launch shows
+    /// no frame for 75 s, MetalFX is turned off for that game.
+    private func disableMetalFXIfNoFrames() {
+        guard !metalFXTurnedOff, !metrics.receivedNewFrames, metrics.secondsSinceLaunch >= 75,
+              let active = coordinator.activeWindowsProfile, active.metalFXEnabled,
+              coordinator.windowsStatus == "Running" || coordinator.windowsStatus == "Wine started; waiting for game..."
+        else { return }
+        let store = WindowsLibraryStore()
+        var profile = store.profile(for: active.id, title: active.title)
+        profile.metalFXEnabled = false
+        store.save(profile)
+        metalFXTurnedOff = true
+        SteamLog.event("[metalfx] no game frame after 75 s with MetalFX; turned off for \(active.id)")
+    }
+
     private let tick = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     var body: some View {
@@ -248,6 +265,11 @@ struct GameSessionView: View {
                             .foregroundColor(.white)
                             .font(.caption.weight(.semibold))
                             .lineLimit(2)
+                    } else if metalFXTurnedOff {
+                        Text(tr("The game showed no image with MetalFX, so MetalFX is now off for it. Close the game and open it again."))
+                            .foregroundColor(.yellow)
+                            .font(.caption2.weight(.semibold))
+                            .lineLimit(3)
                     } else if !metrics.receivedNewFrames &&
                               (coordinator.windowsStatus == "Wine started; waiting for game..." ||
                                coordinator.windowsStatus == "Running") {
@@ -435,6 +457,7 @@ struct GameSessionView: View {
                     : "[steam-start] first Metal frame detected after Wine startup")
                 coordinator.setWindowsStatus("Running")
             }
+            disableMetalFXIfNoFrames()
             coordinator.pollWindowsSessionClose()
             coordinator.refreshWindowsSessionHealth()
         }
