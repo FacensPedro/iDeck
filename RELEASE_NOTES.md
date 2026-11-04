@@ -7,5 +7,3 @@
 - Controle dos downloads pelo iRelay conectado por USB.
 - Seleção de servidores GOG e Epic por latência quando o iRelay está conectado, com fallback automático.
 - Auto Save desativado por padrão.
-
-As transferências em andamento preservam os dados parciais quando pausadas. A velocidade efetiva depende da conexão, do servidor e do dispositivo.
