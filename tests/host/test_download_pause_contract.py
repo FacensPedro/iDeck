@@ -25,6 +25,12 @@ class DownloadPauseContractTests(unittest.TestCase):
         self.assertIn("func pause(_ app: String)", EPIC)
         self.assertIn("func cancel(_ app: String)", EPIC)
 
+    def test_irelay_stop_waits_for_owned_steam_files_cleanup(self):
+        self.assertIn("func cancelInstallAndWait(appID: UInt32) async", STEAM)
+        self.assertIn("await previous?.value", STEAM)
+        self.assertIn("await cleanup?.value", STEAM)
+        self.assertIn("await steam.cancelInstallAndWait(appID: id)", RELAY)
+
     def test_device_service_exposes_store_agnostic_transfer_controls(self):
         self.assertIn('case ("POST", "/downloads/control"):', RELAY)
         self.assertIn('"protocol": 3', RELAY)
