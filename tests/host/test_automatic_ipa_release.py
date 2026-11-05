@@ -106,6 +106,9 @@ class AutomaticIPAReleaseTests(unittest.TestCase):
         name = "Reject mismatched manual release tags before building"
         self.assertIn(name, checks)
         self.assertLess(checks.index(name), checks.index("Setup Xcode"))
+        build = WORKFLOW.split("\n  build:\n", 1)[1].split("\n  release:\n", 1)[0]
+        self.assertIn(name, build, "Build job must independently reject stale release tags")
+        self.assertLess(build.index(name), build.index("Setup Xcode"))
         guard = checks.split("      - name: " + name, 1)[1].split("      - name: Setup Xcode", 1)[0]
         self.assertIn("github.event_name == 'workflow_dispatch'", guard)
         self.assertIn("REQUESTED_RELEASE_TAG:", guard)
