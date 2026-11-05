@@ -554,32 +554,22 @@ struct WindowsWorkspaceView: View {
 
     private var topBar: some View {
         HStack(spacing: 12) {
-            if let onBack = onBack {
-                Button(action: onBack) {
-                    Image(systemName: "chevron.left")
-                        .font(.headline)
-                        .foregroundColor(.white)
-                        .frame(width: 42, height: 42)
-                        .background(panelColor)
-                        .overlay(RoundedRectangle(cornerRadius: 9).stroke(lineColor, lineWidth: 1))
-                        .clipShape(RoundedRectangle(cornerRadius: 9))
-                }
-                .accessibilityLabel(tr("Home"))
-            }
-            Spacer()
-            VStack(spacing: 2) {
-                Text(mode == .pc ? tr("Madeira") : tr("LiveContainer"))
+            Image("IDeckLogo")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 38, height: 38)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(tr("Madeira"))
                     .font(.headline)
                     .foregroundColor(.white)
-                if mode == .pc {
-                    HStack(spacing: 5) {
-                        Circle()
-                            .fill(coordinator.isJITEnabled ? Color.green : Color.orange)
-                            .frame(width: 6, height: 6)
-                        Text(coordinator.isJITEnabled ? tr("JIT active") : tr("JIT off"))
-                            .font(.caption2)
-                            .foregroundColor(.gray)
-                    }
+                HStack(spacing: 5) {
+                    Circle()
+                        .fill(coordinator.isJITEnabled ? Color.green : Color.orange)
+                        .frame(width: 6, height: 6)
+                    Text(coordinator.isJITEnabled ? tr("JIT active") : tr("JIT off"))
+                        .font(.caption2)
+                        .foregroundColor(.gray)
                 }
             }
             Spacer()
