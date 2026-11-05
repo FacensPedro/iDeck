@@ -287,7 +287,7 @@ final class IRelayDeviceService: @unchecked Sendable {
             switch action {
             case "pause": gog.pauseDownload(game)
             case "resume": gog.resumeDownload(game)
-            default: gog.cancelDownload(game)
+            default: await gog.cancelDownloadAndWait(game)
             }
         case "epic":
             guard let app = json["id"] as? String, EpicLibrary.shared.game(app) != nil else {
@@ -296,7 +296,7 @@ final class IRelayDeviceService: @unchecked Sendable {
             switch action {
             case "pause": EpicLibrary.shared.pause(app)
             case "resume": EpicLibrary.shared.install(app)
-            default: EpicLibrary.shared.cancel(app)
+            default: await EpicLibrary.shared.cancelAndWait(app)
             }
         default:
             throw FinishError(errorDescription: "Unknown game store.")
