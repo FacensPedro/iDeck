@@ -27,8 +27,8 @@ class WineCloseSessionTests(unittest.TestCase):
         self.assertIn('coordinator.windowsStatus != "Windows Ready"', MAIN)
         self.assertIn("coordinator.requestCloseWindowsSession()", MAIN)
         self.assertIn("GameSessionView(coordinator: coordinator)", MAIN)
-        self.assertIn("selectedWorkspace == .pc", MAIN)
-        self.assertNotIn("selectedWorkspace = nil", MAIN.split(".fullScreenCover(", 1)[1].split("private var homeView:", 1)[0])
+        self.assertIn("WindowsWorkspaceView(coordinator: coordinator, steamLibrary: steamLibrary)", MAIN)
+        self.assertNotIn("selectedWorkspace", MAIN)
 
     def test_coordinator_waits_for_both_threads_and_clears_session_state(self):
         self.assertIn("func requestCloseWindowsSession()", COORDINATOR)

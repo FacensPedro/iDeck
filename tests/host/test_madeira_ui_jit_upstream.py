@@ -12,15 +12,14 @@ EXTRACTOR = (ROOT / 'iDeck/NativeRuntime/VCArchiveExtractor.c').read_text()
 STEAM = (ROOT / 'iDeck/SteamManager.swift').read_text()
 
 class MadeiraUIJITUpstreamTests(unittest.TestCase):
-    def test_home_modes_are_only_short_titles(self):
-        home = MAIN.split('private var homeView:', 1)[1].split('struct SteamGameArtworkView:', 1)[0]
-        self.assertNotIn('Text("iDeck")', home)
-        self.assertNotIn('tr("Choose a mode")', home)
-        self.assertNotIn('tr("Madeira Emulator")', MAIN)
-        self.assertIn('modeTile(title: tr("Madeira"), symbol:', home)
-        self.assertIn('modeTile(title: tr("LiveContainer"), symbol:', home)
-        self.assertIn('private func modeTile(title: String, symbol: String)', home)
-        self.assertNotIn('Text(subtitle)', home)
+    def test_madeira_is_root_view_without_livecontainer(self):
+        self.assertIn('WindowsWorkspaceView(coordinator: coordinator, steamLibrary: steamLibrary)', MAIN)
+        self.assertIn('Image("IDeckLogo")', MAIN)
+        self.assertIn('.frame(width: 38, height: 38)', MAIN)
+        self.assertNotIn('homeView', MAIN)
+        self.assertNotIn('LiveContainer', MAIN)
+        self.assertNotIn('appManager', MAIN)
+        self.assertNotIn('modeTile', MAIN)
 
     def test_controller_options_only_when_connected(self):
         start = SETTINGS.index('settingsSection(title: tr("Controller"))')

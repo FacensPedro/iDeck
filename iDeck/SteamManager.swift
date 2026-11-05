@@ -32,6 +32,7 @@ final class SteamOwnedGamesModel: ObservableObject {
     @Published private(set) var cloudSyncing: Set<UInt32> = []
 
     private var installTasks: [UInt32: Task<Void, Never>] = [:]
+    private var stopCleanupTasks: [UInt32: Task<Void, Never>] = [:]
     private var userPausedPrefixes: [UInt32: URL] = [:]
     private var dlcTasks: [UInt32: Task<Void, Never>] = [:]
     private var lastRefresh: Date?
@@ -233,7 +234,7 @@ final class SteamOwnedGamesModel: ObservableObject {
             cancellingApps.insert(appID)
             let previous = installTasks[appID]
             previous?.cancel()
-            Task { @MainActor in
+            stopCleanupTasks[appID] = Task { @MainActor in
                 await previous?.value
                 pausedInstalls.remove(appID)
                 if !isInstalled(appID: appID, prefixPath: prefix) {
@@ -251,12 +252,23 @@ final class SteamOwnedGamesModel: ObservableObject {
                 downloadProgress.removeValue(forKey: appID)
                 cancellingApps.remove(appID)
                 stoppingPausedInstalls.remove(appID)
+                stopCleanupTasks.removeValue(forKey: appID)
             }
             return
         }
         guard let task = installTasks[appID] else { return }
         cancellingApps.insert(appID)
         task.cancel()
+    }
+
+    /// A USB Stop response is returned only after file writes have stopped
+    /// and the cancelled installation's owned temporary files were removed.
+    func cancelInstallAndWait(appID: UInt32) async {
+        let previous = installTasks[appID]
+        cancelInstall(appID: appID)
+        let cleanup = stopCleanupTasks[appID]
+        await previous?.value
+        await cleanup?.value
     }
 
     func startDLCInstall(appID: UInt32, dlcAppID: UInt32, prefixPath: URL) {

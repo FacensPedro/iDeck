@@ -75,13 +75,14 @@ class MadeiraBlackScreenCloseAndLocalizationTests(unittest.TestCase):
                 self.assertIn('"pt":', source[pos:pos + 700])
                 self.assertIn('"es":', source[pos:pos + 700])
 
-    def test_jit_copy_is_removed_and_update_button_is_removed(self):
+    def test_jit_copy_is_removed_and_signed_update_handoff_is_available(self):
         source = (ROOT / "iDeck/SettingsView.swift").read_text()
         self.assertNotIn("copyJITDiagnostics", source)
         self.assertNotIn('tr("Copy JIT diagnostics")', source)
         self.assertIn("!coordinator.isJITEnabled", source)
         self.assertNotIn('actionButton(title: tr("Update iDeck %@', source)
-        self.assertNotIn("updater.installIDeckUpdate()", source)
+        self.assertIn("updater.installIDeckUpdate()", source)
+        self.assertIn("updater.openIDeckReleases()", source)
 
     def test_closing_and_child_process_controls_use_translation(self):
         session = (ROOT / "iDeck/GameSessionView.swift").read_text()

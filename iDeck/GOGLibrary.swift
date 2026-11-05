@@ -495,6 +495,7 @@ final class GOGLibraryModel: ObservableObject {
     private var downloadTasks: [Int: Task<Void, Never>] = [:]
     private var resumeDownloads: [Int: () -> Void] = [:]
     private var stagingFolders: [Int: URL] = [:]
+    private var cancellationCleanup: [Int: Task<Void, Never>] = [:]
     private let cacheURL = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
         .appendingPathComponent("iDeck-gog-library.json")
 
@@ -691,13 +692,20 @@ final class GOGLibraryModel: ObservableObject {
         previous?.cancel()
         pausedDownloads.remove(game.id)
         resumeDownloads.removeValue(forKey: game.id)
-        Task { @MainActor in
+        cancellationCleanup[game.id] = Task { @MainActor in
             await previous?.value
             if let staging = stagingFolders.removeValue(forKey: game.id) {
                 try? FileManager.default.removeItem(at: staging)
             }
             downloadProgress.removeValue(forKey: game.id)
+            cancellationCleanup.removeValue(forKey: game.id)
         }
+    }
+
+    func cancelDownloadAndWait(_ game: GOGGame) async {
+        cancelDownload(game)
+        let cleanup = cancellationCleanup[game.id]
+        await cleanup?.value
     }
 
     /// `manualUrl` answers with a redirect to a signed CDN URL; URLSession

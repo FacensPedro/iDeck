@@ -1,61 +1,36 @@
 import Foundation
 import Darwin
 
-class ContainerHost {
-    private var isMounted = false
-
-    func setupContainer(injectHooks: Bool, completion: @escaping (Bool) -> Void) {
-        let success = setupVirtualFileSystem()
-        guard success else {
-            isMounted = false
-            completion(false)
-            return
-        }
-        if injectHooks {
-            LiveContainerHook.installHooks()
-        }
-        isMounted = true
-        completion(true)
-    }
-
+/// Creates the on-device Wine prefix used exclusively by Madeira.
+final class MadeiraPrefixHost {
     func mountEnvironment(completion: @escaping (String?) -> Void) {
-        guard setupVirtualFileSystem(),
-              let documentDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
-            isMounted = false
+        guard let documents = FileManager.default.urls(
+            for: .documentDirectory, in: .userDomainMask
+        ).first else {
             completion(nil)
             return
         }
-        isMounted = true
-        completion(documentDirectory.appendingPathComponent("wine", isDirectory: true).path)
-    }
-
-    private func setupVirtualFileSystem() -> Bool {
-        let fileManager = FileManager.default
-        guard let documentDirectory = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first else {
-            return false
-        }
-        let virtualRoot = documentDirectory.appendingPathComponent("wine", isDirectory: true)
-        let directories = [
-            virtualRoot,
-            virtualRoot.appendingPathComponent("Library", isDirectory: true),
-            virtualRoot.appendingPathComponent("Documents", isDirectory: true),
-            virtualRoot.appendingPathComponent("SystemData", isDirectory: true),
-            virtualRoot.appendingPathComponent("tmp", isDirectory: true),
-            virtualRoot.appendingPathComponent("GuestApps", isDirectory: true),
-            virtualRoot.appendingPathComponent("Windows", isDirectory: true),
-            virtualRoot.appendingPathComponent("WindowsDownloads", isDirectory: true),
-            virtualRoot.appendingPathComponent("drive_c/WindowsDownloads", isDirectory: true)
+        let wine = documents.appendingPathComponent("wine", isDirectory: true)
+        let paths = [
+            wine,
+            wine.appendingPathComponent("Library", isDirectory: true),
+            wine.appendingPathComponent("Documents", isDirectory: true),
+            wine.appendingPathComponent("SystemData", isDirectory: true),
+            wine.appendingPathComponent("tmp", isDirectory: true),
+            wine.appendingPathComponent("Windows", isDirectory: true),
+            wine.appendingPathComponent("WindowsDownloads", isDirectory: true),
+            wine.appendingPathComponent("drive_c/WindowsDownloads", isDirectory: true)
         ]
         do {
-            for directory in directories {
-                try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+            for path in paths {
+                try FileManager.default.createDirectory(at: path, withIntermediateDirectories: true)
             }
-            setenv("TMPDIR", virtualRoot.appendingPathComponent("tmp").path, 1)
-            setenv("HOME", virtualRoot.path, 1)
-            return true
+            setenv("TMPDIR", wine.appendingPathComponent("tmp").path, 1)
+            setenv("HOME", wine.path, 1)
+            completion(wine.path)
         } catch {
-            print("ContainerHost: could not create virtual filesystem: \(error.localizedDescription)")
-            return false
+            AppLog.record("[madeira-prefix] failed to prepare Wine prefix: \(error.localizedDescription)")
+            completion(nil)
         }
     }
 }

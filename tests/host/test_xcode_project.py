@@ -123,11 +123,11 @@ class XcodeProjectTests(unittest.TestCase):
             bridge.read_text(encoding="utf-8"),
         )
 
-    def test_native_diagnostics_and_guest_store_are_compiled_once(self):
+    def test_native_diagnostics_are_compiled_once(self):
         marker = "333333333333333333333332 /* Sources */ = {"
         self.assertIn(marker, self.project)
         sources = self.project.split(marker, 1)[1].split("\n\t\t};", 1)[0]
-        for filename in ("NativeRuntimeDiagnostics.mm", "GuestContainerStore.swift"):
+        for filename in ("NativeRuntimeDiagnostics.mm",):
             with self.subTest(filename=filename):
                 # Match sources-phase entries, not the PBXBuildFile declarations.
                 matching = re.findall(

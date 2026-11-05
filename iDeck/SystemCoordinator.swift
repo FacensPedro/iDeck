@@ -11,10 +11,8 @@ class SystemCoordinator: ObservableObject {
     @Published var isContainerReady: Bool = false
     @Published var currentStatus: String = "Ready"
     @Published var windowsStatus: String = "Ready"
-    @Published var liveContainerStatus: String = "Ready"
     @Published var isSteamConnected: Bool = false
     @Published var hasPairingFile: Bool = false
-    @Published var isGuestHooksEnabled: Bool = true
     
     @Published var isMaxRefreshRateEnabled: Bool = false {
         didSet {
@@ -23,7 +21,7 @@ class SystemCoordinator: ObservableObject {
     }
     
     let jitEnabler = JITEnabler()
-    let containerHost = ContainerHost()
+    let prefixHost = MadeiraPrefixHost()
     let windowsEnvironment = WindowsEnvironment()
     let prefixInstaller = PrefixInstaller()
     private var displayLink: CADisplayLink?
@@ -202,14 +200,6 @@ class SystemCoordinator: ObservableObject {
         }
     }
 
-    func setLiveContainerStatus(_ status: String) {
-        let update = {
-            self.liveContainerStatus = status
-            self.currentStatus = status
-        }
-        if Thread.isMainThread { update() } else { DispatchQueue.main.async(execute: update) }
-    }
-
     func refreshJITStatus() {
         var info = kinfo_proc()
         var size = MemoryLayout<kinfo_proc>.stride
@@ -254,15 +244,6 @@ class SystemCoordinator: ObservableObject {
         } else {
             DispatchQueue.main.async(execute: update)
         }
-    }
-
-    func forceJITAndStartLiveContainer() {
-        refreshJITStatus()
-        guard isJITEnabled else {
-            setLiveContainerStatus("Activate JIT with StikDebug, then confirm it in iDeck Settings.")
-            return
-        }
-        startLiveContainer()
     }
 
     /// Opening the Madeira library never requests JIT. Authorization is
@@ -328,49 +309,30 @@ class SystemCoordinator: ObservableObject {
         }
     }
 
-    private func startLiveContainer() {
-        setLiveContainerStatus("Initializing LiveContainer...")
-        containerHost.setupContainer(injectHooks: isGuestHooksEnabled) { [weak self] success in
-            DispatchQueue.main.async {
-                self?.isContainerReady = success
-                self?.setLiveContainerStatus(success ? "LiveContainer Running" : "Container Error")
-            }
-        }
-    }
-    
     private func startWindows() {
         setWindowsStatus("Preparing Windows Environment...")
-        containerHost.setupContainer(injectHooks: isGuestHooksEnabled) { [weak self] setupSuccess in
+        prefixHost.mountEnvironment { [weak self] mountPath in
             guard let self else { return }
-            guard setupSuccess else {
-                self.setWindowsStatus("Container initialization failed")
+            guard let mountPath else {
+                self.setWindowsStatus("Windows prefix initialization failed")
                 return
             }
-
-            self.containerHost.mountEnvironment { [weak self] mountPath in
-                guard let self else { return }
-                guard let mountPath else {
-                    self.setWindowsStatus("Container not initialized")
+            DispatchQueue.main.async {
+                self.isContainerReady = true
+                guard Bundle.main.url(forResource: "prefix-template", withExtension: "tar.gz") != nil else {
+                    self.setWindowsStatus("Library Ready — Madeira native runtime is not bundled")
                     return
                 }
-
-                DispatchQueue.main.async {
-                    self.isContainerReady = true
-                    guard Bundle.main.url(forResource: "prefix-template", withExtension: "tar.gz") != nil else {
-                        self.setWindowsStatus("Library Ready — Madeira native runtime is not bundled")
+                self.setWindowsStatus("Preparing Wine prefix...")
+                self.prefixInstaller.installWinePrefix(to: mountPath) { success in
+                    guard success else {
+                        self.setWindowsStatus("Wine prefix setup failed")
                         return
                     }
-                    self.setWindowsStatus("Preparing Wine prefix...")
-                    self.prefixInstaller.installWinePrefix(to: mountPath) { success in
-                        guard success else {
-                            self.setWindowsStatus("Wine prefix setup failed")
-                            return
-                        }
-                        self.windowsEnvironment.configureWine(prefix: mountPath)
-                        self.mountExternalDrives(prefix: mountPath)
-                        self.setWindowsStatus(self.windowsEnvironment.hasRuntime(in: mountPath)
-                            ? "Windows Runtime Ready" : "Madeira runtime components are missing")
-                    }
+                    self.windowsEnvironment.configureWine(prefix: mountPath)
+                    self.mountExternalDrives(prefix: mountPath)
+                    self.setWindowsStatus(self.windowsEnvironment.hasRuntime(in: mountPath)
+                        ? "Windows Runtime Ready" : "Madeira runtime components are missing")
                 }
             }
         }
@@ -518,7 +480,7 @@ class SystemCoordinator: ObservableObject {
         guard ensureJITForGameLaunch() else { return }
 
         setWindowsStatus("Downloading Steam...")
-        containerHost.mountEnvironment { [weak self] mountPath in
+        prefixHost.mountEnvironment { [weak self] mountPath in
             guard let self = self else { return }
             guard let mountPath = mountPath else {
                 self.setWindowsStatus("Container not initialized")
@@ -736,7 +698,7 @@ class SystemCoordinator: ObservableObject {
         let fileManager = FileManager.default
         let hasScope = url.startAccessingSecurityScopedResource()
 
-        containerHost.mountEnvironment { [weak self] mountPath in
+        prefixHost.mountEnvironment { [weak self] mountPath in
             defer { if hasScope { url.stopAccessingSecurityScopedResource() } }
             guard let self else { return }
             guard let mountPath else {
@@ -1696,23 +1658,5 @@ class SystemCoordinator: ObservableObject {
         }
     }
 
-    /// Loads and starts a guest .app inside this process (see LiveContainerHook).
-    func launchGuestApp(at url: URL) {
-        guard isJITEnabled && isContainerReady else {
-            setLiveContainerStatus("Requires JIT & LiveContainer")
-            return
-        }
-        guard FileManager.default.fileExists(atPath: url.path) else {
-            setLiveContainerStatus("Guest app not found")
-            return
-        }
-        
-        setLiveContainerStatus("Launching: \(url.lastPathComponent)")
-        var message: NSString?
-        if LiveContainerHook.launchGuestApp(atPath: url.path, errorMessage: &message) {
-            setLiveContainerStatus("Guest app running: \(url.lastPathComponent)")
-        } else {
-            setLiveContainerStatus("Guest launch failed: \(message ?? "O carregador não conseguiu abrir este aplicativo.")")
-        }
-    }
+
 }

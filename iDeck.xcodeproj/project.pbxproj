@@ -70,7 +70,6 @@
 		F3A000000000000000000013 /* BenchmarkSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000013 /* BenchmarkSession.swift */; };
 		F3A000000000000000000012 /* DownloadSpeed.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000012 /* DownloadSpeed.swift */; };
 		F3A000000000000000000005 /* GameDetailComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000005 /* GameDetailComponents.swift */; };
-		F3A000000000000000000011 /* LiveContainerSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000011 /* LiveContainerSettings.swift */; };
 		F3A000000000000000000010 /* JITBuiltInHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000010 /* JITBuiltInHost.swift */; };
 		F3A00000000000000000000F /* JITBuiltInMessages.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A00000000000000000000F /* JITBuiltInMessages.swift */; };
 		F3A00000000000000000000D /* EpicGames.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A00000000000000000000D /* EpicGames.swift */; };
@@ -137,15 +136,12 @@
 		999999999999999999999913 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 999999999999999999999905 /* Assets.xcassets */; };
 		B10000000000000000000052 /* jit-pool.txt in Resources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000052 /* jit-pool.txt */; };
 		B10000000000000000000051 /* universal.jitscript in Resources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000051 /* universal.jitscript */; };
-		111111111111111111111124 /* AppManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222236 /* AppManager.swift */; };
 		1111111111111111111A0C01 /* SessionControlsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2222222222222222222A0C01 /* SessionControlsSheet.swift */; };
 		1111111111111111111A0C04 /* TouchMouseView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2222222222222222222A0C04 /* TouchMouseView.swift */; };
 		1111111111111111111A0C05 /* AddressSpaceCheck.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2222222222222222222A0C05 /* AddressSpaceCheck.swift */; };
 		111111111111111111111125 /* GameSessionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222237 /* GameSessionView.swift */; };
 		111111111111111111111127 /* WindowsRendererView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222239 /* WindowsRendererView.swift */; };
 		111111111111111111111128 /* WineInputBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222240 /* WineInputBridge.swift */; };
-		111111111111111111111129 /* LiveContainerHook.m in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222241 /* LiveContainerHook.m */; };
-		111111111111111111111130 /* LiveContainerInit.c in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222242 /* LiveContainerInit.c */; };
 		BEEF00000000000000000001 /* WindowsLaunchArguments.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEEF00000000000000000002 /* WindowsLaunchArguments.swift */; };
 		AC100000000000000000010 /* VCArchiveExtractor.c in Sources */ = {isa = PBXBuildFile; fileRef = AC200000000000000000010 /* VCArchiveExtractor.c */; };
 		AC100000000000000000011 /* cabd.c in Sources */ = {isa = PBXBuildFile; fileRef = AC200000000000000000011 /* cabd.c */; };
@@ -162,7 +158,6 @@
 		A10000000000000000000007 /* SteamCloud.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000007 /* SteamCloud.swift */; };
 		A10000000000000000000008 /* SteamCloudSyncEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000008 /* SteamCloudSyncEngine.swift */; };
 		A10000000000000000000009 /* IPAArchivePath.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000009 /* IPAArchivePath.swift */; };
-		B10000000000000000000001 /* GuestContainerStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000001 /* GuestContainerStore.swift */; };
 
 		D20000000000000000000001 /* RuntimeLifecycle.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = NativeRuntime/RuntimeLifecycle.mm; sourceTree = "<group>"; };
 		D20000000000000000000002 /* FEXMemoryManager.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = NativeRuntime/FEXMemoryManager.cpp; sourceTree = "<group>"; };
@@ -214,7 +209,6 @@
 		F4A000000000000000000013 /* BenchmarkSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BenchmarkSession.swift; sourceTree = "<group>"; };
 		F4A000000000000000000012 /* DownloadSpeed.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadSpeed.swift; sourceTree = "<group>"; };
 		F4A000000000000000000005 /* GameDetailComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameDetailComponents.swift; sourceTree = "<group>"; };
-		F4A000000000000000000011 /* LiveContainerSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveContainerSettings.swift; sourceTree = "<group>"; };
 		F4A000000000000000000010 /* JITBuiltInHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JITBuiltInHost.swift; sourceTree = "<group>"; };
 		F4A00000000000000000000F /* JITBuiltInMessages.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JITBuiltInMessages.swift; sourceTree = "<group>"; };
 		F4A00000000000000000000D /* EpicGames.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EpicGames.swift; sourceTree = "<group>"; };
@@ -283,16 +277,12 @@
 		999999999999999999999905 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		B20000000000000000000052 /* jit-pool.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "../jit-pool.txt"; sourceTree = "<group>"; };
 		B20000000000000000000051 /* universal.jitscript */ = {isa = PBXFileReference; lastKnownFileType = text; path = "../scripts/jit/universal.jitscript"; sourceTree = "<group>"; };
-		222222222222222222222236 /* AppManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppManager.swift"; sourceTree = "<group>"; };
 		2222222222222222222A0C01 /* SessionControlsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SessionControlsSheet.swift"; sourceTree = "<group>"; };
 		2222222222222222222A0C04 /* TouchMouseView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TouchMouseView.swift"; sourceTree = "<group>"; };
 		2222222222222222222A0C05 /* AddressSpaceCheck.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AddressSpaceCheck.swift"; sourceTree = "<group>"; };
 		222222222222222222222237 /* GameSessionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GameSessionView.swift"; sourceTree = "<group>"; };
 		222222222222222222222239 /* WindowsRendererView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WindowsRendererView.swift"; sourceTree = "<group>"; };
 		222222222222222222222240 /* WineInputBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WineInputBridge.swift"; sourceTree = "<group>"; };
-		222222222222222222222241 /* LiveContainerHook.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "LiveContainerHook.m"; sourceTree = "<group>"; };
-		222222222222222222222242 /* LiveContainerInit.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = "LiveContainerInit.c"; sourceTree = "<group>"; };
-		222222222222222222222243 /* LiveContainerHook.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "LiveContainerHook.h"; sourceTree = "<group>"; };
 		222222222222222222222244 /* iDeck-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "iDeck-Bridging-Header.h"; sourceTree = "<group>"; };
 		BEEF00000000000000000002 /* WindowsLaunchArguments.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowsLaunchArguments.swift; sourceTree = "<group>"; };
 		AC200000000000000000010 /* VCArchiveExtractor.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = NativeRuntime/VCArchiveExtractor.c; sourceTree = "<group>"; };
@@ -337,7 +327,6 @@
 		A20000000000000000000007 /* SteamCloud.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamCloud.swift; sourceTree = "<group>"; };
 		A20000000000000000000008 /* SteamCloudSyncEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamCloudSyncEngine.swift; sourceTree = "<group>"; };
 		A20000000000000000000009 /* IPAArchivePath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IPAArchivePath.swift; sourceTree = "<group>"; };
-		B20000000000000000000001 /* GuestContainerStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuestContainerStore.swift; sourceTree = "<group>"; };
 
 		333333333333333333333331 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
@@ -394,7 +383,6 @@
 				F3A000000000000000000013 /* BenchmarkSession.swift in Sources */,
 				F3A000000000000000000012 /* DownloadSpeed.swift in Sources */,
 				F3A000000000000000000005 /* GameDetailComponents.swift in Sources */,
-				F3A000000000000000000011 /* LiveContainerSettings.swift in Sources */,
 				F3A000000000000000000010 /* JITBuiltInHost.swift in Sources */,
 				F3A00000000000000000000F /* JITBuiltInMessages.swift in Sources */,
 				F3A00000000000000000000D /* EpicGames.swift in Sources */,
@@ -456,15 +444,12 @@
 				F3A000000000000000000014 /* GOGContentSystem.swift in Sources */,
 				F3A000000000000000000001 /* BugReportView.swift in Sources */,
 				999999999999999999999915 /* Localization.swift in Sources */,
-				111111111111111111111124 /* AppManager.swift in Sources */,
 				1111111111111111111A0C01 /* SessionControlsSheet.swift in Sources */,
 				1111111111111111111A0C04 /* TouchMouseView.swift in Sources */,
 				1111111111111111111A0C05 /* AddressSpaceCheck.swift in Sources */,
 				111111111111111111111125 /* GameSessionView.swift in Sources */,
 				111111111111111111111127 /* WindowsRendererView.swift in Sources */,
 				111111111111111111111128 /* WineInputBridge.swift in Sources */,
-				111111111111111111111129 /* LiveContainerHook.m in Sources */,
-				111111111111111111111130 /* LiveContainerInit.c in Sources */,
 				BEEF00000000000000000001 /* WindowsLaunchArguments.swift in Sources */,
 				DEAD00000000000000000071 /* VisualCRuntimeBootstrap.swift in Sources */,
 				A70100000000000000000001 /* WineExitDiagnostics.swift in Sources */,
@@ -493,7 +478,6 @@
 				A10000000000000000000007 /* SteamCloud.swift in Sources */,
 				A10000000000000000000008 /* SteamCloudSyncEngine.swift in Sources */,
 				A10000000000000000000009 /* IPAArchivePath.swift in Sources */,
-				B10000000000000000000001 /* GuestContainerStore.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -563,7 +547,6 @@
 				F4A000000000000000000013 /* BenchmarkSession.swift */,
 				F4A000000000000000000012 /* DownloadSpeed.swift */,
 				F4A000000000000000000005 /* GameDetailComponents.swift */,
-				F4A000000000000000000011 /* LiveContainerSettings.swift */,
 				F4A000000000000000000010 /* JITBuiltInHost.swift */,
 				F4A00000000000000000000F /* JITBuiltInMessages.swift */,
 				F4A00000000000000000000D /* EpicGames.swift */,
@@ -625,16 +608,12 @@
 				F4A000000000000000000014 /* GOGContentSystem.swift */,
 				F4A000000000000000000001 /* BugReportView.swift */,
 				999999999999999999999907 /* Localization.swift */,
-				222222222222222222222236 /* AppManager.swift */,
 				2222222222222222222A0C01 /* SessionControlsSheet.swift */,
 				2222222222222222222A0C04 /* TouchMouseView.swift */,
 				2222222222222222222A0C05 /* AddressSpaceCheck.swift */,
 				222222222222222222222237 /* GameSessionView.swift */,
 				222222222222222222222239 /* WindowsRendererView.swift */,
 				222222222222222222222240 /* WineInputBridge.swift */,
-				222222222222222222222241 /* LiveContainerHook.m */,
-				222222222222222222222242 /* LiveContainerInit.c */,
-				222222222222222222222243 /* LiveContainerHook.h */,
 				222222222222222222222244 /* iDeck-Bridging-Header.h */,
 				BEEF00000000000000000002 /* WindowsLaunchArguments.swift */,
 				DEAD00000000000000000072 /* VisualCRuntimeBootstrap.swift */,
@@ -679,7 +658,6 @@
 				A20000000000000000000007 /* SteamCloud.swift */,
 				A20000000000000000000008 /* SteamCloudSyncEngine.swift */,
 				A20000000000000000000009 /* IPAArchivePath.swift */,
-				B20000000000000000000001 /* GuestContainerStore.swift */,
 			);
 			path = iDeck;
 			sourceTree = "<group>";
