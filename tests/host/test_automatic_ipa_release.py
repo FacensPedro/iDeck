@@ -1,4 +1,8 @@
+import os
 import pathlib
+import subprocess
+import sys
+import textwrap
 import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -96,6 +100,27 @@ class AutomaticIPAReleaseTests(unittest.TestCase):
         self.assertIn('Release $TAG already exists. Refusing to overwrite', release)
         self.assertIn('sha256sum --check iDeck.ipa.sha256', release)
         self.assertIn('if [[ "$KIND" != "native" ]]; then', release)
+
+    def test_manual_tag_mismatch_fails_before_an_expensive_native_build(self):
+        checks = WORKFLOW.split("\n  checks:\n", 1)[1].split("\n  build:\n", 1)[0]
+        name = "Reject mismatched manual release tags before building"
+        self.assertIn(name, checks)
+        self.assertLess(checks.index(name), checks.index("Setup Xcode"))
+        guard = checks.split("      - name: " + name, 1)[1].split("      - name: Setup Xcode", 1)[0]
+        self.assertIn("github.event_name == 'workflow_dispatch'", guard)
+        self.assertIn("REQUESTED_RELEASE_TAG:", guard)
+        script = textwrap.dedent(guard.split("python3 - <<'PY'\n", 1)[1].split("\n          PY", 1)[0])
+
+        for tag, expected_ok in (("1.0.5", True), ("v1.0.5", True), ("1.0.4", False), ("v1.0.6", False)):
+            with self.subTest(tag=tag):
+                env = os.environ.copy()
+                env["REQUESTED_RELEASE_TAG"] = tag
+                result = subprocess.run([sys.executable, "-c", script], cwd=ROOT, env=env,
+                                        text=True, capture_output=True, check=False)
+                self.assertEqual(result.returncode == 0, expected_ok,
+                                 result.stdout + result.stderr)
+                if not expected_ok:
+                    self.assertIn("does not match project version v1.0.5", result.stderr)
 
     def test_auto_release_tag_uses_the_verified_ipa_version(self):
         release = WORKFLOW.split("\n  release:\n", 1)[1]
