@@ -99,7 +99,8 @@ class AutomaticIPAReleaseTests(unittest.TestCase):
 
     def test_auto_release_tag_uses_the_verified_ipa_version(self):
         release = WORKFLOW.split("\n  release:\n", 1)[1]
-        self.assertIn('if [[ "$TAG" == "auto" ]]; then TAG="v$VERSION"; fi', release)
+        self.assertIn('elif [[ "$TAG" == "auto" ]]; then', release)
+        self.assertIn('TAG="v$VERSION"', release)
         self.assertIn('CFBundleShortVersionString', release)
         self.assertIn('Payload/iDeck.app/Info.plist', release)
         self.assertIn('TAG#v', release)
