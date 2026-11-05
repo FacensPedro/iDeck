@@ -434,8 +434,22 @@ struct SettingsView: View {
                 }
                 .disabled(updater.isChecking)
             }
-            // No in-app iDeck update action: users install signed IPAs through
-            // their chosen installer. The version list remains read-only.
+            settingsSection(title: tr("Version")) {
+                LabeledContent(tr("Installed version"), value: "v\(updater.currentVersion)")
+                if updater.availableIDeckUpdate != nil {
+                    Button(tr("Install update")) {
+                        updater.installIDeckUpdate()
+                    }
+                }
+                Button(tr("View iDeck releases")) {
+                    updater.openIDeckReleases()
+                }
+                if let message = updater.installHandoffMessage {
+                    Text(message).font(.caption).foregroundStyle(.secondary)
+                }
+                Text(tr("An updated iDeck IPA must be signed and installed by your sideloading app."))
+                    .font(.caption).foregroundStyle(.secondary)
+            }
         }
         .navigationTitle(tr("Updates"))
     }
