@@ -87,6 +87,13 @@ enum SteamDLLRepair {
             return Report(copied: [], missing: missingBefore, invalid: ["unsafe import folder"])
         }
 
+        let invalidSources = clientLibraries.filter { name in
+            let input = folder.appendingPathComponent(name)
+            return fm.fileExists(atPath: input.path) && !validX64DLL(input)
+        }
+        guard invalidSources.isEmpty else {
+            return Report(copied: [], missing: missingBefore, invalid: invalidSources)
+        }
         let invalid = clientLibraries.filter { name in
             let destination = root.appendingPathComponent(name)
             return fm.fileExists(atPath: destination.path) && !validX64DLL(destination)
@@ -114,7 +121,7 @@ enum SteamDLLRepair {
                 try fm.copyItem(at: source, to: destination)
                 copied.append(name)
             } catch {
-                AppLog.record("[steam-dll] could not copy \\(name): \\(error.localizedDescription)")
+                AppLog.record("[steam-dll] could not copy \(name): \(error.localizedDescription)")
             }
         }
         return Report(copied: copied,
