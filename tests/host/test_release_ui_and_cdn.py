@@ -45,7 +45,7 @@ class ReleaseInterfaceCDNTests(unittest.TestCase):
         self.assertIn("case 489830: return 12.0", metadata)
         self.assertIn("size.isRequirement", device)
         self.assertIn('"requiredSpaceGB":', device)
-        self.assertIn('"size": max(gog.installedSizes[game.id] ?? 0, gog.downloadSizes[game.id] ?? 0)', device)
+        self.assertIn('"size": gog.installedSizes[game.id].flatMap', device)
         self.assertIn("steamLibrary.installedSizes[game.appID]", VIEW)
         self.assertIn('tr("Minimum required space: %@", text)', VIEW)
 
