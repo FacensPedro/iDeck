@@ -1,51 +1,50 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-enum IDeckWorkspace {
-    case pc
-    case liveContainer
-}
-
 struct MainView: View {
     @ObservedObject var coordinator: SystemCoordinator
     @Environment(\.scenePhase) private var scenePhase
-    @State private var selectedWorkspace: IDeckWorkspace?
     // Lazily retained: a download remains owned when navigating home, but
     // the Steam session is not constructed during process cold-start.
     @State private var steamLibrary: SteamOwnedGamesModel?
 
     var body: some View {
         Group {
-            if let selectedWorkspace, let steamLibrary {
-                WindowsWorkspaceView(coordinator: coordinator, onBack: {
-                    self.selectedWorkspace = nil
-                }, mode: selectedWorkspace, steamLibrary: steamLibrary)
+            if let steamLibrary {
+                WindowsWorkspaceView(coordinator: coordinator, steamLibrary: steamLibrary)
             } else {
-                homeView
+                Color.black.ignoresSafeArea()
+                    .task {
+                        await Task.yield()
+                        coordinator.configureNativeHostIfNeeded()
+                        coordinator.loadSteamAccountIfNeeded()
+                        steamLibrary = SteamOwnedGamesModel.shared
+                        coordinator.openMadeiraWorkspace()
+                    }
             }
         }
         .onAppear {
             // First paint must be independent of the native Madeira runtime,
             // the external debugger and the stored Steam session.
-            NSLog("[iDeck startup] Home view ready; Wine and Steam not initialized")
+            NSLog("[iDeck startup] Madeira library is the root view")
             UIApplication.shared.isIdleTimerDisabled = true
         }
         .onChange(of: scenePhase) { _, phase in
             UIApplication.shared.isIdleTimerDisabled = phase == .active
-            if phase == .active && selectedWorkspace != nil {
+            if phase == .active && steamLibrary != nil {
                 coordinator.refreshJITStatus()
             }
         }
-        .task(id: selectedWorkspace != nil && scenePhase == .active) {
-            guard selectedWorkspace != nil && scenePhase == .active else { return }
+        .task(id: steamLibrary != nil && scenePhase == .active) {
+            guard steamLibrary != nil && scenePhase == .active else { return }
             while !Task.isCancelled {
                 coordinator.refreshJITStatus()
                 do { try await Task.sleep(nanoseconds: 5_000_000_000) }
                 catch { return }
             }
         }
-        .task(id: selectedWorkspace == .pc && coordinator.isSteamConnected) {
-            guard selectedWorkspace == .pc, let steamLibrary else { return }
+        .task(id: steamLibrary != nil && coordinator.isSteamConnected) {
+            guard let steamLibrary else { return }
             if coordinator.isSteamConnected {
                 await steamLibrary.refresh()
             } else {
@@ -90,60 +89,7 @@ struct MainView: View {
         }
     }
 
-    private var homeView: some View {
-        ZStack {
-            Color.black.ignoresSafeArea()
-            ScrollView {
-                VStack(spacing: 22) {
-                    Image("IDeckLogo")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 140, height: 140)
-                    Button {
-                        // Opening the Madeira library must not request JIT.
-                        // Authorization is checked when a game actually starts.
-                        coordinator.configureNativeHostIfNeeded()
-                        coordinator.loadSteamAccountIfNeeded()
-                        if steamLibrary == nil { steamLibrary = SteamOwnedGamesModel.shared }
-                        selectedWorkspace = .pc
-                        if !coordinator.isContainerReady {
-                            coordinator.openMadeiraWorkspace()
-                        }
-                    } label: {
-                        modeTile(title: tr("Madeira"), symbol: "gamecontroller.fill")
-                    }
-                    .buttonStyle(.plain)
-                    Button {
-                        coordinator.configureNativeHostIfNeeded()
-                        if steamLibrary == nil { steamLibrary = SteamOwnedGamesModel.shared }
-                        selectedWorkspace = .liveContainer
-                    } label: {
-                        modeTile(title: tr("LiveContainer"), symbol: "square.stack.3d.up.fill")
-                    }
-                    .buttonStyle(.plain)
-                }
-                .frame(maxWidth: 520)
-                .padding(28)
-                .frame(maxWidth: .infinity)
-            }
-        }
-    }
 
-    private func modeTile(title: String, symbol: String) -> some View {
-        VStack(spacing: 12) {
-            Image(systemName: symbol)
-                .font(.system(size: 32))
-                .foregroundColor(.white)
-            Text(title)
-                .font(.title3.bold())
-                .foregroundColor(.white)
-                .multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(24)
-        .background(Color.white.opacity(0.09))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-    }
 }
 
 struct SteamGameArtworkView: View {
