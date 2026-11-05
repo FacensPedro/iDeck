@@ -168,6 +168,21 @@ if [[ "$REBUILD" == "1" ]]; then
       }
     done
   done
+  # Steam's security-provider probes require Wine's own ARM64EC PE modules.
+  # Compile the actual Wine implementations (never copy Microsoft DLLs,
+  # fabricate stubs, or pull DLLs from untrusted websites). This remains in
+  # the pinned Wine build tree and uses the same ABI as the rest of the farm.
+  for module in msv1_0 kerberos; do
+    target="dlls/$module/arm64ec-windows/$module.dll"
+    PATH="$MD/toolchains/llvm-mingw-20260421-ucrt-macos-universal/bin:$PATH" \
+      make -C "$MD/wine/build-arm64ec" -j"$(sysctl -n hw.ncpu)" "$target"
+    output="$MD/wine/build-arm64ec/$target"
+    [[ -s "$output" && "$(head -c 2 "$output")" == "MZ" ]] || {
+      echo "ERROR: Wine ARM64EC security provider was not built: $module.dll" >&2
+      exit 2
+    }
+    install -m 644 "$output" "$MD/app/Madeira/arm64ec-windows/$module.dll"
+  done
   NTDLL_LOG="$MD/build/ntdll-unix/build-ideck.log"
   if ! bash "$MD/build/ntdll-unix/build.sh" 2>&1 | tee "$NTDLL_LOG"; then
     FAILED_UNIXLIBS="$(sed -n 's/^Failed://p' "$NTDLL_LOG")"
