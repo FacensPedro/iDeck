@@ -874,9 +874,10 @@ jobs:
     name: ${{ github.event_name == 'pull_request' && 'Verify PR iDeck IPA preview' || 'Publish verified iDeck IPA release' }}
     needs: [checks, build]
     # Every PR gets a final, read-only IPA verification and an artifact link.
-    # Verify IPA artifacts for PRs and manual runs. Pushes never publish releases.
-    # A manual run only publishes when the release_tag input is nonblank.
-    if: ${{ needs.checks.result == 'success' && needs.build.result == 'success' && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') }}
+    # Explicit manual releases remain available. An approved native push on main
+    # may publish a new version only when .github/release-request.txt matches the
+    # exact version inside the audited IPA. Repeated pushes cannot overwrite it.
+    if: ${{ needs.checks.result == 'success' && needs.build.result == 'success' && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.build.outputs.ipa_kind == 'native')) }}
     runs-on: ubuntu-26.04
     permissions:
       contents: write
@@ -978,13 +979,13 @@ jobs:
           echo 'A pull request does not create a public GitHub Release.' >> "$GITHUB_STEP_SUMMARY"
 
       - name: Publish release
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag != '' }}
+        if: ${{ (github.event_name == 'workflow_dispatch' && inputs.release_tag != '') || (github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.build.outputs.ipa_kind == 'native') }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
           KIND: ${{ needs.build.outputs.ipa_kind }}
           GRAPHICS: ${{ needs.build.outputs.graphics_backend }}
-          TAG: ${{ inputs.release_tag }}
+          TAG: ${{ github.event_name == 'push' && 'auto' || inputs.release_tag }}
         run: |
           set -euo pipefail
           [[ -n "${TAG//[[:space:]]/}" ]] || { echo "::error::release_tag is required to publish a GitHub Release."; exit 2; }
@@ -1002,7 +1003,22 @@ jobs:
           [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
             echo "::error::Verified IPA has no valid semantic version."; exit 2;
           }
-          if [[ "$TAG" == "auto" ]]; then TAG="v$VERSION"; fi
+          if [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
+            # On main, a separate, reviewed version-specific request is
+            # mandatory. No general-purpose automatic release on every push.
+            test -s .github/release-request.txt || {
+              echo 'No explicit main-branch release request found.' >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            }
+            REQUESTED="$(tr -d '[:space:]' < .github/release-request.txt)"
+            if [[ "$REQUESTED" != "$VERSION" ]]; then
+              echo "Release request is for $REQUESTED, but this IPA is $VERSION; nothing published." >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            TAG="$VERSION"
+          elif [[ "$TAG" == "auto" ]]; then
+            TAG="v$VERSION"
+          fi
           [[ "$TAG" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ && "${TAG#v}" == "$VERSION" ]] || {
             echo "::error::Release tag '$TAG' does not match the IPA version v$VERSION."; exit 2;
           }
@@ -1031,6 +1047,10 @@ jobs:
             exit 2
           }
           if gh release view "$TAG" >/dev/null 2>&1; then
+            if [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
+              echo "Release $TAG already exists. Refusing to overwrite its audited IPA on an automatic push." >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
             if [[ "$KIND" != "native" ]]; then
               echo "::error::Refusing to overwrite an existing versioned release with an interface-only IPA."
               exit 2
