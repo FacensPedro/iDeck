@@ -23,30 +23,32 @@ class LaunchStartupIsolationTests(unittest.TestCase):
         self.assertIn("private var steamSignInLoaded = false", COORDINATOR)
         self.assertIn("func loadSteamAccountIfNeeded()", COORDINATOR)
 
-    def test_native_memory_setup_is_delayed_until_mode_selected(self):
+    def test_native_memory_setup_is_delayed_until_madeira_first_paint(self):
         self.assertIn("func configureNativeHostIfNeeded()", COORDINATOR)
         self.assertIn("ideck_native_memory_install_notifications()", COORDINATOR)
         self.assertIn("ideck_native_memory_configure(64 * 1024 * 1024", COORDINATOR)
-        self.assertEqual(MAIN.count("coordinator.configureNativeHostIfNeeded()"), 2)
+        self.assertEqual(MAIN.count("coordinator.configureNativeHostIfNeeded()"), 1)
+        self.assertIn("await Task.yield()", MAIN)
 
-    def test_home_does_not_create_steam_or_check_native_jit(self):
-        main = MAIN.split("struct MainView: View {", 1)[1].split("private var homeView:", 1)[0]
-        self.assertNotIn("@StateObject private var steamLibrary", main)
-        self.assertNotIn("coordinator.refreshJITStatus()\n            UIApplication", main)
-        self.assertIn("selectedWorkspace != nil && scenePhase == .active", main)
-        self.assertIn('NSLog("[iDeck startup] Home view ready', main)
+    def test_madeira_replaces_home_and_preserves_deferred_jit_checks(self):
+        main = MAIN.split("struct MainView: View {", 1)[1].split("struct SteamGameArtworkView:", 1)[0]
         self.assertIn("@State private var steamLibrary: SteamOwnedGamesModel?", main)
+        self.assertIn("steamLibrary = SteamOwnedGamesModel.shared", main)
+        self.assertIn("WindowsWorkspaceView(coordinator: coordinator, steamLibrary: steamLibrary)", main)
+        self.assertNotIn("homeView", main)
+        self.assertNotIn("selectedWorkspace", main)
         self.assertNotIn("private struct WorkspaceHostView: View", MAIN)
-        self.assertEqual(MAIN.count("if steamLibrary == nil { steamLibrary = SteamOwnedGamesModel.shared }"), 2)
+        self.assertIn("steamLibrary != nil && scenePhase == .active", main)
+        self.assertIn("steamLibrary != nil && coordinator.isSteamConnected", main)
         self.assertIn("await steamLibrary.refresh()", main)
-        self.assertIn("selectedWorkspace == .pc && coordinator.isSteamConnected", main)
+        self.assertIn('NSLog("[iDeck startup] Madeira library is the root view")', main)
 
     def test_madeira_loads_library_without_requesting_jit(self):
-        home = MAIN.split("private var homeView:", 1)[1].split("private func modeTile", 1)[0]
-        self.assertIn("coordinator.loadSteamAccountIfNeeded()", home)
-        self.assertIn("coordinator.openMadeiraWorkspace()", home)
-        self.assertNotIn("coordinator.forceJITAndStartWindows()", home)
-        self.assertNotIn("coordinator.reconnectStikDebugForWineIfNeeded()", home)
+        root = MAIN.split("struct MainView: View {", 1)[1].split("struct SteamGameArtworkView:", 1)[0]
+        self.assertIn("coordinator.loadSteamAccountIfNeeded()", root)
+        self.assertIn("coordinator.openMadeiraWorkspace()", root)
+        self.assertNotIn("coordinator.forceJITAndStartWindows()", root)
+        self.assertNotIn("coordinator.reconnectStikDebugForWineIfNeeded()", root)
         self.assertIn("guard ensureJITForGameLaunch() else { return }", COORDINATOR)
 
 
