@@ -44,6 +44,16 @@ class SystemCoordinator: ObservableObject {
     @Published private(set) var isSteamSession: Bool = UserDefaults.standard.bool(forKey: "session.lastWasSteam") {
         didSet { UserDefaults.standard.set(isSteamSession, forKey: "session.lastWasSteam") }
     }
+    /// Persist only public game identity, never store authentication or tokens.
+    /// Last completed or attempted launch is shown in Bugs & logs and iRelay.
+    private func recordGameContext(_ title: String, launcher: String) {
+        let clean = title.replacingOccurrences(of: "[\\r\\n]", with: " ", options: .regularExpression)
+        let safeTitle = String(clean.prefix(160))
+        UserDefaults.standard.set(safeTitle, forKey: "diagnostics.lastGame")
+        UserDefaults.standard.set(launcher, forKey: "diagnostics.lastLauncher")
+        AppLog.record("[game-session] launcher=\(launcher) game=\(safeTitle)")
+    }
+
     @Published private(set) var activeWindowsProfile: WindowsGameProfile?
     private var activeSteamPrefix: String?
     private var pendingSteamGameID: UInt32?
@@ -702,6 +712,10 @@ class SystemCoordinator: ObservableObject {
     func launchWindowsExecutable(at url: URL, profile: WindowsGameProfile? = nil) {
         guard !isClosingWindowsSession else { return }
         isSteamSession = false
+        let gameID = profile?.id ?? ""
+        let launcher = gameID.hasPrefix("epic:") ? "Epic Games"
+            : gameID.hasPrefix("gog:") || gameID.hasPrefix("gog-setup:") ? "GOG" : ".exe"
+        recordGameContext(profile?.title ?? url.deletingPathExtension().lastPathComponent, launcher: launcher)
         BenchmarkSession.begin(kind: "game", scenario: profile?.title ?? url.deletingPathExtension().lastPathComponent,
                                settings: BenchmarkSession.gameSettings(profile))
         guard !previousWineSessionStillFinishing() else { return }
@@ -790,7 +804,10 @@ class SystemCoordinator: ObservableObject {
                         self.windowsEnvironment.execute(
                             binary: destination,
                             arguments: profile?.arguments ?? "",
-                            is32Bit: false,
+                            // GOG offline installers can be PE32 even when
+                            // the installed game itself is x64. Route by the
+                            // verified PE machine, not by filename or store.
+                            is32Bit: WindowsEnvironment.isPE32WindowsExecutable(destination),
                             isSteam: false,
                             jitEnabler: self.jitEnabler
                         ) { [weak self] result in
@@ -831,6 +848,7 @@ class SystemCoordinator: ObservableObject {
     func launchSteamGame(game: SteamAppInfo, profile: WindowsGameProfile, prefixPath: URL, skipSteamClient: Bool = false) {
         guard !isClosingWindowsSession else { return }
         isSteamSession = true
+        recordGameContext(game.name, launcher: "Steam")
         var benchmarkSettings = BenchmarkSession.gameSettings(profile)
         benchmarkSettings["store"] = "steam"
         BenchmarkSession.begin(kind: "game", scenario: game.name, settings: benchmarkSettings)

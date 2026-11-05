@@ -137,7 +137,11 @@ final class IRelayDeviceService: @unchecked Sendable {
                 return .error(422, error.localizedDescription)
             }
         case ("DELETE", "/logs"):
-            // iRelay's "Clear" on iDeck bugs: the same as Bugs & logs › Clear logs.
+            // Keep reports intact while Steam, GOG, Epic or relay transfers
+            // are still writing data on the iPad.
+            if await MainActor.run(body: { BugReportModel.downloadsOrTransfersActive }) {
+                return .error(409, "Pause or finish the download and USB transfer before clearing logs.")
+            }
             AppLog.clear()
             if let wine = await MainActor.run(body: { BugReportModel.wineLogURL }) { try? FileManager.default.removeItem(at: wine) }
             return .json(["ok": true])
@@ -363,8 +367,12 @@ final class IRelayDeviceService: @unchecked Sendable {
         let app = tail(AppLog.fileURL, 512 << 10)
         let wine = tail(wineURL, 2 << 20)
         let issues = LogIssueScanner.scan(app, source: .app, limit: 5000) + LogIssueScanner.scan(wine, source: .wine, limit: 5000)
-        let recent = app.split(whereSeparator: \.isNewline).suffix(300).joined(separator: "\n")
-        return ["issues": issues.map(\.copyText), "log": recent]
+        let context = await MainActor.run {
+            "Hardware: " + BugReportModel.hardwareSummary + "\n" + BugReportModel.gameContext
+        }
+        let recent = context + "\n" + app.split(whereSeparator: \.isNewline).suffix(300).joined(separator: "\n")
+        return ["issues": issues.map { context.replacingOccurrences(of: "\n", with: " | ") + " | " + $0.copyText },
+                "log": recent]
     }
 
     // MARK: Libraries

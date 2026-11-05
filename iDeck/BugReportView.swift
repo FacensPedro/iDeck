@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import Darwin
 
 /// iDeck's own persistent log (Documents/iDeck-app-log.txt). Everything else
 /// only reaches stdout, which nobody can read after the fact; this file is
@@ -248,9 +249,29 @@ final class BugReportModel: ObservableObject {
         notice = tr("Log copied to the clipboard.")
     }
 
+    /// Logging evidence must remain available throughout active downloads
+    /// and transfers; paused jobs do not count as an active transfer.
+    static var downloadsOrTransfersActive: Bool {
+        let steam = SteamOwnedGamesModel.shared
+        if steam.installingApps.contains(where: { !steam.pausedInstalls.contains($0) }) { return true }
+        let gog = GOGLibraryModel.shared
+        if gog.downloadProgress.keys.contains(where: { !gog.pausedDownloads.contains($0) }) { return true }
+        let epic = EpicLibrary.shared
+        if epic.downloads.values.contains(where: { download in
+            if case .paused = download.state { return false }
+            if case .failed = download.state { return false }
+            return true
+        }) { return true }
+        return false
+    }
+
     /// Clears every log the bug list reads: iDeck's own log and the last
     /// Wine log. Live JIT state is checked again, not cleared.
     func clearLogs() {
+        guard !Self.downloadsOrTransfersActive else {
+            notice = "Pause or finish the download and transfer before clearing logs."
+            return
+        }
         AppLog.clear()
         if let wine = Self.wineLogURL {
             try? FileManager.default.removeItem(at: wine)
@@ -262,14 +283,45 @@ final class BugReportModel: ObservableObject {
         notice = tr("Logs cleared.")
     }
 
+    /// Hardware identification uses the device's actual machine identifier.
+    /// Unknown and future devices are reported by identifier, never guessed.
+    static var hardwareSummary: String {
+        var bytes = [CChar](repeating: 0, count: 128)
+        var length = bytes.count
+        let value: String
+        if sysctlbyname("hw.machine", &bytes, &length, nil, 0) == 0 {
+            value = String(cString: bytes)
+        } else {
+            value = UIDevice.current.model
+        }
+        let device: String
+        switch value {
+        case "iPhone15,4": device = "iPhone 15"
+        case "iPhone15,5": device = "iPhone 15 Plus"
+        case "iPad16,1", "iPad16,2": device = "iPad mini (A17 Pro)"
+        default: device = UIDevice.current.model + " (" + value + ")"
+        }
+        let cores = ProcessInfo.processInfo.activeProcessorCount
+        return "\(device) [\(value)]; \(cores) active logical CPU cores"
+    }
+
+    static var gameContext: String {
+        let defaults = UserDefaults.standard
+        let launcher = defaults.string(forKey: "diagnostics.lastLauncher") ?? "Unknown"
+        let game = defaults.string(forKey: "diagnostics.lastGame") ?? "Not recorded"
+        return "Game: \(game) | Launcher: \(launcher)"
+    }
+
     /// A paste-ready report: device, app build and the selected problems.
     private func report(for selected: [LogIssue]) -> String {
         let info = Bundle.main.infoDictionary
         let version = (info?["CFBundleShortVersionString"] as? String ?? "?") + " (" + (info?["CFBundleVersion"] as? String ?? "?") + ")"
         var lines = [
             "iDeck bug report",
-            "iDeck \(version), \(UIDevice.current.model), iOS \(UIDevice.current.systemVersion)",
-            "Runtime: \(MadeiraBundleIdentity.isNative ? "Madeira-native" : "interface-only")",
+            "iDeck \(version), iOS \(UIDevice.current.systemVersion)",
+            "Hardware: " + Self.hardwareSummary,
+            Self.gameContext,
+            "Runtime: \(MadeiraBundleIdentity.isNative ? "native" : "interface-only")",
         ]
         if let wineFinding { lines.append("Diagnosis: " + wineFinding) }
         lines.append("")
@@ -283,6 +335,7 @@ struct BugReportView: View {
     @State private var expanded: Set<String> = []
     @State private var bugsOpen = false
     @State private var jitOpen = false
+    @State private var showClearConfirmation = false
     @AppStorage("diagnostics.detailed") private var detailedDiagnostics = false
     @AppStorage(BenchmarkSession.enabledKey) private var recordBenchmarks = false
     @State private var benchmarkReports: [URL] = []
@@ -368,13 +421,19 @@ struct BugReportView: View {
                         Label(tr("Copy iDeck log"), systemImage: "list.bullet.rectangle")
                     }
                     .disabled(!model.hasAppLog)
-                    Button(role: .destructive) { model.clearLogs() } label: {
+                    Button(role: .destructive) { showClearConfirmation = true } label: {
                         Label(tr("Clear logs"), systemImage: "trash")
                     }
-                    .disabled(!model.hasAppLog && !model.hasWineLog)
+                    .disabled((!model.hasAppLog && !model.hasWineLog) || BugReportModel.downloadsOrTransfersActive)
                 }
             }
             .scrollContentBackground(.hidden)
+        }
+        .confirmationDialog("Clear diagnostic logs?", isPresented: $showClearConfirmation) {
+            Button(tr("Clear logs"), role: .destructive) { model.clearLogs() }
+            Button(tr("Cancel"), role: .cancel) { }
+        } message: {
+            Text("This action cannot be undone. Games and settings will not be changed.")
         }
         .navigationTitle(tr("Bugs & logs"))
         .navigationBarTitleDisplayMode(.inline)
