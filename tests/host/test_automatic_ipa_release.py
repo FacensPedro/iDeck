@@ -83,10 +83,10 @@ class AutomaticIPAReleaseTests(unittest.TestCase):
         self.assertNotIn("# iDeck 1.0.0", notes)
         self.assertTrue(notes.startswith("## What's Changed\n"))
 
-    def test_one_time_1_0_4_release_request_requires_native_main_and_does_not_clobber(self):
+    def test_one_time_1_0_5_release_request_requires_native_main_and_does_not_clobber(self):
         release = WORKFLOW.split("\n  release:\n", 1)[1]
         requested = (ROOT / ".github/release-request.txt").read_text(encoding="utf-8").strip()
-        self.assertEqual(requested, "1.0.4")
+        self.assertEqual(requested, "1.0.5")
         self.assertIn("needs.build.outputs.ipa_kind == 'native'", release)
         self.assertIn("github.ref == 'refs/heads/main'", release)
         self.assertIn('test -s .github/release-request.txt', release)
