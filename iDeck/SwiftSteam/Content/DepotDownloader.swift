@@ -135,7 +135,7 @@ final class DepotDownloader {
         let prepStarted = Date()
         manifestStats = ManifestStats()
         let health = ContentHostHealth()
-        let pool = Array(hosts.prefix(hostPoolSize))
+        let pool = Self.prioritizedDownloadHosts(hosts, limit: hostPoolSize)
         var plans: [DepotPlan] = []
         var licenseSkipped: [UInt32] = []
         // The logged-on account, for the install record. Read while the session
@@ -1298,6 +1298,17 @@ final class DepotDownloader {
         return 0
     }
 
+    /// Keep Valve's fallback CDN available for chunks even when the directory
+    /// returns more than six primary servers. Previously only manifest
+    /// requests had fallback coverage; a chunk failure could exhaust the
+    /// six primaries and abort an otherwise recoverable install.
+    nonisolated static func prioritizedDownloadHosts(_ hosts: [String], limit: Int) -> [String] {
+        var selected = Array(hosts.prefix(max(1, limit)))
+        let fallback = "https://steampipe.akamaized.net"
+        if hosts.contains(fallback), !selected.contains(fallback) { selected.append(fallback) }
+        return selected
+    }
+
     // MARK: - CDN Discovery + Auth
 
     /// Content server discovery via the public Web API
@@ -1568,7 +1579,7 @@ extension DepotDownloader {
         guard !hosts.isEmpty else { throw SteamError.chunkDownloadFailed("No content servers are available.") }
         let key = try await depotKey(depotID: appID, appID: appID)
         let manifest = try await fetchManifest(depotID: appID, appID: appID, manifestGID: manifestGID, key: key, hosts: hosts)
-        let pool = Array(hosts.prefix(hostPoolSize))
+        let pool = Self.prioritizedDownloadHosts(hosts, limit: hostPoolSize)
         let auth = await cdnAuthFragments(depotID: appID, appID: appID, hosts: pool)
         let plan = DepotPlan(depotID: appID, manifestGID: manifestGID, key: key, manifest: manifest, hosts: pool, auth: auth,
                              declaredSize: manifest.totalUncompressedSize, health: ContentHostHealth(), installURL: folder)
