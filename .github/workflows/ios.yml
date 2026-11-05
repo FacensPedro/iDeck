@@ -29,7 +29,7 @@ on:
         required: false
         default: false
       release_tag:
-        description: "Optional version/tag for publishing a release (e.g. v1.0.0); leave empty to build IPA only"
+        description: "Use auto for the signed IPA version (currently v1.0.0), a matching v1.0.0 tag, or leave blank to build without publishing"
         required: false
         default: ""
   push:
@@ -988,6 +988,25 @@ jobs:
         run: |
           set -euo pipefail
           [[ -n "${TAG//[[:space:]]/}" ]] || { echo "::error::release_tag is required to publish a GitHub Release."; exit 2; }
+          # Release tags must match the version of the verified IPA itself.
+          # 'auto' derives the tag from CFBundleShortVersionString, currently 1.0.0.
+          VERSION="$(python3 - <<'PY'
+          import plistlib
+          from zipfile import ZipFile
+
+          with ZipFile("iDeck.ipa") as archive:
+              info = plistlib.loads(archive.read("Payload/iDeck.app/Info.plist"))
+          print(info.get("CFBundleShortVersionString", ""))
+          PY
+          )"
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+            echo "::error::Verified IPA has no valid semantic version."; exit 2;
+          }
+          if [[ "$TAG" == "auto" ]]; then TAG="v$VERSION"; fi
+          [[ "$TAG" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ && "${TAG#v}" == "$VERSION" ]] || {
+            echo "::error::Release tag '$TAG' does not match the IPA version v$VERSION."; exit 2;
+          }
+
           [[ "$KIND" == "native" || "$KIND" == "interface" ]] || {
             echo "::error::The IPA type was not verified."
             exit 2
