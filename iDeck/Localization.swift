@@ -182,8 +182,6 @@ enum Translations {
         "Sign in to load the Steam game library.": ["pt": "Entre para carregar a biblioteca de jogos da Steam.", "es": "Inicia sesión para cargar la biblioteca de juegos de Steam."],
                 "Steam did not respond in time. Check your internet connection and try again.": ["pt": "O Steam não respondeu a tempo. Verifique a conexão com a internet e tente novamente.", "es": "Steam no respondió a tiempo. Comprueba tu conexión a Internet e inténtalo de nuevo."],
         "Run Executable (.exe)": ["pt": "Executar programa (.exe)", "es": "Ejecutar programa (.exe)"],
-        "Start LiveContainer": ["pt": "Iniciar LiveContainer", "es": "Iniciar LiveContainer"],
-        "LiveContainer Apps": ["pt": "Apps do LiveContainer", "es": "Apps de LiveContainer"],
         "No apps installed. Tap + to install an .ipa": ["pt": "Nenhum app instalado. Toque em + para instalar um .ipa", "es": "No hay apps instaladas. Toca + para instalar un .ipa"],
 
         // Settings
@@ -239,7 +237,6 @@ enum Translations {
         "DXVK HUD": ["pt": "HUD do DXVK", "es": "HUD de DXVK"],
         "D3DMetal Rendering": ["pt": "Renderização D3DMetal", "es": "Renderizado D3DMetal"],
         "Updates": ["pt": "Atualizações", "es": "Actualizaciones"],
-        "LiveContainer": ["pt": "LiveContainer", "es": "LiveContainer"],
         "Inject Guest Hooks": ["pt": "Injetar hooks nos apps convidados", "es": "Inyectar hooks en apps invitadas"],
         "Pairing file: imported": ["pt": "Arquivo de pareamento: importado", "es": "Archivo de emparejamiento: importado"],
         "Pairing file: none": ["pt": "Arquivo de pareamento: nenhum", "es": "Archivo de emparejamiento: ninguno"],
@@ -295,8 +292,6 @@ enum Translations {
 
         // Status lines
         "Ready": ["pt": "Pronto", "es": "Listo"],
-        "Initializing LiveContainer...": ["pt": "Iniciando o LiveContainer...", "es": "Iniciando LiveContainer..."],
-        "LiveContainer Running": ["pt": "LiveContainer em execução", "es": "LiveContainer en ejecución"],
         "Container Error": ["pt": "Erro no container", "es": "Error del contenedor"],
         "Requires JIT": ["pt": "Requer JIT", "es": "Requiere JIT"],
         "Installing Windows Environment...": ["pt": "Instalando o ambiente Windows...", "es": "Instalando el entorno de Windows..."],
@@ -320,7 +315,6 @@ enum Translations {
         "Loading Executable...": ["pt": "Carregando o programa...", "es": "Cargando el programa..."],
         "Running": ["pt": "Em execução", "es": "En ejecución"],
         "Execution Error": ["pt": "Erro de execução", "es": "Error de ejecución"],
-        "Requires JIT & LiveContainer": ["pt": "Requer JIT e LiveContainer", "es": "Requiere JIT y LiveContainer"],
         "Guest app not found": ["pt": "App convidado não encontrado", "es": "App invitada no encontrada"],
         "Launching": ["pt": "Abrindo", "es": "Abriendo"],
         "Guest app running": ["pt": "App convidado em execução", "es": "App invitada en ejecución"],
@@ -348,7 +342,6 @@ enum Translations {
         "Delete container": ["pt": "Excluir contêiner", "es": "Eliminar contenedor"],
         "Delete container and all its data?": ["pt": "Excluir o contêiner e todos os seus dados?", "es": "¿Eliminar el contenedor y todos sus datos?"],
         "Data is preserved when updating or uninstalling the app. Delete containers separately.": ["pt": "Os dados são mantidos ao atualizar ou desinstalar o app. Exclua os contêineres separadamente.", "es": "Los datos se conservan al actualizar o desinstalar la app. Elimina los contenedores por separado."],
-        "Container storage is ready. Running iOS apps still requires integration of the LiveContainer loader and signing.": ["pt": "O armazenamento está pronto. A execução de apps iOS ainda depende da integração do carregador e da assinatura do LiveContainer.", "es": "El almacenamiento está listo. Ejecutar apps iOS todavía requiere integrar el cargador y la firma de LiveContainer."],
         "Connected": ["pt": "Conectado", "es": "Conectado"],
         "Disconnect Steam": ["pt": "Desconectar Steam", "es": "Desconectar Steam"],
         "JIT detected": ["pt": "JIT detectado", "es": "JIT detectado"],
@@ -489,7 +482,6 @@ enum Translations {
         "%d installed": ["pt": "%d instalados", "es": "%d instalados"],
         "Your installed apps will appear here": ["pt": "Seus apps instalados aparecerão aqui", "es": "Tus aplicaciones instaladas aparecerán aquí"],
         "Install an IPA or add a Windows executable. Both appear in this library.": ["pt": "Instale um IPA ou adicione um executável do Windows. Ambos aparecem nesta biblioteca.", "es": "Instala un IPA o añade un ejecutable de Windows. Ambos aparecerán en esta biblioteca."],
-        "iOS app · LiveContainer": ["pt": "App iOS · LiveContainer", "es": "App iOS · LiveContainer"],
         "Windows app": ["pt": "App do Windows", "es": "App de Windows"],
         "App details": ["pt": "Detalhes do app", "es": "Detalles de la app"],
         "Game details": ["pt": "Detalhes do jogo", "es": "Detalles del juego"],
