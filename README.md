@@ -1,6 +1,6 @@
 # iDeck
 
-**iDeck is an experimental iOS and iPadOS app that combines a Steam game library, hosted iOS apps, and a Windows compatibility environment powered by [Madeira](https://github.com/willfaust/madeira).**
+**iDeck is an experimental iOS and iPadOS app that combines a Steam game library and a Windows compatibility environment powered by [Madeira](https://github.com/willfaust/madeira).**
 
 > **Project status:** An **interface-only IPA cannot run Windows games**. A **Madeira-native IPA** includes native FEX, Wine ARM64EC, DXMT, WineMetal, and D3D12 components, but successful compilation does **not** guarantee that a game starts, renders, or runs correctly on an iPad.
 
@@ -195,7 +195,7 @@ For more detail, read [Game startup and black-screen diagnostics](docs/IDECK_GAM
 
 iDeck opens directly into the Madeira library. The Home mode picker and iOS guest-app host have been removed. The Wine prefix remains under Documents/wine.
 
-The app version remains **1.0.0**. A maintainer can run **Actions → iOS Build** with `release_tag=auto` to publish a verified native IPA using the version embedded in the IPA. A custom tag must match that version. Leave the input blank to build only. Native runtime verification and licensed-component checks remain enforced.
+The app version is **1.0.1** (build 2). A maintainer can run **Actions → iOS Build** with `release_tag=auto` to publish a verified native IPA using the version embedded in the IPA. A custom tag must match that version. Leave the input blank to build only. Native runtime verification and licensed-component checks remain enforced.
 
 iDeck integrates or adapts code and techniques from [Madeira](https://github.com/willfaust/madeira), [FEX](https://github.com/FEX-Emu/FEX), [Wine](https://www.winehq.org/), [DXMT](https://github.com/3Shain/dxmt), [StikDebug](https://github.com/StikDebug/StikDebug).
 

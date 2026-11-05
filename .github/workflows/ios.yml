@@ -29,7 +29,7 @@ on:
         required: false
         default: false
       release_tag:
-        description: "Use auto for the signed IPA version (currently v1.0.0), a matching v1.0.0 tag, or leave blank to build without publishing"
+        description: "Use auto for the verified IPA version (currently 1.0.1), a matching version tag, or leave blank to build without publishing"
         required: false
         default: ""
   push:
@@ -989,7 +989,7 @@ jobs:
           set -euo pipefail
           [[ -n "${TAG//[[:space:]]/}" ]] || { echo "::error::release_tag is required to publish a GitHub Release."; exit 2; }
           # Release tags must match the version of the verified IPA itself.
-          # 'auto' derives the tag from CFBundleShortVersionString, currently 1.0.0.
+          # 'auto' derives the tag from CFBundleShortVersionString (no hard-coded version).
           VERSION="$(python3 - <<'PY'
           import plistlib
           from zipfile import ZipFile
