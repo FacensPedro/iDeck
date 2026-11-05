@@ -79,12 +79,6 @@ struct SettingsView: View {
                     }
                 }
 
-                Section(tr("Apps")) {
-                    NavigationLink { LiveContainerSettingsView(coordinator: coordinator) } label: {
-                        SettingsRow(icon: "square.stack.3d.up.fill", color: .cyan, title: "LiveContainer")
-                    }
-                }
-
                 Section(tr("General")) {
                     languagePicker
                     NavigationLink { updatesPage } label: {
