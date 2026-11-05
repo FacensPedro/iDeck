@@ -14,7 +14,6 @@
 | Windows | EXE import, Wine prefixes, game profiles, and the Madeira runtime | Requires an actual native IPA, FEX/JIT, and compatible Wine functionality |
 | WoW64 (32-bit x86) | Native Madeira builds include the i386 FEX translator, 32-bit Wine DLL farm and WoW64 host DLLs by default | Real device compatibility depends on the JIT pool, Wine prefix and individual game requirements |
 | Graphics | Metal adapters, DXMT, WineMetal, D3D12, OpenGL (Mesa Zink or OpenGL ES), Vulkan (MoltenVK), and MetalFX settings | Game rendering and performance require hardware testing; Vulkan is x64-only |
-| iOS app hosting | LiveContainer-inspired integration | Subject to iPadOS entitlements, signing, and sandbox restrictions |
 | JIT | Integration with the external [StikDebug](https://github.com/StikDebug/StikDebug) workflow | iDeck cannot independently grant JIT permissions or bypass iOS security |
 | Runtime caching | Precompiled Madeira kits through GitHub Actions cache or Git LFS | Requires a legitimate native build and permission to redistribute components |
 
@@ -192,7 +191,7 @@ For more detail, read [Game startup and black-screen diagnostics](docs/IDECK_GAM
 
 ## Licenses, security, and attribution
 
-iDeck integrates or adapts code and techniques from [Madeira](https://github.com/willfaust/madeira), [FEX](https://github.com/FEX-Emu/FEX), [Wine](https://www.winehq.org/), [DXMT](https://github.com/3Shain/dxmt), [StikDebug](https://github.com/StikDebug/StikDebug), and [LiveContainer](https://github.com/LiveContainer/LiveContainer).
+iDeck integrates or adapts code and techniques from [Madeira](https://github.com/willfaust/madeira), [FEX](https://github.com/FEX-Emu/FEX), [Wine](https://www.winehq.org/), [DXMT](https://github.com/3Shain/dxmt), [StikDebug](https://github.com/StikDebug/StikDebug).
 
 Review the repository's [license notices](LICENSES) and the applicable upstream terms. Do not upload proprietary Microsoft DLLs, the Apple Metal Shader Converter, or distributing artifacts that contain them without the appropriate redistribution rights. Remove credentials, account tokens, and personal data from diagnostics.
 
