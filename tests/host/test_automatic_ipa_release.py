@@ -74,7 +74,7 @@ class AutomaticIPAReleaseTests(unittest.TestCase):
     def test_release_checks_out_notes_and_updates_existing_version(self):
         release = WORKFLOW.split("\n  release:\n", 1)[1]
         self.assertIn("name: Checkout release notes", release)
-        self.assertIn("uses: actions/checkout@v4", release)
+        self.assertIn("uses: actions/checkout@v5", release)
         self.assertIn("persist-credentials: false", release)
         self.assertIn("test -s RELEASE_NOTES.md", release)
         self.assertIn('gh release edit "$TAG" --title "$TITLE" --notes-file RELEASE_NOTES.md', release)
