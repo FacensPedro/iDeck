@@ -1,7 +1,6 @@
 ## What's Changed
-- Opened directly into the Madeira game library, without the mode-selection screen.
-- Moved the iDeck logo into the Madeira header at a smaller size.
-- Removed LiveContainer iOS guest-app hosting and associated settings.
-- Kept Wine prefix preparation separate from the removed guest-app loader.
-- Updated Steam cancellation so iRelay Stop waits for the incomplete install cleanup.
-- Enabled version-aware release publishing and update installation through a signing app.
+- Shortened long game titles with a trailing ellipsis in the iDeck library.
+- Renamed the Madeira workspace header above the JIT indicator to iDeck.
+- Improved game-size detection for Oblivion Game of the Year Edition and Skyrim Anniversary Edition.
+- Preferred actual installed sizes or Steam depot metadata, with correctly labeled minimum disk-space estimates only when size metadata is unavailable.
+- Included available GOG and Epic game sizes in the iRelay device library response.
