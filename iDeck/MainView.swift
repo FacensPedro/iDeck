@@ -560,20 +560,18 @@ struct WindowsWorkspaceView: View {
                 .scaledToFit()
                 .frame(width: 38, height: 38)
                 .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("iDeck")
-                    .font(.headline)
+            Spacer(minLength: 0)
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(coordinator.isJITEnabled ? Color.green : Color.orange)
+                    .frame(width: 7, height: 7)
+                Text(coordinator.isJITEnabled ? tr("JIT active") : tr("JIT off"))
+                    .font(.subheadline.weight(.medium))
                     .foregroundColor(.white)
-                HStack(spacing: 5) {
-                    Circle()
-                        .fill(coordinator.isJITEnabled ? Color.green : Color.orange)
-                        .frame(width: 6, height: 6)
-                    Text(coordinator.isJITEnabled ? tr("JIT active") : tr("JIT off"))
-                        .font(.caption2)
-                        .foregroundColor(.gray)
-                }
             }
-            Spacer()
+            .frame(maxWidth: .infinity)
+            .accessibilityElement(children: .combine)
+            Spacer(minLength: 0)
             Button { isSettingsPresented = true } label: {
                 Image(systemName: "gearshape.fill")
                     .font(.title3)
@@ -945,7 +943,6 @@ struct WindowsWorkspaceView: View {
     }
 
     private func launchEpicGame(_ game: EpicInstalledGame) {
-        guard requireJIT() else { return }
         let executable = EpicLibrary.drive.appendingPathComponent(game.programPath)
         let savedProfile = windowsLibrary.profile(for: "epic:\(game.appName)", title: game.title)
         Task { @MainActor in
@@ -1012,18 +1009,11 @@ struct WindowsWorkspaceView: View {
     }
 
     /// JIT must be on before any Windows program starts.
-    private func requireJIT() -> Bool {
-        coordinator.refreshJITStatus()
-        guard coordinator.isJITEnabled else {
-            installMessage = tr("Activate JIT with StikDebug, then confirm it in Settings.")
-            isShowingInstallResult = true
-            return false
-        }
-        return true
-    }
+    // JIT is requested by SystemCoordinator at the exact launch boundary.
+    // Do not block GOG/Epic here: launchWindowsExecutable automatically opens
+    // StikDebug and resumes only after live debugger/JIT readiness is proven.
 
     private func launchGOGGame(_ game: GOGInstalledGame) {
-        guard requireJIT() else { return }
         var profile = windowsLibrary.profile(for: "gog:\(game.gameID)", title: game.name)
         if profile.arguments.isEmpty { profile.arguments = game.arguments }
         coordinator.launchWindowsExecutable(at: game.executable, profile: profile)
@@ -1037,13 +1027,8 @@ struct WindowsWorkspaceView: View {
         gogLibrary.install(game, prefixPath: prefixPath) { outcome in
             windowsLibrary.refresh(prefixPath: prefixPath)
             guard case .installer(let setup) = outcome else { return }
-            coordinator.refreshJITStatus()
-            guard coordinator.isJITEnabled else {
-                installMessage = tr("The %@ installer is ready under Installed games as %@. Run it to install the game; it then appears with the GOG mark.",
-                                    game.title, setup.deletingPathExtension().lastPathComponent)
-                isShowingInstallResult = true
-                return
-            }
+            // The offline GOG installer uses the same JIT handshake as any
+            // executable; it remains queued while StikDebug attaches.
             let profile = WindowsGameProfile(id: "gog-setup:\(game.id)", title: game.title,
                                              arguments: GOGLibraryModel.silentInstallArguments(for: game))
             coordinator.launchWindowsExecutable(at: setup, profile: profile)
@@ -2325,8 +2310,7 @@ extension WindowsWorkspaceView {
             if let game = epicLibrary.owned.first(where: { $0.appName == app }) { epicCard(game) }
         case .exe(let path):
             Button {
-                guard requireJIT() else { return }
-                let url = URL(fileURLWithPath: path)
+                        let url = URL(fileURLWithPath: path)
                 let profile = windowsLibrary.profile(for: windowsLibrary.profileID(for: url),
                                                      title: url.deletingPathExtension().lastPathComponent)
                 coordinator.launchWindowsExecutable(at: url, profile: profile)
