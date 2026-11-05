@@ -35,7 +35,7 @@ class ReleaseInterfaceCDNTests(unittest.TestCase):
         self.assertIn(".truncationMode(.tail)", card)
         self.assertIn(".accessibilityLabel(title)", card)
         top = VIEW.split("private var topBar: some View", 1)[1].split("private enum MixedLibraryEntry", 1)[0]
-        self.assertIn('Text("iDeck")', top)
+        self.assertNotIn('Text("iDeck")', top)
         self.assertNotIn('Text(tr("Madeira"))', top)
 
     def test_legacy_steam_sizes_and_store_library_response(self):
