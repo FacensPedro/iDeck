@@ -426,7 +426,7 @@ final class IRelayDeviceService: @unchecked Sendable {
         var gogGames: [[String: Any]] = gog.games.filter(\.worksOnWindows).map { game in
             ["id": game.id, "title": game.title, "cover": game.artworkCandidates.first?.absoluteString ?? "",
              "installed": gogInstalled[game.id] != nil,
-             "size": max(gog.installedSizes[game.id] ?? 0, gog.downloadSizes[game.id] ?? 0)]
+             "size": gog.installedSizes[game.id].flatMap { $0 > 0 ? $0 : nil } ?? (gog.downloadSizes[game.id] ?? 0)]
         }
         let gogListed = Set(gog.games.map(\.id))
         for (id, game) in gogInstalled where !gogListed.contains(id) {
@@ -439,7 +439,7 @@ final class IRelayDeviceService: @unchecked Sendable {
             ["appName": game.appName, "title": game.title, "namespace": game.namespace,
              "catalogItemId": game.catalogItemID, "cover": game.cover?.absoluteString ?? "",
              "folderName": game.folderName, "installed": epic.installed[game.appName] != nil,
-             "size": max(epic.installed[game.appName]?.installBytes ?? 0, epic.manifestSizes[game.appName] ?? 0)]
+             "size": (epic.installed[game.appName]?.installBytes ?? 0) > 0 ? (epic.installed[game.appName]?.installBytes ?? 0) : (epic.manifestSizes[game.appName] ?? 0)]
         }
         let epicListed = Set(epic.owned.map(\.appName))
         for (app, game) in epic.installed where !epicListed.contains(app) {
