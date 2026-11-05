@@ -804,7 +804,10 @@ class SystemCoordinator: ObservableObject {
                         self.windowsEnvironment.execute(
                             binary: destination,
                             arguments: profile?.arguments ?? "",
-                            is32Bit: false,
+                            // GOG offline installers can be PE32 even when
+                            // the installed game itself is x64. Route by the
+                            // verified PE machine, not by filename or store.
+                            is32Bit: WindowsEnvironment.isPE32WindowsExecutable(destination),
                             isSteam: false,
                             jitEnabler: self.jitEnabler
                         ) { [weak self] result in
