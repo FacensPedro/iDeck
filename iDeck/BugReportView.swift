@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import Darwin
 
 /// iDeck's own persistent log (Documents/iDeck-app-log.txt). Everything else
 /// only reaches stdout, which nobody can read after the fact; this file is
@@ -264,7 +265,7 @@ final class BugReportModel: ObservableObject {
 
     /// Hardware identification uses the device's actual machine identifier.
     /// Unknown and future devices are reported by identifier, never guessed.
-    nonisolated static var hardwareSummary: String {
+    static var hardwareSummary: String {
         var bytes = [CChar](repeating: 0, count: 128)
         var length = bytes.count
         let value: String
@@ -284,7 +285,7 @@ final class BugReportModel: ObservableObject {
         return "\(device) [\(value)]; \(cores) active logical CPU cores"
     }
 
-    nonisolated static var gameContext: String {
+    static var gameContext: String {
         let defaults = UserDefaults.standard
         let launcher = defaults.string(forKey: "diagnostics.lastLauncher") ?? "Unknown"
         let game = defaults.string(forKey: "diagnostics.lastGame") ?? "Not recorded"
