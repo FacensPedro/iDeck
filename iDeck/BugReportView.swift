@@ -262,14 +262,45 @@ final class BugReportModel: ObservableObject {
         notice = tr("Logs cleared.")
     }
 
+    /// Hardware identification uses the device's actual machine identifier.
+    /// Unknown and future devices are reported by identifier, never guessed.
+    nonisolated static var hardwareSummary: String {
+        var bytes = [CChar](repeating: 0, count: 128)
+        var length = bytes.count
+        let value: String
+        if sysctlbyname("hw.machine", &bytes, &length, nil, 0) == 0 {
+            value = String(cString: bytes)
+        } else {
+            value = UIDevice.current.model
+        }
+        let device: String
+        switch value {
+        case "iPhone15,4": device = "iPhone 15"
+        case "iPhone15,5": device = "iPhone 15 Plus"
+        case "iPad16,1", "iPad16,2": device = "iPad mini (A17 Pro)"
+        default: device = UIDevice.current.model + " (" + value + ")"
+        }
+        let cores = ProcessInfo.processInfo.activeProcessorCount
+        return "\(device) [\(value)]; \(cores) active logical CPU cores"
+    }
+
+    nonisolated static var gameContext: String {
+        let defaults = UserDefaults.standard
+        let launcher = defaults.string(forKey: "diagnostics.lastLauncher") ?? "Unknown"
+        let game = defaults.string(forKey: "diagnostics.lastGame") ?? "Not recorded"
+        return "Game: \(game) | Launcher: \(launcher)"
+    }
+
     /// A paste-ready report: device, app build and the selected problems.
     private func report(for selected: [LogIssue]) -> String {
         let info = Bundle.main.infoDictionary
         let version = (info?["CFBundleShortVersionString"] as? String ?? "?") + " (" + (info?["CFBundleVersion"] as? String ?? "?") + ")"
         var lines = [
             "iDeck bug report",
-            "iDeck \(version), \(UIDevice.current.model), iOS \(UIDevice.current.systemVersion)",
-            "Runtime: \(MadeiraBundleIdentity.isNative ? "Madeira-native" : "interface-only")",
+            "iDeck \(version), iOS \(UIDevice.current.systemVersion)",
+            "Hardware: " + Self.hardwareSummary,
+            Self.gameContext,
+            "Runtime: \(MadeiraBundleIdentity.isNative ? "native" : "interface-only")",
         ]
         if let wineFinding { lines.append("Diagnosis: " + wineFinding) }
         lines.append("")
