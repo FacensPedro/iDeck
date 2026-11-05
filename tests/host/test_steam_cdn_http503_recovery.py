@@ -14,6 +14,12 @@ class SteamCDN503RecoveryTests(unittest.TestCase):
         self.assertIn("let delay = overloaded", DEPOT)
         self.assertIn("try await Task.sleep(nanoseconds: delay)", DEPOT)
 
+    def test_chunk_hosts_keep_the_valve_fallback(self):
+        self.assertIn("nonisolated static func prioritizedDownloadHosts(", DEPOT)
+        self.assertIn('let fallback = "https://steampipe.akamaized.net"', DEPOT)
+        self.assertIn("let pool = Self.prioritizedDownloadHosts(hosts, limit: hostPoolSize)", DEPOT)
+        self.assertEqual(DEPOT.count("let pool = Self.prioritizedDownloadHosts(hosts, limit: hostPoolSize)"), 2)
+
     def test_manifest_retries_transient_outages_without_bypassing_auth(self):
         self.assertIn("for round in 0..<3", DEPOT)
         self.assertIn("var transientOutage = false", DEPOT)
