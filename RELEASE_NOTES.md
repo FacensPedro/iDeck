@@ -1,6 +1,5 @@
 ## What's Changed
-- Shortened long game titles with a trailing ellipsis in the iDeck library.
-- Renamed the Madeira workspace header above the JIT indicator to iDeck.
-- Improved game-size detection for Oblivion Game of the Year Edition and Skyrim Anniversary Edition.
-- Preferred actual installed sizes or Steam depot metadata, with correctly labeled minimum disk-space estimates only when size metadata is unavailable.
-- Included available GOG and Epic game sizes in the iRelay device library response.
+- Renamed the Madeira workspace header to iDeck and shortened long game titles with a trailing ellipsis.
+- Improved size reporting for Oblivion Game of the Year Edition, Skyrim Anniversary Edition, and GOG/Epic games; minimum disk-space requirements are distinguished from measured sizes.
+- Improved recovery from temporary iRelay USB outages during Steam downloads, allowing interrupted progress checks to retry.
+- Reduced the iDeck USB HTTP receive buffer size to lower transient memory allocations during file transfers.
