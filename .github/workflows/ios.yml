@@ -886,6 +886,11 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Checkout release notes
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
       - name: Download verified iDeck IPA directly
         uses: actions/download-artifact@v8
         with:
@@ -1007,12 +1012,17 @@ jobs:
 
           fi
 
+          test -s RELEASE_NOTES.md || {
+            echo "::error::RELEASE_NOTES.md is missing or empty; checkout the release notes before publishing."
+            exit 2
+          }
           if gh release view "$TAG" >/dev/null 2>&1; then
             if [[ "$KIND" != "native" ]]; then
               echo "::error::Refusing to overwrite an existing versioned release with an interface-only IPA."
               exit 2
             fi
             gh release upload "$TAG" iDeck.ipa iDeck.ipa.sha256 iDeck-distribution-audit.json --clobber
+            gh release edit "$TAG" --title "$TITLE" --notes-file RELEASE_NOTES.md
           else
             OPTIONS=(--target "$GITHUB_SHA" --title "$TITLE" --notes-file RELEASE_NOTES.md)
             gh release create "$TAG" iDeck.ipa iDeck.ipa.sha256 iDeck-distribution-audit.json "${OPTIONS[@]}"
