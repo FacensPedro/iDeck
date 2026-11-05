@@ -64,6 +64,14 @@ int32_t ideck_wine_log_diagnose(const char *path) {
                (strstr(current_session, "[mach_exc] unhandled") ||
                 strstr(current_session, "code=c000001d"))) {
         code = IDECK_WINE_LOG_ARM64EC_EXCEPTION;
+    } else if (strstr(current_session, "[ec-bind]") &&
+               strstr(current_session, "pool stale") &&
+               (strstr(current_session, "c0000005") ||
+                strstr(current_session, "unhandled page fault"))) {
+        // A stale function pointer in the JIT pool is concrete evidence of a
+        // synchronization discrepancy. It can coexist with a guest AV; this
+        // classification does NOT prove it caused that exception.
+        code = IDECK_WINE_LOG_ARM64EC_STALE_IAT_FAULT;
     } else if (strstr(current_session, "vm_remap failed") ||
         strstr(current_session, "vm_protect(rw) failed") ||
         strstr(current_session, "jit-pool] exhausted") ||

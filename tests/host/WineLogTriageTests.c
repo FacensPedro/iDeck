@@ -39,6 +39,29 @@ int main(void) {
     write_log(path, "err:module:import_dll missing foo.dll\n[jit-pool] EXHAUSTED\n");
     assert(ideck_wine_log_diagnose(path) == IDECK_WINE_LOG_JIT);
 
+    // Crash Bandicoot: an old x64 thunk was visible in a JIT image copy
+    // while the game also raised a real access violation. Do not mistake the
+    // noisy Steam dependency errors for a definitive root cause.
+    write_log(path,
+        "[wineserver-bridge] ws_log test - log file set up OK\n"
+        "err:module:import_dll Library libavcodec-62.dll not found\n"
+        "[ec-bind] rpcrt4.dll.NdrClientCall2 POOL STALE\n"
+        "wine: Unhandled page fault on read access to FFFFFFFFFFFFFFE8\n"
+        "abort_process: status=0xc0000005\n");
+    assert(ideck_wine_log_diagnose(path) == IDECK_WINE_LOG_ARM64EC_STALE_IAT_FAULT);
+
+    // Stale binding evidence by itself must not claim a guest crash.
+    write_log(path, "[ec-bind] rpcrt4.dll.NdrClientCall2 POOL STALE\n");
+    assert(ideck_wine_log_diagnose(path) == IDECK_WINE_LOG_NONE);
+    // In a newer session, the preceding IAT note is not relevant.
+    write_log(path,
+        "[wineserver-bridge] ws_log test first\n"
+        "[ec-bind] rpcrt4.dll.NdrClientCall2 POOL STALE\n"
+        "abort_process: status=0xc0000005\n"
+        "[wineserver-bridge] ws_log test second\n"
+        "Wine process exited normally\n");
+    assert(ideck_wine_log_diagnose(path) == IDECK_WINE_LOG_NONE);
+
     // A 32-bit Windows installer can fail before its entry point when
     // iPadOS cannot reserve the minimum WoW64 guest window.
     write_log(path,

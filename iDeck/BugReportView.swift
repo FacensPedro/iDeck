@@ -224,6 +224,7 @@ final class BugReportModel: ObservableObject {
         case 5: return "Last Wine log indicates a missing or incompatible DLL."
         case 6: return "A 32-bit Windows program could not reserve its WoW64 address window. The iOS device's virtual address space is insufficient for the current Madeira memory policy."
         case 7: return "Wine/FEX encountered an unhandled native ARM64EC exception (x18 handler) and terminated with NTSTATUS 0xC000001D. This is a runtime compatibility failure, not proof of a missing game DLL."
+        case 8: return "Wine recorded a stale ARM64EC import address in its JIT executable copy and a Windows game access violation (0xC0000005). The synchronization discrepancy requires native Wine/FEX investigation; these logs do not prove it caused the crash."
         default: return nil
         }
     }
