@@ -318,7 +318,7 @@ class WindowsEnvironment {
         task.resume()
     }
     
-    private static func isPE32WindowsExecutable(_ url: URL) -> Bool {
+    static func isPE32WindowsExecutable(_ url: URL) -> Bool {
         url.path.withCString { ideck_native_pe_machine($0) == 0x014c }
     }
     
