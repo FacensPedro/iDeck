@@ -72,6 +72,7 @@ jobs:
       - name: Test download controls, version UI and CDN selection
         run: |
           python3 -m unittest discover -s tests/host -p 'test_download_pause_contract.py' -v
+          python3 -m unittest discover -s tests/host -p 'test_steam_cdn_http503_recovery.py' -v
           python3 -m unittest discover -s tests/host -p 'test_release_ui_and_cdn.py' -v
 
       - name: Test Metal Toolchain bootstrap
