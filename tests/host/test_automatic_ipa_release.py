@@ -71,6 +71,18 @@ class AutomaticIPAReleaseTests(unittest.TestCase):
         self.assertIn('gh release create "$TAG" iDeck.ipa iDeck.ipa.sha256 iDeck-distribution-audit.json', release)
         self.assertIn("sha256sum --check iDeck.ipa.sha256", release)
 
+    def test_release_checks_out_notes_and_updates_existing_version(self):
+        release = WORKFLOW.split("\n  release:\n", 1)[1]
+        self.assertIn("name: Checkout release notes", release)
+        self.assertIn("uses: actions/checkout@v5", release)
+        self.assertIn("persist-credentials: false", release)
+        self.assertIn("test -s RELEASE_NOTES.md", release)
+        self.assertIn('gh release edit "$TAG" --title "$TITLE" --notes-file RELEASE_NOTES.md', release)
+        self.assertIn('gh release create "$TAG" iDeck.ipa iDeck.ipa.sha256 iDeck-distribution-audit.json', release)
+        notes = (ROOT / "RELEASE_NOTES.md").read_text(encoding="utf-8")
+        self.assertNotIn("# iDeck 1.0.0", notes)
+        self.assertTrue(notes.startswith("## O que mudou\n"))
+
     def test_versioned_release_rejects_ui_only_and_tampered_native_manifest(self):
         release = WORKFLOW.split("\n  release:\n", 1)[1]
         self.assertIn("Versioned releases require verified Wine/FEX/DXMT/D3D12", release)

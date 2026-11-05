@@ -1,5 +1,3 @@
-# iDeck 1.0.0
-
 ## O que mudou
 - Nomes dos jogos centralizados na biblioteca e na tela de detalhes.
 - Símbolos das lojas removidos ao lado dos nomes dos jogos.
