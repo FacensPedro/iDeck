@@ -65,11 +65,11 @@ jobs:
           from pathlib import Path
 
           project = Path("iDeck.xcodeproj/project.pbxproj").read_text(encoding="utf-8")
-          versions = set(re.findall(r"\\bMARKETING_VERSION\\s*=\\s*([^;]+);", project))
+          versions = set(re.findall(r"\bMARKETING_VERSION\s*=\s*([^;]+);", project))
           if len(versions) != 1:
               raise SystemExit(f"::error::Project contains inconsistent MARKETING_VERSION values: {sorted(versions)}")
           version = versions.pop().strip()
-          if not re.fullmatch(r"[0-9]+\\.[0-9]+\\.[0-9]+", version):
+          if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version):
               raise SystemExit(f"::error::Project has invalid marketing version: {version!r}")
           tag = os.environ["REQUESTED_RELEASE_TAG"].strip()
           if tag not in (version, f"v{version}"):
