@@ -5,7 +5,7 @@
 import Foundation
 
 /// The private NSExtension API (ExtensionFoundation) that starts an app extension of
-/// Madeira's own: the same calls LiveContainer uses to start its LiveProcess.
+/// Madeira's own: the same calls compatible iOS tools use to start its LiveProcess.
 @objc private protocol NSExtensionClassShim {
     @objc(extensionWithIdentifier:error:)
     func `extension`(withIdentifier identifier: String) throws -> AnyObject
@@ -28,7 +28,7 @@ import Foundation
 /// deadlocking iDeck itself.
 ///
 /// The helper is a classic app extension (PlugIns/MadeiraJITHelper.appex, on
-/// com.apple.ar.viewer as LiveContainer's LiveProcess is), started by the bundle ID it
+/// com.apple.ar.viewer as a standard JIT helper extension is), started by the bundle ID it
 /// has in this installation. Sideloaders that sign with the user's own Apple ID rename
 /// Madeira's bundle ID and the helper's along with it (SideStore, AltStore and Plume
 /// append the team ID), and that is all this lookup needs. An ExtensionKit extension
@@ -53,7 +53,7 @@ enum IDeckBuiltInJIT {
             return "Built-in JIT requires iOS 26 or later."
         }
         if getenv("LC_HOME_PATH") != nil {
-            return "Built-in JIT is unavailable inside LiveContainer. Choose StikDebug instead."
+            return "Built-in JIT is unavailable for this build. Choose StikDebug instead."
         }
         return nil
 #endif
