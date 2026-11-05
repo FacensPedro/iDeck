@@ -135,7 +135,7 @@ final class DepotDownloader {
         let prepStarted = Date()
         manifestStats = ManifestStats()
         let health = ContentHostHealth()
-        let pool = Array(hosts.prefix(hostPoolSize))
+        let pool = Self.prioritizedDownloadHosts(hosts, limit: hostPoolSize)
         var plans: [DepotPlan] = []
         var licenseSkipped: [UInt32] = []
         // The logged-on account, for the install record. Read while the session
@@ -787,7 +787,10 @@ final class DepotDownloader {
             }
         }
         var lastError: Error = SteamError.chunkDownloadFailed("No content server responded.")
-        for attempt in 0..<max(1, attempts) {
+        // Retry temporary Steam CDN overloads beyond the ordinary budget.
+        // The shared host-health map continues to favor responsive servers.
+        let maxAttempts = max(attempts, plan.hosts.count * 2, 10)
+        for attempt in 0..<maxAttempts {
             try Task.checkCancellation()
             // Healthy servers first, starting from a per-chunk offset.
             let order = plan.health.order(plan.hosts, seed: seed)
@@ -807,7 +810,20 @@ final class DepotDownloader {
                 lastError = error
                 plan.health.recordFailure(host, reason: failureReason(error))
                 SteamLog.trace("chunk attempt \(attempt + 1) failed: \(failureReason(error))")
-                if attempt + 1 < attempts { try await Task.sleep(nanoseconds: UInt64(attempt + 1) * 400_000_000) }
+                if attempt + 1 < maxAttempts {
+                    let overloaded: Bool
+                    if case SteamError.contentHTTP(let status) = error {
+                        overloaded = status == 429 || (500...504).contains(status)
+                    } else {
+                        overloaded = false
+                    }
+                    // A 503 is a CDN outage, not missing game ownership.
+                    // Back off while retaining every validated chunk/journal.
+                    let delay = overloaded
+                        ? min(UInt64(4_000_000_000), UInt64(attempt + 1) * 650_000_000)
+                        : min(UInt64(2_000_000_000), UInt64(attempt + 1) * 400_000_000)
+                    try await Task.sleep(nanoseconds: delay)
+                }
                 continue
             }
             // A verified chunk proves the CDN worked. Local I/O failures must
@@ -1061,16 +1077,22 @@ final class DepotDownloader {
         var refusals: [String] = []
         var authorized = 0
         var refusedStatus = 0
+        var transientOutage = false
         // A server that refuses (401/403) is asked again once with a fresh
         // authorization; when no server answers and some refused, the round is
         // repeated once with a fresh request code (it is short-lived and Steam
         // may have answered without one).
-        for round in 0..<2 {
-            if round == 1 {
-                guard !refusals.isEmpty else { break }
-                SteamLog.event("[steam-depot] manifest refused app=\(appID) depot=\(depotID) code=\(requestCode == 0 ? "none" : "yes") tokens=\(authorized)/\(servers.count) refusals=\(refusals.joined(separator: ",")) retry=fresh-code")
-                requestCode = try await manifestRequestCode(depotID: depotID, appID: appID, manifestGID: manifestGID, branch: branch)
-                refusals = []; authorized = 0
+        for round in 0..<3 {
+            if round > 0 {
+                guard !refusals.isEmpty || transientOutage else { break }
+                if !refusals.isEmpty {
+                    SteamLog.event("[steam-depot] manifest refused app=\(appID) depot=\(depotID) code=\(requestCode == 0 ? "none" : "yes") tokens=\(authorized)/\(servers.count) refusals=\(refusals.joined(separator: ",")) retry=fresh-code")
+                    requestCode = try await manifestRequestCode(depotID: depotID, appID: appID, manifestGID: manifestGID, branch: branch)
+                } else {
+                    SteamLog.event("[steam-cdn] manifest temporary outage app=\(appID) depot=\(depotID) retry=\(round + 1)/3")
+                }
+                try await Task.sleep(nanoseconds: UInt64(round) * 1_500_000_000)
+                refusals = []; authorized = 0; transientOutage = false
             }
             for host in servers {
                 try Task.checkCancellation()
@@ -1109,10 +1131,14 @@ final class DepotDownloader {
                     throw CancellationError()
                 } catch {
                     lastError = error
-                    if case SteamError.contentHTTP(let status) = error, status == 401 || status == 403 {
-                        refusals.append("\(URL(string: host)?.host ?? host):\(status)")
-                        refusedStatus = status
-                        if !auth.isEmpty { authorized += 1 }
+                    if case SteamError.contentHTTP(let status) = error {
+                        if status == 401 || status == 403 {
+                            refusals.append("\(URL(string: host)?.host ?? host):\(status)")
+                            refusedStatus = status
+                            if !auth.isEmpty { authorized += 1 }
+                        } else if status == 429 || (500...504).contains(status) {
+                            transientOutage = true
+                        }
                     }
                     SteamLog.trace("manifest from a content server failed: \(error.localizedDescription)")
                 }
@@ -1270,6 +1296,17 @@ final class DepotDownloader {
             SteamLog.event("[steam-depot] manifest-code refused app=\(appID) depot=\(depotID) eresult=\(eresult) tries=3")
         }
         return 0
+    }
+
+    /// Keep Valve's fallback CDN available for chunks even when the directory
+    /// returns more than six primary servers. Previously only manifest
+    /// requests had fallback coverage; a chunk failure could exhaust the
+    /// six primaries and abort an otherwise recoverable install.
+    nonisolated static func prioritizedDownloadHosts(_ hosts: [String], limit: Int) -> [String] {
+        var selected = Array(hosts.prefix(max(1, limit)))
+        let fallback = "https://steampipe.akamaized.net"
+        if hosts.contains(fallback), !selected.contains(fallback) { selected.append(fallback) }
+        return selected
     }
 
     // MARK: - CDN Discovery + Auth
@@ -1542,7 +1579,7 @@ extension DepotDownloader {
         guard !hosts.isEmpty else { throw SteamError.chunkDownloadFailed("No content servers are available.") }
         let key = try await depotKey(depotID: appID, appID: appID)
         let manifest = try await fetchManifest(depotID: appID, appID: appID, manifestGID: manifestGID, key: key, hosts: hosts)
-        let pool = Array(hosts.prefix(hostPoolSize))
+        let pool = Self.prioritizedDownloadHosts(hosts, limit: hostPoolSize)
         let auth = await cdnAuthFragments(depotID: appID, appID: appID, hosts: pool)
         let plan = DepotPlan(depotID: appID, manifestGID: manifestGID, key: key, manifest: manifest, hosts: pool, auth: auth,
                              declaredSize: manifest.totalUncompressedSize, health: ContentHostHealth(), installURL: folder)

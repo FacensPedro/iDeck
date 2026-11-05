@@ -29,7 +29,7 @@ on:
         required: false
         default: false
       release_tag:
-        description: "Use auto for the verified IPA version (currently 1.0.2), a matching version tag, or leave blank to build without publishing"
+        description: "Use auto for the verified IPA version (currently 1.0.3), a matching version tag, or leave blank to build without publishing"
         required: false
         default: ""
   push:
@@ -72,6 +72,7 @@ jobs:
       - name: Test download controls, version UI and CDN selection
         run: |
           python3 -m unittest discover -s tests/host -p 'test_download_pause_contract.py' -v
+          python3 -m unittest discover -s tests/host -p 'test_steam_cdn_http503_recovery.py' -v
           python3 -m unittest discover -s tests/host -p 'test_release_ui_and_cdn.py' -v
 
       - name: Test Metal Toolchain bootstrap
