@@ -29,7 +29,7 @@ on:
         required: false
         default: false
       release_tag:
-        description: "Use auto for the verified IPA version (currently 1.0.2), a matching version tag, or leave blank to build without publishing"
+        description: "Use auto for the verified IPA version (currently 1.0.3), a matching version tag, or leave blank to build without publishing"
         required: false
         default: ""
   push:
