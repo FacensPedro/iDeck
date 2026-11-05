@@ -137,6 +137,12 @@ class SystemCoordinator: ObservableObject {
     /// fetched once, in the background, as soon as a Steam account is signed
     /// in and the Wine prefix exists (again on the next library visit if not).
     func installSteamClientComponentsIfNeeded() {
+        // Expose the import folder through Files without touching running
+        // sessions or re-creating it on every library refresh.
+        if MadeiraDock.bundled, let folder = SteamDLLRepair.sourceFolder,
+           !FileManager.default.fileExists(atPath: folder.path) {
+            try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        }
         // Runs when the Madeira workspace first opens (its Wine prefix
         // ready), with or without a Steam account: the components come from
         // Valve's public update server.
