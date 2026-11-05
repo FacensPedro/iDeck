@@ -191,6 +191,12 @@ For more detail, read [Game startup and black-screen diagnostics](docs/IDECK_GAM
 
 ## Licenses, security, and attribution
 
+## Startup and releases
+
+iDeck opens directly into the Madeira library. The Home mode picker and iOS guest-app host have been removed. The Wine prefix remains under Documents/wine.
+
+The app version remains **1.0.0**. A maintainer can run **Actions → iOS Build** with `release_tag=auto` to publish a verified native IPA using the version embedded in the IPA. A custom tag must match that version. Leave the input blank to build only. Native runtime verification and licensed-component checks remain enforced.
+
 iDeck integrates or adapts code and techniques from [Madeira](https://github.com/willfaust/madeira), [FEX](https://github.com/FEX-Emu/FEX), [Wine](https://www.winehq.org/), [DXMT](https://github.com/3Shain/dxmt), [StikDebug](https://github.com/StikDebug/StikDebug).
 
 Review the repository's [license notices](LICENSES) and the applicable upstream terms. Do not upload proprietary Microsoft DLLs, the Apple Metal Shader Converter, or distributing artifacts that contain them without the appropriate redistribution rights. Remove credentials, account tokens, and personal data from diagnostics.
