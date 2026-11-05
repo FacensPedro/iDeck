@@ -329,10 +329,11 @@ struct WindowsWorkspaceView: View {
         Text(title)
             .font(.subheadline.weight(.medium))
             .foregroundColor(textColor)
-            .lineLimit(2)
-            .multilineTextAlignment(.center)
+            .lineLimit(1)
             .truncationMode(.tail)
+            .multilineTextAlignment(.center)
             .frame(maxWidth: .infinity, alignment: .center)
+            .accessibilityLabel(title)
     }
 
     /// The shared look of a card's primary action, at `cardActionHeight`.
@@ -560,7 +561,7 @@ struct WindowsWorkspaceView: View {
                 .frame(width: 38, height: 38)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
-                Text(tr("Madeira"))
+                Text("iDeck")
                     .font(.headline)
                     .foregroundColor(.white)
                 HStack(spacing: 5) {
@@ -1431,11 +1432,11 @@ private struct SteamProgramDetailsView: View {
     /// Size on disk when installed; otherwise what the account's own
     /// edition takes once installed (or, failing that, its download size).
     private var installedSizeText: String? {
-        var bytes: UInt64 = 0
-        if installed { bytes = steamLibrary.installedSizes[game.appID] ?? 0 }
-                if bytes == 0 { bytes = game.downloadSize(for: "windows") }
-        guard bytes > 0 else { return nil }
-        return ByteCountFormatter.string(fromByteCount: Int64(clamping: bytes), countStyle: .file)
+        let measured = installed ? (steamLibrary.installedSizes[game.appID] ?? 0) : 0
+        let reported = game.displaySizeForWindows(installedBytes: measured)
+        guard reported.bytes > 0 else { return nil }
+        let text = ByteCountFormatter.string(fromByteCount: Int64(clamping: reported.bytes), countStyle: .file)
+        return reported.isRequirement ? tr("Minimum required space: %@", text) : text
     }
 
     private var steamCloudControls: some View {

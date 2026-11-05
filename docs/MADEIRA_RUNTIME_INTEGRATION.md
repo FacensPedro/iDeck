@@ -486,9 +486,9 @@ O símbolo público `ideck_madeira_launch_v1` **não** é exportado na compilaç
 
 A integração do pipeline de compilação Xcode das bibliotecas upstream **continua pendente** e não pode ser substituída por renomear arquivos, editar mensagens de erro ou modificar um IPA sem assinatura.
 
-### Importação IPA / LiveContainer
+### Segurança na extração de arquivos
 
-O reparo do extrator aceita registros legítimos de diretório (`Payload/GetMoreRam.app/`) e adia a criação dessas pastas até haver arquivos para gravar. Mantém checagem de traversal e links simbólicos. **Importar um IPA não significa executá-lo no LiveContainer**. Executar aplicativos dentro de outro aplicativo depende de um runtime compatível e das restrições de assinatura do iPadOS.
+O extrator preserva a validação de caminhos, registros legítimos de diretório e links simbólicos ao lidar com arquivos. O carregamento de aplicativos iOS convidados foi removido; a aplicação concentra-se no prefixo Wine do Madeira e na execução de programas Windows dentro das restrições de assinatura do iPadOS.
 
 ### Empacotamento opcional do runtime
 

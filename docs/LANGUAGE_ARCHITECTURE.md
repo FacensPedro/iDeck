@@ -6,7 +6,7 @@ boundaries with `scripts/check_language_layers.py`.
 | Language | Used for | Where |
 |---|---|---|
 | **C++** | Intensive processing: emulation glue, the Wine JIT pool (`FEXRuntime.cpp`), graphics translation helpers, download codecs (`EpicChunkCodec.cpp`) | `iDeck/NativeRuntime/*.cpp`, `iDeck/*.cpp` |
-| **C** | System components that already use C: zlib/zstd/LZMA codecs, disk I/O, ZIP extraction, LiveContainer init, Wine environment | `iDeck/*.c`, `iDeck/NativeRuntime/*.c` |
+| **C** | System components that already use C: zlib/zstd/LZMA codecs, disk I/O, ZIP extraction, native Madeira prefix setup, Wine environment | `iDeck/*.c`, `iDeck/NativeRuntime/*.c` |
 | **Swift** | SwiftUI interface and native iOS features (networking, Keychain, Background Tasks, GameController, system frameworks such as Compression and CryptoKit) | `iDeck/*.swift` |
 | **Objective-C++** | The only bridge between Swift and C++: an Objective-C class or `extern "C"` API whose header has no C++ types | `iDeck/*.mm`, `iDeck/NativeRuntime/*.mm` |
 | **Python** | Build and validation tools outside the app | `scripts/`, `tests/host/` |

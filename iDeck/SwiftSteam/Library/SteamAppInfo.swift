@@ -343,6 +343,34 @@ struct SteamAppInfo {
         }
     }
 
+    /// Prefer measured installed bytes, then PICS install/download metadata.
+    /// Certain legacy editions do not expose usable depot sizes in Steam's
+    /// product info; the last resort is the *published minimum disk space*,
+    /// which is explicitly marked as a requirement, not an exact download size.
+    func displaySizeForWindows(installedBytes: UInt64 = 0) -> (bytes: UInt64, isRequirement: Bool) {
+        if installedBytes > 0 { return (installedBytes, false) }
+        let installed = installSize(for: "windows")
+        if installed > 0 { return (installed, false) }
+        let download = downloadSize(for: "windows")
+        if download > 0 { return (download, false) }
+        if let gb = Self.publishedRequiredSpaceGB(for: appID) {
+            return (UInt64(gb * 1_000_000_000), true)
+        }
+        return (0, false)
+    }
+
+    /// Steam store PC minimum storage, in decimal GB, when PICS has no size.
+    /// 22330: Oblivion GOTY (4.6 GB); 489830: Skyrim Special/Anniversary
+    /// Edition (12 GB; Anniversary Upgrade is DLC 1746860, not a standalone
+    /// game). These are required free-space estimates, not installed-file scans.
+    static func publishedRequiredSpaceGB(for appID: UInt32) -> Double? {
+        switch appID {
+        case 22330: return 4.6
+        case 489830: return 12.0
+        default: return nil
+        }
+    }
+
     // MARK: - Parsing
 
     /// Parse app info from a PICS text-VDF buffer.

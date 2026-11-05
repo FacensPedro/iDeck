@@ -390,9 +390,12 @@ final class IRelayDeviceService: @unchecked Sendable {
             let build = installed ? SteamInstallFiles.buildID(appID: Int(game.appID), steamApps: steamApps) : nil
             // An update only when Steam's current build differs from the installed record's.
             let update = installed && game.buildID != 0 && build != nil && build != Int(game.buildID)
-            let size = installed ? (steam.installedSizes[game.appID] ?? 0) : game.downloadSize(for: "windows")
+            let size = game.displaySizeForWindows(installedBytes: installed ? (steam.installedSizes[game.appID] ?? 0) : 0)
             return ["appId": game.appID, "name": game.name, "installDir": game.installDir,
-                    "installed": installed, "update": update, "size": size, "dlc": dlc(game.appID)]
+                    "installed": installed, "update": update, "size": size.bytes,
+                    "sizeSource": size.isRequirement ? "requirements" : "metadata",
+                    "requiredSpaceGB": size.isRequirement ? (SteamAppInfo.publishedRequiredSpaceGB(for: game.appID) ?? 0) : 0,
+                    "dlc": dlc(game.appID)]
         }
         // Installed games the owned list does not have (not loaded yet, or another account's).
         let listed = Set(steam.games.map(\.appID))
@@ -400,30 +403,49 @@ final class IRelayDeviceService: @unchecked Sendable {
         // (228980) or other records that only lend depots.
         for game in MadeiraDock.games(drive: drive) where !listed.contains(UInt32(game.id)) {
             let id = UInt32(game.id)
-            steamGames.append(["appId": id, "name": game.name, "installDir": game.installDir, "installed": true, "dlc": dlc(id)])
+            let size = SteamAppInfo(appID: id).displaySizeForWindows(installedBytes: steam.installedSizes[id] ?? 0)
+            steamGames.append(["appId": id, "name": game.name, "installDir": game.installDir,
+                               "installed": true, "size": size.bytes,
+                               "sizeSource": size.isRequirement ? "requirements" : "metadata",
+                               "requiredSpaceGB": size.isRequirement ? (SteamAppInfo.publishedRequiredSpaceGB(for: id) ?? 0) : 0,
+                               "dlc": dlc(id)])
         }
         let gog = GOGLibraryModel.shared
         gog.refreshInstalled(prefixPath: prefix)
         let gogInstalled = await Task.detached(priority: .userInitiated) { GOGInstallScanner.installed(in: drive) }.value
+        // GOG editions do not always publish a size in the initial owned
+        // list. Ask GOG's content plan for the requested legacy title instead
+        // of reporting a guessed fixed-size download.
+        if gog.isSignedIn {
+            for game in gog.games where game.worksOnWindows &&
+                game.title.localizedCaseInsensitiveContains("Oblivion") &&
+                gog.downloadSizes[game.id] == nil {
+                await gog.loadSize(for: game)
+            }
+        }
         var gogGames: [[String: Any]] = gog.games.filter(\.worksOnWindows).map { game in
             ["id": game.id, "title": game.title, "cover": game.artworkCandidates.first?.absoluteString ?? "",
-             "installed": gogInstalled[game.id] != nil]
+             "installed": gogInstalled[game.id] != nil,
+             "size": gog.installedSizes[game.id].flatMap { $0 > 0 ? $0 : nil } ?? (gog.downloadSizes[game.id] ?? 0)]
         }
         let gogListed = Set(gog.games.map(\.id))
         for (id, game) in gogInstalled where !gogListed.contains(id) {
-            gogGames.append(["id": id, "title": game.name, "cover": "", "installed": true])
+            gogGames.append(["id": id, "title": game.name, "cover": "", "installed": true,
+                             "size": gog.installedSizes[id] ?? 0])
         }
         let epic = EpicLibrary.shared
         epic.reloadInstalled()
         var epicGames: [[String: Any]] = epic.owned.map { game in
             ["appName": game.appName, "title": game.title, "namespace": game.namespace,
              "catalogItemId": game.catalogItemID, "cover": game.cover?.absoluteString ?? "",
-             "folderName": game.folderName, "installed": epic.installed[game.appName] != nil]
+             "folderName": game.folderName, "installed": epic.installed[game.appName] != nil,
+             "size": (epic.installed[game.appName]?.installBytes ?? 0) > 0 ? (epic.installed[game.appName]?.installBytes ?? 0) : (epic.manifestSizes[game.appName] ?? 0)]
         }
         let epicListed = Set(epic.owned.map(\.appName))
         for (app, game) in epic.installed where !epicListed.contains(app) {
             epicGames.append(["appName": app, "title": game.title, "namespace": game.namespace,
-                              "catalogItemId": game.catalogItemID, "cover": "", "folderName": "", "installed": true])
+                              "catalogItemId": game.catalogItemID, "cover": "", "folderName": "", "installed": true,
+                              "size": game.installBytes])
         }
         return [
             "steam": ["signedIn": SteamSignIn.isSignedIn || !records.isEmpty, "account": SteamSignIn.accountName ?? "", "games": steamGames],

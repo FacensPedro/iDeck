@@ -64,12 +64,12 @@ Do not confuse a **cold-start app crash** with a Wine game-launch failure.
 After a previous JIT crash, restarting the process must not automatically
 restart FEX, Wine or the debugger.
 
-The iDeck root view now starts without reading a Steam token, creating the
-Steam library/session or probing the native FEX/Wine JIT pool. Even native
-memory notifications are configured only after the user selects Madeira or
-LiveContainer. The Steam model is created lazily when the user first selects a workspace,
-then retained while navigating home so active installations are not discarded. The runtime and JIT behavior during an explicit
-Madeira launch remains unchanged.
+The iDeck root view starts directly in the Madeira library. The initial SwiftUI
+frame does not read a Steam token or probe the native FEX/Wine JIT pool.
+Memory notifications and the Steam model initialize after that initial frame.
+There is no longer a mode picker or a navigation path back to a home screen;
+the retained Steam library keeps ongoing downloads available. Windows/JIT
+startup still occurs only when a game is explicitly launched.
 
 This also supports a signed **iPadOS 26 or later** installation; the app and
 VPN extension must both advertise `MinimumOSVersion = 26.0`, even though
