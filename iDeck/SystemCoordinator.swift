@@ -141,14 +141,34 @@ class SystemCoordinator: ObservableObject {
         // ready), with or without a Steam account: the components come from
         // Valve's public update server.
         guard steamComponentsTask == nil, MadeiraDock.bundled,
-              !MadeiraDock.clientInstalled,
               PrefixInstaller.isPrefixInstalled(at: MadeiraDock.prefix),
               !ideck_wineprocess_running(), !ideck_wineserver_running() else { return }
-        // SteamRuntimeInstaller is an actor: its work runs off the main thread.
+        // The pinned Valve installer does not guarantee the optional video
+        // codecs. Repair an already installed client as well, without
+        // restarting Wine or copying large DLLs on the UI thread.
+        guard !MadeiraDock.clientInstalled || SteamDLLRepair.hasImportFiles else { return }
         steamComponentsTask = Task(priority: .utility) { @MainActor [weak self] in
             do {
-                try await SteamRuntimeInstaller.shared.prepare(prefix: MadeiraDock.prefix) { message in
-                    AppLog.record("[steam-components] " + message)
+                if !MadeiraDock.clientInstalled {
+                    try await SteamRuntimeInstaller.shared.prepare(prefix: MadeiraDock.prefix) { message in
+                        AppLog.record("[steam-components] " + message)
+                    }
+                }
+                let prefix = MadeiraDock.prefix
+                let report = await Task.detached(priority: .utility) {
+                    SteamDLLRepair.repair(prefix: prefix)
+                }.value
+                if !report.copied.isEmpty {
+                    AppLog.record("[steam-dll] repaired: " + report.copied.joined(separator: ", "))
+                }
+                if !report.invalid.isEmpty {
+                    AppLog.record("[steam-dll] incompatible or unsafe files preserved: "
+                                  + report.invalid.joined(separator: ", "))
+                }
+                if !report.missing.isEmpty {
+                    AppLog.record("[steam-dll] Steam video client is missing: "
+                                  + report.missing.joined(separator: ", ")
+                                  + "; import matching genuine Steam x64 DLLs into Documents/SteamDLLs")
                 }
             } catch {
                 AppLog.record("[steam-components] automatic setup failed: \(error.localizedDescription)")
