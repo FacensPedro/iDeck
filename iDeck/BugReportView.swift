@@ -249,9 +249,29 @@ final class BugReportModel: ObservableObject {
         notice = tr("Log copied to the clipboard.")
     }
 
+    /// Logging evidence must remain available throughout active downloads
+    /// and transfers; paused jobs do not count as an active transfer.
+    static var downloadsOrTransfersActive: Bool {
+        let steam = SteamOwnedGamesModel.shared
+        if steam.installingApps.contains(where: { !steam.pausedInstalls.contains($0) }) { return true }
+        let gog = GOGLibraryModel.shared
+        if gog.downloadProgress.keys.contains(where: { !gog.pausedDownloads.contains($0) }) { return true }
+        let epic = EpicLibrary.shared
+        if epic.downloads.values.contains(where: { download in
+            if case .paused = download.state { return false }
+            if case .failed = download.state { return false }
+            return true
+        }) { return true }
+        return false
+    }
+
     /// Clears every log the bug list reads: iDeck's own log and the last
     /// Wine log. Live JIT state is checked again, not cleared.
     func clearLogs() {
+        guard !Self.downloadsOrTransfersActive else {
+            notice = "Pause or finish the download and transfer before clearing logs."
+            return
+        }
         AppLog.clear()
         if let wine = Self.wineLogURL {
             try? FileManager.default.removeItem(at: wine)
@@ -315,6 +335,7 @@ struct BugReportView: View {
     @State private var expanded: Set<String> = []
     @State private var bugsOpen = false
     @State private var jitOpen = false
+    @State private var showClearConfirmation = false
     @AppStorage("diagnostics.detailed") private var detailedDiagnostics = false
     @AppStorage(BenchmarkSession.enabledKey) private var recordBenchmarks = false
     @State private var benchmarkReports: [URL] = []
@@ -400,13 +421,19 @@ struct BugReportView: View {
                         Label(tr("Copy iDeck log"), systemImage: "list.bullet.rectangle")
                     }
                     .disabled(!model.hasAppLog)
-                    Button(role: .destructive) { model.clearLogs() } label: {
+                    Button(role: .destructive) { showClearConfirmation = true } label: {
                         Label(tr("Clear logs"), systemImage: "trash")
                     }
-                    .disabled(!model.hasAppLog && !model.hasWineLog)
+                    .disabled((!model.hasAppLog && !model.hasWineLog) || BugReportModel.downloadsOrTransfersActive)
                 }
             }
             .scrollContentBackground(.hidden)
+        }
+        .confirmationDialog("Clear diagnostic logs?", isPresented: $showClearConfirmation) {
+            Button(tr("Clear logs"), role: .destructive) { model.clearLogs() }
+            Button(tr("Cancel"), role: .cancel) { }
+        } message: {
+            Text("This action cannot be undone. Games and settings will not be changed.")
         }
         .navigationTitle(tr("Bugs & logs"))
         .navigationBarTitleDisplayMode(.inline)
