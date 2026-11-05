@@ -131,7 +131,7 @@ final class IRelayDeviceService: @unchecked Sendable {
             guard let body = request.body,
                   let json = try? JSONSerialization.jsonObject(with: body) as? [String: Any] else { return .status(400) }
             do {
-                try await MainActor.run { try Self.downloadControl(json) }
+                try await Self.downloadControl(json)
                 return .json(["ok": true])
             } catch {
                 return .error(422, error.localizedDescription)
@@ -261,7 +261,7 @@ final class IRelayDeviceService: @unchecked Sendable {
     /// Transfer controls are executed by the owning store on iDeck, not by
     /// killing the PC-side worker. This also stops iDeck's own HTTP downloads.
     @MainActor
-    private static func downloadControl(_ json: [String: Any]) throws {
+    private static func downloadControl(_ json: [String: Any]) async throws {
         guard let store = json["store"] as? String,
               let action = json["action"] as? String,
               ["pause", "resume", "stop"].contains(action) else {
@@ -276,7 +276,7 @@ final class IRelayDeviceService: @unchecked Sendable {
             switch action {
             case "pause": steam.pauseInstall(appID: id)
             case "resume": steam.resumeInstall(appID: id)
-            default: steam.cancelInstall(appID: id)
+            default: await steam.cancelInstallAndWait(appID: id)
             }
         case "gog":
             guard let id = (json["id"] as? NSNumber)?.intValue,
