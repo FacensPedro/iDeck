@@ -1,5 +1,5 @@
 ## What's Changed
-- Renamed the Madeira workspace header to iDeck and shortened long game titles with a trailing ellipsis.
-- Improved size reporting for Oblivion Game of the Year Edition, Skyrim Anniversary Edition, and GOG/Epic games; minimum disk-space requirements are distinguished from measured sizes.
-- Improved recovery from temporary iRelay USB outages during Steam downloads, allowing interrupted progress checks to retry.
-- Reduced the iDeck USB HTTP receive buffer size to lower transient memory allocations during file transfers.
+- Added a safe way to restore missing Steam video-client DLLs from the owner's matching Windows Steam installation.
+- Added native build and packaging checks for the Windows security provider DLLs `MSV1_0.dll` and `Kerberos.dll`.
+- Improved game error diagnostics for stale import bindings and memory access violations.
+- Preserved graphics quality, rendering settings, and game resolution while improving Steam component handling.
