@@ -230,8 +230,6 @@ struct SteamGameBannerView: View {
 
 struct WindowsWorkspaceView: View {
     @ObservedObject var coordinator: SystemCoordinator
-    let onBack: (() -> Void)?
-    let mode: IDeckWorkspace
     @ObservedObject var steamLibrary: SteamOwnedGamesModel
 
     @State private var isSettingsPresented = false
@@ -239,12 +237,9 @@ struct WindowsWorkspaceView: View {
     /// The selected tile of the console-style shelf (a store or a game).
     @State var shelf: ShelfItem = .store(.steam)
     @State private var prefixPath: URL?
-    @StateObject private var appManager = AppManager()
     @StateObject private var windowsLibrary = WindowsLibraryStore()
     @State private var isExecutablePickerPresented = false
     @State private var isExecutableMenuPresented = false
-    @State private var isIPAPickerPresented = false
-    @State private var selectedGuestApp: SelectedLibraryURL?
     @State private var selectedExecutable: SelectedLibraryURL?
     @State private var selectedSteamGame: SelectedSteamGame?
     @State private var installMessage: String?
@@ -425,17 +420,13 @@ struct WindowsWorkspaceView: View {
                 topBar
                 ScrollView {
                     VStack(alignment: .leading, spacing: 22) {
-                        if mode == .pc {
-                            HStack(alignment: .center, spacing: 14) {
-                                libraryHeading
-                                Spacer(minLength: 8)
-                                steamConnectButton
-                            }
-                            consoleShelf
-                            shelfContent
-                        } else {
-                            liveContainerContent
+                        HStack(alignment: .center, spacing: 14) {
+                            libraryHeading
+                            Spacer(minLength: 8)
+                            steamConnectButton
                         }
+                        consoleShelf
+                        shelfContent
                     }
                     .frame(maxWidth: 1000)
                     .padding(.horizontal, isCompact ? 14 : 28)
@@ -464,15 +455,12 @@ struct WindowsWorkspaceView: View {
                                  coordinator: coordinator) { game in launchEpicGame(game) }
         }
         .onAppear {
-            if mode == .pc { epicLibrary.start() }
+            epicLibrary.start()
         }
         .task(id: gogLibrary.isSignedIn) {
-            if mode == .pc && gogLibrary.isSignedIn && gogLibrary.games.isEmpty {
+            if gogLibrary.isSignedIn && gogLibrary.games.isEmpty {
                 await gogLibrary.refresh()
             }
-        }
-        .sheet(item: $selectedGuestApp) { selection in
-            GuestProgramDetailsView(appURL: selection.url, appManager: appManager, coordinator: coordinator)
         }
         .sheet(item: $selectedExecutable) { selection in
             WindowsExecutableDetailsView(executableURL: selection.url, prefixPath: prefixPath, library: windowsLibrary, coordinator: coordinator)
@@ -492,28 +480,6 @@ struct WindowsWorkspaceView: View {
                     await windowsLibrary.importEmbeddedIcon(for: executable)
                 }
             } catch {
-                installMessage = error.localizedDescription
-                isShowingInstallResult = true
-            }
-        }
-        .fileImporter(
-            isPresented: $isIPAPickerPresented,
-            allowedContentTypes: [UTType(filenameExtension: "ipa") ?? .data, .zip, .data],
-            allowsMultipleSelection: false
-        ) { result in
-            switch result {
-            case .success(let urls):
-                guard let url = urls.first else { return }
-                appManager.installIPA(from: url) { result in
-                    switch result {
-                    case .success(let appURL):
-                        selectedGuestApp = SelectedLibraryURL(url: appURL)
-                    case .failure(let error):
-                        installMessage = error.localizedDescription
-                        isShowingInstallResult = true
-                    }
-                }
-            case .failure(let error):
                 installMessage = error.localizedDescription
                 isShowingInstallResult = true
             }
@@ -540,7 +506,6 @@ struct WindowsWorkspaceView: View {
 
         .onAppear {
             resolvePrefixPath()
-            appManager.refreshInstalledApps()
         }
         // iRelay copied a game from the PC.
         .onReceive(NotificationCenter.default.publisher(for: IRelayDeviceService.installedNotification)) { _ in
@@ -549,78 +514,11 @@ struct WindowsWorkspaceView: View {
         // A finished Wine session may have installed a game (a GOG installer,
         // a setup program): look for new installs whenever Wine stops.
         .onChange(of: coordinator.windowsStatus) { _, _ in
-            guard mode == .pc, let prefixPath, !ideck_wineprocess_running() else { return }
+            guard let prefixPath, !ideck_wineprocess_running() else { return }
             gogLibrary.refreshInstalled(prefixPath: prefixPath)
             windowsLibrary.refresh(prefixPath: prefixPath)
         }
         .preferredColorScheme(.dark)
-    }
-
-    private var liveContainerContent: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            Text(tr("LiveContainer Apps"))
-                .font(.title2.bold())
-                .foregroundColor(.white)
-            Button {
-                isIPAPickerPresented = true
-            } label: {
-                Label(tr("Install IPA"), systemImage: "square.and.arrow.down")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 15)
-            }
-            .buttonStyle(.borderedProminent)
-
-            if appManager.installedApps.isEmpty {
-                Text(tr("No apps installed. Tap + to install an .ipa"))
-                    .foregroundColor(.gray)
-                    .frame(maxWidth: .infinity, minHeight: 110)
-            } else {
-                LazyVGrid(columns: columns, spacing: 14) {
-                    ForEach(appManager.installedApps, id: \.path) { appURL in
-                        VStack(spacing: 10) {
-                            Button {
-                                selectedGuestApp = SelectedLibraryURL(url: appURL)
-                            } label: {
-                                VStack(spacing: 9) {
-                                    AppBundleArtworkView(appURL: appURL, appManager: appManager)
-                                        .frame(width: artworkWidth, height: artworkHeight)
-                                    cardTitle(appManager.displayName(for: appURL))
-                                }
-                            }
-                            .buttonStyle(.plain)
-                            Button {
-                                launchGuest(appURL)
-                            } label: {
-                                Label(tr("Launch"), systemImage: "play.fill")
-                                    .frame(maxWidth: .infinity)
-                            }
-                            .buttonStyle(.borderedProminent)
-                        }
-                        .padding(10)
-                        .frame(maxWidth: .infinity)
-                        .background(panelColor)
-                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(lineColor, lineWidth: 1))
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
-                    }
-                }
-            }
-        }
-    }
-
-    private func launchGuest(_ appURL: URL) {
-        coordinator.refreshJITStatus()
-        guard coordinator.isJITEnabled else {
-            installMessage = tr("Activate JIT with StikDebug, then confirm it in Settings.")
-            isShowingInstallResult = true
-            return
-        }
-        coordinator.forceJITAndStartLiveContainer()
-        coordinator.launchGuestApp(at: appURL)
-        if coordinator.liveContainerStatus.hasPrefix("Guest launch failed") {
-            installMessage = coordinator.liveContainerStatus
-            isShowingInstallResult = true
-        }
     }
 
     private var libraryHeading: some View {
@@ -1092,7 +990,7 @@ struct WindowsWorkspaceView: View {
     }
 
     private func resolvePrefixPath() {
-        coordinator.containerHost.mountEnvironment { mountedPath in
+        coordinator.prefixHost.mountEnvironment { mountedPath in
             guard let mountedPath else { return }
             let root = URL(fileURLWithPath: mountedPath, isDirectory: true)
             Task { @MainActor in
@@ -1108,8 +1006,7 @@ struct WindowsWorkspaceView: View {
                 steamLibrary.refreshInstalledApps(prefixPath: root)
                 gogLibrary.refreshInstalled(prefixPath: root)
                 coordinator.installSteamClientComponentsIfNeeded()
-                appManager.refreshInstalledApps()
-            }
+                }
         }
     }
 
@@ -1184,7 +1081,7 @@ struct WindowsWorkspaceView: View {
     }
 
     private func install(_ game: SteamAppInfo) {
-        coordinator.containerHost.mountEnvironment { mountedPath in
+        coordinator.prefixHost.mountEnvironment { mountedPath in
             guard let mountedPath else {
                 coordinator.setWindowsStatus("Container initialization failed")
                 return
@@ -1259,215 +1156,6 @@ private struct WindowsExecutableArtworkView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .clipped()
         .accessibilityLabel(profile.title)
-    }
-}
-
-private struct AppBundleArtworkView: View {
-    let appURL: URL
-    @ObservedObject var appManager: AppManager
-
-    var body: some View {
-        Group {
-            if let icon = appManager.iconImage(for: appURL) {
-                Image(uiImage: icon)
-                    .resizable()
-                    .scaledToFit()
-                    .padding(12)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color.white.opacity(0.05))
-            } else {
-                ZStack {
-                    Color.white.opacity(0.06)
-                    Image(systemName: "app.fill")
-                        .font(.system(size: 44))
-                        .foregroundColor(.gray)
-                }
-            }
-        }
-        .clipShape(RoundedRectangle(cornerRadius: 9))
-        .accessibilityLabel(appManager.displayName(for: appURL))
-    }
-}
-
-private struct GuestProgramDetailsView: View {
-    let appURL: URL
-    @ObservedObject var appManager: AppManager
-    @ObservedObject var coordinator: SystemCoordinator
-    @Environment(\.dismiss) private var dismiss
-    @State private var errorMessage: String?
-    @State private var showError = false
-    @State private var isArtworkPickerPresented = false
-
-    private var displayName: String { appManager.displayName(for: appURL) }
-    @State private var appSize: Int64 = 0
-
-    @State private var dataSelection = GuestContainerSelection()
-    @State private var containerName = ""
-    @State private var containerToDelete: GuestDataContainer?
-    @State private var confirmContainerDeletion = false
-
-    private var containerKey: String { appManager.bundleIdentifier(for: appURL) ?? appURL.lastPathComponent }
-
-    private func updateContainers(_ action: () throws -> Void) {
-        do {
-            try action()
-            dataSelection = try GuestContainerStore.shared.selection(for: containerKey)
-        } catch {
-            errorMessage = error.localizedDescription
-            showError = true
-        }
-    }
-
-    private var containerControls: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(tr("Data containers")).font(.headline)
-            Text(tr("Data is preserved when updating or uninstalling the app. Delete containers separately."))
-                .font(.caption).foregroundColor(.secondary)
-            ForEach(dataSelection.containers) { container in
-                HStack {
-                    Button {
-                        updateContainers { try GuestContainerStore.shared.select(container.id, for: containerKey) }
-                    } label: {
-                        Label(container.name, systemImage: dataSelection.selected == container.id ? "checkmark.circle.fill" : "circle")
-                    }
-                    Spacer()
-                    Button(role: .destructive) {
-                        containerToDelete = container
-                        confirmContainerDeletion = true
-                    } label: { Image(systemName: "trash") }
-                    .accessibilityLabel(tr("Delete container"))
-                }
-            }
-            TextField(tr("Container name"), text: $containerName).textFieldStyle(.roundedBorder)
-            HStack {
-                Button(tr("Create container")) {
-                    updateContainers {
-                        try GuestContainerStore.shared.create(for: containerKey, name: containerName)
-                        containerName = ""
-                    }
-                }
-                Button(tr("Rename selected")) {
-                    guard let selected = dataSelection.selected else { return }
-                    updateContainers {
-                        try GuestContainerStore.shared.rename(selected, for: containerKey, name: containerName)
-                        containerName = ""
-                    }
-                }.disabled(dataSelection.selected == nil)
-            }.disabled(containerName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            Text(tr("Container storage is ready. Running iOS apps still requires integration of the LiveContainer loader and signing."))
-                .font(.caption).foregroundColor(.secondary)
-        }
-    }
-
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 18) {
-                    AppBundleArtworkView(appURL: appURL, appManager: appManager)
-                        .frame(width: 160, height: 160)
-                    Button {
-                        isArtworkPickerPresented = true
-                    } label: {
-                        Label(tr("Change cover"), systemImage: "photo")
-                    }
-                    .buttonStyle(.bordered)
-                    Text(displayName)
-                        .font(.title2.bold())
-                        .foregroundColor(.white)
-                    Text(appManager.bundleIdentifier(for: appURL) ?? appURL.lastPathComponent)
-                        .font(.caption)
-                        .foregroundColor(.gray)
-                        .textSelection(.enabled)
-                    Text(tr("App size: %@", ByteCountFormatter.string(
-                        fromByteCount: appSize, countStyle: .file)))
-                        .font(.subheadline)
-                        .foregroundColor(.gray)
-                    containerControls
-                    Button {
-                        coordinator.refreshJITStatus()
-                        guard coordinator.isJITEnabled else {
-                            errorMessage = tr("Activate JIT with StikDebug, then confirm it in Settings.")
-                            showError = true
-                            return
-                        }
-                        coordinator.forceJITAndStartLiveContainer()
-                        coordinator.launchGuestApp(at: appURL)
-                        if coordinator.liveContainerStatus.hasPrefix("Guest launch failed") {
-                            errorMessage = coordinator.liveContainerStatus
-                            showError = true
-                            return
-                        }
-                        dismiss()
-                    } label: {
-                        Label(tr("Open app"), systemImage: "play.fill")
-                            .font(.headline)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    Button(role: .destructive) {
-                        do {
-                            try appManager.uninstallApp(at: appURL)
-                            dismiss()
-                        } catch {
-                            errorMessage = error.localizedDescription
-                            showError = true
-                        }
-                    } label: {
-                        Label(tr("Uninstall"), systemImage: "trash")
-                            .font(.headline)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
-                    }
-                    .buttonStyle(.bordered)
-                }
-                .padding(24)
-            }
-            .background(Color.black.ignoresSafeArea())
-            .navigationTitle(tr("App details"))
-            .navigationBarTitleDisplayMode(.inline)
-            .task(id: appURL) {
-                updateContainers { }
-                let url = appURL
-                appSize = await Task.detached(priority: .utility) {
-                    AppManager.sizeOfInstalledApp(at: url)
-                }.value
-            }
-            .fileImporter(isPresented: $isArtworkPickerPresented, allowedContentTypes: [.image], allowsMultipleSelection: false) { result in
-                switch result {
-                case .success(let urls):
-                    guard let url = urls.first else { return }
-                    do {
-                        try appManager.setArtwork(from: url, for: appURL)
-                    } catch {
-                        errorMessage = error.localizedDescription
-                        showError = true
-                    }
-                case .failure(let error):
-                    errorMessage = error.localizedDescription
-                    showError = true
-                }
-            }
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(tr("Done")) { dismiss() }
-                }
-            }
-            .confirmationDialog(tr("Delete container and all its data?"), isPresented: $confirmContainerDeletion, titleVisibility: .visible) {
-                Button(tr("Delete container"), role: .destructive) {
-                    guard let container = containerToDelete else { return }
-                    updateContainers { try GuestContainerStore.shared.remove(container.id, for: containerKey) }
-                    containerToDelete = nil
-                }
-                Button(tr("Cancel"), role: .cancel) { containerToDelete = nil }
-            }
-            .alert(tr("Error"), isPresented: $showError) {
-                Button(tr("OK"), role: .cancel) { }
-            } message: {
-                Text(errorMessage ?? tr("Unknown error"))
-            }
-        }
-        .preferredColorScheme(.dark)
     }
 }
 
