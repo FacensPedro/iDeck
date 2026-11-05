@@ -29,7 +29,7 @@ on:
         required: false
         default: false
       release_tag:
-        description: "Use auto for the verified IPA version (currently 1.0.1), a matching version tag, or leave blank to build without publishing"
+        description: "Use auto for the verified IPA version (currently 1.0.2), a matching version tag, or leave blank to build without publishing"
         required: false
         default: ""
   push:
@@ -1037,7 +1037,7 @@ jobs:
             [[ "$GRAPHICS" == "d3d11" || "$GRAPHICS" == "d3d12" ]] || {
               echo "::error::Native release missing an audited graphics profile."; exit 2;
             }
-            TITLE="iDeck $TAG — Native Madeira $GRAPHICS"
+            TITLE="iDeck $TAG"
           else
             TITLE="iDeck $TAG — Interface Only (No Windows Games)"
 
