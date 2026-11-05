@@ -35,6 +35,19 @@ class DownloadPauseContractTests(unittest.TestCase):
         self.assertIn("func cancelDownloadAndWait(_ game: GOGGame) async", GOG)
         self.assertIn("func cancelAndWait(_ app: String) async", EPIC)
 
+    def test_pc_status_poll_recovers_temporary_usb_errors(self):
+        downloader = (ROOT / "iDeck/SwiftSteam/Content/DepotDownloader.swift").read_text(encoding="utf-8")
+        self.assertIn("var reconnectDeadline: Date?", downloader)
+        self.assertIn("addingTimeInterval(65)", downloader)
+        self.assertIn("USB status recovered", downloader)
+        self.assertIn("USB poll unavailable", downloader)
+        self.assertIn("await pc.cancelProcess(job)", downloader)
+
+    def test_usb_http_receiver_uses_small_network_slabs(self):
+        self.assertIn("maximumLength: 256 << 10", RELAY)
+        self.assertIn('case ("PUT", "/write"):', RELAY)
+        self.assertIn('SHA-1 mismatch', RELAY)
+
     def test_device_service_exposes_store_agnostic_transfer_controls(self):
         self.assertIn('case ("POST", "/downloads/control"):', RELAY)
         self.assertIn('"protocol": 3', RELAY)

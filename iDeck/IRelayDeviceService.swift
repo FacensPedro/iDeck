@@ -607,7 +607,8 @@ final class IRelayHTTPConnection: @unchecked Sendable {
     }
 
     private func receive(_ then: @escaping (Data?) -> Void) {
-        connection.receive(minimumIncompleteLength: 1, maximumLength: 4 << 20) { data, _, complete, error in
+        // Smaller receive slabs reduce peak Data allocation under memory pressure.
+        connection.receive(minimumIncompleteLength: 1, maximumLength: 256 << 10) { data, _, complete, error in
             if let data, !data.isEmpty { then(data) } else if complete || error != nil { then(nil) } else { then(Data()) }
         }
     }

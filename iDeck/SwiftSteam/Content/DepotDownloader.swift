@@ -698,11 +698,36 @@ final class DepotDownloader {
         let baseDone = state.doneBytes, baseInstalled = state.installedBytes
         let started = Date()
         var status = IRelayClient.ProcessStatus()
+        var reconnectDeadline: Date?
+        var pollFailures = 0
         do {
             while true {
                 try Task.checkCancellation()
                 try await Task.sleep(nanoseconds: 1_000_000_000)
-                status = try await pc.processStatus(job)
+                do {
+                    status = try await pc.processStatus(job)
+                    if pollFailures > 0 {
+                        SteamLog.event("[irelay] USB status recovered app=\(app.appID) after \(pollFailures) failed polls")
+                    }
+                    reconnectDeadline = nil
+                    pollFailures = 0
+                } catch {
+                    // iRelay can briefly stop answering when iOS is under
+                    // memory pressure or usbmux reconnects. Preserve all the
+                    // PC-side work while the cable is recovering instead of
+                    // cancelling the job after its first missed status poll.
+                    try Task.checkCancellation()
+                    pollFailures += 1
+                    if pollFailures == 1 || pollFailures % 5 == 0 {
+                        SteamLog.event("[irelay] USB poll unavailable app=\(app.appID) count=\(pollFailures): \(error.localizedDescription)")
+                    }
+                    if reconnectDeadline == nil {
+                        reconnectDeadline = Date().addingTimeInterval(65)
+                    }
+                    guard Date() < reconnectDeadline! else { throw error }
+                    try await Task.sleep(nanoseconds: 1_500_000_000)
+                    continue
+                }
                 state.doneBytes = baseDone + status.compressedDone
                 state.installedBytes = baseInstalled + status.bytesDone
                 state.bytesPerSecond = Double(status.compressedDone) / max(Date().timeIntervalSince(started), 0.001)
