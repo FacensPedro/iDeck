@@ -6,23 +6,23 @@ WORKFLOW = (ROOT / ".github/workflows/ios.yml").read_text(encoding="utf-8")
 
 
 class AutomaticIPAReleaseTests(unittest.TestCase):
-    def test_release_verification_only_runs_for_pr_or_manual_build(self):
+    def test_release_verification_only_runs_for_pr_manual_or_approved_native_main(self):
         release = WORKFLOW.split("\n  release:\n", 1)[1]
         self.assertIn("needs: [checks, build]", release)
         self.assertIn("needs.checks.result == 'success'", release)
         self.assertIn("needs.build.result == 'success'", release)
         self.assertIn("github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'", release)
-        self.assertNotIn("github.ref == 'refs/heads/main'", release)
+        self.assertIn("github.ref == 'refs/heads/main' && needs.build.outputs.ipa_kind == 'native'", release)
         self.assertNotIn("startsWith(github.ref, 'refs/tags/')", release)
 
     def test_pr_final_job_runs_but_cannot_publish_a_github_release(self):
         release = WORKFLOW.split("\n  release:\n", 1)[1]
         self.assertIn("github.event_name == 'workflow_dispatch'", release)
-        self.assertNotIn("github.event_name == 'push'", release)
+        self.assertIn("github.event_name == 'push' && github.ref == 'refs/heads/main'", release)
         self.assertIn("github.event_name == 'pull_request'", release)
         self.assertIn("permissions:\n      contents: write", release)
         self.assertIn("if: ${{ github.event_name == 'pull_request' }}", release)
-        self.assertIn("if: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag != '' }}", release)
+        self.assertIn("github.event_name == 'workflow_dispatch' && inputs.release_tag != ''", release)
         self.assertIn("name: Provide verified IPA to pull request", release)
         self.assertIn("A pull request does not create a public GitHub Release.", release)
         self.assertIn("needs.build.outputs.ipa_artifact_url", release)
@@ -61,8 +61,8 @@ class AutomaticIPAReleaseTests(unittest.TestCase):
         self.assertIn("needs.build.outputs.ipa_kind", release)
         self.assertIn("actions/download-artifact@v8", release)
         self.assertIn("GH_REPO: ${{ github.repository }}", release)
-        self.assertIn("if: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag != '' }}", release)
-        self.assertIn("TAG: ${{ inputs.release_tag }}", release)
+        self.assertIn("github.event_name == 'workflow_dispatch' && inputs.release_tag != ''", release)
+        self.assertIn("TAG: ${{ github.event_name == 'push' && 'auto' || inputs.release_tag }}", release)
         self.assertIn('[[ -n "${TAG//[[:space:]]/}" ]]', release)
         self.assertNotIn("AUTO_TAG:", release)
         self.assertNotIn("format('ideck-ci-{0}-{1}', github.run_id, github.run_attempt)", release)
@@ -83,9 +83,24 @@ class AutomaticIPAReleaseTests(unittest.TestCase):
         self.assertNotIn("# iDeck 1.0.0", notes)
         self.assertTrue(notes.startswith("## What's Changed\n"))
 
+    def test_one_time_1_0_1_release_request_requires_native_main_and_does_not_clobber(self):
+        release = WORKFLOW.split("\n  release:\n", 1)[1]
+        requested = (ROOT / ".github/release-request.txt").read_text(encoding="utf-8").strip()
+        self.assertEqual(requested, "1.0.1")
+        self.assertIn("needs.build.outputs.ipa_kind == 'native'", release)
+        self.assertIn("github.ref == 'refs/heads/main'", release)
+        self.assertIn('test -s .github/release-request.txt', release)
+        self.assertIn('REQUESTED="$(tr -d \'[:space:]\' < .github/release-request.txt)"', release)
+        self.assertIn('if [[ "$REQUESTED" != "$VERSION" ]]; then', release)
+        self.assertIn('if [[ "$GITHUB_EVENT_NAME" == "push" ]]; then', release)
+        self.assertIn('Release $TAG already exists. Refusing to overwrite', release)
+        self.assertIn('sha256sum --check iDeck.ipa.sha256', release)
+        self.assertIn('if [[ "$KIND" != "native" ]]; then', release)
+
     def test_auto_release_tag_uses_the_verified_ipa_version(self):
         release = WORKFLOW.split("\n  release:\n", 1)[1]
-        self.assertIn('if [[ "$TAG" == "auto" ]]; then TAG="v$VERSION"; fi', release)
+        self.assertIn('elif [[ "$TAG" == "auto" ]]; then', release)
+        self.assertIn('TAG="v$VERSION"', release)
         self.assertIn('CFBundleShortVersionString', release)
         self.assertIn('Payload/iDeck.app/Info.plist', release)
         self.assertIn('TAG#v', release)
