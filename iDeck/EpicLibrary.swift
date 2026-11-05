@@ -86,6 +86,7 @@ struct EpicInstalledGame: Codable, Sendable {
     private var active: (app: String, task: Task<Void, Never>)?
     private var inSession = false
     private var resumeAfterSession = Set<String>()
+    private var cancellationCleanup: [String: Task<Void, Never>] = [:]
     private var resumeAfterBackground = Set<String>()
     private var started = false
     private var timer: Timer?
@@ -383,14 +384,23 @@ struct EpicInstalledGame: Codable, Sendable {
         downloads[app] = nil
         guard firstInstall, let game = game(app) else { return }
         let folder = Self.drive.appendingPathComponent(Self.installRoot).appendingPathComponent(game.folderName)
-        Task {
+        cancellationCleanup[app] = Task {
             await running?.value
             if !ExternalDrives.removeExternalInstall(at: folder) {
                 try? FileManager.default.removeItem(at: folder)
             }
             try? FileManager.default.removeItem(at: Self.journalURL(app))
             EpicLog.event("[epic-download] cancelled app=\(app) partial-files-removed=1")
+            cancellationCleanup.removeValue(forKey: app)
         }
+    }
+
+    func cancelAndWait(_ app: String) async {
+        let running = active?.app == app ? active?.task : nil
+        cancel(app)
+        let cleanup = cancellationCleanup[app]
+        await running?.value
+        await cleanup?.value
     }
 
     /// Deletes the game's files and its library entry (its per-game settings).
