@@ -83,6 +83,14 @@ class AutomaticIPAReleaseTests(unittest.TestCase):
         self.assertNotIn("# iDeck 1.0.0", notes)
         self.assertTrue(notes.startswith("## O que mudou\n"))
 
+    def test_auto_release_tag_uses_the_verified_ipa_version(self):
+        release = WORKFLOW.split("\n  release:\n", 1)[1]
+        self.assertIn('if [[ "$TAG" == "auto" ]]; then TAG="v$VERSION"; fi', release)
+        self.assertIn('CFBundleShortVersionString', release)
+        self.assertIn('Payload/iDeck.app/Info.plist', release)
+        self.assertIn('TAG#v', release)
+        self.assertIn('if [[ "$KIND" != "native" ]]; then', release)
+
     def test_versioned_release_rejects_ui_only_and_tampered_native_manifest(self):
         release = WORKFLOW.split("\n  release:\n", 1)[1]
         self.assertIn("Versioned releases require verified Wine/FEX/DXMT/D3D12", release)
