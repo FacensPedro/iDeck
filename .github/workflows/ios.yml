@@ -29,7 +29,7 @@ on:
         required: false
         default: false
       release_tag:
-        description: "Use auto for the verified IPA version (currently 1.0.4), a matching version tag, or leave blank to build without publishing"
+        description: "Use auto for the verified IPA version (currently 1.0.5), a matching version tag, or leave blank to build without publishing"
         required: false
         default: ""
   push:
@@ -52,6 +52,31 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+
+      - name: Reject mismatched manual release tags before building
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag != '' && inputs.release_tag != 'auto' }}
+        env:
+          REQUESTED_RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          project = Path("iDeck.xcodeproj/project.pbxproj").read_text(encoding="utf-8")
+          versions = set(re.findall(r"\bMARKETING_VERSION\s*=\s*([^;]+);", project))
+          if len(versions) != 1:
+              raise SystemExit(f"::error::Project contains inconsistent MARKETING_VERSION values: {sorted(versions)}")
+          version = versions.pop().strip()
+          if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version):
+              raise SystemExit(f"::error::Project has invalid marketing version: {version!r}")
+          tag = os.environ["REQUESTED_RELEASE_TAG"].strip()
+          if tag not in (version, f"v{version}"):
+              raise SystemExit(f"::error::Requested release tag '{tag}' does not match project version v{version}. Update and rebuild the IPA before publishing.")
+          print(f"Verified manual release request v{version} matches the project version.")
+          PY
+
 
       - name: Setup Xcode
         uses: maxim-lobanov/setup-xcode@v1
@@ -440,6 +465,31 @@ jobs:
         uses: actions/checkout@v5
         with:
           lfs: true
+
+      - name: Reject mismatched manual release tags before building
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag != '' && inputs.release_tag != 'auto' }}
+        env:
+          REQUESTED_RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          project = Path("iDeck.xcodeproj/project.pbxproj").read_text(encoding="utf-8")
+          versions = set(re.findall(r"\bMARKETING_VERSION\s*=\s*([^;]+);", project))
+          if len(versions) != 1:
+              raise SystemExit(f"::error::Project contains inconsistent MARKETING_VERSION values: {sorted(versions)}")
+          version = versions.pop().strip()
+          if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version):
+              raise SystemExit(f"::error::Project has invalid marketing version: {version!r}")
+          tag = os.environ["REQUESTED_RELEASE_TAG"].strip()
+          if tag not in (version, f"v{version}"):
+              raise SystemExit(f"::error::Requested release tag '{tag}' does not match project version v{version}. Update and rebuild the IPA before publishing.")
+          print(f"Verified manual release request v{version} matches the project version.")
+          PY
+
 
       - name: Setup Xcode
         uses: maxim-lobanov/setup-xcode@v1
