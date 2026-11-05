@@ -81,7 +81,7 @@ class AutomaticIPAReleaseTests(unittest.TestCase):
         self.assertIn('gh release create "$TAG" iDeck.ipa iDeck.ipa.sha256 iDeck-distribution-audit.json', release)
         notes = (ROOT / "RELEASE_NOTES.md").read_text(encoding="utf-8")
         self.assertNotIn("# iDeck 1.0.0", notes)
-        self.assertTrue(notes.startswith("## O que mudou\\n"))
+        self.assertTrue(notes.startswith("## O que mudou\n"))
 
     def test_versioned_release_rejects_ui_only_and_tampered_native_manifest(self):
         release = WORKFLOW.split("\n  release:\n", 1)[1]
