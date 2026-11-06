@@ -1149,10 +1149,11 @@ class SystemCoordinator: ObservableObject {
                 DockInstallers.prepare(dockGame, drive: drive, prefix: MadeiraDock.prefix,
                                        others: MadeiraDock.games(drive: drive))
                 if DockInstallers.script != nil, MadeiraDock.stageCommandShell() == nil {
-                    let skipped = MadeiraDock.skipInstalls(dockGame)
-                    SteamLog.event("[dock-installers] no cmd.exe in this build: \(skipped) one-time install(s) recorded as run; starting the game")
-                    DockInstallers.prepare(dockGame, drive: drive, prefix: MadeiraDock.prefix,
-                                           others: MadeiraDock.games(drive: drive))
+                    // A missing or invalid cmd.exe cannot run the Steamworks
+                    // install script. Never forge its HasRun registry values:
+                    // that made a failed prerequisite appear installed.
+                    SteamLog.event("[dock-installers] blocked: valid Windows cmd.exe unavailable; prerequisites remain pending")
+                    throw DockError.message("Steam's one-time installers could not start because Wine cmd.exe is missing or invalid. Rebuild the native IPA with a verified Windows command interpreter.")
                 }
                 if DockInstallers.installsOnly, let script = DockInstallers.script {
                     // No host runs in this session: nothing will take the sign-in transfer.
