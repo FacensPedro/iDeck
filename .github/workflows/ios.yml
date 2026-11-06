@@ -29,7 +29,7 @@ on:
         required: false
         default: false
       release_tag:
-        description: "Use auto for the verified IPA version (currently 1.0.6), a matching version tag, or leave blank to build without publishing"
+        description: "Use auto for the verified IPA version (currently 1.0.7), a matching version tag, or leave blank to build without publishing"
         required: false
         default: ""
   push:
@@ -378,6 +378,9 @@ jobs:
 
       - name: Test live bug report visibility and log refresh
         run: python3 -m unittest discover -s tests/host -p 'test_bug_report_live_visibility.py' -v
+
+      - name: Test Steam memory and interrupted-download diagnostics
+        run: python3 -m unittest discover -s tests/host -p 'test_steam_memory_diagnostics.py' -v
 
       - name: Test Madeira OpenGL (WGL on Zink/GLES) and Vulkan (MoltenVK) runtime wiring
         run: python3 -m unittest discover -s tests/host -p 'test_madeira_gl_vulkan_runtime.py' -v
