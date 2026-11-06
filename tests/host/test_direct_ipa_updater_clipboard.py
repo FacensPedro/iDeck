@@ -10,7 +10,8 @@ class DirectIPAUpdaterAndClipboardTests(unittest.TestCase):
         segment = workflow.split("      - name: Upload IPA directly (no outer ZIP)", 1)[1].split("      - name:", 1)[0]
         self.assertIn("uses: actions/upload-artifact@v7", segment)
         self.assertIn("path: iDeck-*.ipa", segment)
-        self.assertIn("name: iDeck.ipa", segment)
+        self.assertIn("Resolve versioned IPA artifact from project version", workflow)
+        self.assertIn("steps.ipa_name.outputs.name", workflow)
         self.assertIn("Prepare versioned IPA filename", workflow)
         self.assertIn("Restore canonical IPA name for integrity verification", workflow)
         self.assertIn("archive: false", segment)
