@@ -11,7 +11,7 @@ struct SettingsView: View {
     @AppStorage("controllerRightSensitivity") private var controllerRightSensitivity = 1.0
     @AppStorage("controllerDeadzone") private var controllerDeadzone = 0.10
     @AppStorage("wineControllerAPI") private var wineControllerAPI = "XInput"
-    @AppStorage("wineJITPoolMiB") private var wineJITPoolMiB = 0
+    @AppStorage("wineJITPoolMiB") private var wineJITPoolMiB = 896
     @AppStorage(BackgroundDownloads.continuedKey) private var continueDownloadsInBackground = true
     @AppStorage(BackgroundDownloads.notificationsKey) private var downloadNotifications = true
     @AppStorage(SystemCoordinator.jitMethodKey) private var jitMethod = "stikdebug"

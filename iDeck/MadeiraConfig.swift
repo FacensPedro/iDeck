@@ -104,10 +104,46 @@ enum MadeiraConfig {
     /// madeira-bcd: whichever file MADEIRA_CFG_GAME names -- a game's own
     /// GameProfiles.swift file, or the merged madeira-game.cfg (applyGame) --
     /// with the same parser GameProfile uses.
+    /// Game profiles may be queried many times while configuring graphics,
+    /// JIT and a Wine session. Cache the parsed content by path and inode
+    /// metadata; an updated profile is picked up automatically.
+    private final class GameCache: @unchecked Sendable {
+        let lock = NSLock()
+        var path = ""
+        var stamp = ""
+        var values: [String: String] = [:]
+    }
+    private static let gameCache = GameCache()
+
+    private static func invalidateGameCache() {
+        gameCache.lock.lock()
+        gameCache.stamp = ""
+        gameCache.path = ""
+        gameCache.values.removeAll(keepingCapacity: true)
+        gameCache.lock.unlock()
+    }
+
     static func gameValue(_ key: String) -> String? {
-        guard let p = getenv("MADEIRA_CFG_GAME"), case let path = String(cString: p), !path.isEmpty,
-              let text = try? String(contentsOfFile: path, encoding: .utf8) else { return nil }
-        return parse(text)[key].flatMap { $0.isEmpty ? nil : $0 }
+        guard let pointer = getenv("MADEIRA_CFG_GAME") else { return nil }
+        let path = String(cString: pointer)
+        guard !path.isEmpty else { return nil }
+        var info = stat()
+        #if os(Linux)
+        let stamp = stat(path, &info) == 0
+            ? "\(info.st_mtim.tv_sec).\(info.st_mtim.tv_nsec).\(info.st_size).\(info.st_ino)" : ""
+        #else
+        let stamp = stat(path, &info) == 0
+            ? "\(info.st_mtimespec.tv_sec).\(info.st_mtimespec.tv_nsec).\(info.st_size).\(info.st_ino)" : ""
+        #endif
+        guard !stamp.isEmpty else { return nil }
+        gameCache.lock.lock()
+        defer { gameCache.lock.unlock() }
+        if gameCache.path != path || gameCache.stamp != stamp {
+            gameCache.values = (try? String(contentsOfFile: path, encoding: .utf8)).map(parse) ?? [:]
+            gameCache.path = path
+            gameCache.stamp = stamp
+        }
+        return gameCache.values[key].flatMap { $0.isEmpty ? nil : $0 }
     }
 
     /// Makes `text` the running game's lines: written and exported as
@@ -128,6 +164,7 @@ enum MadeiraConfig {
     @discardableResult
     static func applyGame(_ text: String?) throws -> [String: String] {
         let profileURL = bcdProfileURL()
+        invalidateGameCache()
         unsetenv("MADEIRA_CFG_GAME")
         let pairs = parse(text ?? "")
         guard let u = gameURL else { return [:] }

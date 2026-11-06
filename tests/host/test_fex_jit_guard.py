@@ -16,10 +16,12 @@ class FEXJITGuardTests(unittest.TestCase):
         self.assertIn("P_TRACED", FEX)
         self.assertIn("KERN_PROC_PID", FEX)
         self.assertIn("sysctl(", FEX)
-        self.assertIn("fex_initialized || debugger_attached()", FEX)
+        self.assertIn("fex_initialized.load(std::memory_order_acquire) || debugger_attached()", FEX)
+        self.assertIn("std::lock_guard<std::mutex> lock(fex_mutex)", FEX)
         start = FEX.index('extern "C" bool ideck_fex_initialize(void)')
         guard = FEX.index("if (!debugger_attached())", start)
-        call = FEX.index("fex_initialized = init()", start)
+        call = FEX.index("const bool initialized = init()", start)
+        self.assertIn("fex_initialized.store(initialized, std::memory_order_release)", FEX)
         self.assertLess(guard, call)
 
     def test_native_fex_availability_requires_static_linkage(self):

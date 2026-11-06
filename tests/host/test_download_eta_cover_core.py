@@ -1,0 +1,58 @@
+import unittest
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+
+
+def source(name):
+    return (ROOT / name).read_text(encoding="utf-8")
+
+
+class DownloadETACoreContract(unittest.TestCase):
+    def test_eta_uses_real_speed_not_guess(self):
+        eta = source("iDeck/DownloadSpeed.swift")
+        self.assertIn("total - done", eta)
+        self.assertIn("bytesPerSecond.isFinite", eta)
+        self.assertIn("bytesPerSecond > 1_024", eta)
+        device = source("iDeck/IRelayDeviceService.swift")
+        self.assertIn('"etaSeconds"', device)
+        self.assertIn("DownloadETA.seconds", device)
+        view = source("iDeck/MainView.swift")
+        self.assertIn("remainingSeconds:", view)
+        self.assertIn("downloadETASeconds[game.id]", view)
+        self.assertIn('remainingText(remainingSeconds)', view)
+
+    def test_download_button_over_blurred_cover_is_separate_control(self):
+        view = source("iDeck/MainView.swift")
+        self.assertIn("Image(\"DownloadCloud\")", view)
+        self.assertIn("downloadCoverButton", view)
+        self.assertIn(".blur(radius:", view)
+        self.assertTrue((ROOT / "iDeck/Assets.xcassets/DownloadCloud.imageset/download.png").exists())
+
+    def test_first_architecture_bootstrap_is_win64_wow64(self):
+        view = source("iDeck/MainView.swift")
+        self.assertIn('Button("Initialize x64 and x86")', view)
+        self.assertIn('hasWoW64Runtime()', view)
+        self.assertIn('Button("Install Madeira Dock")', view)
+        self.assertIn('coordinator.openMadeiraWorkspace()', view)
+        windows = source("iDeck/WindowsEnvironment.swift")
+        self.assertIn('setenv("WINEARCH", "win64", 1)', windows)
+
+    def test_jit_defaults_to_896_and_hot_path_avoids_lock(self):
+        settings = source("iDeck/SettingsView.swift")
+        self.assertIn('private var wineJITPoolMiB = 896', settings)
+        coordinator = source("iDeck/SystemCoordinator.swift")
+        self.assertIn('as? Int ?? 896', coordinator)
+        core = source("iDeck/NativeRuntime/FEXRuntime.cpp")
+        self.assertIn('std::atomic<bool> fex_initialized', core)
+        self.assertIn('std::memory_order_acquire', core)
+
+    def test_madeira_game_config_is_cached_and_invalidated(self):
+        config = source("iDeck/MadeiraConfig.swift")
+        self.assertIn('private static let gameCache', config)
+        self.assertIn('invalidateGameCache()', config)
+        self.assertIn('info.st_ino', config)
+
+
+if __name__ == "__main__":
+    unittest.main()
