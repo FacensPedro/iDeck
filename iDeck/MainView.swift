@@ -1361,7 +1361,7 @@ private struct SteamProgramDetailsView: View {
         self.library = library
         self.steamLibrary = steamLibrary
         self.coordinator = coordinator
-        var initial = library.profile(for: "steam:\(game.appID)", title: game.name)
+        let initial = library.profile(for: "steam:\(game.appID)", title: game.name)
         _profile = State(initialValue: initial)
     }
 
@@ -1823,7 +1823,7 @@ private struct StoreGameDetailsView<Extra: View>: View {
         self.library = library
         self.coordinator = coordinator
         self.extra = extra()
-        var initial = library.profile(for: profileID, title: title)
+        let initial = library.profile(for: profileID, title: title)
         _profile = State(initialValue: initial)
     }
 

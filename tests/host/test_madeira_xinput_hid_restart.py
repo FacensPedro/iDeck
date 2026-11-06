@@ -50,7 +50,7 @@ class MadeiraXInputHIDRestartTests(unittest.TestCase):
         self.assertLess(NATIVE.index("ideck_gamepad_begin_session();"),
                         NATIVE.index("ideck_wineserver_initialize(wine_prefix)"))
         self.assertIn("ideck_gamepad_end_session();", NATIVE)
-        self.assertIn("ideck_controller_stop()", (ROOT / "iDeck/NativeRuntime/RuntimeLifecycle.mm").read_text())
+        self.assertIn("ideck_controller_stop()", (ROOT / "iDeck/NativeRuntime/MadeiraPlatform.mm").read_text())
         self.assertIn('ideck_gamepad_begin_session(void)', HEADER)
         self.assertIn('ideck_gamepad_end_session(void)', HEADER)
         self.assertIn("WineGamepadEventClaim()", SESSION)

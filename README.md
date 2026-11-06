@@ -35,7 +35,7 @@ The Xcode project currently targets **iOS/iPadOS 26.0** as its minimum OS versio
 1. Open [Actions → iOS Build](https://github.com/FacensPedro/iDeck/actions/workflows/ios.yml).
 2. Choose the branch and select **Run workflow**.
 3. For an interface-only build, disable **Require Madeira runtime**.
-4. On **Run workflow**, the defaults request **Require Madeira runtime = on**, **Native renderer = d3d11**, **Build WoW64 = on**, **Wine Mono = off**, **Metal Shader Converter = off**, **Export runtime kit = off** and an empty release tag.
+4. On **Run workflow**, the defaults request **Require Madeira runtime = on**, **Native renderer = d3d11**, **Build WoW64 = on**, **Wine Mono = on**, **Metal Shader Converter = off**, **Export runtime kit = off** and an empty release tag.
 5. Enable the converter license option **only** when selecting the optional D3D12 profile and only after confirming the necessary rights. Unlicensed D3D12 compilation is rejected.
 6. Download the exact `iDeck.ipa` artifact from that manual native run, not the IPA of a pull request or an ordinary push without owner-approved native distribution. PRs build an **interface-only** IPA and cannot run Windows games. A successful native build still requires code signing, JIT and on-device validation.
 

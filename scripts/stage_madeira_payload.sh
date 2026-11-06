@@ -201,6 +201,8 @@ if [[ -d "$VCRT_SOURCE" ]]; then
 elif [[ "${IDECK_REQUIRE_VCRUNTIME:-0}" == "1" ]]; then
   echo "ERROR: provide authorized Microsoft VC++ DLLs in IDECK_VCRUNTIME_DIR" >&2
   exit 2
+elif [[ "${IDECK_BUNDLE_VCRUNTIME:-1}" != "0" ]]; then
+  echo "Microsoft VC++ runtime will be bundled by scripts/bundle_vcruntime.sh."
 else
   echo "WARNING: Microsoft VC++ runtime absent; games needing it may fail."
 fi

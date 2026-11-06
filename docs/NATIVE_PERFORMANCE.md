@@ -8,12 +8,12 @@ The performance modules in `iDeck/NativeRuntime/` provide small, independently t
 | --- | --- | --- | --- |
 | `FEXExecutionScheduler.cpp` | `ideck_scheduler_*` | Bounded background work queue with a fixed worker count, completion barrier and graceful shutdown | Opt-in; does not replace the internal FEX scheduler |
 | `GuestMemoryPool.cpp` | `ideck_memory_pool_*` | Thread-safe, capped reuse of ordinary host heap blocks | Opt-in; not used for executable or JIT memory |
-| `MetalFrameOptimizer.mm` | `ideck_metal_frame_*` | Metal layer setup and pixel-size updates without redundant resize assignments | Used by `MetalSwapchain.mm`; not an FPS guarantee |
-| `RuntimePerformanceMonitor.mm` | `ideck_performance_*` | Lightweight, atomic frame-time and swapchain creation counters | Reset during native session preparation; swapchains counted automatically |
-| `NativePerformanceClock.cpp` | `ideck_performance_now_ns`, `ideck_performance_record_interval` | Monotonic nanosecond clock and explicit frame-interval reporting | Opt-in; frame durations require explicit instrumentation |
+| `MadeiraPlatform.mm` | `ideck_metal_frame_*` | Metal layer setup and pixel-size updates without redundant resize assignments | Used by `MadeiraPlatform.mm`; not an FPS guarantee |
+| `NativePerformance.cpp` | `ideck_performance_*` | Lightweight, atomic frame-time and swapchain creation counters | Reset during native session preparation; swapchains counted automatically |
+| `NativePerformance.cpp` | `ideck_performance_now_ns`, `ideck_performance_record_interval` | Monotonic nanosecond clock and explicit frame-interval reporting | Opt-in; frame durations require explicit instrumentation |
 | `NativePerformance.h` | C ABI | Public interface callable from Swift and C/Objective-C/C++ | Imported by `iDeck-Bridging-Header.h` |
 | `NativeMemoryManager.cpp` | `ideck_native_memory_*` | Bounded scratch-memory allocation and cache reclamation under pressure | Initialized at app launch; only used by explicit scratch clients |
-| `NativeMemoryPressure.mm` | UIKit notifications | Reacts to app memory warnings and background/foreground transitions | Registered once during app launch |
+| `MadeiraPlatform.mm` | UIKit notifications | Reacts to app memory warnings and background/foreground transitions | Registered once during app launch |
 
 ## Behavioral contract
 
@@ -32,8 +32,8 @@ xcrun clang++ -std=c++20 -O2 -pthread -x c++ \
   tests/host/NativePerformanceTests.cpp \
   iDeck/NativeRuntime/FEXExecutionScheduler.cpp \
   iDeck/NativeRuntime/GuestMemoryPool.cpp \
-  iDeck/NativeRuntime/NativePerformanceClock.cpp \
-  iDeck/NativeRuntime/RuntimePerformanceMonitor.mm \
+  iDeck/NativeRuntime/NativePerformance.cpp \
+  iDeck/NativeRuntime/NativePerformance.cpp \
   -o /tmp/ideck-native-performance-tests
 
 /tmp/ideck-native-performance-tests

@@ -6,8 +6,8 @@ iDeck includes a **bounded native scratch-buffer manager** intended for host-sid
 
 - `NativeMemoryManager.cpp` provides the thread-safe `ideck_native_memory_*` C API. A single lazy memory pool holds reusable **non-executable** scratch buffers with a configurable active-allocation ceiling and cache ceiling.
 - `GuestMemoryPool.cpp` supports reducing its cache limit, immediately freeing released cached blocks until the new limit is respected. It never frees an active allocation.
-- `NativeMemoryPressure.mm` listens for UIKit memory-warning and foreground/background notifications and updates the cache policy.
-- `iDeckApp.swift` registers notifications at startup. `RuntimeLifecycle.mm` resets the default budgets on native-session preparation and trims scratch cache on session shutdown.
+- `MadeiraPlatform.mm` listens for UIKit memory-warning and foreground/background notifications and updates the cache policy.
+- `iDeckApp.swift` registers notifications at startup. `MadeiraPlatform.mm` resets the default budgets on native-session preparation and trims scratch cache on session shutdown.
 - `NativeMemoryManager.h` exposes the API and usage counters to Swift/C/C++.
 
 ## Default policy
