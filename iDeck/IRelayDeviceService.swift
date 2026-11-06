@@ -323,6 +323,9 @@ final class IRelayDeviceService: @unchecked Sendable {
             list.append(["store": "steam", "id": id, "title": name,
                          "phase": steam.pausedInstalls.contains(id) ? "paused" : progress.phase.rawValue,
                          "done": progress.doneBytes, "total": progress.totalBytes,
+                         "etaSeconds": steam.pausedInstalls.contains(id) || progress.phase != .downloading ? 0 :
+                             (DownloadETA.seconds(done: progress.doneBytes, total: progress.totalBytes,
+                                                  bytesPerSecond: progress.bytesPerSecond) ?? 0),
                          "error": steam.downloadErrors[id] ?? ""])
         }
         for id in steam.pausedInstalls where steam.downloadProgress[id] == nil {
@@ -339,6 +342,7 @@ final class IRelayDeviceService: @unchecked Sendable {
             list.append(["store": "gog", "id": id, "title": gog.games.first { $0.id == id }?.title ?? "GOG \(id)",
                          "phase": gog.pausedDownloads.contains(id) ? "paused" : "downloading",
                          "done": Int(fraction * 1000), "total": 1000,
+                         "etaSeconds": gog.pausedDownloads.contains(id) ? 0 : (gog.downloadETASeconds[id] ?? 0),
                          "error": gog.downloadErrors[id] ?? ""])
         }
         for id in gog.pausedDownloads where gog.downloadProgress[id] == nil {
@@ -351,7 +355,12 @@ final class IRelayDeviceService: @unchecked Sendable {
             var error = ""
             if case .failed(let reason) = download.state { error = reason }
             list.append(["store": "epic", "id": app, "title": epic.game(app)?.title ?? app, "phase": download.state == .paused ? "paused" : "\(download.state)",
-                         "done": download.progress.fraction * 1000, "total": 1000, "error": error])
+                         "done": download.progress.fraction * 1000, "total": 1000,
+                         "etaSeconds": download.progress.phase == .downloading && download.state != .paused
+                             ? (DownloadETA.seconds(done: download.progress.doneBytes,
+                                                    total: download.progress.totalBytes,
+                                                    bytesPerSecond: download.progress.bytesPerSecond) ?? 0) : 0,
+                         "error": error])
         }
         return ["installs": list]
     }
