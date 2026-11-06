@@ -151,7 +151,7 @@ class SystemCoordinator: ObservableObject {
             ResourceGovernor.shared.onActivityChange = { [weak self] in self?.applyMaxRefreshRate() }
             ResourceGovernor.shared.start()
         }
-        Self.exportWineJITPreference(UserDefaults.standard.integer(forKey: "wineJITPoolMiB"))
+        Self.exportWineJITPreference(UserDefaults.standard.object(forKey: "wineJITPoolMiB") as? Int ?? 896)
         Self.exportLastGoodPool()
         // Keep app startup free of native Wine/JIT probes and Keychain reads.
         // In particular, a CS_DEBUGGED flag left behind by StikDebug or a
