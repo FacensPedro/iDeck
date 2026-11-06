@@ -87,6 +87,9 @@ final class IRelayDeviceService: @unchecked Sendable {
     static func folder(_ root: String) -> URL? {
         guard let relative = clean(root),
               roots.contains(where: { (relative + "/").hasPrefix($0) && relative.count > $0.count }) else { return nil }
+        if relative.hasPrefix("WindowsDownloads/Launchers/") &&
+            relative != "WindowsDownloads/Launchers/EA" &&
+            relative != "WindowsDownloads/Launchers/Ubisoft" { return nil }
         return drive.appendingPathComponent(relative, isDirectory: true)
     }
 
