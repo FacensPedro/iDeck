@@ -1,4 +1,6 @@
 ## What's Changed
-- Corrected the iDeck application version and build number for the 1.0.5 IPA release.
-- Added an early release-tag validation check to prevent mismatched IPA uploads.
-- Kept existing game graphics, compatibility settings, and data unchanged.
+- Fixed missing bug entries in the iDeck diagnostic screen by expanding detected errors and JIT issues automatically.
+- Refreshed error reports while the diagnostic screen is open so new problems appear without manual reloads.
+- Improved detection of warnings and long Windows runtime error messages.
+- Fixed the general bug counter when only JIT diagnostics are present.
+- Prevented cleared errors from reappearing because of an in-progress log scan.
