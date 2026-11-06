@@ -226,7 +226,8 @@ class SystemCoordinator: ObservableObject {
         // The pinned Valve installer does not guarantee the optional video
         // codecs. Repair an already installed client as well, without
         // restarting Wine or copying large DLLs on the UI thread.
-        guard !MadeiraDock.clientInstalled || SteamDLLRepair.hasImportFiles else {
+        guard !MadeiraDock.clientInstalled || SteamDLLRepair.hasImportFiles
+                || SteamDLLRepair.needsRepair(prefix: MadeiraDock.prefix) else {
             if force { steamComponentsProgress = "Madeira Dock is already installed." }
             return
         }
@@ -243,6 +244,17 @@ class SystemCoordinator: ObservableObject {
                     }
                 }
                 let prefix = MadeiraDock.prefix
+                if SteamDLLRepair.needsRepair(prefix: prefix) {
+                    // Valve's official x64 video DLLs and SDL3.dll, pinned by SHA-256.
+                    do {
+                        try await SteamRuntimeInstaller.shared.fetchVideoLibraries { [weak self] message in
+                            AppLog.record("[steam-dll] " + message)
+                            await self?.publishSteamComponentsProgress(message)
+                        }
+                    } catch {
+                        AppLog.record("[steam-dll] official Steam DLL download failed: \(error.localizedDescription)")
+                    }
+                }
                 let report = await Task.detached(priority: .utility) {
                     SteamDLLRepair.repair(prefix: prefix)
                 }.value
@@ -256,7 +268,7 @@ class SystemCoordinator: ObservableObject {
                 if !report.missing.isEmpty {
                     AppLog.record("[steam-dll] Steam video client is missing: "
                                   + report.missing.joined(separator: ", ")
-                                  + "; import matching genuine Steam x64 DLLs into Documents/SteamDLLs")
+                                  + "; retry Madeira Dock setup or import genuine Steam x64 DLLs into Documents/SteamDLLs")
                 }
                 self?.steamComponentsProgress = report.missing.isEmpty
                     ? "Madeira Dock installed and verified."

@@ -268,7 +268,7 @@ struct SettingsView: View {
         let setupReady = FileManager.default.fileExists(atPath: setup.path)
         let clientReady = FileManager.default.fileExists(atPath: executable.path)
         return Form {
-            Section(title) {
+            Section {
                 LabeledContent(tr("Installer"), value: tr(setupReady ? "Transferred" : "Not transferred"))
                 Button(tr("Run Windows installer")) {
                     coordinator.launchWindowsExecutable(at: setup,
@@ -283,6 +283,16 @@ struct SettingsView: View {
                         dismiss()
                     }
                 }
+            } header: {
+                HStack(spacing: 10) {
+                    Image(slug == "ea" ? "StoreBadgeEA" : "StoreBadgeUbisoft")
+                        .renderingMode(.original)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 36, height: 36)
+                    Text(title)
+                }
+                .textCase(nil)
             }
             Section(tr("Transfer")) {
                 Text(tr("Download the official Windows installer on your PC. In iRelay, open the matching launcher and transfer its .exe over USB. Reopen this page after the transfer."))
@@ -569,7 +579,8 @@ struct SettingsRow: View {
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(.white)
                 .frame(width: 28, height: 28)
-                .background(color, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+                .background(assetKeepsColors ? Color.clear : color,
+                            in: RoundedRectangle(cornerRadius: 7, style: .continuous))
             Text(title)
             Spacer(minLength: 8)
             if let value {
@@ -583,7 +594,6 @@ struct SettingsRow: View {
     @ViewBuilder private var iconView: some View {
         if let asset, assetKeepsColors {
             Image(asset).renderingMode(.original).resizable().scaledToFit()
-                .padding(2)
         } else if let asset {
             Image(asset).renderingMode(.template).resizable().scaledToFit()
                 .padding(5)
