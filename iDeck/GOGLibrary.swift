@@ -326,6 +326,34 @@ final class GOGLibraryModel: ObservableObject {
     @Published private(set) var installed: [Int: GOGInstalledGame] = [:]
     @Published private(set) var downloadProgress: [Int: Double] = [:]
     @Published private(set) var downloadErrors: [Int: String] = [:]
+    @Published private(set) var downloadETASeconds: [Int: Int] = [:]
+    private var transferRateSamples: [Int: (at: Date, bytes: UInt64, rate: Double)] = [:]
+
+    private func updateDownloadETA(gameID: Int, done: UInt64, total: UInt64) {
+        guard total > 0, done < total else {
+            downloadETASeconds.removeValue(forKey: gameID)
+            return
+        }
+        let now = Date()
+        guard let previous = transferRateSamples[gameID] else {
+            transferRateSamples[gameID] = (now, done, 0)
+            return
+        }
+        let elapsed = now.timeIntervalSince(previous.at)
+        guard elapsed >= 1.0 else { return }
+        let currentRate = done > previous.bytes ? Double(done - previous.bytes) / elapsed : 0
+        let smoothed = previous.rate > 0 && currentRate > 0
+            ? 0.65 * previous.rate + 0.35 * currentRate : currentRate
+        transferRateSamples[gameID] = (now, done, smoothed)
+        downloadETASeconds[gameID] = DownloadETA.seconds(done: done, total: total,
+                                                         bytesPerSecond: smoothed)
+    }
+
+    private func resetDownloadETA(gameID: Int) {
+        transferRateSamples.removeValue(forKey: gameID)
+        downloadETASeconds.removeValue(forKey: gameID)
+    }
+
     @Published private(set) var pausedDownloads: Set<Int> = []
     /// Download size of each game's Windows installer, from GOG; 0 = unknown.
     @Published private(set) var downloadSizes: [Int: Int64] = [:]
@@ -366,6 +394,7 @@ final class GOGLibraryModel: ObservableObject {
         resumeDownloads[game.id] = { [weak self] in self?.install(game, prefixPath: prefixPath, completion: completion) }
         downloadErrors[game.id] = nil
         downloadProgress[game.id] = 0
+        resetDownloadETA(gameID: game.id)
         let games = prefixPath.appendingPathComponent("drive_c/GOG Games", isDirectory: true)
         BackgroundDownloads.gog.attach(active: { [weak self] in !(self?.downloadTasks.isEmpty ?? true) },
                                        pause: {}, resume: {})
@@ -374,6 +403,7 @@ final class GOGLibraryModel: ObservableObject {
             var outcome = BackgroundDownloads.Outcome.paused
             var fallback = false
             defer {
+                resetDownloadETA(gameID: game.id)
                 downloadTasks[game.id] = nil
                 if !fallback {
                     if !pausedDownloads.contains(game.id) { downloadProgress[game.id] = nil }
@@ -411,6 +441,7 @@ final class GOGLibraryModel: ObservableObject {
                     let done = counter.add(bytes)
                     Task { @MainActor in
                         self.downloadProgress[game.id] = min(Double(done) / Double(total), 1)
+                        self.updateDownloadETA(gameID: game.id, done: UInt64(max(done, 0)), total: UInt64(total))
                         BackgroundDownloads.gog.progress(done: UInt64(done), total: UInt64(total))
                     }
                 }
@@ -604,6 +635,7 @@ final class GOGLibraryModel: ObservableObject {
         resumeDownloads[game.id] = { [weak self] in self?.downloadInstaller(game, prefixPath: prefixPath, completion: completion) }
         downloadErrors[game.id] = nil
         downloadProgress[game.id] = 0
+        resetDownloadETA(gameID: game.id)
         let folder = prefixPath.appendingPathComponent("drive_c/WindowsDownloads", isDirectory: true)
         BackgroundDownloads.gog.attach(active: { [weak self] in !(self?.downloadTasks.isEmpty ?? true) },
                                        pause: {}, resume: {})
@@ -627,6 +659,14 @@ final class GOGLibraryModel: ObservableObject {
                     let part = try await download(file, into: folder, tokens: tokens) { fraction in
                         let overall = (Double(index) + fraction) / Double(files.count)
                         self.downloadProgress[game.id] = overall
+                        let totalBytes = files.reduce(Int64(0)) { $0 + max(0, $1.sizeBytes) }
+                        if totalBytes > 0 {
+                            let complete = files.prefix(index).reduce(Int64(0)) { $0 + max(0, $1.sizeBytes) }
+                            let doneBytes = complete + Int64(Double(max(0, file.sizeBytes)) * fraction)
+                            self.updateDownloadETA(gameID: game.id,
+                                                   done: UInt64(max(0, doneBytes)),
+                                                   total: UInt64(totalBytes))
+                        }
                         BackgroundDownloads.gog.progress(done: UInt64(overall * 10_000), total: 10_000)
                     }
                     saved.append(part)
