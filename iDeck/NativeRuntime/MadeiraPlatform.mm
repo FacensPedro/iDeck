@@ -16,19 +16,28 @@
 
 // MARK: - Metal device and renderer
 
+// MTLCreateSystemDefaultDevice() is costly; the system device never changes
+// during the process, so it is created once and shared.
+static id<MTLDevice> ideck_metal_device(void) {
+    static id<MTLDevice> device;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{ device = MTLCreateSystemDefaultDevice(); });
+    return device;
+}
+
 struct IDeckMetalRenderer {
     id<MTLDevice> device;
     id<MTLTexture> texture;
 };
 
 extern "C" bool ideck_metal_available(void) {
-    return MTLCreateSystemDefaultDevice() != nil;
+    return ideck_metal_device() != nil;
 }
 
 extern "C" void *ideck_metal_renderer_create(int32_t width, int32_t height) {
     if (width < 1 || height < 1 || width > 8192 || height > 8192) return nullptr;
     @autoreleasepool {
-        id<MTLDevice> device = MTLCreateSystemDefaultDevice();
+        id<MTLDevice> device = ideck_metal_device();
         if (!device) return nullptr;
         MTLTextureDescriptor *descriptor = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatBGRA8Unorm width:(NSUInteger)width height:(NSUInteger)height mipmapped:NO];
         descriptor.usage = MTLTextureUsageShaderRead | MTLTextureUsageRenderTarget;
@@ -66,7 +75,7 @@ static CAMetalLayer *ideck_checked_layer(void *pointer) {
 extern "C" bool ideck_metal_frame_prepare(void *metal_layer) {
     CAMetalLayer *layer = ideck_checked_layer(metal_layer);
     if (!layer) return false;
-    if (!layer.device) layer.device = MTLCreateSystemDefaultDevice();
+    if (!layer.device) layer.device = ideck_metal_device();
     if (!layer.device) return false;
     layer.pixelFormat = MTLPixelFormatBGRA8Unorm;
     layer.framebufferOnly = NO;
@@ -102,7 +111,7 @@ extern "C" void ideck_metal_swapchain_destroy(void *swapchain) {
 // MARK: - DXMT
 
 extern "C" bool ideck_dxmt_available(void) {
-    if (MTLCreateSystemDefaultDevice() == nil) return false;
+    if (ideck_metal_device() == nil) return false;
 #if defined(IDECK_NATIVE_MADEIRA_ENABLED) && IDECK_NATIVE_MADEIRA_ENABLED
     // A missing DXMT renderer implementation must fail the native link.
     return &madeira_get_present_count != nullptr;

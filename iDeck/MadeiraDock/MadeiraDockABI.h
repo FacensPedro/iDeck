@@ -1,6 +1,6 @@
 // Madeira runtime functions the copied Madeira Dock files call (MadeiraDock/,
 // verbatim). Native builds link Madeira's own definitions; interface builds
-// use MadeiraDockInterfaceStubs.c.
+// use NativeRuntime/InterfaceOnlyStubs.c.
 #ifndef MADEIRA_DOCK_ABI_H
 #define MADEIRA_DOCK_ABI_H
 
