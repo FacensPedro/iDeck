@@ -2612,7 +2612,7 @@ private struct IDeckFirstRunSetupView: View {
                 coordinator.installMadeiraDock()
             }
             .buttonStyle(.bordered)
-            .disabled(!prefixReady || !MadeiraDock.bundled)
+            .disabled(!MadeiraDock.bundled)
             if let progress = coordinator.steamComponentsProgress {
                 Text(progress)
                     .font(.caption)
