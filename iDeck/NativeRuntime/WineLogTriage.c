@@ -94,3 +94,55 @@ int32_t ideck_wine_log_diagnose(const char *path) {
     free(buffer);
     return code;
 }
+
+// The Wine host may return exit code 0 even after its Steam-launched child
+// pseudo-process aborted with STATUS_ACCESS_VIOLATION. Read only bytes logged
+// after the active launch began: earlier game crashes must not poison a later
+// successful exit. We require abort_process rather than a handled SEH fault.
+int32_t ideck_wine_log_fatal_av_since(const char *path, int64_t start_offset) {
+    if (!path || !*path || start_offset < 0) return 0;
+    int fd = open(path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
+    if (fd < 0) return 0;
+    struct stat info;
+    if (fstat(fd, &info) || !S_ISREG(info.st_mode) || info.st_size <= 0) {
+        close(fd);
+        return 0;
+    }
+    // If Madeira truncated the previous log when opening the new session,
+    // inspect the new log from its beginning.
+    off_t start = (off_t)start_offset;
+    if (start > info.st_size) start = 0;
+    off_t floor = info.st_size > WINE_LOG_TAIL_LIMIT
+        ? info.st_size - WINE_LOG_TAIL_LIMIT : 0;
+    if (start < floor) start = floor;
+    size_t length = (size_t)(info.st_size - start);
+    if (!length) { close(fd); return 0; }
+    char *buffer = malloc(length + 1);
+    if (!buffer) { close(fd); return 0; }
+    size_t done = 0;
+    while (done < length) {
+        ssize_t n = pread(fd, buffer + done, length - done, start + (off_t)done);
+        if (n < 0 && errno == EINTR) continue;
+        if (n <= 0) break;
+        done += (size_t)n;
+    }
+    close(fd);
+    buffer[done] = '\0';
+    for (size_t i = 0; i < done; ++i) {
+        if (buffer[i] == '\0') buffer[i] = ' ';
+        if (buffer[i] >= 'A' && buffer[i] <= 'Z')
+            buffer[i] = (char)(buffer[i] - 'A' + 'a');
+    }
+    // The Steam Dock host can exit successfully while the launched game dies.
+    // Ignore merely handled exceptions and diagnostics from older sessions.
+    const char *current = buffer;
+    const char *marker = "[wineserver-bridge] ws_log test";
+    const char *next = buffer;
+    while ((next = strstr(next, marker)) != NULL) {
+        current = next;
+        next += strlen(marker);
+    }
+    int32_t found = strstr(current, "abort_process: status=0xc0000005") != NULL;
+    free(buffer);
+    return found;
+}
