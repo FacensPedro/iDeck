@@ -16,7 +16,7 @@
 
 namespace {
 std::mutex fex_mutex;
-bool fex_initialized = false;
+std::atomic<bool> fex_initialized{false};
 
 // CS_DEBUGGED/MAP_JIT can remain available after the debugger detaches.
 // Madeira's JIT allocator uses BRK #0xf00d and requires a live debugger
@@ -45,15 +45,15 @@ extern "C" bool ideck_jit_debugger_attached(void) {
 }
 
 extern "C" bool ideck_fex_jit_ready(void) {
-    std::lock_guard<std::mutex> lock(fex_mutex);
-    // Once the FEX pool exists, further launches do not need a debugger
-    // merely to use that existing RX/RW mapping.
-    return fex_initialized || debugger_attached();
+    // Hot JIT-readiness checks must not contend on the FEX initialization mutex.
+    // An initialized FEX translator keeps its executable mapping after debugger detach.
+    return fex_initialized.load(std::memory_order_acquire) || debugger_attached();
 }
 
 extern "C" bool ideck_fex_initialize(void) {
+    if (fex_initialized.load(std::memory_order_acquire)) return true;
     std::lock_guard<std::mutex> lock(fex_mutex);
-    if (fex_initialized) return true;
+    if (fex_initialized.load(std::memory_order_relaxed)) return true;
 
     // Fail without entering jit26_prepare_region: an unhandled BRK is a
     // process-fatal EXC_BREAKPOINT, not a recoverable initialization failure.
@@ -69,8 +69,9 @@ extern "C" bool ideck_fex_initialize(void) {
     // The native initializer must be resolved from the real linked FEX bridge.
     using Init = bool (*)(void);
     Init init = &fex_initialize;
-    fex_initialized = init();
-    return fex_initialized;
+    const bool initialized = init();
+    fex_initialized.store(initialized, std::memory_order_release);
+    return initialized;
 #else
     return false;
 #endif
@@ -117,7 +118,7 @@ extern "C" IDeckJITSnapshot ideck_jit_snapshot(void) {
     state.debugger_attached = debugger_attached();
 
     if (fex_mutex.try_lock()) {
-        state.fex_initialized = fex_initialized;
+        state.fex_initialized = fex_initialized.load(std::memory_order_acquire);
         fex_mutex.unlock();
     } else {
         state.fex_state_busy = true;
