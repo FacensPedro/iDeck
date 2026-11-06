@@ -36,8 +36,13 @@ class SystemCoordinator: ObservableObject {
     // Only inspect Wine fatal-crash lines written after the current launch.
     private var wineLogStartOffset: Int64?
 
+    private static var wineLogURL: URL? {
+        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?
+            .appendingPathComponent("madeira-log.txt", isDirectory: false)
+    }
+
     private func captureWineLogStart() {
-        guard let path = BugReportModel.wineLogURL?.path else {
+        guard let path = Self.wineLogURL?.path else {
             wineLogStartOffset = nil
             return
         }
@@ -52,7 +57,7 @@ class SystemCoordinator: ObservableObject {
         let nativeStatus = ideck_wineprocess_last_ntstatus(&nativeCrashStatus) ? nativeCrashStatus : nil
         let childAV: Bool
         if code == 0, nativeStatus == nil,
-           let start = wineLogStartOffset, let path = BugReportModel.wineLogURL?.path {
+           let start = wineLogStartOffset, let path = Self.wineLogURL?.path {
             childAV = path.withCString { ideck_wine_log_fatal_av_since($0, start) != 0 }
         } else {
             childAV = false
