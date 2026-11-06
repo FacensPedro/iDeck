@@ -19,7 +19,7 @@ struct iDeckApp: App {
         // Report the interruption, never assume Jetsam or discard game files.
         let diagnostics = UserDefaults.standard
         if let inFlight = diagnostics.string(forKey: "diagnostics.installInFlight"), !inFlight.isEmpty {
-            AppLog.record("[startup] previous Steam installation did not finish normally: \(inFlight); cause undetermined")
+            AppLog.record("[startup] warning: previous Steam installation did not finish normally: \(inFlight); cause undetermined")
             diagnostics.removeObject(forKey: "diagnostics.installInFlight")
         }
         // iRelay over the USB cable: listen from launch so the PC finds iDeck at once.
