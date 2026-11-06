@@ -65,7 +65,7 @@ jobs:
           from pathlib import Path
 
           project = Path("iDeck.xcodeproj/project.pbxproj").read_text(encoding="utf-8")
-          versions = set(re.findall(r"\bMARKETING_VERSION\s*=\s*([^;]+);", project))
+          versions = set(re.findall(r"MARKETING_VERSION\s*=\s*([0-9]+\.[0-9]+\.[0-9]+);", project))
           if len(versions) != 1:
               raise SystemExit(f"::error::Project contains inconsistent MARKETING_VERSION values: {sorted(versions)}")
           version = versions.pop().strip()
@@ -973,7 +973,7 @@ jobs:
           if len(versions) != 1:
               raise SystemExit(f"Expected exactly one iDeck marketing version, found {sorted(versions)}")
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
-              output.write(f"name=iDeck-{versions.pop()}.ipa\\n")
+              output.write(f"name=iDeck-{versions.pop()}.ipa\n")
           PY
 
       - name: Download verified iDeck IPA directly
