@@ -35,8 +35,8 @@ class SteamMemoryDiagnosticsTests(unittest.TestCase):
         # array. The remaining queue must be counted after filtering.
         self.assertIn('journal-resume=', DOWN)
         self.assertIn('[steam-depot] resume checked app=', DOWN)
-        self.assertIn(r'to-fetch-chunks=\\(work.reduce(0) { $0 + $1.count })', DOWN)
-        self.assertNotIn(r'to-fetch-chunks=\\(bad.reduce(0)', DOWN)
+        self.assertIn(r'to-fetch-chunks=\(work.reduce(0) { $0 + $1.count })', DOWN)
+        self.assertNotIn(r'to-fetch-chunks=\(bad.reduce(0)', DOWN)
 
     def test_resume_checks_available_disk_after_existing_chunk_verification(self):
         # ftruncate sets logical length before the data arrives. Compare free
