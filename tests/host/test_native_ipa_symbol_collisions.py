@@ -7,11 +7,11 @@ import subprocess
 import tempfile
 import unittest
 
-ROOT = Path(__file__).resolve().parents[2]
+from support import ROOT, repo_text
 SCRIPT = ROOT / "scripts/prepare_madeira_wine_link.py"
-KIT = (ROOT / "scripts/madeira_native_kit.py").read_text(encoding="utf-8")
-SOURCE_LINKER = (ROOT / "scripts/link_madeira_native.sh").read_text(encoding="utf-8")
-HEADER = (ROOT / "iDeck/SwiftSteam/zstd_edu.h").read_text(encoding="utf-8")
+KIT = repo_text("scripts/madeira_native_kit.py")
+SOURCE_LINKER = repo_text("scripts/link_madeira_native.sh")
+HEADER = repo_text("iDeck/SwiftSteam/zstd_edu.h")
 ZSTD_SOURCE = ROOT / "iDeck/SwiftSteam/zstd_edu.c"
 
 sys.path.insert(0, str(ROOT / "scripts"))

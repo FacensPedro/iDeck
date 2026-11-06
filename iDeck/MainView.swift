@@ -2645,7 +2645,7 @@ private struct IDeckFirstRunSetupView: View {
             // 5. Steam's official x64 video DLLs and SDL3.dll.
             if !steamDLLsReady {
                 do {
-                    try await SteamRuntimeInstaller.shared.fetchVideoLibraries { message in
+                    try await SteamVideoLibraries.fetch { message in
                         await MainActor.run { installerStatus = message }
                     }
                 } catch {

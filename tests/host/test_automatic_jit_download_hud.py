@@ -1,12 +1,12 @@
 import unittest
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
-SETTINGS = (ROOT / "iDeck/SettingsView.swift").read_text(encoding="utf-8")
-COORDINATOR = (ROOT / "iDeck/SystemCoordinator.swift").read_text(encoding="utf-8")
-SESSION = (ROOT / "iDeck/GameSessionView.swift").read_text(encoding="utf-8")
-STEAM = (ROOT / "iDeck/SteamManager.swift").read_text(encoding="utf-8")
-DEPOT = (ROOT / "iDeck/SwiftSteam/Content/DepotDownloader.swift").read_text(encoding="utf-8")
+from support import ROOT, repo_text
+SETTINGS = repo_text("iDeck/SettingsView.swift")
+COORDINATOR = repo_text("iDeck/SystemCoordinator.swift")
+SESSION = repo_text("iDeck/GameSessionView.swift")
+STEAM = repo_text("iDeck/SteamManager.swift")
+DEPOT = repo_text("iDeck/SwiftSteam/Content/DepotDownloader.swift")
 
 
 class AutomaticJITAndDownloadHUDTests(unittest.TestCase):

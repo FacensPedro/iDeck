@@ -157,8 +157,81 @@ enum SteamDLLRepair {
     }
 }
 
+/// Valve's official x64 video-client DLLs (FFmpeg family and SDL3.dll),
+/// downloaded from Steam's update server and pinned by size and SHA-256.
+enum SteamVideoLibraries {
+    typealias Package = SteamRuntimeFiles.Package
+    /// Valve's x64 video-client dependencies (win64 client manifest
+    /// 1792618285): the FFmpeg family video64.dll imports and SDL3.dll.
+    /// Only these DLLs are taken from the packages.
+    static let packages = [
+        Package(file: "bins_codecs_win64.zip.ad3f4b232ba00296ed683021adf1b761a629b74a", bytes: 13_241_033,
+                sha256: "160c767800a310521a9926771c85a07ab4d71bd4b621d2d11c4dbbf63449447f"),
+        Package(file: "bins_win64.zip.1f91da2609327de9658146b01307e89a13cc1ef8", bytes: 64_309_479,
+                sha256: "f34b0d5924d0cca4c81775ed2fef0aee1ca060e2daa5c24270711267786c0236")
+    ]
+
+    /// Downloads Valve's pinned x64 video-client packages and places the
+    /// FFmpeg DLLs and SDL3.dll in Documents/SteamDLLs, where
+    /// SteamDLLRepair validates and installs them. Nothing is executed.
+    static func fetch(progress: @Sendable (String) async -> Void) async throws {
+        guard let folder = SteamDLLRepair.sourceFolder else { return }
+        let fm = FileManager.default
+        let names = SteamDLLRepair.mediaLibraries + [SteamDLLRepair.sdlLibrary]
+        guard !names.allSatisfy({ SteamDLLRepair.validX64DLL(folder.appendingPathComponent($0)) }) else { return }
+        let wanted = Set(names.map { $0.lowercased() })
+        try fm.createDirectory(at: folder, withIntermediateDirectories: true)
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.httpCookieStorage = nil; configuration.urlCredentialStorage = nil
+        configuration.timeoutIntervalForRequest = 60; configuration.timeoutIntervalForResource = 900
+        let session = URLSession(configuration: configuration, delegate: SteamUpdateRedirects(), delegateQueue: nil)
+        defer { session.invalidateAndCancel() }
+        for (index, package) in packages.enumerated() {
+            try Task.checkCancellation()
+            await progress("Downloading Steam DLLs (\(index + 1) of \(packages.count))…")
+            let url = URL(string: SteamRuntimeFiles.origin + package.file)!
+            let (temporary, response) = try await session.download(from: url)
+            defer { try? fm.removeItem(at: temporary) }
+            guard let http = response as? HTTPURLResponse, http.statusCode == 200,
+                  http.url?.host == url.host, http.url?.scheme == "https",
+                  (try temporary.resourceValues(forKeys: [.fileSizeKey])).fileSize == package.bytes else {
+                throw SteamRuntimeFiles.Failure.invalidPackage
+            }
+            let archive = try Data(contentsOf: temporary, options: .mappedIfSafe)
+            guard hash(archive) == package.sha256 else { throw SteamRuntimeFiles.Failure.invalidPackage }
+            await progress("Verifying Steam DLLs…")
+            try SteamRuntimeFiles.unpack(archive) { name, bytes in
+                guard !name.contains("/"), wanted.contains(name.lowercased()) else { return }
+                let target = folder.appendingPathComponent(name)
+                guard !SteamDLLRepair.validX64DLL(target) else { return }
+                try bytes.write(to: target, options: .atomic)
+                guard SteamDLLRepair.validX64DLL(target) else {
+                    try? fm.removeItem(at: target)
+                    throw SteamRuntimeFiles.Failure.invalidPackage
+                }
+            }
+        }
+        await progress("Steam DLLs are ready.")
+    }
+
+    private static func hash(_ data: Data) -> String {
+        SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+    }
+}
+
+/// Redirects stay on Valve's update host (as SteamRuntime.swift's own delegate).
+private final class SteamUpdateRedirects: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+    func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
+                    newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {
+        let url = request.url
+        let allowed = url?.scheme == "https" && url?.host == "client-update.akamai.steamstatic.com"
+            && (url?.port == nil || url?.port == 443) && url?.user == nil && url?.password == nil
+        completionHandler(allowed ? request : nil)
+    }
+}
+
 // iDeck glue around Madeira Dock. MadeiraDock.swift, DockInstallers.swift,
-// DockReset.swift, DockStartProgram.swift and SteamRuntime.swift in this folder
+// DockReset.swift, DockStartProgram.swift and SteamRuntime.swift in Vendor/Madeira
 // are Madeira's (willfaust/Madeira, app/Madeira), copied verbatim. What follows
 // is what iDeck needs around them: Madeira keeps these pieces in its library
 // and ContentView, which iDeck does not have.

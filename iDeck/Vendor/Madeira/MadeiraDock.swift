@@ -6,6 +6,20 @@ import Foundation
 import Darwin
 import Network
 
+/// JIT pool size of a Dock session. A Dock session runs no desktop Steam
+/// client (no Chromium helper fan-out), so it can live with a smaller pool.
+/// Opt-in per launch (the Dock sheet's toggle, default from
+/// `env.MADEIRA_DOCK_COMPACT_POOL`, off unless set to 1). It never applies
+/// outside a Dock launch, and an explicit madeira.cfg `pool` still wins
+/// because the caller applies that afterwards.
+enum DockPerformancePolicy {
+    static let compactPoolMB = 512
+
+    static func sessionPoolMB(standard: Int, dock: Bool, compact: Bool) -> Int {
+        dock && compact ? min(standard, compactPoolMB) : standard
+    }
+}
+
 enum DockError: LocalizedError {
     case message(String)
     var errorDescription: String? { if case .message(let text) = self { return text }; return nil }

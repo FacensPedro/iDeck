@@ -55,7 +55,7 @@ upstream implementation documents possible indefinite waits, so iDeck does
 not enable it for every game. A DRM-protected game may require Steam's
 Windows client even when its files and real App ID are available.
 
-See [the source-level Madeira comparison](WINE_RUNTIME_GAP_ANALYSIS.md) for
+See [the source-level Madeira comparison](archive/WINE_RUNTIME_GAP_ANALYSIS.md) for
 the remaining host/runtime differences and device-test guidance.
 
 ## App closes immediately before the home screen

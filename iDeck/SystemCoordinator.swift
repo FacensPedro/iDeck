@@ -247,7 +247,7 @@ class SystemCoordinator: ObservableObject {
                 if SteamDLLRepair.needsRepair(prefix: prefix) {
                     // Valve's official x64 video DLLs and SDL3.dll, pinned by SHA-256.
                     do {
-                        try await SteamRuntimeInstaller.shared.fetchVideoLibraries { [weak self] message in
+                        try await SteamVideoLibraries.fetch { [weak self] message in
                             AppLog.record("[steam-dll] " + message)
                             await self?.publishSteamComponentsProgress(message)
                         }

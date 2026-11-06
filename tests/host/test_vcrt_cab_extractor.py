@@ -6,7 +6,8 @@ import tempfile
 import unittest
 
 
-EXTRACTOR = pathlib.Path(sys.argv[1]) if len(sys.argv) > 1 else None
+# Only the iOS Build passes the compiled extractor, running this file directly.
+EXTRACTOR = pathlib.Path(sys.argv[1]) if __name__ == "__main__" and len(sys.argv) > 1 else None
 DLL_NAMES = (
     "concrt140.dll", "msvcp140.dll", "msvcp140_1.dll",
     "msvcp140_2.dll", "msvcp140_atomic_wait.dll",
@@ -70,6 +71,7 @@ def make_nested_cab(missing=None, machine=0x8664, cert=True):
     return make_cab_payloads([("a10", inner_crt), ("a11", inner_mfc)])
 
 
+@unittest.skipIf(EXTRACTOR is None, "Needs the compiled extractor path (iOS Build passes it)")
 class ExtractorTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()

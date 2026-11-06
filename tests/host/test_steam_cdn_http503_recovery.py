@@ -1,8 +1,8 @@
 import unittest
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
-DEPOT = (ROOT / "iDeck/SwiftSteam/Content/DepotDownloader.swift").read_text(encoding="utf-8")
+from support import ROOT, repo_text
+DEPOT = repo_text("iDeck/SwiftSteam/Content/DepotDownloader.swift")
 
 
 class SteamCDN503RecoveryTests(unittest.TestCase):

@@ -4,9 +4,7 @@ import unittest
 from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parents[2]
-
-
+from support import ROOT, repo_text
 class OptionalNativeArgumentsTests(unittest.TestCase):
     def test_empty_and_populated_flags_under_bash_nounset(self):
         script = r"""
@@ -38,13 +36,13 @@ python3 -c 'import json,sys;print(json.dumps(sys.argv[1:]))' ${FLAGS[@]+"${FLAGS
             content = path.read_text(encoding="utf-8")
             with self.subTest(path=path):
                 self.assertIn(name + '[@]+"', content)
-        build = (ROOT / "scripts/build_ipa.sh").read_text(encoding="utf-8")
+        build = repo_text("scripts/build_ipa.sh")
         self.assertNotIn("WOW64_FLAGS[@]", build)
 
     def test_native_d3d11_and_d3d12_default_to_wow64_with_explicit_disable(self):
-        ipa = (ROOT / "scripts/build_ipa.sh").read_text(encoding="utf-8")
-        native = (ROOT / "scripts/build_native_runtime.sh").read_text(encoding="utf-8")
-        components = (ROOT / "scripts/build_madeira_components.sh").read_text(encoding="utf-8")
+        ipa = repo_text("scripts/build_ipa.sh")
+        native = repo_text("scripts/build_native_runtime.sh")
+        components = repo_text("scripts/build_madeira_components.sh")
         self.assertIn('export IDECK_BUILD_WOW64="${IDECK_BUILD_WOW64:-1}"', native)
         self.assertIn('export IDECK_MADEIRA_GRAPHICS="${IDECK_MADEIRA_GRAPHICS:-d3d11}"', native)
         self.assertIn('export IDECK_PREBUILT_MODE="${IDECK_PREBUILT_MODE:-prefer}"', native)
@@ -58,7 +56,7 @@ python3 -c 'import json,sys;print(json.dumps(sys.argv[1:]))' ${FLAGS[@]+"${FLAGS
         self.assertIn('bash "$MD/build/wine-i386/build.sh"', components)
 
     def test_native_bundle_is_verified_with_and_without_wow64(self):
-        source = (ROOT / "scripts/build_ipa.sh").read_text(encoding="utf-8")
+        source = repo_text("scripts/build_ipa.sh")
         self.assertIn(
             'python3 scripts/verify_madeira_bundle.py --app "$APP" --require --require-wow64',
             source,

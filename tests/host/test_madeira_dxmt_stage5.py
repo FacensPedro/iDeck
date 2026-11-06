@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-ROOT = Path(__file__).resolve().parents[2]
+from support import ROOT, repo_text
 sys.path.insert(0, str(ROOT / "scripts"))
 SPEC = importlib.util.spec_from_file_location("madeira_dxmt_stage5", ROOT / "scripts/verify_madeira_dxmt_stage5.py")
 stage = importlib.util.module_from_spec(SPEC)
@@ -97,7 +97,7 @@ class MadeiraDXMTStage5Tests(unittest.TestCase):
             self.assertNotIn("metalirconverter", artifact.lower())
 
     def test_standalone_script_builds_before_wow64_and_d3d12(self):
-        source = (ROOT / "scripts/build_madeira_components.sh").read_text(encoding="utf-8")
+        source = repo_text("scripts/build_madeira_components.sh")
         self.assertIn('IDECK_MADEIRA_STOP_AFTER:-all', source)
         self.assertIn('STOP_AFTER" == "dxmt"', source)
         self.assertIn('verify_madeira_dxmt_stage5.py', source)

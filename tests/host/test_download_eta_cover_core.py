@@ -38,7 +38,7 @@ class DownloadETACoreContract(unittest.TestCase):
         self.assertIn('case windows, dock, jit, summary', view)
         self.assertIn('coordinator.openMadeiraWorkspace()', view)
         for component in ('VisualCRuntimeLegacy.installAll', 'wineMono.install()',
-                          'SteamRuntimeInstaller.shared.fetchVideoLibraries'):
+                          'SteamVideoLibraries.fetch'):
             self.assertIn(component, view)
         windows = source("iDeck/WindowsEnvironment.swift")
         self.assertIn('setenv("WINEARCH", "win64", 1)', windows)

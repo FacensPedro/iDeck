@@ -1,12 +1,10 @@
 import unittest
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
-
-
+from support import ROOT, repo_text
 class DirectIPAUpdaterAndClipboardTests(unittest.TestCase):
     def test_ipa_is_uploaded_as_a_raw_file_not_a_second_zip(self):
-        workflow = (ROOT / ".github/workflows/ios.yml").read_text()
+        workflow = repo_text(".github/workflows/ios.yml")
         segment = workflow.split("      - name: Upload IPA directly (no outer ZIP)", 1)[1].split("      - name:", 1)[0]
         self.assertIn("uses: actions/upload-artifact@v7", segment)
         self.assertIn("path: iDeck-*.ipa", segment)
@@ -21,8 +19,8 @@ class DirectIPAUpdaterAndClipboardTests(unittest.TestCase):
         self.assertIn("gh release create", workflow)
 
     def test_updater_checks_verified_github_ipa_releases(self):
-        source = (ROOT / "iDeck/UpdateChecker.swift").read_text()
-        settings = (ROOT / "iDeck/SettingsView.swift").read_text()
+        source = repo_text("iDeck/UpdateChecker.swift")
+        settings = repo_text("iDeck/SettingsView.swift")
         self.assertIn("ipa.path.hasPrefix(\"/FacensPedro/iDeck/releases/download/\")", source)
         self.assertIn('parts.queryItems = [URLQueryItem(name: "url", value: ipa.absoluteString)]', source)
         self.assertIn('["sidestore", "altstore"]', source)
@@ -34,9 +32,9 @@ class DirectIPAUpdaterAndClipboardTests(unittest.TestCase):
         self.assertIn("func installIDeckUpdate()", source)
 
     def test_copy_log_is_one_tap_and_bounded(self):
-        view = (ROOT / "iDeck/GameSessionView.swift").read_text()
-        helper = (ROOT / "iDeck/WineLogClipboard.swift").read_text()
-        project = (ROOT / "iDeck.xcodeproj/project.pbxproj").read_text()
+        view = repo_text("iDeck/GameSessionView.swift")
+        helper = repo_text("iDeck/WineLogClipboard.swift")
+        project = repo_text("iDeck.xcodeproj/project.pbxproj")
         self.assertIn('Label(tr("Copy Wine log")', view)
         self.assertIn('UIPasteboard.general.string = content.text', view)
         self.assertIn('Task.detached(priority: .utility)', view)
@@ -46,7 +44,7 @@ class DirectIPAUpdaterAndClipboardTests(unittest.TestCase):
         self.assertEqual(project.count("WineLogClipboard.swift in Sources */,"), 1)
 
     def test_localization_does_not_duplicate_keys(self):
-        source = (ROOT / "iDeck/Localization.swift").read_text()
+        source = repo_text("iDeck/Localization.swift")
         import re
         matches = re.findall(r'^ {8}"((?:\\.|[^"\\])+)":\s*\[', source, re.M)
         self.assertEqual(len(matches), len(set(matches)))

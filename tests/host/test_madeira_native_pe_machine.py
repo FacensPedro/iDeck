@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
+from support import ROOT, repo_text
 HEADER = ROOT / "iDeck/NativeRuntime/WindowsPEMachine.h"
 NATIVE = ROOT / "iDeck/NativeRuntimeDiagnostics.mm"
 BRIDGE = ROOT / "iDeck/NativeRuntime/MadeiraRuntimeBridge.mm"
@@ -89,10 +89,10 @@ class NativePEMachineTests(unittest.TestCase):
             source = (ROOT / script).read_text()
             self.assertIn('IDECK_BUILD_WOW64="${IDECK_BUILD_WOW64:-1}"', source)
         self.assertIn('IDECK_BUILD_WOW64 must be 0 or 1',
-                      (ROOT / "scripts/build_ipa.sh").read_text())
+                      repo_text("scripts/build_ipa.sh"))
 
     def test_session_releases_input_and_waits_for_guest_readiness(self):
-        wine = (ROOT / "iDeck/NativeRuntime/WineProcessBridge.mm").read_text()
+        wine = repo_text("iDeck/NativeRuntime/WineBridge.mm")
         bridge = BRIDGE.read_text()
         self.assertIn("return start(wine_prefix) == 0 ? 0 : EIO;", wine)
         self.assertIn("ideck_gamepad_end_session();\n    ideck_session_stop();", bridge)

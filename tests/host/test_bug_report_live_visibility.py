@@ -1,9 +1,9 @@
 import unittest
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
-BUGS = (ROOT / "iDeck/BugReportView.swift").read_text(encoding="utf-8")
-SERVICE = (ROOT / "iDeck/IRelayDeviceService.swift").read_text(encoding="utf-8")
+from support import ROOT, repo_text
+BUGS = repo_text("iDeck/BugReportView.swift")
+SERVICE = repo_text("iDeck/IRelayDeviceService.swift")
 
 class BugReportLiveVisibilityTests(unittest.TestCase):
     def test_all_detected_bugs_are_expanded_by_default(self):

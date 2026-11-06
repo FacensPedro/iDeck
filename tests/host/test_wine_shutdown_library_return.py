@@ -7,7 +7,7 @@ COORDINATOR = (ROOT / "iDeck/SystemCoordinator.swift").read_text(encoding="utf-8
 MAIN = (ROOT / "iDeck/MainView.swift").read_text(encoding="utf-8")
 BRIDGE = (ROOT / "iDeck/NativeRuntime/MadeiraRuntimeBridge.mm").read_text(encoding="utf-8")
 HEADER = (ROOT / "iDeck/NativeRuntime/MadeiraRuntimeBridge.h").read_text(encoding="utf-8")
-SERVER = (ROOT / "iDeck/NativeRuntime/WineServerBridge.m").read_text(encoding="utf-8")
+SERVER = (ROOT / "iDeck/NativeRuntime/WineBridge.mm").read_text(encoding="utf-8")
 INPUT = (ROOT / "iDeck/WineInputBridge.swift").read_text(encoding="utf-8")
 
 

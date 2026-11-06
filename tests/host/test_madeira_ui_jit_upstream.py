@@ -1,15 +1,15 @@
 import unittest
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
-MAIN = (ROOT / 'iDeck/MainView.swift').read_text()
-SETTINGS = (ROOT / 'iDeck/SettingsView.swift').read_text()
-INPUT = (ROOT / 'iDeck/InputManager.swift').read_text()
-COORDINATOR = (ROOT / 'iDeck/SystemCoordinator.swift').read_text()
-FEX = (ROOT / 'iDeck/NativeRuntime/FEXRuntime.cpp').read_text()
-HEADER = (ROOT / 'iDeck/NativeRuntime/MadeiraRuntimeBridge.h').read_text()
-EXTRACTOR = (ROOT / 'iDeck/NativeRuntime/VCArchiveExtractor.c').read_text()
-STEAM = (ROOT / 'iDeck/SteamManager.swift').read_text()
+from support import ROOT, repo_text
+MAIN = repo_text("iDeck/MainView.swift")
+SETTINGS = repo_text("iDeck/SettingsView.swift")
+INPUT = repo_text("iDeck/InputManager.swift")
+COORDINATOR = repo_text("iDeck/SystemCoordinator.swift")
+FEX = repo_text("iDeck/NativeRuntime/FEXRuntime.cpp")
+HEADER = repo_text("iDeck/NativeRuntime/MadeiraRuntimeBridge.h")
+EXTRACTOR = repo_text("iDeck/NativeRuntime/VCArchiveExtractor.c")
+STEAM = repo_text("iDeck/SteamManager.swift")
 
 class MadeiraUIJITUpstreamTests(unittest.TestCase):
     def test_madeira_is_root_view_without_livecontainer(self):
@@ -39,7 +39,7 @@ class MadeiraUIJITUpstreamTests(unittest.TestCase):
         self.assertIn('state->found_count++;', EXTRACTOR)
 
     def test_background_downloads_are_balanced(self):
-        background = (ROOT / "iDeck/BackgroundDownloads.swift").read_text()
+        background = repo_text("iDeck/BackgroundDownloads.swift")
         self.assertIn('beginBackgroundTask(', background)
         self.assertIn('UIApplication.shared.endBackgroundTask(graceTask)', background)
         self.assertIn('BGContinuedProcessingTaskRequest', background)

@@ -1,12 +1,12 @@
 import unittest
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
-SCANNER = (ROOT / "iDeck/BugReportView.swift").read_text(encoding="utf-8")
-STEAM = (ROOT / "iDeck/SteamManager.swift").read_text(encoding="utf-8")
-GOV = (ROOT / "iDeck/ResourceGovernor.swift").read_text(encoding="utf-8")
-DOWN = (ROOT / "iDeck/SwiftSteam/Content/DepotDownloader.swift").read_text(encoding="utf-8")
-START = (ROOT / "iDeck/iDeckApp.swift").read_text(encoding="utf-8")
+from support import ROOT, repo_text
+SCANNER = repo_text("iDeck/BugReportView.swift")
+STEAM = repo_text("iDeck/SteamManager.swift")
+GOV = repo_text("iDeck/ResourceGovernor.swift")
+DOWN = repo_text("iDeck/SwiftSteam/Content/DepotDownloader.swift")
+START = repo_text("iDeck/iDeckApp.swift")
 
 
 class SteamMemoryDiagnosticsTests(unittest.TestCase):

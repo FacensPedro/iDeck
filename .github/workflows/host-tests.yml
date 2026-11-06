@@ -1,0 +1,27 @@
+name: Host Tests
+
+# Every host test on each push and pull request. Native compilation, the IPA
+# and releases are in ios.yml; the macOS-only tests run there as well.
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  host-tests:
+    name: Host test suite
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - name: Run host tests
+        run: python3 -m unittest discover -s tests/host -v
+      - name: Check language layers
+        run: python3 scripts/check_language_layers.py .

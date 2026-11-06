@@ -1,13 +1,13 @@
 import unittest
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
-STEAM = (ROOT / "iDeck/SteamManager.swift").read_text(encoding="utf-8")
-GOG = (ROOT / "iDeck/GOGLibrary.swift").read_text(encoding="utf-8")
-EPIC = (ROOT / "iDeck/EpicLibrary.swift").read_text(encoding="utf-8")
-RELAY = (ROOT / "iDeck/IRelayDeviceService.swift").read_text(encoding="utf-8")
-VIEW = (ROOT / "iDeck/MainView.swift").read_text(encoding="utf-8")
-TRANSLATIONS = (ROOT / "iDeck/Localization.swift").read_text(encoding="utf-8")
+from support import ROOT, repo_text
+STEAM = repo_text("iDeck/SteamManager.swift")
+GOG = repo_text("iDeck/GOGLibrary.swift")
+EPIC = repo_text("iDeck/EpicLibrary.swift")
+RELAY = repo_text("iDeck/IRelayDeviceService.swift")
+VIEW = repo_text("iDeck/MainView.swift")
+TRANSLATIONS = repo_text("iDeck/Localization.swift")
 
 
 class DownloadPauseContractTests(unittest.TestCase):
@@ -36,7 +36,7 @@ class DownloadPauseContractTests(unittest.TestCase):
         self.assertIn("func cancelAndWait(_ app: String) async", EPIC)
 
     def test_pc_status_poll_recovers_temporary_usb_errors(self):
-        downloader = (ROOT / "iDeck/SwiftSteam/Content/DepotDownloader.swift").read_text(encoding="utf-8")
+        downloader = repo_text("iDeck/SwiftSteam/Content/DepotDownloader.swift")
         self.assertIn("var reconnectDeadline: Date?", downloader)
         self.assertIn("addingTimeInterval(65)", downloader)
         self.assertIn("USB status recovered", downloader)

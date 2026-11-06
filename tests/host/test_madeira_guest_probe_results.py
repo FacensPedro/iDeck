@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
+from support import ROOT, repo_text
 SPEC = importlib.util.spec_from_file_location(
     "device_guest_probes", ROOT / "scripts/verify_madeira_guest_probe_results.py"
 )
@@ -100,15 +100,15 @@ class DeviceGuestProbeTests(unittest.TestCase):
             module.audit(self.root, self.paths)
 
     def test_original_device_sources_use_actual_windows_apis(self):
-        source = (ROOT / "tests/device/ideck_guest_audio_input_probe.c").read_text()
+        source = repo_text("tests/device/ideck_guest_audio_input_probe.c")
         for symbol in ("waveOutOpen(", "waveOutWrite(", "waveOutUnprepareHeader(",
                        "XInputGetState(", "WM_TOUCH", "WM_LBUTTONDOWN"):
             self.assertIn(symbol, source)
-        d3d12 = (ROOT / "tests/device/ideck_d3d12_frame_probe.cpp").read_text()
+        d3d12 = repo_text("tests/device/ideck_d3d12_frame_probe.cpp")
         for symbol in ("D3D12CreateDevice(", "CreateCommandQueue(", "CreateSwapChainForHwnd(",
                        "ClearRenderTargetView(", "ExecuteCommandLists(", "Present("):
             self.assertIn(symbol, d3d12)
-        builder = (ROOT / "scripts/build_madeira_device_probes.sh").read_text()
+        builder = repo_text("scripts/build_madeira_device_probes.sh")
         self.assertIn("-lwinmm -lxinput9_1_0", builder)
         self.assertIn("-ld3d12 -ldxgi", builder)
 

@@ -1,10 +1,10 @@
 import unittest
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
-APP = (ROOT / "iDeck/iDeckApp.swift").read_text(encoding="utf-8")
-MAIN = (ROOT / "iDeck/MainView.swift").read_text(encoding="utf-8")
-COORDINATOR = (ROOT / "iDeck/SystemCoordinator.swift").read_text(encoding="utf-8")
+from support import ROOT, repo_text
+APP = repo_text("iDeck/iDeckApp.swift")
+MAIN = repo_text("iDeck/MainView.swift")
+COORDINATOR = repo_text("iDeck/SystemCoordinator.swift")
 
 
 class LaunchStartupIsolationTests(unittest.TestCase):

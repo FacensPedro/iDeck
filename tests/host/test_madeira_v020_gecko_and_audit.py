@@ -3,10 +3,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
-GECKO = (ROOT / "iDeck/WineGeckoRuntime.swift").read_text(encoding="utf-8")
-COORDINATOR = (ROOT / "iDeck/SystemCoordinator.swift").read_text(encoding="utf-8")
-PROJECT = (ROOT / "iDeck.xcodeproj/project.pbxproj").read_text(encoding="utf-8")
+from support import ROOT, repo_text
+GECKO = repo_text("iDeck/WineGeckoRuntime.swift")
+COORDINATOR = repo_text("iDeck/SystemCoordinator.swift")
+PROJECT = repo_text("iDeck.xcodeproj/project.pbxproj")
 AUDITOR = ROOT / "scripts/audit_madeira_v020_pe.py"
 
 spec = importlib.util.spec_from_file_location("madeira_v020_auditor", AUDITOR)

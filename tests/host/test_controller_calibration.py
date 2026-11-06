@@ -5,9 +5,9 @@ import subprocess
 import tempfile
 import unittest
 
-ROOT = Path(__file__).resolve().parents[2]
-BRIDGE = (ROOT / "iDeck/NativeRuntime/DirectInputBridge.mm").read_text(encoding="utf-8")
-INPUT = (ROOT / "iDeck/InputManager.swift").read_text(encoding="utf-8")
+from support import ROOT, repo_text
+BRIDGE = repo_text("iDeck/NativeRuntime/DirectInputBridge.mm")
+INPUT = repo_text("iDeck/InputManager.swift")
 HEADER = ROOT / "iDeck/NativeRuntime/GamepadResponse.h"
 
 C_TEST = r"""
