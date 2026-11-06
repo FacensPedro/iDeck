@@ -2450,6 +2450,11 @@ private struct IDeckFirstRunSetupView: View {
             }
             .buttonStyle(.borderedProminent)
             .disabled(!MadeiraDock.bundled)
+            .onChange(of: coordinator.windowsStatus) { _, status in
+                if status == "Windows Runtime Ready" || status == "Madeira runtime components are missing" {
+                    coordinator.installSteamClientComponentsIfNeeded()
+                }
+            }
             if let progress = coordinator.steamComponentsProgress {
                 Text(progress).font(.caption).foregroundStyle(.secondary)
             }
