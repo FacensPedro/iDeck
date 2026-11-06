@@ -153,6 +153,7 @@
 		AC100000000000000000017 /* crc32.c in Sources */ = {isa = PBXBuildFile; fileRef = AC200000000000000000017 /* crc32.c */; };
 		DEAD00000000000000000071 /* VisualCRuntimeBootstrap.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEAD00000000000000000072 /* VisualCRuntimeBootstrap.swift */; };
 		A70100000000000000000001 /* WineExitDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = A70200000000000000000001 /* WineExitDiagnostics.swift */; };
+		BEEF20261106000000000001 /* WineGeckoRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEEF20261106000000000002 /* WineGeckoRuntime.swift */; };
 		A10000000000000000000005 /* SteamInstall.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000005 /* SteamInstall.swift */; };
 		A10000000000000000000006 /* WindowsLibraryModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000006 /* WindowsLibraryModels.swift */; };
 		A10000000000000000000007 /* SteamCloud.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000007 /* SteamCloud.swift */; };
@@ -295,6 +296,7 @@
 		AC200000000000000000017 /* crc32.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = ThirdParty/libmspack/crc32.c; sourceTree = "<group>"; };
 		DEAD00000000000000000072 /* VisualCRuntimeBootstrap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisualCRuntimeBootstrap.swift; sourceTree = "<group>"; };
 		A70200000000000000000001 /* WineExitDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WineExitDiagnostics.swift; sourceTree = "<group>"; };
+		BEEF20261106000000000002 /* WineGeckoRuntime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WineGeckoRuntime.swift; sourceTree = "<group>"; };
 		A20000000000000000000005 /* SteamInstall.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamInstall.swift; sourceTree = "<group>"; };
 		E20000000000000000000010 /* SteamDepotRegionPolicy.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = SteamDepotRegionPolicy.c; sourceTree = "<group>"; };
 		E20000000000000000000011 /* SteamDepotRegionPolicy.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SteamDepotRegionPolicy.h; sourceTree = "<group>"; };
@@ -453,6 +455,7 @@
 				BEEF00000000000000000001 /* WindowsLaunchArguments.swift in Sources */,
 				DEAD00000000000000000071 /* VisualCRuntimeBootstrap.swift in Sources */,
 				A70100000000000000000001 /* WineExitDiagnostics.swift in Sources */,
+				BEEF20261106000000000001 /* WineGeckoRuntime.swift in Sources */,
 				AC100000000000000000010 /* VCArchiveExtractor.c in Sources */,
 				AC100000000000000000011 /* cabd.c in Sources */,
 				AC100000000000000000012 /* cabc.c in Sources */,
@@ -618,6 +621,7 @@
 				BEEF00000000000000000002 /* WindowsLaunchArguments.swift */,
 				DEAD00000000000000000072 /* VisualCRuntimeBootstrap.swift */,
 				A70200000000000000000001 /* WineExitDiagnostics.swift */,
+				BEEF20261106000000000002 /* WineGeckoRuntime.swift */,
 				AC200000000000000000010 /* VCArchiveExtractor.c */,
 				AC200000000000000000011 /* cabd.c */,
 				AC200000000000000000012 /* cabc.c */,
