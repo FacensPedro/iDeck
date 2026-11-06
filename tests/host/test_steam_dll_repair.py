@@ -10,7 +10,7 @@ STAGE = (ROOT / "scripts/stage_madeira_payload.sh").read_text(encoding="utf-8")
 MEDIA = (
     "libavcodec-62.dll", "libavformat-62.dll", "libavutil-60.dll",
     "libavfilter-11.dll", "libswresample-6.dll", "libswscale-9.dll",
-    "video64.dll",
+    "video64.dll", "SDL3.dll",
 )
 
 
@@ -29,11 +29,24 @@ class SteamDLLRecoveryTests(unittest.TestCase):
         self.assertIn('values.isSymbolicLink != true', GLUE)
         self.assertIn('u16(pe + 4) == 0x8664', GLUE)
         self.assertIn('u16(pe + 22) & 0x2000 != 0', GLUE)
-        self.assertIn('guard invalid.isEmpty else', GLUE)
-        self.assertIn('guard prepared.count == clientLibraries.count else', GLUE)
-        self.assertIn('!fm.fileExists(atPath: destination.path)', GLUE)
-        self.assertIn('try fm.copyItem(at: source, to: destination)', GLUE)
+        self.assertIn('let blocked = invalidExisting.filter { $0 != sdlLibrary }', GLUE)
+        self.assertIn('let videoReady = videoLibraries.allSatisfy', GLUE)
+        self.assertIn('if exists && name != sdlLibrary { continue }', GLUE)
+        self.assertIn('name + ".ideck-invalid-backup"', GLUE)
+        self.assertIn('try fm.copyItem(at: source, to: temporary)', GLUE)
+        self.assertIn('try fm.moveItem(at: temporary, to: destination)', GLUE)
+        self.assertIn('try? fm.moveItem(at: backup, to: destination)', GLUE)
         self.assertNotIn('replaceItemAt(', GLUE)
+
+    def test_sdl_repair_is_separate_from_complete_ffmpeg_set(self):
+        self.assertIn('static let sdlLibrary = "SDL3.dll"', GLUE)
+        self.assertIn('let candidates = (videoReady ? videoLibraries : []) + [sdlLibrary]', GLUE)
+        self.assertIn('u16(pe + 24) == 0x020b', GLUE)
+        self.assertIn('u16(pe + 20) >= 112', GLUE)
+        self.assertIn('validX64DLL(temporary)', GLUE)
+        self.assertIn('SteamDLLRepair.repair(prefix: root)', COORDINATOR)
+        self.assertIn('repaired before Steam launch:', COORDINATOR)
+        self.assertIn('missing before launch:', COORDINATOR)
 
     def test_repair_off_ui_thread_and_no_graphics_reduction(self):
         self.assertIn('Task.detached(priority: .utility)', COORDINATOR)
