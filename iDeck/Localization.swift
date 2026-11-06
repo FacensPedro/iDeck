@@ -55,6 +55,7 @@ func trStatus(_ status: String) -> String {
 
 enum Translations {
     static let table: [String: [String: String]] = [
+        "Time left": ["pt": "Tempo restante", "es": "Tiempo restante"],
 
         "Waiting for the first Windows game frame...": ["pt": "Aguardando o primeiro quadro do jogo Windows...", "es": "Esperando el primer fotograma del juego de Windows..."],
         "No Windows game frame detected. Check the Wine log.": ["pt": "Nenhum quadro do jogo Windows detectado. Verifique o log do Wine.", "es": "No se detectaron fotogramas del juego de Windows. Consulta el registro de Wine."],
