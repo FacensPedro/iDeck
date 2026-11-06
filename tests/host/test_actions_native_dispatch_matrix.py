@@ -28,7 +28,7 @@ class ActionsNativeDispatchMatrix(unittest.TestCase):
         self.assertNotIn("graphics_profile:", header)
         self.assertEqual("true", field_default("build_wow64"))
         self.assertEqual("false", field_default("accept_converter_license"))
-        self.assertEqual("false", field_default("bundle_wine_mono"))
+        self.assertEqual("true", field_default("bundle_wine_mono"))
         self.assertEqual("false", field_default("export_runtime_kit"))
 
     def test_native_build_not_enabled_on_pull_requests(self):

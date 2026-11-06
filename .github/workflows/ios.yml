@@ -192,8 +192,7 @@ jobs:
             tests/host/NativePerformanceTests.cpp \
             iDeck/NativeRuntime/FEXExecutionScheduler.cpp \
             iDeck/NativeRuntime/GuestMemoryPool.cpp \
-            iDeck/NativeRuntime/NativePerformanceClock.cpp \
-            iDeck/NativeRuntime/RuntimePerformanceMonitor.mm \
+            iDeck/NativeRuntime/NativePerformance.cpp \
             -o /tmp/ideck-native-performance-tests
           /tmp/ideck-native-performance-tests
 

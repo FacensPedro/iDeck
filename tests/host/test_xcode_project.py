@@ -58,9 +58,8 @@ class XcodeProjectTests(unittest.TestCase):
         names = (
             "FEXExecutionScheduler.cpp",
             "GuestMemoryPool.cpp",
-            "RuntimePerformanceMonitor.mm",
-            "MetalFrameOptimizer.mm",
-            "NativePerformanceClock.cpp",
+            "NativePerformance.cpp",
+            "MadeiraPlatform.mm",
         )
         marker = "333333333333333333333332 /* Sources */ = {"
         sources = self.project.split(marker, 1)[1].split("\n\t\t};", 1)[0]
@@ -91,7 +90,7 @@ class XcodeProjectTests(unittest.TestCase):
         self.assertIn("NativeRuntime/NativePerformance.h", header.read_text(encoding="utf-8"))
 
     def test_native_memory_manager_sources_are_registered(self):
-        names = ("NativeMemoryManager.cpp", "NativeMemoryPressure.mm")
+        names = ("NativeMemoryManager.cpp", "MadeiraPlatform.mm")
         marker = "333333333333333333333332 /* Sources */ = {"
         sources = self.project.split(marker, 1)[1].split("\n\t\t};", 1)[0]
         refs = dict(BUILD_FILE.findall(self.project))

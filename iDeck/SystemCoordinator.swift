@@ -234,9 +234,9 @@ class SystemCoordinator: ObservableObject {
         steamComponentsTask = Task(priority: .utility) { @MainActor [weak self] in
             do {
                 if !MadeiraDock.clientInstalled {
-                    try await SteamRuntimeInstaller.shared.prepare(prefix: MadeiraDock.prefix) { message in
+                    try await SteamRuntimeInstaller.shared.prepare(prefix: MadeiraDock.prefix) { [weak self] message in
                         AppLog.record("[steam-components] " + message)
-                        Task { @MainActor [weak self] in self?.steamComponentsProgress = message }
+                        await self?.publishSteamComponentsProgress(message)
                     }
                     guard MadeiraDock.clientInstalled else {
                         throw DockError.message("Madeira Dock installation finished without steamclient64.dll.")
@@ -268,6 +268,10 @@ class SystemCoordinator: ObservableObject {
             }
             self?.steamComponentsTask = nil
         }
+    }
+
+    @MainActor private func publishSteamComponentsProgress(_ message: String) {
+        steamComponentsProgress = message
     }
 
     func loadSteamAccountIfNeeded() {
@@ -750,20 +754,18 @@ class SystemCoordinator: ObservableObject {
         setWindowsStatus(VisualCRuntimeLegacy.installStatus)
         let generation = UUID()
         legacyVisualCRuntimeGeneration = generation
-        legacyVisualCRuntimeTask = Task { [weak self] in
+        legacyVisualCRuntimeTask = Task { @MainActor [weak self] in
             let failures = await VisualCRuntimeLegacy.installAll(documents: documents) { name in
                 AppLog.record("[vcrt] installing Visual C++ \(name)")
             }
-            await MainActor.run {
-                guard let self, self.legacyVisualCRuntimeGeneration == generation else { return }
-                self.legacyVisualCRuntimeTask = nil
-                guard self.windowsStatus == VisualCRuntimeLegacy.installStatus else { return }
-                for failure in failures { AppLog.record("[vcrt] \(failure)") }
-                AppLog.record(failures.isEmpty ? "[vcrt] Visual C++ 2005-2013 and 32-bit runtimes installed"
-                                               : "[vcrt] \(failures.count) Visual C++ packages failed; retried next launch")
-                if self.windowsStatus == VisualCRuntimeLegacy.installStatus { self.setWindowsStatus("Windows Ready") }
-                resume()
-            }
+            guard let self, self.legacyVisualCRuntimeGeneration == generation else { return }
+            self.legacyVisualCRuntimeTask = nil
+            guard self.windowsStatus == VisualCRuntimeLegacy.installStatus else { return }
+            for failure in failures { AppLog.record("[vcrt] \(failure)") }
+            AppLog.record(failures.isEmpty ? "[vcrt] Visual C++ 2005-2013 and 32-bit runtimes installed"
+                                           : "[vcrt] \(failures.count) Visual C++ packages failed; retried next launch")
+            if self.windowsStatus == VisualCRuntimeLegacy.installStatus { self.setWindowsStatus("Windows Ready") }
+            resume()
         }
     }
 
@@ -881,7 +883,7 @@ class SystemCoordinator: ObservableObject {
                     guard self.ensureJITForGameLaunch() else { return }
                     self.windowsEnvironment.configureWine(prefix: mountPath)
                     self.mountExternalDrives(prefix: mountPath)
-                    var effectiveProfile = profile ?? WindowsGameProfile(id: destination.path, title: destination.deletingPathExtension().lastPathComponent)
+                    let effectiveProfile = profile ?? WindowsGameProfile(id: destination.path, title: destination.deletingPathExtension().lastPathComponent)
                     self.windowsEnvironment.applyGameProfile(effectiveProfile)
                     self.activeWindowsProfile = effectiveProfile
                     self.setWindowsStatus("Launching Windows app...")
@@ -1034,7 +1036,7 @@ class SystemCoordinator: ObservableObject {
         windowsEnvironment.configureWine(prefix: prefixPath.path)
         mountExternalDrives(prefix: prefixPath.path)
         windowsEnvironment.graphicsConfig.applyGraphicsEnvironment()
-        var effectiveProfile = profile
+        let effectiveProfile = profile
         windowsEnvironment.applyGameProfile(effectiveProfile)
         activeWindowsProfile = effectiveProfile
         // Steam games start through Valve's client (Madeira Dock) on their

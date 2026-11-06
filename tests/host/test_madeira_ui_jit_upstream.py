@@ -14,8 +14,8 @@ STEAM = (ROOT / 'iDeck/SteamManager.swift').read_text()
 class MadeiraUIJITUpstreamTests(unittest.TestCase):
     def test_madeira_is_root_view_without_livecontainer(self):
         self.assertIn('WindowsWorkspaceView(coordinator: coordinator, steamLibrary: steamLibrary)', MAIN)
-        self.assertIn('Image("IDeckLogo")', MAIN)
-        self.assertIn('.frame(width: 38, height: 38)', MAIN)
+        self.assertIn('Text("iDeck")', MAIN)
+        self.assertNotIn('Image("IDeckLogo")', MAIN)
         self.assertNotIn('homeView', MAIN)
         self.assertNotIn('LiveContainer', MAIN)
         self.assertNotIn('appManager', MAIN)

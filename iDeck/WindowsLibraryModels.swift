@@ -141,8 +141,10 @@ final class WindowsLibraryStore: ObservableObject {
         loadProfiles()
         observer = NotificationCenter.default.addObserver(
             forName: Self.profilesChanged, object: nil, queue: .main) { [weak self] note in
-            guard let self, note.object as AnyObject? !== self else { return }
-            self.loadProfiles()
+            MainActor.assumeIsolated {
+                guard let self, note.object as AnyObject? !== self else { return }
+                self.loadProfiles()
+            }
         }
     }
 

@@ -446,7 +446,7 @@ final class IRelayDeviceService: @unchecked Sendable {
             }
         }
         var gogGames: [[String: Any]] = gog.games.filter(\.worksOnWindows).map { game in
-            ["id": game.id, "title": game.title, "cover": game.artworkCandidates.first?.absoluteString ?? "",
+            ["id": game.id, "title": game.title, "cover": (game.artworkCandidates.first?.absoluteString ?? "") as String,
              "installed": gogInstalled[game.id] != nil,
              "size": gog.installedSizes[game.id].flatMap { $0 > 0 ? $0 : nil } ?? (gog.downloadSizes[game.id] ?? 0)]
         }
@@ -755,7 +755,7 @@ final class IRelayHTTPConnection: @unchecked Sendable {
     }
 
     private func respond(to request: IRelayHTTPRequest) {
-        Task {
+        Task { [self] in
             let response = await service.handle(request)
             let reason = response.status == 200 ? "OK" : "Error"
             var head = "HTTP/1.1 \(response.status) \(reason)\r\nContent-Type: application/json\r\n"

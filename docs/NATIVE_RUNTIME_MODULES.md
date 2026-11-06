@@ -8,16 +8,16 @@ The files in `iDeck/NativeRuntime/` are actual C, C++, Objective-C and Objective
 | FEXRuntime.cpp | Checks and invokes an already linked FEX initializer |
 | WineServerBridge.m | Checks and invokes an already linked Wine server initializer |
 | WineProcessBridge.mm | Checks and invokes an already linked Wine process entry point |
-| DXMTBridge.mm | Detects the existing native DXMT presentation entry point |
-| D3D12Bridge.cpp | Detects the existing Madeira D3D12 canary symbol |
-| MetalRenderer.mm | Creates/releases an offscreen Metal texture owned by the caller |
-| JITMemoryManager.c | Allocates memory as RW; attempts RX transition only when permitted by iPadOS |
+| MadeiraPlatform.mm | Detects the existing native DXMT presentation entry point |
+| MadeiraCore.cpp | Detects the existing Madeira D3D12 canary symbol |
+| MadeiraPlatform.mm | Creates/releases an offscreen Metal texture owned by the caller |
+| MadeiraCore.cpp | Allocates memory as RW; attempts RX transition only when permitted by iPadOS |
 | NativePerformance.h | Stable C ABI used by the host-side performance utilities and exposed to Swift |
 | FEXExecutionScheduler.cpp | Bounded, opt-in host task scheduling; does not change FEX's internal JIT scheduler |
 | GuestMemoryPool.cpp | Bounded reuse of ordinary heap blocks, never JIT or executable pages |
-| MetalFrameOptimizer.mm | Configures a CAMetalLayer and avoids redundant drawable-size changes |
-| RuntimePerformanceMonitor.mm | Lightweight, opt-in frame timing and automatic swapchain creation counters |
-| NativePerformanceClock.cpp | Monotonic nanosecond timer for explicit duration measurements |
+| MadeiraPlatform.mm | Configures a CAMetalLayer and avoids redundant drawable-size changes |
+| NativePerformance.cpp | Lightweight, opt-in frame timing and automatic swapchain creation counters |
+| NativePerformance.cpp | Monotonic nanosecond timer for explicit duration measurements |
 | scripts/build_native_runtime.sh | Checks macOS/Xcode and upstream Madeira source tree, refusing to fake runtime availability |
 
 ## Scope and limitations
