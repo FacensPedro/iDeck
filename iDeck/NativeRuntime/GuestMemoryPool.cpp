@@ -27,23 +27,40 @@ extern "C" IDeckGuestMemoryPool *ideck_memory_pool_create(size_t max_cached_byte
     return new (std::nothrow) IDeckGuestMemoryPool(max_cached_bytes);
 }
 
-extern "C" void *ideck_memory_pool_acquire(IDeckGuestMemoryPool *pool, size_t size) {
+// Reusing a cached allocation must fit the caller's actual active-memory limit.
+// Otherwise an oversized cached block can cause a false out-of-budget failure
+// even though allocating the requested size would be possible.
+extern "C" void *ideck_memory_pool_acquire_limited(IDeckGuestMemoryPool *pool,
+                                                    size_t size, size_t max_active_bytes) {
     if (!pool || !size) return nullptr;
     std::lock_guard<std::mutex> lock(pool->mutex);
-    if (size > std::numeric_limits<size_t>::max() - pool->active_bytes) return nullptr;
+    if (size > max_active_bytes || pool->active_bytes > max_active_bytes - size) return nullptr;
+    const size_t available = max_active_bytes - pool->active_bytes;
+
+    // Best-fit reduces wasted resident memory without reallocating the block.
+    // Preserve Madeira's 2x reuse ceiling and prefer exact-size matches.
+    size_t best_index = pool->cached.size();
+    size_t best_size = std::numeric_limits<size_t>::max();
     for (size_t index = 0; index < pool->cached.size(); ++index) {
         const auto &block = pool->cached[index];
-        if (block.size < size || block.size - size > size) continue;
+        if (block.size < size || block.size - size > size || block.size > available) continue;
+        if (block.size < best_size) {
+            best_index = index;
+            best_size = block.size;
+            if (best_size == size) break;
+        }
+    }
+    if (best_index != pool->cached.size()) {
+        const auto block = pool->cached[best_index];
         try {
             pool->active.emplace(block.pointer, block.size);
         } catch (...) {
             return nullptr;
         }
-        void *pointer = block.pointer;
         pool->active_bytes += block.size;
         pool->cached_bytes -= block.size;
-        pool->cached.erase(pool->cached.begin() + index);
-        return pointer;
+        pool->cached.erase(pool->cached.begin() + best_index);
+        return block.pointer;
     }
     void *pointer = std::malloc(size);
     if (!pointer) return nullptr;
@@ -57,6 +74,10 @@ extern "C" void *ideck_memory_pool_acquire(IDeckGuestMemoryPool *pool, size_t si
     return pointer;
 }
 
+extern "C" void *ideck_memory_pool_acquire(IDeckGuestMemoryPool *pool, size_t size) {
+    return ideck_memory_pool_acquire_limited(pool, size, std::numeric_limits<size_t>::max());
+}
+
 extern "C" bool ideck_memory_pool_release(IDeckGuestMemoryPool *pool, void *pointer) {
     if (!pool || !pointer) return false;
     std::lock_guard<std::mutex> lock(pool->mutex);
@@ -65,7 +86,8 @@ extern "C" bool ideck_memory_pool_release(IDeckGuestMemoryPool *pool, void *poin
     size_t size = found->second;
     pool->active_bytes -= size;
     pool->active.erase(found);
-    if (size <= pool->cache_limit - pool->cached_bytes) {
+    if (pool->cached_bytes <= pool->cache_limit &&
+        size <= pool->cache_limit - pool->cached_bytes) {
         try {
             pool->cached.push_back({pointer, size});
             pool->cached_bytes += size;
