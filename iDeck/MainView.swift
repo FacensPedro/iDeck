@@ -399,11 +399,7 @@ struct WindowsWorkspaceView: View {
                         .font(.caption.weight(.semibold))
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
-                    if let remaining = remainingText(remainingSeconds) {
-                        Text(remaining)
-                            .font(.system(size: 10, weight: .medium))
-                            .lineLimit(1)
-                    }
+                    // Time remaining is available on the game's details page.
                 }
                 .foregroundColor(.white)
                 .frame(maxWidth: .infinity)
@@ -597,11 +593,11 @@ struct WindowsWorkspaceView: View {
 
     private var topBar: some View {
         HStack(spacing: 12) {
-            Image("IDeckLogo")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 38, height: 38)
-                .accessibilityHidden(true)
+            Text("iDeck")
+                .font(.system(size: 24, weight: .bold, design: .rounded))
+                .tracking(-0.5)
+                .foregroundColor(.white)
+                .accessibilityAddTraits(.isHeader)
             Spacer(minLength: 0)
             HStack(spacing: 6) {
                 Circle()
@@ -1537,6 +1533,15 @@ private struct SteamProgramDetailsView: View {
                  tr("Installing %d%%", Int(((progress?.fraction ?? 0) * 100).rounded())))
                 .font(.caption)
                 .foregroundColor(.white)
+            if let progress, progress.phase == .downloading,
+               let eta = DownloadETA.seconds(done: progress.doneBytes,
+                                             total: progress.totalBytes,
+                                             bytesPerSecond: progress.bytesPerSecond),
+               let remaining = DownloadETA.label(eta) {
+                Label(tr("Time left") + ": " + remaining, systemImage: "clock")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             if let progress, progress.installedBytes > 0 {
                 Text(tr("Installed: %@", ByteCountFormatter.string(
                     fromByteCount: Int64(clamping: progress.installedBytes), countStyle: .file)))
@@ -2440,44 +2445,94 @@ private struct IDeckFirstRunSetupView: View {
         MadeiraBundleIdentity.profile["wineMonoBundled"] as? Bool ?? false
     }
 
+    private let setupTitles = [
+        "Windows compatibility",
+        ".NET compatibility",
+        "JIT configuration",
+        "Visual C++ runtime",
+        "Setup summary"
+    ]
+
     var body: some View {
         NavigationStack {
-            VStack(alignment: .leading, spacing: 20) {
-                ProgressView(value: Double(step + 1), total: 5)
-                Text("Step \(step + 1) of 5")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+            ZStack {
+                Color(red: 0.055, green: 0.063, blue: 0.085).ignoresSafeArea()
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 22) {
+                        HStack(spacing: 12) {
+                            Image(systemName: "square.stack.3d.up.fill")
+                                .font(.title2)
+                                .foregroundStyle(.white)
+                                .frame(width: 52, height: 52)
+                                .background(Color.blue.opacity(0.24),
+                                            in: RoundedRectangle(cornerRadius: 14))
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("iDeck")
+                                    .font(.system(size: 30, weight: .bold, design: .rounded))
+                                    .foregroundStyle(.white)
+                                Text("Initial setup · Windows runtime")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        Text("Prepare the Windows environment before installing or launching games.")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
 
-                Group {
-                    switch step {
-                    case 0: dockStep
-                    case 1: monoStep
-                    case 2: jitStep
-                    case 3: visualCStep
-                    default: completeStep
-                    }
-                }
+                        HStack(spacing: 7) {
+                            ForEach(0..<5, id: \.self) { index in
+                                Capsule()
+                                    .fill(index <= step ? Color.blue : Color.white.opacity(0.13))
+                                    .frame(height: 5)
+                            }
+                        }
+                        Text("STEP \(step + 1) OF 5  ·  \(setupTitles[step].uppercased())")
+                            .font(.caption.weight(.semibold))
+                            .tracking(1.0)
+                            .foregroundStyle(.secondary)
 
-                Spacer(minLength: 12)
-                HStack {
-                    if step > 0 {
-                        Button("Back") { step -= 1 }
-                            .buttonStyle(.bordered)
+                        VStack(alignment: .leading, spacing: 16) {
+                            Group {
+                                switch step {
+                                case 0: dockStep
+                                case 1: monoStep
+                                case 2: jitStep
+                                case 3: visualCStep
+                                default: completeStep
+                                }
+                            }
+                        }
+                        .padding(22)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color(red: 0.11, green: 0.12, blue: 0.15),
+                                    in: RoundedRectangle(cornerRadius: 18))
+                        .overlay(RoundedRectangle(cornerRadius: 18)
+                            .stroke(Color.white.opacity(0.1), lineWidth: 1))
+
+                        HStack(spacing: 12) {
+                            if step > 0 {
+                                Button("Back") { withAnimation(.easeInOut(duration: 0.2)) { step -= 1 } }
+                                    .buttonStyle(.bordered)
+                            }
+                            Spacer()
+                            if step < 4 {
+                                Button("Continue") { withAnimation(.easeInOut(duration: 0.2)) { step += 1 } }
+                                    .buttonStyle(.borderedProminent)
+                                    .disabled(installingVisualC || (step == 0 &&
+                                              (!prefixReady || !coordinator.windowsEnvironment.hasWoW64Runtime())))
+                            } else {
+                                Button("Finish setup", action: onFinish)
+                                    .buttonStyle(.borderedProminent)
+                            }
+                        }
+                        .controlSize(.large)
                     }
-                    Spacer()
-                    if step < 4 {
-                        Button("Next") { step += 1 }
-                            .buttonStyle(.borderedProminent)
-                            .disabled(installingVisualC)
-                    } else {
-                        Button("Finish setup", action: onFinish)
-                            .buttonStyle(.borderedProminent)
-                    }
+                    .padding(24)
+                    .frame(maxWidth: 660)
+                    .frame(maxWidth: .infinity)
                 }
             }
-            .padding(24)
-            .navigationTitle("Set up iDeck")
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarHidden(true)
         }
         .fileImporter(isPresented: $pairingImporterPresented,
                       allowedContentTypes: [.propertyList, .xml, .json, .data]) { result in
@@ -2488,6 +2543,9 @@ private struct IDeckFirstRunSetupView: View {
         .onAppear {
             coordinator.refreshJITStatus()
             coordinator.refreshPairingFileState()
+            if !prefixReady && MadeiraDock.bundled {
+                coordinator.openMadeiraWorkspace()
+            }
         }
         .preferredColorScheme(.dark)
     }
@@ -2506,13 +2564,19 @@ private struct IDeckFirstRunSetupView: View {
             }
             .buttonStyle(.borderedProminent)
             .disabled(!MadeiraDock.bundled || prefixReady || !coordinator.windowsEnvironment.hasWoW64Runtime())
-            Button("Install Madeira Dock") {
-                coordinator.installSteamClientComponentsIfNeeded()
+            Button(MadeiraDock.clientInstalled ? "Repair Madeira Dock" : "Install Madeira Dock") {
+                coordinator.installMadeiraDock()
             }
             .buttonStyle(.bordered)
             .disabled(!prefixReady || !MadeiraDock.bundled)
             if let progress = coordinator.steamComponentsProgress {
-                Text(progress).font(.caption).foregroundStyle(.secondary)
+                Text(progress)
+                    .font(.caption)
+                    .foregroundStyle(progress.contains("failed") || progress.contains("missing") ? Color.orange : Color.secondary)
+            }
+            if !prefixReady {
+                ProgressView(coordinator.windowsStatus)
+                    .font(.caption)
             }
             if !MadeiraDock.bundled {
                 Text("This IPA does not include Madeira Dock. Install a native iDeck IPA.")
@@ -2554,7 +2618,8 @@ private struct IDeckFirstRunSetupView: View {
                 }
             }
             Button(coordinator.isJITEnabled ? "Reconnect debugger" : "Enable JIT") {
-                coordinator.requestStikDebugJIT()
+                if jitMethod == "builtIn" { coordinator.requestBuiltInJIT() }
+                else { coordinator.requestStikDebugJIT() }
             }
             .buttonStyle(.borderedProminent)
             Text("Wine/FEX requires a working debugger and executable-memory setup. JIT permission alone is insufficient.")
