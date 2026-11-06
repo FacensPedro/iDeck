@@ -1,17 +1,18 @@
 import CryptoKit
 import Foundation
 
-/// Repairs the seven Steam video-client DLLs from files the device owner
-/// supplies through Files > On My iPad > iDeck > SteamDLLs. Valve's binaries
-/// are not redistributed, downloaded from DLL sites, or synthesized here.
-/// Never modify a running Wine session or overwrite existing Steam files.
+/// Repairs Steam's video-client FFmpeg dependencies and SDL3.dll from
+/// compatible Windows x64 binaries supplied by the user from their own Steam
+/// installation. Never use random DLL mirrors or overwrite a running client.
 enum SteamDLLRepair {
     static let mediaLibraries = [
         "libavcodec-62.dll", "libavformat-62.dll", "libavutil-60.dll",
         "libavfilter-11.dll", "libswresample-6.dll", "libswscale-9.dll"
     ]
     static let videoLibrary = "video64.dll"
-    static let clientLibraries = mediaLibraries + [videoLibrary]
+    static let sdlLibrary = "SDL3.dll"
+    static let videoLibraries = mediaLibraries + [videoLibrary]
+    static let clientLibraries = videoLibraries + [sdlLibrary]
 
     struct Report: Sendable {
         let copied: [String]
@@ -31,11 +32,10 @@ enum SteamDLLRepair {
         }
     }
 
-    /// Only genuine x64 PE DLLs are candidates. Name, architecture, and a valid
-    /// PE header establish compatibility constraints, NOT publisher authenticity.
-    /// Files must come from the user's own Steam client, not generic DLL sites.
+    /// Validates file type, PE32+ optional-header length, AMD64 machine and
+    /// IMAGE_FILE_DLL, not merely MZ. It does not authenticate the publisher:
+    /// use matching libraries from the user's own genuine Steam installation.
     static func validX64DLL(_ url: URL) -> Bool {
-        let fm = FileManager.default
         guard let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey]),
               values.isRegularFile == true, values.isSymbolicLink != true,
               let count = values.fileSize, (4096...64 * 1024 * 1024).contains(count),
@@ -43,50 +43,41 @@ enum SteamDLLRepair {
         defer { try? handle.close() }
         guard let data = try? handle.read(upToCount: 4096) else { return false }
         let bytes = [UInt8](data)
-        func u16(_ p: Int) -> UInt16 {
-            UInt16(bytes[p]) | UInt16(bytes[p + 1]) << 8
-        }
-        func u32(_ p: Int) -> UInt32 {
-            UInt32(u16(p)) | UInt32(u16(p + 2)) << 16
-        }
+        func u16(_ p: Int) -> UInt16 { UInt16(bytes[p]) | UInt16(bytes[p + 1]) << 8 }
+        func u32(_ p: Int) -> UInt32 { UInt32(u16(p)) | UInt32(u16(p + 2)) << 16 }
         guard bytes.count >= 0x40, bytes[0] == 0x4d, bytes[1] == 0x5a else { return false }
         let pe = Int(u32(0x3c))
-        guard pe >= 0x40, pe + 24 <= bytes.count,
+        guard pe >= 0x40, pe + 26 <= bytes.count,
               u32(pe) == 0x00004550,
               u16(pe + 4) == 0x8664,
-              u16(pe + 22) & 0x2000 != 0 else { return false }
+              u16(pe + 22) & 0x2000 != 0,
+              u16(pe + 20) >= 112,
+              u16(pe + 24) == 0x020b,
+              pe + 24 + Int(u16(pe + 20)) <= count else { return false }
         return true
     }
 
-    /// Return a concise log result; do not treat absent optional Steam media
-    /// DLLs as proof that the Windows game executable itself cannot run.
+    /// Install missing DLLs, and optionally replace a malformed existing
+    /// SDL3.dll after keeping a backup. The FFmpeg family is all-or-nothing
+    /// to avoid a partially installed, incompatible video64.dll chain.
     static func repair(prefix: URL) -> Report {
         let fm = FileManager.default
         let root = prefix.appendingPathComponent("drive_c")
             .appendingPathComponent(SteamRuntimeFiles.relativeRoot, isDirectory: true)
-        guard fm.fileExists(atPath: root.appendingPathComponent("steam.exe").path) else {
+        guard fm.fileExists(atPath: root.appendingPathComponent("steam.exe").path),
+              wine_process_is_running() == 0, wineserver_is_running() == 0,
+              let folder = sourceFolder else {
             return Report(copied: [], missing: [], invalid: [])
         }
-        guard wine_process_is_running() == 0 && wineserver_is_running() == 0 else {
-            return Report(copied: [], missing: [], invalid: [])
-        }
-        guard let folder = sourceFolder else {
-            return Report(copied: [], missing: [], invalid: [])
-        }
-        let missingBefore = clientLibraries.filter {
-            !validX64DLL(root.appendingPathComponent($0))
-        }
+        let missingBefore = clientLibraries.filter { !validX64DLL(root.appendingPathComponent($0)) }
         guard hasImportFiles else {
             return Report(copied: [], missing: missingBefore, invalid: [])
         }
-        // Reject linked import directories and linked Steam destinations:
-        // only copy from regular files in the app's user-owned documents.
         guard (try? folder.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey]))?.isDirectory == true,
               (try? folder.resourceValues(forKeys: [.isSymbolicLinkKey]))?.isSymbolicLink != true,
               root.standardizedFileURL.path == root.resolvingSymlinksInPath().standardizedFileURL.path else {
             return Report(copied: [], missing: missingBefore, invalid: ["unsafe import folder"])
         }
-
         let invalidSources = clientLibraries.filter { name in
             let input = folder.appendingPathComponent(name)
             return fm.fileExists(atPath: input.path) && !validX64DLL(input)
@@ -94,39 +85,67 @@ enum SteamDLLRepair {
         guard invalidSources.isEmpty else {
             return Report(copied: [], missing: missingBefore, invalid: invalidSources)
         }
-        let invalid = clientLibraries.filter { name in
-            let destination = root.appendingPathComponent(name)
-            return fm.fileExists(atPath: destination.path) && !validX64DLL(destination)
+        let invalidExisting = clientLibraries.filter { name in
+            let target = root.appendingPathComponent(name)
+            return fm.fileExists(atPath: target.path) && !validX64DLL(target)
         }
-        // A previously installed incompatible DLL is never silently replaced.
-        guard invalid.isEmpty else {
-            return Report(copied: [], missing: missingBefore, invalid: invalid)
+        // Unknown existing FFmpeg builds are preserved. SDL3.dll, however,
+        // commonly exists with the wrong architecture: a verified x64 input
+        // may replace that single file while keeping the original as backup.
+        let blocked = invalidExisting.filter { $0 != sdlLibrary }
+        guard blocked.isEmpty else {
+            return Report(copied: [], missing: missingBefore, invalid: blocked)
         }
-        // Never install half the FFmpeg dependency chain. Keep a complete set
-        // of all six matching SONAME majors, and the video client if needed.
-        let prepared = clientLibraries.filter { name in
+        let videoReady = videoLibraries.allSatisfy { name in
             validX64DLL(root.appendingPathComponent(name)) ||
-                validX64DLL(folder.appendingPathComponent(name))
-        }
-        guard prepared.count == clientLibraries.count else {
-            return Report(copied: [], missing: missingBefore, invalid: [])
+            validX64DLL(folder.appendingPathComponent(name))
         }
         var copied: [String] = []
-        for name in clientLibraries {
+        var invalid: [String] = []
+        let candidates = (videoReady ? videoLibraries : []) + [sdlLibrary]
+        for name in candidates {
             let destination = root.appendingPathComponent(name)
             if validX64DLL(destination) { continue }
             let source = folder.appendingPathComponent(name)
-            guard validX64DLL(source), !fm.fileExists(atPath: destination.path) else { continue }
-            do {
-                try fm.copyItem(at: source, to: destination)
-                copied.append(name)
-            } catch {
-                AppLog.record("[steam-dll] could not copy \(name): \(error.localizedDescription)")
+            guard validX64DLL(source) else { continue }
+            let exists = fm.fileExists(atPath: destination.path)
+            if exists && name != sdlLibrary { continue }
+            // Never follow a preexisting symlink, even for SDL3.dll.
+            if (try? destination.resourceValues(forKeys: [.isSymbolicLinkKey]))?.isSymbolicLink == true {
+                invalid.append(name)
+                continue
             }
+            let backup = root.appendingPathComponent(name + ".ideck-invalid-backup")
+            if exists && fm.fileExists(atPath: backup.path) {
+                invalid.append(name)
+                continue
+            }
+            do {
+                // Stage the new file before changing anything in the Steam
+                // client. On error, restore the exact original byte content.
+                let temporary = root.appendingPathComponent(name + ".ideck-staging-" + UUID().uuidString)
+                try fm.copyItem(at: source, to: temporary)
+                defer { try? fm.removeItem(at: temporary) }
+                guard validX64DLL(temporary) else { throw CocoaError(.fileReadCorruptFile) }
+                if exists { try fm.moveItem(at: destination, to: backup) }
+                do {
+                    try fm.moveItem(at: temporary, to: destination)
+                    copied.append(name)
+                } catch {
+                    if exists { try? fm.moveItem(at: backup, to: destination) }
+                    throw error
+                }
+            } catch {
+                AppLog.record("[steam-dll] could not repair \(name): \(error.localizedDescription)")
+                invalid.append(name)
+            }
+        }
+        if !videoReady && mediaLibraries.contains(where: { !validX64DLL(root.appendingPathComponent($0)) }) {
+            AppLog.record("[steam-dll] incomplete FFmpeg set; refusing partial video64.dll dependency repair")
         }
         return Report(copied: copied,
                       missing: clientLibraries.filter { !validX64DLL(root.appendingPathComponent($0)) },
-                      invalid: [])
+                      invalid: invalid)
     }
 }
 
