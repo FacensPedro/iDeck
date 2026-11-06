@@ -75,7 +75,10 @@ enum LogIssueScanner {
         "error", "err:", "fatal", "crash", "exception", "panic", "abort",
         "c0000005", "c000001d", "c0000135", "status_access_violation", "unhandled",
     ]
-    private static let failures = ["failed", "failure", "cannot", "could not", "unable to", "timed out", "timeout", "denied"]
+    private static let failures = [
+        "failed", "failure", "cannot", "could not", "unable to", "timed out", "timeout",
+        "denied", "warning", "warn:", "missing", "stale", "mprotect", "invalid",
+    ]
     /// Wine debug channels that print "err:" for harmless probing.
     private static let noise = ["fixme:", "err:ole:", "err:winediag:"]
     /// Counters that report no problem at all ("launch-client-error=0").
@@ -89,8 +92,13 @@ enum LogIssueScanner {
         var found: [String: LogIssue] = [:]
         var order: [String] = []
         for raw in text.split(whereSeparator: \.isNewline) {
-            let line = raw.trimmingCharacters(in: .whitespaces)
-            guard !line.isEmpty, line.count < 2000 else { continue }
+            let original = raw.trimmingCharacters(in: .whitespaces)
+            guard !original.isEmpty else { continue }
+            // Native Wine output may include very long diagnostic lines.
+            // Preserve both ends instead of silently discarding the problem.
+            let line = original.count <= 2000
+                ? String(original)
+                : String(original.prefix(1200)) + " … " + String(original.suffix(750))
             let lower = line.lowercased()
             if noise.contains(where: lower.contains) { continue }
             if !steamSession, steamTags.contains(where: lower.contains) { continue }
@@ -136,6 +144,7 @@ final class BugReportModel: ObservableObject {
     @Published private(set) var hasWineLog = false
     @Published private(set) var hasAppLog = false
     @Published var notice: String?
+    private var scanGeneration = 0
 
     static var wineLogURL: URL? {
         FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?
@@ -152,6 +161,7 @@ final class BugReportModel: ObservableObject {
         hasWineLog = wineURL != nil
         hasAppLog = !appURLs.isEmpty
         let steamSession = UserDefaults.standard.bool(forKey: "session.lastWasSteam")
+        let generation = scanGeneration
         let result = await Task.detached(priority: .userInitiated) { () -> ([LogIssue], Int32) in
             var issues: [LogIssue] = []
             let appText = appURLs.compactMap { try? WineLogClipboard.read(from: $0).text }.joined(separator: "\n")
@@ -165,6 +175,8 @@ final class BugReportModel: ObservableObject {
             }
             return (issues.sorted { $0.severity > $1.severity }, diagnosis)
         }.value
+        // Clearing logs while a read is in flight must not restore stale bugs.
+        guard generation == scanGeneration, !Task.isCancelled else { return }
         issues = Self.liveJITIssues() + result.0
         wineFinding = Self.finding(for: result.1)
     }
@@ -272,6 +284,7 @@ final class BugReportModel: ObservableObject {
             notice = "Pause or finish the download and transfer before clearing logs."
             return
         }
+        scanGeneration += 1
         AppLog.clear()
         if let wine = Self.wineLogURL {
             try? FileManager.default.removeItem(at: wine)
@@ -333,8 +346,8 @@ final class BugReportModel: ObservableObject {
 struct BugReportView: View {
     @StateObject private var model = BugReportModel()
     @State private var expanded: Set<String> = []
-    @State private var bugsOpen = false
-    @State private var jitOpen = false
+    @State private var bugsOpen = true
+    @State private var jitOpen = true
     @State private var showClearConfirmation = false
     @AppStorage("diagnostics.detailed") private var detailedDiagnostics = false
     @AppStorage(BenchmarkSession.enabledKey) private var recordBenchmarks = false
@@ -365,24 +378,26 @@ struct BugReportView: View {
                         .buttonStyle(.plain)
                     }
                 }
+                let gameIssues = model.issues.filter { $0.source != .jit }
                 Section {
-                    if model.isScanning && model.issues.isEmpty {
+                    if model.isScanning && gameIssues.isEmpty {
                         HStack { ProgressView(); Text(tr("Reading logs...")).foregroundColor(.gray) }
-                    } else if model.issues.isEmpty {
+                    } else if gameIssues.isEmpty {
                         Label(tr("No bugs found in the logs."), systemImage: "checkmark.seal")
                             .foregroundColor(.green)
                     } else if bugsOpen {
-                        ForEach(model.issues.filter { $0.source != .jit }) { issue in issueRow(issue) }
+                        ForEach(gameIssues) { issue in issueRow(issue) }
                     }
                 } header: {
-                    // Bugs start hidden; the header shows or hides them.
+                    // Show detected problems immediately. Users may collapse
+                    // the section, but should never need to discover a hidden list.
                     Button {
                         withAnimation { bugsOpen.toggle() }
                     } label: {
                         HStack {
-                            Text(tr("Bugs found") + (model.issues.isEmpty ? "" : " (\(model.issues.count))"))
+                            Text(tr("Bugs found") + (gameIssues.isEmpty ? "" : " (\(gameIssues.count))"))
                             Spacer()
-                            if !model.issues.isEmpty {
+                            if !gameIssues.isEmpty {
                                 Image(systemName: "chevron.down").rotationEffect(.degrees(bugsOpen ? 0 : -90))
                             }
                         }
@@ -443,7 +458,18 @@ struct BugReportView: View {
                     .disabled(model.isScanning)
             }
         }
-        .task { await model.scan() }
+        .task {
+            // New errors may be written by Wine after the screen opens.
+            // Rescan only while Bugs & logs is visible; cancellation stops
+            // polling when the user leaves this page.
+            await model.scan()
+            while !Task.isCancelled {
+                do { try await Task.sleep(nanoseconds: 5_000_000_000) }
+                catch { break }
+                guard !Task.isCancelled else { break }
+                await model.scan()
+            }
+        }
         .alert(model.notice ?? "", isPresented: Binding(
             get: { model.notice != nil }, set: { if !$0 { model.notice = nil } })) {
             Button(tr("OK"), role: .cancel) {}
