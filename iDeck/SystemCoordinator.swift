@@ -190,6 +190,12 @@ class SystemCoordinator: ObservableObject {
            !FileManager.default.fileExists(atPath: folder.path) {
             try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         }
+        // Madeira 0.2.0: prepare WineHQ's pinned Gecko MSI installers in
+        // WINEPREFIX/.cache/wine on Wi-Fi only. This is independent of the
+        // Steam client and avoids Wine's in-guest Gecko download dialog.
+        if MadeiraDock.bundled, PrefixInstaller.isPrefixInstalled(at: MadeiraDock.prefix) {
+            WineGeckoRuntime.prepareInBackground(prefix: MadeiraDock.prefix)
+        }
         // Runs when the Madeira workspace first opens (its Wine prefix
         // ready), with or without a Steam account: the components come from
         // Valve's public update server.
