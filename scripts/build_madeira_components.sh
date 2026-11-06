@@ -183,6 +183,19 @@ if [[ "$REBUILD" == "1" ]]; then
     }
     install -m 644 "$output" "$MD/app/Madeira/arm64ec-windows/$module.dll"
   done
+  # Steam installscript.vdf runs through the genuine Wine command interpreter.
+  # The upstream aarch64-windows/cmd.exe is ARM64, not an x64/ARM64EC
+  # executable usable by iDeck's Windows launcher. Build it from the pinned
+  # Wine 11.4 ARM64EC tree rather than shipping a placeholder or the wrong ABI.
+  cmd_target="programs/cmd/arm64ec-windows/cmd.exe"
+  PATH="$MD/toolchains/llvm-mingw-20260421-ucrt-macos-universal/bin:$PATH" \
+    make -C "$MD/wine/build-arm64ec" -j"$(sysctl -n hw.ncpu)" "$cmd_target"
+  cmd_output="$MD/wine/build-arm64ec/$cmd_target"
+  [[ -s "$cmd_output" && "$(head -c 2 "$cmd_output")" == "MZ" ]] || {
+    echo "ERROR: Wine ARM64EC cmd.exe was not compiled; Steam installers cannot run." >&2
+    exit 2
+  }
+  install -m 644 "$cmd_output" "$MD/app/Madeira/arm64ec-windows/cmd.exe"
   NTDLL_LOG="$MD/build/ntdll-unix/build-ideck.log"
   if ! bash "$MD/build/ntdll-unix/build.sh" 2>&1 | tee "$NTDLL_LOG"; then
     FAILED_UNIXLIBS="$(sed -n 's/^Failed://p' "$NTDLL_LOG")"
