@@ -1,11 +1,14 @@
 /* Interface-only builds link no Madeira runtime: these stand in for the
- * JITAllocator.c symbols the copied Madeira JIT files (StikJITHelper.swift,
- * EntitlementChecker.swift) reference. Native builds link Madeira's own
- * JITAllocator.c (scripts/link_madeira_native.sh) and compile none of this. */
+ * symbols the copied Madeira JIT files (StikJITHelper.swift,
+ * EntitlementChecker.swift) and Madeira Dock files reference. Native builds
+ * link Madeira's own JITAllocator.c and runtime (scripts/link_madeira_native.sh)
+ * and compile none of this. */
 #if !(defined(IDECK_NATIVE_MADEIRA_ENABLED) && IDECK_NATIVE_MADEIRA_ENABLED)
 #include "../MadeiraJIT/JITAllocator.h"
+#include "../MadeiraDock/MadeiraDockABI.h"
 #include <os/proc.h>
 
+/* JIT allocator */
 unsigned long madeira_early_window_base, madeira_early_window_size;
 unsigned long madeira_early_pool_base, madeira_early_pool_size;
 unsigned long madeira_early_intruder_base, madeira_early_intruder_size;
@@ -22,4 +25,9 @@ bool jit_task_map_range(uint64_t *min_address, uint64_t *max_address) {
 uint64_t jit_available_memory(void) { return (uint64_t)os_proc_available_memory(); }
 void *jit26_prepare_region(void *addr, size_t len) { (void)addr; (void)len; return 0; }
 void jit26_detach(void) {}
+
+/* Madeira Dock runtime */
+int wine_process_is_running(void) { return 0; }
+int wineserver_is_running(void) { return 0; }
+void madeira_seed_prefix_if_needed(const char *prefix_path) { (void)prefix_path; }
 #endif

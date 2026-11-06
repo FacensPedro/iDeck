@@ -936,56 +936,6 @@ private struct GOGLoginWebView: UIViewRepresentable {
     }
 }
 
-// MARK: - Store badge
+// MARK: - Store
 
 enum GameStore { case steam, gog, epic }
-
-/// A small store mark next to a game's name. When the app bundles official
-/// artwork as "StoreBadgeSteam" / "StoreBadgeGOG" / "StoreBadgeEpic" image
-/// assets, that is used; otherwise a neutral text tag.
-struct StoreBadge: View {
-    let store: GameStore
-
-    private var assetName: String {
-        switch store {
-        case .steam: return "StoreBadgeSteam"
-        case .gog: return "StoreBadgeGOG"
-        case .epic: return "StoreBadgeEpic"
-        }
-    }
-    private var label: String {
-        switch store {
-        case .steam: return "Steam"
-        case .gog: return "GOG"
-        case .epic: return "Epic"
-        }
-    }
-    private var tint: Color {
-        switch store {
-        case .steam: return Color(red: 0.11, green: 0.24, blue: 0.40)
-        case .gog: return Color(red: 0.42, green: 0.16, blue: 0.55)
-        case .epic: return Color(red: 0.20, green: 0.20, blue: 0.22)
-        }
-    }
-
-    var body: some View {
-        Group {
-            if UIImage(named: assetName) != nil {
-                Image(assetName)
-                    .renderingMode(store == .steam ? .original : .template)
-                    .resizable()
-                    .scaledToFit()
-                    .foregroundColor(.white)
-                    .frame(width: store == .epic ? 15 : 16, height: store == .epic ? 17 : 16)
-            } else {
-                Text(label)
-                    .font(.system(size: 8, weight: .heavy, design: .rounded))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 4)
-                    .padding(.vertical, 2)
-                    .background(tint, in: RoundedRectangle(cornerRadius: 3))
-            }
-        }
-        .accessibilityLabel(label)
-    }
-}
