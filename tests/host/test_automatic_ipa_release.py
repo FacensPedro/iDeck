@@ -1,5 +1,6 @@
 import os
 import pathlib
+import re
 import subprocess
 import sys
 import textwrap
@@ -7,6 +8,13 @@ import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 WORKFLOW = (ROOT / ".github/workflows/ios.yml").read_text(encoding="utf-8")
+PROJECT = (ROOT / "iDeck.xcodeproj/project.pbxproj").read_text(encoding="utf-8")
+VERSIONS = set(re.findall(r"\\bMARKETING_VERSION\\s*=\\s*([^;]+);", PROJECT))
+if len(VERSIONS) != 1:
+    raise AssertionError(f"Inconsistent iDeck project versions: {sorted(VERSIONS)}")
+PROJECT_VERSION = VERSIONS.pop().strip()
+if not re.fullmatch(r"[0-9]+\\.[0-9]+\\.[0-9]+", PROJECT_VERSION):
+    raise AssertionError(f"Invalid iDeck project version: {PROJECT_VERSION!r}")
 
 
 class AutomaticIPAReleaseTests(unittest.TestCase):
@@ -87,10 +95,10 @@ class AutomaticIPAReleaseTests(unittest.TestCase):
         self.assertNotIn("# iDeck 1.0.0", notes)
         self.assertTrue(notes.startswith("## What's Changed\n"))
 
-    def test_one_time_1_0_7_release_request_requires_native_main_and_does_not_clobber(self):
+    def test_one_time_current_release_request_requires_native_main_and_does_not_clobber(self):
         release = WORKFLOW.split("\n  release:\n", 1)[1]
         requested = (ROOT / ".github/release-request.txt").read_text(encoding="utf-8").strip()
-        self.assertEqual(requested, "1.0.7")
+        self.assertEqual(requested, PROJECT_VERSION)
         self.assertIn("needs.build.outputs.ipa_kind == 'native'", release)
         self.assertIn("github.ref == 'refs/heads/main'", release)
         self.assertIn('test -s .github/release-request.txt', release)
@@ -114,7 +122,15 @@ class AutomaticIPAReleaseTests(unittest.TestCase):
         self.assertIn("REQUESTED_RELEASE_TAG:", guard)
         script = textwrap.dedent(guard.split("python3 - <<'PY'\n", 1)[1].split("\n          PY", 1)[0])
 
-        for tag, expected_ok in (("1.0.7", True), ("v1.0.7", True), ("1.0.6", False), ("v1.0.8", False)):
+        major, minor, patch = (int(x) for x in PROJECT_VERSION.split("."))
+        previous_version = f"{major}.{minor}.{patch - 1}" if patch else f"{major}.{minor}.{patch + 1}"
+        for tag, expected_ok in (
+            (PROJECT_VERSION, True),
+            (f"v{PROJECT_VERSION}", True),
+            (previous_version, False),
+            (f"v{previous_version}", False),
+            ("not-a-version", False),
+        ):
             with self.subTest(tag=tag):
                 env = os.environ.copy()
                 env["REQUESTED_RELEASE_TAG"] = tag
@@ -123,7 +139,7 @@ class AutomaticIPAReleaseTests(unittest.TestCase):
                 self.assertEqual(result.returncode == 0, expected_ok,
                                  result.stdout + result.stderr)
                 if not expected_ok:
-                    self.assertIn("does not match project version v1.0.7", result.stderr)
+                    self.assertIn(f"does not match project version v{PROJECT_VERSION}", result.stderr)
 
     def test_auto_release_tag_uses_the_verified_ipa_version(self):
         release = WORKFLOW.split("\n  release:\n", 1)[1]
