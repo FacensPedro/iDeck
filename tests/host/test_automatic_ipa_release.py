@@ -87,10 +87,10 @@ class AutomaticIPAReleaseTests(unittest.TestCase):
         self.assertNotIn("# iDeck 1.0.0", notes)
         self.assertTrue(notes.startswith("## What's Changed\n"))
 
-    def test_one_time_1_0_6_release_request_requires_native_main_and_does_not_clobber(self):
+    def test_one_time_1_0_7_release_request_requires_native_main_and_does_not_clobber(self):
         release = WORKFLOW.split("\n  release:\n", 1)[1]
         requested = (ROOT / ".github/release-request.txt").read_text(encoding="utf-8").strip()
-        self.assertEqual(requested, "1.0.6")
+        self.assertEqual(requested, "1.0.7")
         self.assertIn("needs.build.outputs.ipa_kind == 'native'", release)
         self.assertIn("github.ref == 'refs/heads/main'", release)
         self.assertIn('test -s .github/release-request.txt', release)
@@ -114,7 +114,7 @@ class AutomaticIPAReleaseTests(unittest.TestCase):
         self.assertIn("REQUESTED_RELEASE_TAG:", guard)
         script = textwrap.dedent(guard.split("python3 - <<'PY'\n", 1)[1].split("\n          PY", 1)[0])
 
-        for tag, expected_ok in (("1.0.6", True), ("v1.0.6", True), ("1.0.5", False), ("v1.0.7", False)):
+        for tag, expected_ok in (("1.0.7", True), ("v1.0.7", True), ("1.0.6", False), ("v1.0.8", False)):
             with self.subTest(tag=tag):
                 env = os.environ.copy()
                 env["REQUESTED_RELEASE_TAG"] = tag
@@ -123,7 +123,7 @@ class AutomaticIPAReleaseTests(unittest.TestCase):
                 self.assertEqual(result.returncode == 0, expected_ok,
                                  result.stdout + result.stderr)
                 if not expected_ok:
-                    self.assertIn("does not match project version v1.0.6", result.stderr)
+                    self.assertIn("does not match project version v1.0.7", result.stderr)
 
     def test_auto_release_tag_uses_the_verified_ipa_version(self):
         release = WORKFLOW.split("\n  release:\n", 1)[1]
