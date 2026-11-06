@@ -22,7 +22,7 @@ on:
         description: "Include Wine Mono for compatible .NET Framework applications"
         type: boolean
         required: false
-        default: false
+        default: true
       export_runtime_kit:
         description: "Export native runtime ZIP as an artifact for authorized Git LFS storage (requires distribution rights)"
         type: boolean
@@ -461,7 +461,7 @@ jobs:
       IDECK_REQUIRE_IPHONE_DUO_SDK: '1'
       IDECK_NATIVE_BUILD: ${{ ((github.event_name == 'workflow_dispatch' && inputs.require_madeira) || (github.event_name == 'push' && vars.IDECK_NATIVE_DISTRIBUTION_APPROVED == 'true')) && '1' || '0' }}
       IDECK_BUILD_WOW64: ${{ ((github.event_name == 'workflow_dispatch' && inputs.require_madeira && inputs.build_wow64) || (github.event_name == 'push' && vars.IDECK_NATIVE_DISTRIBUTION_APPROVED == 'true')) && '1' || '0' }}
-      IDECK_BUNDLE_WINE_MONO: ${{ github.event_name == 'workflow_dispatch' && inputs.require_madeira && inputs.bundle_wine_mono && '1' || '0' }}
+      IDECK_BUNDLE_WINE_MONO: ${{ ((github.event_name == 'workflow_dispatch' && inputs.require_madeira && inputs.bundle_wine_mono) || (github.event_name == 'push' && vars.IDECK_NATIVE_DISTRIBUTION_APPROVED == 'true')) && '1' || '0' }}
       # The profile (always unified): DXMT + Madeira D3D12 ("d3d12" payload).
       IDECK_GRAPHICS_PROFILE: unified
       IDECK_MADEIRA_GRAPHICS: d3d12
@@ -725,6 +725,7 @@ jobs:
                   "arm64ec-windows/dxgi.dll",
                   "arm64ec-windows/d3d10core.dll",
                   "arm64ec-windows/dcomp.dll",
+                  "arm64ec-windows/cmd.exe",
                   "arm64ec-windows/ktmw32.dll",
                   "arm64ec-windows/faultrep.dll",
                   "arm64ec-windows/xaudio2_7.dll",
