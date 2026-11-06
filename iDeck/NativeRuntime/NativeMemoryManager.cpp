@@ -68,16 +68,10 @@ extern "C" void *ideck_native_memory_acquire(size_t bytes) {
     if (!bytes) return nullptr;
     MemoryState &s = state();
     std::lock_guard<std::mutex> lock(s.mutex);
-    auto before = pool_stats(s);
-    if (bytes > s.active_budget || before.active_bytes > s.active_budget - bytes) return nullptr;
-    if (!ensure_pool(s)) return nullptr;
-    void *memory = ideck_memory_pool_acquire(s.pool, bytes);
-    if (!memory) return nullptr;
-    if (pool_stats(s).active_bytes > s.active_budget) {
-        ideck_memory_pool_release(s.pool, memory);
-        return nullptr;
-    }
-    return memory;
+    if (bytes > s.active_budget || !ensure_pool(s)) return nullptr;
+    // The pool itself enforces the active-byte budget, including the actual
+    // size of a cached block. Avoid two extra pool-stat snapshots and locks.
+    return ideck_memory_pool_acquire_limited(s.pool, bytes, s.active_budget);
 }
 
 extern "C" bool ideck_native_memory_release(void *pointer) {

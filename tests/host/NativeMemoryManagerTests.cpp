@@ -115,10 +115,76 @@ static void test_pool_reduction() {
     ideck_memory_pool_destroy(pool);
 }
 
+
+static void test_best_fit_cache_reuse() {
+    auto *pool = ideck_memory_pool_create(8192);
+    assert(pool);
+    void *large = ideck_memory_pool_acquire(pool, 1024);
+    void *exact = ideck_memory_pool_acquire(pool, 640);
+    assert(large && exact);
+    assert(ideck_memory_pool_release(pool, large));
+    assert(ideck_memory_pool_release(pool, exact));
+
+    // The larger cached block comes first, but the exact-size block must win.
+    void *reused = ideck_memory_pool_acquire(pool, 640);
+    assert(reused == exact);
+    IDeckMemoryPoolStats stats{};
+    assert(ideck_memory_pool_stats(pool, &stats));
+    assert(stats.active_bytes == 640);
+    assert(stats.cached_bytes == 1024);
+    assert(ideck_memory_pool_release(pool, reused));
+    ideck_memory_pool_destroy(pool);
+}
+
+static void test_active_budget_rejects_oversized_cache_block() {
+    auto *pool = ideck_memory_pool_create(2048);
+    assert(pool);
+    void *oversized = ideck_memory_pool_acquire(pool, 800);
+    void *active = ideck_memory_pool_acquire(pool, 600);
+    assert(oversized && active);
+    assert(ideck_memory_pool_release(pool, oversized));
+
+    // 1024-byte active budget, 600 currently in use: an 800-byte cached
+    // allocation cannot fulfill the new 400-byte request. malloc(400) can.
+    void *fit = ideck_memory_pool_acquire_limited(pool, 400, 1024);
+    assert(fit && fit != oversized);
+    IDeckMemoryPoolStats stats{};
+    assert(ideck_memory_pool_stats(pool, &stats));
+    assert(stats.active_bytes == 1000);
+    assert(stats.cached_bytes == 800);
+    assert(!ideck_memory_pool_acquire_limited(pool, 25, 1024));
+    assert(ideck_memory_pool_release(pool, fit));
+    assert(ideck_memory_pool_release(pool, active));
+    ideck_memory_pool_destroy(pool);
+}
+
+static void test_native_budget_uses_exact_size_fallback() {
+    ideck_native_memory_trim();
+    assert(ideck_native_memory_configure(2048, 2048));
+    void *cached = ideck_native_memory_acquire(800);
+    void *live = ideck_native_memory_acquire(600);
+    assert(cached && live);
+    assert(ideck_native_memory_release(cached));
+    assert(ideck_native_memory_configure(1024, 1024));
+    void *fits = ideck_native_memory_acquire(400);
+    assert(fits && fits != cached);
+    IDeckNativeMemoryStats snapshot{};
+    assert(ideck_native_memory_snapshot(&snapshot));
+    assert(snapshot.active_bytes == 1000);
+    assert(snapshot.cached_bytes == 800);
+    assert(ideck_native_memory_release(fits));
+    assert(ideck_native_memory_release(live));
+    ideck_native_memory_trim();
+    assert(ideck_native_memory_configure(1024, 256));
+}
+
 int main() {
     test_budget_limits();
     test_pressure();
     test_concurrent_allocations();
     test_pool_reduction();
+    test_best_fit_cache_reuse();
+    test_active_budget_rejects_oversized_cache_block();
+    test_native_budget_uses_exact_size_fallback();
     return 0;
 }

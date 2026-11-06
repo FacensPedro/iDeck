@@ -27,6 +27,9 @@ typedef struct IDeckMemoryPoolStats {
 } IDeckMemoryPoolStats;
 IDeckGuestMemoryPool *ideck_memory_pool_create(size_t max_cached_bytes);
 void *ideck_memory_pool_acquire(IDeckGuestMemoryPool *pool, size_t size);
+// Enforce the requested active-memory budget when choosing a cached allocation.
+void *ideck_memory_pool_acquire_limited(IDeckGuestMemoryPool *pool, size_t size,
+                                       size_t max_active_bytes);
 bool ideck_memory_pool_release(IDeckGuestMemoryPool *pool, void *pointer);
 bool ideck_memory_pool_stats(const IDeckGuestMemoryPool *pool, IDeckMemoryPoolStats *output);
 void ideck_memory_pool_trim(IDeckGuestMemoryPool *pool);
