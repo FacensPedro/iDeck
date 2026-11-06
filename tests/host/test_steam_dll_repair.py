@@ -22,23 +22,45 @@ class SteamDLLRecoveryTests(unittest.TestCase):
         self.assertIn('appendingPathComponent("SteamDLLs"', GLUE)
         self.assertIn('SteamRuntimeFiles.relativeRoot', GLUE)
 
-    def test_never_overwrite_active_or_untrusted_steam_installation(self):
+    def test_media_group_and_sdl_architecture_are_checked_separately(self):
+        self.assertIn('"SDL3.dll"', GLUE)
+        self.assertIn('static let clientLibraries = mediaLibraries + [videoLibrary]', GLUE)
+        self.assertIn('(clientLibraries + [sdlLibrary]).contains', GLUE)
+        self.assertIn('static func steamClientMachine(root: URL) -> UInt16?', GLUE)
+        self.assertIn('machine == 0x014c || machine == 0x8664', GLUE)
+        self.assertIn('validDLL(input, machine: machine)', GLUE)
+        self.assertIn('let sdl = repairSDL3(root: root, sourceFolder: folder, machine: machine)', GLUE)
+        self.assertIn('prepared.count == clientLibraries.count', GLUE)
+        self.assertIn('if invalidSources.isEmpty && invalidDestinations.isEmpty', GLUE)
+
+    def test_never_replace_running_wine_or_unverified_media_dlls(self):
         self.assertIn('wine_process_is_running() == 0', GLUE)
         self.assertIn('wineserver_is_running() == 0', GLUE)
         self.assertIn('values.isRegularFile == true', GLUE)
         self.assertIn('values.isSymbolicLink != true', GLUE)
-        self.assertIn('u16(pe + 4) == 0x8664', GLUE)
+        self.assertIn('u16(pe + 4) == machine', GLUE)
         self.assertIn('u16(pe + 22) & 0x2000 != 0', GLUE)
-        self.assertIn('guard invalid.isEmpty else', GLUE)
-        self.assertIn('guard prepared.count == clientLibraries.count else', GLUE)
+        self.assertIn('u16(pe + 24) == magic', GLUE)
         self.assertIn('!fm.fileExists(atPath: destination.path)', GLUE)
         self.assertIn('try fm.copyItem(at: source, to: destination)', GLUE)
         self.assertNotIn('replaceItemAt(', GLUE)
+
+    def test_sdl3_incompatible_repair_keeps_backup_and_rolls_back(self):
+        self.assertIn('static func validX64DLL(_ url: URL) -> Bool', GLUE)
+        self.assertIn('private static func repairSDL3(root: URL, sourceFolder: URL, machine: UInt16)', GLUE)
+        self.assertIn('if validDLL(target, machine: machine) { return (false, nil) }', GLUE)
+        self.assertIn('sdlLibrary + ".ideck-incompatible-backup"', GLUE)
+        self.assertIn('try fm.moveItem(at: target, to: backup)', GLUE)
+        self.assertIn('try fm.copyItem(at: input, to: target)', GLUE)
+        self.assertIn('try? fm.moveItem(at: backup, to: target)', GLUE)
+        self.assertIn('if let reason = sdl.invalid { invalid.append(reason) }', GLUE)
 
     def test_repair_off_ui_thread_and_no_graphics_reduction(self):
         self.assertIn('Task.detached(priority: .utility)', COORDINATOR)
         self.assertIn('SteamDLLRepair.repair(prefix: prefix)', COORDINATOR)
         self.assertIn('if !MadeiraDock.clientInstalled', COORDINATOR)
+        self.assertIn('steamDLLAuditComplete = true', COORDINATOR)
+        self.assertIn('SteamDLLRepair.hasImportFiles || !steamDLLAuditComplete', COORDINATOR)
         self.assertNotIn('resolution =', GLUE)
         self.assertNotIn('fpsMode =', GLUE)
         self.assertNotIn('metalFXEnabled =', GLUE)
