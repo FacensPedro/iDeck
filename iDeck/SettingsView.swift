@@ -32,25 +32,12 @@ struct SettingsView: View {
             Form {
                 overviewSection
 
-                Section(tr("Accounts")) {
-                    NavigationLink { steamPage } label: {
-                        SettingsRow(icon: "gamecontroller.fill", color: Color(red: 0.07, green: 0.12, blue: 0.25), title: "Steam",
-                                    value: coordinator.isSteamConnected ? (SteamSignIn.accountName ?? tr("Connected")) : tr("Not connected"),
-                                    asset: "StoreBadgeSteam", assetKeepsColors: true)
+                Section(tr("Services")) {
+                    NavigationLink { accountsPage } label: {
+                        SettingsRow(icon: "square.grid.2x2.fill", color: .blue,
+                                    title: tr("Stores & launchers"),
+                                    value: tr("Steam, GOG, Epic, EA, Ubisoft"))
                     }
-                    NavigationLink { gogPage } label: {
-                        SettingsRow(icon: "shippingbox.fill", color: Color(red: 0.42, green: 0.16, blue: 0.55), title: "GOG",
-                                    value: gogLibrary.isSignedIn ? (gogLibrary.username ?? tr("Connected")) : tr("Not connected"),
-                                    asset: "StoreBadgeGOG")
-                    }
-                    NavigationLink { epicPage } label: {
-                        SettingsRow(icon: "e.square.fill", color: Color(white: 0.22), title: "Epic Games",
-                                    value: epicLibrary.signedIn ? (epicLibrary.accountName ?? tr("Connected")) : tr("Not connected"),
-                                    asset: "StoreBadgeEpic")
-                    }
-                }
-
-                Section(tr("PC")) {
                     NavigationLink { irelayPage } label: {
                         SettingsRow(icon: "cable.connector", color: .blue, title: "iRelay",
                                     value: tr("Automatic"))
@@ -80,6 +67,11 @@ struct SettingsView: View {
                 }
 
                 Section(tr("General")) {
+                    Button(tr("Run first-time setup again")) {
+                        UserDefaults.standard.set(false, forKey: "firstRunSetup.complete.v1")
+                        dismiss()
+                    }
+
                     languagePicker
                     NavigationLink { updatesPage } label: {
                         SettingsRow(icon: "arrow.triangle.2.circlepath", color: .blue, title: tr("Updates"),
@@ -226,6 +218,82 @@ struct SettingsView: View {
         }
         .navigationTitle("Epic Games")
         .onAppear { epicLibrary.start() }
+    }
+
+    private var accountsPage: some View {
+        Form {
+            Section(tr("Game stores")) {
+                NavigationLink { steamPage } label: {
+                    SettingsRow(icon: "gamecontroller.fill", color: .blue, title: "Steam",
+                                value: coordinator.isSteamConnected ? (SteamSignIn.accountName ?? tr("Connected")) : tr("Not connected"),
+                                asset: "StoreBadgeSteam", assetKeepsColors: true)
+                }
+                NavigationLink { gogPage } label: {
+                    SettingsRow(icon: "shippingbox.fill", color: .purple, title: "GOG",
+                                value: gogLibrary.isSignedIn ? (gogLibrary.username ?? tr("Connected")) : tr("Not connected"),
+                                asset: "StoreBadgeGOG")
+                }
+                NavigationLink { epicPage } label: {
+                    SettingsRow(icon: "e.square.fill", color: .gray, title: "Epic Games",
+                                value: epicLibrary.signedIn ? (epicLibrary.accountName ?? tr("Connected")) : tr("Not connected"),
+                                asset: "StoreBadgeEpic")
+                }
+            }
+            Section(tr("Windows launchers")) {
+                NavigationLink { externalLauncherPage(title: "EA app", folder: "EA",
+                                      installer: "EAappInstaller.exe",
+                                      client: "Program Files/Electronic Arts/EA Desktop/EA Desktop/EADesktop.exe",
+                                      slug: "ea") } label: {
+                    SettingsRow(icon: "square.stack", color: .blue, title: "EA app",
+                                asset: "StoreBadgeEA", assetKeepsColors: true)
+                }
+                NavigationLink { externalLauncherPage(title: "Ubisoft Connect", folder: "Ubisoft",
+                                      installer: "UbisoftConnectInstaller.exe",
+                                      client: "Program Files (x86)/Ubisoft/Ubisoft Game Launcher/UbisoftConnect.exe",
+                                      slug: "ubisoft") } label: {
+                    SettingsRow(icon: "square.stack", color: .purple, title: "Ubisoft Connect",
+                                asset: "StoreBadgeUbisoft", assetKeepsColors: true)
+                }
+            }
+        }
+        .navigationTitle(tr("Stores & launchers"))
+    }
+
+    private func externalLauncherPage(title: String, folder: String, installer: String,
+                                      client: String, slug: String) -> some View {
+        let drive = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("wine/drive_c", isDirectory: true)
+        let setup = drive.appendingPathComponent("WindowsDownloads/Launchers/" + folder + "/" + installer)
+        let executable = drive.appendingPathComponent(client)
+        let setupReady = FileManager.default.fileExists(atPath: setup.path)
+        let clientReady = FileManager.default.fileExists(atPath: executable.path)
+        return Form {
+            Section(title) {
+                LabeledContent(tr("Installer"), value: tr(setupReady ? "Transferred" : "Not transferred"))
+                Button(tr("Run Windows installer")) {
+                    coordinator.launchWindowsExecutable(at: setup,
+                        profile: WindowsGameProfile(id: slug + ":installer", title: title + " installer"))
+                    dismiss()
+                }
+                .disabled(!setupReady)
+                if clientReady {
+                    Button(tr("Launch client")) {
+                        coordinator.launchWindowsExecutable(at: executable,
+                            profile: WindowsGameProfile(id: slug + ":client", title: title))
+                        dismiss()
+                    }
+                }
+            }
+            Section(tr("Transfer")) {
+                Text(tr("Download the official Windows installer on your PC. In iRelay, open the matching launcher and transfer its .exe over USB. Reopen this page after the transfer."))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text(tr("Running the installer does not guarantee sign-in, DRM, or games will work under Wine."))
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            }
+        }
+        .navigationTitle(title)
     }
 
     // MARK: JIT
@@ -387,6 +455,10 @@ struct SettingsView: View {
                                value: tr(MadeiraBundleIdentity.d3d12Available ? "Bundled" : "Not bundled"))
                 LabeledContent("WoW64", value: tr((runtime["wow64Enabled"] as? Bool ?? false) ? "Bundled" : "Not bundled"))
                 LabeledContent("Wine Mono", value: tr((runtime["wineMonoBundled"] as? Bool ?? false) ? "Bundled" : "Not bundled"))
+                LabeledContent("Memory+", value: tr("Requested in IPA"))
+                Text(tr("Memory+ requires the signed app to retain the Increased Memory Limit entitlement. The iDeck settings cannot enable it after signing."))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 LabeledContent("Metal Shader Converter",
                                value: tr((runtime["metalShaderConverterBundled"] as? Bool ?? false) ? "Bundled" : "Not bundled"))
                 LabeledContent(tr("Madeira Dock"), value: tr(MadeiraDock.bundled ? "Bundled" : "Not bundled"))

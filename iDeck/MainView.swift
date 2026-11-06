@@ -7,6 +7,8 @@ struct MainView: View {
     // Lazily retained: a download remains owned when navigating home, but
     // the Steam session is not constructed during process cold-start.
     @State private var steamLibrary: SteamOwnedGamesModel?
+    @AppStorage("firstRunSetup.complete.v1") private var firstRunSetupComplete = false
+    @State private var isFirstRunSetupPresented = false
 
     var body: some View {
         Group {
@@ -28,6 +30,18 @@ struct MainView: View {
             // the external debugger and the stored Steam session.
             NSLog("[iDeck startup] Madeira library is the root view")
             UIApplication.shared.isIdleTimerDisabled = true
+            if !firstRunSetupComplete {
+                DispatchQueue.main.async { isFirstRunSetupPresented = true }
+            }
+        }
+        .onChange(of: firstRunSetupComplete) { _, complete in
+            if !complete { isFirstRunSetupPresented = true }
+        }
+        .fullScreenCover(isPresented: $isFirstRunSetupPresented) {
+            IDeckFirstRunSetupView(coordinator: coordinator) {
+                firstRunSetupComplete = true
+                isFirstRunSetupPresented = false
+            }
         }
         .onChange(of: scenePhase) { _, phase in
             UIApplication.shared.isIdleTimerDisabled = phase == .active
@@ -2340,6 +2354,211 @@ extension WindowsWorkspaceView {
             selectedExecutable = SelectedLibraryURL(url: URL(fileURLWithPath: path))
         default:
             break
+        }
+    }
+}
+
+
+// MARK: First-run setup
+
+private struct IDeckFirstRunSetupView: View {
+    @ObservedObject var coordinator: SystemCoordinator
+    let onFinish: () -> Void
+
+    @AppStorage(SystemCoordinator.jitMethodKey) private var jitMethod = "stikdebug"
+    @State private var step = 0
+    @State private var installingVisualC = false
+    @State private var installerStatus = ""
+    @State private var pairingImporterPresented = false
+
+    private var prefixReady: Bool {
+        PrefixInstaller.isPrefixInstalled(at: MadeiraDock.prefix)
+    }
+
+    private var visualCInstalled: Bool {
+        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        return VisualCRuntimeBootstrap.installed(in: MadeiraDock.prefix, documents: docs)
+    }
+
+    private var wineMonoIncluded: Bool {
+        MadeiraBundleIdentity.profile["wineMonoBundled"] as? Bool ?? false
+    }
+
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 20) {
+                ProgressView(value: Double(step + 1), total: 5)
+                Text("Step \(step + 1) of 5")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+
+                Group {
+                    switch step {
+                    case 0: dockStep
+                    case 1: monoStep
+                    case 2: jitStep
+                    case 3: visualCStep
+                    default: completeStep
+                    }
+                }
+
+                Spacer(minLength: 12)
+                HStack {
+                    if step > 0 {
+                        Button("Back") { step -= 1 }
+                            .buttonStyle(.bordered)
+                    }
+                    Spacer()
+                    if step < 4 {
+                        Button("Next") { step += 1 }
+                            .buttonStyle(.borderedProminent)
+                            .disabled(installingVisualC)
+                    } else {
+                        Button("Finish setup", action: onFinish)
+                            .buttonStyle(.borderedProminent)
+                    }
+                }
+            }
+            .padding(24)
+            .navigationTitle("Set up iDeck")
+            .navigationBarTitleDisplayMode(.inline)
+        }
+        .fileImporter(isPresented: $pairingImporterPresented,
+                      allowedContentTypes: [.propertyList, .xml, .json, .data]) { result in
+            if case .success(let url) = result {
+                coordinator.importPairingFile(at: url)
+            }
+        }
+        .onAppear {
+            coordinator.refreshJITStatus()
+            coordinator.refreshPairingFileState()
+        }
+        .preferredColorScheme(.dark)
+    }
+
+    private var dockStep: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label("Madeira Dock", systemImage: "square.stack.3d.up.fill")
+                .font(.title2.bold())
+            Text("Prepare the Wine prefix and Valve's desktop client components.")
+            LabeledContent("Native runtime", value: MadeiraBundleIdentity.isNative ? "Included" : "Missing")
+            LabeledContent("Wine prefix", value: prefixReady ? "Ready" : "Preparing")
+            LabeledContent("Madeira Dock", value: MadeiraDock.clientInstalled ? "Ready" : "Not prepared")
+            Button("Prepare Madeira Dock") {
+                if !prefixReady { coordinator.openMadeiraWorkspace() }
+                coordinator.installSteamClientComponentsIfNeeded()
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(!MadeiraDock.bundled)
+            .onChange(of: coordinator.windowsStatus) { _, status in
+                if status == "Windows Runtime Ready" || status == "Madeira runtime components are missing" {
+                    coordinator.installSteamClientComponentsIfNeeded()
+                }
+            }
+            if let progress = coordinator.steamComponentsProgress {
+                Text(progress).font(.caption).foregroundStyle(.secondary)
+            }
+            if !MadeiraDock.bundled {
+                Text("This IPA does not include Madeira Dock. Install a native iDeck IPA.")
+                    .font(.caption).foregroundStyle(.orange)
+            }
+        }
+    }
+
+    private var monoStep: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label(".NET support (Wine Mono)", systemImage: "shippingbox")
+                .font(.title2.bold())
+            Text("Wine Mono supplies compatible .NET Framework components for many Windows programs.")
+            LabeledContent("Package", value: wineMonoIncluded ? "Included in IPA" : "Unavailable in this build")
+            if wineMonoIncluded {
+                Text("Wine can initialize the bundled Mono package when its prefix requires .NET support. Its installation inside Wine is not verified by this check.")
+                    .font(.caption).foregroundStyle(.secondary)
+            } else {
+                Text("Wine Mono must be included by the native iOS build. It cannot be enabled by a setting or a simulated installer.")
+                    .font(.caption).foregroundStyle(.orange)
+            }
+        }
+    }
+
+    private var jitStep: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label("Set up JIT", systemImage: "bolt.fill")
+                .font(.title2.bold())
+            Picker("JIT method", selection: $jitMethod) {
+                Text("StikDebug").tag("stikdebug")
+                Text("Built-in").tag("builtIn")
+            }
+            .pickerStyle(.segmented)
+            LabeledContent("JIT permission", value: coordinator.isJITEnabled ? "Active" : "Inactive")
+            LabeledContent("Debugger", value: coordinator.isStikDebugAttached ? "Attached" : "Detached")
+            if jitMethod == "builtIn" {
+                Button(coordinator.hasPairingFile ? "Replace pairing file" : "Import pairing file") {
+                    pairingImporterPresented = true
+                }
+            }
+            Button(coordinator.isJITEnabled ? "Reconnect debugger" : "Enable JIT") {
+                coordinator.requestStikDebugJIT()
+            }
+            .buttonStyle(.borderedProminent)
+            Text("Wine/FEX requires a working debugger and executable-memory setup. JIT permission alone is insufficient.")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+    }
+
+    private var visualCStep: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label("Microsoft Visual C++ Runtime", systemImage: "checkmark.shield")
+                .font(.title2.bold())
+            Text("Download the official Windows x64 redistributable and extract the verified DLLs.")
+            LabeledContent("Runtime", value: visualCInstalled ? "Installed" : "Not installed")
+            Button("Install Visual C++") { installVisualC() }
+                .buttonStyle(.borderedProminent)
+                .disabled(installingVisualC || visualCInstalled || !prefixReady)
+            if installingVisualC { ProgressView("Installing…") }
+            if !prefixReady { Text("Prepare the Wine prefix before installing Visual C++.").font(.caption).foregroundStyle(.orange) }
+            if !installerStatus.isEmpty {
+                Text(installerStatus).font(.caption).foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var completeStep: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label("Setup summary", systemImage: "checkmark.circle")
+                .font(.title2.bold())
+            LabeledContent("Madeira Dock", value: MadeiraDock.clientInstalled ? "Ready" : "Needs setup")
+            LabeledContent("Wine Mono package", value: wineMonoIncluded ? "Included" : "Missing")
+            LabeledContent("JIT", value: coordinator.isJITEnabled && (coordinator.isStikDebugAttached || coordinator.isWineJITPrepared) ? "Ready" : "Not ready")
+            LabeledContent("Visual C++", value: visualCInstalled ? "Installed" : "Not installed")
+            LabeledContent("Memory+", value: "Requested in IPA")
+            Text("Memory+ depends on the signing tool preserving the increased-memory-limit entitlement. It cannot be activated within iDeck.")
+                .font(.caption).foregroundStyle(.secondary)
+            Text("Unfinished steps can be revisited from Settings.")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+    }
+
+    private func installVisualC() {
+        guard prefixReady, !installingVisualC else { return }
+        installingVisualC = true
+        installerStatus = "Downloading from Microsoft…"
+        VisualCRuntimeBootstrap.download(in: MadeiraDock.prefix) { result in
+            switch result {
+            case .failure(let error):
+                installerStatus = error.localizedDescription
+                installingVisualC = false
+            case .success(let installer):
+                installerStatus = "Verifying and extracting…"
+                let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+                VisualCRuntimeBootstrap.extractAndInstall(installer: installer, documents: docs) { outcome in
+                    switch outcome {
+                    case .success: installerStatus = "Visual C++ installed and verified."
+                    case .failure(let error): installerStatus = error.localizedDescription
+                    }
+                    installingVisualC = false
+                }
+            }
         }
     }
 }
