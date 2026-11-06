@@ -32,6 +32,14 @@ enum SteamDLLRepair {
         }
     }
 
+    /// The installed Steam client lacks a valid x64 video DLL or SDL3.dll.
+    static func needsRepair(prefix: URL) -> Bool {
+        let root = prefix.appendingPathComponent("drive_c")
+            .appendingPathComponent(SteamRuntimeFiles.relativeRoot, isDirectory: true)
+        guard FileManager.default.fileExists(atPath: root.appendingPathComponent("steam.exe").path) else { return false }
+        return clientLibraries.contains { !validX64DLL(root.appendingPathComponent($0)) }
+    }
+
     /// Validates file type, PE32+ optional-header length, AMD64 machine and
     /// IMAGE_FILE_DLL, not merely MZ. It does not authenticate the publisher:
     /// use matching libraries from the user's own genuine Steam installation.

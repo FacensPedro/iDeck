@@ -332,21 +332,19 @@ struct WindowsWorkspaceView: View {
     /// game that is installing keeps exactly the size of an installed one.
     private let cardActionHeight: CGFloat = 40
 
+    /// Madeira's library lattice: 20 pt between columns, 18 pt between rows.
     private var columns: [GridItem] {
-        [GridItem(.adaptive(minimum: isCompact ? 140 : 184, maximum: isCompact ? 184 : 226), spacing: isCompact ? 10 : 16)]
+        [GridItem(.adaptive(minimum: isCompact ? 110 : 154, maximum: 220), spacing: 20)]
     }
-
-    private var artworkWidth: CGFloat { isCompact ? 112 : 148 }
-    private var artworkHeight: CGFloat { isCompact ? 168 : 222 }
 
     private func cardTitle(_ title: String) -> some View {
         Text(title)
-            .font(.subheadline.weight(.medium))
+            .font(.subheadline.weight(.semibold))
             .foregroundColor(textColor)
             .lineLimit(1)
             .truncationMode(.tail)
-            .multilineTextAlignment(.center)
-            .frame(maxWidth: .infinity, alignment: .center)
+            .multilineTextAlignment(.leading)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .accessibilityLabel(title)
     }
 
@@ -701,12 +699,12 @@ struct WindowsWorkspaceView: View {
     private func gameCard(_ game: SteamAppInfo) -> some View {
         let installed = steamLibrary.installedApps.contains(game.appID)
 
-        return VStack(alignment: .center, spacing: 10) {
-            VStack(alignment: .center, spacing: 9) {
+        return VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 6) {
                 ZStack {
                     Button { selectedSteamGame = SelectedSteamGame(game: game) } label: {
                         SteamGameArtworkView(game: game)
-                            .frame(width: artworkWidth, height: artworkHeight)
+                            .libraryCoverFrame()
                             .blur(radius: !installed && !steamLibrary.installingApps.contains(game.appID) && !steamLibrary.pausedInstalls.contains(game.appID) && game.installableOnWindows ? 3 : 0)
                     }
                     .buttonStyle(.plain)
@@ -715,10 +713,8 @@ struct WindowsWorkspaceView: View {
                         downloadCoverButton { install(game) }
                     }
                 }
-                .frame(width: artworkWidth, height: artworkHeight)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .overlay(RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color.white.opacity(0.08), lineWidth: 1))
+                .libraryCoverFrame()
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 .clipped()
                 Button { selectedSteamGame = SelectedSteamGame(game: game) } label: {
                     cardTitle(game.name.isEmpty ? tr("Untitled Steam app") : game.name)
@@ -754,18 +750,8 @@ struct WindowsWorkspaceView: View {
                 }
             }
         }
-        .padding(10)
+        .padding(4)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(LinearGradient(colors: [
-                    panelColor,
-                    Color(red: 0.085, green: 0.105, blue: 0.145)
-                ], startPoint: .topLeading, endPoint: .bottomTrailing))
-        )
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(lineColor.opacity(0.85), lineWidth: 1))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .shadow(color: .black.opacity(0.16), radius: 10, y: 4)
     }
 
     @ViewBuilder
@@ -803,7 +789,7 @@ struct WindowsWorkspaceView: View {
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 24)
                     } else {
-                        LazyVGrid(columns: columns, spacing: 14) {
+                        LazyVGrid(columns: columns, spacing: 18) {
                             ForEach(filteredGOGGames) { game in gogCard(game) }
                         }
                     }
@@ -834,12 +820,12 @@ struct WindowsWorkspaceView: View {
 
     private func gogCard(_ game: GOGGame) -> some View {
         let installed = gogLibrary.installed[game.id]
-        return VStack(alignment: .center, spacing: 10) {
-            VStack(alignment: .center, spacing: 9) {
+        return VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 6) {
                 ZStack {
                     Button { selectedGOGGame = game } label: {
                         GOGArtworkView(urls: game.artworkCandidates, fallbackColor: secondaryColor)
-                            .frame(width: artworkWidth, height: artworkHeight)
+                            .libraryCoverFrame()
                             .blur(radius: installed == nil && gogLibrary.downloadProgress[game.id] == nil &&
                                   !gogLibrary.pausedDownloads.contains(game.id) && game.worksOnWindows ? 3 : 0)
                     }
@@ -850,10 +836,8 @@ struct WindowsWorkspaceView: View {
                             .disabled(prefixPath == nil)
                     }
                 }
-                .frame(width: artworkWidth, height: artworkHeight)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .overlay(RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color.white.opacity(0.08), lineWidth: 1))
+                .libraryCoverFrame()
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 .clipped()
                 Button { selectedGOGGame = game } label: { cardTitle(game.title) }
                     .buttonStyle(.plain)
@@ -887,18 +871,8 @@ struct WindowsWorkspaceView: View {
                     .frame(height: cardActionHeight)
             }
         }
-        .padding(10)
+        .padding(4)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(LinearGradient(colors: [
-                    panelColor,
-                    Color(red: 0.085, green: 0.105, blue: 0.145)
-                ], startPoint: .topLeading, endPoint: .bottomTrailing))
-        )
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(lineColor.opacity(0.85), lineWidth: 1))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .shadow(color: .black.opacity(0.16), radius: 10, y: 4)
     }
 
     @ViewBuilder
@@ -936,7 +910,7 @@ struct WindowsWorkspaceView: View {
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 24)
                     } else {
-                        LazyVGrid(columns: columns, spacing: 14) {
+                        LazyVGrid(columns: columns, spacing: 18) {
                             ForEach(filteredEpicGames) { game in epicCard(game) }
                         }
                     }
@@ -968,12 +942,12 @@ struct WindowsWorkspaceView: View {
     private func epicCard(_ game: EpicOwnedGame) -> some View {
         let installed = epicLibrary.installed[game.appName]
         let download = epicLibrary.downloads[game.appName]
-        return VStack(alignment: .center, spacing: 10) {
-            VStack(alignment: .center, spacing: 9) {
+        return VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 6) {
                 ZStack {
                     Button { selectedEpicGame = SelectedEpicGame(id: game.appName) } label: {
                         GOGArtworkView(urls: [game.cover].compactMap { $0 }, fallbackColor: secondaryColor)
-                            .frame(width: artworkWidth, height: artworkHeight)
+                            .libraryCoverFrame()
                             .blur(radius: installed == nil && download == nil ? 3 : 0)
                     }
                     .buttonStyle(.plain)
@@ -981,10 +955,8 @@ struct WindowsWorkspaceView: View {
                         downloadCoverButton { epicLibrary.install(game.appName) }
                     }
                 }
-                .frame(width: artworkWidth, height: artworkHeight)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .overlay(RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color.white.opacity(0.08), lineWidth: 1))
+                .libraryCoverFrame()
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 .clipped()
                 Button { selectedEpicGame = SelectedEpicGame(id: game.appName) } label: { cardTitle(game.title) }
                     .buttonStyle(.plain)
@@ -1020,18 +992,8 @@ struct WindowsWorkspaceView: View {
                 Color.clear.frame(height: cardActionHeight)
             }
         }
-        .padding(10)
+        .padding(4)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(LinearGradient(colors: [
-                    panelColor,
-                    Color(red: 0.085, green: 0.105, blue: 0.145)
-                ], startPoint: .topLeading, endPoint: .bottomTrailing))
-        )
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(lineColor.opacity(0.85), lineWidth: 1))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .shadow(color: .black.opacity(0.16), radius: 10, y: 4)
     }
 
     private func launchEpicGame(_ game: EpicInstalledGame) {
@@ -2340,7 +2302,7 @@ extension WindowsWorkspaceView {
                     .foregroundColor(.gray)
             }
         } else {
-            LazyVGrid(columns: columns, spacing: 14) {
+            LazyVGrid(columns: columns, spacing: 18) {
                 ForEach(sorted) { entry in
                     switch entry {
                     case .steam(let game): gameCard(game)
@@ -2471,33 +2433,48 @@ private struct IDeckFirstRunSetupView: View {
     let onFinish: () -> Void
 
     @AppStorage(SystemCoordinator.jitMethodKey) private var jitMethod = "stikdebug"
+    @ObservedObject private var wineMono = WineMonoModel.shared
     @State private var step = 0
-    @State private var installingVisualC = false
+    @State private var installing = false
     @State private var installerStatus = ""
+    @State private var refresh = 0
     @State private var pairingImporterPresented = false
 
-    private var prefixReady: Bool {
-        PrefixInstaller.isPrefixInstalled(at: MadeiraDock.prefix)
+    private enum Step: Int, CaseIterable {
+        case windows, dock, jit, summary
+        var title: String {
+            switch self {
+            case .windows: return "Windows runtime"
+            case .dock: return "Madeira Dock"
+            case .jit: return "JIT configuration"
+            case .summary: return "Setup summary"
+            }
+        }
     }
 
-    private var visualCInstalled: Bool {
-        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        return VisualCRuntimeBootstrap.installed(in: MadeiraDock.prefix, documents: docs)
+    private var documents: URL {
+        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
     }
-
-    private var wineMonoIncluded: Bool {
-        MadeiraBundleIdentity.profile["wineMonoBundled"] as? Bool ?? false
+    private var prefixReady: Bool { PrefixInstaller.isPrefixInstalled(at: MadeiraDock.prefix) }
+    private var x64Ready: Bool { MadeiraBundleIdentity.isNative && prefixReady }
+    private var x86Ready: Bool { coordinator.windowsEnvironment.hasWoW64Runtime() && prefixReady }
+    private var visualCx64Ready: Bool { VisualCRuntimeBootstrap.installed(in: MadeiraDock.prefix, documents: documents) }
+    private var visualCx86Ready: Bool { VisualCRuntimeLegacy.installed(documents: documents) }
+    private var steamDLLsReady: Bool {
+        guard let folder = SteamDLLRepair.sourceFolder else { return false }
+        let root = MadeiraDock.prefix.appendingPathComponent("drive_c")
+            .appendingPathComponent(SteamRuntimeFiles.relativeRoot, isDirectory: true)
+        return (SteamDLLRepair.mediaLibraries + [SteamDLLRepair.sdlLibrary]).allSatisfy {
+            SteamDLLRepair.validX64DLL(folder.appendingPathComponent($0))
+                || SteamDLLRepair.validX64DLL(root.appendingPathComponent($0))
+        }
     }
-
-    private let setupTitles = [
-        "Windows compatibility",
-        ".NET compatibility",
-        "JIT configuration",
-        "Visual C++ runtime",
-        "Setup summary"
-    ]
+    private var windowsReady: Bool {
+        x64Ready && x86Ready && visualCx64Ready && visualCx86Ready && WineMonoModel.available && steamDLLsReady
+    }
 
     var body: some View {
+        let current = Step(rawValue: step) ?? .summary
         NavigationStack {
             ZStack {
                 Color(red: 0.055, green: 0.063, blue: 0.085).ignoresSafeArea()
@@ -2508,50 +2485,38 @@ private struct IDeckFirstRunSetupView: View {
                                 .font(.title2)
                                 .foregroundStyle(.white)
                                 .frame(width: 52, height: 52)
-                                .background(Color.blue.opacity(0.24),
-                                            in: RoundedRectangle(cornerRadius: 14))
+                                .background(Color.blue.opacity(0.24), in: RoundedRectangle(cornerRadius: 14))
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("iDeck")
                                     .font(.system(size: 30, weight: .bold, design: .rounded))
                                     .foregroundStyle(.white)
-                                Text("Initial setup · Windows runtime")
+                                Text("Initial setup")
                                     .font(.subheadline)
                                     .foregroundStyle(.secondary)
                             }
                         }
-                        Text("Prepare the Windows environment before installing or launching games.")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
 
-                        HStack(spacing: 7) {
-                            ForEach(0..<5, id: \.self) { index in
-                                Capsule()
-                                    .fill(index <= step ? Color.blue : Color.white.opacity(0.13))
-                                    .frame(height: 5)
+                        Picker("Setup step", selection: $step) {
+                            ForEach(Step.allCases, id: \.rawValue) { item in
+                                Text(item.title).tag(item.rawValue)
                             }
                         }
-                        Text("STEP \(step + 1) OF 5  ·  \(setupTitles[step].uppercased())")
-                            .font(.caption.weight(.semibold))
-                            .tracking(1.0)
-                            .foregroundStyle(.secondary)
+                        .pickerStyle(.segmented)
+                        .disabled(installing)
 
                         VStack(alignment: .leading, spacing: 16) {
-                            Group {
-                                switch step {
-                                case 0: dockStep
-                                case 1: monoStep
-                                case 2: jitStep
-                                case 3: visualCStep
-                                default: completeStep
-                                }
+                            switch current {
+                            case .windows: windowsStep
+                            case .dock: dockStep
+                            case .jit: jitStep
+                            case .summary: completeStep
                             }
                         }
+                        .id(refresh)
                         .padding(22)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Color(red: 0.11, green: 0.12, blue: 0.15),
-                                    in: RoundedRectangle(cornerRadius: 18))
-                        .overlay(RoundedRectangle(cornerRadius: 18)
-                            .stroke(Color.white.opacity(0.1), lineWidth: 1))
+                        .background(Color(red: 0.11, green: 0.12, blue: 0.15), in: RoundedRectangle(cornerRadius: 18))
+                        .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.white.opacity(0.1), lineWidth: 1))
 
                         HStack(spacing: 12) {
                             if step > 0 {
@@ -2559,17 +2524,17 @@ private struct IDeckFirstRunSetupView: View {
                                     .buttonStyle(.bordered)
                             }
                             Spacer()
-                            if step < 4 {
+                            if current != .summary {
                                 Button("Continue") { withAnimation(.easeInOut(duration: 0.2)) { step += 1 } }
                                     .buttonStyle(.borderedProminent)
-                                    .disabled(installingVisualC || (step == 0 &&
-                                              (!prefixReady || !coordinator.windowsEnvironment.hasWoW64Runtime())))
+                                    .disabled(installing || (current == .windows && (!x64Ready || !x86Ready)))
                             } else {
                                 Button("Finish setup", action: onFinish)
                                     .buttonStyle(.borderedProminent)
                             }
                         }
                         .controlSize(.large)
+                        .disabled(installing)
                     }
                     .padding(24)
                     .frame(maxWidth: 660)
@@ -2580,70 +2545,163 @@ private struct IDeckFirstRunSetupView: View {
         }
         .fileImporter(isPresented: $pairingImporterPresented,
                       allowedContentTypes: [.propertyList, .xml, .json, .data]) { result in
-            if case .success(let url) = result {
-                coordinator.importPairingFile(at: url)
-            }
+            if case .success(let url) = result { coordinator.importPairingFile(at: url) }
         }
         .onAppear {
             coordinator.refreshJITStatus()
             coordinator.refreshPairingFileState()
-            if !prefixReady && MadeiraDock.bundled {
-                coordinator.openMadeiraWorkspace()
-            }
+            wineMono.refresh()
         }
         .preferredColorScheme(.dark)
     }
 
-    private var dockStep: some View {
+    // MARK: - Windows runtime
+
+    private var windowsStep: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Label("Windows x64 + x86 (WoW64)", systemImage: "square.stack.3d.up.fill")
+            Label("Windows runtime", systemImage: "square.stack.3d.up.fill")
                 .font(.title2.bold())
-            Text("The first initialization prepares only the x64 Wine prefix and x86 WoW64 support. Optional .NET, Visual C++, and the Steam client are separate steps.")
-            LabeledContent("x64 Wine", value: MadeiraBundleIdentity.isNative ? "Included" : "Missing")
-            LabeledContent("x86 WoW64", value: coordinator.windowsEnvironment.hasWoW64Runtime() ? "Included" : "Missing")
-            LabeledContent("Wine prefix", value: prefixReady ? "Ready" : "Not prepared")
-            LabeledContent("Madeira Dock", value: MadeiraDock.clientInstalled ? "Ready" : "Not prepared")
-            Button("Initialize x64 and x86") {
-                coordinator.openMadeiraWorkspace()
+            Text("Installs everything Windows games need: the x64 and x86 environments, Microsoft Visual C++ DLLs, .NET (Wine Mono) and Steam's DLLs.")
+            statusRow("x64 Wine environment", x64Ready)
+            statusRow("x86 (WoW64) environment", x86Ready)
+            statusRow("Visual C++ DLLs x64 (2015-2022)", visualCx64Ready)
+            statusRow("Visual C++ DLLs x86 + 2005-2013", visualCx86Ready)
+            statusRow(".NET support (Wine Mono)", WineMonoModel.available, detail: wineMono.busy ? wineMono.status : nil)
+            statusRow("Steam DLLs (video client, SDL3)", steamDLLsReady)
+            Button(windowsReady ? "Installed" : (installing ? "Installing…" : "Install all")) {
+                installWindowsRuntime()
             }
             .buttonStyle(.borderedProminent)
-            .disabled(!MadeiraDock.bundled || prefixReady || !coordinator.windowsEnvironment.hasWoW64Runtime())
+            .disabled(installing || windowsReady || !MadeiraDock.bundled)
+            if installing { ProgressView(installerStatus.isEmpty ? coordinator.windowsStatus : installerStatus).font(.caption) }
+            else if !installerStatus.isEmpty {
+                Text(installerStatus).font(.caption).foregroundStyle(.secondary)
+            }
+            if let error = wineMono.error { Text(error).font(.caption).foregroundStyle(.orange) }
+            if !MadeiraDock.bundled {
+                Text("This IPA does not include the Windows runtime. Install a native iDeck IPA.")
+                    .font(.caption).foregroundStyle(.orange)
+            }
+        }
+    }
+
+    private func statusRow(_ title: String, _ ready: Bool, detail: String? = nil) -> some View {
+        HStack {
+            Image(systemName: ready ? "checkmark.circle.fill" : "circle")
+                .foregroundStyle(ready ? Color.green : Color.secondary)
+            Text(title)
+            Spacer()
+            Text(detail ?? (ready ? "Installed" : "Not installed"))
+                .font(.caption).foregroundStyle(.secondary)
+        }
+    }
+
+    /// Runs every Windows component in order; each one is skipped when present.
+    private func installWindowsRuntime() {
+        guard !installing else { return }
+        installing = true
+        Task { @MainActor in
+            defer { installing = false; refresh += 1 }
+            // 1. x64 prefix with x86 WoW64.
+            if !prefixReady {
+                installerStatus = "Preparing x64 + x86 Wine environment…"
+                coordinator.openMadeiraWorkspace()
+                for _ in 0..<600 where !prefixReady {
+                    try? await Task.sleep(nanoseconds: 1_000_000_000)
+                }
+                guard prefixReady else {
+                    installerStatus = "The Wine environment could not be prepared: \(coordinator.windowsStatus)"
+                    return
+                }
+            }
+            refresh += 1
+            // 2. Visual C++ x64: bundled in the IPA, otherwise Microsoft's redistributable.
+            if !visualCx64Ready {
+                installerStatus = "Installing Visual C++ x64…"
+                if !VisualCRuntimeBootstrap.installBundled(documents: documents) || !visualCx64Ready {
+                    if let failure = await downloadVisualC() {
+                        installerStatus = failure
+                        return
+                    }
+                }
+            }
+            refresh += 1
+            // 3. Visual C++ x86 and 2005-2013.
+            if !visualCx86Ready {
+                installerStatus = "Installing Visual C++ x86 and 2005-2013…"
+                let failures = await VisualCRuntimeLegacy.installAll(documents: documents) { name in
+                    AppLog.record("[vcrt] installing Visual C++ \(name)")
+                }
+                for failure in failures { AppLog.record("[vcrt] \(failure)") }
+            }
+            refresh += 1
+            // 4. Wine Mono (.NET Framework).
+            if !WineMonoModel.available {
+                installerStatus = "Installing Wine Mono…"
+                wineMono.install()
+                while wineMono.busy { try? await Task.sleep(nanoseconds: 500_000_000) }
+            }
+            refresh += 1
+            // 5. Steam's official x64 video DLLs and SDL3.dll.
+            if !steamDLLsReady {
+                do {
+                    try await SteamRuntimeInstaller.shared.fetchVideoLibraries { message in
+                        await MainActor.run { installerStatus = message }
+                    }
+                } catch {
+                    installerStatus = "Steam DLLs: \(error.localizedDescription)"
+                    return
+                }
+            }
+            installerStatus = windowsReady ? "Windows runtime installed." : "Some components are missing. Tap Install all to retry."
+        }
+    }
+
+    private func downloadVisualC() async -> String? {
+        await withCheckedContinuation { continuation in
+            VisualCRuntimeBootstrap.download(in: MadeiraDock.prefix) { result in
+                switch result {
+                case .failure(let error):
+                    continuation.resume(returning: error.localizedDescription)
+                case .success(let installer):
+                    VisualCRuntimeBootstrap.extractAndInstall(installer: installer, documents: documents) { outcome in
+                        try? FileManager.default.removeItem(at: installer)
+                        switch outcome {
+                        case .success: continuation.resume(returning: nil)
+                        case .failure(let error): continuation.resume(returning: error.localizedDescription)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Madeira Dock
+
+    private var dockStep: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label("Madeira Dock", systemImage: "dock.rectangle")
+                .font(.title2.bold())
+            Text("Madeira Dock runs Valve's official Steam client so Steam games start with their licence and DRM intact.")
+            statusRow("Steam client", MadeiraDock.clientInstalled)
+            statusRow("Steam DLLs", steamDLLsReady)
             Button(MadeiraDock.clientInstalled ? "Repair Madeira Dock" : "Install Madeira Dock") {
                 coordinator.installMadeiraDock()
             }
-            .buttonStyle(.bordered)
-            .disabled(!MadeiraDock.bundled)
+            .buttonStyle(.borderedProminent)
+            .disabled(!MadeiraDock.bundled || !prefixReady)
             if let progress = coordinator.steamComponentsProgress {
                 Text(progress)
                     .font(.caption)
                     .foregroundStyle(progress.contains("failed") || progress.contains("missing") ? Color.orange : Color.secondary)
             }
             if !prefixReady {
-                ProgressView(coordinator.windowsStatus)
-                    .font(.caption)
-            }
-            if !MadeiraDock.bundled {
-                Text("This IPA does not include Madeira Dock. Install a native iDeck IPA.")
-                    .font(.caption).foregroundStyle(.orange)
+                Text("Install the Windows runtime first.").font(.caption).foregroundStyle(.orange)
             }
         }
     }
 
-    private var monoStep: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Label(".NET support (Wine Mono)", systemImage: "shippingbox")
-                .font(.title2.bold())
-            Text("Wine Mono supplies compatible .NET Framework components for many Windows programs.")
-            LabeledContent("Package", value: wineMonoIncluded ? "Included in IPA" : "Unavailable in this build")
-            if wineMonoIncluded {
-                Text("Wine can initialize the bundled Mono package when its prefix requires .NET support. Its installation inside Wine is not verified by this check.")
-                    .font(.caption).foregroundStyle(.secondary)
-            } else {
-                Text("Wine Mono must be included by the native iOS build. It cannot be enabled by a setting or a simulated installer.")
-                    .font(.caption).foregroundStyle(.orange)
-            }
-        }
-    }
+    // MARK: - JIT
 
     private var jitStep: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -2671,59 +2729,24 @@ private struct IDeckFirstRunSetupView: View {
         }
     }
 
-    private var visualCStep: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Label("Microsoft Visual C++ Runtime", systemImage: "checkmark.shield")
-                .font(.title2.bold())
-            Text("Download the official Windows x64 redistributable and extract the verified DLLs.")
-            LabeledContent("Runtime", value: visualCInstalled ? "Installed" : "Not installed")
-            Button("Install Visual C++") { installVisualC() }
-                .buttonStyle(.borderedProminent)
-                .disabled(installingVisualC || visualCInstalled || !prefixReady)
-            if installingVisualC { ProgressView("Installing…") }
-            if !prefixReady { Text("Prepare the Wine prefix before installing Visual C++.").font(.caption).foregroundStyle(.orange) }
-            if !installerStatus.isEmpty {
-                Text(installerStatus).font(.caption).foregroundStyle(.secondary)
-            }
-        }
-    }
+    // MARK: - Summary
 
     private var completeStep: some View {
         VStack(alignment: .leading, spacing: 12) {
             Label("Setup summary", systemImage: "checkmark.circle")
                 .font(.title2.bold())
-            LabeledContent("Madeira Dock", value: MadeiraDock.clientInstalled ? "Ready" : "Needs setup")
-            LabeledContent("Wine Mono package", value: wineMonoIncluded ? "Included" : "Missing")
-            LabeledContent("JIT", value: coordinator.isJITEnabled && (coordinator.isStikDebugAttached || coordinator.isWineJITPrepared) ? "Ready" : "Not ready")
-            LabeledContent("Visual C++", value: visualCInstalled ? "Installed" : "Not installed")
-            LabeledContent("Memory+", value: "Requested in IPA")
-            Text("Memory+ depends on the signing tool preserving the increased-memory-limit entitlement. It cannot be activated within iDeck.")
-                .font(.caption).foregroundStyle(.secondary)
+            statusRow("Windows runtime", windowsReady)
+            statusRow("Madeira Dock", MadeiraDock.clientInstalled)
+            statusRow("JIT", coordinator.isJITEnabled && (coordinator.isStikDebugAttached || coordinator.isWineJITPrepared))
             Text("Unfinished steps can be revisited from Settings.")
                 .font(.caption).foregroundStyle(.secondary)
         }
     }
+}
 
-    private func installVisualC() {
-        guard prefixReady, !installingVisualC else { return }
-        installingVisualC = true
-        installerStatus = "Downloading from Microsoft…"
-        VisualCRuntimeBootstrap.download(in: MadeiraDock.prefix) { result in
-            switch result {
-            case .failure(let error):
-                installerStatus = error.localizedDescription
-                installingVisualC = false
-            case .success(let installer):
-                installerStatus = "Verifying and extracting…"
-                let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-                VisualCRuntimeBootstrap.extractAndInstall(installer: installer, documents: docs) { outcome in
-                    switch outcome {
-                    case .success: installerStatus = "Visual C++ installed and verified."
-                    case .failure(let error): installerStatus = error.localizedDescription
-                    }
-                    installingVisualC = false
-                }
-            }
-        }
+private extension View {
+    /// A library cover as Madeira draws it: the card's full width at 2:3.
+    func libraryCoverFrame() -> some View {
+        frame(maxWidth: .infinity).aspectRatio(2.0 / 3.0, contentMode: .fit)
     }
 }
