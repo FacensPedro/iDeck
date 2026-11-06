@@ -1,6 +1,6 @@
 ## What's Changed
-- Corrected the game-exit status when a Steam-launched Windows process terminates with an access violation but the Wine host returns exit code 0.
-- Limited fatal-crash detection to the current Wine session and added regression coverage for previous-session logs.
-- Fixed release-tag validation tests to follow the actual Xcode project version.
-- Updated the iDeck application version to 1.0.8 (build 9).
-
+- Added recovery of the Steam client's SDL3.dll with x64 PE validation and guarded backup of invalid copies.
+- Improved detection and recovery of missing Steam video dependencies and checked DLL availability before launching Steam games.
+- Added verified Wine Gecko 2.47.4 installer caching for x86 and x64 Windows applications.
+- Added a native DLL comparison tool for auditing compatibility with newer Windows runtime components.
+- Updated the iDeck application version to 1.0.9 (build 10).
