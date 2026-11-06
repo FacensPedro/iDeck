@@ -418,12 +418,19 @@ final class SteamOwnedGamesModel: ObservableObject {
         // the app during a download, before the executable has launched.
         UserDefaults.standard.set(String(displayName.prefix(160)), forKey: "diagnostics.lastGame")
         UserDefaults.standard.set("Steam", forKey: "diagnostics.lastLauncher")
+        // This marker survives a process termination that cannot run defer.
+        // It is diagnostic only: never delete journals or staging files.
+        UserDefaults.standard.set("\(appID)|" + String(displayName.prefix(160)),
+                                  forKey: "diagnostics.installInFlight")
         AppLog.record("[steam-install] started app=\(appID) game=\(displayName)")
         BackgroundDownloads.steam.started(name: displayName)
         BenchmarkSession.begin(kind: "install", scenario: "Steam: " + displayName,
                                settings: ["store": "steam", "reinstall": isInstalled(appID: appID, prefixPath: prefixPath)])
         var outcome = BackgroundDownloads.Outcome.paused
         defer {
+            if UserDefaults.standard.string(forKey: "diagnostics.installInFlight")?.hasPrefix("\(appID)|") == true {
+                UserDefaults.standard.removeObject(forKey: "diagnostics.installInFlight")
+            }
             installingApps.remove(appID)
             BackgroundDownloads.steam.ended(name: displayName, outcome: outcome,
                                             queueEmpty: installingApps.isEmpty)
