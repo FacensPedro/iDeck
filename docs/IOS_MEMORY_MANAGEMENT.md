@@ -5,7 +5,7 @@ iDeck includes a **bounded native scratch-buffer manager** intended for host-sid
 ## Architecture
 
 - `NativeMemoryManager.cpp` provides the thread-safe `ideck_native_memory_*` C API. A single lazy memory pool holds reusable **non-executable** scratch buffers with a configurable active-allocation ceiling and cache ceiling.
-- `GuestMemoryPool.cpp` supports reducing its cache limit, immediately freeing least-recently released cached blocks until the new limit is respected.
+- `GuestMemoryPool.cpp` supports reducing its cache limit, immediately freeing released cached blocks until the new limit is respected. It never frees an active allocation.
 - `NativeMemoryPressure.mm` listens for UIKit memory-warning and foreground/background notifications and updates the cache policy.
 - `iDeckApp.swift` registers notifications at startup. `RuntimeLifecycle.mm` resets the default budgets on native-session preparation and trims scratch cache on session shutdown.
 - `NativeMemoryManager.h` exposes the API and usage counters to Swift/C/C++.
@@ -39,7 +39,9 @@ void perform_host_side_work(size_t bytes) {
 }
 ```
 
-`ideck_native_memory_snapshot` returns active and cached byte counts, allocation counts, configured/effective budgets, pressure events and cache-reclamation totals. `ideck_native_memory_configure` rejects invalid or over-limit budgets. `ideck_native_memory_pressure` can also be called explicitly by a native integration component.
+`ideck_native_memory_snapshot` returns active and cached byte counts, allocation counts, configured/effective budgets, pressure events and cache-reclamation totals.
+
+The cache now offers `ideck_memory_pool_set_cache_limit_reclaimed()` and `ideck_memory_pool_trim_reclaimed()` for atomic reclamation and accounting in a **single** pool critical section. Existing `set_cache_limit` and `trim` entry points remain supported. In the native manager, a pressure notification no longer needs two separate statistics snapshots surrounding the trim, avoiding additional lock acquisitions. `ideck_native_memory_configure` rejects invalid or over-limit budgets. `ideck_native_memory_pressure` can also be called explicitly by a native integration component.
 
 **Caller responsibilities:** release each acquired pointer exactly once; do not share pointers beyond their ownership lifetime; do not use returned memory for JIT executable pages, Metal textures, Wine/FEX guest address spaces, immutable shared data, or app-sandbox-escaping files. Callers must initialize buffer contents before reading. Repeated concurrent calls are internally serialized for memory safety. When the active budget is exhausted, `acquire` returns `nullptr` instead of asking iPadOS for more memory.
 
@@ -52,6 +54,8 @@ Reducing cache retention can save memory at the expense of reallocating buffers 
 ## Testing
 
 The `iOS Build` workflow compiles and runs `tests/host/NativeMemoryManagerTests.cpp` to validate budget enforcement, successful reclamation on warning and critical events, preservation of active pointers, double-release rejection, concurrent allocation/release and cache-limit reduction.
+
+The host tests also exercise reclaimed-byte accounting (including repeated memory-pressure notifications), and ensure active allocations remain valid under pressure. `MadeiraConfig.swift` takes one cached configuration snapshot per `get` or `flag` request, avoiding a redundant filesystem `stat` and lock acquisition while retaining legacy-file fallback.
 
 On macOS with the Xcode Command Line Tools:
 

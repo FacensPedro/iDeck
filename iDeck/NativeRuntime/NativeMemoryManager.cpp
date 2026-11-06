@@ -41,10 +41,10 @@ IDeckMemoryPoolStats pool_stats(MemoryState &s) {
 
 void reclaim_cache(MemoryState &s, size_t limit) {
     if (!s.pool) return;
-    size_t before = pool_stats(s).cached_bytes;
-    ideck_memory_pool_set_cache_limit(s.pool, limit);
-    size_t after = pool_stats(s).cached_bytes;
-    if (before > after) s.reclaimed_bytes += static_cast<uint64_t>(before - after);
+    // One lock in the pool both trims and counts freed bytes. The previous
+    // accounting took three locks and two intermediate snapshots per event.
+    s.reclaimed_bytes += static_cast<uint64_t>(
+        ideck_memory_pool_set_cache_limit_reclaimed(s.pool, limit));
 }
 }
 
@@ -120,7 +120,5 @@ extern "C" void ideck_native_memory_trim(void) {
     MemoryState &s = state();
     std::lock_guard<std::mutex> lock(s.mutex);
     if (!s.pool) return;
-    size_t before = pool_stats(s).cached_bytes;
-    ideck_memory_pool_trim(s.pool);
-    s.reclaimed_bytes += static_cast<uint64_t>(before);
+    s.reclaimed_bytes += static_cast<uint64_t>(ideck_memory_pool_trim_reclaimed(s.pool));
 }

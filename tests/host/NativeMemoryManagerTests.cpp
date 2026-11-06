@@ -178,6 +178,55 @@ static void test_native_budget_uses_exact_size_fallback() {
     assert(ideck_native_memory_configure(1024, 256));
 }
 
+static void test_cache_reclamation_is_atomic_and_exact() {
+    auto *pool = ideck_memory_pool_create(4096);
+    assert(pool);
+    void *one = ideck_memory_pool_acquire(pool, 256);
+    void *two = ideck_memory_pool_acquire(pool, 512);
+    void *three = ideck_memory_pool_acquire(pool, 1024);
+    assert(one && two && three);
+    assert(ideck_memory_pool_release(pool, one));
+    assert(ideck_memory_pool_release(pool, two));
+    assert(ideck_memory_pool_release(pool, three));
+
+    // The pool trims only released allocations, and never double-counts them.
+    assert(ideck_memory_pool_set_cache_limit_reclaimed(pool, 1024) == 1024);
+    IDeckMemoryPoolStats stats{};
+    assert(ideck_memory_pool_stats(pool, &stats));
+    assert(stats.cached_bytes == 768);
+    assert(ideck_memory_pool_set_cache_limit_reclaimed(pool, 1024) == 0);
+    assert(ideck_memory_pool_trim_reclaimed(pool) == 768);
+    assert(ideck_memory_pool_trim_reclaimed(pool) == 0);
+    assert(ideck_memory_pool_set_cache_limit_reclaimed(nullptr, 0) == 0);
+    assert(ideck_memory_pool_trim_reclaimed(nullptr) == 0);
+    assert(ideck_memory_pool_stats(pool, &stats));
+    assert(stats.cached_bytes == 0);
+    ideck_memory_pool_destroy(pool);
+}
+
+static void test_reclaim_pressure_does_not_release_active_buffers() {
+    assert(ideck_native_memory_configure(4096, 4096));
+    auto *live = ideck_native_memory_acquire(256);
+    auto *released = ideck_native_memory_acquire(512);
+    assert(live && released);
+    assert(ideck_native_memory_release(released));
+    IDeckNativeMemoryStats before{}, after{};
+    assert(ideck_native_memory_snapshot(&before));
+    ideck_native_memory_pressure(IDECK_MEMORY_PRESSURE_CRITICAL);
+    assert(ideck_native_memory_snapshot(&after));
+    assert(after.cached_bytes == 0);
+    assert(after.active_bytes == 256);
+    assert(after.reclaimed_cached_bytes == before.reclaimed_cached_bytes + before.cached_bytes);
+    ideck_native_memory_pressure(IDECK_MEMORY_PRESSURE_CRITICAL);
+    IDeckNativeMemoryStats repeated{};
+    assert(ideck_native_memory_snapshot(&repeated));
+    assert(repeated.reclaimed_cached_bytes == after.reclaimed_cached_bytes);
+    assert(ideck_native_memory_release(live));
+    ideck_native_memory_pressure(IDECK_MEMORY_PRESSURE_NORMAL);
+    ideck_native_memory_trim();
+    assert(ideck_native_memory_configure(1024, 256));
+}
+
 int main() {
     test_budget_limits();
     test_pressure();
@@ -186,5 +235,7 @@ int main() {
     test_best_fit_cache_reuse();
     test_active_budget_rejects_oversized_cache_block();
     test_native_budget_uses_exact_size_fallback();
+    test_cache_reclamation_is_atomic_and_exact();
+    test_reclaim_pressure_does_not_release_active_buffers();
     return 0;
 }
