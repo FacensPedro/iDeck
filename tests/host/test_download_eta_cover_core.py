@@ -20,7 +20,8 @@ class DownloadETACoreContract(unittest.TestCase):
         view = source("iDeck/MainView.swift")
         self.assertIn("remainingSeconds:", view)
         self.assertIn("downloadETASeconds[game.id]", view)
-        self.assertIn('remainingText(remainingSeconds)', view)
+        self.assertIn('let remaining = DownloadETA.label(eta)', view)
+        self.assertIn('Label(tr("Time left") + ": " + remaining', view)
 
     def test_download_button_over_blurred_cover_is_separate_control(self):
         view = source("iDeck/MainView.swift")
@@ -33,7 +34,8 @@ class DownloadETACoreContract(unittest.TestCase):
         view = source("iDeck/MainView.swift")
         self.assertIn('Button("Initialize x64 and x86")', view)
         self.assertIn('hasWoW64Runtime()', view)
-        self.assertIn('Button("Install Madeira Dock")', view)
+        self.assertIn('coordinator.installMadeiraDock()', view)
+        self.assertIn('if !prefixReady && MadeiraDock.bundled', view)
         self.assertIn('coordinator.openMadeiraWorkspace()', view)
         windows = source("iDeck/WindowsEnvironment.swift")
         self.assertIn('setenv("WINEARCH", "win64", 1)', windows)
