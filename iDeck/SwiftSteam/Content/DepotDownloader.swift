@@ -237,20 +237,7 @@ final class DepotDownloader {
         state.installedBytes = prepared.totalUncompressed &- prepared.remainingUncompressed
         state.phase = .downloading
         report(state)
-        SteamLog.event("[steam-depot] install begin app=\(app.appID) depots=\(plans.count) files=\(prepared.fileCount) resume=\(prepared.doneBytes > 0 ? 1 : 0)")
-
-        let remaining = prepared.remainingUncompressed
-        if remaining > 0 {
-            // Unknown free space does not block the download.
-            if let free = installURL.freeSpace, case let available = UInt64(free) {
-                if available < remaining { throw SteamError.insufficientDiskSpace(needed: remaining, available: available) }
-                let headroom = available - remaining
-                if headroom < 1_073_741_824 {
-                    let freeMB = headroom / (1024 * 1024)
-                    SteamLog.event("[steam-depot] low disk space warning: \(freeMB) MB free after install")
-                }
-            }
-        }
+        SteamLog.event("[steam-depot] install begin app=\(app.appID) depots=\(plans.count) files=\(prepared.fileCount) journal-resume=\(prepared.doneBytes > 0 ? 1 : 0)")
 
         // 3a. Files already on disk (a repair, an update, a moved game): each is
         // read once, front to back in large blocks, a few files at a time, and
@@ -263,6 +250,24 @@ final class DepotDownloader {
             for item in work[index] { pendingUncompressed += UInt64(plan.manifest.files[item.file].chunks[item.chunk].uncompressedSize) }
         }
         state.installedBytes = prepared.totalUncompressed &- min(pendingUncompressed, prepared.totalUncompressed)
+        let pendingChunks = work.reduce(0) { $0 + $1.count }
+        SteamLog.event("[steam-depot] resume checked app=\(app.appID) verified-existing-bytes=\(state.reusedBytes) "
+            + "journal-bytes=\(prepared.doneBytes) to-fetch-chunks=\(pendingChunks) remaining-write-bytes=\(pendingUncompressed)")
+        // A partial file may already have its final logical length because the
+        // downloader creates sparse files with ftruncate. File length is NOT
+        // evidence that its remaining chunks occupy disk. Check the bytes
+        // actually pending after verifying all existing chunks, including new
+        // files that did not enter the hash-verification pass.
+        if pendingUncompressed > 0, let free = installURL.freeSpace {
+            let available = UInt64(free)
+            if available < pendingUncompressed {
+                throw SteamError.insufficientDiskSpace(needed: pendingUncompressed, available: available)
+            }
+            let headroom = available - pendingUncompressed
+            if headroom < 1_073_741_824 {
+                SteamLog.event("[steam-depot] low disk space warning: \(headroom / (1024 * 1024)) MB free after install")
+            }
+        }
 
         // 3. Chunks: from a PC on this network first when one answers
         // (SteamLANPeer), from the content servers for the rest. Speed counts
@@ -624,7 +629,7 @@ final class DepotDownloader {
         }
         work = keepItems
         let seconds = max(Date().timeIntervalSince(started), 0.001)
-        SteamLog.event("[steam-depot] check files=\(checks.count) read-mb=\(total >> 20) mb-per-s=\(Int(Double(total >> 20) / seconds)) readers=\(width) kept-bytes=\(state.reusedBytes) to-fetch-chunks=\(bad.reduce(0) { $0 + $1.count })")
+        SteamLog.event("[steam-depot] check files=\(checks.count) read-mb=\(total >> 20) mb-per-s=\(Int(Double(total >> 20) / seconds)) readers=\(width) kept-bytes=\(state.reusedBytes) to-fetch-chunks=\(work.reduce(0) { $0 + $1.count })")
         state.phase = .downloading
         report(state)
     }
