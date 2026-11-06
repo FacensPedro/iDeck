@@ -583,10 +583,11 @@ final class DepotDownloader {
         let total = checks.reduce(UInt64(0)) { $0 + $1.chunks.reduce(0) { $0 + UInt64($1.uncompressedSize) } }
         state.phase = .checking; state.checkTotal = total; state.checkDone = 0
         report(state)
-        // A drive reached through iOS's user-space file system gains little from
-        // more readers at once; this device's own storage takes more.
-        let external = prepared.paths.joined().first { !$0.isEmpty }.map { $0.contains("/LiveFiles/") || $0.contains("/External/") } ?? false
-        let width = external ? 4 : 8
+        // Every concurrent checker allocates a 16 MiB scratch buffer.
+        // Eight checkers previously allocated up to 128 MiB just to verify
+        // resumed game files. Cap this pass at 32 MiB on both internal and
+        // external storage; hashes and journals are unchanged.
+        let width = 2
         let journals = try plans.indices.map { try JournalWriter(url: prepared.journals[$0]) }
         defer { journals.forEach { $0.close() } }
         var bad: [[WorkItem]] = plans.map { _ in [] }
