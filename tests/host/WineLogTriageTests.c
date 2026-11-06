@@ -115,7 +115,25 @@ int main(void) {
     free(padding);
     assert(ideck_wine_log_diagnose(path) == IDECK_WINE_LOG_MISSING_DLL);
 
+    // A Steam-launched game may crash while the Wine/Dock host returns 0.
+    // Require a fatal child abort within this launch, not an old log entry.
+    write_log(path, "abort_process: status=0xc0000005\\n");
+    assert(ideck_wine_log_fatal_av_since(path, 0) == 1);
+    assert(ideck_wine_log_fatal_av_since(path, (int64_t)strlen("abort_process: status=0xc0000005\\n")) == 0);
+    FILE *append = fopen(path, "ab");
+    assert(append);
+    assert(fputs("wine: Unhandled page fault on read access\\n", append) > 0);
+    assert(fclose(append) == 0);
+    assert(ideck_wine_log_fatal_av_since(path, (int64_t)strlen("abort_process: status=0xc0000005\\n")) == 0);
+    append = fopen(path, "ab");
+    assert(append);
+    assert(fputs("0094:err:thread:abort_process abort_process: status=0xc0000005\\n", append) > 0);
+    assert(fclose(append) == 0);
+    assert(ideck_wine_log_fatal_av_since(path, (int64_t)strlen("abort_process: status=0xc0000005\\n")) == 1);
+    assert(ideck_wine_log_fatal_av_since(path, -1) == 0);
+
     assert(symlink(path, alias) == 0);
+    assert(ideck_wine_log_fatal_av_since(alias, 0) == 0);
     assert(ideck_wine_log_diagnose(alias) == IDECK_WINE_LOG_NONE);
     assert(unlink(alias) == 0);
     assert(unlink(path) == 0);
