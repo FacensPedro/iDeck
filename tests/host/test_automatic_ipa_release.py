@@ -79,8 +79,8 @@ class AutomaticIPAReleaseTests(unittest.TestCase):
         self.assertNotIn("AUTO_TAG:", release)
         self.assertNotIn("format('ideck-ci-{0}-{1}', github.run_id, github.run_attempt)", release)
         self.assertIn('if [[ "$KIND" != "native" ]]; then', release)
-        self.assertIn('gh release upload "$TAG" iDeck.ipa iDeck.ipa.sha256 iDeck-distribution-audit.json --clobber', release)
-        self.assertIn('gh release create "$TAG" iDeck.ipa iDeck.ipa.sha256 iDeck-distribution-audit.json', release)
+        self.assertIn('gh release upload "$TAG" "iDeck-${VERSION}.ipa" iDeck.ipa.sha256 iDeck-distribution-audit.json --clobber', release)
+        self.assertIn('gh release create "$TAG" "iDeck-${VERSION}.ipa" iDeck.ipa.sha256 iDeck-distribution-audit.json', release)
         self.assertIn("sha256sum --check iDeck.ipa.sha256", release)
 
     def test_release_checks_out_notes_and_updates_existing_version(self):
@@ -90,7 +90,7 @@ class AutomaticIPAReleaseTests(unittest.TestCase):
         self.assertIn("persist-credentials: false", release)
         self.assertIn("test -s RELEASE_NOTES.md", release)
         self.assertIn('gh release edit "$TAG" --title "$TITLE" --notes-file RELEASE_NOTES.md', release)
-        self.assertIn('gh release create "$TAG" iDeck.ipa iDeck.ipa.sha256 iDeck-distribution-audit.json', release)
+        self.assertIn('gh release create "$TAG" "iDeck-${VERSION}.ipa" iDeck.ipa.sha256 iDeck-distribution-audit.json', release)
         notes = (ROOT / "RELEASE_NOTES.md").read_text(encoding="utf-8")
         self.assertNotIn("# iDeck 1.0.0", notes)
         self.assertTrue(notes.startswith("## What's Changed\n"))

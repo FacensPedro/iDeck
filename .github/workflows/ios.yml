@@ -899,11 +899,25 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+      - name: Prepare versioned IPA filename
+        run: |
+          set -euo pipefail
+          VERSION="$(python3 - <<'PY'
+          import plistlib
+          from zipfile import ZipFile
+          with ZipFile('iDeck.ipa') as archive:
+              print(plistlib.loads(archive.read('Payload/iDeck.app/Info.plist'))['CFBundleShortVersionString'])
+          PY
+          )"
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || exit 2
+          cp iDeck.ipa "iDeck-${VERSION}.ipa"
+
       - name: Upload IPA directly (no outer ZIP)
         id: ipa_artifact
         uses: actions/upload-artifact@v7
         with:
-          path: iDeck.ipa
+          name: iDeck.ipa
+          path: iDeck-*.ipa
           archive: false
           if-no-files-found: error
           retention-days: 30
@@ -920,13 +934,13 @@ jobs:
             echo 'The native payload passed build verification, but game execution, JIT and device signing are not verified.' >> "$GITHUB_STEP_SUMMARY"
             echo "Kit: ${NATIVE_KIT_FOUND}; Actions cache: ${NATIVE_CACHE_HIT}; WoW64: ${IDECK_BUILD_WOW64}; Mono: ${IDECK_BUNDLE_WINE_MONO}; converter license acknowledged: ${IDECK_ACCEPT_METAL_CONVERTER_LICENSE}" >> "$GITHUB_STEP_SUMMARY"
             echo "Graphics profile: $IDECK_GRAPHICS_PROFILE (payload: $IDECK_MADEIRA_GRAPHICS; D3D11 via DXMT: yes; D3D12 via Madeira: $([[ "$IDECK_MADEIRA_GRAPHICS" == "d3d12" ]] && echo yes || echo no))" >> "$GITHUB_STEP_SUMMARY"
-            echo 'Download **iDeck.ipa** directly under Artifacts; the file is not wrapped in another ZIP.' >> "$GITHUB_STEP_SUMMARY"
+            echo 'Download the versioned **iDeck-(version).ipa** directly under Artifacts; the file is not wrapped in another ZIP.' >> "$GITHUB_STEP_SUMMARY"
           else
             echo '## iDeck interface-only IPA' >> "$GITHUB_STEP_SUMMARY"
             echo '**Windows games will not run in this IPA. FEX, Wine, DXMT and D3D12 were not compiled or linked.**' >> "$GITHUB_STEP_SUMMARY"
-            echo 'Download **iDeck.ipa** directly under Artifacts. This is interface-only; enable the native runtime and confirm the license before building a game-capable IPA.' >> "$GITHUB_STEP_SUMMARY"
+            echo 'Download the versioned **iDeck-(version).ipa** directly under Artifacts. This is interface-only; enable the native runtime and confirm the license before building a game-capable IPA.' >> "$GITHUB_STEP_SUMMARY"
           fi
-          echo "[Download iDeck.ipa directly](${{ steps.ipa_artifact.outputs.artifact-url }})" >> "$GITHUB_STEP_SUMMARY"
+          echo "[Download versioned iDeck IPA directly](${{ steps.ipa_artifact.outputs.artifact-url }})" >> "$GITHUB_STEP_SUMMARY"
           echo "[Open all artifacts](https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})" >> "$GITHUB_STEP_SUMMARY"
           echo 'An IPA is internally a ZIP-formatted iOS app package. The new artifact removes only the extra GitHub ZIP wrapper.' >> "$GITHUB_STEP_SUMMARY"
 
@@ -951,6 +965,14 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           name: iDeck.ipa
+
+      - name: Restore canonical IPA name for integrity verification
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          ipas=(iDeck-*.ipa)
+          [[ ${#ipas[@]} -eq 1 ]] || { echo 'Expected exactly one versioned IPA'; exit 2; }
+          cp "${ipas[0]}" iDeck.ipa
 
       - name: Download build integrity receipts
         uses: actions/download-artifact@v8
@@ -1115,11 +1137,13 @@ jobs:
               echo "::error::Refusing to overwrite an existing versioned release with an interface-only IPA."
               exit 2
             fi
-            gh release upload "$TAG" iDeck.ipa iDeck.ipa.sha256 iDeck-distribution-audit.json --clobber
+            cp iDeck.ipa "iDeck-${VERSION}.ipa"
+            gh release upload "$TAG" "iDeck-${VERSION}.ipa" iDeck.ipa.sha256 iDeck-distribution-audit.json --clobber
             gh release edit "$TAG" --title "$TITLE" --notes-file RELEASE_NOTES.md
           else
             OPTIONS=(--target "$GITHUB_SHA" --title "$TITLE" --notes-file RELEASE_NOTES.md)
-            gh release create "$TAG" iDeck.ipa iDeck.ipa.sha256 iDeck-distribution-audit.json "${OPTIONS[@]}"
+            cp iDeck.ipa "iDeck-${VERSION}.ipa"
+            gh release create "$TAG" "iDeck-${VERSION}.ipa" iDeck.ipa.sha256 iDeck-distribution-audit.json "${OPTIONS[@]}"
           fi
           echo "Published $KIND IPA under GitHub Release $TAG" >> "$GITHUB_STEP_SUMMARY"
           echo 'Published `iDeck.ipa.sha256` and `iDeck-distribution-audit.json` for independent integrity verification.' >> "$GITHUB_STEP_SUMMARY"

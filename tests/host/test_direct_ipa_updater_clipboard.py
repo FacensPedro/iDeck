@@ -9,7 +9,10 @@ class DirectIPAUpdaterAndClipboardTests(unittest.TestCase):
         workflow = (ROOT / ".github/workflows/ios.yml").read_text()
         segment = workflow.split("      - name: Upload IPA directly (no outer ZIP)", 1)[1].split("      - name:", 1)[0]
         self.assertIn("uses: actions/upload-artifact@v7", segment)
-        self.assertIn("path: iDeck.ipa", segment)
+        self.assertIn("path: iDeck-*.ipa", segment)
+        self.assertIn("name: iDeck.ipa", segment)
+        self.assertIn("Prepare versioned IPA filename", workflow)
+        self.assertIn("Restore canonical IPA name for integrity verification", workflow)
         self.assertIn("archive: false", segment)
         self.assertIn("id: ipa_artifact", segment)
         self.assertIn("steps.ipa_artifact.outputs.artifact-url", workflow)
