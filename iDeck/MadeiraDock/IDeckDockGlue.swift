@@ -224,19 +224,17 @@ extension MadeiraDock {
     static func stageCommandShell() -> URL? {
         let target = drive.appendingPathComponent("windows/system32/cmd.exe")
         let fm = FileManager.default
-        if fm.fileExists(atPath: target.path) {
+        let linked = (try? target.resourceValues(forKeys: [.isSymbolicLinkKey]))?.isSymbolicLink == true
+        if !linked && fm.fileExists(atPath: target.path) {
             guard validCommandShell(target) else {
                 AppLog.record("[dock-installers] existing Wine cmd.exe is invalid or has an unsupported PE machine; no installers were marked complete")
                 return nil
             }
             return target
         }
-        // A dangling symlink is not reported by fileExists; it must never be
-        // followed or overwritten with a supposedly trusted command shell.
-        if (try? target.resourceValues(forKeys: [.isSymbolicLinkKey]))?.isSymbolicLink == true {
-            AppLog.record("[dock-installers] refusing linked Wine cmd.exe")
-            return nil
-        }
+        // The seeded Wine prefix can have a cmd.exe symlink. Do not execute
+        // its target; replace the link only after validating a bundled PE
+        // interpreter, retaining the previous staging behavior.
         guard let source = ["arm64ec-windows", "x86_64-windows", "aarch64-windows"]
             .map({ Bundle.main.bundleURL.appendingPathComponent($0 + "/cmd.exe") })
             .first(where: validCommandShell) else {
@@ -245,6 +243,7 @@ extension MadeiraDock {
         }
         do {
             try fm.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
+            if linked { try fm.removeItem(at: target) }
             try fm.copyItem(at: source, to: target)
             guard validCommandShell(target) else {
                 try? fm.removeItem(at: target)
