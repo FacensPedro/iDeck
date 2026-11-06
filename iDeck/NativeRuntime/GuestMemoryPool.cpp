@@ -107,24 +107,40 @@ extern "C" bool ideck_memory_pool_stats(const IDeckGuestMemoryPool *pool, IDeckM
     return true;
 }
 
-extern "C" void ideck_memory_pool_trim(IDeckGuestMemoryPool *pool) {
-    if (!pool) return;
+// Memory-pressure accounting and cache reclamation are atomic under one lock.
+// The legacy API remains available for callers that do not need a byte count.
+extern "C" size_t ideck_memory_pool_trim_reclaimed(IDeckGuestMemoryPool *pool) {
+    if (!pool) return 0;
     std::lock_guard<std::mutex> lock(pool->mutex);
-    for (auto block : pool->cached) std::free(block.pointer);
+    const size_t reclaimed = pool->cached_bytes;
+    for (const auto &block : pool->cached) std::free(block.pointer);
     pool->cached.clear();
     pool->cached_bytes = 0;
+    return reclaimed;
 }
 
-extern "C" bool ideck_memory_pool_set_cache_limit(IDeckGuestMemoryPool *pool, size_t max_cached_bytes) {
-    if (!pool) return false;
+extern "C" void ideck_memory_pool_trim(IDeckGuestMemoryPool *pool) {
+    (void)ideck_memory_pool_trim_reclaimed(pool);
+}
+
+extern "C" size_t ideck_memory_pool_set_cache_limit_reclaimed(
+    IDeckGuestMemoryPool *pool, size_t max_cached_bytes) {
+    if (!pool) return 0;
     std::lock_guard<std::mutex> lock(pool->mutex);
+    const size_t before = pool->cached_bytes;
     pool->cache_limit = max_cached_bytes;
     while (pool->cached_bytes > max_cached_bytes && !pool->cached.empty()) {
-        auto block = pool->cached.back();
+        const auto block = pool->cached.back();
         pool->cached.pop_back();
         pool->cached_bytes -= block.size;
         std::free(block.pointer);
     }
+    return before - pool->cached_bytes;
+}
+
+extern "C" bool ideck_memory_pool_set_cache_limit(IDeckGuestMemoryPool *pool, size_t max_cached_bytes) {
+    if (!pool) return false;
+    (void)ideck_memory_pool_set_cache_limit_reclaimed(pool, max_cached_bytes);
     return true;
 }
 
