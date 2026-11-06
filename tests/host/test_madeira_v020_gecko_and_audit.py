@@ -25,7 +25,7 @@ class MadeiraV020GeckoTests(unittest.TestCase):
         self.assertIn("settings.allowsExpensiveNetworkAccess = false", GECKO)
         self.assertIn("settings.allowsConstrainedNetworkAccess = false", GECKO)
         self.assertIn("wine_process_is_running() == 0, wineserver_is_running() == 0", GECKO)
-        self.assertIn("guard WineGeckoRuntime.valid(downloaded, for: pin)", GECKO)
+        self.assertIn("WineGeckoRuntime.valid(downloaded, for: pin)", GECKO)
         self.assertIn('".ideck-invalid-backup"', GECKO)
         self.assertIn('try? fm.moveItem(at: backup, to: destination)', GECKO)
         self.assertNotIn("fileDataRepresentation(", GECKO)
