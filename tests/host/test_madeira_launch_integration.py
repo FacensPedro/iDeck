@@ -47,6 +47,22 @@ class MadeiraLaunchIntegrationTests(unittest.TestCase):
         self.assertIn("if status == Int(EINVAL)", COORDINATOR)
         self.assertIn("[iDeck native launch] EINVAL", COORDINATOR)
 
+    def test_windows_shell_pe_machine_and_precise_preflight(self):
+        glue = (ROOT / "iDeck/MadeiraDock/IDeckDockGlue.swift").read_text(encoding="utf-8")
+        self.assertIn("actualMachine == 0xA641", ENVIRONMENT)
+        self.assertNotIn("actualMachine == 0xAA64", ENVIRONMENT)
+        self.assertIn('drive_c/windows/system32/cmd.exe', ENVIRONMENT)
+        self.assertIn('validCommandShell', glue)
+        self.assertIn('machine == 0x8664 || machine == 0xA641', glue)
+        self.assertIn('valid Windows cmd.exe unavailable; prerequisites remain pending', COORDINATOR)
+        self.assertNotIn("MadeiraDock.skipInstalls(", COORDINATOR)
+        self.assertNotIn("static func skipInstalls(", glue)
+        self.assertIn('executable missing:', ENVIRONMENT)
+        self.assertIn('executable is not a valid Windows PE:', ENVIRONMENT)
+        self.assertIn('malformed or oversized Windows launch arguments', ENVIRONMENT)
+        self.assertIn('unsupported Windows PE machine', ENVIRONMENT)
+        self.assertIn('guestMachine == 0xa641', NATIVE)
+
     def test_do_not_disable_wine_directwrite(self):
         self.assertNotIn('setenv("WINEDLLOVERRIDES"', ENVIRONMENT)
 
