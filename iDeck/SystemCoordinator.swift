@@ -1076,6 +1076,26 @@ class SystemCoordinator: ObservableObject {
                     failure = error.localizedDescription
                 }
             }
+            // An already installed Steam client may still have an x86 or
+            // malformed SDL3.dll, or be missing video64.dll's FFmpeg imports.
+            // Recheck immediately before the Dock session, not only when the
+            // library workspace opens. Never modify a running Wine session.
+            if MadeiraDock.clientInstalled {
+                let root = MadeiraDock.prefix
+                let repair = await Task.detached(priority: .utility) {
+                    SteamDLLRepair.repair(prefix: root)
+                }.value
+                if !repair.copied.isEmpty {
+                    AppLog.record("[steam-dll] repaired before Steam launch: " + repair.copied.joined(separator: ", "))
+                }
+                if !repair.invalid.isEmpty {
+                    AppLog.record("[steam-dll] incompatible DLLs preserved or repair failed: " + repair.invalid.joined(separator: ", "))
+                }
+                if !repair.missing.isEmpty {
+                    AppLog.record("[steam-dll] missing before launch: " + repair.missing.joined(separator: ", ")
+                                  + "; import matching genuine Steam x64 DLLs into Documents/SteamDLLs")
+                }
+            }
             guard let self, self.windowsStatus == Self.steamComponentsInstallStatus else { return }
             self.steamComponentsProgress = nil
             if MadeiraDock.clientInstalled && MadeiraDock.clientSupported {
