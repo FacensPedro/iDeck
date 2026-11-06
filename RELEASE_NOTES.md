@@ -1,6 +1,6 @@
 ## What's Changed
-- Added first-run Windows environment setup, including launcher installation guidance and runtime prerequisites.
-- Added download time remaining estimates and updated game-cover download controls.
-- Improved x64/x86 first-run initialization and native memory-budget enforcement.
-- Reduced redundant native cache locking and repeated configuration lookups.
-- Updated the application version to 1.0.10 (build 11).
+- Fixed the native Wine ARM64EC command interpreter required by Windows installers.
+- Included Wine Mono in approved native builds and strengthened x64/x86 environment checks.
+- Improved the initial setup flow, Madeira Dock installation and recovery feedback.
+- Updated game cards and placed estimated installation time in game details.
+- Replaced download, EA app and Ubisoft Connect icons and updated the header to display iDeck text.
