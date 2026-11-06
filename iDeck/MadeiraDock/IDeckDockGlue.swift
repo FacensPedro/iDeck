@@ -211,23 +211,48 @@ extension MadeiraDock {
         return target
     }
 
-    /// The program a session of one-time installs runs: Wine's cmd.exe, staged
-    /// from the bundle into system32 (the launch checks a real PE file there).
-    /// nil when this build has none: the installs are then skipped.
+    /// The program a session of one-time installs runs: Wine's cmd.exe.
+    /// Reject a truncated, linked or wrong-architecture interpreter before
+    /// attempting Wine; never record prerequisites as completed on failure.
+    private static func validCommandShell(_ url: URL) -> Bool {
+        guard let attrs = try? url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey]),
+              attrs.isRegularFile == true, attrs.isSymbolicLink != true else { return false }
+        let machine = url.path.withCString { ideck_native_pe_machine($0) }
+        return machine == 0x8664 || machine == 0xA641
+    }
+
     static func stageCommandShell() -> URL? {
         let target = drive.appendingPathComponent("windows/system32/cmd.exe")
         let fm = FileManager.default
-        let linked = (try? target.resourceValues(forKeys: [.isSymbolicLinkKey]))?.isSymbolicLink == true
-        if !linked, fm.fileExists(atPath: target.path) { return target }
+        if fm.fileExists(atPath: target.path) {
+            guard validCommandShell(target) else {
+                AppLog.record("[dock-installers] existing Wine cmd.exe is invalid or has an unsupported PE machine; no installers were marked complete")
+                return nil
+            }
+            return target
+        }
+        // A dangling symlink is not reported by fileExists; it must never be
+        // followed or overwritten with a supposedly trusted command shell.
+        if (try? target.resourceValues(forKeys: [.isSymbolicLinkKey]))?.isSymbolicLink == true {
+            AppLog.record("[dock-installers] refusing linked Wine cmd.exe")
+            return nil
+        }
         guard let source = ["arm64ec-windows", "x86_64-windows", "aarch64-windows"]
             .map({ Bundle.main.bundleURL.appendingPathComponent($0 + "/cmd.exe") })
-            .first(where: { fm.fileExists(atPath: $0.path) }) else { return nil }
+            .first(where: validCommandShell) else {
+            AppLog.record("[dock-installers] no valid x64/ARM64EC Wine cmd.exe in the IPA")
+            return nil
+        }
         do {
             try fm.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
-            if linked { try fm.removeItem(at: target) }
             try fm.copyItem(at: source, to: target)
+            guard validCommandShell(target) else {
+                try? fm.removeItem(at: target)
+                return nil
+            }
             return target
         } catch {
+            AppLog.record("[dock-installers] could not stage cmd.exe: \(error.localizedDescription)")
             return nil
         }
     }
