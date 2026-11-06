@@ -179,6 +179,7 @@ class SystemCoordinator: ObservableObject {
     /// The installer's latest message while components download for a launch.
     @Published var steamComponentsProgress: String?
     private var steamComponentsTask: Task<Void, Never>?
+    private var steamDLLAuditComplete = false
 
     /// Madeira Dock needs Valve's client components in the prefix. They are
     /// fetched once, in the background, as soon as a Steam account is signed
@@ -199,7 +200,11 @@ class SystemCoordinator: ObservableObject {
         // The pinned Valve installer does not guarantee the optional video
         // codecs. Repair an already installed client as well, without
         // restarting Wine or copying large DLLs on the UI thread.
-        guard !MadeiraDock.clientInstalled || SteamDLLRepair.hasImportFiles else { return }
+        // Audit once even without imported files; this exposes missing Steam
+        // video codecs and invalid SDL3 before the next Wine process starts.
+        // User imports always trigger another check.
+        guard !MadeiraDock.clientInstalled || SteamDLLRepair.hasImportFiles || !steamDLLAuditComplete else { return }
+        steamDLLAuditComplete = true
         steamComponentsTask = Task(priority: .utility) { @MainActor [weak self] in
             do {
                 if !MadeiraDock.clientInstalled {
@@ -219,9 +224,9 @@ class SystemCoordinator: ObservableObject {
                                   + report.invalid.joined(separator: ", "))
                 }
                 if !report.missing.isEmpty {
-                    AppLog.record("[steam-dll] Steam video client is missing: "
+                    AppLog.record("[steam-dll] Steam client DLLs missing or incompatible: "
                                   + report.missing.joined(separator: ", ")
-                                  + "; import matching genuine Steam x64 DLLs into Documents/SteamDLLs")
+                                  + "; import matching genuine Steam DLLs from the same client build into Documents/SteamDLLs (SDL3 must match steam.exe architecture)")
                 }
             } catch {
                 AppLog.record("[steam-components] automatic setup failed: \(error.localizedDescription)")
