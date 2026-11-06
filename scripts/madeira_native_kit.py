@@ -105,6 +105,7 @@ REQUIRED_PE = (
     "arm64ec-windows/winemetal.dll", "arm64ec-windows/d3d11.dll",
     "arm64ec-windows/dxgi.dll", "aarch64-windows/winemetal.dll",
     "arm64ec-windows/dcomp.dll",
+    "arm64ec-windows/cmd.exe",
     "arm64ec-windows/ktmw32.dll",
     "arm64ec-windows/faultrep.dll",
     "arm64ec-windows/xaudio2_7.dll",
