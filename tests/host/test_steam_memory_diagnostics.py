@@ -30,6 +30,27 @@ class SteamMemoryDiagnosticsTests(unittest.TestCase):
         self.assertIn("let journals = try plans.indices.map", DOWN)
         self.assertIn("results[i] = Data(digest) == chunk.sha", DOWN)
 
+    def test_resume_reports_all_chunks_not_only_failed_existing_file_checks(self):
+        # Chunks in brand-new files never enter checkExisting's hash result
+        # array. The remaining queue must be counted after filtering.
+        self.assertIn('journal-resume=', DOWN)
+        self.assertIn('[steam-depot] resume checked app=', DOWN)
+        self.assertIn('to-fetch-chunks=\\(work.reduce(0) { $0 + $1.count })', DOWN)
+        self.assertNotIn('to-fetch-chunks=\\(bad.reduce(0)', DOWN)
+
+    def test_resume_checks_available_disk_after_existing_chunk_verification(self):
+        # ftruncate sets logical length before the data arrives. Compare free
+        # space to verified pending bytes, not to the sparse file's length.
+        start = DOWN.index('SteamLog.event("[steam-depot] install begin')
+        verified = DOWN.index('try await checkExisting(plans: plans,', start)
+        pending = DOWN.index('var pendingUncompressed: UInt64 = 0', verified)
+        free = DOWN.index('if pendingUncompressed > 0, let free = installURL.freeSpace', pending)
+        relay = DOWN.index('if !work.allSatisfy(\\.isEmpty), let pc = IRelayClient.configured()', free)
+        self.assertLess(verified, pending)
+        self.assertLess(pending, free)
+        self.assertLess(free, relay)
+        self.assertIn('insufficientDiskSpace(needed: pendingUncompressed', DOWN)
+
     def test_diagnostics_identify_game_before_start(self):
         self.assertIn('forKey: "diagnostics.lastGame"', STEAM)
         self.assertIn('forKey: "diagnostics.lastLauncher"', STEAM)
