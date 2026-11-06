@@ -72,7 +72,7 @@ struct LogIssue: Identifiable, Hashable {
 enum LogIssueScanner {
     /// Patterns are matched case-insensitively against each line.
     private static let errors = [
-        "error", "err:", "fatal", "crash", "exception", "panic", "abort",
+        "error", "err:", "fatal", "crash", "exception", "panic", "abort", "pressure critical",
         "c0000005", "c000001d", "c0000135", "status_access_violation", "unhandled",
     ]
     private static let failures = [
@@ -82,7 +82,7 @@ enum LogIssueScanner {
     /// Wine debug channels that print "err:" for harmless probing.
     private static let noise = ["fixme:", "err:ole:", "err:winediag:"]
     /// Counters that report no problem at all ("launch-client-error=0").
-    private static let zeroCount = try! NSRegularExpression(pattern: #"\b(error|errors|failed|failures)\s*[=:]\s*0\b"#)
+    private static let zeroCount = try! NSRegularExpression(pattern: #"\b(error|errors|failed|failures|missing)\s*[=:]\s*0\b"#)
     /// Lines from iDeck's Steam client, downloads and Madeira Dock.
     private static let steamTags = ["[steam", "[dock", "steam client", "steam's", "madeira dock", "steamworks", "steam_api"]
 
@@ -102,11 +102,13 @@ enum LogIssueScanner {
             let lower = line.lowercased()
             if noise.contains(where: lower.contains) { continue }
             if !steamSession, steamTags.contains(where: lower.contains) { continue }
+            // Counts such as missing=0, errors=0 or failed=0 are normal
+            // success telemetry. Remove only those zero-valued terms so a
+            // real failure elsewhere in the same line remains visible.
             let range = NSRange(lower.startIndex..., in: lower)
-            if zeroCount.firstMatch(in: lower, range: range) != nil,
-               !errors.contains(where: { $0 != "error" && lower.contains($0) }) { continue }
-            let severity = errors.contains(where: lower.contains) ? 2
-                : failures.contains(where: lower.contains) ? 1 : 0
+            let actionable = zeroCount.stringByReplacingMatches(in: lower, range: range, withTemplate: "")
+            let severity = errors.contains(where: actionable.contains) ? 2
+                : failures.contains(where: actionable.contains) ? 1 : 0
             guard severity > 0 else { continue }
             // JIT problems get their own group, whichever log they came from.
             let lineSource: LogIssue.Source = lower.contains("jit") ? .jit : source

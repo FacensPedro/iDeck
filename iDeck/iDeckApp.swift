@@ -14,6 +14,14 @@ struct iDeckApp: App {
         // default, so a game's intro videos failed (0xc00d36bb).
         // madeira.cfg env.MADEIRA_WG_64BIT = 0 turns it off again.
         setenv("MADEIRA_WG_64BIT", "1", 0)
+        // A previous install without a matching normal exit might indicate
+        // an OS termination, force quit, restart or power interruption.
+        // Report the interruption, never assume Jetsam or discard game files.
+        let diagnostics = UserDefaults.standard
+        if let inFlight = diagnostics.string(forKey: "diagnostics.installInFlight"), !inFlight.isEmpty {
+            AppLog.record("[startup] warning: previous Steam installation did not finish normally: \(inFlight); cause undetermined")
+            diagnostics.removeObject(forKey: "diagnostics.installInFlight")
+        }
         // iRelay over the USB cable: listen from launch so the PC finds iDeck at once.
         // The prefix is Documents/wine (Madeira's); earlier builds' moves first.
         MadeiraDock.linkPrefix()

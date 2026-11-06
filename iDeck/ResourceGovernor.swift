@@ -100,8 +100,15 @@ final class ResourceGovernor {
         let before = Self.footprintMiB()
         URLCache.shared.removeAllCachedResponses()
         NotificationCenter.default.post(name: Self.releaseCachesNotification, object: nil)
+        // A critical iOS memory-pressure event is system-wide; it is not
+        // automatically evidence of jetsam or a process exceeding its limit.
+        // Capture foreground state and the active Steam installation count
+        // so a later restart report can distinguish game execution and USB
+        // transfer activity from an actual process termination record.
+        let steamInstalls = SteamOwnedGamesModel.shared.installingApps.count
         AppLog.record("[memory] pressure \(level): footprint \(before) MiB -> \(Self.footprintMiB()) MiB after releasing caches, " +
-                      "\(Self.availableMiB()) MiB left before the system limit, game running: \(Self.gameRunning)")
+                      "\(Self.availableMiB()) MiB left before the system limit, game running: \(Self.gameRunning), " +
+                      "app active: \(Self.appActive), Steam installs: \(steamInstalls)")
         BenchmarkSession.mark("memory_pressure_" + level)
     }
 
