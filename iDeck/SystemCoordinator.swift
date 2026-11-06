@@ -32,6 +32,38 @@ class SystemCoordinator: ObservableObject {
     /// A Madeira Dock (Steam client) session is running; its final report is
     /// read when Wine exits.
     private var dockSessionActive = false
+    // The Wine host can return 0 after a Steam-launched game child aborts.
+    // Only inspect Wine fatal-crash lines written after the current launch.
+    private var wineLogStartOffset: Int64?
+
+    private func captureWineLogStart() {
+        guard let path = BugReportModel.wineLogURL?.path else {
+            wineLogStartOffset = nil
+            return
+        }
+        let attributes = try? FileManager.default.attributesOfItem(atPath: path)
+        wineLogStartOffset = (attributes?[.size] as? NSNumber)?.int64Value ?? 0
+    }
+
+    private func wineExitResult() -> (reason: String, ntstatus: UInt32?) {
+        var nativeExitCode: Int32 = 0
+        var nativeCrashStatus: UInt32 = 0
+        let code = ideck_wineprocess_last_exit_code(&nativeExitCode) ? nativeExitCode : nil
+        let nativeStatus = ideck_wineprocess_last_ntstatus(&nativeCrashStatus) ? nativeCrashStatus : nil
+        let childAV: Bool
+        if code == 0, nativeStatus == nil,
+           let start = wineLogStartOffset, let path = BugReportModel.wineLogURL?.path {
+            childAV = path.withCString { ideck_wine_log_fatal_av_since($0, start) != 0 }
+        } else {
+            childAV = false
+        }
+        let effectiveStatus = nativeStatus ?? (childAV ? UInt32(0xC0000005) : nil)
+        var reason = WineExitDiagnostics.message(exitCode: code, crashStatus: effectiveStatus)
+        if childAV {
+            reason += " Wine's host returned exit code 0, but a Windows child process terminated with an access violation."
+        }
+        return (reason, effectiveStatus)
+    }
     private var activeSteamInstallerAppID: UInt32?
     private var steamDockStartedAt: TimeInterval?
     @Published private(set) var steamPrerequisiteProgress: String?
@@ -801,6 +833,7 @@ class SystemCoordinator: ObservableObject {
                             self.setWindowsStatus("Execution Error: another Wine process is already running.")
                             return
                         }
+                        self.captureWineLogStart()
                         self.windowsEnvironment.execute(
                             binary: destination,
                             arguments: profile?.arguments ?? "",
@@ -981,6 +1014,7 @@ class SystemCoordinator: ObservableObject {
                 self.setWindowsStatus("Execution Error: another Wine process started during game preparation.")
                 return
             }
+            self.captureWineLogStart()
             self.windowsEnvironment.execute(binary: executableURL,
                                             arguments: profile.arguments.isEmpty ? entryArguments : profile.arguments,
                                             steamAppID: game.appID,
@@ -1162,6 +1196,7 @@ class SystemCoordinator: ObservableObject {
                 self.setWindowsStatus("Execution Error: another Wine process started during game preparation.")
                 return
             }
+            self.captureWineLogStart()
             self.windowsEnvironment.execute(binary: program, arguments: arguments, jitEnabler: self.jitEnabler) { [weak self] status in
                 DispatchQueue.main.async {
                     guard let self else { return }
@@ -1416,11 +1451,10 @@ class SystemCoordinator: ObservableObject {
                 return
             }
         }
-        var exitCode: Int32 = 0
-        var crashStatus: UInt32 = 0
-        let code = ideck_wineprocess_last_exit_code(&exitCode) ? exitCode : nil
-        let ntstatus = ideck_wineprocess_last_ntstatus(&crashStatus) ? crashStatus : nil
-        var reason = WineExitDiagnostics.message(exitCode: code, crashStatus: ntstatus)
+        let outcome = wineExitResult()
+        wineLogStartOffset = nil
+        let ntstatus = outcome.ntstatus
+        var reason = outcome.reason
         // An illegal instruction (0xC000001D) is what a game built for AVX
         // processors hits without AVX translation: it is turned on for that game.
         if ntstatus == 0xC000001D, let endedGame, AVXAuto.enable(endedGame) {
@@ -1434,11 +1468,7 @@ class SystemCoordinator: ObservableObject {
 
     private func nativeLaunchFailure(_ status: Int) -> String {
         if status == 0 || status == Int(EAGAIN) {
-            var exitCode: Int32 = 0
-            var crashStatus: UInt32 = 0
-            let code = ideck_wineprocess_last_exit_code(&exitCode) ? exitCode : nil
-            let ntstatus = ideck_wineprocess_last_ntstatus(&crashStatus) ? crashStatus : nil
-            return WineExitDiagnostics.message(exitCode: code, crashStatus: ntstatus)
+            return wineExitResult().reason
         }
         if status == Int(EALREADY) {
             return ideck_wineprocess_running()
