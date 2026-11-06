@@ -9,11 +9,11 @@ import unittest
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 WORKFLOW = (ROOT / ".github/workflows/ios.yml").read_text(encoding="utf-8")
 PROJECT = (ROOT / "iDeck.xcodeproj/project.pbxproj").read_text(encoding="utf-8")
-VERSIONS = set(re.findall(r"\\bMARKETING_VERSION\\s*=\\s*([^;]+);", PROJECT))
+VERSIONS = set(re.findall(r"\bMARKETING_VERSION\s*=\s*([^;]+);", PROJECT))
 if len(VERSIONS) != 1:
     raise AssertionError(f"Inconsistent iDeck project versions: {sorted(VERSIONS)}")
 PROJECT_VERSION = VERSIONS.pop().strip()
-if not re.fullmatch(r"[0-9]+\\.[0-9]+\\.[0-9]+", PROJECT_VERSION):
+if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", PROJECT_VERSION):
     raise AssertionError(f"Invalid iDeck project version: {PROJECT_VERSION!r}")
 
 
