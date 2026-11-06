@@ -716,6 +716,9 @@ struct WindowsWorkspaceView: View {
                     }
                 }
                 .frame(width: artworkWidth, height: artworkHeight)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .overlay(RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color.white.opacity(0.08), lineWidth: 1))
                 .clipped()
                 Button { selectedSteamGame = SelectedSteamGame(game: game) } label: {
                     cardTitle(game.name.isEmpty ? tr("Untitled Steam app") : game.name)
@@ -753,9 +756,16 @@ struct WindowsWorkspaceView: View {
         }
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(panelColor)
-        .overlay(RoundedRectangle(cornerRadius: 10).stroke(lineColor, lineWidth: 1))
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(LinearGradient(colors: [
+                    panelColor,
+                    Color(red: 0.085, green: 0.105, blue: 0.145)
+                ], startPoint: .topLeading, endPoint: .bottomTrailing))
+        )
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(lineColor.opacity(0.85), lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .shadow(color: .black.opacity(0.16), radius: 10, y: 4)
     }
 
     @ViewBuilder
@@ -841,6 +851,9 @@ struct WindowsWorkspaceView: View {
                     }
                 }
                 .frame(width: artworkWidth, height: artworkHeight)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .overlay(RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color.white.opacity(0.08), lineWidth: 1))
                 .clipped()
                 Button { selectedGOGGame = game } label: { cardTitle(game.title) }
                     .buttonStyle(.plain)
@@ -876,9 +889,16 @@ struct WindowsWorkspaceView: View {
         }
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(panelColor)
-        .overlay(RoundedRectangle(cornerRadius: 10).stroke(lineColor, lineWidth: 1))
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(LinearGradient(colors: [
+                    panelColor,
+                    Color(red: 0.085, green: 0.105, blue: 0.145)
+                ], startPoint: .topLeading, endPoint: .bottomTrailing))
+        )
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(lineColor.opacity(0.85), lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .shadow(color: .black.opacity(0.16), radius: 10, y: 4)
     }
 
     @ViewBuilder
@@ -962,6 +982,9 @@ struct WindowsWorkspaceView: View {
                     }
                 }
                 .frame(width: artworkWidth, height: artworkHeight)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .overlay(RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color.white.opacity(0.08), lineWidth: 1))
                 .clipped()
                 Button { selectedEpicGame = SelectedEpicGame(id: game.appName) } label: { cardTitle(game.title) }
                     .buttonStyle(.plain)
@@ -999,9 +1022,16 @@ struct WindowsWorkspaceView: View {
         }
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(panelColor)
-        .overlay(RoundedRectangle(cornerRadius: 10).stroke(lineColor, lineWidth: 1))
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(LinearGradient(colors: [
+                    panelColor,
+                    Color(red: 0.085, green: 0.105, blue: 0.145)
+                ], startPoint: .topLeading, endPoint: .bottomTrailing))
+        )
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(lineColor.opacity(0.85), lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .shadow(color: .black.opacity(0.16), radius: 10, y: 4)
     }
 
     private func launchEpicGame(_ game: EpicInstalledGame) {
