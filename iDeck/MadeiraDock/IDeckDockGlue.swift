@@ -257,14 +257,6 @@ extension MadeiraDock {
         }
     }
 
-    /// No cmd.exe to run a game's one-time installs: they are recorded as run
-    /// (Visual C++ is built in; DirectX and the rest come with Wine) and the
-    /// game starts.
-    static func skipInstalls(_ game: DockGame) -> Int {
-        let runs = DockInstallers.found(game, drive: drive).processes.map(\.run)
-        guard !runs.isEmpty else { return 0 }
-        return (try? SteamInstallScripts.mark(runs, prefix: prefix)) ?? 0
-    }
 }
 
 /// The starting status line, from the host's report (Madeira's DockStartStatus
