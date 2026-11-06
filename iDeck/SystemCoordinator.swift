@@ -179,11 +179,29 @@ class SystemCoordinator: ObservableObject {
     /// The installer's latest message while components download for a launch.
     @Published var steamComponentsProgress: String?
     private var steamComponentsTask: Task<Void, Never>?
+    private var dockInstallAfterPrefix = false
+    private var isPreparingWindowsPrefix = false
+
+    /// Explicitly requested from onboarding. Unlike background repair, a tap
+    /// always returns visible feedback and can initialize the prefix first.
+    func installMadeiraDock() {
+        guard MadeiraDock.bundled else {
+            steamComponentsProgress = "Madeira Dock is missing from this IPA."
+            return
+        }
+        if !PrefixInstaller.isPrefixInstalled(at: MadeiraDock.prefix) {
+            steamComponentsProgress = "Preparing x64 + x86 Wine environment…"
+            dockInstallAfterPrefix = true
+            openMadeiraWorkspace()
+            return
+        }
+        installSteamClientComponentsIfNeeded(force: true)
+    }
 
     /// Madeira Dock needs Valve's client components in the prefix. They are
     /// fetched once, in the background, as soon as a Steam account is signed
     /// in and the Wine prefix exists (again on the next library visit if not).
-    func installSteamClientComponentsIfNeeded() {
+    func installSteamClientComponentsIfNeeded(force: Bool = false) {
         // Expose the import folder through Files without touching running
         // sessions or re-creating it on every library refresh.
         if MadeiraDock.bundled, let folder = SteamDLLRepair.sourceFolder,
@@ -201,16 +219,27 @@ class SystemCoordinator: ObservableObject {
         // Valve's public update server.
         guard steamComponentsTask == nil, MadeiraDock.bundled,
               PrefixInstaller.isPrefixInstalled(at: MadeiraDock.prefix),
-              !ideck_wineprocess_running(), !ideck_wineserver_running() else { return }
+              !ideck_wineprocess_running(), !ideck_wineserver_running() else {
+            if force { steamComponentsProgress = "Dock setup is unavailable while Wine is running or its prefix is not ready." }
+            return
+        }
         // The pinned Valve installer does not guarantee the optional video
         // codecs. Repair an already installed client as well, without
         // restarting Wine or copying large DLLs on the UI thread.
-        guard !MadeiraDock.clientInstalled || SteamDLLRepair.hasImportFiles else { return }
+        guard !MadeiraDock.clientInstalled || SteamDLLRepair.hasImportFiles else {
+            if force { steamComponentsProgress = "Madeira Dock is already installed." }
+            return
+        }
+        steamComponentsProgress = "Installing Madeira Dock components…"
         steamComponentsTask = Task(priority: .utility) { @MainActor [weak self] in
             do {
                 if !MadeiraDock.clientInstalled {
                     try await SteamRuntimeInstaller.shared.prepare(prefix: MadeiraDock.prefix) { message in
                         AppLog.record("[steam-components] " + message)
+                        Task { @MainActor [weak self] in self?.steamComponentsProgress = message }
+                    }
+                    guard MadeiraDock.clientInstalled else {
+                        throw DockError.message("Madeira Dock installation finished without steamclient64.dll.")
                     }
                 }
                 let prefix = MadeiraDock.prefix
@@ -229,8 +258,13 @@ class SystemCoordinator: ObservableObject {
                                   + report.missing.joined(separator: ", ")
                                   + "; import matching genuine Steam x64 DLLs into Documents/SteamDLLs")
                 }
+                self?.steamComponentsProgress = report.missing.isEmpty
+                    ? "Madeira Dock installed and verified."
+                    : "Madeira Dock installed. Optional Steam video DLLs are missing: " + report.missing.joined(separator: ", ")
             } catch {
-                AppLog.record("[steam-components] automatic setup failed: \(error.localizedDescription)")
+                let message = "Madeira Dock installation failed: \(error.localizedDescription)"
+                self?.steamComponentsProgress = message
+                AppLog.record("[steam-components] " + message)
             }
             self?.steamComponentsTask = nil
         }
@@ -389,29 +423,42 @@ class SystemCoordinator: ObservableObject {
     }
 
     private func startWindows() {
+        guard !isPreparingWindowsPrefix else { return }
+        isPreparingWindowsPrefix = true
         setWindowsStatus("Preparing Windows Environment...")
         prefixHost.mountEnvironment { [weak self] mountPath in
             guard let self else { return }
             guard let mountPath else {
+                self.isPreparingWindowsPrefix = false
+                self.dockInstallAfterPrefix = false
                 self.setWindowsStatus("Windows prefix initialization failed")
                 return
             }
             DispatchQueue.main.async {
                 self.isContainerReady = true
                 guard Bundle.main.url(forResource: "prefix-template", withExtension: "tar.gz") != nil else {
+                    self.isPreparingWindowsPrefix = false
+                    self.dockInstallAfterPrefix = false
                     self.setWindowsStatus("Library Ready — Madeira native runtime is not bundled")
                     return
                 }
                 self.setWindowsStatus("Preparing Wine prefix...")
                 self.prefixInstaller.installWinePrefix(to: mountPath) { success in
+                    self.isPreparingWindowsPrefix = false
                     guard success else {
+                        self.dockInstallAfterPrefix = false
                         self.setWindowsStatus("Wine prefix setup failed")
                         return
                     }
                     self.windowsEnvironment.configureWine(prefix: mountPath)
                     self.mountExternalDrives(prefix: mountPath)
-                    self.setWindowsStatus(self.windowsEnvironment.hasRuntime(in: mountPath)
-                        ? "Windows Runtime Ready" : "Madeira runtime components are missing")
+                    let runtimeReady = self.windowsEnvironment.hasRuntime(in: mountPath)
+                    self.setWindowsStatus(runtimeReady ? "Windows Runtime Ready" : "Madeira runtime components are missing")
+                    if self.dockInstallAfterPrefix {
+                        self.dockInstallAfterPrefix = false
+                        if runtimeReady { self.installSteamClientComponentsIfNeeded(force: true) }
+                        else { self.steamComponentsProgress = "Cannot install Dock: native Wine runtime is incomplete." }
+                    }
                 }
             }
         }

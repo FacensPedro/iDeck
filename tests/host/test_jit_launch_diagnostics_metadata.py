@@ -41,7 +41,8 @@ class LauncherJITAndDiagnosticsTests(unittest.TestCase):
 
     def test_clean_release_and_centered_jit_status(self):
         top = MAIN.split("private var topBar: some View")[1].split("private enum MixedLibraryEntry")[0]
-        self.assertNotIn('Text("iDeck")', top)
+        self.assertIn('Text("iDeck")', top)
+        self.assertNotIn('Image("IDeckLogo")', top)
         self.assertIn(".frame(maxWidth: .infinity)", top)
         self.assertNotIn("Bendy", NOTES)
         self.assertNotIn("Bendy and the Ink Machine", NOTES)

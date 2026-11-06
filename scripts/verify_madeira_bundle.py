@@ -72,6 +72,7 @@ PE_FILES = (
     "arm64ec-windows/xtajit64.dll",
     "arm64ec-windows/winemetal.dll",
     "arm64ec-windows/dcomp.dll",
+    "arm64ec-windows/cmd.exe",
     "arm64ec-windows/ktmw32.dll",
     "arm64ec-windows/faultrep.dll",
     "arm64ec-windows/xaudio2_7.dll",

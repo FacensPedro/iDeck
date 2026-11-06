@@ -245,11 +245,8 @@ extension MadeiraDock {
         let fm = FileManager.default
         let linked = (try? target.resourceValues(forKeys: [.isSymbolicLinkKey]))?.isSymbolicLink == true
         if !linked && fm.fileExists(atPath: target.path) {
-            guard validCommandShell(target) else {
-                AppLog.record("[dock-installers] existing Wine cmd.exe is invalid or has an unsupported PE machine; no installers were marked complete")
-                return nil
-            }
-            return target
+            if validCommandShell(target) { return target }
+            AppLog.record("[dock-installers] invalid Wine cmd.exe in prefix; restoring verified bundled interpreter")
         }
         // The seeded Wine prefix can have a cmd.exe symlink. Do not execute
         // its target; replace the link only after validating a bundled PE
@@ -262,7 +259,7 @@ extension MadeiraDock {
         }
         do {
             try fm.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
-            if linked { try fm.removeItem(at: target) }
+            if linked || fm.fileExists(atPath: target.path) { try fm.removeItem(at: target) }
             try fm.copyItem(at: source, to: target)
             guard validCommandShell(target) else {
                 try? fm.removeItem(at: target)

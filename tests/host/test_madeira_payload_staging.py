@@ -14,7 +14,7 @@ ARM64EC = (
     "kernel32.dll", "kernelbase.dll", "user32.dll", "gdi32.dll",
     "ws2_32.dll", "d3d9.dll", "vulkan-1.dll", "madeira_d3d12.dll",
     "dcomp.dll", "ktmw32.dll", "faultrep.dll", "xaudio2_7.dll",
-    "d3dx11_43.dll", "d3dcompiler_47.dll", "dinput8.dll",
+    "d3dx11_43.dll", "d3dcompiler_47.dll", "dinput8.dll", "cmd.exe",
     "msv1_0.dll", "kerberos.dll",
 )
 ARM64 = ("d3d11.dll", "dxgi.dll", "winemetal.dll", "kernel32.dll", "user32.dll")
@@ -150,6 +150,20 @@ class MadeiraPayloadStagingTests(unittest.TestCase):
         )
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("requested WoW64", result.stderr)
+
+    def test_native_fails_when_command_interpreter_is_absent(self):
+        (self.source / "arm64ec-windows/cmd.exe").unlink()
+        environment = dict(os.environ)
+        environment.update({
+            "IDECK_MADEIRA_APP_ROOT": str(self.source),
+            "IDECK_MADEIRA_GRAPHICS": "d3d11",
+        })
+        result = subprocess.run(
+            ["bash", str(STAGER), str(self.app)],
+            env=environment, check=False, text=True, capture_output=True,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("arm64ec-windows/cmd.exe", result.stderr)
 
     def test_native_fails_when_wine_security_provider_is_absent(self):
         (self.source / "arm64ec-windows/kerberos.dll").unlink()
