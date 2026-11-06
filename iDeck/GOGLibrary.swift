@@ -654,21 +654,24 @@ final class GOGLibraryModel: ObservableObject {
                 try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
                 var setup: URL?
                 var saved: [URL] = []
+                let totalBytes = files.reduce(Int64(0)) { $0 + max(0, $1.sizeBytes) }
+                var previousBytes: Int64 = 0
                 for (index, file) in files.enumerated() {
                     try Task.checkCancellation()
+                    let partBytes = max(0, file.sizeBytes)
+                    let baseBytes = previousBytes
                     let part = try await download(file, into: folder, tokens: tokens) { fraction in
                         let overall = (Double(index) + fraction) / Double(files.count)
                         self.downloadProgress[game.id] = overall
-                        let totalBytes = files.reduce(Int64(0)) { $0 + max(0, $1.sizeBytes) }
                         if totalBytes > 0 {
-                            let complete = files.prefix(index).reduce(Int64(0)) { $0 + max(0, $1.sizeBytes) }
-                            let doneBytes = complete + Int64(Double(max(0, file.sizeBytes)) * fraction)
+                            let doneBytes = baseBytes + Int64(Double(partBytes) * fraction)
                             self.updateDownloadETA(gameID: game.id,
                                                    done: UInt64(max(0, doneBytes)),
                                                    total: UInt64(totalBytes))
                         }
                         BackgroundDownloads.gog.progress(done: UInt64(overall * 10_000), total: 10_000)
                     }
+                    previousBytes += partBytes
                     saved.append(part)
                     if setup == nil, part.pathExtension.lowercased() == "exe" { setup = part }
                 }
