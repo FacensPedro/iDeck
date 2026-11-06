@@ -1062,7 +1062,8 @@ struct WindowsWorkspaceView: View {
                 }
                 steamLibrary.refreshInstalledApps(prefixPath: root)
                 gogLibrary.refreshInstalled(prefixPath: root)
-                coordinator.installSteamClientComponentsIfNeeded()
+                // Keep the first Wine prefix initialization architecture-only.
+                // Steam client components are installed from the explicit Madeira Dock step.
                 }
         }
     }
@@ -2493,23 +2494,23 @@ private struct IDeckFirstRunSetupView: View {
 
     private var dockStep: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Label("Madeira Dock", systemImage: "square.stack.3d.up.fill")
+            Label("Windows x64 + x86 (WoW64)", systemImage: "square.stack.3d.up.fill")
                 .font(.title2.bold())
-            Text("Prepare the Wine prefix and Valve's desktop client components.")
-            LabeledContent("Native runtime", value: MadeiraBundleIdentity.isNative ? "Included" : "Missing")
-            LabeledContent("Wine prefix", value: prefixReady ? "Ready" : "Preparing")
+            Text("The first initialization prepares only the x64 Wine prefix and x86 WoW64 support. Optional .NET, Visual C++, and the Steam client are separate steps.")
+            LabeledContent("x64 Wine", value: MadeiraBundleIdentity.isNative ? "Included" : "Missing")
+            LabeledContent("x86 WoW64", value: coordinator.windowsEnvironment.hasWoW64Runtime() ? "Included" : "Missing")
+            LabeledContent("Wine prefix", value: prefixReady ? "Ready" : "Not prepared")
             LabeledContent("Madeira Dock", value: MadeiraDock.clientInstalled ? "Ready" : "Not prepared")
-            Button("Prepare Madeira Dock") {
-                if !prefixReady { coordinator.openMadeiraWorkspace() }
-                coordinator.installSteamClientComponentsIfNeeded()
+            Button("Initialize x64 and x86") {
+                coordinator.openMadeiraWorkspace()
             }
             .buttonStyle(.borderedProminent)
-            .disabled(!MadeiraDock.bundled)
-            .onChange(of: coordinator.windowsStatus) { _, status in
-                if status == "Windows Runtime Ready" || status == "Madeira runtime components are missing" {
-                    coordinator.installSteamClientComponentsIfNeeded()
-                }
+            .disabled(!MadeiraDock.bundled || prefixReady || !coordinator.windowsEnvironment.hasWoW64Runtime())
+            Button("Install Madeira Dock") {
+                coordinator.installSteamClientComponentsIfNeeded()
             }
+            .buttonStyle(.bordered)
+            .disabled(!prefixReady || !MadeiraDock.bundled)
             if let progress = coordinator.steamComponentsProgress {
                 Text(progress).font(.caption).foregroundStyle(.secondary)
             }
