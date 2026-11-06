@@ -1749,6 +1749,7 @@ private struct StoreGameDetailsView<Extra: View>: View {
     let installed: Bool
     /// Install progress 0...1 while downloading or installing.
     let progress: Double?
+    let etaSeconds: Int?
     let paused: Bool
     let sizeText: String?
     let errorText: String?
@@ -1767,7 +1768,7 @@ private struct StoreGameDetailsView<Extra: View>: View {
     @State private var errorMessage: String?
 
     init(title: String, store: GameStore, profileID: String, covers: [URL], banners: [URL],
-         installed: Bool, progress: Double?, paused: Bool = false, sizeText: String?, errorText: String?,
+         installed: Bool, progress: Double?, etaSeconds: Int? = nil, paused: Bool = false, sizeText: String?, errorText: String?,
          canInstall: Bool, onLaunch: @escaping () -> Void, onInstall: @escaping () -> Void,
          onPause: (() -> Void)? = nil, onStop: @escaping () -> Void, onUninstall: (() -> Bool)?,
          library: WindowsLibraryStore, coordinator: SystemCoordinator,
@@ -1779,6 +1780,7 @@ private struct StoreGameDetailsView<Extra: View>: View {
         self.banners = banners
         self.installed = installed
         self.progress = progress
+        self.etaSeconds = etaSeconds
         self.paused = paused
         self.sizeText = sizeText
         self.errorText = errorText
@@ -1871,6 +1873,11 @@ private struct StoreGameDetailsView<Extra: View>: View {
                 Text(tr("Installing %d%%", Int((progress * 100).rounded())))
                     .font(.caption)
                     .foregroundColor(.white)
+                if let etaSeconds, let eta = DownloadETA.label(etaSeconds) {
+                    Label(tr("Time left") + ": " + eta, systemImage: "clock")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
                 if let onPause {
                     Button(action: onPause) {
                         Label(tr("Pause download"), systemImage: "pause.fill")
@@ -1931,6 +1938,7 @@ private struct GOGGameDetailsSheet: View {
             title: game.title, store: .gog, profileID: "gog:\(game.id)",
             covers: game.artworkCandidates, banners: GOGLibraryModel.bannerCandidates(game),
             installed: installed != nil, progress: gog.downloadProgress[game.id],
+            etaSeconds: gog.downloadETASeconds[game.id],
             paused: gog.pausedDownloads.contains(game.id),
             sizeText: sizeText, errorText: gog.downloadErrors[game.id].map { tr($0) },
             canInstall: game.worksOnWindows && prefixPath != nil,
@@ -1968,13 +1976,19 @@ private struct EpicGameDetailsSheet: View {
         let download = epic.downloads[appName]
         let failed: String? = { if case .failed(let message) = download?.state { return message }; return nil }()
         let paused: Bool = { if case .paused = download?.state { return true }; return false }()
+        let eta: Int? = {
+            guard let download, download.progress.phase == .downloading else { return nil }
+            return DownloadETA.seconds(done: download.progress.doneBytes,
+                                       total: download.progress.totalBytes,
+                                       bytesPerSecond: download.progress.bytesPerSecond)
+        }()
         StoreGameDetailsView(
             title: title, store: .epic, profileID: "epic:\(appName)",
             covers: [epic.game(appName)?.cover].compactMap { $0 },
             banners: [epic.game(appName)?.wide].compactMap { $0 },
             installed: installed != nil && download == nil,
             progress: (download != nil && failed == nil) ? download?.progress.fraction : nil,
-            paused: paused, sizeText: sizeText, errorText: failed,
+            etaSeconds: eta, paused: paused, sizeText: sizeText, errorText: failed,
             canInstall: true,
             onLaunch: { if let installed { launch(installed) } },
             onInstall: { epic.install(appName) },
