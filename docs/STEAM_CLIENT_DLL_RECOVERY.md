@@ -5,7 +5,10 @@ An installation may be missing some Windows **Steam client** DLLs even though
 `steamclient64.dll` and `steam.exe` are installed. The Wine log records this
 as `video64.dll` importing `libavcodec-62.dll`, `libavformat-62.dll`,
 `libavutil-60.dll`, `libavfilter-11.dll`, `libswresample-6.dll`
-and `libswscale-9.dll`.
+and `libswscale-9.dll`. A separate `SDL3.dll` loader error
+`STATUS_INVALID_IMAGE_FORMAT (0xC000007B)` may indicate a wrong-architecture
+binary, malformed image or incompatible dependency; it is not proof the DLL
+is absent.
 
 ## Steam's seven video DLLs
 
@@ -29,6 +32,38 @@ the prefix, or reinstall the matching official Steam client package.
 The `SteamRuntimeInstaller` still downloads its pinned, SHA-256-verified
 Valve packages. This importer does not replace that verified setup or
 silently download unverified binaries.
+
+## SDL3.dll architecture repair
+
+The importer now audits the Steam client once after the Windows prefix is
+ready, even if no DLLs have been imported yet. It identifies the PE machine
+of the installed `steam.exe` and checks that `SDL3.dll` uses the same
+architecture (x86 or x64). A missing or incompatible SDL3 is reported
+alongside the missing media components. SDL3 can be imported independently
+of the seven-file FFmpeg/video group.
+
+1. Obtain `SDL3.dll` from the same **genuine, compatible Steam Windows
+   client build** as the other DLLs. Do not use a copy from another game or
+   substitute a 32-bit DLL for a 64-bit client (or vice versa).
+2. Put the file in `Files → On My iPad → iDeck → SteamDLLs → SDL3.dll`.
+3. With no Wine process running, revisit the Steam library. iDeck validates
+   the imported PE architecture and copies it into the Steam client directory.
+   If a wrong-architecture SDL3 already exists, iDeck moves the original to
+   `SDL3.dll.ideck-incompatible-backup` before copying the replacement.
+4. If a copy or verification fails, iDeck attempts to restore the original.
+   If a backup already exists it refuses to overwrite it, and reports that
+   manual review is required.
+
+This **does not guarantee** that every `0xC000007B` is fixed: a valid DLL
+can still depend on another invalid or missing image. The next device Wine
+log should be checked to identify the actual loader failure if it persists.
+The importer does not download a new, unpinned Steam client or bundle Valve
+DLL binaries into the IPA.
+
+The currently pinned, hash-verified Valve client packages are installed by
+`SteamRuntimeInstaller`. If Valve's pinned archives do not contain one of
+these optional DLLs, the importer needs an owner-supplied matching copy;
+fabricating an FFmpeg or SDL3 replacement would be unsafe.
 
 ## Wine's MSV1_0.dll and Kerberos.dll
 
