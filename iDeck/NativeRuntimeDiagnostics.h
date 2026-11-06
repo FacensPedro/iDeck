@@ -17,7 +17,7 @@ typedef struct {
 } IDeckNativeCapabilities;
 IDeckNativeCapabilities ideck_native_capabilities(void);
 bool ideck_process_has_jit_permission(void);
-// Returns 0x014c for x86 PE32, 0x8664 for AMD64 PE32+, or 0 if invalid.
+// Returns 0x014c for i386 PE32, 0x8664 for AMD64 PE32+,\n// 0xa641 for ARM64EC PE32+ (including a trusted Wine cmd.exe), or 0 if invalid.
 uint16_t ideck_native_pe_machine(const char *path);
 bool ideck_native_validate_pe(const char *path);
 #ifdef __cplusplus

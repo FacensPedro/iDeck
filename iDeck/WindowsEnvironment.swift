@@ -342,19 +342,36 @@ class WindowsEnvironment {
             completion(Int(EALREADY))
             return
         }
-        guard FileManager.default.fileExists(atPath: binary.path),
-              binary.path.withCString({ ideck_native_validate_pe($0) }),
-              let parsedArguments = BoxTranslator.parseArguments(arguments) else {
-            SteamLog.event("[wine-launch] invalid executable or Windows launch arguments")
+        // Report precisely which preflight failed. Wine has not started at
+        // this point, so a generic EINVAL concealed a missing or invalid
+        // prefix command interpreter during Steam's one-time installs.
+        guard FileManager.default.fileExists(atPath: binary.path) else {
+            SteamLog.event("[wine-launch] executable missing: \(binary.lastPathComponent)")
+            completion(Int(EINVAL))
+            return
+        }
+        let actualMachine = binary.path.withCString { ideck_native_pe_machine($0) }
+        guard actualMachine != 0 else {
+            SteamLog.event("[wine-launch] executable is not a valid Windows PE: \(binary.lastPathComponent)")
+            completion(Int(EINVAL))
+            return
+        }
+        guard let parsedArguments = BoxTranslator.parseArguments(arguments) else {
+            SteamLog.event("[wine-launch] malformed or oversized Windows launch arguments for \(binary.lastPathComponent)")
             completion(Int(EINVAL))
             return
         }
 
-        let actualMachine = binary.path.withCString { ideck_native_pe_machine($0) }
-        // Wine's own cmd.exe may be an ARM64 build: allowed for Steam's one-time installs only.
-        let nativeShell = actualMachine == 0xAA64 && binary.lastPathComponent.lowercased() == "cmd.exe"
+        // IMAGE_FILE_MACHINE_ARM64EC is 0xA641, not ARM64 (0xAA64).
+        // Only the command interpreter staged in the prefix may use this
+        // exception; the native launcher repeats the same path restriction.
+        let shellPath = URL(fileURLWithPath: winePrefixPath, isDirectory: true)
+            .appendingPathComponent("drive_c/windows/system32/cmd.exe")
+            .resolvingSymlinksInPath().standardizedFileURL.path
+        let nativeShell = actualMachine == 0xA641 &&
+            binary.resolvingSymlinksInPath().standardizedFileURL.path == shellPath
         guard actualMachine == 0x014c || actualMachine == 0x8664 || nativeShell else {
-            SteamLog.event("[wine-launch] unsupported or truncated PE image")
+            SteamLog.event("[wine-launch] unsupported Windows PE machine \(String(format: "0x%04x", actualMachine)) for \(binary.lastPathComponent)")
             completion(Int(EINVAL))
             return
         }
