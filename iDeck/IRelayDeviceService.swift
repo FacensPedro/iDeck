@@ -29,6 +29,8 @@ final class IRelayDeviceService: @unchecked Sendable {
         SteamInstallPaths.libraryRelative + "/common/",
         "GOG Games/",
         "Program Files/Epic Games/",
+        // EA app and Ubisoft Connect installers are confined to launcher subfolders.
+        "WindowsDownloads/Launchers/",
     ]
 
     private let queue = DispatchQueue(label: "ideck.irelay.service", qos: .userInitiated)
@@ -104,7 +106,7 @@ final class IRelayDeviceService: @unchecked Sendable {
             let free: Int64 = values?.volumeAvailableCapacityForImportantUsage ?? 0
             let name = await MainActor.run { UIDevice.current.name }
             let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
-            return .json(["name": name, "app": "iDeck", "version": version, "protocol": 3, "freeBytes": free])
+            return .json(["name": name, "app": "iDeck", "version": version, "protocol": 4, "freeBytes": free])
         case ("PUT", "/write"):
             return Self.write(request)
         case ("POST", "/install"):
