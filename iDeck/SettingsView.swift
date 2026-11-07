@@ -244,11 +244,6 @@ struct SettingsView: View {
                                 value: eaLibrary.signedIn ? (eaLibrary.accountName ?? tr("Connected")) : tr("Not connected"),
                                 asset: "StoreBadgeEA", assetKeepsColors: true)
                 }
-                NavigationLink { ubisoftPage } label: {
-                    SettingsRow(icon: "square.stack", color: .purple, title: "Ubisoft Connect",
-                                value: tr("No launcher required"),
-                                asset: "StoreBadgeUbisoft", assetKeepsColors: true)
-                }
             }
         }
         .navigationTitle(tr("Stores & launchers"))
@@ -273,22 +268,6 @@ struct SettingsView: View {
         .navigationTitle("EA app")
         .onAppear { eaLibrary.start() }
         .sheet(isPresented: $isEASignInPresented) { EASignInView() }
-    }
-
-    private var ubisoftPage: some View {
-        Form {
-            Section {
-                LabeledContent(tr("Launcher"), value: tr("Not required"))
-                LabeledContent(tr("Installed games"), value: String(UbisoftLibrary.shared.installed.count))
-                Text(tr("Games transferred with iRelay can be launched directly without installing Ubisoft Connect."))
-                    .font(.subheadline)
-            } header: {
-                launcherHeader("Ubisoft Connect", asset: "StoreBadgeUbisoft")
-            } footer: {
-                Text(tr("Account sign-in, ownership library and direct downloads are not available yet. Optima's Linux implementation must be ported and verified for iPadOS before these features can be enabled. Some games still require Ubisoft services."))
-            }
-        }
-        .navigationTitle("Ubisoft Connect")
     }
 
     private func launcherHeader(_ title: String, asset: String) -> some View {

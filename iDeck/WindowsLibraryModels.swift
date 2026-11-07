@@ -177,15 +177,6 @@ final class WindowsLibraryStore: ObservableObject {
         } catch {
             executableURLs = []
         }
-        // Show the Ubisoft Connect installer downloaded from Ubisoft without
-        // scanning arbitrary folders in the Wine prefix. EA games need no EA app.
-        let launchers = ["Ubisoft/UbisoftConnectInstaller.exe"]
-        for relative in launchers {
-            let installer = directory.appendingPathComponent("Launchers/" + relative)
-            if (try? installer.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true {
-                executableURLs.append(installer)
-            }
-        }
         // Programs a setup (.exe installer) put in the prefix: the shortcuts it
         // created in the Start Menu and on the Desktop name their executables.
         let drive = prefixPath.appendingPathComponent("drive_c", isDirectory: true)

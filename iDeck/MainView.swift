@@ -269,7 +269,6 @@ struct WindowsWorkspaceView: View {
     @State private var isEpicSignInPresented = false
     @State private var isEASignInPresented = false
     @ObservedObject private var eaLibrary = EALibrary.shared
-    @ObservedObject private var ubisoftLibrary = UbisoftLibrary.shared
     @State private var selectedEpicGame: SelectedEpicGame?
     @State private var selectedEAGame: EAOwnedGame?
     @State private var selectedGOGGame: GOGGame?
@@ -1120,51 +1119,6 @@ struct WindowsWorkspaceView: View {
                 installMessage = error.localizedDescription
                 isShowingInstallResult = true
             }
-        }
-    }
-
-    // MARK: Ubisoft Connect (games copied from the PC by iRelay)
-
-    @ViewBuilder
-    private var ubisoftContent: some View {
-        let games = ubisoftLibrary.installed.values
-            .filter { searchText.isEmpty || $0.title.localizedCaseInsensitiveContains(searchText) }
-            .sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
-        if games.isEmpty {
-            Text(tr("Transfer your owned Ubisoft games from your PC using iRelay. Ubisoft Connect is not required on iDeck; account library and direct downloads are not yet supported."))
-                .font(.subheadline)
-                .foregroundColor(.gray)
-        } else {
-            LazyVGrid(columns: columns, spacing: 18) {
-                ForEach(games) { game in
-                    VStack(alignment: .leading, spacing: 6) {
-                        ZStack {
-                            panelColor
-                            Image("StoreBadgeUbisoft").resizable().scaledToFit().padding(30)
-                        }
-                        .libraryCoverFrame()
-                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                        cardTitle(game.title)
-                        Button { launchUbisoftGame(game) } label: {
-                            cardActionLabel(tr("Launch"), systemImage: "play.fill")
-                        }
-                    }
-                    .padding(4)
-                }
-            }
-        }
-    }
-
-    /// Launch the transferred game directly, without requiring the Windows launcher.
-    /// Games requiring Ubisoft's online client may still reject this launch.
-    private func launchUbisoftGame(_ game: UbisoftInstalledGame) {
-        UbisoftLibrary.writeRegistry(game)
-        let profile = windowsLibrary.profile(for: "ubisoft:\(game.id)", title: game.title)
-        if let executable = UbisoftLibrary.gameExecutable(game) {
-            coordinator.launchWindowsExecutable(at: executable, profile: profile)
-        } else {
-            installMessage = tr("No game executable was found in this game's folder. Copy it again with iRelay.")
-            isShowingInstallResult = true
         }
     }
 
@@ -2317,7 +2271,7 @@ extension WindowsWorkspaceView {
         ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(alignment: .top, spacing: isCompact ? 10 : 14) {
-                    ForEach([GameStore.steam, .gog, .epic, .ea, .ubisoft], id: \.self) { store in
+                    ForEach([GameStore.steam, .gog, .epic, .ea], id: \.self) { store in
                         shelfTile(.store(store))
                     }
                     if !shelfGames.isEmpty {
@@ -2374,7 +2328,7 @@ extension WindowsWorkspaceView {
             ZStack {
                 panelColor
                 Image(storeAsset(store))
-                    .renderingMode(store == .steam || store == .ea || store == .ubisoft ? .original : .template)
+                    .renderingMode(store == .steam || store == .ea ? .original : .template)
                     .resizable()
                     .scaledToFit()
                     .foregroundColor(textColor)
@@ -2428,7 +2382,6 @@ extension WindowsWorkspaceView {
         case .gog: return "StoreBadgeGOG"
         case .epic: return "StoreBadgeEpic"
         case .ea: return "StoreBadgeEA"
-        case .ubisoft: return "StoreBadgeUbisoft"
         }
     }
 
@@ -2438,7 +2391,6 @@ extension WindowsWorkspaceView {
         case .store(.gog): return "GOG"
         case .store(.epic): return "Epic Games"
         case .store(.ea): return "EA app"
-        case .store(.ubisoft): return "Ubisoft Connect"
         case .steam(let id): return steamLibrary.games.first { $0.appID == id }?.name ?? "Steam"
         case .gog(let id): return gogLibrary.installed[id]?.name ?? "GOG"
         case .gogInstalling(let id): return gogLibrary.games.first { $0.id == id }?.title ?? "GOG"
@@ -2537,8 +2489,6 @@ extension WindowsWorkspaceView {
                 } else {
                     eaContent
                 }
-            case .ubisoft:
-                ubisoftContent
             }
         }
     }
@@ -2576,37 +2526,49 @@ extension WindowsWorkspaceView {
     /// An installed (or installing) game: big art, Play and its settings.
     @ViewBuilder
     private func gamePage(_ item: ShelfItem) -> some View {
+        // One tap on the cover starts the game; pressing and holding it opens
+        // the game's details. No card, title or buttons under the title.
         VStack(alignment: .center, spacing: 16) {
             gameHero(item)
                 .frame(maxWidth: .infinity)
                 .frame(height: isCompact ? 180 : 260)
                 .clipShape(RoundedRectangle(cornerRadius: 14))
                 .overlay(RoundedRectangle(cornerRadius: 14).stroke(lineColor, lineWidth: 1))
+                .contentShape(RoundedRectangle(cornerRadius: 14))
+                .onLongPressGesture(minimumDuration: 0.4) { openSettings(item) }
+                .onTapGesture { launchFromCover(item) }
+                .accessibilityAddTraits(.isButton)
+                .accessibilityHint(tr("Tap to play. Touch and hold for details."))
             Text(shelfTitle(item))
                 .font(.system(size: isCompact ? 22 : 28, weight: .semibold))
                 .foregroundColor(textColor)
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
                 .frame(maxWidth: .infinity, alignment: .center)
-            HStack(spacing: 10) {
-                gameAction(item)
-                    .frame(maxWidth: 320)
-                if hasSettings(item) {
-                    Button { openSettings(item) } label: {
-                        Image(systemName: "gearshape.fill")
-                            .font(.headline)
-                            .foregroundColor(textColor)
-                            .frame(width: cardActionHeight, height: cardActionHeight)
-                            .background(panelColor)
-                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(lineColor, lineWidth: 1))
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                    }
-                    .accessibilityLabel(tr("Settings"))
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .center)
         }
         .frame(maxWidth: .infinity, alignment: .center)
+    }
+
+    /// A tap on the cover: starts an installed game; a paused Steam install
+    /// resumes. A game still downloading is left alone.
+    private func launchFromCover(_ item: ShelfItem) {
+        switch item {
+        case .steam(let id):
+            guard let game = steamLibrary.games.first(where: { $0.appID == id }) else { return }
+            if steamLibrary.pausedInstalls.contains(id) { steamLibrary.resumeInstall(appID: id) }
+            else if !steamLibrary.installingApps.contains(id) { launchSteamGame(game) }
+        case .gog(let id):
+            if let game = gogLibrary.installed[id] { launchGOGGame(game) }
+        case .epic(let app):
+            if let game = epicLibrary.installed[app] { launchEpicGame(game) }
+        case .exe(let path):
+            let url = URL(fileURLWithPath: path)
+            let profile = windowsLibrary.profile(for: windowsLibrary.profileID(for: url),
+                                                 title: url.deletingPathExtension().lastPathComponent)
+            coordinator.launchWindowsExecutable(at: url, profile: profile)
+        case .gogInstalling, .epicInstalling, .store:
+            break
+        }
     }
 
     @ViewBuilder
@@ -2621,60 +2583,13 @@ extension WindowsWorkspaceView {
         }
     }
 
-    @ViewBuilder
-    private func gameAction(_ item: ShelfItem) -> some View {
-        switch item {
-        case .steam(let id):
-            if let game = steamLibrary.games.first(where: { $0.appID == id }) {
-                if steamLibrary.pausedInstalls.contains(id) {
-                    Button { steamLibrary.resumeInstall(appID: id) } label: {
-                        cardActionLabel(tr("Resume"), systemImage: "play.circle.fill")
-                    }
-                } else if steamLibrary.installingApps.contains(id) {
-                    steamProgressAction(for: game)
-                } else {
-                    Button { launchSteamGame(game) } label: { cardActionLabel(tr("Launch"), systemImage: "play.fill") }
-                }
-            }
-        case .gog(let id):
-            if let game = gogLibrary.installed[id] {
-                Button { launchGOGGame(game) } label: { cardActionLabel(tr("Launch"), systemImage: "play.fill") }
-            }
-        case .gogInstalling(let id):
-            if let game = gogLibrary.games.first(where: { $0.id == id }) { gogCard(game) }
-        case .epic(let app):
-            if let game = epicLibrary.installed[app] {
-                Button { launchEpicGame(game) } label: { cardActionLabel(tr("Launch"), systemImage: "play.fill") }
-            }
-        case .epicInstalling(let app):
-            if let game = epicLibrary.owned.first(where: { $0.appName == app }) { epicCard(game) }
-        case .exe(let path):
-            Button {
-                        let url = URL(fileURLWithPath: path)
-                let profile = windowsLibrary.profile(for: windowsLibrary.profileID(for: url),
-                                                     title: url.deletingPathExtension().lastPathComponent)
-                coordinator.launchWindowsExecutable(at: url, profile: profile)
-            } label: { cardActionLabel(tr("Launch"), systemImage: "play.fill") }
-        case .store:
-            EmptyView()
-        }
-    }
-
-    private func hasSettings(_ item: ShelfItem) -> Bool {
-        switch item {
-        case .steam, .epic, .exe: return true
-        case .gog(let id): return gogLibrary.games.contains { $0.id == id }
-        default: return false
-        }
-    }
-
     private func openSettings(_ item: ShelfItem) {
         switch item {
         case .steam(let id):
             if let game = steamLibrary.games.first(where: { $0.appID == id }) { selectedSteamGame = SelectedSteamGame(game: game) }
-        case .gog(let id):
+        case .gog(let id), .gogInstalling(let id):
             selectedGOGGame = gogLibrary.games.first { $0.id == id }
-        case .epic(let app):
+        case .epic(let app), .epicInstalling(let app):
             selectedEpicGame = SelectedEpicGame(id: app)
         case .exe(let path):
             selectedExecutable = SelectedLibraryURL(url: URL(fileURLWithPath: path))
