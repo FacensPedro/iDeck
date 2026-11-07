@@ -134,12 +134,10 @@ class PrefixInstaller: ObservableObject {
         let link = dosdevices.appendingPathComponent("c:")
         let current = try? fm.destinationOfSymbolicLink(atPath: link.path)
         if current == "../drive_c" { return }
-        if current != "../drive_c" {
-            if current != nil || fm.fileExists(atPath: link.path) {
-                try fm.removeItem(at: link)
-            }
-            try fm.createSymbolicLink(atPath: link.path, withDestinationPath: "../drive_c")
+        if current != nil || fm.fileExists(atPath: link.path) {
+            try fm.removeItem(at: link)
         }
+        try fm.createSymbolicLink(atPath: link.path, withDestinationPath: "../drive_c")
     }
 
     private static func sha256(of url: URL) throws -> String {
