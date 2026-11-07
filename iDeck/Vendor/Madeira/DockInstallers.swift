@@ -559,6 +559,13 @@ enum DockInstallers {
     /// session of their own also leaves madsync on for the game. One session runs per app run,
     /// so the game starts after a restart of Madeira.
     private(set) static var installsOnly = false
+
+    /// iDeck: no valid cmd.exe to run this start's batch. The game starts
+    /// without it; nothing is recorded as run, so the installs stay pending.
+    static func skipScript() {
+        script = nil
+        installsOnly = false
+    }
     nonisolated static let restartWords = "To start the game, restart Madeira: swipe it away in the app switcher, open it again and start the game."
     /// What the starting screen says once the installs ended, until the session has closed (the
     /// wineserver writes the registry to disk as it stops; Madeira asks for the restart then).
