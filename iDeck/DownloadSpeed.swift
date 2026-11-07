@@ -23,9 +23,9 @@ enum DownloadETA {
 
     static func label(_ seconds: Int?) -> String? {
         guard let seconds, seconds > 0 else { return nil }
-        if seconds < 60 { return "(seconds)s" }
-        if seconds < 3_600 { return "(seconds / 60)m" }
-        if seconds < 86_400 { return "(seconds / 3_600)h (seconds % 3_600 / 60)m" }
-        return "(seconds / 86_400)d (seconds % 86_400 / 3_600)h"
+        if seconds < 60 { return "\(seconds)s" }
+        if seconds < 3_600 { return "\(seconds / 60)m" }
+        if seconds < 86_400 { return "\(seconds / 3_600)h \(seconds % 3_600 / 60)m" }
+        return "\(seconds / 86_400)d \(seconds % 86_400 / 3_600)h"
     }
 }

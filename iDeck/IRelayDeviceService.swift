@@ -56,6 +56,10 @@ final class IRelayDeviceService: @unchecked Sendable {
                 AppLog.record("[irelay] could not listen on port \(Self.port)")
                 return
             }
+            // Advertised on Bonjour: iOS then asks for local network access as
+            // soon as iDeck starts. Without that permission iRelay's connections
+            // never reach this listener and pairing cannot work.
+            listener.service = NWListener.Service(type: "_ideck._tcp")
             listener.newConnectionHandler = { [weak self] connection in
                 guard let self else { return }
                 IRelayHTTPConnection(connection: connection, queue: self.queue, service: self).start()
@@ -108,7 +112,8 @@ final class IRelayDeviceService: @unchecked Sendable {
             let free: Int64 = values?.volumeAvailableCapacityForImportantUsage ?? 0
             let name = await MainActor.run { UIDevice.current.name }
             let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
-            return .json(["name": name, "app": "iDeck", "version": version, "protocol": 4, "freeBytes": free])
+            return .json(["name": name, "app": "iDeck", "version": version, "protocol": 4, "freeBytes": free,
+                          "deviceID": IRelayPairing.deviceID])
         case ("PUT", "/write"):
             return Self.write(request)
         case ("POST", "/install"):
@@ -704,7 +709,10 @@ final class IRelayHTTPConnection: @unchecked Sendable {
             if !(request.method == "GET" && request.path == "/info") {
                 let peer = IRelayPairing.host(of: connection)
                 guard IRelayPairing.authorize(request.headers["x-ideck-code"], from: peer) else {
-                    return reject(IRelayHTTPResponse.error(401, "Wrong or missing iDeck pairing code"))
+                    let message = IRelayPairing.isLocked(peer)
+                        ? "Too many wrong pairing codes from this PC (iDeck pairing code). Try again in a minute."
+                        : "Wrong or missing iDeck pairing code"
+                    return reject(IRelayHTTPResponse.error(401, message))
                 }
             }
             if let (url, mtime) = service.uploadTarget(request) {
@@ -842,6 +850,7 @@ final class IRelayHTTPConnection: @unchecked Sendable {
 /// sends it with every request (`X-iDeck-Code`) and on each tunnel connection.
 enum IRelayPairing {
     private static let key = "irelay.pairingCode"
+    private static let deviceIDKey = "irelay.deviceID"
     private static let alphabet = Array("ABCDEFGHJKLMNPQRSTUVWXYZ23456789")
     private static let lock = NSLock()
     private static var failures: [String: (count: Int, until: Date)] = [:]
@@ -850,6 +859,16 @@ enum IRelayPairing {
     static var code: String {
         if let stored = UserDefaults.standard.string(forKey: key), stored.count == 8 { return stored }
         return regenerate()
+    }
+
+    /// A random identifier for this install, sent in GET /info so iRelay finds
+    /// a paired iPad again when the network gives it a new address. It grants
+    /// nothing: every other request still needs the pairing code.
+    static var deviceID: String {
+        if let stored = UserDefaults.standard.string(forKey: deviceIDKey), !stored.isEmpty { return stored }
+        let value = UUID().uuidString
+        UserDefaults.standard.set(value, forKey: deviceIDKey)
+        return value
     }
 
     /// The code as shown on screen: ABCD-EFGH.
@@ -864,6 +883,7 @@ enum IRelayPairing {
         _ = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
         let value = String(bytes.map { alphabet[Int($0) % alphabet.count] })
         UserDefaults.standard.set(value, forKey: key)
+        lock.lock(); failures.removeAll(); lock.unlock()
         return value
     }
 
@@ -887,6 +907,13 @@ enum IRelayPairing {
         failures[host] = (count, Date().addingTimeInterval(60))
         if count == 5 { AppLog.record("[irelay] wrong pairing code 5 times from \(host); refused for a minute") }
         return false
+    }
+
+    /// Whether `host` is refused for now after five wrong codes.
+    static func isLocked(_ host: String) -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        guard let entry = failures[host] else { return false }
+        return entry.count >= 5 && entry.until > Date()
     }
 
     static func host(of connection: NWConnection) -> String {

@@ -100,7 +100,7 @@ struct WindowsRendererView: UIViewRepresentable {
                 return CGSize(width: Int(width), height: Int(height))
             }
         }
-        return requestedSize ?? CGSize(width: 960, height: 540)
+        return requestedSize ?? CGSize(width: 1280, height: 720)
     }
 
     // Shared geometric mapping, also used by touch overlays. Returns guest

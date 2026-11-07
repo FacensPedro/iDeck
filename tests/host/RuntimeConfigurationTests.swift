@@ -2,7 +2,7 @@ import Foundation
 import CoreGraphics
 
 struct WindowsGameProfile {
-    var resolution = "960x540"
+    var resolution = "1280x720"
     var fpsLimit = "30"
     var graphicsAPI = "Automatic"
     var metalFXEnabled = false
@@ -12,7 +12,7 @@ struct WindowsGameProfile {
 @main struct RuntimeConfigurationTests {
     static func main() {
         let normal = RuntimeConfiguration.settings(for: WindowsGameProfile())
-        precondition(normal.resolutionWidth == 960 && normal.resolutionHeight == 540)
+        precondition(normal.resolutionWidth == 1280 && normal.resolutionHeight == 720)
         precondition(normal.framesPerSecond == 30)
         for viewport in [CGSize(width: 390, height: 844), CGSize(width: 844, height: 390), CGSize(width: 900, height: 700)] {
             let fitted = RuntimeConfiguration.fittedSize(content: CGSize(width: 960, height: 540), available: viewport)
