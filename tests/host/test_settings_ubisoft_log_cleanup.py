@@ -14,7 +14,8 @@ class SettingsUbisoftLogCleanupTests(unittest.TestCase):
         self.assertNotIn("Install Ubisoft Connect in Settings", MAIN)
         self.assertNotIn(".disabled(!UbisoftLibrary.clientInstalled)", MAIN)
         self.assertIn("UbisoftLibrary.gameExecutable(game)", MAIN)
-        self.assertIn("nonisolated static func gameExecutable", UBISOFT)
+        self.assertIn("static func gameExecutable", UBISOFT)
+        self.assertNotIn("nonisolated static func gameExecutable", UBISOFT)
 
     def test_settings_rows_are_trimmed(self):
         self.assertNotIn('value: tr("Steam, GOG, Epic, EA, Ubisoft")', SETTINGS)
