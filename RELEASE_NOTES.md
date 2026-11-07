@@ -1,13 +1,4 @@
 ## What's Changed
-- GOG Galaxy services for GOG games: while a GOG game runs, iDeck answers its Galaxy SDK on 127.0.0.1:9977 (sign-in, achievements, stats, leaderboards, play time) with a token GOG mints for that game's own client, and registers the GalaxyCommunication service in the Wine prefix. Ported from Madeira.
-- Game backdrop: the selected game's cover now fills the screen behind the store and game tiles, and does nothing when touched.
-- Tapping a game's tile opens its details. Steam games and programs now have a Launch button there; without JIT, StikDebug opens first.
-- The cover's tap-to-play and touch-and-hold were removed.
-- Bully: Scholarship Edition starts directly instead of through the Steam client, which stopped its 32-bit process at its first instruction (0xC000001D).
-- Every game's DXGI lists the same display modes as Windows (user32). Crash Bandicoot N. Sane Trilogy found an empty list and stopped right after loading its shaders.
-- Lighter runtime by default: Wine logs only exceptions and process errors (it wrote thousands of lines per launch), so games start with less CPU and disk work. Settings › Bugs & logs › Detailed diagnostics still records everything.
-- The JIT pool defaults to 624 MB, the size this iPad actually gets: iDeck no longer reserves 896 MB first and then shrinks it, which used more memory at start.
-- New games are limited to 30 FPS by default, using less GPU, CPU and battery; each game can still choose 40, 60 or Uncapped.
-- Steam games start even when Steam's one-time installers cannot run (no valid cmd.exe in the build). The installers stay pending; nothing is marked as installed.
-- iDeck waits up to 15 seconds for the game display before reporting that it did not become ready.
-- Updated the application version to 1.3.1 (build 27).
+- Added GOG Galaxy services for GOG games: while a GOG game runs, iDeck answers its Galaxy SDK on 127.0.0.1:9977 (sign-in, achievements, stats, leaderboards and play time) with a token GOG mints for that game's own client.
+- Registered the GalaxyCommunication service in the Wine prefix for Galaxy SDK versions that start it first.
+- Updated the application version to 1.4.2 (build 29).

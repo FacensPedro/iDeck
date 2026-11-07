@@ -77,10 +77,12 @@ enum LogIssueScanner {
     private static let errors = [
         "error", "err:", "fatal", "crash", "exception", "panic", "abort", "pressure critical",
         "c0000005", "c000001d", "c0000135", "status_access_violation", "unhandled",
+        "checksum mismatch", "hash verification failed", "illegal instruction",
     ]
     private static let failures = [
         "failed", "failure", "cannot", "could not", "unable to", "timed out", "timeout",
         "denied", "warning", "warn:", "missing", "stale", "mprotect", "invalid",
+        "wineserver timeout", "usbmux timeout", "no drawable available",
     ]
     /// Wine debug channels that print "err:" for harmless probing.
     private static let noise = ["fixme:", "err:ole:", "err:winediag:"]
@@ -243,6 +245,11 @@ final class BugReportModel: ObservableObject {
         case 6: return "A 32-bit Windows program could not reserve its WoW64 address window. The iOS device's virtual address space is insufficient for the current Madeira memory policy."
         case 7: return "Wine/FEX encountered an unhandled native ARM64EC exception (x18 handler) and terminated with NTSTATUS 0xC000001D. This is a runtime compatibility failure, not proof of a missing game DLL."
         case 8: return "Wine recorded a stale ARM64EC import address in its JIT executable copy and a Windows game access violation (0xC0000005). The synchronization discrepancy requires native Wine/FEX investigation; these logs do not prove it caused the crash."
+        case 9: return "WineServer reported a startup, connection, or unexpected-exit failure. Inspect its native log for the actual cause."
+        case 10: return "The graphics pipeline reported a DXMT, Direct3D 12, Metal presentation, or shader compilation failure. This does not establish which component caused it."
+        case 11: return "The guest log reported an illegal or unsupported CPU instruction (0xC000001D). Check the game executable and FEX translation logs."
+        case 12: return "iRelay or USB transport reported a connection failure. Verify the companion service and device connectivity."
+        case 13: return "Download or installation integrity verification failed. Check hashes and retry only the affected data."
         default: return nil
         }
     }

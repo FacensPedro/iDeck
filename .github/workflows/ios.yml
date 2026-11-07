@@ -104,6 +104,9 @@ jobs:
           python3 -m unittest discover -s tests/host -p 'test_runtime_efficiency.py' -v
           python3 -m unittest discover -s tests/host -p 'test_ea_store.py' -v
 
+      - name: Test compiled native log diagnostics and session isolation
+        run: python3 -m unittest discover -s tests/host -p 'test_extended_wine_log_diagnostics.py' -v
+
       - name: Test Metal Toolchain bootstrap
         run: |
           bash -n scripts/ensure_metal_toolchain.sh
@@ -880,6 +883,7 @@ jobs:
           path: |
             build/iDeck.ipa.sha256
             build/iDeck-distribution-audit.json
+            build/iDeck-duplicate-audit.json
           if-no-files-found: error
           retention-days: 30
 

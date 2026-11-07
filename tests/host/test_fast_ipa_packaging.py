@@ -1,4 +1,5 @@
 import importlib.util
+import hashlib
 import os
 import pathlib
 import stat
@@ -53,6 +54,35 @@ class FastIPARegressionTests(unittest.TestCase):
                 self.assertTrue(stat.S_ISLNK(link_bits))
                 self.assertEqual(ipa.getinfo(prefix + "Assets.car").compress_type, ZIP_STORED)
 
+    def test_sha256_duplicate_audit_does_not_mutate_runtime(self):
+        with tempfile.TemporaryDirectory() as directory:
+            app = pathlib.Path(directory) / "iDeck.app"
+            app.mkdir()
+            (app / "Info.plist").write_bytes(b"plist")
+            (app / "a.dll").write_bytes(b"identical DLL bytes")
+            (app / "b.dll").write_bytes(b"identical DLL bytes")
+            (app / "different.dll").write_bytes(b"unique bytes")
+            report = package_ipa.audit_duplicate_files(app)
+            self.assertEqual(len(report["duplicate_groups"]), 1)
+            self.assertEqual(report["potential_savings_bytes"], len(b"identical DLL bytes"))
+            self.assertEqual(report["duplicate_groups"][0]["paths"], ["a.dll", "b.dll"])
+            self.assertTrue((app / "a.dll").exists())
+            self.assertTrue((app / "b.dll").exists())
+
+    def test_lossless_adaptive_compression(self):
+        with tempfile.TemporaryDirectory() as directory:
+            app = pathlib.Path(directory) / "iDeck.app"
+            app.mkdir()
+            (app / "Info.plist").write_bytes(b"plist")
+            (app / "data.json").write_bytes(b'{"key": "' + b"a" * 12000 + b'"}')
+            (app / "photo.png").write_bytes(b"already-compressed")
+            output = pathlib.Path(directory) / "iDeck.ipa"
+            package_ipa.build_ipa(app, output)
+            with ZipFile(output) as ipa:
+                self.assertEqual(ipa.read("Payload/iDeck.app/data.json"), (app / "data.json").read_bytes())
+                self.assertEqual(ipa.getinfo("Payload/iDeck.app/photo.png").compress_type, ZIP_STORED)
+                self.assertEqual(ipa.getinfo("Payload/iDeck.app/data.json").compress_type, 8)
+
     def test_rejects_invalid_app_and_cleans_up_partial_archives(self):
         with tempfile.TemporaryDirectory() as directory:
             root = pathlib.Path(directory)
@@ -66,7 +96,7 @@ class FastIPARegressionTests(unittest.TestCase):
         self.assertNotIn('rm -rf "$BUILD_DIR/Build"', script)
         self.assertIn('xcodebuild build', script)
         self.assertIn('ditto "$COMPILED_APP" "$APP"', script)
-        self.assertIn('python3 scripts/package_ipa.py --app "$APP" --output iDeck.ipa', script)
+        self.assertIn('python3 scripts/package_ipa.py --app "$APP" --output iDeck.ipa --duplicate-report build/iDeck-duplicate-audit.json', script)
         self.assertNotIn('cp -R "$APP" Payload/', script)
 
 
