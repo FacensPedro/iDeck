@@ -127,6 +127,8 @@ enum GOGAPI {
     /// GOG Galaxy's published client secret (it is embedded in every Galaxy client).
     static let clientSecret = "9d85c43b1482497dbbce61f6e4aa173a433796eeae2ca8c5f6129f2dc4de46d9"
     static let redirectURI = "https://embed.gog.com/on_login_success?origin=client"
+    /// What GOG Galaxy itself sends; the Galaxy service (GOGGalaxy) uses it too.
+    static let userAgent = "GOGGalaxyClient/2.0.67.2 (Windows_32bit)"
 
     static var loginURL: URL {
         var components = URLComponents(string: "https://auth.gog.com/auth")!

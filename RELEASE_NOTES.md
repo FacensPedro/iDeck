@@ -1,4 +1,5 @@
 ## What's Changed
+- GOG Galaxy services for GOG games: while a GOG game runs, iDeck answers its Galaxy SDK on 127.0.0.1:9977 (sign-in, achievements, stats, leaderboards, play time) with a token GOG mints for that game's own client, and registers the GalaxyCommunication service in the Wine prefix. Ported from Madeira.
 - Game backdrop: the selected game's cover now fills the screen behind the store and game tiles, and does nothing when touched.
 - Tapping a game's tile opens its details. Steam games and programs now have a Launch button there; without JIT, StikDebug opens first.
 - The cover's tap-to-play and touch-and-hold were removed.
