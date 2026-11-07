@@ -106,7 +106,7 @@ class SystemCoordinator: ObservableObject {
     private var visualCRuntimeSkipAction: (() -> Void)?
     private var bypassVisualCRuntimeForPrefix: String?
 
-    private static let supportedWineJITPoolMiB: Set<Int> = [64, 96, 128, 192, 256, 384, 512, 640, 768, 896, 1152]
+    private static let supportedWineJITPoolMiB: Set<Int> = [64, 96, 128, 192, 256, 384, 512, 624, 640, 768, 896, 1152]
 
     /// The pool size that last prepared successfully on this device: the
     /// native side starts there instead of retrying larger sizes the
@@ -150,7 +150,7 @@ class SystemCoordinator: ObservableObject {
             ResourceGovernor.shared.onActivityChange = { [weak self] in self?.applyMaxRefreshRate() }
             ResourceGovernor.shared.start()
         }
-        Self.exportWineJITPreference(UserDefaults.standard.object(forKey: "wineJITPoolMiB") as? Int ?? 896)
+        Self.exportWineJITPreference(UserDefaults.standard.object(forKey: "wineJITPoolMiB") as? Int ?? 624)
         Self.exportLastGoodPool()
         // Keep app startup free of native Wine/JIT probes and Keychain reads.
         // In particular, a CS_DEBUGGED flag left behind by StikDebug or a
@@ -656,7 +656,7 @@ class SystemCoordinator: ObservableObject {
         }
     }
     
-    private func withPreparedMetalDisplay(expectedStatus: String, remainingChecks: Int = 80, perform: @escaping () -> Void) {
+    private func withPreparedMetalDisplay(expectedStatus: String, remainingChecks: Int = 300, perform: @escaping () -> Void) {
         if !Thread.isMainThread {
             DispatchQueue.main.async { [weak self] in
                 self?.withPreparedMetalDisplay(expectedStatus: expectedStatus, remainingChecks: remainingChecks, perform: perform)
@@ -944,7 +944,16 @@ class SystemCoordinator: ObservableObject {
 
     /// Launches a Steam game in its original installation directory, preserving
     /// relative DLL and asset paths instead of copying the executable elsewhere.
+    /// Steam games that need no Steam client to run and fail when Valve's
+    /// client spawns them: Bully: Scholarship Edition (12200) is a 32-bit
+    /// program, and as a child of the 64-bit Steam client its i386 process
+    /// started without an emulator CPU area (x28 = 0) and stopped at its first
+    /// instruction (0xC000001D). Started directly, it is the session's own
+    /// WoW64 process, set up like any other 32-bit game.
+    static let directSteamLaunchAppIDs: Set<UInt32> = [12200]
+
     func launchSteamGame(game: SteamAppInfo, profile: WindowsGameProfile, prefixPath: URL, skipSteamClient: Bool = false) {
+        let skipSteamClient = skipSteamClient || Self.directSteamLaunchAppIDs.contains(game.appID)
         guard !isClosingWindowsSession else { return }
         isSteamSession = true
         recordGameContext(game.name, launcher: "Steam")
@@ -1233,8 +1242,11 @@ class SystemCoordinator: ObservableObject {
                     // A missing or invalid cmd.exe cannot run the Steamworks
                     // install script. Never forge its HasRun registry values:
                     // that made a failed prerequisite appear installed.
-                    SteamLog.event("[dock-installers] blocked: valid Windows cmd.exe unavailable; prerequisites remain pending")
-                    throw DockError.message("Steam's one-time installers could not start because Wine cmd.exe is missing or invalid. Rebuild the native IPA with a verified Windows command interpreter.")
+                    // The game itself still starts: Visual C++ is built into
+                    // iDeck and most games need nothing else. Blocking here
+                    // left games such as Bully unable to start at all.
+                    SteamLog.event("[dock-installers] skipped: valid Windows cmd.exe unavailable; prerequisites remain pending, starting the game")
+                    DockInstallers.skipScript()
                 }
                 if DockInstallers.installsOnly, let script = DockInstallers.script {
                     // No host runs in this session: nothing will take the sign-in transfer.

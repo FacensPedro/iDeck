@@ -43,7 +43,7 @@ struct WindowsGameProfile: Codable, Equatable, Identifiable {
     var fastSync: Bool = true
     static let d3d12Renderers = ["Madeira D3D12", "VKD3D-Proton"]
     var metalFXEnabled: Bool = false
-    var fpsLimit: String = "60"
+    var fpsLimit: String = "30"
     /// The frame-rate limits a game can use; "Auto" lets Madeira's power
     /// governor move the cap between 60 and 20 fps.
     static let fpsLimits = ["Auto", "30", "40", "60", "Uncapped"]
@@ -67,7 +67,7 @@ struct WindowsGameProfile: Codable, Equatable, Identifiable {
     static let vulkanModes = ["Automatic", "On", "Off"]
     static let openGLBackends = ["Automatic", "Desktop OpenGL", "OpenGL ES"]
 
-    init(id: String, title: String, arguments: String = "", resolution: String = "1280x720", surfaceScaling: String = "fit", graphicsAPI: String = "Automatic", controllerAPI: String = "Automatic", metalFXEnabled: Bool = false, fpsLimit: String = "60", avxEnabled: Bool = false, keepChildProcessesRunning: Bool = false, artworkFilename: String? = nil, updatedAt: Date = Date(), vulkanMode: String = "Automatic", openGLBackend: String = "Automatic") {
+    init(id: String, title: String, arguments: String = "", resolution: String = "1280x720", surfaceScaling: String = "fit", graphicsAPI: String = "Automatic", controllerAPI: String = "Automatic", metalFXEnabled: Bool = false, fpsLimit: String = "30", avxEnabled: Bool = false, keepChildProcessesRunning: Bool = false, artworkFilename: String? = nil, updatedAt: Date = Date(), vulkanMode: String = "Automatic", openGLBackend: String = "Automatic") {
         self.id = id
         self.title = title
         self.arguments = arguments

@@ -43,11 +43,11 @@ class DownloadETACoreContract(unittest.TestCase):
         windows = source("iDeck/WindowsEnvironment.swift")
         self.assertIn('setenv("WINEARCH", "win64", 1)', windows)
 
-    def test_jit_defaults_to_896_and_hot_path_avoids_lock(self):
+    def test_jit_defaults_to_624_and_hot_path_avoids_lock(self):
         settings = source("iDeck/SettingsView.swift")
-        self.assertIn('private var wineJITPoolMiB = 896', settings)
+        self.assertIn('private var wineJITPoolMiB = 624', settings)
         coordinator = source("iDeck/SystemCoordinator.swift")
-        self.assertIn('as? Int ?? 896', coordinator)
+        self.assertIn('as? Int ?? 624', coordinator)
         core = source("iDeck/NativeRuntime/FEXRuntime.cpp")
         self.assertIn('std::atomic<bool> fex_initialized', core)
         self.assertIn('std::memory_order_acquire', core)

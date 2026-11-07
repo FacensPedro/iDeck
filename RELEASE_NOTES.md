@@ -1,5 +1,11 @@
 ## What's Changed
-- Expanded automatic diagnostics for WineServer, DXMT/D3D12, unsupported CPU instructions, USB/iRelay and download integrity failures.
-- Improved Windows NTSTATUS diagnostics for address conflicts and out-of-memory errors.
-- Added native log classification regression tests and cross-session isolation checks.
-- Updated the application version to 1.4.0 (build 27).
+- Reduced default Wine logging overhead while keeping crash and process diagnostics available.
+- Added a 624 MiB Wine JIT pool option and made it the default for new installations.
+- Set new game profiles to 30 FPS by default without changing saved profiles.
+- Allowed Steam games to start when a required one-time installer cannot run, without falsely marking prerequisites as installed.
+- Started Bully: Scholarship Edition directly instead of launching it as a Steam child process.
+- Aligned DXGI display-mode reporting with the Windows display-mode table.
+- Extended Metal display readiness checks to 15 seconds.
+- Moved game launch actions into their details pages and displayed selected cover art as a noninteractive backdrop.
+- Preserved the iDeck 1.4.0 native fault diagnostics and regression checks.
+- Updated the application version to 1.4.1 (build 28).

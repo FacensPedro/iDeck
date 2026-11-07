@@ -346,7 +346,6 @@ enum Translations {
         "Eco mode": ["pt": "Modo econômico", "es": "Modo ahorro"],
         "Memory & sync": ["pt": "Memória e sincronização", "es": "Memoria y sincronización"],
         "Advanced": ["pt": "Avançado", "es": "Avanzado"],
-        "Tap to play. Touch and hold for details.": ["pt": "Toque para jogar. Toque e segure para ver os detalhes.", "es": "Toca para jugar. Mantén pulsado para ver los detalles."],
         "Off": ["pt": "Desligado", "es": "Desactivado"],
         "Performance": ["pt": "Desempenho", "es": "Rendimiento"],
         "CPU cores": ["pt": "Núcleos de CPU", "es": "Núcleos de CPU"],
