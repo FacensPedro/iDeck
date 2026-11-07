@@ -240,6 +240,8 @@ struct IRelaySettingsSection: View {
 
     private func refresh() {
         IRelayRuntime.start()
+        IRelayTunnel.shared.restartIfStopped()
+        IRelayDeviceService.shared.restartIfStopped()
         addresses = IRelayPairing.localAddresses()
     }
 
@@ -248,11 +250,6 @@ struct IRelaySettingsSection: View {
         testing = true
         status = nil
         Task {
-            guard IRelayTunnel.shared.pcConnected else {
-                status = tr("No iRelay tunnel is connected. Keep iDeck open, allow Local Network access in iPadOS Settings, and pair iRelay on the PC using the iPad address and code shown above.")
-                testing = false
-                return
-            }
             do {
                 let info = try await IRelayClient().ping()
                 status = tr("Connected to %@ (version %d).", info.machine ?? info.name, info.version)
@@ -306,12 +303,12 @@ final class IRelayTunnel: @unchecked Sendable {
     private var waiting: [(NWConnection, DispatchWorkItem)] = []
 
     /// Whether iRelay has connections waiting on the local network.
-    var pcConnected: Bool { queue.sync { !pool.isEmpty } }
+    var pcConnected: Bool { queue.sync { pool.contains { if case .ready = $0.state { return true }; return false } } }
 
     /// Starts both listeners once; safe to call again.
     func start() {
         queue.sync {
-            guard pcListener == nil else { return }
+            guard pcListener == nil && localListener == nil else { return }
             pcListener = makeListener(port: Self.pcPort) { [weak self] connection in self?.addPC(connection) }
             localListener = makeListener(port: Self.localPort) { [weak self] connection in self?.addLocal(connection) }
         }
@@ -343,8 +340,10 @@ final class IRelayTunnel: @unchecked Sendable {
         queue.async { [self] in
             let stopped = [pcListener, localListener].contains { listener in
                 guard let listener else { return true }
-                if case .ready = listener.state { return false }
-                return true
+                switch listener.state {
+                case .failed, .cancelled: return true
+                default: return false
+                }
             }
             guard stopped else { return }
             AppLog.record("[irelay-lan] listeners restarted after returning to the foreground")
@@ -354,9 +353,14 @@ final class IRelayTunnel: @unchecked Sendable {
 
     private func restart() {
         pcListener?.cancel(); localListener?.cancel()
+        pool.forEach { $0.cancel() }
+        pool.removeAll()
+        waiting.forEach { local, timeout in timeout.cancel(); local.cancel() }
+        waiting.removeAll()
         pcListener = nil; localListener = nil
         queue.asyncAfter(deadline: .now() + 2) { [weak self] in
             guard let self else { return }
+            guard self.pcListener == nil && self.localListener == nil else { return }
             self.pcListener = self.makeListener(port: Self.pcPort) { [weak self] c in self?.addPC(c) }
             self.localListener = self.makeListener(port: Self.localPort) { [weak self] c in self?.addLocal(c) }
         }
