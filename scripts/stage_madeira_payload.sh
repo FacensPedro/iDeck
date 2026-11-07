@@ -101,6 +101,18 @@ if [[ "$GRAPHICS" == "d3d12" ]]; then
   }
 fi
 
+# GalaxyCommunication is a Windows service stub used by Galaxy SDK games.
+# It is not the GOG Galaxy client or the host-side 127.0.0.1:9977 listener.
+GALAXY_SERVICE="$SOURCE/aarch64-windows/madeira-galaxy-service.exe"
+if [[ -s "$GALAXY_SERVICE" ]]; then
+  [[ "$(head -c 2 "$GALAXY_SERVICE")" == "MZ" ]] || {
+    echo "ERROR: invalid Madeira GalaxyCommunication PE service" >&2; exit 2;
+  }
+  cp "$GALAXY_SERVICE" "$APP/aarch64-windows/madeira-galaxy-service.exe"
+else
+  echo "WARNING: Madeira GalaxyCommunication stub unavailable; Galaxy SDK service registration disabled" >&2
+fi
+
 [[ -s "$APP/nls/locale.nls" ]] || {
   echo "ERROR: Wine locale.nls is missing" >&2; exit 2;
 }
