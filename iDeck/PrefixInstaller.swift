@@ -38,8 +38,14 @@ class PrefixInstaller: ObservableObject {
 
         if PrefixInstaller.isPrefixInstalled(at: destinationURL) {
             DispatchQueue.global(qos: .utility).async {
-                PrefixInstaller.migrateLegacyWindowsDownloads(in: destinationURL)
-                DispatchQueue.main.async { completion(true) }
+                do {
+                    try PrefixInstaller.createDosDevices(in: destinationURL)
+                    PrefixInstaller.migrateLegacyWindowsDownloads(in: destinationURL)
+                    DispatchQueue.main.async { completion(true) }
+                } catch {
+                    print("PrefixInstaller: existing prefix repair failed: \(error)")
+                    DispatchQueue.main.async { completion(false) }
+                }
             }
             return
         }
@@ -127,12 +133,11 @@ class PrefixInstaller: ObservableObject {
         try fm.createDirectory(at: dosdevices, withIntermediateDirectories: true)
         let link = dosdevices.appendingPathComponent("c:")
         let current = try? fm.destinationOfSymbolicLink(atPath: link.path)
-        if current != "../drive_c" {
-            if current != nil || fm.fileExists(atPath: link.path) {
-                try fm.removeItem(at: link)
-            }
-            try fm.createSymbolicLink(atPath: link.path, withDestinationPath: "../drive_c")
+        if current == "../drive_c" { return }
+        if current != nil || fm.fileExists(atPath: link.path) {
+            try fm.removeItem(at: link)
         }
+        try fm.createSymbolicLink(atPath: link.path, withDestinationPath: "../drive_c")
     }
 
     private static func sha256(of url: URL) throws -> String {

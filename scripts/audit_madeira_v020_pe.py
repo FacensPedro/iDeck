@@ -39,6 +39,8 @@ def audit(madeira: Path, ideck: Path, *, graphics: str, wow64: bool) -> dict:
     missing: list[str] = []
     changed: list[str] = []
     identical: list[str] = []
+    extra: list[str] = []
+    architecture_sizes: dict[str, dict] = {}
     examined = 0
     skipped: list[str] = []
     for arch in ARCHES:
@@ -46,6 +48,14 @@ def audit(madeira: Path, ideck: Path, *, graphics: str, wow64: bool) -> dict:
             continue
         source = scan(madeira / arch)
         target = scan(ideck / arch)
+        expected = {name for name in source if graphics != "d3d11" or name not in D3D12}
+        extra.extend(f"{arch}/{name}" for name in sorted(target.keys() - expected))
+        architecture_sizes[arch] = {
+            "madeira_files": len(expected),
+            "ideck_files": len(target),
+            "madeira_bytes": sum(p.stat().st_size for name, p in source.items() if name in expected),
+            "ideck_bytes": sum(p.stat().st_size for p in target.values()),
+        }
         for name, path in sorted(source.items()):
             logical = f"{arch}/{name}"
             if graphics == "d3d11" and name in D3D12:
@@ -65,6 +75,8 @@ def audit(madeira: Path, ideck: Path, *, graphics: str, wow64: bool) -> dict:
         "wow64": wow64,
         "examined": examined,
         "missing": missing,
+        "extra_in_ideck": extra,
+        "architecture_sizes": architecture_sizes,
         "different_binary": changed,
         "identical_binary": len(identical),
         "optional_profile_exclusions": skipped,

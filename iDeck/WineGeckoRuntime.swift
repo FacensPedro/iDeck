@@ -73,6 +73,18 @@ actor WineGeckoDownloadManager {
             !WineGeckoRuntime.valid(cache.appendingPathComponent($0.name), for: $0)
         }
         guard !missing.isEmpty else { return }
+        for pin in missing {
+            let backup = cache.appendingPathComponent(pin.name + ".ideck-invalid-backup")
+            if WineGeckoRuntime.valid(backup, for: pin),
+               !fm.fileExists(atPath: cache.appendingPathComponent(pin.name).path) {
+                do { try fm.moveItem(at: backup, to: cache.appendingPathComponent(pin.name)) }
+                catch { AppLog.record("[wine-gecko] could not recover verified cached MSI: \(error.localizedDescription)") }
+            }
+        }
+        let unresolved = WineGeckoRuntime.pins.filter {
+            !WineGeckoRuntime.valid(cache.appendingPathComponent($0.name), for: $0)
+        }
+        guard !unresolved.isEmpty else { return }
         // Mirrors Madeira v0.2.0's automatic, Wi-Fi-only retry cadence.
         let now = Date().timeIntervalSince1970
         guard now - UserDefaults.standard.double(forKey: attemptKey) > 86_400 else { return }
@@ -93,7 +105,7 @@ actor WineGeckoDownloadManager {
             let session = URLSession(configuration: settings)
             defer { session.invalidateAndCancel() }
 
-            for pin in missing {
+            for pin in unresolved {
                 try Task.checkCancellation()
                 guard wine_process_is_running() == 0, wineserver_is_running() == 0 else {
                     AppLog.record("[wine-gecko] Wine started while downloading; cache update postponed")
@@ -140,6 +152,7 @@ actor WineGeckoDownloadManager {
                     if exists { try? fm.moveItem(at: backup, to: destination) }
                     throw error
                 }
+                if fm.fileExists(atPath: backup.path) { try? fm.removeItem(at: backup) }
                 AppLog.record("[wine-gecko] verified \(pin.name) is available to Wine")
             }
         } catch {
