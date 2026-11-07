@@ -21,6 +21,10 @@ struct SettingsView: View {
     @State private var isSteamSignInPresented = false
     @ObservedObject private var gogLibrary = GOGLibraryModel.shared
     @ObservedObject private var epicLibrary = EpicLibrary.shared
+    @ObservedObject private var eaLibrary = EALibrary.shared
+    @State private var isEASignInPresented = false
+    @State private var ubisoftDownloading = false
+    @State private var ubisoftMessage: String?
     @ObservedObject private var externalDrives = ExternalDrives.shared
     @State private var isGOGSignInPresented = false
     @State private var isEpicSignInPresented = false
@@ -239,19 +243,15 @@ struct SettingsView: View {
                                 asset: "StoreBadgeEpic")
                 }
             }
-            Section(tr("Windows launchers")) {
-                NavigationLink { externalLauncherPage(title: "EA app", folder: "EA",
-                                      installer: "EAappInstaller.exe",
-                                      client: "Program Files/Electronic Arts/EA Desktop/EA Desktop/EADesktop.exe",
-                                      slug: "ea") } label: {
+            Section {
+                NavigationLink { eaPage } label: {
                     SettingsRow(icon: "square.stack", color: .blue, title: "EA app",
+                                value: eaLibrary.signedIn ? (eaLibrary.accountName ?? tr("Connected")) : tr("Not connected"),
                                 asset: "StoreBadgeEA", assetKeepsColors: true)
                 }
-                NavigationLink { externalLauncherPage(title: "Ubisoft Connect", folder: "Ubisoft",
-                                      installer: "UbisoftConnectInstaller.exe",
-                                      client: "Program Files (x86)/Ubisoft/Ubisoft Game Launcher/UbisoftConnect.exe",
-                                      slug: "ubisoft") } label: {
+                NavigationLink { ubisoftPage } label: {
                     SettingsRow(icon: "square.stack", color: .purple, title: "Ubisoft Connect",
+                                value: UbisoftLibrary.clientInstalled ? tr("Installed") : tr("Not installed"),
                                 asset: "StoreBadgeUbisoft", assetKeepsColors: true)
                 }
             }
@@ -259,51 +259,72 @@ struct SettingsView: View {
         .navigationTitle(tr("Stores & launchers"))
     }
 
-    private func externalLauncherPage(title: String, folder: String, installer: String,
-                                      client: String, slug: String) -> some View {
-        let drive = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("wine/drive_c", isDirectory: true)
-        let setup = drive.appendingPathComponent("WindowsDownloads/Launchers/" + folder + "/" + installer)
-        let executable = drive.appendingPathComponent(client)
-        let setupReady = FileManager.default.fileExists(atPath: setup.path)
-        let clientReady = FileManager.default.fileExists(atPath: executable.path)
+    private var eaPage: some View {
+        Form {
+            Section {
+                LabeledContent(tr("Account"),
+                               value: eaLibrary.signedIn ? (eaLibrary.accountName ?? tr("Connected")) : tr("Not connected"))
+                if eaLibrary.signedIn {
+                    Button(tr("Sign out"), role: .destructive) { eaLibrary.signOut() }
+                } else {
+                    Button(tr("Connect EA")) { isEASignInPresented = true }
+                }
+            } header: {
+                launcherHeader("EA app", asset: "StoreBadgeEA")
+            } footer: {
+                Text(tr("EA games are downloaded from EA and started without the EA app: iDeck signs in to EA, gets each game's licence and answers the game as the EA app would."))
+            }
+        }
+        .navigationTitle("EA app")
+        .onAppear { eaLibrary.start() }
+        .sheet(isPresented: $isEASignInPresented) { EASignInView() }
+    }
+
+    private var ubisoftPage: some View {
+        let drive = EpicLibrary.drive
+        let setup = drive.appendingPathComponent(UbisoftLibrary.installer)
+        let client = drive.appendingPathComponent(UbisoftLibrary.client)
         return Form {
             Section {
-                LabeledContent(tr("Installer"), value: tr(setupReady ? "Transferred" : "Not transferred"))
+                LabeledContent(tr("Installer"), value: tr(UbisoftLibrary.installerDownloaded ? "Downloaded" : "Not downloaded"))
+                Button(ubisoftDownloading ? tr("Downloading…") : tr("Download from Ubisoft")) {
+                    ubisoftDownloading = true
+                    ubisoftMessage = nil
+                    Task {
+                        do { try await UbisoftLibrary.downloadInstaller() } catch { ubisoftMessage = error.localizedDescription }
+                        ubisoftDownloading = false
+                    }
+                }
+                .disabled(ubisoftDownloading)
                 Button(tr("Run Windows installer")) {
                     coordinator.launchWindowsExecutable(at: setup,
-                        profile: WindowsGameProfile(id: slug + ":installer", title: title + " installer"))
+                        profile: WindowsGameProfile(id: "ubisoft:installer", title: "Ubisoft Connect installer"))
                     dismiss()
                 }
-                .disabled(!setupReady)
-                if clientReady {
+                .disabled(!UbisoftLibrary.installerDownloaded)
+                if UbisoftLibrary.clientInstalled {
                     Button(tr("Launch client")) {
-                        coordinator.launchWindowsExecutable(at: executable,
-                            profile: WindowsGameProfile(id: slug + ":client", title: title))
+                        coordinator.launchWindowsExecutable(at: client,
+                            profile: WindowsGameProfile(id: "ubisoft:client", title: "Ubisoft Connect"))
                         dismiss()
                     }
                 }
+                if let ubisoftMessage { Text(ubisoftMessage).font(.caption).foregroundStyle(.orange) }
             } header: {
-                HStack(spacing: 10) {
-                    Image(slug == "ea" ? "StoreBadgeEA" : "StoreBadgeUbisoft")
-                        .renderingMode(.original)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 36, height: 36)
-                    Text(title)
-                }
-                .textCase(nil)
-            }
-            Section(tr("Transfer")) {
-                Text(tr("Download the official Windows installer on your PC. In iRelay, open the matching launcher and transfer its .exe over the local network. Reopen this page after the transfer."))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Text(tr("Running the installer does not guarantee sign-in, DRM, or games will work under Wine."))
-                    .font(.caption)
-                    .foregroundStyle(.orange)
+                launcherHeader("Ubisoft Connect", asset: "StoreBadgeUbisoft")
+            } footer: {
+                Text(tr("Ubisoft games ask Ubisoft Connect for their licence. Install it here, then copy games installed on your PC with iRelay; they start through Ubisoft Connect. This does not guarantee sign-in, DRM, or games will work under Wine."))
             }
         }
-        .navigationTitle(title)
+        .navigationTitle("Ubisoft Connect")
+    }
+
+    private func launcherHeader(_ title: String, asset: String) -> some View {
+        HStack(spacing: 10) {
+            Image(asset).renderingMode(.original).resizable().scaledToFit().frame(width: 36, height: 36)
+            Text(title)
+        }
+        .textCase(nil)
     }
 
     // MARK: JIT

@@ -171,9 +171,9 @@ final class WindowsLibraryStore: ObservableObject {
         } catch {
             executableURLs = []
         }
-        // Show EA and Ubisoft setup files transferred by iRelay without scanning
-        // arbitrary folders in the Wine prefix.
-        let launchers = ["EA/EAappInstaller.exe", "Ubisoft/UbisoftConnectInstaller.exe"]
+        // Show the Ubisoft Connect installer downloaded from Ubisoft without
+        // scanning arbitrary folders in the Wine prefix. EA games need no EA app.
+        let launchers = ["Ubisoft/UbisoftConnectInstaller.exe"]
         for relative in launchers {
             let installer = directory.appendingPathComponent("Launchers/" + relative)
             if (try? installer.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true {

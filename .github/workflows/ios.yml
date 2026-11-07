@@ -102,6 +102,7 @@ jobs:
           python3 -m unittest discover -s tests/host -p 'test_release_ui_and_cdn.py' -v
           python3 -m unittest discover -s tests/host -p 'test_steam_video_dlls_and_library.py' -v
           python3 -m unittest discover -s tests/host -p 'test_runtime_efficiency.py' -v
+          python3 -m unittest discover -s tests/host -p 'test_ea_ubisoft.py' -v
 
       - name: Test Metal Toolchain bootstrap
         run: |

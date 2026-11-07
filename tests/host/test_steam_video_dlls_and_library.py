@@ -36,7 +36,7 @@ class SteamVideoDLLsAndLibraryTests(unittest.TestCase):
     def test_launcher_logos_have_no_tile_background(self):
         settings = source("iDeck/SettingsView.swift")
         self.assertIn("assetKeepsColors ? Color.clear : color", settings)
-        self.assertIn('Image(slug == "ea" ? "StoreBadgeEA" : "StoreBadgeUbisoft")', settings)
+        self.assertIn('Image(asset).renderingMode(.original)', settings)
 
 
 if __name__ == "__main__":
