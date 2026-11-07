@@ -368,6 +368,8 @@ struct EpicInstalledGame: Codable, Sendable {
     func pause(_ app: String) {
         if let current = active, current.app == app {
             current.task.cancel()
+            // Shown as paused at once: the task stops at its next chunk.
+            downloads[app]?.state = .paused
         } else if let index = queue.firstIndex(of: app) {
             queue.remove(at: index)
             downloads[app]?.state = .paused

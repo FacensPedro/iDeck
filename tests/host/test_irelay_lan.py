@@ -24,11 +24,22 @@ class IRelayLocalNetworkTests(unittest.TestCase):
         client = repo_text("iDeck/IRelayClient.swift")
         service = repo_text("iDeck/IRelayDeviceService.swift")
         self.assertIn("Button(tr(\"Refresh connection\"))", client)
-        self.assertIn("IRelayDeviceService.shared.connectionStatus", client)
+        self.assertNotIn('tr("iDeck service")', client)
         self.assertIn("guard IRelayTunnel.shared.pcConnected else", client)
         self.assertIn("case .ready: self.listenerState", service)
         self.assertIn("case .waiting(let error): self.listenerState", service)
         self.assertIn("case .failed(let error):", service)
+
+    def test_four_digit_code_and_listener_without_bonjour(self):
+        client = repo_text("iDeck/IRelayClient.swift")
+        service = repo_text("iDeck/IRelayDeviceService.swift")
+        self.assertIn("static let digits = 4", service)
+        self.assertIn("preambleLength = 7 + IRelayPairing.digits + 1", client)
+        self.assertNotIn("listener.service =", service)
+        self.assertIn('NWBrowser(for: .bonjour(type: "_ideck._tcp", domain: nil)', service)
+        self.assertIn("UIApplication.didBecomeActiveNotification", client)
+        self.assertIn("IRelayDeviceService.shared.restartIfStopped()", client)
+        self.assertIn("IRelayTunnel.shared.restartIfStopped()", client)
 
     def test_no_usb_transport_left(self):
         for path in ("iDeck/IRelayClient.swift", "iDeck/IRelayDeviceService.swift"):

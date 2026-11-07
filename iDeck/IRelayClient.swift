@@ -210,7 +210,6 @@ struct IRelaySettingsSection: View {
     @State private var testing = false
     @State private var code = IRelayPairing.display
     @State private var addresses = IRelayPairing.localAddresses()
-    @State private var serviceState = tr("Starting…")
 
     var body: some View {
         Section {
@@ -220,7 +219,6 @@ struct IRelaySettingsSection: View {
                 Text(code).font(.body.monospaced().weight(.semibold)).textSelection(.enabled)
             }
             Button(tr("Refresh connection")) { refresh() }
-            LabeledContent(tr("iDeck service"), value: serviceState)
             Button(tr("New pairing code")) {
                 IRelayPairing.regenerate()
                 code = IRelayPairing.display
@@ -243,7 +241,6 @@ struct IRelaySettingsSection: View {
     private func refresh() {
         IRelayRuntime.start()
         addresses = IRelayPairing.localAddresses()
-        serviceState = IRelayDeviceService.shared.connectionStatus
     }
 
     private func test() {
@@ -269,10 +266,20 @@ struct IRelaySettingsSection: View {
 
 /// Starts everything iRelay needs on this device.
 enum IRelayRuntime {
+    private static var observer: NSObjectProtocol?
+
     static func start() {
         guard IRelaySetting.enabled else { return }
         IRelayTunnel.shared.start()
         IRelayDeviceService.shared.start()
+        IRelayPairing.requestLocalNetworkAccess()
+        if observer == nil {
+            observer = NotificationCenter.default.addObserver(
+                forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { _ in
+                IRelayTunnel.shared.restartIfStopped()
+                IRelayDeviceService.shared.restartIfStopped()
+            }
+        }
     }
 }
 
@@ -330,6 +337,21 @@ final class IRelayTunnel: @unchecked Sendable {
         return listener
     }
 
+    /// After iDeck returns to the foreground: listeners iOS stopped while the
+    /// app was suspended are created again.
+    func restartIfStopped() {
+        queue.async { [self] in
+            let stopped = [pcListener, localListener].contains { listener in
+                guard let listener else { return true }
+                if case .ready = listener.state { return false }
+                return true
+            }
+            guard stopped else { return }
+            AppLog.record("[irelay-lan] listeners restarted after returning to the foreground")
+            restart()
+        }
+    }
+
     private func restart() {
         pcListener?.cancel(); localListener?.cancel()
         pcListener = nil; localListener = nil
@@ -340,8 +362,8 @@ final class IRelayTunnel: @unchecked Sendable {
         }
     }
 
-    /// `IRELAY <code>\n`: 16 bytes the PC sends first on each connection.
-    private static let preambleLength = 16
+    /// `IRELAY <code>\n`: 12 bytes the PC sends first on each connection.
+    private static let preambleLength = 7 + IRelayPairing.digits + 1
 
     private func addPC(_ connection: NWConnection) {
         connection.start(queue: queue)

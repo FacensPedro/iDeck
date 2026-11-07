@@ -91,23 +91,34 @@ final class EARangeClient: @unchecked Sendable {
         return data
     }
 
-    /// Bytes `range` of the archive as they arrive.
-    func stream(_ url: URL, range: Range<Int64>) -> AsyncThrowingStream<Data, Error> {
+    /// Bytes `range` of the archive as they arrive, with back-pressure: the
+    /// connection is suspended while more than `EARangeStream.highWater` bytes
+    /// wait for the consumer. Without it the network outran the inflater and
+    /// the waiting chunks filled memory (5.8 GB, then iOS ended iDeck), and a
+    /// pause had to wait for that backlog.
+    func stream(_ url: URL, range: Range<Int64>) -> EARangeStream {
         var request = URLRequest(url: url)
         request.setValue("bytes=\(range.lowerBound)-\(range.upperBound - 1)", forHTTPHeaderField: "Range")
+        let flow = EARangeStream.Flow()
         let http = self.http
-        return AsyncThrowingStream { continuation in
-            let delegate = StreamDelegate(continuation: continuation)
+        let inner = AsyncThrowingStream<Data, Error> { continuation in
+            let delegate = StreamDelegate(continuation: continuation, flow: flow)
             let task = http.dataTask(with: request)
             task.delegate = delegate
+            flow.task = task
             continuation.onTermination = { _ in task.cancel() }
             task.resume()
         }
+        return EARangeStream(inner: inner, flow: flow)
     }
 
     private final class StreamDelegate: NSObject, URLSessionDataDelegate {
         let continuation: AsyncThrowingStream<Data, Error>.Continuation
-        init(continuation: AsyncThrowingStream<Data, Error>.Continuation) { self.continuation = continuation }
+        let flow: EARangeStream.Flow
+        init(continuation: AsyncThrowingStream<Data, Error>.Continuation, flow: EARangeStream.Flow) {
+            self.continuation = continuation
+            self.flow = flow
+        }
         func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse,
                         completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
             guard let http = response as? HTTPURLResponse, http.statusCode == 206 || http.statusCode == 200 else {
@@ -116,7 +127,10 @@ final class EARangeClient: @unchecked Sendable {
             }
             completionHandler(.allow)
         }
-        func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) { continuation.yield(data) }
+        func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
+            flow.received(data.count)
+            continuation.yield(data)
+        }
         func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
             if let error { continuation.finish(throwing: error) } else { continuation.finish() }
         }
@@ -145,6 +159,56 @@ final class EARangeClient: @unchecked Sendable {
         }
         return EABuildArchive(url: url, fileSize: size, entries: entries)
     }
+}
+
+/// A byte-range stream that tells the connection what the consumer has taken,
+/// so the connection pauses while too much waits in memory.
+struct EARangeStream: AsyncSequence {
+    typealias Element = Data
+    static let highWater = 8 << 20
+    static let lowWater = 2 << 20
+
+    final class Flow: @unchecked Sendable {
+        private let lock = NSLock()
+        private var waiting = 0
+        private var suspended = false
+        weak var task: URLSessionDataTask?
+
+        func received(_ count: Int) {
+            lock.lock(); defer { lock.unlock() }
+            waiting += count
+            if !suspended && waiting > EARangeStream.highWater {
+                suspended = true
+                task?.suspend()
+            }
+        }
+
+        func consumed(_ count: Int) {
+            lock.lock(); defer { lock.unlock() }
+            waiting = max(0, waiting - count)
+            if suspended && waiting < EARangeStream.lowWater {
+                suspended = false
+                task?.resume()
+            }
+        }
+    }
+
+    let inner: AsyncThrowingStream<Data, Error>
+    let flow: Flow
+
+    struct AsyncIterator: AsyncIteratorProtocol {
+        var inner: AsyncThrowingStream<Data, Error>.AsyncIterator
+        let flow: Flow
+        mutating func next() async throws -> Data? {
+            // A pause stops at the next chunk, not after the backlog.
+            try Task.checkCancellation()
+            guard let chunk = try await inner.next() else { return nil }
+            flow.consumed(chunk.count)
+            return chunk
+        }
+    }
+
+    func makeAsyncIterator() -> AsyncIterator { AsyncIterator(inner: inner.makeAsyncIterator(), flow: flow) }
 }
 
 /// Raw DEFLATE (or a stored entry) to a file, with the CRC-32 and size of what came out.
