@@ -1,4 +1,7 @@
 ## What's Changed
+- Game backdrop: the selected game's cover now fills the screen behind the store and game tiles, and does nothing when touched.
+- Tapping a game's tile opens its details. Steam games and programs now have a Launch button there; without JIT, StikDebug opens first.
+- The cover's tap-to-play and touch-and-hold were removed.
 - Bully: Scholarship Edition starts directly instead of through the Steam client, which stopped its 32-bit process at its first instruction (0xC000001D).
 - Every game's DXGI lists the same display modes as Windows (user32). Crash Bandicoot N. Sane Trilogy found an empty list and stopped right after loading its shaders.
 - Lighter runtime by default: Wine logs only exceptions and process errors (it wrote thousands of lines per launch), so games start with less CPU and disk work. Settings › Bugs & logs › Detailed diagnostics still records everything.
