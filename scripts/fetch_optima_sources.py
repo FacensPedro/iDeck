@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Fetch a pinned Optima source snapshot for the iOS port (not a runtime build).
 
-This intentionally does not stage Optima's Linux CLI or Windows DLLs into the IPA.
-The upstream CLI must first be refactored into a Rust staticlib with a C ABI and
-an iOS-compatible browser authentication flow.
+This stages only a temporary upstream build tree, including resources required
+by Rust include_bytes! at compile time. It does not bundle or distribute the
+upstream Linux executable or DLLs in an iDeck IPA. A functional iOS integration
+requires a staticlib/C ABI and iOS-compatible authentication flow.
 """
 from __future__ import annotations
 
@@ -40,9 +41,10 @@ def main() -> None:
             parts = pathlib.PurePosixPath(member.name).parts[1:]
             if not parts or any(p in ("..", ".") for p in parts):
                 continue
-            # Source only: never vendor prebuilt DLLs or local auth files.
-            if pathlib.PurePosixPath(*parts).suffix.lower() in (".dll", ".exe", ".cer", ".crt"):
-                continue
+            # Upstream source uses include_bytes! for its DLL and certificate
+            # resources. Keep them in this disposable CI build tree: excluding
+            # them makes cargo check fail before examining iOS compatibility.
+            # The iDeck IPA packaging workflow does not read this directory.
             target = (destination / pathlib.Path(*parts)).resolve()
             if not target.is_relative_to(destination):
                 raise SystemExit("Unsafe archive entry")
@@ -54,7 +56,7 @@ def main() -> None:
             count += 1
     print(f"Optima source snapshot {REVISION}: {count} files staged at {destination}")
     print(f"Archive SHA-256: {hashlib.sha256(data).hexdigest()}")
-    print("NOTE: Source only; Optima is not compiled or integrated into the iDeck IPA.")
+    print("NOTE: Build-time resources are present; nothing is packaged into the iDeck IPA.")
 
 
 if __name__ == "__main__":
