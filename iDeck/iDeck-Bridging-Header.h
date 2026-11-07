@@ -2,8 +2,6 @@
 #define iDeck_Bridging_Header_h
 
 #import "NativeRuntimeDiagnostics.h"
-#import "NativeRuntime/NativePerformance.h"
-#import "NativeRuntime/NativeMemoryManager.h"
 #import "NativeRuntime/MadeiraRuntimeBridge.h"
 #import "MadeiraDock/MadeiraDockABI.h"
 #import "NativeRuntime/RuntimeSupport.h"

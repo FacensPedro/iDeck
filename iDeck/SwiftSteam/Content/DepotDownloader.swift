@@ -282,7 +282,7 @@ final class DepotDownloader {
             peer = await lanPeerSource(appID: app.appID, currentBuild: installedBuild == app.buildID ? 0 : installedBuild,
                                        depots: Set(plans.map(\.depotID)))
         }
-        // iDeck: iRelay, the PC connected by USB, does this download: it fetches,
+        // iDeck: iRelay, the PC on the local network, does this download: it fetches,
         // decrypts, decompresses and checks every chunk at the PC's speed and
         // writes it into the game's files here (IRelayDeviceService, PUT /write,
         // which checks each chunk's SHA-1 again). Chunks it could not deliver
@@ -713,19 +713,19 @@ final class DepotDownloader {
                 do {
                     status = try await pc.processStatus(job)
                     if pollFailures > 0 {
-                        SteamLog.event("[irelay] USB status recovered app=\(app.appID) after \(pollFailures) failed polls")
+                        SteamLog.event("[irelay] status recovered app=\(app.appID) after \(pollFailures) failed polls")
                     }
                     reconnectDeadline = nil
                     pollFailures = 0
                 } catch {
                     // iRelay can briefly stop answering when iOS is under
-                    // memory pressure or usbmux reconnects. Preserve all the
+                    // memory pressure or network reconnects. Preserve all the
                     // PC-side work while the cable is recovering instead of
                     // cancelling the job after its first missed status poll.
                     try Task.checkCancellation()
                     pollFailures += 1
                     if pollFailures == 1 || pollFailures % 5 == 0 {
-                        SteamLog.event("[irelay] USB poll unavailable app=\(app.appID) count=\(pollFailures): \(error.localizedDescription)")
+                        SteamLog.event("[irelay] poll unavailable app=\(app.appID) count=\(pollFailures): \(error.localizedDescription)")
                     }
                     if reconnectDeadline == nil {
                         reconnectDeadline = Date().addingTimeInterval(65)

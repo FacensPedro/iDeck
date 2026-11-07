@@ -59,8 +59,8 @@ struct WindowsRendererView: UIViewRepresentable {
     private static var currentSurface: (guest: CGSize, drawable: CGSize, bounds: CGRect, mode: RuntimeConfiguration.SurfaceMode)?
 
     static var isNativeDisplayLinked: Bool {
-        dlsym(UnsafeMutableRawPointer(bitPattern: -2), "madeira_display_set_layer") != nil &&
-        dlsym(UnsafeMutableRawPointer(bitPattern: -2), "macdrv_functions") != nil
+        NativeSymbol.address("madeira_display_set_layer") != nil &&
+        NativeSymbol.address("macdrv_functions") != nil
     }
 
     static var isReadyForFrames: Bool {
@@ -91,8 +91,7 @@ struct WindowsRendererView: UIViewRepresentable {
     private typealias ShowCompositor = @convention(c) (Int32) -> Int32
 
     private static var currentGuestSize: CGSize {
-        if let symbol = dlsym(UnsafeMutableRawPointer(bitPattern: -2),
-                              "winios_screen_size") {
+        if let symbol = NativeSymbol.address("winios_screen_size") {
             let read = unsafeBitCast(symbol, to: ScreenSize.self)
             var width: Int32 = 0
             var height: Int32 = 0
@@ -124,8 +123,7 @@ struct WindowsRendererView: UIViewRepresentable {
             lastGuestSize = nil
         }
         activeViewport = viewport
-        if let symbol = dlsym(UnsafeMutableRawPointer(bitPattern: -2),
-                              "winios_compositor_set_hidden") {
+        if let symbol = NativeSymbol.address("winios_compositor_set_hidden") {
             let show = unsafeBitCast(symbol, to: ShowCompositor.self)
             _ = show(0)
         }
@@ -147,8 +145,7 @@ struct WindowsRendererView: UIViewRepresentable {
                 height: max(2, (host.bounds.height * scale).rounded()))
         }
         if !layerRegistered,
-           let symbol = dlsym(UnsafeMutableRawPointer(bitPattern: -2),
-                              "madeira_display_set_layer") {
+           let symbol = NativeSymbol.address("madeira_display_set_layer") {
             let setter = unsafeBitCast(symbol, to: SetMetalLayer.self)
             setter(Unmanaged.passUnretained(host.metalLayer).toOpaque())
             layerRegistered = true
@@ -161,8 +158,7 @@ struct WindowsRendererView: UIViewRepresentable {
         // Prime the guest monitor once per launch, never on every SwiftUI
         // layout. The native game/DXMT will handle subsequent mode changes.
         if let size = requestedSize, size != lastGuestSize,
-           let symbol = dlsym(UnsafeMutableRawPointer(bitPattern: -2),
-                              "winios_display_mode_changed") {
+           let symbol = NativeSymbol.address("winios_display_mode_changed") {
             lastGuestSize = size
             let mode = unsafeBitCast(symbol, to: DisplayModeChanged.self)
             mode(Int32(size.width), Int32(size.height))
@@ -203,14 +199,12 @@ struct WindowsRendererView: UIViewRepresentable {
         // reached its final size. A one-time frame-change guard leaves GDI
         // windows black because no desktop rectangle is ever published.
         // This refresh is also invoked while a Windows guest is launching.
-        if let symbol = dlsym(UnsafeMutableRawPointer(bitPattern: -2),
-                              "winios_set_compositor_frame") {
+        if let symbol = NativeSymbol.address("winios_set_compositor_frame") {
             let setFrame = unsafeBitCast(symbol, to: SetCompositorFrame.self)
             setFrame(Double(frame.minX), Double(frame.minY),
                      Double(frame.width), Double(frame.height))
         }
-        if let symbol = dlsym(UnsafeMutableRawPointer(bitPattern: -2),
-                              "winios_set_desktop_rect") {
+        if let symbol = NativeSymbol.address("winios_set_desktop_rect") {
             let setDesktop = unsafeBitCast(symbol, to: SetDesktopRect.self)
             setDesktop(Double(positioned.minX - frame.minX),
                        Double(positioned.minY - frame.minY),
@@ -237,8 +231,7 @@ struct WindowsRendererView: UIViewRepresentable {
         // Keep the persistent layer object alive for DXMT's cached
         // swapchain pointer, but remove its window overlay on dismissal.
         MadeiraWindowMetalHost.shared.removeFromSuperview()
-        if let symbol = dlsym(UnsafeMutableRawPointer(bitPattern: -2),
-                              "winios_compositor_set_hidden") {
+        if let symbol = NativeSymbol.address("winios_compositor_set_hidden") {
             let hide = unsafeBitCast(symbol, to: ShowCompositor.self)
             _ = hide(1)
         }

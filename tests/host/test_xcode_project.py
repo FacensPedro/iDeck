@@ -54,13 +54,9 @@ class XcodeProjectTests(unittest.TestCase):
             with self.subTest(build_id=build_id):
                 self.assertIn(file_id, ids)
 
-    def test_native_performance_sources_are_compiled_once(self):
-        names = (
-            "FEXExecutionScheduler.cpp",
-            "GuestMemoryPool.cpp",
-            "NativePerformance.cpp",
-            "MadeiraPlatform.mm",
-        )
+    def test_native_runtime_sources_are_compiled_once(self):
+        names = ("MadeiraPlatform.mm", "MadeiraRuntimeBridge.mm", "WineBridge.mm",
+                 "FEXRuntime.cpp", "DirectInputBridge.mm", "InterfaceOnlyStubs.c")
         marker = "333333333333333333333332 /* Sources */ = {"
         sources = self.project.split(marker, 1)[1].split("\n\t\t};", 1)[0]
         refs = dict(BUILD_FILE.findall(self.project))
@@ -83,44 +79,15 @@ class XcodeProjectTests(unittest.TestCase):
                 )
                 self.assertRegex(self.project, expected)
 
-    def test_performance_header_is_linked_to_swift(self):
-        self.assertIn("NativePerformance.h */ = {isa = PBXFileReference;", self.project)
-        root = PROJECT.parents[1]
-        header = root / "iDeck" / "iDeck-Bridging-Header.h"
-        self.assertIn("NativeRuntime/NativePerformance.h", header.read_text(encoding="utf-8"))
-
-    def test_native_memory_manager_sources_are_registered(self):
-        names = ("NativeMemoryManager.cpp", "MadeiraPlatform.mm")
-        marker = "333333333333333333333332 /* Sources */ = {"
-        sources = self.project.split(marker, 1)[1].split("\n\t\t};", 1)[0]
-        refs = dict(BUILD_FILE.findall(self.project))
-        for filename in names:
-            with self.subTest(filename=filename):
-                entries = re.findall(
-                    r"^\s*([A-F0-9]{24})\s+/\* " + re.escape(filename)
-                    + r" in Sources \*/,?\s*$",
-                    sources,
-                    re.MULTILINE,
-                )
-                self.assertEqual(len(entries), 1)
-                self.assertIn(entries[0], refs)
-                referenced = refs[entries[0]]
-                self.assertRegex(
-                    self.project,
-                    re.compile(
-                        r"^\s*" + referenced + r"\s+/\* " + re.escape(filename)
-                        + r" \*/\s*=\s*\{isa = PBXFileReference;.*path = NativeRuntime/"
-                        + re.escape(filename) + r";",
-                        re.MULTILINE,
-                    ),
-                )
-
-    def test_native_memory_bridge_is_available_to_swift(self):
-        bridge = PROJECT.parents[1] / "iDeck" / "iDeck-Bridging-Header.h"
-        self.assertIn(
-            'NativeRuntime/NativeMemoryManager.h',
-            bridge.read_text(encoding="utf-8"),
-        )
+    def test_unused_native_modules_stay_removed(self):
+        # Nothing called them: Madeira's own FEX, Wine and DXMT do this work.
+        for name in ("FEXExecutionScheduler", "GuestMemoryPool", "NativeMemoryManager",
+                     "NativePerformance", "MadeiraCore"):
+            with self.subTest(name=name):
+                self.assertNotIn(name, self.project)
+        header = (PROJECT.parents[1] / "iDeck" / "iDeck-Bridging-Header.h").read_text(encoding="utf-8")
+        self.assertNotIn("NativePerformance.h", header)
+        self.assertNotIn("NativeMemoryManager.h", header)
 
     def test_native_diagnostics_are_compiled_once(self):
         marker = "333333333333333333333332 /* Sources */ = {"

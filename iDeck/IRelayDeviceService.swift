@@ -1,10 +1,12 @@
 import CryptoKit
 import Foundation
 import Network
+import Security
 import UIKit
 
-/// The service iRelay reaches over the USB cable (usbmux delivers the PC's
-/// connections to this port on the loopback interface). Plain HTTP/1.1, JSON:
+/// The service iRelay reaches over the local network (Wi-Fi or Ethernet, never
+/// cellular). Plain HTTP/1.1, JSON. Every request except `GET /info` carries
+/// the pairing code shown in Settings › iRelay (`X-iDeck-Code`):
 ///
 /// - `GET /info`: this device's name, iDeck's version and free space.
 /// - `GET /library`: the Steam, GOG and Epic libraries iDeck is signed in to,
@@ -33,7 +35,9 @@ final class IRelayDeviceService: @unchecked Sendable {
         "WindowsDownloads/Launchers/",
     ]
 
-    private let queue = DispatchQueue(label: "ideck.irelay.service", qos: .userInitiated)
+    // Transfers stay below the game: SHA-1 checks and file writes must not compete
+    // with the emulation threads for CPU time.
+    private let queue = DispatchQueue(label: "ideck.irelay.service", qos: .utility)
     private var listener: NWListener?
 
     /// Documents/wine/drive_c (as EpicLibrary.drive, usable off the main actor).
@@ -46,9 +50,7 @@ final class IRelayDeviceService: @unchecked Sendable {
     func start() {
         queue.async { [self] in
             guard listener == nil else { return }
-            let parameters = NWParameters.tcp
-            parameters.allowLocalEndpointReuse = true
-            parameters.requiredInterfaceType = .loopback
+            let parameters = IRelayPairing.localNetworkParameters()
             guard let port = NWEndpoint.Port(rawValue: Self.port),
                   let listener = try? NWListener(using: parameters, on: port) else {
                 AppLog.record("[irelay] could not listen on port \(Self.port)")
@@ -145,7 +147,7 @@ final class IRelayDeviceService: @unchecked Sendable {
             // Keep reports intact while Steam, GOG, Epic or relay transfers
             // are still writing data on the iPad.
             if await MainActor.run(body: { BugReportModel.downloadsOrTransfersActive }) {
-                return .error(409, "Pause or finish the download and USB transfer before clearing logs.")
+                return .error(409, "Pause or finish the download and iRelay transfer before clearing logs.")
             }
             AppLog.clear()
             if let wine = await MainActor.run(body: { BugReportModel.wineLogURL }) { try? FileManager.default.removeItem(at: wine) }
@@ -628,6 +630,14 @@ final class IRelayHTTPConnection: @unchecked Sendable {
         keep = nil
     }
 
+    private func reject(_ response: IRelayHTTPResponse) {
+        var head = "HTTP/1.1 \(response.status) Unauthorized\r\nContent-Type: application/json\r\n"
+        head += "Content-Length: \(response.body.count)\r\nConnection: close\r\n\r\n"
+        var out = Data(head.utf8)
+        out.append(response.body)
+        connection.send(content: out, completion: .contentProcessed { [weak self] _ in self?.close() })
+    }
+
     private func receive(_ then: @escaping (Data?) -> Void) {
         // Smaller receive slabs reduce peak Data allocation under memory pressure.
         connection.receive(minimumIncompleteLength: 1, maximumLength: 256 << 10) { data, _, complete, error in
@@ -642,6 +652,13 @@ final class IRelayHTTPConnection: @unchecked Sendable {
             guard let request = parse(head) else { return close() }
             let length = Int(request.headers["content-length"] ?? "0") ?? -1
             guard length >= 0 else { return close() }
+            // Nothing but this device's name is answered without the pairing code.
+            if !(request.method == "GET" && request.path == "/info") {
+                let peer = IRelayPairing.host(of: connection)
+                guard IRelayPairing.authorize(request.headers["x-ideck-code"], from: peer) else {
+                    return reject(IRelayHTTPResponse.error(401, "Wrong or missing iDeck pairing code"))
+                }
+            }
             if let (url, mtime) = service.uploadTarget(request) {
                 upload(request, to: url, mtime: mtime, length: length)
             } else {
@@ -768,5 +785,93 @@ final class IRelayHTTPConnection: @unchecked Sendable {
                 self.queue.async { self.readHeader() }
             })
         }
+    }
+}
+
+// MARK: - Pairing
+
+/// The code that pairs iRelay with this iPad over the local network. iRelay
+/// sends it with every request (`X-iDeck-Code`) and on each tunnel connection.
+enum IRelayPairing {
+    private static let key = "irelay.pairingCode"
+    private static let alphabet = Array("ABCDEFGHJKLMNPQRSTUVWXYZ23456789")
+    private static let lock = NSLock()
+    private static var failures: [String: (count: Int, until: Date)] = [:]
+
+    /// Eight characters from a 32-letter alphabet (40 bits), created once.
+    static var code: String {
+        if let stored = UserDefaults.standard.string(forKey: key), stored.count == 8 { return stored }
+        return regenerate()
+    }
+
+    /// The code as shown on screen: ABCD-EFGH.
+    static var display: String {
+        let value = code
+        return String(value.prefix(4)) + "-" + String(value.suffix(4))
+    }
+
+    /// A new code; iRelay must be paired again.
+    @discardableResult static func regenerate() -> String {
+        var bytes = [UInt8](repeating: 0, count: 8)
+        _ = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
+        let value = String(bytes.map { alphabet[Int($0) % alphabet.count] })
+        UserDefaults.standard.set(value, forKey: key)
+        return value
+    }
+
+    static func matches(_ candidate: String?) -> Bool {
+        guard let candidate else { return false }
+        let given = Array(candidate.uppercased().filter { $0 != "-" && $0 != " " }.utf8)
+        let expected = Array(code.utf8)
+        guard given.count == expected.count else { return false }
+        return zip(given, expected).reduce(0) { $0 | ($1.0 ^ $1.1) } == 0
+    }
+
+    /// Checks a code, refusing a host for a minute after five wrong codes.
+    static func authorize(_ candidate: String?, from host: String) -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        if let entry = failures[host], entry.count >= 5, entry.until > Date() { return false }
+        if matches(candidate) {
+            failures[host] = nil
+            return true
+        }
+        let count = (failures[host]?.count ?? 0) + 1
+        failures[host] = (count, Date().addingTimeInterval(60))
+        if count == 5 { AppLog.record("[irelay] wrong pairing code 5 times from \(host); refused for a minute") }
+        return false
+    }
+
+    static func host(of connection: NWConnection) -> String {
+        if case .hostPort(let host, _) = connection.endpoint { return "\(host)" }
+        return "unknown"
+    }
+
+    /// TCP on Wi-Fi or Ethernet; never cellular.
+    static func localNetworkParameters() -> NWParameters {
+        let parameters = NWParameters.tcp
+        parameters.allowLocalEndpointReuse = true
+        parameters.prohibitedInterfaceTypes = [.cellular]
+        return parameters
+    }
+
+    /// This iPad's IPv4 addresses on the local network, for Settings › iRelay.
+    static func localAddresses() -> [String] {
+        var result: [String] = []
+        var list: UnsafeMutablePointer<ifaddrs>?
+        guard getifaddrs(&list) == 0, let first = list else { return [] }
+        defer { freeifaddrs(list) }
+        for entry in sequence(first: first, next: { $0.pointee.ifa_next }) {
+            let flags = Int32(entry.pointee.ifa_flags)
+            guard let address = entry.pointee.ifa_addr, address.pointee.sa_family == UInt8(AF_INET),
+                  flags & IFF_UP != 0, flags & IFF_LOOPBACK == 0 else { continue }
+            let name = String(cString: entry.pointee.ifa_name)
+            guard name.hasPrefix("en") || name.hasPrefix("bridge") else { continue }
+            var host = [CChar](repeating: 0, count: Int(NI_MAXHOST))
+            if getnameinfo(address, socklen_t(address.pointee.sa_len), &host, socklen_t(host.count),
+                           nil, 0, NI_NUMERICHOST) == 0 {
+                result.append(String(cString: host))
+            }
+        }
+        return result
     }
 }

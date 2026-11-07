@@ -64,9 +64,7 @@ class MadeiraBlackScreenCloseAndLocalizationTests(unittest.TestCase):
             "Retry Close",
             "Keep Waiting",
             "Return to Game",
-            "JIT diagnostics copied to clipboard",
             "Keep helper processes running",
-            "Use only when a launcher exits after starting its game.",
         ):
             with self.subTest(key=key):
                 pos = source.index('"' + key)

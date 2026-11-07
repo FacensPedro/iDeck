@@ -38,8 +38,8 @@ class MadeiraSteamClientFirstFrameTests(unittest.TestCase):
         self.assertIn("init() {", metrics)
         init_start = metrics.index("    init() {")
         init_end = metrics.index("    func sample(", init_start)
-        self.assertIn('"madeira_get_present_count"', metrics[init_start:init_end])
-        self.assertIn("baselineFrames = unsafeBitCast(pointer, to: PresentCount.self)()", metrics[init_start:init_end])
+        self.assertIn('NativeSymbol.address("madeira_get_present_count")', metrics)
+        self.assertIn("baselineFrames = Self.presentCount?()", metrics[init_start:init_end])
         self.assertIn("count > baselineFrames", metrics)
         self.assertIn("if firstFrameAt == nil", metrics)
 

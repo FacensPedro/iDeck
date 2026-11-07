@@ -12,7 +12,7 @@ struct TouchMouseView: UIViewRepresentable {
 final class TouchMouseSurface: UIView {
     private typealias Post = @convention(c) (Int32, Int32) -> Void
     private static func symbol(_ name: String) -> Post? {
-        dlsym(UnsafeMutableRawPointer(bitPattern: -2), name).map { unsafeBitCast($0, to: Post.self) }
+        NativeSymbol.address(name).map { unsafeBitCast($0, to: Post.self) }
     }
     private static let down = symbol("winios_post_touch_down")
     private static let move = symbol("winios_post_touch_move")
@@ -63,7 +63,7 @@ enum TouchMouseCursor {
     static func hide() {
         // Madeira reads this each time it would place the game-mode cursor.
         setenv("MADEIRA_GAME_DIALOG_CURSOR", "0", 1)
-        if let symbol = dlsym(UnsafeMutableRawPointer(bitPattern: -2), "winios_cursor_show") {
+        if let symbol = NativeSymbol.address("winios_cursor_show") {
             unsafeBitCast(symbol, to: Show.self)(0)
         }
     }

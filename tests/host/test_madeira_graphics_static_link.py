@@ -14,7 +14,7 @@ class MadeiraGraphicsStaticLinkTests(unittest.TestCase):
         self.assertNotIn('dlsym(', source)
 
     def test_d3d12_uses_real_linked_canary(self):
-        source = (NATIVE / 'MadeiraCore.cpp').read_text(encoding='utf-8')
+        source = (NATIVE / 'MadeiraPlatform.mm').read_text(encoding='utf-8')
         self.assertIn('#include "MadeiraStaticABI.h"', source)
         self.assertIn('&madeira_d3d12_canary_run', source)
         self.assertIn('return false;', source)
@@ -28,7 +28,7 @@ class MadeiraGraphicsStaticLinkTests(unittest.TestCase):
             header,
         )
         self.assertIn('void (*sink)(const char *));', header)
-        for name in ('MadeiraPlatform.mm', 'MadeiraCore.cpp'):
+        for name in ('MadeiraPlatform.mm',):
             source = (NATIVE / name).read_text(encoding='utf-8')
             self.assertIn('defined(IDECK_NATIVE_MADEIRA_ENABLED)', source)
 

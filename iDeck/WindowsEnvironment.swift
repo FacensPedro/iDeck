@@ -146,7 +146,7 @@ class WindowsEnvironment {
             return false
         }
         return requiredSymbols.allSatisfy { name in
-            name.withCString { dlsym(UnsafeMutableRawPointer(bitPattern: -2), $0) != nil }
+            NativeSymbol.address(name) != nil
         }
     }
 
@@ -246,7 +246,7 @@ class WindowsEnvironment {
             ("winios_display_mode_changed", "Wine display mode bridge"),
             ("wine_process_is_running", "Wine process readiness")
         ] {
-            if name.withCString({ dlsym(UnsafeMutableRawPointer(bitPattern: -2), $0) == nil }) {
+            if NativeSymbol.address(name) == nil {
                 missing.append(label)
             }
         }
@@ -861,7 +861,7 @@ private class BoxTranslator {
                 launchDetails["steamWorkingDirectory"] = steamWorkingDirectory.standardizedFileURL.path
             }
         }
-        guard let symbol = "ideck_madeira_launch_v1".withCString({ dlsym(UnsafeMutableRawPointer(bitPattern: -2), $0) }),
+        guard let symbol = NativeSymbol.address("ideck_madeira_launch_v1"),
               !environment.isEmpty,
               FileManager.default.fileExists(atPath: executablePath),
               let payload = try? JSONSerialization.data(withJSONObject: launchDetails),

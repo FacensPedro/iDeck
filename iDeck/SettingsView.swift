@@ -39,8 +39,8 @@ struct SettingsView: View {
                                     value: tr("Steam, GOG, Epic, EA, Ubisoft"))
                     }
                     NavigationLink { irelayPage } label: {
-                        SettingsRow(icon: "cable.connector", color: .blue, title: "iRelay",
-                                    value: tr("Automatic"))
+                        SettingsRow(icon: "wifi", color: .blue, title: "iRelay",
+                                    value: IRelayPairing.display)
                     }
                 }
 
@@ -295,7 +295,7 @@ struct SettingsView: View {
                 .textCase(nil)
             }
             Section(tr("Transfer")) {
-                Text(tr("Download the official Windows installer on your PC. In iRelay, open the matching launcher and transfer its .exe over USB. Reopen this page after the transfer."))
+                Text(tr("Download the official Windows installer on your PC. In iRelay, open the matching launcher and transfer its .exe over the local network. Reopen this page after the transfer."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Text(tr("Running the installer does not guarantee sign-in, DRM, or games will work under Wine."))

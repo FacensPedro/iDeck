@@ -184,7 +184,7 @@ For more detail, read [Game startup and black-screen diagnostics](docs/IDECK_GAM
 - [Optional D3D12 MSC 4.0 Beta 3, WoW64 and on-device acceptance](docs/archive/MADEIRA_EXPANDED_PROFILES.md)
 - [Native Madeira build](docs/IDECK_MADEIRA_NATIVE_BUILD.md)
 - [Native linking and verification](docs/archive/MADEIRA_NATIVE_LINKING.md)
-- [Native runtime modules](docs/NATIVE_RUNTIME_MODULES.md)
+- [Architecture](docs/ARCHITECTURE.md)
 - [iPadOS memory management](docs/archive/IOS_MEMORY_MANAGEMENT.md)
 - [Native performance](docs/archive/NATIVE_PERFORMANCE.md)
 - [Steam download performance](docs/archive/STEAM_DOWNLOAD_PERFORMANCE.md)

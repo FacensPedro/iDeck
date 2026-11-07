@@ -31,7 +31,8 @@ class AutomaticJITAndDownloadHUDTests(unittest.TestCase):
         self.assertIn('Text("GPU memory (Metal):', SESSION)
         self.assertIn('Text("GPU utilization: unavailable on iOS")', SESSION)
         self.assertIn("if horizontalSizeClass != .compact {", SESSION)
-        self.assertIn("if collectPerformance && getrusage(", SESSION)
+        self.assertIn("if collectPerformance {", SESSION)
+        self.assertIn("getrusage(RUSAGE_SELF, &usage)", SESSION)
 
     def test_log_copy_is_only_offered_when_session_has_problems(self):
         self.assertIn("private var hasWineProblem: Bool", SESSION)

@@ -15,23 +15,8 @@ class MadeiraCoreArchitectureTests(unittest.TestCase):
         self.assertIn('madeira-\\(key).txt', get_body)
         self.assertIn("info.st_ino", config)
 
-    def test_native_memory_manager_avoids_redundant_pool_snapshots(self):
-        manager = repo_text("iDeck/NativeRuntime/NativeMemoryManager.cpp")
-        pool = repo_text("iDeck/NativeRuntime/GuestMemoryPool.cpp")
-        header = repo_text("iDeck/NativeRuntime/NativePerformance.h")
-        self.assertIn("ideck_memory_pool_set_cache_limit_reclaimed(s.pool, limit)", manager)
-        self.assertIn("ideck_memory_pool_trim_reclaimed(s.pool)", manager)
-        self.assertIn("before - pool->cached_bytes", pool)
-        self.assertIn("const size_t reclaimed = pool->cached_bytes", pool)
-        self.assertIn("ideck_memory_pool_trim_reclaimed", header)
-        self.assertIn("ideck_memory_pool_set_cache_limit_reclaimed", header)
-        self.assertIn("ideck_memory_pool_set_cache_limit(", header)
-        self.assertIn("ideck_memory_pool_trim(", header)
-
     def test_native_jit_and_wine_ownership_remains_intact(self):
         coordinator = repo_text("iDeck/SystemCoordinator.swift")
-        self.assertIn("ideck_native_memory_install_notifications()", coordinator)
-        self.assertIn("ideck_native_memory_configure(64 * 1024 * 1024, 8 * 1024 * 1024)", coordinator)
         self.assertIn("guard ensureJITForGameLaunch() else { return }", coordinator)
 
 

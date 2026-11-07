@@ -42,7 +42,7 @@ class FirstRunLaunchersContract(unittest.TestCase):
             self.assertIn(name, settings)
             self.assertIn(name, models)
 
-    def test_usb_launcher_paths_are_narrowly_scoped(self):
+    def test_launcher_paths_are_narrowly_scoped(self):
         swift = repo_text("iDeck/IRelayDeviceService.swift")
         self.assertIn('"protocol": 4', swift)
         for folder in ('WindowsDownloads/Launchers/EA', 'WindowsDownloads/Launchers/Ubisoft'):

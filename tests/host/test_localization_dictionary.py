@@ -21,6 +21,22 @@ class LocalizationDictionaryTests(unittest.TestCase):
         self.assertFalse(duplicates, 'Duplicate Swift dictionary literals crash the app at startup: ' + repr(duplicates))
         self.assertEqual(counts['Madeira'], 1)
 
+    def test_launch_smoke_test_keys_exist(self):
+        smoke = (ROOT / 'tests/host/LocalizationLaunchSmokeTests.swift').read_text(encoding='utf-8')
+        table = LOCALIZATION.read_text(encoding='utf-8')
+        for key in set(re.findall(r'tr\("([^"]+)"\) == "(?!\1)', smoke)):
+            with self.subTest(key=key):
+                self.assertIn('"' + key + '": [', table)
+
+    def test_every_translation_is_used(self):
+        source = LOCALIZATION.read_text(encoding='utf-8')
+        table = source.split(DECLARATION, 1)[1].rsplit('\n    ]\n}', 1)[0]
+        code = ''.join(path.read_text(encoding='utf-8') for path in (ROOT / 'iDeck').rglob('*.swift')
+                       if path.name != 'Localization.swift')
+        unused = [m.group(1) for m in KEY.finditer(table)
+                  if '"' + m.group(1) + '"' not in code and m.group(1) not in ('Madeira', 'System default')]
+        self.assertFalse(unused, 'Translations no Swift file uses: ' + repr(unused[:20]))
+
 
 if __name__ == '__main__':
     unittest.main()
