@@ -457,6 +457,7 @@ struct WindowsWorkspaceView: View {
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
+            shelfBackdrop
             VStack(spacing: 0) {
                 topBar
                 ScrollView {
@@ -515,7 +516,8 @@ struct WindowsWorkspaceView: View {
             WindowsExecutableDetailsView(executableURL: selection.url, prefixPath: prefixPath, library: windowsLibrary, coordinator: coordinator)
         }
         .sheet(item: $selectedSteamGame) { selection in
-            SteamProgramDetailsView(game: selection.game, prefixPath: prefixPath, library: windowsLibrary, steamLibrary: steamLibrary, coordinator: coordinator)
+            SteamProgramDetailsView(game: selection.game, prefixPath: prefixPath, library: windowsLibrary, steamLibrary: steamLibrary,
+                                    coordinator: coordinator) { game in launchSteamGame(game) }
         }
         .fileImporter(
             isPresented: $isExecutablePickerPresented,
@@ -1362,6 +1364,17 @@ private struct WindowsExecutableDetailsView: View {
                             .textSelection(.enabled)
                     }
                     .frame(maxWidth: .infinity)
+                    // Starts the program; without JIT, StikDebug opens first.
+                    Button {
+                        library.save(profile)
+                        dismiss()
+                        coordinator.launchWindowsExecutable(at: executableURL, profile: profile)
+                    } label: {
+                        Label(tr("Launch"), systemImage: "play.fill")
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                    }
+                    .buttonStyle(.borderedProminent)
                     WindowsGameProfileForm(profile: $profile)
                     Button(role: .destructive) {
                         guard let prefixPath else {
@@ -1437,13 +1450,16 @@ private struct SteamProgramDetailsView: View {
     @ObservedObject var library: WindowsLibraryStore
     @ObservedObject var steamLibrary: SteamOwnedGamesModel
     @ObservedObject var coordinator: SystemCoordinator
+    var launch: (SteamAppInfo) -> Void = { _ in }
     @Environment(\.dismiss) private var dismiss
     @State private var profile: WindowsGameProfile
     @State private var errorMessage: String?
     @State private var showError = false
 
     init(game: SteamAppInfo, prefixPath: URL?, library: WindowsLibraryStore,
-         steamLibrary: SteamOwnedGamesModel, coordinator: SystemCoordinator) {
+         steamLibrary: SteamOwnedGamesModel, coordinator: SystemCoordinator,
+         launch: @escaping (SteamAppInfo) -> Void = { _ in }) {
+        self.launch = launch
         self.game = game
         self.prefixPath = prefixPath
         self.library = library
@@ -1502,6 +1518,16 @@ private struct SteamProgramDetailsView: View {
                     } else if installing {
                         downloadStatus
                     } else if installed {
+                        // Starts the game; without JIT, StikDebug opens first.
+                        Button {
+                            dismiss()
+                            launch(game)
+                        } label: {
+                            Label(tr("Launch"), systemImage: "play.fill")
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 14)
+                        }
+                        .buttonStyle(.borderedProminent)
                         Button(role: .destructive) {
                             guard let prefixPath else { return }
                             if steamLibrary.uninstall(appID: game.appID, prefixPath: prefixPath) {
@@ -2298,6 +2324,8 @@ extension WindowsWorkspaceView {
         let selected = currentShelf == item
         return Button {
             withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { shelf = item }
+            // A game's tile opens its details, where Launch starts it.
+            if case .store = item {} else { openSettings(item) }
         } label: {
             VStack(spacing: 6) {
                 shelfArtwork(item)
@@ -2523,51 +2551,32 @@ extension WindowsWorkspaceView {
         }
     }
 
-    /// An installed (or installing) game: big art, Play and its settings.
-    @ViewBuilder
+    /// The selected game's name. Its cover is the shelf backdrop
+    /// (`shelfBackdrop`); its tile opens the details, where Launch starts it.
     private func gamePage(_ item: ShelfItem) -> some View {
-        // One tap on the cover starts the game; pressing and holding it opens
-        // the game's details. No card, title or buttons under the title.
-        VStack(alignment: .center, spacing: 16) {
-            gameHero(item)
-                .frame(maxWidth: .infinity)
-                .frame(height: isCompact ? 180 : 260)
-                .clipShape(RoundedRectangle(cornerRadius: 14))
-                .overlay(RoundedRectangle(cornerRadius: 14).stroke(lineColor, lineWidth: 1))
-                .contentShape(RoundedRectangle(cornerRadius: 14))
-                .onLongPressGesture(minimumDuration: 0.4) { openSettings(item) }
-                .onTapGesture { launchFromCover(item) }
-                .accessibilityAddTraits(.isButton)
-                .accessibilityHint(tr("Tap to play. Touch and hold for details."))
-            Text(shelfTitle(item))
-                .font(.system(size: isCompact ? 22 : 28, weight: .semibold))
-                .foregroundColor(textColor)
-                .multilineTextAlignment(.center)
-                .lineLimit(2)
-                .frame(maxWidth: .infinity, alignment: .center)
-        }
-        .frame(maxWidth: .infinity, alignment: .center)
+        Text(shelfTitle(item))
+            .font(.system(size: isCompact ? 22 : 28, weight: .semibold))
+            .foregroundColor(textColor)
+            .multilineTextAlignment(.center)
+            .lineLimit(2)
+            .frame(maxWidth: .infinity, alignment: .center)
     }
 
-    /// A tap on the cover: starts an installed game; a paused Steam install
-    /// resumes. A game still downloading is left alone.
-    private func launchFromCover(_ item: ShelfItem) {
-        switch item {
-        case .steam(let id):
-            guard let game = steamLibrary.games.first(where: { $0.appID == id }) else { return }
-            if steamLibrary.pausedInstalls.contains(id) { steamLibrary.resumeInstall(appID: id) }
-            else if !steamLibrary.installingApps.contains(id) { launchSteamGame(game) }
-        case .gog(let id):
-            if let game = gogLibrary.installed[id] { launchGOGGame(game) }
-        case .epic(let app):
-            if let game = epicLibrary.installed[app] { launchEpicGame(game) }
-        case .exe(let path):
-            let url = URL(fileURLWithPath: path)
-            let profile = windowsLibrary.profile(for: windowsLibrary.profileID(for: url),
-                                                 title: url.deletingPathExtension().lastPathComponent)
-            coordinator.launchWindowsExecutable(at: url, profile: profile)
-        case .gogInstalling, .epicInstalling, .store:
-            break
+    /// Game backdrop: the selected game's cover fills the screen behind the
+    /// store and game tiles, blurred and darkened. It does nothing when touched.
+    @ViewBuilder
+    var shelfBackdrop: some View {
+        if case .store = currentShelf {
+            EmptyView()
+        } else {
+            gameHero(currentShelf)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .clipped()
+                .blur(radius: 24)
+                .overlay(Color.black.opacity(0.55))
+                .ignoresSafeArea()
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
         }
     }
 
