@@ -2,13 +2,13 @@ import unittest
 from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parents[2]
-FEX = (ROOT / "iDeck/NativeRuntime/FEXRuntime.cpp").read_text(encoding="utf-8")
-RUNTIME = (ROOT / "iDeck/NativeRuntime/MadeiraRuntimeBridge.mm").read_text(encoding="utf-8")
-COORDINATOR = (ROOT / "iDeck/SystemCoordinator.swift").read_text(encoding="utf-8")
-BRIDGE = (ROOT / "iDeck/iDeck-Bridging-Header.h").read_text(encoding="utf-8")
-HEADER = (ROOT / "iDeck/NativeRuntime/MadeiraRuntimeBridge.h").read_text(encoding="utf-8")
-JIT_SCRIPT = (ROOT / "scripts/jit/universal.jitscript").read_text(encoding="utf-8")
+from support import ROOT, repo_text
+FEX = repo_text("iDeck/NativeRuntime/FEXRuntime.cpp")
+RUNTIME = repo_text("iDeck/NativeRuntime/MadeiraRuntimeBridge.mm")
+COORDINATOR = repo_text("iDeck/SystemCoordinator.swift")
+BRIDGE = repo_text("iDeck/iDeck-Bridging-Header.h")
+HEADER = repo_text("iDeck/NativeRuntime/MadeiraRuntimeBridge.h")
+JIT_SCRIPT = repo_text("scripts/jit/universal.jitscript")
 
 
 class FEXJITGuardTests(unittest.TestCase):

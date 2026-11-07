@@ -179,15 +179,15 @@ For more detail, read [Game startup and black-screen diagnostics](docs/IDECK_GAM
 - [Microsoft Visual C++ DLL setup](docs/MICROSOFT_VISUAL_CPP_DLLS.md)
 - [Precompiled Madeira runtime](docs/MADEIRA_PREBUILT_RUNTIME.md)
 - [Game startup diagnostics](docs/IDECK_GAME_STARTUP_DIAGNOSTICS.md)
-- [Madeira vs. iDeck Windows runtime differences](docs/WINE_RUNTIME_GAP_ANALYSIS.md)
-- [Madeira integration status](docs/MADEIRA_RUNTIME_INTEGRATION.md)
-- [Optional D3D12 MSC 4.0 Beta 3, WoW64 and on-device acceptance](docs/MADEIRA_EXPANDED_PROFILES.md)
+- [Madeira vs. iDeck Windows runtime differences](docs/archive/WINE_RUNTIME_GAP_ANALYSIS.md)
+- [Madeira integration status](docs/archive/MADEIRA_RUNTIME_INTEGRATION.md)
+- [Optional D3D12 MSC 4.0 Beta 3, WoW64 and on-device acceptance](docs/archive/MADEIRA_EXPANDED_PROFILES.md)
 - [Native Madeira build](docs/IDECK_MADEIRA_NATIVE_BUILD.md)
-- [Native linking and verification](docs/MADEIRA_NATIVE_LINKING.md)
+- [Native linking and verification](docs/archive/MADEIRA_NATIVE_LINKING.md)
 - [Native runtime modules](docs/NATIVE_RUNTIME_MODULES.md)
-- [iPadOS memory management](docs/IOS_MEMORY_MANAGEMENT.md)
-- [Native performance](docs/NATIVE_PERFORMANCE.md)
-- [Steam download performance](docs/STEAM_DOWNLOAD_PERFORMANCE.md)
+- [iPadOS memory management](docs/archive/IOS_MEMORY_MANAGEMENT.md)
+- [Native performance](docs/archive/NATIVE_PERFORMANCE.md)
+- [Steam download performance](docs/archive/STEAM_DOWNLOAD_PERFORMANCE.md)
 
 ## Licenses, security, and attribution
 

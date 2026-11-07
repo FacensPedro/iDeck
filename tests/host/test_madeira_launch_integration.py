@@ -1,12 +1,12 @@
 import unittest
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
-NATIVE = (ROOT / "iDeck/NativeRuntime/MadeiraRuntimeBridge.mm").read_text(encoding="utf-8")
-BRIDGE = (ROOT / "iDeck/NativeRuntime/WineProcessBridge.mm").read_text(encoding="utf-8")
-HEADER = (ROOT / "iDeck/NativeRuntime/MadeiraRuntimeBridge.h").read_text(encoding="utf-8")
-ENVIRONMENT = (ROOT / "iDeck/WindowsEnvironment.swift").read_text(encoding="utf-8")
-COORDINATOR = (ROOT / "iDeck/SystemCoordinator.swift").read_text(encoding="utf-8")
+from support import ROOT, repo_text
+NATIVE = repo_text("iDeck/NativeRuntime/MadeiraRuntimeBridge.mm")
+BRIDGE = repo_text("iDeck/NativeRuntime/WineBridge.mm")
+HEADER = repo_text("iDeck/NativeRuntime/MadeiraRuntimeBridge.h")
+ENVIRONMENT = repo_text("iDeck/WindowsEnvironment.swift")
+COORDINATOR = repo_text("iDeck/SystemCoordinator.swift")
 
 
 class MadeiraLaunchIntegrationTests(unittest.TestCase):
@@ -48,7 +48,7 @@ class MadeiraLaunchIntegrationTests(unittest.TestCase):
         self.assertIn("[iDeck native launch] EINVAL", COORDINATOR)
 
     def test_windows_shell_pe_machine_and_precise_preflight(self):
-        glue = (ROOT / "iDeck/MadeiraDock/IDeckDockGlue.swift").read_text(encoding="utf-8")
+        glue = repo_text("iDeck/MadeiraDock/IDeckDockGlue.swift")
         self.assertIn("actualMachine == 0xA641", ENVIRONMENT)
         self.assertNotIn("actualMachine == 0xAA64", ENVIRONMENT)
         self.assertIn('drive_c/windows/system32/cmd.exe', ENVIRONMENT)

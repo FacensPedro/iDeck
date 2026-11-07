@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parents[2]
+from support import ROOT, repo_text
 PATCH = ROOT / "patches/madeira-game-compat-backports.patch"
 FETCH = ROOT / "scripts/fetch_madeira_sources.sh"
 TARGETS = (
@@ -91,9 +91,9 @@ class MadeiraCompatibilityBackportsTests(unittest.TestCase):
         self.assertIn('git -C "$DEST" apply --check "$COMPAT_PATCH"', fetch)
 
     def test_automatic_vc_setup_preserves_madeira_documents_overlay(self):
-        settings = (ROOT / "iDeck/SettingsView.swift").read_text(encoding="utf-8")
-        bootstrap = (ROOT / "iDeck/VisualCRuntimeBootstrap.swift").read_text(encoding="utf-8")
-        coordinator = (ROOT / "iDeck/SystemCoordinator.swift").read_text(encoding="utf-8")
+        settings = repo_text("iDeck/SettingsView.swift")
+        bootstrap = repo_text("iDeck/VisualCRuntimeBootstrap.swift")
+        coordinator = repo_text("iDeck/SystemCoordinator.swift")
         self.assertNotIn('settingsSection(title: tr("Windows compatibility"))', settings)
         self.assertIn('documents.appendingPathComponent("vcruntime", isDirectory: true)', bootstrap)
         self.assertIn('VisualCRuntimeBootstrap.extractAndInstall(', coordinator)

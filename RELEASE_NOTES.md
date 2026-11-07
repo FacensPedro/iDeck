@@ -1,7 +1,6 @@
 ## What's Changed
-- Initial setup installs the whole Windows runtime in one step: x64 and x86 environments, Visual C++ DLLs (x64, x86 and 2005-2013), .NET (Wine Mono) and Steam's DLLs.
-- Steam's video client DLLs (FFmpeg and SDL3) are downloaded from Valve's official update server and verified, so they no longer have to be imported by hand.
-- Dock installation moved to its own tab in the initial setup.
-- Game library cards redesigned: full-width 2:3 covers with rounded corners and left-aligned titles.
-- EA app and Ubisoft Connect logos no longer show a background tile.
-- Updated the application version to 1.0.14 (build 15).
+- Simplified the native runtime: the Wine process and wineserver bridges are one module.
+- Unmodified upstream files are kept separately from iDeck's own code, which makes runtime updates simpler.
+- Faster, simpler automated checks: one host test workflow and one build and release workflow.
+- Documentation reorganized; older reports moved to an archive.
+- Updated the application version to 1.0.15 (build 16).

@@ -6,8 +6,7 @@ The files in `iDeck/NativeRuntime/` are actual C, C++, Objective-C and Objective
 | --- | --- |
 | MadeiraRuntimeBridge.h/.mm | Stable adapter API and guarded runtime preparation; intentionally does not export the production launch ABI |
 | FEXRuntime.cpp | Checks and invokes an already linked FEX initializer |
-| WineServerBridge.m | Checks and invokes an already linked Wine server initializer |
-| WineProcessBridge.mm | Checks and invokes an already linked Wine process entry point |
+| WineBridge.mm | Checks and invokes the linked Wine process entry point and wineserver |
 | MadeiraPlatform.mm | Detects the existing native DXMT presentation entry point |
 | MadeiraCore.cpp | Detects the existing Madeira D3D12 canary symbol |
 | MadeiraPlatform.mm | Creates/releases an offscreen Metal texture owned by the caller |
@@ -45,4 +44,4 @@ A functional iOS IPA and a successful on-device Windows game test are **not**
 implied by these files. GitHub-hosted build jobs are subject to repository
 billing and runner availability. Rust is optional, not required.
 
-For module ownership rules, test commands, and benchmark requirements, see [Native Performance Foundation](NATIVE_PERFORMANCE.md). These utilities do not independently improve FPS or establish Windows game compatibility.
+For module ownership rules, test commands, and benchmark requirements, see [Native Performance Foundation](archive/NATIVE_PERFORMANCE.md). These utilities do not independently improve FPS or establish Windows game compatibility.

@@ -1,11 +1,11 @@
 import unittest
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
-SETTINGS = (ROOT / "iDeck/SettingsView.swift").read_text(encoding="utf-8")
-COORDINATOR = (ROOT / "iDeck/SystemCoordinator.swift").read_text(encoding="utf-8")
-LOCALIZATION = (ROOT / "iDeck/Localization.swift").read_text(encoding="utf-8")
-ENVIRONMENT = (ROOT / "iDeck/WindowsEnvironment.swift").read_text(encoding="utf-8")
+from support import ROOT, repo_text
+SETTINGS = repo_text("iDeck/SettingsView.swift")
+COORDINATOR = repo_text("iDeck/SystemCoordinator.swift")
+LOCALIZATION = repo_text("iDeck/Localization.swift")
+ENVIRONMENT = repo_text("iDeck/WindowsEnvironment.swift")
 
 
 class AutomaticWindowsRuntimeSettingsTests(unittest.TestCase):

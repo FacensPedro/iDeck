@@ -1,24 +1,24 @@
 import unittest
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
-VIEW = (ROOT / "iDeck/MainView.swift").read_text(encoding="utf-8")
-PROJECT = (ROOT / "iDeck.xcodeproj/project.pbxproj").read_text(encoding="utf-8")
-SAVE = (ROOT / "iDeck/SessionControlsSheet.swift").read_text(encoding="utf-8")
-RELAY = (ROOT / "iDeck/IRelayClient.swift").read_text(encoding="utf-8")
-EPIC = (ROOT / "iDeck/EpicLibrary.swift").read_text(encoding="utf-8")
-GOG = (ROOT / "iDeck/GOGContentSystem.swift").read_text(encoding="utf-8")
-WORKFLOW = (ROOT / ".github/workflows/ios.yml").read_text(encoding="utf-8")
-NOTES = (ROOT / "RELEASE_NOTES.md").read_text(encoding="utf-8")
-SETTINGS = (ROOT / "iDeck/SettingsView.swift").read_text(encoding="utf-8")
-DOWNLOAD_SPEED = (ROOT / "iDeck/DownloadSpeed.swift").read_text(encoding="utf-8")
+from support import ROOT, repo_text
+VIEW = repo_text("iDeck/MainView.swift")
+PROJECT = repo_text("iDeck.xcodeproj/project.pbxproj")
+SAVE = repo_text("iDeck/SessionControlsSheet.swift")
+RELAY = repo_text("iDeck/IRelayClient.swift")
+EPIC = repo_text("iDeck/EpicLibrary.swift")
+GOG = repo_text("iDeck/GOGContentSystem.swift")
+WORKFLOW = repo_text(".github/workflows/ios.yml")
+NOTES = repo_text("RELEASE_NOTES.md")
+SETTINGS = repo_text("iDeck/SettingsView.swift")
+DOWNLOAD_SPEED = repo_text("iDeck/DownloadSpeed.swift")
 
 
 class ReleaseInterfaceCDNTests(unittest.TestCase):
-    def test_version_is_one_zero_fourteen_build_fifteen(self):
+    def test_version_is_one_zero_fifteen_build_sixteen(self):
         self.assertNotIn("MARKETING_VERSION = 1.0.0;", PROJECT)
-        self.assertEqual(PROJECT.count("MARKETING_VERSION = 1.0.14;"), 6)
-        self.assertEqual(PROJECT.count("CURRENT_PROJECT_VERSION = 15;"), 6)
+        self.assertEqual(PROJECT.count("MARKETING_VERSION = 1.0.15;"), 6)
+        self.assertEqual(PROJECT.count("CURRENT_PROJECT_VERSION = 16;"), 6)
 
     def test_store_badges_no_longer_appear_with_game_titles(self):
         self.assertIn("private func cardTitle(_ title: String)", VIEW)
@@ -40,8 +40,8 @@ class ReleaseInterfaceCDNTests(unittest.TestCase):
         self.assertNotIn('Text(tr("Madeira"))', top)
 
     def test_legacy_steam_sizes_and_store_library_response(self):
-        metadata = (ROOT / "iDeck/SwiftSteam/Library/SteamAppInfo.swift").read_text()
-        device = (ROOT / "iDeck/IRelayDeviceService.swift").read_text()
+        metadata = repo_text("iDeck/SwiftSteam/Library/SteamAppInfo.swift")
+        device = repo_text("iDeck/IRelayDeviceService.swift")
         self.assertIn("func displaySizeForWindows(installedBytes: UInt64 = 0)", metadata)
         self.assertIn("case 22330: return 4.6", metadata)
         self.assertIn("case 489830: return 12.0", metadata)

@@ -8,7 +8,7 @@ import zipfile
 from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parents[2]
+from support import ROOT, repo_text
 RUNNER = r"""
 import Foundation
 @main
@@ -49,8 +49,8 @@ struct IPAZipHostTests {
 
 
 class HuskIPAExtractionTests(unittest.TestCase):
+    @unittest.skipUnless(shutil.which("xcrun"), "Runs on the macOS GitHub Actions host (iOS Build)")
     def test_real_zip_extraction(self):
-        self.assertTrue(shutil.which("xcrun"), "Runs on the macOS GitHub Actions host")
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             good = root / "Husk.ipa"
@@ -86,7 +86,7 @@ class HuskIPAExtractionTests(unittest.TestCase):
             mismatched.write_bytes(corrupted)
             with zipfile.ZipFile(bomb, "w", compression=zipfile.ZIP_DEFLATED) as archive:
                 archive.writestr("Payload/Husk.app/padding.dat", b"A" * (2 * 1024 * 1024))
-            source = (ROOT / "iDeck/PrefixInstaller.swift").read_text(encoding="utf-8")
+            source = repo_text("iDeck/PrefixInstaller.swift")
             start = source.index("enum ZipError: Error {")
             actual_extractor = root / "Extractor.swift"
             actual_extractor.write_text(

@@ -2,7 +2,7 @@ import unittest
 from pathlib import Path
 import plistlib
 
-ROOT = Path(__file__).resolve().parents[2]
+from support import ROOT, repo_text
 REQUIRED = (
     "com.apple.developer.kernel.increased-memory-limit",
     "com.apple.developer.kernel.extended-virtual-addressing",
@@ -17,7 +17,7 @@ class MadeiraEntitlementTests(unittest.TestCase):
             self.assertIs(entitlements.get(key), True)
 
     def test_signed_entitlements_must_be_verified_off_device(self):
-        checker = (ROOT / "scripts/verify_signed_madeira_app.py").read_text()
+        checker = repo_text("scripts/verify_signed_madeira_app.py")
         self.assertIn("codesign", checker)
         self.assertIn("embedded.mobileprovision", checker)
         self.assertIn("security", checker)

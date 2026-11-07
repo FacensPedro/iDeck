@@ -3,11 +3,11 @@ import tempfile
 import unittest
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
-CPP = (ROOT / "iDeck/NativeRuntime/FEXRuntime.cpp").read_text(encoding="utf-8")
-HEADER = (ROOT / "iDeck/NativeRuntime/MadeiraRuntimeBridge.h").read_text(encoding="utf-8")
-SETTINGS = (ROOT / "iDeck/SettingsView.swift").read_text(encoding="utf-8")
-POLICY = (ROOT / "iDeck/NativeRuntime/JITRegionPolicy.h").read_text(encoding="utf-8")
+from support import ROOT, repo_text
+CPP = repo_text("iDeck/NativeRuntime/FEXRuntime.cpp")
+HEADER = repo_text("iDeck/NativeRuntime/MadeiraRuntimeBridge.h")
+SETTINGS = repo_text("iDeck/SettingsView.swift")
+POLICY = repo_text("iDeck/NativeRuntime/JITRegionPolicy.h")
 
 
 class MadeiraStage7JITTests(unittest.TestCase):

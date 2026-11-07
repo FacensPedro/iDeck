@@ -1,12 +1,10 @@
 import unittest
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
-
-
+from support import ROOT, repo_text
 class MadeiraBlackScreenCloseAndLocalizationTests(unittest.TestCase):
     def test_compositor_sync_is_not_gated_on_window_resizing(self):
-        renderer = (ROOT / "iDeck/WindowsRendererView.swift").read_text()
+        renderer = repo_text("iDeck/WindowsRendererView.swift")
         start = renderer.index("fileprivate static func layoutViewport(")
         end = renderer.index("fileprivate static func detachViewport(", start)
         code = renderer[start:end]
@@ -25,15 +23,15 @@ class MadeiraBlackScreenCloseAndLocalizationTests(unittest.TestCase):
         self.assertLess(guard_end, desktop)
 
     def test_guest_liveness_is_not_reported_as_rendered_app(self):
-        coordinator = (ROOT / "iDeck/SystemCoordinator.swift").read_text()
-        view = (ROOT / "iDeck/GameSessionView.swift").read_text()
+        coordinator = repo_text("iDeck/SystemCoordinator.swift")
+        view = repo_text("iDeck/GameSessionView.swift")
         self.assertIn('? "Wine started; waiting for game..." : self.nativeLaunchFailure(result)', coordinator)
         self.assertIn("WindowsRendererView.refreshNativeDisplay()", view)
         self.assertIn("metrics.receivedNewFrames", view)
         self.assertIn('coordinator.setWindowsStatus("Running")', view)
 
     def test_close_retries_are_bounded_and_safe(self):
-        coordinator = (ROOT / "iDeck/SystemCoordinator.swift").read_text()
+        coordinator = repo_text("iDeck/SystemCoordinator.swift")
         self.assertIn("private var windowsCloseAttempts = 0", coordinator)
         self.assertIn("windowsCloseAttempts < 3", coordinator)
         self.assertIn("seconds >= Double((windowsCloseAttempts + 1) * 4)", coordinator)
@@ -44,9 +42,9 @@ class MadeiraBlackScreenCloseAndLocalizationTests(unittest.TestCase):
         self.assertNotIn("pthread_cancel(", coordinator)
 
     def test_orphan_wineserver_can_only_be_stopped_after_guest_finished(self):
-        server = (ROOT / "iDeck/NativeRuntime/WineServerBridge.m").read_text()
-        coordinator = (ROOT / "iDeck/SystemCoordinator.swift").read_text()
-        native = (ROOT / "iDeck/NativeRuntime/MadeiraStaticABI.h").read_text()
+        server = repo_text("iDeck/NativeRuntime/WineBridge.mm")
+        coordinator = repo_text("iDeck/SystemCoordinator.swift")
+        native = repo_text("iDeck/NativeRuntime/MadeiraStaticABI.h")
         self.assertIn("void wineserver_stop(void);", native)
         self.assertIn("bool ideck_wineserver_stop_if_idle(void)", server)
         self.assertIn("!ideck_wineprocess_thread_finished()", server)
@@ -59,7 +57,7 @@ class MadeiraBlackScreenCloseAndLocalizationTests(unittest.TestCase):
         self.assertNotIn("kill(getpid()", server)
 
     def test_all_requested_portuguese_and_spanish_ui_strings_exist(self):
-        source = (ROOT / "iDeck/Localization.swift").read_text()
+        source = repo_text("iDeck/Localization.swift")
         for key in (
             "Closing Wine and wineserver...",
             "Wine did not close",
@@ -76,7 +74,7 @@ class MadeiraBlackScreenCloseAndLocalizationTests(unittest.TestCase):
                 self.assertIn('"es":', source[pos:pos + 700])
 
     def test_jit_copy_is_removed_and_signed_update_handoff_is_available(self):
-        source = (ROOT / "iDeck/SettingsView.swift").read_text()
+        source = repo_text("iDeck/SettingsView.swift")
         self.assertNotIn("copyJITDiagnostics", source)
         self.assertNotIn('tr("Copy JIT diagnostics")', source)
         self.assertIn("!coordinator.isJITEnabled", source)
@@ -85,8 +83,8 @@ class MadeiraBlackScreenCloseAndLocalizationTests(unittest.TestCase):
         self.assertIn("updater.openIDeckReleases()", source)
 
     def test_closing_and_child_process_controls_use_translation(self):
-        session = (ROOT / "iDeck/GameSessionView.swift").read_text()
-        main = (ROOT / "iDeck/MainView.swift").read_text()
+        session = repo_text("iDeck/GameSessionView.swift")
+        main = repo_text("iDeck/MainView.swift")
         self.assertIn('Text(tr("Closing Wine and wineserver..."))', session)
         self.assertIn('.alert(tr("Wine did not close")', session)
         self.assertIn("Text(tr(coordinator.windowsCloseWarning ?? \"\"))", session)

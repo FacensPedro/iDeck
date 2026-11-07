@@ -5,7 +5,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 COORDINATOR = (ROOT / "iDeck/SystemCoordinator.swift").read_text()
 NATIVE = (ROOT / "iDeck/NativeRuntime/MadeiraRuntimeBridge.mm").read_text()
 PATCH = (ROOT / "patches/madeira-repeat-wine-sessions.patch").read_text()
-BRIDGE = (ROOT / "iDeck/NativeRuntime/WineProcessBridge.mm").read_text()
+BRIDGE = (ROOT / "iDeck/NativeRuntime/WineBridge.mm").read_text()
 
 
 class MadeiraSecondLaunchCloseContractTests(unittest.TestCase):
@@ -40,10 +40,6 @@ class MadeiraSecondLaunchCloseContractTests(unittest.TestCase):
 
     def test_graceful_close_is_real_alt_f4_not_forced_host_kill(self):
         self.assertIn("bool ideck_wineprocess_request_close(void)", BRIDGE)
-        self.assertIn("post(0x12, 1)", BRIDGE)
-        self.assertIn("post(0x73, 1)", BRIDGE)
-        self.assertIn("post(0x73, 0)", BRIDGE)
-        self.assertIn("post(0x12, 0)", BRIDGE)
         self.assertIn('windowsCloseAttempts < 3', COORDINATOR)
         self.assertIn('seconds >= 15', COORDINATOR)
         self.assertIn('func retryCloseWindowsSession()', COORDINATOR)

@@ -1,15 +1,15 @@
 import unittest
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
-VIEW = (ROOT / "iDeck/GameSessionView.swift").read_text()
-BRIDGE = (ROOT / "iDeck/NativeRuntime/WineProcessBridge.mm").read_text()
-HEADER = (ROOT / "iDeck/NativeRuntime/MadeiraRuntimeBridge.h").read_text()
-NATIVE = (ROOT / "iDeck/NativeRuntime/MadeiraRuntimeBridge.mm").read_text()
-ENTITLEMENTS = (ROOT / "iDeck/iDeck.entitlements").read_text()
-PROFILES = (ROOT / "iDeck/WindowsLibraryModels.swift").read_text()
-ENVIRONMENT = (ROOT / "iDeck/WindowsEnvironment.swift").read_text()
-UI = (ROOT / "iDeck/MainView.swift").read_text()
+from support import ROOT, repo_text
+VIEW = repo_text("iDeck/GameSessionView.swift")
+BRIDGE = repo_text("iDeck/NativeRuntime/WineBridge.mm")
+HEADER = repo_text("iDeck/NativeRuntime/MadeiraRuntimeBridge.h")
+NATIVE = repo_text("iDeck/NativeRuntime/MadeiraRuntimeBridge.mm")
+ENTITLEMENTS = repo_text("iDeck/iDeck.entitlements")
+PROFILES = repo_text("iDeck/WindowsLibraryModels.swift")
+ENVIRONMENT = repo_text("iDeck/WindowsEnvironment.swift")
+UI = repo_text("iDeck/MainView.swift")
 
 
 class WineStartupSessionTests(unittest.TestCase):
@@ -22,14 +22,14 @@ class WineStartupSessionTests(unittest.TestCase):
         self.assertIn("Startup milestone, not the game's internal loading percentage.", VIEW)
 
     def test_close_uses_native_madeira_keyboard_queue(self):
-        coordinator = (ROOT / "iDeck/SystemCoordinator.swift").read_text()
+        coordinator = repo_text("iDeck/SystemCoordinator.swift")
         self.assertIn("Button(action: coordinator.requestCloseWindowsSession)", VIEW)
         self.assertIn("ideck_wineprocess_request_close()", coordinator)
         self.assertIn("ideck_wineprocess_request_close(void)", HEADER)
         self.assertIn("&winios_post_key", BRIDGE)
         self.assertIn("void winios_post_key(int vk, int down);",
-                      (ROOT / "iDeck/NativeRuntime/MadeiraStaticABI.h").read_text())
-        close = BRIDGE.split('extern "C" bool ideck_wineprocess_request_close(void)', 1)[1]
+                      repo_text("iDeck/NativeRuntime/MadeiraStaticABI.h"))
+        close = BRIDGE.split('extern "C" bool ideck_wineprocess_request_close(void)', 1)[1].split('// MARK: - wineserver', 1)[0]
         self.assertIn("#if defined(IDECK_NATIVE_MADEIRA_ENABLED)", close)
         self.assertNotIn("dlsym(", close)
         self.assertIn("post(0x12, 1)", BRIDGE)

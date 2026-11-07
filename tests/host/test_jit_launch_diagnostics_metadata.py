@@ -1,12 +1,12 @@
 import unittest
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
-MAIN = (ROOT / "iDeck/MainView.swift").read_text(encoding="utf-8")
-COORD = (ROOT / "iDeck/SystemCoordinator.swift").read_text(encoding="utf-8")
-BUGS = (ROOT / "iDeck/BugReportView.swift").read_text(encoding="utf-8")
-SERVICE = (ROOT / "iDeck/IRelayDeviceService.swift").read_text(encoding="utf-8")
-NOTES = (ROOT / "RELEASE_NOTES.md").read_text(encoding="utf-8")
+from support import ROOT, repo_text
+MAIN = repo_text("iDeck/MainView.swift")
+COORD = repo_text("iDeck/SystemCoordinator.swift")
+BUGS = repo_text("iDeck/BugReportView.swift")
+SERVICE = repo_text("iDeck/IRelayDeviceService.swift")
+NOTES = repo_text("RELEASE_NOTES.md")
 
 class LauncherJITAndDiagnosticsTests(unittest.TestCase):
     def test_nonsteam_launchers_use_existing_auto_jit_handshake(self):

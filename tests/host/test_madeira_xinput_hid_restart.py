@@ -5,7 +5,7 @@ import unittest
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 PAD = (ROOT / "iDeck/NativeRuntime/DirectInputBridge.mm").read_text()
 NATIVE = (ROOT / "iDeck/NativeRuntime/MadeiraRuntimeBridge.mm").read_text()
-BRIDGE = (ROOT / "iDeck/NativeRuntime/WineProcessBridge.mm").read_text()
+BRIDGE = (ROOT / "iDeck/NativeRuntime/WineBridge.mm").read_text()
 COORDINATOR = (ROOT / "iDeck/SystemCoordinator.swift").read_text()
 HEADER = (ROOT / "iDeck/NativeRuntime/MadeiraRuntimeBridge.h").read_text()
 INPUT = (ROOT / "iDeck/WineInputBridge.swift").read_text()

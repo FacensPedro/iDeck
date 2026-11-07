@@ -10,16 +10,16 @@ NATIVE = ROOT / 'iDeck/NativeRuntime'
 
 class WineStaticLinkTests(unittest.TestCase):
     def test_native_close_uses_real_winios_key_abi(self):
-        source = (NATIVE / 'WineProcessBridge.mm').read_text()
+        source = (NATIVE / 'WineBridge.mm').read_text()
         abi = (NATIVE / 'MadeiraStaticABI.h').read_text()
         self.assertIn('void winios_post_key(int vk, int down);', abi)
-        close = source.split('extern "C" bool ideck_wineprocess_request_close(void)', 1)[1]
+        close = source.split('extern "C" bool ideck_wineprocess_request_close(void)', 1)[1].split('// MARK: - wineserver', 1)[0]
         self.assertIn('&winios_post_key', close)
         self.assertNotIn('dlsym(', close)
         self.assertIn('return false;', close)
 
     def test_availability_requires_linked_native_wineserver(self):
-        server = (NATIVE / 'WineServerBridge.m').read_text()
+        server = (NATIVE / 'WineBridge.mm').read_text()
         fn = server.split('bool ideck_wineserver_available(void)', 1)[1].split('\n}', 1)[0]
         self.assertIn('&wineserver_start', fn)
         self.assertIn('&wineserver_is_ready', fn)
@@ -28,7 +28,7 @@ class WineStaticLinkTests(unittest.TestCase):
     def test_native_bridge_calls_linked_implementation_and_requires_it(self):
         compiler = shutil.which('c++')
         self.assertIsNotNone(compiler, 'C++ compiler required')
-        source = (NATIVE / 'WineProcessBridge.mm').read_text()
+        source = (NATIVE / 'WineBridge.mm').read_text()
         # Compile the real portable process ABI; only the trailing UI key-up
         # dispatch block requires Apple's Objective-C runtime.
         source = source.split('extern "C" bool ideck_wineprocess_request_close')[0]
