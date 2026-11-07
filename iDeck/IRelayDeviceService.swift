@@ -31,8 +31,6 @@ final class IRelayDeviceService: @unchecked Sendable {
         SteamInstallPaths.libraryRelative + "/common/",
         "GOG Games/",
         "Program Files/Epic Games/",
-        // Games Ubisoft Connect installed on the PC, copied by iRelay.
-        UbisoftLibrary.installRoot + "/",
     ]
 
     // Transfers stay below the game: SHA-1 checks and file writes must not compete
@@ -535,16 +533,11 @@ final class IRelayDeviceService: @unchecked Sendable {
         for (id, game) in ea.installed where !eaListed.contains(id) {
             eaGames.append(["id": id, "title": game.title, "cover": "", "installed": true, "size": game.installBytes])
         }
-        let ubisoft = UbisoftLibrary.shared
-        ubisoft.reload()
         return [
             "steam": ["signedIn": SteamSignIn.isSignedIn || !records.isEmpty, "account": SteamSignIn.accountName ?? "", "games": steamGames],
             "gog": ["signedIn": gog.isSignedIn || !gogInstalled.isEmpty, "games": gogGames],
             "epic": ["signedIn": epic.signedIn || !epic.installed.isEmpty, "games": epicGames],
             "ea": ["signedIn": ea.signedIn || !ea.installed.isEmpty, "games": eaGames],
-            "ubisoft": ["clientInstalled": UbisoftLibrary.clientInstalled,
-                        "games": ubisoft.installed.values.map { ["id": $0.id, "title": $0.title, "folder": $0.folder,
-                                                                 "installed": true, "size": $0.installBytes] }],
         ]
     }
 
@@ -634,15 +627,6 @@ final class IRelayDeviceService: @unchecked Sendable {
                 throw FinishError(errorDescription: "Invalid Epic install record.")
             }
             EpicLibrary.shared.registerTransferred(game)
-        case "ubisoft":
-            guard let id = json["id"] as? String, !id.isEmpty, id.allSatisfy({ $0.isNumber || $0.isLetter }),
-                  let folderPath = (json["folder"] as? String).flatMap(clean),
-                  folderPath.hasPrefix(UbisoftLibrary.installRoot + "/"), folder(folderPath) != nil else {
-                throw FinishError(errorDescription: "Invalid Ubisoft install record.")
-            }
-            let game = UbisoftInstalledGame(id: id, title: json["title"] as? String ?? folderPath,
-                                            folder: folderPath, installBytes: (json["size"] as? NSNumber)?.int64Value ?? 0)
-            UbisoftLibrary.shared.register(game)
         default:
             throw FinishError(errorDescription: "Unknown store.")
         }

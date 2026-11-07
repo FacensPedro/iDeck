@@ -51,7 +51,7 @@ class LibraryPresentationTests(unittest.TestCase):
     def test_console_shelf_lists_stores_then_games(self):
         view = read("iDeck/MainView.swift")
         self.assertIn("enum ShelfItem: Hashable", view)
-        self.assertIn("ForEach([GameStore.steam, .gog, .epic, .ea, .ubisoft], id: \\.self)", view)
+        self.assertIn("ForEach([GameStore.steam, .gog, .epic, .ea], id: \\.self)", view)
         self.assertIn("consoleShelf", view)
         self.assertIn("shelfContent", view)
         # Collapsible per-store lists were replaced by the shelf.

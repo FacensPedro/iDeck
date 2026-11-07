@@ -33,10 +33,9 @@ class PairingETAResolutionTests(unittest.TestCase):
         self.assertIn("failures.removeAll()", SERVICE)
         self.assertIn('Data("IRELAY-DENIED\\n".utf8)', TUNNEL)
 
-    def test_store_list_has_ea_and_ubisoft_icons(self):
-        self.assertIn("ForEach([GameStore.steam, .gog, .epic, .ea, .ubisoft]", VIEW)
+    def test_store_list_has_ea_icon(self):
+        self.assertIn("ForEach([GameStore.steam, .gog, .epic, .ea]", VIEW)
         self.assertIn('case .ea: return "StoreBadgeEA"', VIEW)
-        self.assertIn('case .ubisoft: return "StoreBadgeUbisoft"', VIEW)
 
 
 if __name__ == "__main__":

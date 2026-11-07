@@ -938,4 +938,4 @@ private struct GOGLoginWebView: UIViewRepresentable {
 
 // MARK: - Store
 
-enum GameStore { case steam, gog, epic, ea, ubisoft }
+enum GameStore { case steam, gog, epic, ea }
