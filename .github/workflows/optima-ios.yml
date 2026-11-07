@@ -1,0 +1,39 @@
+name: Optima iOS compatibility probe
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'scripts/fetch_optima_sources.py'
+      - '.github/workflows/optima-ios.yml'
+      - 'docs/UBISOFT_OPTIMA_INTEGRATION.md'
+
+permissions:
+  contents: read
+
+jobs:
+  optima-ios:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios
+      - name: Install protobuf compiler
+        run: brew install protobuf
+      - name: Fetch pinned Optima sources
+        run: python3 scripts/fetch_optima_sources.py
+      - name: Validate Optima source license
+        run: |
+          test -f vendor/Optima/LICENSE
+          grep -q 'GPL' vendor/Optima/LICENSE
+      - name: Check upstream Rust code for iOS
+        working-directory: vendor/Optima
+        run: |
+          cargo check --locked --target aarch64-apple-ios
+      - name: Report porting boundary
+        if: always()
+        run: |
+          echo 'This workflow is a compatibility probe, not an iOS staticlib build or iDeck IPA integration.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Upstream Optima is a Linux CLI. Passing cargo check alone does not enable login, downloads, or game launch on iPadOS.' >> "$GITHUB_STEP_SUMMARY"
