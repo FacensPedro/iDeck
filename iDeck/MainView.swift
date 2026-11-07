@@ -1059,6 +1059,8 @@ struct WindowsWorkspaceView: View {
                 ZStack {
                     GOGArtworkView(urls: [game.cover].compactMap { $0 }, fallbackColor: secondaryColor)
                         .libraryCoverFrame()
+                        .contentShape(Rectangle())
+                        .onTapGesture { selectedEAGame = game }
                         .blur(radius: installed == nil && download == nil ? 3 : 0)
                     if installed == nil && download == nil {
                         downloadCoverButton { eaLibrary.install(game.id) }
@@ -1070,8 +1072,6 @@ struct WindowsWorkspaceView: View {
                 Button { selectedEAGame = game } label: { cardTitle(game.title) }
                     .buttonStyle(.plain)
             }
-            .contentShape(Rectangle())
-            .onTapGesture { selectedEAGame = game }
             if let download {
                 switch download.state {
                 case .failed(let message):
