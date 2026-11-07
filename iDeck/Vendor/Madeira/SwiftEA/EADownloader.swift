@@ -185,7 +185,7 @@ struct EARangeStream: AsyncSequence {
 
         func consumed(_ count: Int) {
             lock.lock(); defer { lock.unlock() }
-            waiting = max(0, waiting - count)
+            waiting = Swift.max(0, waiting - count)
             if suspended && waiting < EARangeStream.lowWater {
                 suspended = false
                 task?.resume()

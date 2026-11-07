@@ -13,6 +13,9 @@ class PauseAndEAMemoryTests(unittest.TestCase):
         self.assertIn("task?.suspend()", EA_DOWNLOADER)
         self.assertIn("task?.resume()", EA_DOWNLOADER)
         self.assertIn("flow.consumed(chunk.count)", EA_DOWNLOADER)
+        # Inside an AsyncSequence a bare max(...) is the sequence's own method.
+        stream = EA_DOWNLOADER.split("struct EARangeStream: AsyncSequence", 1)[1].split("\n}\n", 1)[0]
+        self.assertNotRegex(stream, r"(?<![.\w])max\(")
         self.assertIn("try Task.checkCancellation()\n            guard let chunk = try await inner.next()", EA_DOWNLOADER)
 
     def test_pause_shows_paused_at_once(self):
