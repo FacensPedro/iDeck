@@ -72,6 +72,29 @@ int32_t ideck_wine_log_diagnose(const char *path) {
         // synchronization discrepancy. It can coexist with a guest AV; this
         // classification does NOT prove it caused that exception.
         code = IDECK_WINE_LOG_ARM64EC_STALE_IAT_FAULT;
+    } else if (strstr(current_session, "wineserver failed to start") ||
+               strstr(current_session, "wineserver timeout") ||
+               strstr(current_session, "wineserver unexpectedly exited") ||
+               strstr(current_session, "wineserver connection refused")) {
+        code = IDECK_WINE_LOG_WINESERVER;
+    } else if (strstr(current_session, "dxmt] failed") ||
+               strstr(current_session, "d3d12] failed") ||
+               strstr(current_session, "metal presentation failed") ||
+               strstr(current_session, "shader compilation failed") ||
+               strstr(current_session, "no drawable available")) {
+        code = IDECK_WINE_LOG_GRAPHICS;
+    } else if (strstr(current_session, "c000001d") ||
+               strstr(current_session, "illegal instruction") ||
+               strstr(current_session, "unsupported instruction")) {
+        code = IDECK_WINE_LOG_UNSUPPORTED_INSTRUCTION;
+    } else if (strstr(current_session, "usbmux timeout") ||
+               strstr(current_session, "ideck is not listening") ||
+               strstr(current_session, "irelay connection failed")) {
+        code = IDECK_WINE_LOG_IRELAY;
+    } else if (strstr(current_session, "checksum mismatch") ||
+               strstr(current_session, "hash verification failed") ||
+               strstr(current_session, "download integrity failed")) {
+        code = IDECK_WINE_LOG_DOWNLOAD_INTEGRITY;
     } else if (strstr(current_session, "vm_remap failed") ||
         strstr(current_session, "vm_protect(rw) failed") ||
         strstr(current_session, "jit-pool] exhausted") ||
