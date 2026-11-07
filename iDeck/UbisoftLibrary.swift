@@ -49,7 +49,7 @@ struct UbisoftInstalledGame: Codable, Sendable, Equatable, Identifiable {
 
     /// The game's own executable: the largest .exe in its folder (three levels
     /// at most) that is not an installer, crash reporter or launcher.
-    nonisolated static func gameExecutable(_ game: UbisoftInstalledGame) -> URL? {
+    static func gameExecutable(_ game: UbisoftInstalledGame) -> URL? {
         let root = EpicLibrary.drive.appendingPathComponent(game.folder, isDirectory: true)
         guard let walker = FileManager.default.enumerator(at: root, includingPropertiesForKeys: [.fileSizeKey, .isRegularFileKey],
                                                           options: [.skipsHiddenFiles]) else { return nil }
