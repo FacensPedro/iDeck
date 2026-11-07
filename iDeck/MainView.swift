@@ -271,6 +271,7 @@ struct WindowsWorkspaceView: View {
     @ObservedObject private var eaLibrary = EALibrary.shared
     @ObservedObject private var ubisoftLibrary = UbisoftLibrary.shared
     @State private var selectedEpicGame: SelectedEpicGame?
+    @State private var selectedEAGame: EAOwnedGame?
     @State private var selectedGOGGame: GOGGame?
     @AppStorage("library.epicOwnedCollapsed") private var epicOwnedCollapsed = false
     @Environment(\.openURL) private var openURL
@@ -497,6 +498,10 @@ struct WindowsWorkspaceView: View {
         .sheet(item: $selectedEpicGame) { selection in
             EpicGameDetailsSheet(appName: selection.id, epic: epicLibrary, library: windowsLibrary,
                                  coordinator: coordinator) { game in launchEpicGame(game) }
+        }
+        .sheet(item: $selectedEAGame) { game in
+            EAGameDetailsSheet(game: game, ea: eaLibrary, library: windowsLibrary,
+                               coordinator: coordinator) { installed in launchEAGame(installed) }
         }
         .onAppear {
             epicLibrary.start()
@@ -1054,6 +1059,8 @@ struct WindowsWorkspaceView: View {
                 ZStack {
                     GOGArtworkView(urls: [game.cover].compactMap { $0 }, fallbackColor: secondaryColor)
                         .libraryCoverFrame()
+                        .contentShape(Rectangle())
+                        .onTapGesture { selectedEAGame = game }
                         .blur(radius: installed == nil && download == nil ? 3 : 0)
                     if installed == nil && download == nil {
                         downloadCoverButton { eaLibrary.install(game.id) }
@@ -1062,7 +1069,8 @@ struct WindowsWorkspaceView: View {
                 .libraryCoverFrame()
                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 .clipped()
-                cardTitle(game.title)
+                Button { selectedEAGame = game } label: { cardTitle(game.title) }
+                    .buttonStyle(.plain)
             }
             if let download {
                 switch download.state {
@@ -2112,6 +2120,79 @@ private struct GOGGameDetailsSheet: View {
             library: library, coordinator: coordinator
         ) { EmptyView() }
         .task(id: game.id) { await gog.loadSize(for: game) }
+    }
+}
+
+/// EA game details use the same game page as GOG and Epic.
+private struct EAGameDetailsSheet: View {
+    let game: EAOwnedGame
+    @ObservedObject var ea: EALibrary
+    @ObservedObject var library: WindowsLibraryStore
+    @ObservedObject var coordinator: SystemCoordinator
+    let launch: (EAInstalledGame) -> Void
+
+    private var sizeText: String? {
+        if let installed = ea.installed[game.id], installed.installBytes > 0 {
+            return ByteCountFormatter.string(fromByteCount: installed.installBytes, countStyle: .file)
+        }
+        if case .known(_, let bytes)? = ea.sizes[game.id], bytes > 0 {
+            return ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
+        }
+        return tr("Size unavailable")
+    }
+
+    var body: some View {
+        let installed = ea.installed[game.id]
+        let download = ea.downloads[game.id]
+        let failed: String? = {
+            if case .failed(let message) = download?.state { return message }
+            return nil
+        }()
+        let paused: Bool = {
+            if case .paused = download?.state { return true }
+            return false
+        }()
+        let eta: Int? = {
+            guard let download, download.progress.phase == .downloading else { return nil }
+            return DownloadETA.seconds(done: download.progress.doneBytes,
+                                       total: download.progress.totalBytes,
+                                       bytesPerSecond: download.progress.bytesPerSecond)
+        }()
+        StoreGameDetailsView(
+            title: game.title, store: .ea, profileID: "ea:\(game.id)",
+            covers: [game.cover].compactMap { $0 },
+            banners: [game.wide].compactMap { $0 },
+            installed: installed != nil && download == nil,
+            progress: (download != nil && failed == nil) ? download?.progress.fraction : nil,
+            etaSeconds: eta, paused: paused, sizeText: sizeText, errorText: failed,
+            canInstall: game.downloadable,
+            onLaunch: { if let installed { launch(installed) } },
+            onInstall: { ea.install(game.id) },
+            onPause: { ea.pause(game.id) },
+            onStop: { ea.cancel(game.id) },
+            onUninstall: download == nil ? { ea.uninstall(game.id); return true } : nil,
+            library: library, coordinator: coordinator
+        ) {
+            if let installed {
+                DetailCard(title: "EA app") {
+                    DetailValueRow(title: tr("Version"), value: installed.version,
+                                   icon: "number", iconColor: .gray)
+                    if ea.updateAvailable(game.id) {
+                        DetailButtonRow(title: tr("Update"), systemImage: "arrow.down.circle") {
+                            ea.install(game.id)
+                        }
+                    }
+                    DetailButtonRow(title: tr("Repair"), systemImage: "wrench.and.screwdriver",
+                                    showsDivider: false) {
+                        ea.repair(game.id)
+                    }
+                }
+            }
+        }
+        .task(id: game.id) {
+            await ea.loadSize(game.id)
+            await ea.checkForUpdate(game.id)
+        }
     }
 }
 
