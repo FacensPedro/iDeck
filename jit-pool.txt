@@ -11,3 +11,5 @@
 # if you make one, overrides these lines on that device.
 
 268910 = 512    # Cuphead
+Maneater.exe = 512                      # Epic Games launcher executable
+Maneater-Win64-Shipping.exe = 512       # Maneater Unreal Engine shipping executable
