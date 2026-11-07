@@ -142,6 +142,12 @@
 		BEEF20261107000000000410 /* EALicense.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEEF20261107000000000420 /* EALicense.swift */; };
 		BEEF20261107000000000310 /* EAFormats.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEEF20261107000000000320 /* EAFormats.swift */; };
 		BEEF20261107000000000210 /* EADownloader.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEEF20261107000000000220 /* EADownloader.swift */; };
+		C0FFEE202611070000000100 /* GalaxyListener.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE202611070000000200 /* GalaxyListener.swift */; };
+		C0FFEE202611070000000110 /* GalaxyService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE202611070000000210 /* GalaxyService.swift */; };
+		C0FFEE202611070000000120 /* GalaxySupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE202611070000000220 /* GalaxySupport.swift */; };
+		C0FFEE202611070000000130 /* GalaxyWire.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE202611070000000230 /* GalaxyWire.swift */; };
+		C0FFEE202611070000000140 /* GOGGalaxy.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE202611070000000240 /* GOGGalaxy.swift */; };
+		C0FFEE202611070000000150 /* madeira-galaxy-service.exe in Resources */ = {isa = PBXBuildFile; fileRef = C0FFEE202611070000000250 /* madeira-galaxy-service.exe */; };
 		BEEF20261107000000000110 /* EAAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEEF20261107000000000120 /* EAAPI.swift */; };
 		BEEF20261107000000000001 /* NativeSymbol.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEEF20261107000000000002 /* NativeSymbol.swift */; };
 		BEEF20261106000000000101 /* WineMono.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEEF20261106000000000102 /* WineMono.swift */; };
@@ -274,6 +280,12 @@
 		BEEF20261107000000000420 /* EALicense.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Vendor/Madeira/SwiftEA/EALicense.swift"; sourceTree = "<group>"; };
 		BEEF20261107000000000320 /* EAFormats.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Vendor/Madeira/SwiftEA/EAFormats.swift"; sourceTree = "<group>"; };
 		BEEF20261107000000000220 /* EADownloader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Vendor/Madeira/SwiftEA/EADownloader.swift"; sourceTree = "<group>"; };
+		C0FFEE202611070000000200 /* GalaxyListener.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Vendor/Madeira/SwiftGOG/Galaxy/GalaxyListener.swift"; sourceTree = "<group>"; };
+		C0FFEE202611070000000210 /* GalaxyService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Vendor/Madeira/SwiftGOG/Galaxy/GalaxyService.swift"; sourceTree = "<group>"; };
+		C0FFEE202611070000000220 /* GalaxySupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Vendor/Madeira/SwiftGOG/Galaxy/GalaxySupport.swift"; sourceTree = "<group>"; };
+		C0FFEE202611070000000230 /* GalaxyWire.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Vendor/Madeira/SwiftGOG/Galaxy/GalaxyWire.swift"; sourceTree = "<group>"; };
+		C0FFEE202611070000000240 /* GOGGalaxy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GOGGalaxy.swift"; sourceTree = "<group>"; };
+		C0FFEE202611070000000250 /* madeira-galaxy-service.exe */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Resources/Galaxy/madeira-galaxy-service.exe"; sourceTree = "<group>"; };
 		BEEF20261107000000000120 /* EAAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Vendor/Madeira/SwiftEA/EAAPI.swift"; sourceTree = "<group>"; };
 		BEEF20261107000000000002 /* NativeSymbol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeSymbol.swift; sourceTree = "<group>"; };
 		BEEF20261106000000000102 /* WineMono.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WineMono.swift; sourceTree = "<group>"; };
@@ -424,6 +436,11 @@
 				BEEF20261107000000000410 /* EALicense.swift in Sources */,
 				BEEF20261107000000000310 /* EAFormats.swift in Sources */,
 				BEEF20261107000000000210 /* EADownloader.swift in Sources */,
+				C0FFEE202611070000000100 /* GalaxyListener.swift in Sources */,
+				C0FFEE202611070000000110 /* GalaxyService.swift in Sources */,
+				C0FFEE202611070000000120 /* GalaxySupport.swift in Sources */,
+				C0FFEE202611070000000130 /* GalaxyWire.swift in Sources */,
+				C0FFEE202611070000000140 /* GOGGalaxy.swift in Sources */,
 				BEEF20261107000000000110 /* EAAPI.swift in Sources */,
 				BEEF20261107000000000001 /* NativeSymbol.swift in Sources */,
 				BEEF20261106000000000101 /* WineMono.swift in Sources */,
@@ -461,6 +478,7 @@
 			files = (
 				999999999999999999999913 /* Assets.xcassets in Resources */,
 				B10000000000000000000052 /* jit-pool.txt in Resources */,
+				C0FFEE202611070000000150 /* madeira-galaxy-service.exe in Resources */,
 				B10000000000000000000051 /* universal.jitscript in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -579,6 +597,12 @@
 				BEEF20261107000000000420 /* EALicense.swift */,
 				BEEF20261107000000000320 /* EAFormats.swift */,
 				BEEF20261107000000000220 /* EADownloader.swift */,
+				C0FFEE202611070000000200 /* GalaxyListener.swift */,
+				C0FFEE202611070000000210 /* GalaxyService.swift */,
+				C0FFEE202611070000000220 /* GalaxySupport.swift */,
+				C0FFEE202611070000000230 /* GalaxyWire.swift */,
+				C0FFEE202611070000000240 /* GOGGalaxy.swift */,
+				C0FFEE202611070000000250 /* madeira-galaxy-service.exe */,
 				BEEF20261107000000000120 /* EAAPI.swift */,
 				BEEF20261107000000000002 /* NativeSymbol.swift */,
 				BEEF20261106000000000102 /* WineMono.swift */,
@@ -753,7 +777,7 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = VPNExtension/VPNExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 28;
+				CURRENT_PROJECT_VERSION = 29;
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = VPNExtension/Info.plist;
@@ -762,7 +786,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.4.1;
+				MARKETING_VERSION = 1.4.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ideck.ideck.VPNExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -778,7 +802,7 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = VPNExtension/VPNExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 28;
+				CURRENT_PROJECT_VERSION = 29;
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = VPNExtension/Info.plist;
@@ -787,7 +811,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.4.1;
+				MARKETING_VERSION = 1.4.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ideck.ideck.VPNExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -881,7 +905,7 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = iDeckJITHelper/iDeckJITHelper.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 28;
+				CURRENT_PROJECT_VERSION = 29;
 				DEVELOPMENT_TEAM = "";
 				"FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*]" = "$(SRCROOT)/Frameworks/StikJIT.xcframework/ios-arm64";
 				GENERATE_INFOPLIST_FILE = NO;
@@ -890,7 +914,7 @@
 					"$(inherited)",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.4.1;
+				MARKETING_VERSION = 1.4.2;
 				"OTHER_LDFLAGS[sdk=iphoneos*]" = (
 					"$(inherited)",
 					"-framework",
@@ -911,7 +935,7 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = iDeckJITHelper/iDeckJITHelper.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 28;
+				CURRENT_PROJECT_VERSION = 29;
 				DEVELOPMENT_TEAM = "";
 				"FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*]" = "$(SRCROOT)/Frameworks/StikJIT.xcframework/ios-arm64";
 				GENERATE_INFOPLIST_FILE = NO;
@@ -920,7 +944,7 @@
 					"$(inherited)",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.4.1;
+				MARKETING_VERSION = 1.4.2;
 				"OTHER_LDFLAGS[sdk=iphoneos*]" = (
 					"$(inherited)",
 					"-framework",
@@ -1002,7 +1026,7 @@
 				OTHER_LDFLAGS = "$(inherited) -lz -llzma $(IDECK_NATIVE_LINK_FLAGS)";
 				OTHER_CFLAGS = "$(inherited) $(IDECK_NATIVE_CFLAGS)";
 				OTHER_CPLUSPLUSFLAGS = "$(inherited) $(IDECK_NATIVE_CFLAGS)";
-				CURRENT_PROJECT_VERSION = 28;
+				CURRENT_PROJECT_VERSION = 29;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -1015,7 +1039,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.4.1;
+				MARKETING_VERSION = 1.4.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ideck.ideck;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -1039,7 +1063,7 @@
 				OTHER_LDFLAGS = "$(inherited) -lz -llzma $(IDECK_NATIVE_LINK_FLAGS)";
 				OTHER_CFLAGS = "$(inherited) $(IDECK_NATIVE_CFLAGS)";
 				OTHER_CPLUSPLUSFLAGS = "$(inherited) $(IDECK_NATIVE_CFLAGS)";
-				CURRENT_PROJECT_VERSION = 28;
+				CURRENT_PROJECT_VERSION = 29;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -1052,7 +1076,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.4.1;
+				MARKETING_VERSION = 1.4.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ideck.ideck;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;

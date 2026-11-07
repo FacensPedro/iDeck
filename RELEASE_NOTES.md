@@ -1,11 +1,7 @@
 ## What's Changed
-- Reduced default Wine logging overhead while keeping crash and process diagnostics available.
-- Added a 624 MiB Wine JIT pool option and made it the default for new installations.
-- Set new game profiles to 30 FPS by default without changing saved profiles.
-- Allowed Steam games to start when a required one-time installer cannot run, without falsely marking prerequisites as installed.
-- Started Bully: Scholarship Edition directly instead of launching it as a Steam child process.
-- Aligned DXGI display-mode reporting with the Windows display-mode table.
-- Extended Metal display readiness checks to 15 seconds.
-- Moved game launch actions into their details pages and displayed selected cover art as a noninteractive backdrop.
-- Preserved the iDeck 1.4.0 native fault diagnostics and regression checks.
-- Updated the application version to 1.4.1 (build 28).
+- Added GOG Galaxy services for GOG games: while a GOG game runs, iDeck answers its Galaxy SDK on 127.0.0.1:9977 (sign-in, achievements, stats, leaderboards and play time) with a token GOG mints for that game's own client.
+- Registered the GalaxyCommunication service in the Wine prefix for Galaxy SDK versions that start it first.
+- Steam's DirectX June 2010 setup is no longer run: Wine's built-in DirectX DLLs are used. Running it stopped iDeck before Cuphead could start.
+- A saved 896 MB JIT pool (the old default, which never fits on these devices) moves to 624 MB once.
+- Windows runtime: ARM64 programs started inside an ARM64EC session (Wine's services.exe for Steam's installers) now get the emulator CPU state the session's ntdll expects, instead of stopping iDeck.
+- Updated the application version to 1.4.2 (build 29).

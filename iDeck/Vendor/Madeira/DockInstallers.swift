@@ -897,6 +897,14 @@ enum DockInstallers {
                                             exists: { resolve($0, drive: drive) != nil },
                                             runnable: { runnable($0, drive: drive, has32Bit: has32Bit, hasMsiexec: hasMsiexec) })
         var pending = items.filter { $0.status == .pending }.map(\.process)
+        // iDeck: DirectX June 2010 (DXSETUP) only copies d3dx/xinput/xaudio DLLs that
+        // Wine already has built in. Running it needed a services.exe session that
+        // stopped iDeck (Cuphead, 2026-11-07), so it is left out; nothing is recorded.
+        let directX = pending.filter { $0.executable.lowercased().hasSuffix("dxsetup.exe") }
+        if !directX.isEmpty {
+            pending.removeAll { $0.executable.lowercased().hasSuffix("dxsetup.exe") }
+            LogStore.shared.log("[dock-installers] app=\(app) DirectX setup skipped: Wine's built-in DirectX DLLs are used")
+        }
         var ledger = DockInstallLedger.load(prefix: prefix)
         // Programs the game's last batch started but never saw exit (absorbResults).
         let unfinished = Set(ledger.unfinishedRuns(app))

@@ -1202,7 +1202,12 @@ struct WindowsWorkspaceView: View {
     private func launchGOGGame(_ game: GOGInstalledGame) {
         var profile = windowsLibrary.profile(for: "gog:\(game.gameID)", title: game.name)
         if profile.arguments.isEmpty { profile.arguments = game.arguments }
-        coordinator.launchWindowsExecutable(at: game.executable, profile: profile)
+        // GOG Galaxy's game services (sign-in, achievements, stats) for this game,
+        // with a token minted for its own client, before Wine starts.
+        Task { @MainActor in
+            await GOGGalaxy.shared.prepare(gameID: game.gameID, drive: EpicLibrary.drive)
+            coordinator.launchWindowsExecutable(at: game.executable, profile: profile)
+        }
     }
 
     /// Installs a GOG game from GOG's content system (the game's own files,

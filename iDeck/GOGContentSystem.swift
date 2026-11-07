@@ -147,6 +147,19 @@ enum GOGContentSystem {
         return result.map { $0.lowercased() }
     }
 
+    /// The newest public Windows build's Galaxy client (clientId and clientSecret in
+    /// its manifest), which the game's Galaxy SDK signs in with; nil without one.
+    static func galaxyClient(gameID: Int, tokens: GOGTokens) async throws -> GOGGalaxyClient? {
+        let buildsURL = URL(string: "https://content-system.gog.com/products/\(gameID)/os/windows/builds?generation=2")!
+        let builds = try json(try await get(buildsURL, tokens: tokens))
+        let items = (builds["items"] as? [[String: Any]]) ?? []
+        guard let build = items.first(where: { int64($0["generation"]) == 2 && ($0["branch"] == nil || $0["branch"] is NSNull) })
+                ?? items.first(where: { int64($0["generation"]) == 2 }),
+              let link = build["link"] as? String, let linkURL = URL(string: link) else { return nil }
+        let manifest = try json(try await get(linkURL, tokens: tokens))
+        return GOGGalaxyClient(id: string(manifest["clientId"]), secret: manifest["clientSecret"] as? String)
+    }
+
     /// Reads the newest public Windows build and lists every file to install.
     static func plan(gameID: Int, tokens: GOGTokens) async throws -> GOGContentPlan {
         let buildsURL = URL(string: "https://content-system.gog.com/products/\(gameID)/os/windows/builds?generation=2")!

@@ -150,6 +150,13 @@ class SystemCoordinator: ObservableObject {
             ResourceGovernor.shared.onActivityChange = { [weak self] in self?.applyMaxRefreshRate() }
             ResourceGovernor.shared.start()
         }
+        // 896 MB was the old default and never fits beside the game on these
+        // devices (the start stopped while reserving it): saved once as 624.
+        if UserDefaults.standard.object(forKey: "wineJITPoolMiB") as? Int == 896,
+           !UserDefaults.standard.bool(forKey: "wineJITPool624Migrated") {
+            UserDefaults.standard.set(624, forKey: "wineJITPoolMiB")
+        }
+        UserDefaults.standard.set(true, forKey: "wineJITPool624Migrated")
         Self.exportWineJITPreference(UserDefaults.standard.object(forKey: "wineJITPoolMiB") as? Int ?? 624)
         Self.exportLastGoodPool()
         // Keep app startup free of native Wine/JIT probes and Keychain reads.
@@ -811,6 +818,8 @@ class SystemCoordinator: ObservableObject {
         let gameID = profile?.id ?? ""
         // The EA app's environment (EALibrary.prepareLaunch) belongs to EA games only.
         if !gameID.hasPrefix("ea:") { EALibrary.clearEnvironment() }
+        // The Galaxy service belongs to the GOG game it was prepared for.
+        if !gameID.hasPrefix("gog:") { DispatchQueue.main.async { MainActor.assumeIsolated { GOGGalaxy.shared.stop() } } }
         let launcher = gameID.hasPrefix("epic:") ? "Epic Games" : gameID.hasPrefix("ea:") ? "EA app"
             : gameID.hasPrefix("gog:") || gameID.hasPrefix("gog-setup:") ? "GOG" : ".exe"
         recordGameContext(profile?.title ?? url.deletingPathExtension().lastPathComponent, launcher: launcher)
@@ -1507,6 +1516,7 @@ class SystemCoordinator: ObservableObject {
         activeSteamPrefix = nil
         pendingSteamGameID = nil
         activeWindowsProfile = nil
+        DispatchQueue.main.async { MainActor.assumeIsolated { GOGGalaxy.shared.stop() } }
         isClosingWindowsSession = false
         windowsCloseRequestedAt = nil
         windowsCloseWarning = nil
