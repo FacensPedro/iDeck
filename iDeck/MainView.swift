@@ -1131,7 +1131,7 @@ struct WindowsWorkspaceView: View {
             .filter { searchText.isEmpty || $0.title.localizedCaseInsensitiveContains(searchText) }
             .sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
         if games.isEmpty {
-            Text(tr("Copy games installed by Ubisoft Connect on your PC with iRelay."))
+            Text(tr("Transfer your owned Ubisoft games from your PC using iRelay. Ubisoft Connect is not required on iDeck; account library and direct downloads are not yet supported."))
                 .font(.subheadline)
                 .foregroundColor(.gray)
         } else {
@@ -1155,15 +1155,12 @@ struct WindowsWorkspaceView: View {
         }
     }
 
-    /// Through Ubisoft Connect when it is installed; otherwise the game's own
-    /// executable starts directly, without asking for the launcher.
+    /// Launch the transferred game directly, without requiring the Windows launcher.
+    /// Games requiring Ubisoft's online client may still reject this launch.
     private func launchUbisoftGame(_ game: UbisoftInstalledGame) {
         UbisoftLibrary.writeRegistry(game)
-        var profile = windowsLibrary.profile(for: "ubisoft:\(game.id)", title: game.title)
-        if UbisoftLibrary.clientInstalled {
-            profile.arguments = "uplay://launch/\(game.id)/0"
-            coordinator.launchWindowsExecutable(at: EpicLibrary.drive.appendingPathComponent(UbisoftLibrary.client), profile: profile)
-        } else if let executable = UbisoftLibrary.gameExecutable(game) {
+        let profile = windowsLibrary.profile(for: "ubisoft:\(game.id)", title: game.title)
+        if let executable = UbisoftLibrary.gameExecutable(game) {
             coordinator.launchWindowsExecutable(at: executable, profile: profile)
         } else {
             installMessage = tr("No game executable was found in this game's folder. Copy it again with iRelay.")

@@ -41,7 +41,8 @@ class FirstRunLaunchersContract(unittest.TestCase):
         # EA games need no EA app (Madeira's EA support); Ubisoft Connect comes from Ubisoft.
         self.assertNotIn("EAappInstaller.exe", settings + models)
         self.assertIn("UbisoftConnectInstaller.exe", models)
-        self.assertIn("UbisoftLibrary.downloadInstaller()", settings)
+        self.assertNotIn("UbisoftLibrary.downloadInstaller()", settings)
+        self.assertIn('tr("No launcher required")', settings)
         self.assertIn("EASignInView()", settings)
 
     def test_launcher_paths_are_narrowly_scoped(self):

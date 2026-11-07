@@ -23,8 +23,6 @@ struct SettingsView: View {
     @ObservedObject private var epicLibrary = EpicLibrary.shared
     @ObservedObject private var eaLibrary = EALibrary.shared
     @State private var isEASignInPresented = false
-    @State private var ubisoftDownloading = false
-    @State private var ubisoftMessage: String?
     @ObservedObject private var externalDrives = ExternalDrives.shared
     @State private var isGOGSignInPresented = false
     @State private var isEpicSignInPresented = false
@@ -248,7 +246,7 @@ struct SettingsView: View {
                 }
                 NavigationLink { ubisoftPage } label: {
                     SettingsRow(icon: "square.stack", color: .purple, title: "Ubisoft Connect",
-                                value: UbisoftLibrary.clientInstalled ? tr("Installed") : tr("Not installed"),
+                                value: tr("No launcher required"),
                                 asset: "StoreBadgeUbisoft", assetKeepsColors: true)
                 }
             }
@@ -278,39 +276,16 @@ struct SettingsView: View {
     }
 
     private var ubisoftPage: some View {
-        let drive = EpicLibrary.drive
-        let setup = drive.appendingPathComponent(UbisoftLibrary.installer)
-        let client = drive.appendingPathComponent(UbisoftLibrary.client)
-        return Form {
+        Form {
             Section {
-                LabeledContent(tr("Installer"), value: tr(UbisoftLibrary.installerDownloaded ? "Downloaded" : "Not downloaded"))
-                Button(ubisoftDownloading ? tr("Downloading…") : tr("Download from Ubisoft")) {
-                    ubisoftDownloading = true
-                    ubisoftMessage = nil
-                    Task {
-                        do { try await UbisoftLibrary.downloadInstaller() } catch { ubisoftMessage = error.localizedDescription }
-                        ubisoftDownloading = false
-                    }
-                }
-                .disabled(ubisoftDownloading)
-                Button(tr("Run Windows installer")) {
-                    coordinator.launchWindowsExecutable(at: setup,
-                        profile: WindowsGameProfile(id: "ubisoft:installer", title: "Ubisoft Connect installer"))
-                    dismiss()
-                }
-                .disabled(!UbisoftLibrary.installerDownloaded)
-                if UbisoftLibrary.clientInstalled {
-                    Button(tr("Launch client")) {
-                        coordinator.launchWindowsExecutable(at: client,
-                            profile: WindowsGameProfile(id: "ubisoft:client", title: "Ubisoft Connect"))
-                        dismiss()
-                    }
-                }
-                if let ubisoftMessage { Text(ubisoftMessage).font(.caption).foregroundStyle(.orange) }
+                LabeledContent(tr("Launcher"), value: tr("Not required"))
+                LabeledContent(tr("Installed games"), value: String(UbisoftLibrary.shared.installed.count))
+                Text(tr("Games transferred with iRelay can be launched directly without installing Ubisoft Connect."))
+                    .font(.subheadline)
             } header: {
                 launcherHeader("Ubisoft Connect", asset: "StoreBadgeUbisoft")
             } footer: {
-                Text(tr("Optional. Games copied from your PC with iRelay start directly; install Ubisoft Connect only for a game that asks for it."))
+                Text(tr("Account sign-in, ownership library and direct downloads are not available yet. Optima's Linux implementation must be ported and verified for iPadOS before these features can be enabled. Some games still require Ubisoft services."))
             }
         }
         .navigationTitle("Ubisoft Connect")
