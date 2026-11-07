@@ -300,7 +300,7 @@ private struct TarReader {
 
     private init() { refresh() }
 
-    func refresh() { installed = Self.downloaded }
+    func refresh() { installed = Self.available }
 
     var status: String {
         switch phase {
@@ -413,7 +413,7 @@ private struct TarReader {
         guard !busy, wine_process_is_running() == 0 else { return }
         try? FileManager.default.removeItem(at: Self.runtime)
         refresh()
-        log("removed")
+        log(Self.bundled ? "downloaded copy removed; bundled Mono remains available" : "removed")
     }
 }
 
