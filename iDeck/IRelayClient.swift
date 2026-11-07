@@ -210,6 +210,7 @@ struct IRelaySettingsSection: View {
     @State private var testing = false
     @State private var code = IRelayPairing.display
     @State private var addresses = IRelayPairing.localAddresses()
+    @State private var serviceState = tr("Starting…")
 
     var body: some View {
         Section {
@@ -218,6 +219,8 @@ struct IRelaySettingsSection: View {
             LabeledContent(tr("Pairing code")) {
                 Text(code).font(.body.monospaced().weight(.semibold)).textSelection(.enabled)
             }
+            Button(tr("Refresh connection")) { refresh() }
+            LabeledContent(tr("iDeck service"), value: serviceState)
             Button(tr("New pairing code")) {
                 IRelayPairing.regenerate()
                 code = IRelayPairing.display
@@ -233,16 +236,26 @@ struct IRelaySettingsSection: View {
             }
         }
         .onAppear {
-            IRelayRuntime.start()
-            addresses = IRelayPairing.localAddresses()
+            refresh()
         }
     }
 
-    private func test() {
+    private func refresh() {
         IRelayRuntime.start()
+        addresses = IRelayPairing.localAddresses()
+        serviceState = IRelayDeviceService.shared.connectionStatus
+    }
+
+    private func test() {
+        refresh()
         testing = true
         status = nil
         Task {
+            guard IRelayTunnel.shared.pcConnected else {
+                status = tr("No iRelay tunnel is connected. Keep iDeck open, allow Local Network access in iPadOS Settings, and pair iRelay on the PC using the iPad address and code shown above.")
+                testing = false
+                return
+            }
             do {
                 let info = try await IRelayClient().ping()
                 status = tr("Connected to %@ (version %d).", info.machine ?? info.name, info.version)
