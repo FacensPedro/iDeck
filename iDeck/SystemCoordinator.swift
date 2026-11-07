@@ -809,7 +809,9 @@ class SystemCoordinator: ObservableObject {
         guard !isClosingWindowsSession else { return }
         isSteamSession = false
         let gameID = profile?.id ?? ""
-        let launcher = gameID.hasPrefix("epic:") ? "Epic Games"
+        // The EA app's environment (EALibrary.prepareLaunch) belongs to EA games only.
+        if !gameID.hasPrefix("ea:") { EALibrary.clearEnvironment() }
+        let launcher = gameID.hasPrefix("epic:") ? "Epic Games" : gameID.hasPrefix("ea:") ? "EA app"
             : gameID.hasPrefix("gog:") || gameID.hasPrefix("gog-setup:") ? "GOG" : ".exe"
         recordGameContext(profile?.title ?? url.deletingPathExtension().lastPathComponent, launcher: launcher)
         BenchmarkSession.begin(kind: "game", scenario: profile?.title ?? url.deletingPathExtension().lastPathComponent,

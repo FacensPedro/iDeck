@@ -31,8 +31,8 @@ final class IRelayDeviceService: @unchecked Sendable {
         SteamInstallPaths.libraryRelative + "/common/",
         "GOG Games/",
         "Program Files/Epic Games/",
-        // EA app and Ubisoft Connect installers are confined to launcher subfolders.
-        "WindowsDownloads/Launchers/",
+        // Games Ubisoft Connect installed on the PC, copied by iRelay.
+        UbisoftLibrary.installRoot + "/",
     ]
 
     // Transfers stay below the game: SHA-1 checks and file writes must not compete
@@ -89,9 +89,6 @@ final class IRelayDeviceService: @unchecked Sendable {
     static func folder(_ root: String) -> URL? {
         guard let relative = clean(root),
               roots.contains(where: { (relative + "/").hasPrefix($0) && relative.count > $0.count }) else { return nil }
-        if relative.hasPrefix("WindowsDownloads/Launchers/") &&
-            relative != "WindowsDownloads/Launchers/EA" &&
-            relative != "WindowsDownloads/Launchers/Ubisoft" { return nil }
         return drive.appendingPathComponent(relative, isDirectory: true)
     }
 
@@ -264,6 +261,11 @@ final class IRelayDeviceService: @unchecked Sendable {
                 throw FinishError(errorDescription: "Epic game not found in iDeck's library.")
             }
             EpicLibrary.shared.install(app)
+        case "ea":
+            guard let id = json["id"] as? String, EALibrary.shared.game(id) != nil else {
+                throw FinishError(errorDescription: "EA game not found in iDeck's library.")
+            }
+            EALibrary.shared.install(id)
         default:
             throw FinishError(errorDescription: "Unknown store.")
         }
@@ -308,6 +310,15 @@ final class IRelayDeviceService: @unchecked Sendable {
             case "pause": EpicLibrary.shared.pause(app)
             case "resume": EpicLibrary.shared.install(app)
             default: await EpicLibrary.shared.cancelAndWait(app)
+            }
+        case "ea":
+            guard let id = json["id"] as? String, EALibrary.shared.downloads[id] != nil else {
+                throw FinishError(errorDescription: "EA download not found.")
+            }
+            switch action {
+            case "pause": EALibrary.shared.pause(id)
+            case "resume": EALibrary.shared.install(id)
+            default: EALibrary.shared.cancel(id)
             }
         default:
             throw FinishError(errorDescription: "Unknown game store.")
@@ -357,6 +368,19 @@ final class IRelayDeviceService: @unchecked Sendable {
             var error = ""
             if case .failed(let reason) = download.state { error = reason }
             list.append(["store": "epic", "id": app, "title": epic.game(app)?.title ?? app, "phase": download.state == .paused ? "paused" : "\(download.state)",
+                         "done": download.progress.fraction * 1000, "total": 1000,
+                         "etaSeconds": download.progress.phase == .downloading && download.state != .paused
+                             ? (DownloadETA.seconds(done: download.progress.doneBytes,
+                                                    total: download.progress.totalBytes,
+                                                    bytesPerSecond: download.progress.bytesPerSecond) ?? 0) : 0,
+                         "error": error])
+        }
+        let ea = EALibrary.shared
+        for (id, download) in ea.downloads {
+            var error = ""
+            if case .failed(let reason) = download.state { error = reason }
+            list.append(["store": "ea", "id": id, "title": ea.game(id)?.title ?? id,
+                         "phase": download.state == .paused ? "paused" : "\(download.state)",
                          "done": download.progress.fraction * 1000, "total": 1000,
                          "etaSeconds": download.progress.phase == .downloading && download.state != .paused
                              ? (DownloadETA.seconds(done: download.progress.doneBytes,
@@ -471,10 +495,25 @@ final class IRelayDeviceService: @unchecked Sendable {
                               "catalogItemId": game.catalogItemID, "cover": "", "folderName": "", "installed": true,
                               "size": game.installBytes])
         }
+        let ea = EALibrary.shared
+        var eaGames: [[String: Any]] = ea.owned.filter(\.downloadable).map { game in
+            ["id": game.id, "title": game.title, "cover": game.cover?.absoluteString ?? "",
+             "installed": ea.installed[game.id] != nil, "size": ea.installed[game.id]?.installBytes ?? 0]
+        }
+        let eaListed = Set(ea.owned.map(\.id))
+        for (id, game) in ea.installed where !eaListed.contains(id) {
+            eaGames.append(["id": id, "title": game.title, "cover": "", "installed": true, "size": game.installBytes])
+        }
+        let ubisoft = UbisoftLibrary.shared
+        ubisoft.reload()
         return [
             "steam": ["signedIn": SteamSignIn.isSignedIn || !records.isEmpty, "account": SteamSignIn.accountName ?? "", "games": steamGames],
             "gog": ["signedIn": gog.isSignedIn || !gogInstalled.isEmpty, "games": gogGames],
             "epic": ["signedIn": epic.signedIn || !epic.installed.isEmpty, "games": epicGames],
+            "ea": ["signedIn": ea.signedIn || !ea.installed.isEmpty, "games": eaGames],
+            "ubisoft": ["clientInstalled": UbisoftLibrary.clientInstalled,
+                        "games": ubisoft.installed.values.map { ["id": $0.id, "title": $0.title, "folder": $0.folder,
+                                                                 "installed": true, "size": $0.installBytes] }],
         ]
     }
 
@@ -564,6 +603,15 @@ final class IRelayDeviceService: @unchecked Sendable {
                 throw FinishError(errorDescription: "Invalid Epic install record.")
             }
             EpicLibrary.shared.registerTransferred(game)
+        case "ubisoft":
+            guard let id = json["id"] as? String, !id.isEmpty, id.allSatisfy({ $0.isNumber || $0.isLetter }),
+                  let folderPath = (json["folder"] as? String).flatMap(clean),
+                  folderPath.hasPrefix(UbisoftLibrary.installRoot + "/"), folder(folderPath) != nil else {
+                throw FinishError(errorDescription: "Invalid Ubisoft install record.")
+            }
+            let game = UbisoftInstalledGame(id: id, title: json["title"] as? String ?? folderPath,
+                                            folder: folderPath, installBytes: (json["size"] as? NSNumber)?.int64Value ?? 0)
+            UbisoftLibrary.shared.register(game)
         default:
             throw FinishError(errorDescription: "Unknown store.")
         }

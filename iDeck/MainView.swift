@@ -267,6 +267,9 @@ struct WindowsWorkspaceView: View {
     @AppStorage("library.gogOwnedCollapsed") private var gogOwnedCollapsed = false
     @ObservedObject private var epicLibrary = EpicLibrary.shared
     @State private var isEpicSignInPresented = false
+    @State private var isEASignInPresented = false
+    @ObservedObject private var eaLibrary = EALibrary.shared
+    @ObservedObject private var ubisoftLibrary = UbisoftLibrary.shared
     @State private var selectedEpicGame: SelectedEpicGame?
     @State private var selectedGOGGame: GOGGame?
     @AppStorage("library.epicOwnedCollapsed") private var epicOwnedCollapsed = false
@@ -483,6 +486,9 @@ struct WindowsWorkspaceView: View {
         .sheet(isPresented: $isEpicSignInPresented) {
             EpicSignInView()
         }
+        .sheet(isPresented: $isEASignInPresented) {
+            EASignInView()
+        }
         .sheet(item: $selectedGOGGame) { game in
             GOGGameDetailsSheet(game: game, prefixPath: prefixPath, gog: gogLibrary, library: windowsLibrary,
                                 coordinator: coordinator, launch: { launchGOGGame($0) },
@@ -494,6 +500,7 @@ struct WindowsWorkspaceView: View {
         }
         .onAppear {
             epicLibrary.start()
+            eaLibrary.start()
         }
         .task(id: gogLibrary.isSignedIn) {
             if gogLibrary.isSignedIn && gogLibrary.games.isEmpty {
@@ -631,12 +638,14 @@ struct WindowsWorkspaceView: View {
         case steam(SteamAppInfo)
         case gog(GOGGame)
         case epic(EpicOwnedGame)
+        case ea(EAOwnedGame)
 
         var id: String {
             switch self {
             case .steam(let game): return "steam:\(game.appID)"
             case .gog(let game): return "gog:\(game.id)"
             case .epic(let game): return "epic:\(game.id)"
+            case .ea(let game): return "ea:\(game.id)"
             }
         }
 
@@ -645,6 +654,7 @@ struct WindowsWorkspaceView: View {
             case .steam(let game): return game.name
             case .gog(let game): return game.title
             case .epic(let game): return game.title
+            case .ea(let game): return game.title
             }
         }
     }
@@ -656,19 +666,22 @@ struct WindowsWorkspaceView: View {
         if coordinator.isSteamConnected { entries += filteredSteamGames.map { .steam($0) } }
         if gogLibrary.isSignedIn { entries += filteredGOGGames.map { .gog($0) } }
         if epicLibrary.signedIn { entries += filteredEpicGames.map { .epic($0) } }
+        if eaLibrary.signedIn { entries += filteredEAGames.map { .ea($0) } }
         return entries.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
     }
 
     private var mixedLibraryCount: Int {
         (coordinator.isSteamConnected ? steamLibrary.games.count : 0) +
         (gogLibrary.isSignedIn ? gogLibrary.games.count : 0) +
-        (epicLibrary.signedIn ? epicLibrary.owned.count : 0)
+        (epicLibrary.signedIn ? epicLibrary.owned.count : 0) +
+        (eaLibrary.signedIn ? eaLibrary.owned.count : 0)
     }
 
     private var mixedLibraryLoading: Bool {
         (coordinator.isSteamConnected && steamLibrary.isLoading) ||
         (gogLibrary.isSignedIn && gogLibrary.isLoading) ||
-        (epicLibrary.signedIn && epicLibrary.refreshing)
+        (epicLibrary.signedIn && epicLibrary.refreshing) ||
+        (eaLibrary.signedIn && eaLibrary.refreshing)
     }
 
     /// Short status lines for stores that are loading or failed to load.
@@ -686,6 +699,10 @@ struct WindowsWorkspaceView: View {
             if epicLibrary.refreshing { notices.append((tr("Loading Epic Games library..."), false)) }
             else if let error = epicLibrary.error { notices.append(("Epic Games: " + error, true)) }
         }
+        if eaLibrary.signedIn {
+            if eaLibrary.refreshing { notices.append((tr("Loading EA app library..."), false)) }
+            else if let error = eaLibrary.error { notices.append(("EA app: " + error, true)) }
+        }
         return notices
     }
 
@@ -695,6 +712,7 @@ struct WindowsWorkspaceView: View {
         if coordinator.isSteamConnected { Task { await steamLibrary.refresh(force: true) } }
         if gogLibrary.isSignedIn { Task { await gogLibrary.refresh() } }
         if epicLibrary.signedIn { Task { await epicLibrary.refreshLibrary() } }
+        if eaLibrary.signedIn { Task { await eaLibrary.refreshLibrary() } }
     }
 
     private func gameCard(_ game: SteamAppInfo) -> some View {
@@ -995,6 +1013,152 @@ struct WindowsWorkspaceView: View {
         }
         .padding(4)
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    // MARK: EA app (Madeira's EA support: no EA app is installed)
+
+    private var filteredEAGames: [EAOwnedGame] {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let games = eaLibrary.owned.filter(\.downloadable)
+        guard !query.isEmpty else { return games }
+        return games.filter { $0.title.localizedCaseInsensitiveContains(query) }
+    }
+
+    private var eaContent: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("EA app")
+                    .font(.headline)
+                    .foregroundColor(.white)
+                Text(tr("Sign in on EA's own page to see your EA games and install them without the EA app. iDeck keeps only the sign-in token, in this device's Keychain."))
+                    .font(.caption)
+                    .foregroundColor(.gray)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 8)
+            Button(tr("Connect EA")) { isEASignInPresented = true }
+                .buttonStyle(.borderedProminent)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(panelColor)
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(lineColor, lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+    }
+
+    private func eaCard(_ game: EAOwnedGame) -> some View {
+        let installed = eaLibrary.installed[game.id]
+        let download = eaLibrary.downloads[game.id]
+        return VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 6) {
+                ZStack {
+                    GOGArtworkView(urls: [game.cover].compactMap { $0 }, fallbackColor: secondaryColor)
+                        .libraryCoverFrame()
+                        .blur(radius: installed == nil && download == nil ? 3 : 0)
+                    if installed == nil && download == nil {
+                        downloadCoverButton { eaLibrary.install(game.id) }
+                    }
+                }
+                .libraryCoverFrame()
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .clipped()
+                cardTitle(game.title)
+            }
+            if let download {
+                switch download.state {
+                case .failed(let message):
+                    Text(message)
+                        .font(.caption2)
+                        .foregroundColor(.red)
+                        .lineLimit(2)
+                        .frame(height: cardActionHeight)
+                case .paused:
+                    Button { eaLibrary.install(game.id) } label: {
+                        cardActionLabel(tr("Resume"), systemImage: "play.circle.fill")
+                    }
+                default:
+                    progressAction(fraction: download.progress.fraction,
+                                   label: tr("Installing %d%%", Int((download.progress.fraction * 100).rounded())),
+                                   remainingSeconds: download.progress.phase == .downloading
+                                       ? DownloadETA.seconds(done: download.progress.doneBytes,
+                                                             total: download.progress.totalBytes,
+                                                             bytesPerSecond: download.progress.bytesPerSecond)
+                                       : nil,
+                                   onPause: { eaLibrary.pause(game.id) },
+                                   onStop: { eaLibrary.cancel(game.id) })
+                }
+            } else if let installed {
+                Button { launchEAGame(installed) } label: {
+                    cardActionLabel(tr("Launch"), systemImage: "play.fill")
+                }
+            } else {
+                Color.clear.frame(height: cardActionHeight)
+            }
+        }
+        .padding(4)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// Licence, registry, the EA app's environment and local service, then Wine.
+    private func launchEAGame(_ game: EAInstalledGame) {
+        let executable = EALibrary.drive.appendingPathComponent(game.programPath)
+        var profile = windowsLibrary.profile(for: "ea:\(game.offerID)", title: game.title)
+        Task { @MainActor in
+            do {
+                try await eaLibrary.prepareLaunch(offerID: game.offerID, nvidiaGPU: profile.reportNVIDIA, avx: profile.avxEnabled)
+                profile.arguments = [profile.arguments, game.arguments].filter { !$0.isEmpty }.joined(separator: " ")
+                coordinator.launchWindowsExecutable(at: executable, profile: profile)
+            } catch {
+                installMessage = error.localizedDescription
+                isShowingInstallResult = true
+            }
+        }
+    }
+
+    // MARK: Ubisoft Connect (games copied from the PC by iRelay)
+
+    @ViewBuilder
+    private var ubisoftContent: some View {
+        let games = ubisoftLibrary.installed.values
+            .filter { searchText.isEmpty || $0.title.localizedCaseInsensitiveContains(searchText) }
+            .sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+        if !UbisoftLibrary.clientInstalled {
+            Text(tr("Install Ubisoft Connect in Settings › Stores & launchers: Ubisoft games start through it."))
+                .font(.caption)
+                .foregroundColor(.orange)
+        }
+        if games.isEmpty {
+            Text(tr("Copy games installed by Ubisoft Connect on your PC with iRelay."))
+                .font(.subheadline)
+                .foregroundColor(.gray)
+        } else {
+            LazyVGrid(columns: columns, spacing: 18) {
+                ForEach(games) { game in
+                    VStack(alignment: .leading, spacing: 6) {
+                        ZStack {
+                            panelColor
+                            Image("StoreBadgeUbisoft").resizable().scaledToFit().padding(30)
+                        }
+                        .libraryCoverFrame()
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        cardTitle(game.title)
+                        Button { launchUbisoftGame(game) } label: {
+                            cardActionLabel(tr("Launch"), systemImage: "play.fill")
+                        }
+                        .disabled(!UbisoftLibrary.clientInstalled)
+                    }
+                    .padding(4)
+                }
+            }
+        }
+    }
+
+    /// Through Ubisoft Connect, which checks the licence and starts the game.
+    private func launchUbisoftGame(_ game: UbisoftInstalledGame) {
+        UbisoftLibrary.writeRegistry(game)
+        var profile = windowsLibrary.profile(for: "ubisoft:\(game.id)", title: game.title)
+        profile.arguments = "uplay://launch/\(game.id)/0"
+        coordinator.launchWindowsExecutable(at: EpicLibrary.drive.appendingPathComponent(UbisoftLibrary.client), profile: profile)
     }
 
     private func launchEpicGame(_ game: EpicInstalledGame) {
@@ -2073,7 +2237,7 @@ extension WindowsWorkspaceView {
         ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(alignment: .top, spacing: isCompact ? 10 : 14) {
-                    ForEach([GameStore.steam, .gog, .epic], id: \.self) { store in
+                    ForEach([GameStore.steam, .gog, .epic, .ea, .ubisoft], id: \.self) { store in
                         shelfTile(.store(store))
                     }
                     if !shelfGames.isEmpty {
@@ -2130,7 +2294,7 @@ extension WindowsWorkspaceView {
             ZStack {
                 panelColor
                 Image(storeAsset(store))
-                    .renderingMode(store == .steam ? .original : .template)
+                    .renderingMode(store == .steam || store == .ea || store == .ubisoft ? .original : .template)
                     .resizable()
                     .scaledToFit()
                     .foregroundColor(textColor)
@@ -2183,6 +2347,8 @@ extension WindowsWorkspaceView {
         case .steam: return "StoreBadgeSteam"
         case .gog: return "StoreBadgeGOG"
         case .epic: return "StoreBadgeEpic"
+        case .ea: return "StoreBadgeEA"
+        case .ubisoft: return "StoreBadgeUbisoft"
         }
     }
 
@@ -2191,6 +2357,8 @@ extension WindowsWorkspaceView {
         case .store(.steam): return "Steam"
         case .store(.gog): return "GOG"
         case .store(.epic): return "Epic Games"
+        case .store(.ea): return "EA app"
+        case .store(.ubisoft): return "Ubisoft Connect"
         case .steam(let id): return steamLibrary.games.first { $0.appID == id }?.name ?? "Steam"
         case .gog(let id): return gogLibrary.installed[id]?.name ?? "GOG"
         case .gogInstalling(let id): return gogLibrary.games.first { $0.id == id }?.title ?? "GOG"
@@ -2282,6 +2450,15 @@ extension WindowsWorkspaceView {
                 } else {
                     epicContent
                 }
+            case .ea:
+                if eaLibrary.signedIn {
+                    storeGrid(loading: eaLibrary.refreshing, error: eaLibrary.error,
+                              count: eaLibrary.owned.count, entries: filteredEAGames.map { .ea($0) })
+                } else {
+                    eaContent
+                }
+            case .ubisoft:
+                ubisoftContent
             }
         }
     }
@@ -2309,6 +2486,7 @@ extension WindowsWorkspaceView {
                     case .steam(let game): gameCard(game)
                     case .gog(let game): gogCard(game)
                     case .epic(let game): epicCard(game)
+                    case .ea(let game): eaCard(game)
                     }
                 }
             }

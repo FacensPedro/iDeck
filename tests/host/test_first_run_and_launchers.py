@@ -38,15 +38,17 @@ class FirstRunLaunchersContract(unittest.TestCase):
         models = repo_text("iDeck/WindowsLibraryModels.swift")
         for name in ("StoreBadgeEA", "StoreBadgeUbisoft"):
             self.assertIn(name, settings)
-        for name in ("EAappInstaller.exe", "UbisoftConnectInstaller.exe"):
-            self.assertIn(name, settings)
-            self.assertIn(name, models)
+        # EA games need no EA app (Madeira's EA support); Ubisoft Connect comes from Ubisoft.
+        self.assertNotIn("EAappInstaller.exe", settings + models)
+        self.assertIn("UbisoftConnectInstaller.exe", models)
+        self.assertIn("UbisoftLibrary.downloadInstaller()", settings)
+        self.assertIn("EASignInView()", settings)
 
     def test_launcher_paths_are_narrowly_scoped(self):
         swift = repo_text("iDeck/IRelayDeviceService.swift")
         self.assertIn('"protocol": 4', swift)
-        for folder in ('WindowsDownloads/Launchers/EA', 'WindowsDownloads/Launchers/Ubisoft'):
-            self.assertIn(folder, swift)
+        self.assertNotIn('WindowsDownloads/Launchers', swift)
+        self.assertIn('folderPath.hasPrefix(UbisoftLibrary.installRoot + "/")', swift)
 
     def test_memory_plus_is_entitlement_not_runtime_switch(self):
         entitlements = repo_text("iDeck/iDeck.entitlements")

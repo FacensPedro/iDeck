@@ -55,6 +55,16 @@ func trStatus(_ status: String) -> String {
 
 enum Translations {
     static let table: [String: [String: String]] = [
+        "Connect EA": ["pt": "Conectar EA", "es": "Conectar EA"],
+        "Loading EA app library...": ["pt": "Carregando a biblioteca do EA app...", "es": "Cargando la biblioteca de EA app..."],
+        "Sign in on EA's own page to see your EA games and install them without the EA app. iDeck keeps only the sign-in token, in this device's Keychain.": ["pt": "Entre pela página da EA para ver seus jogos da EA e instalá-los sem o EA app. O iDeck guarda só o token de acesso, no Keychain deste aparelho.", "es": "Inicia sesión en la página de EA para ver tus juegos de EA e instalarlos sin EA app. iDeck solo guarda el token de acceso, en el Llavero de este dispositivo."],
+        "EA games are downloaded from EA and started without the EA app: iDeck signs in to EA, gets each game's licence and answers the game as the EA app would.": ["pt": "Os jogos da EA são baixados da EA e abertos sem o EA app: o iDeck entra na EA, obtém a licença de cada jogo e responde ao jogo como o EA app faria.", "es": "Los juegos de EA se descargan de EA y se abren sin EA app: iDeck inicia sesión en EA, obtiene la licencia de cada juego y responde al juego como lo haría EA app."],
+        "Download from Ubisoft": ["pt": "Baixar da Ubisoft", "es": "Descargar de Ubisoft"],
+        "Downloaded": ["pt": "Baixado", "es": "Descargado"],
+        "Not downloaded": ["pt": "Não baixado", "es": "No descargado"],
+        "Ubisoft games ask Ubisoft Connect for their licence. Install it here, then copy games installed on your PC with iRelay; they start through Ubisoft Connect. This does not guarantee sign-in, DRM, or games will work under Wine.": ["pt": "Os jogos da Ubisoft pedem a licença ao Ubisoft Connect. Instale-o aqui e copie com o iRelay os jogos instalados no seu PC; eles abrem pelo Ubisoft Connect. Isso não garante que login, DRM ou os jogos funcionem no Wine.", "es": "Los juegos de Ubisoft piden la licencia a Ubisoft Connect. Instálalo aquí y copia con iRelay los juegos instalados en tu PC; se abren con Ubisoft Connect. Esto no garantiza que el inicio de sesión, el DRM o los juegos funcionen en Wine."],
+        "Install Ubisoft Connect in Settings › Stores & launchers: Ubisoft games start through it.": ["pt": "Instale o Ubisoft Connect em Ajustes › Lojas e launchers: os jogos da Ubisoft abrem por ele.", "es": "Instala Ubisoft Connect en Ajustes › Tiendas y launchers: los juegos de Ubisoft se abren con él."],
+        "Copy games installed by Ubisoft Connect on your PC with iRelay.": ["pt": "Copie com o iRelay os jogos instalados pelo Ubisoft Connect no seu PC.", "es": "Copia con iRelay los juegos instalados por Ubisoft Connect en tu PC."],
         "iPad address": ["pt": "Endereço do iPad", "es": "Dirección del iPad"],
         "Connect to Wi-Fi": ["pt": "Conecte-se ao Wi-Fi", "es": "Conéctate a la red Wi-Fi"],
         "Pairing code": ["pt": "Código de pareamento", "es": "Código de emparejamiento"],

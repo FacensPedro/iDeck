@@ -51,7 +51,8 @@ class DownloadPauseContractTests(unittest.TestCase):
     def test_device_service_exposes_store_agnostic_transfer_controls(self):
         self.assertIn('case ("POST", "/downloads/control"):', RELAY)
         self.assertIn('"protocol": 4', RELAY)
-        self.assertIn('"WindowsDownloads/Launchers/"', RELAY)
+        self.assertIn('UbisoftLibrary.installRoot + "/"', RELAY)
+        self.assertNotIn('"WindowsDownloads/Launchers/"', RELAY)
         for store in ('"steam"', '"gog"', '"epic"'):
             self.assertIn(f'case {store}:', RELAY)
         for action in ("pause", "resume", "stop"):

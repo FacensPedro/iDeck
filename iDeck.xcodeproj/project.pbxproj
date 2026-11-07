@@ -135,6 +135,15 @@
 		DEAD00000000000000000071 /* VisualCRuntimeBootstrap.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEAD00000000000000000072 /* VisualCRuntimeBootstrap.swift */; };
 		A70100000000000000000001 /* WineExitDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = A70200000000000000000001 /* WineExitDiagnostics.swift */; };
 		BEEF20261106000000000001 /* WineGeckoRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEEF20261106000000000002 /* WineGeckoRuntime.swift */; };
+		BEEF20261107000000000910 /* UbisoftLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEEF20261107000000000920 /* UbisoftLibrary.swift */; };
+		BEEF20261107000000000810 /* EAGlue.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEEF20261107000000000820 /* EAGlue.swift */; };
+		BEEF20261107000000000710 /* EASignIn.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEEF20261107000000000720 /* EASignIn.swift */; };
+		BEEF20261107000000000610 /* EALibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEEF20261107000000000620 /* EALibrary.swift */; };
+		BEEF20261107000000000510 /* EAService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEEF20261107000000000520 /* EAService.swift */; };
+		BEEF20261107000000000410 /* EALicense.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEEF20261107000000000420 /* EALicense.swift */; };
+		BEEF20261107000000000310 /* EAFormats.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEEF20261107000000000320 /* EAFormats.swift */; };
+		BEEF20261107000000000210 /* EADownloader.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEEF20261107000000000220 /* EADownloader.swift */; };
+		BEEF20261107000000000110 /* EAAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEEF20261107000000000120 /* EAAPI.swift */; };
 		BEEF20261107000000000001 /* NativeSymbol.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEEF20261107000000000002 /* NativeSymbol.swift */; };
 		BEEF20261106000000000101 /* WineMono.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEEF20261106000000000102 /* WineMono.swift */; };
 		A10000000000000000000005 /* SteamInstall.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000005 /* SteamInstall.swift */; };
@@ -259,6 +268,15 @@
 		DEAD00000000000000000072 /* VisualCRuntimeBootstrap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisualCRuntimeBootstrap.swift; sourceTree = "<group>"; };
 		A70200000000000000000001 /* WineExitDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WineExitDiagnostics.swift; sourceTree = "<group>"; };
 		BEEF20261106000000000002 /* WineGeckoRuntime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WineGeckoRuntime.swift; sourceTree = "<group>"; };
+		BEEF20261107000000000920 /* UbisoftLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UbisoftLibrary.swift; sourceTree = "<group>"; };
+		BEEF20261107000000000820 /* EAGlue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MadeiraDock/EAGlue.swift"; sourceTree = "<group>"; };
+		BEEF20261107000000000720 /* EASignIn.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EASignIn.swift; sourceTree = "<group>"; };
+		BEEF20261107000000000620 /* EALibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EALibrary.swift; sourceTree = "<group>"; };
+		BEEF20261107000000000520 /* EAService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Vendor/Madeira/SwiftEA/EAService.swift"; sourceTree = "<group>"; };
+		BEEF20261107000000000420 /* EALicense.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Vendor/Madeira/SwiftEA/EALicense.swift"; sourceTree = "<group>"; };
+		BEEF20261107000000000320 /* EAFormats.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Vendor/Madeira/SwiftEA/EAFormats.swift"; sourceTree = "<group>"; };
+		BEEF20261107000000000220 /* EADownloader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Vendor/Madeira/SwiftEA/EADownloader.swift"; sourceTree = "<group>"; };
+		BEEF20261107000000000120 /* EAAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Vendor/Madeira/SwiftEA/EAAPI.swift"; sourceTree = "<group>"; };
 		BEEF20261107000000000002 /* NativeSymbol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeSymbol.swift; sourceTree = "<group>"; };
 		BEEF20261106000000000102 /* WineMono.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WineMono.swift; sourceTree = "<group>"; };
 		A20000000000000000000005 /* SteamInstall.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamInstall.swift; sourceTree = "<group>"; };
@@ -401,6 +419,15 @@
 				DEAD00000000000000000071 /* VisualCRuntimeBootstrap.swift in Sources */,
 				A70100000000000000000001 /* WineExitDiagnostics.swift in Sources */,
 				BEEF20261106000000000001 /* WineGeckoRuntime.swift in Sources */,
+				BEEF20261107000000000910 /* UbisoftLibrary.swift in Sources */,
+				BEEF20261107000000000810 /* EAGlue.swift in Sources */,
+				BEEF20261107000000000710 /* EASignIn.swift in Sources */,
+				BEEF20261107000000000610 /* EALibrary.swift in Sources */,
+				BEEF20261107000000000510 /* EAService.swift in Sources */,
+				BEEF20261107000000000410 /* EALicense.swift in Sources */,
+				BEEF20261107000000000310 /* EAFormats.swift in Sources */,
+				BEEF20261107000000000210 /* EADownloader.swift in Sources */,
+				BEEF20261107000000000110 /* EAAPI.swift in Sources */,
 				BEEF20261107000000000001 /* NativeSymbol.swift in Sources */,
 				BEEF20261106000000000101 /* WineMono.swift in Sources */,
 				AC100000000000000000010 /* VCArchiveExtractor.c in Sources */,
@@ -548,6 +575,15 @@
 				DEAD00000000000000000072 /* VisualCRuntimeBootstrap.swift */,
 				A70200000000000000000001 /* WineExitDiagnostics.swift */,
 				BEEF20261106000000000002 /* WineGeckoRuntime.swift */,
+				BEEF20261107000000000920 /* UbisoftLibrary.swift */,
+				BEEF20261107000000000820 /* EAGlue.swift */,
+				BEEF20261107000000000720 /* EASignIn.swift */,
+				BEEF20261107000000000620 /* EALibrary.swift */,
+				BEEF20261107000000000520 /* EAService.swift */,
+				BEEF20261107000000000420 /* EALicense.swift */,
+				BEEF20261107000000000320 /* EAFormats.swift */,
+				BEEF20261107000000000220 /* EADownloader.swift */,
+				BEEF20261107000000000120 /* EAAPI.swift */,
 				BEEF20261107000000000002 /* NativeSymbol.swift */,
 				BEEF20261106000000000102 /* WineMono.swift */,
 				AC200000000000000000010 /* VCArchiveExtractor.c */,
@@ -721,7 +757,7 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = VPNExtension/VPNExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 17;
+				CURRENT_PROJECT_VERSION = 18;
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = VPNExtension/Info.plist;
@@ -730,7 +766,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.1.0;
+				MARKETING_VERSION = 1.2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ideck.ideck.VPNExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -746,7 +782,7 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = VPNExtension/VPNExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 17;
+				CURRENT_PROJECT_VERSION = 18;
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = VPNExtension/Info.plist;
@@ -755,7 +791,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.1.0;
+				MARKETING_VERSION = 1.2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ideck.ideck.VPNExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -849,7 +885,7 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = iDeckJITHelper/iDeckJITHelper.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 17;
+				CURRENT_PROJECT_VERSION = 18;
 				DEVELOPMENT_TEAM = "";
 				"FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*]" = "$(SRCROOT)/Frameworks/StikJIT.xcframework/ios-arm64";
 				GENERATE_INFOPLIST_FILE = NO;
@@ -858,7 +894,7 @@
 					"$(inherited)",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.1.0;
+				MARKETING_VERSION = 1.2.0;
 				"OTHER_LDFLAGS[sdk=iphoneos*]" = (
 					"$(inherited)",
 					"-framework",
@@ -879,7 +915,7 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = iDeckJITHelper/iDeckJITHelper.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 17;
+				CURRENT_PROJECT_VERSION = 18;
 				DEVELOPMENT_TEAM = "";
 				"FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*]" = "$(SRCROOT)/Frameworks/StikJIT.xcframework/ios-arm64";
 				GENERATE_INFOPLIST_FILE = NO;
@@ -888,7 +924,7 @@
 					"$(inherited)",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.1.0;
+				MARKETING_VERSION = 1.2.0;
 				"OTHER_LDFLAGS[sdk=iphoneos*]" = (
 					"$(inherited)",
 					"-framework",
@@ -970,7 +1006,7 @@
 				OTHER_LDFLAGS = "$(inherited) -lz -llzma $(IDECK_NATIVE_LINK_FLAGS)";
 				OTHER_CFLAGS = "$(inherited) $(IDECK_NATIVE_CFLAGS)";
 				OTHER_CPLUSPLUSFLAGS = "$(inherited) $(IDECK_NATIVE_CFLAGS)";
-				CURRENT_PROJECT_VERSION = 17;
+				CURRENT_PROJECT_VERSION = 18;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -983,7 +1019,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.1.0;
+				MARKETING_VERSION = 1.2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ideck.ideck;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -1007,7 +1043,7 @@
 				OTHER_LDFLAGS = "$(inherited) -lz -llzma $(IDECK_NATIVE_LINK_FLAGS)";
 				OTHER_CFLAGS = "$(inherited) $(IDECK_NATIVE_CFLAGS)";
 				OTHER_CPLUSPLUSFLAGS = "$(inherited) $(IDECK_NATIVE_CFLAGS)";
-				CURRENT_PROJECT_VERSION = 17;
+				CURRENT_PROJECT_VERSION = 18;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -1020,7 +1056,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.1.0;
+				MARKETING_VERSION = 1.2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ideck.ideck;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
