@@ -8,6 +8,10 @@ Upstream: https://github.com/Starkka15/Optima (GPL-3.0-or-later), Rust CLI for L
 - **Optima has NOT been ported, linked or bundled into the iDeck IPA.** No Ubisoft account login, entitlement lookup, CDN downloads or compatibility shims are available in iDeck yet. The UI explicitly states these limitations.
 - Some games may still require Ubisoft client services, online authorization or DRM.
 
+## Build compatibility probe
+- `scripts/fetch_optima_sources.py` stages a pinned upstream snapshot under `vendor/Optima` for CI only. It retains upstream embedded resource files (including Windows DLLs and a certificate) because Optima's Rust `include_bytes!` declarations require them even for `cargo check`. **These files are not copied into the iDeck IPA** and must undergo source/license/security review before any distribution.
+- `.github/workflows/optima-ios.yml` runs `cargo check --locked --target aarch64-apple-ios` with `actions/checkout@v5`. This is a compile check, not a functional iPadOS integration.
+
 ## Required work before claiming an Optima integration
 1. Audit Optima's Cargo dependencies, Linux-only code, embedded DLLs and third-party licenses. Pin a specific upstream revision and record attribution.
 2. Separate the Rust library from the Linux CLI (browser login, local HTTPS capture, config paths, Proton/umu invocation). Build an arm64-apple-ios static library with a stable C ABI and strict concurrency boundaries.
