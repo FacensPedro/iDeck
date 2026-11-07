@@ -263,8 +263,11 @@ class WindowsEnvironment {
             setenv("MADEIRA_DEBUG_VERBOSE", "1", 1)
             setenv("WINEDEBUG", "err+all", 1)
         } else {
-            // Match Madeira's lightweight default; do not suppress errors.
-            setenv("WINEDEBUG", "err+all,err-virtual,fixme-d3dcompiler", 1)
+            // Lean default: only exceptions (seh) and process errors, which the
+            // bug report diagnoses crashes from. err+all wrote thousands of
+            // lines per launch (thread, module, sync...), costing CPU and disk
+            // while the game started.
+            setenv("WINEDEBUG", "-all,err+seh,err+process", 1)
         }
         setenv("WINEARCH", "win64", 1)
         setenv("STEAM_COMPAT_CLIENT_INSTALL_PATH", prefix + "/drive_c/Program Files (x86)/Steam", 1)

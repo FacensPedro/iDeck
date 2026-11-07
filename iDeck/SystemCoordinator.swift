@@ -106,7 +106,7 @@ class SystemCoordinator: ObservableObject {
     private var visualCRuntimeSkipAction: (() -> Void)?
     private var bypassVisualCRuntimeForPrefix: String?
 
-    private static let supportedWineJITPoolMiB: Set<Int> = [64, 96, 128, 192, 256, 384, 512, 640, 768, 896, 1152]
+    private static let supportedWineJITPoolMiB: Set<Int> = [64, 96, 128, 192, 256, 384, 512, 624, 640, 768, 896, 1152]
 
     /// The pool size that last prepared successfully on this device: the
     /// native side starts there instead of retrying larger sizes the
@@ -150,7 +150,7 @@ class SystemCoordinator: ObservableObject {
             ResourceGovernor.shared.onActivityChange = { [weak self] in self?.applyMaxRefreshRate() }
             ResourceGovernor.shared.start()
         }
-        Self.exportWineJITPreference(UserDefaults.standard.object(forKey: "wineJITPoolMiB") as? Int ?? 896)
+        Self.exportWineJITPreference(UserDefaults.standard.object(forKey: "wineJITPoolMiB") as? Int ?? 624)
         Self.exportLastGoodPool()
         // Keep app startup free of native Wine/JIT probes and Keychain reads.
         // In particular, a CS_DEBUGGED flag left behind by StikDebug or a
