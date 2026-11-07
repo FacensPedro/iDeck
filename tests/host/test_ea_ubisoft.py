@@ -33,12 +33,16 @@ class EAAndUbisoftTests(unittest.TestCase):
         self.assertIn('"Software\\\\Wow6432Node\\\\" + key.dropFirst("Software\\\\".count)', glue)
         self.assertIn('return name + String(format: "=dword:%08x", number)', glue)
 
-    def test_ubisoft_installs_through_its_client(self):
+    def test_ubisoft_launch_does_not_require_windows_launcher(self):
+        view = repo_text("iDeck/MainView.swift")
+        settings = repo_text("iDeck/SettingsView.swift")
         ubisoft = repo_text("iDeck/UbisoftLibrary.swift")
-        self.assertIn('https://static3.cdn.ubi.com/orbit/launcher_installer/UbisoftConnectInstaller.exe', ubisoft)
-        self.assertIn('http.url?.host?.hasSuffix(".ubi.com") == true', ubisoft)
+        self.assertIn("UbisoftLibrary.gameExecutable(game)", view)
+        self.assertNotIn('profile.arguments = "uplay://launch/', view)
+        self.assertNotIn('Button(tr("Run Windows installer"))', settings)
+        self.assertNotIn('Button(ubisoftDownloading', settings)
+        self.assertIn('tr("No launcher required")', settings)
         self.assertIn('Software\\\\Ubisoft\\\\Launcher\\\\Installs\\\\', ubisoft)
-        self.assertIn('profile.arguments = "uplay://launch/\\(game.id)/0"', repo_text("iDeck/MainView.swift"))
 
     def test_irelay_endpoints_know_ea_and_ubisoft(self):
         service = repo_text("iDeck/IRelayDeviceService.swift")
