@@ -101,6 +101,7 @@ jobs:
           python3 -m unittest discover -s tests/host -p 'test_jit_launch_diagnostics_metadata.py' -v
           python3 -m unittest discover -s tests/host -p 'test_release_ui_and_cdn.py' -v
           python3 -m unittest discover -s tests/host -p 'test_steam_video_dlls_and_library.py' -v
+          python3 -m unittest discover -s tests/host -p 'test_runtime_efficiency.py' -v
 
       - name: Test Metal Toolchain bootstrap
         run: |
@@ -186,25 +187,6 @@ jobs:
           python3 -m unittest discover -s tests/host -p 'test_madeira_native_duplicate_symbols.py' -v
           python3 -m unittest discover -s tests/host -p 'test_native_ipa_symbol_collisions.py' -v
 
-
-      - name: Test native performance C++ modules
-        run: |
-          xcrun clang++ -std=c++20 -O2 -pthread -x c++ \
-            tests/host/NativePerformanceTests.cpp \
-            iDeck/NativeRuntime/FEXExecutionScheduler.cpp \
-            iDeck/NativeRuntime/GuestMemoryPool.cpp \
-            iDeck/NativeRuntime/NativePerformance.cpp \
-            -o /tmp/ideck-native-performance-tests
-          /tmp/ideck-native-performance-tests
-
-      - name: Test native memory budgeting and pressure recovery
-        run: |
-          xcrun clang++ -std=c++20 -O2 -pthread \
-            tests/host/NativeMemoryManagerTests.cpp \
-            iDeck/NativeRuntime/NativeMemoryManager.cpp \
-            iDeck/NativeRuntime/GuestMemoryPool.cpp \
-            -o /tmp/ideck-memory-manager-tests
-          /tmp/ideck-memory-manager-tests
 
       - name: Test Wine JIT pool preference and Wine Mono native bundle indicators
         run: python3 -m unittest discover -s tests/host -p 'test_wine_jit_pool_settings.py' -v

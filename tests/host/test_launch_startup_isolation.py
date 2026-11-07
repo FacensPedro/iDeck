@@ -15,7 +15,7 @@ class LaunchStartupIsolationTests(unittest.TestCase):
         self.assertNotIn("ideck_fex_initialize(", APP)
 
     def test_coordinator_startup_never_calls_native_or_keychain(self):
-        body = COORDINATOR.split("    init() {", 1)[1].split("    func configureNativeHostIfNeeded()", 1)[0]
+        body = COORDINATOR.split("    init() {", 1)[1].split("    /// The installer's latest message", 1)[0]
         self.assertNotIn("refreshJITStatus()", body)
         self.assertNotIn("SteamSignIn.isSignedIn", body.replace(
             "self.isSteamConnected = SteamSignIn.isSignedIn", ""))
@@ -23,11 +23,11 @@ class LaunchStartupIsolationTests(unittest.TestCase):
         self.assertIn("private var steamSignInLoaded = false", COORDINATOR)
         self.assertIn("func loadSteamAccountIfNeeded()", COORDINATOR)
 
-    def test_native_memory_setup_is_delayed_until_madeira_first_paint(self):
-        self.assertIn("func configureNativeHostIfNeeded()", COORDINATOR)
-        self.assertIn("ideck_native_memory_install_notifications()", COORDINATOR)
-        self.assertIn("ideck_native_memory_configure(64 * 1024 * 1024", COORDINATOR)
-        self.assertEqual(MAIN.count("coordinator.configureNativeHostIfNeeded()"), 1)
+    def test_one_memory_pressure_handler_and_deferred_first_paint(self):
+        # ResourceGovernor (Swift) is the only memory-pressure handler; the
+        # native pool that held no allocations is gone.
+        self.assertNotIn("ideck_native_memory", COORDINATOR)
+        self.assertIn("DispatchSource.makeMemoryPressureSource", repo_text("iDeck/ResourceGovernor.swift"))
         self.assertIn("await Task.yield()", MAIN)
 
     def test_madeira_replaces_home_and_preserves_deferred_jit_checks(self):

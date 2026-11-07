@@ -4,23 +4,32 @@ import Metal
 import Darwin
 import UIKit
 
+/// The session's frame and resource figures, sampled once a second. Only what the
+/// screen shows is published, and only when it changes: every published change
+/// re-evaluates the whole session view, so a game that runs for an hour should not
+/// rebuild it 3,600 times for values nobody sees.
 private final class GameRuntimeMetrics: ObservableObject {
     @Published private(set) var fps = "N/D"
     @Published private(set) var cpu = "N/D"
     @Published private(set) var gpuMemory = "N/D"
-    @Published private(set) var frameCount: UInt64 = 0
+    /// Published until shortly after the first frame (the loading screen and its
+    /// 20-second hint read it); afterwards it is kept without republishing.
     @Published private(set) var secondsSinceLaunch: TimeInterval = 0
     @Published private(set) var presentCounterAvailable = false
     @Published private(set) var receivedNewFrames = false
     @Published private(set) var firstFrameAt: TimeInterval?
 
+    private var elapsed: TimeInterval = 0
     private let startedAt = ProcessInfo.processInfo.systemUptime
-    private let metalDevice = MTLCreateSystemDefaultDevice()
+    private lazy var metalDevice = MTLCreateSystemDefaultDevice()
     private var baselineFrames: UInt64?
     private var previousUptime: TimeInterval?
     private var previousCPU: Double?
     private var previousFrames: UInt64?
     private typealias PresentCount = @convention(c) () -> UInt64
+    /// Madeira's present counter, resolved once (nil in an interface-only build).
+    private static let presentCount: PresentCount? =
+        NativeSymbol.address("madeira_get_present_count").map { unsafeBitCast($0, to: PresentCount.self) }
 
     init() {
         // Capture the in-process present counter when the game session view
@@ -28,57 +37,66 @@ private final class GameRuntimeMetrics: ObservableObject {
         // the first and only guest frame can become the baseline and never
         // be acknowledged. Previous Wine sessions may have left a nonzero
         // counter, so do not interpret a raw nonzero count as this game's frame.
-        if let pointer = dlsym(UnsafeMutableRawPointer(bitPattern: -2),
-                               "madeira_get_present_count") {
-            baselineFrames = unsafeBitCast(pointer, to: PresentCount.self)()
-        }
+        baselineFrames = Self.presentCount?()
     }
 
     /// Re-arm the render-counter baseline once Valve's LaunchApp succeeds.
     /// Frames produced earlier by Wine's desktop or the Steam loader cannot
     /// count as a successful post-launch Metal presentation.
     func armAfterSteamLaunch() {
-        if let pointer = dlsym(UnsafeMutableRawPointer(bitPattern: -2), "madeira_get_present_count") {
-            baselineFrames = unsafeBitCast(pointer, to: PresentCount.self)()
-            receivedNewFrames = false
-            firstFrameAt = nil
-        }
+        guard let count = Self.presentCount?() else { return }
+        baselineFrames = count
+        if receivedNewFrames { receivedNewFrames = false }
+        if firstFrameAt != nil { firstFrameAt = nil }
     }
+
+    /// Seconds since the session view appeared (always current, never published late).
+    var secondsSinceStart: TimeInterval { elapsed }
 
     func sample(collectPerformance: Bool = false) {
         let uptime = ProcessInfo.processInfo.systemUptime
-        secondsSinceLaunch = max(0, uptime - startedAt)
-        var usage = rusage()
-        if collectPerformance && getrusage(RUSAGE_SELF, &usage) == 0 {
-            let consumed = Double(usage.ru_utime.tv_sec) + Double(usage.ru_utime.tv_usec) / 1_000_000 +
-                Double(usage.ru_stime.tv_sec) + Double(usage.ru_stime.tv_usec) / 1_000_000
-            if let oldTime = previousUptime, let oldCPU = previousCPU, uptime > oldTime {
-                cpu = String(format: "%.0f%%", max(0, (consumed - oldCPU) / (uptime - oldTime) * 100))
-            }
-            previousCPU = consumed
+        elapsed = max(0, uptime - startedAt)
+        // The loading screen needs the clock until the "ready" banner is gone.
+        if !receivedNewFrames || elapsed - (firstFrameAt ?? elapsed) < 3 {
+            secondsSinceLaunch = elapsed
         }
-        if let pointer = dlsym(UnsafeMutableRawPointer(bitPattern: -2), "madeira_get_present_count") {
-            presentCounterAvailable = true
-            let count = unsafeBitCast(pointer, to: PresentCount.self)()
+        if collectPerformance {
+            var usage = rusage()
+            if getrusage(RUSAGE_SELF, &usage) == 0 {
+                let consumed = Double(usage.ru_utime.tv_sec) + Double(usage.ru_utime.tv_usec) / 1_000_000 +
+                    Double(usage.ru_stime.tv_sec) + Double(usage.ru_stime.tv_usec) / 1_000_000
+                if let oldTime = previousUptime, let oldCPU = previousCPU, uptime > oldTime {
+                    update(\.cpu, String(format: "%.0f%%", max(0, (consumed - oldCPU) / (uptime - oldTime) * 100)))
+                }
+                previousCPU = consumed
+            }
+        }
+        if let presentCount = Self.presentCount {
+            if !presentCounterAvailable { presentCounterAvailable = true }
+            let count = presentCount()
             if baselineFrames == nil { baselineFrames = count }
-            if let baselineFrames, count > baselineFrames {
-                if firstFrameAt == nil { firstFrameAt = secondsSinceLaunch }
+            if let baselineFrames, count > baselineFrames, !receivedNewFrames {
+                if firstFrameAt == nil { firstFrameAt = elapsed }
                 receivedNewFrames = true
             }
-            if let oldTime = previousUptime, let oldFrames = previousFrames, uptime > oldTime {
+            if collectPerformance, let oldTime = previousUptime, let oldFrames = previousFrames, uptime > oldTime {
                 let delta = count >= oldFrames ? count - oldFrames : 0
-                fps = String(format: "%.0f", Double(delta) / (uptime - oldTime))
+                update(\.fps, String(format: "%.0f", Double(delta) / (uptime - oldTime)))
             }
-            frameCount = count
             previousFrames = count
         } else {
-            presentCounterAvailable = false
-            fps = "N/D"
+            if presentCounterAvailable { presentCounterAvailable = false }
+            update(\.fps, "N/D")
         }
         if collectPerformance, let device = metalDevice {
-            gpuMemory = "\(device.currentAllocatedSize / (1024 * 1024)) MB"
+            update(\.gpuMemory, "\(device.currentAllocatedSize / (1024 * 1024)) MB")
         }
         previousUptime = uptime
+    }
+
+    /// Assigns a published string only when it changes.
+    private func update(_ key: ReferenceWritableKeyPath<GameRuntimeMetrics, String>, _ value: String) {
+        if self[keyPath: key] != value { self[keyPath: key] = value }
     }
 }
 
@@ -182,7 +200,7 @@ struct GameSessionView: View {
     /// nothing with it on, 60 fps with it off). When a MetalFX launch shows
     /// no frame for 75 s, MetalFX is turned off for that game.
     private func disableMetalFXIfNoFrames() {
-        guard !metalFXTurnedOff, !metrics.receivedNewFrames, metrics.secondsSinceLaunch >= 75,
+        guard !metalFXTurnedOff, !metrics.receivedNewFrames, metrics.secondsSinceStart >= 75,
               let active = coordinator.activeWindowsProfile, active.metalFXEnabled,
               coordinator.windowsStatus == "Running" || coordinator.windowsStatus == "Wine started; waiting for game..."
         else { return }

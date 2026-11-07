@@ -35,7 +35,9 @@ final class IRelayDeviceService: @unchecked Sendable {
         "WindowsDownloads/Launchers/",
     ]
 
-    private let queue = DispatchQueue(label: "ideck.irelay.service", qos: .userInitiated)
+    // Transfers stay below the game: SHA-1 checks and file writes must not compete
+    // with the emulation threads for CPU time.
+    private let queue = DispatchQueue(label: "ideck.irelay.service", qos: .utility)
     private var listener: NWListener?
 
     /// Documents/wine/drive_c (as EpicLibrary.drive, usable off the main actor).

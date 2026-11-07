@@ -18,7 +18,6 @@ struct MainView: View {
                 Color.black.ignoresSafeArea()
                     .task {
                         await Task.yield()
-                        coordinator.configureNativeHostIfNeeded()
                         coordinator.loadSteamAccountIfNeeded()
                         steamLibrary = SteamOwnedGamesModel.shared
                         coordinator.openMadeiraWorkspace()
@@ -52,7 +51,9 @@ struct MainView: View {
         .task(id: steamLibrary != nil && scenePhase == .active) {
             guard steamLibrary != nil && scenePhase == .active else { return }
             while !Task.isCancelled {
-                coordinator.refreshJITStatus()
+                // JIT cannot change under a running game, which needs it: skip
+                // the sysctl/code-signing probe and its UI refresh meanwhile.
+                if !ideck_wineprocess_running() { coordinator.refreshJITStatus() }
                 do { try await Task.sleep(nanoseconds: 5_000_000_000) }
                 catch { return }
             }

@@ -1,47 +1,76 @@
 # iDeck architecture
 
-iDeck is split into three layers. Each layer only calls the one below it.
+iDeck has three layers. Each layer calls only the one below it; Madeira's own
+FEX, Wine ARM64EC, DXMT and D3D12 do the translation and rendering and are
+linked statically into the app (`MadeiraStaticABI.h`).
 
-| Layer | Location | Role |
-| --- | --- | --- |
-| Interface | `iDeck/*.swift` (SwiftUI) | Library, stores (Steam, Epic, GOG, EA app, Ubisoft Connect), settings, iRelay USB service |
-| Coordination | `iDeck/SystemCoordinator.swift`, `iDeck/MadeiraDock/` (glue), `iDeck/MadeiraJIT/` | Wine prefixes, Dock installers, JIT, session start/stop |
-| Vendored Madeira | `iDeck/Vendor/Madeira/` | Madeira's Dock and Steam runtime files, byte-for-byte from the pinned commit; never edited |
-| Madeira core | `iDeck/NativeRuntime/` | C/C++/Objective-C++ bridge to FEX, Wine, DXMT and D3D12 |
+| Layer | Language | Location | Owns |
+| --- | --- | --- | --- |
+| 1. iDeck UI | SwiftUI | `iDeck/*.swift` | Library, stores (Steam, GOG, Epic, EA app, Ubisoft Connect), settings, downloads, iRelay service, game session screen |
+| 2. Runtime Manager | Swift + Objective-C++ | `SystemCoordinator.swift`, `WindowsEnvironment.swift`, `ResourceGovernor.swift`, `NativeSymbol.swift`, `MadeiraDock/`, `MadeiraJIT/`, `NativeRuntime/MadeiraRuntimeBridge.mm`, `NativeRuntime/WineBridge.mm` | Prefix, Wine and wineserver start/stop, JIT (StikDebug, 896 MB pool by default), session state and errors, memory pressure |
+| 3. Madeira Core | C/C++ (+ the linked Madeira archives) | `NativeRuntime/` | FEX/JIT guards, graphics availability (DXMT, D3D12, Metal), controllers, Visual C++ extraction, Wine log triage |
 
-## Madeira core (`iDeck/NativeRuntime`)
+## Layer 1 — iDeck UI
+
+- Nothing heavy runs on the main thread: library scans, manifest parsing and
+  extraction use detached tasks or background queues.
+- The game session screen (`GameSessionView.swift`) samples once a second and
+  publishes only what it shows, only when it changes (`GameRuntimeMetrics`).
+  FPS, CPU and Metal memory are measured only while the performance overlay is on.
+- The 5-second JIT status probe (`MainView`) pauses while a Wine game runs:
+  JIT cannot change under a running game.
+- iRelay transfers (`IRelayDeviceService`) run on a `.utility` queue so SHA-1
+  checks and file writes stay below the game's threads.
+
+## Layer 2 — Runtime Manager
+
+- `SystemCoordinator` is the single owner of a session: prefix preparation,
+  Visual C++/Gecko/Mono components, JIT, launch, close and session state.
+- `WindowsEnvironment` builds the launch request and calls
+  `ideck_madeira_launch_v1` (`MadeiraRuntimeBridge.mm`) once per launch.
+- `WineBridge.mm` wraps Wine's process and wineserver entry points
+  (`ideck_wineprocess_*`, `ideck_wineserver_*`).
+- `NativeSymbol` resolves Madeira's C entry points (`winios_*`, `madeira_*`)
+  once and caches them, instead of a `dlsym` on every frame-layout or
+  per-second call.
+- `ResourceGovernor` is the one memory-pressure handler: on a warning it drops
+  what iDeck can rebuild (network and artwork caches) and logs the footprint;
+  it also pauses games in the background and holds 120 Hz only during play.
+
+## Layer 3 — Madeira Core (`iDeck/NativeRuntime`)
 
 | File | Contents |
 | --- | --- |
-| `MadeiraCore.cpp` | JIT and FEX memory, runtime error reporting, Windows path mapping, D3D12 canary |
-| `MadeiraPlatform.mm` | Shared Metal device, renderer/swapchain/frames, DXMT availability, audio session, memory-pressure notifications, session lifecycle |
-| `NativePerformance.cpp` | Frame clock and lock-free performance counters |
-| `NativeMemoryManager.cpp`, `GuestMemoryPool.cpp` | Guest memory budget and reusable pools |
-| `FEXRuntime.cpp`, `FEXExecutionScheduler.cpp` | FEX start-up and execution scheduling |
-| `MadeiraRuntimeBridge.mm`, `WineBridge.mm` | Wine process and wineserver control |
-| `DirectInputBridge.mm` | Controllers, XInput/HID and touch gamepad |
-| `VCArchiveExtractor.c`, `WineLogTriage.c` | Visual C++ cabinet extraction and Wine log triage |
+| `MadeiraRuntimeBridge.h/.mm` | Launch ABI (`ideck_madeira_launch_v1`), runtime preparation, session completion |
+| `WineBridge.mm` | Wine guest process and wineserver control |
+| `FEXRuntime.cpp`, `JITRegionPolicy.h` | FEX availability, Wine JIT pool state and failure details |
+| `MadeiraPlatform.mm` | Metal, DXMT and D3D12 availability; end of session |
+| `DirectInputBridge.mm`, `GamepadResponse.h` | Controllers, XInput/HID, touch gamepad |
+| `VCArchiveExtractor.c` | Visual C++ cabinet extraction and PE checks |
+| `WineLogTriage.c` | Wine log diagnosis |
 | `MadeiraHostCallbacks.m` | Host log sink (kept out of the native static archive) |
-| `InterfaceOnlyStubs.c` | JIT allocator and Dock stand-ins compiled only in interface-only builds |
+| `InterfaceOnlyStubs.c` | JIT allocator and Dock stand-ins for interface-only builds |
+| `RuntimeSupport.h`, `MadeiraStaticABI.h`, `WindowsPEMachine.h` | C declarations shared with Swift and the linked Madeira ABI |
 
-Public C entry points are declared in `RuntimeSupport.h`, `MadeiraRuntimeBridge.h`,
-`NativePerformance.h` and `NativeMemoryManager.h`; the statically linked Madeira
-ABI is in `MadeiraStaticABI.h`.
+Executable memory is only ever created by Madeira's JIT allocator under
+StikDebug; iDeck's own code allocates no RX pages.
 
 ## Vendored Madeira (`iDeck/Vendor/Madeira`)
 
 `MadeiraDock.swift`, `DockInstallers.swift`, `DockReset.swift`,
 `DockStartProgram.swift` and `SteamRuntime.swift` are copied unchanged from
 the Madeira commit pinned in `scripts/fetch_madeira_sources.sh`. Updating
-Madeira means replacing these files. Everything iDeck adds around them
-(Steam DLL repair, Steam video libraries, external drives) lives in
+Madeira means replacing these files. iDeck's additions around them (Steam DLL
+repair, Steam video libraries, external drives) live in
 `iDeck/MadeiraDock/IDeckDockGlue.swift`.
 
 ## Tests and CI
 
-- `tests/host/`: run with `python3 -m unittest discover -s tests/host`;
+- `tests/host/`: `python3 -m unittest discover -s tests/host`;
   `tests/host/support.py` provides `ROOT` and cached `repo_text()`.
 - `.github/workflows/host-tests.yml`: the whole host suite on every push/PR.
-- `.github/workflows/ios.yml`: interface IPA, native IPA, macOS-only tests
-  and releases.
+- `.github/workflows/ios.yml`: interface IPA on pushes and PRs; native IPA
+  (FEX, Wine, DXMT, D3D12) on manual runs; releases only from a verified
+  native IPA.
+- `docs/PERFORMANCE_1_1.md`: what 1.1 changed and what needs an iPad to verify.
 - `docs/archive/`: dated reports from earlier integration stages.

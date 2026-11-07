@@ -15,10 +15,10 @@ DOWNLOAD_SPEED = repo_text("iDeck/DownloadSpeed.swift")
 
 
 class ReleaseInterfaceCDNTests(unittest.TestCase):
-    def test_version_is_one_zero_fifteen_build_sixteen(self):
+    def test_version_is_one_one_build_seventeen(self):
         self.assertNotIn("MARKETING_VERSION = 1.0.0;", PROJECT)
-        self.assertEqual(PROJECT.count("MARKETING_VERSION = 1.0.15;"), 6)
-        self.assertEqual(PROJECT.count("CURRENT_PROJECT_VERSION = 16;"), 6)
+        self.assertEqual(PROJECT.count("MARKETING_VERSION = 1.1.0;"), 6)
+        self.assertEqual(PROJECT.count("CURRENT_PROJECT_VERSION = 17;"), 6)
 
     def test_store_badges_no_longer_appear_with_game_titles(self):
         self.assertIn("private func cardTitle(_ title: String)", VIEW)

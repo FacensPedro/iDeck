@@ -27,7 +27,6 @@ class SystemCoordinator: ObservableObject {
     private var displayLink: CADisplayLink?
     private var steamSignInObserver: NSObjectProtocol?
     private var steamSignInLoaded = false
-    private var nativeHostConfigured = false
     private var activeSteamGameID: UInt32?
     /// A Madeira Dock (Steam client) session is running; its final report is
     /// read when Wine exits.
@@ -167,13 +166,6 @@ class SystemCoordinator: ObservableObject {
             self.isSteamConnected = SteamSignIn.isSignedIn
             self.installSteamClientComponentsIfNeeded()
         }
-    }
-
-    func configureNativeHostIfNeeded() {
-        guard !nativeHostConfigured else { return }
-        nativeHostConfigured = true
-        ideck_native_memory_install_notifications()
-        _ = ideck_native_memory_configure(64 * 1024 * 1024, 8 * 1024 * 1024)
     }
 
     /// The installer's latest message while components download for a launch.
