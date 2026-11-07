@@ -3,4 +3,5 @@
 - Registered the GalaxyCommunication service in the Wine prefix for Galaxy SDK versions that start it first.
 - Steam's DirectX June 2010 setup is no longer run: Wine's built-in DirectX DLLs are used. Running it stopped iDeck before Cuphead could start.
 - A saved 896 MB JIT pool (the old default, which never fits on these devices) moves to 624 MB once.
+- Windows runtime: ARM64 programs started inside an ARM64EC session (Wine's services.exe for Steam's installers) now get the emulator CPU state the session's ntdll expects, instead of stopping iDeck.
 - Updated the application version to 1.4.2 (build 29).

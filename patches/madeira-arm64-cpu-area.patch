@@ -1,0 +1,22 @@
+diff --git a/build/ntdll-unix/thread_ios.c b/build/ntdll-unix/thread_ios.c
+index 0dfc99a..fb2bd52 100644
+--- a/build/ntdll-unix/thread_ios.c
++++ b/build/ntdll-unix/thread_ios.c
+@@ -1757,8 +1757,16 @@ NTSTATUS init_thread_stack( TEB *teb, ULONG_PTR limit, SIZE_T reserve_size, SIZE
+      * desktop need it, aarch64 threads must not get it. */
+     extern const SECTION_IMAGE_INFORMATION *ios_image_info_for_peb( void *peb_id );
+     const SECTION_IMAGE_INFORMATION *ios_ii = ios_image_info_for_peb( teb->Peb );
++    /* iDeck: an ARM64 process (services.exe for Steam's installers) in an
++     * ARM64EC session still runs the session's ARM64EC ntdll, whose syscall
++     * and exception paths read TEB->ChpeV2CpuAreaInfo; without one they
++     * dereferenced NULL and the session, and so the app, stopped (Cuphead,
++     * 2026-11-07: "NOT setting cpu_area (owner machine=0xaa64 session
++     * is_arm64ec=1)"). Such threads get the CPU area too; the emulator never
++     * enters them, so it only costs the 256 KB emulator stack. */
+     if (current_machine == IMAGE_FILE_MACHINE_ARM64 &&
+-        ios_ii->Machine == IMAGE_FILE_MACHINE_AMD64)
++        (ios_ii->Machine == IMAGE_FILE_MACHINE_AMD64 ||
++         (ios_ii->Machine == IMAGE_FILE_MACHINE_ARM64 && is_arm64ec())))
+     {
+         CHPE_V2_CPU_AREA_INFO *cpu_area;
+         const SIZE_T chpev2_stack_size = 0x40000;

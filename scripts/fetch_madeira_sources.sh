@@ -26,6 +26,14 @@ if ! git -C "$DEST" apply --reverse --check "$EARLY_JIT_PATCH" >/dev/null 2>&1; 
   git -C "$DEST" apply "$EARLY_JIT_PATCH"
 fi
 
+# ARM64 processes in an ARM64EC session (services.exe for Steam's installers)
+# get the emulator CPU area the session's ARM64EC ntdll reads.
+ARM64_CPU_AREA_PATCH="$ROOT/patches/madeira-arm64-cpu-area.patch"
+if ! git -C "$DEST" apply --reverse --check "$ARM64_CPU_AREA_PATCH" >/dev/null 2>&1; then
+  git -C "$DEST" apply --check "$ARM64_CPU_AREA_PATCH"
+  git -C "$DEST" apply "$ARM64_CPU_AREA_PATCH"
+fi
+
 FAULT_DIAGNOSTICS_PATCH="$ROOT/patches/madeira-fault-diagnostics.patch"
 if ! git -C "$DEST" apply --reverse --check "$FAULT_DIAGNOSTICS_PATCH" >/dev/null 2>&1; then
   git -C "$DEST" apply --check "$FAULT_DIAGNOSTICS_PATCH"

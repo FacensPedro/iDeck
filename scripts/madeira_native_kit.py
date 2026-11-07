@@ -31,7 +31,9 @@ ARM_HOST_FEATURE_PATCH_SHA256 = hashlib.sha256(
 ).hexdigest()
 EARLY_JIT_PATCH_SHA256 = hashlib.sha256(
     (ROOT / "patches/madeira-jit-early-hole.patch").read_bytes() +
-    (ROOT / "patches/madeira-fault-diagnostics.patch").read_bytes()
+    (ROOT / "patches/madeira-fault-diagnostics.patch").read_bytes() +
+    # A kit without the ARM64 CPU area fix is not interchangeable either.
+    (ROOT / "patches/madeira-arm64-cpu-area.patch").read_bytes()
 ).hexdigest()
 REPEAT_WINE_SESSION_PATCH_SHA256 = hashlib.sha256(
     (Path(__file__).resolve().parents[1] / "patches/madeira-repeat-wine-sessions.patch").read_bytes()
