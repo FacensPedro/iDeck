@@ -40,6 +40,19 @@ final class IRelayDeviceService: @unchecked Sendable {
     private let queue = DispatchQueue(label: "ideck.irelay.service", qos: .utility)
     private var listener: NWListener?
     private var listenerState = "Not started"
+    private var isListening = false
+
+    /// After iDeck returns to the foreground: a listener iOS stopped while the
+    /// app was suspended is created again, so iRelay finds the iPad at once.
+    func restartIfStopped() {
+        queue.async { [self] in
+            guard !isListening else { return }
+            listener?.cancel()
+            listener = nil
+            AppLog.record("[irelay] service restarted after returning to the foreground")
+            start()
+        }
+    }
 
     var connectionStatus: String { queue.sync { listenerState } }
 
@@ -61,10 +74,11 @@ final class IRelayDeviceService: @unchecked Sendable {
                 AppLog.record("[irelay] could not listen on port \(Self.port)")
                 return
             }
-            // Advertised on Bonjour: iOS then asks for local network access as
-            // soon as iDeck starts. Without that permission iRelay's connections
-            // never reach this listener and pairing cannot work.
-            listener.service = NWListener.Service(type: "_ideck._tcp")
+            // No Bonjour service on this listener: when iOS suspended iDeck
+            // (StikDebug opening for JIT) mDNSResponder dropped the registration
+            // (-65569 DefunctConnection) and took the whole listener down with
+            // it, so iRelay lost the iPad. Local network access is asked for by
+            // a separate browser (IRelayPairing.requestLocalNetworkAccess).
             listener.newConnectionHandler = { [weak self] connection in
                 guard let self else { return }
                 IRelayHTTPConnection(connection: connection, queue: self.queue, service: self).start()
@@ -72,9 +86,10 @@ final class IRelayDeviceService: @unchecked Sendable {
             listener.stateUpdateHandler = { [weak self] state in
                 guard let self else { return }
                 switch state {
-                case .ready: self.listenerState = "Listening on port \(Self.port)"
-                case .waiting(let error): self.listenerState = "Waiting: \(error.localizedDescription)"
+                case .ready: self.listenerState = "Listening on port \(Self.port)"; self.isListening = true
+                case .waiting(let error): self.listenerState = "Waiting: \(error.localizedDescription)"; self.isListening = false
                 case .failed(let error):
+                    self.isListening = false
                     self.listenerState = "Failed: \(error.localizedDescription)"
                     AppLog.record("[irelay] service failed: \(error)")
                     self.queue.asyncAfter(deadline: .now() + 2) {
@@ -866,14 +881,19 @@ final class IRelayHTTPConnection: @unchecked Sendable {
 enum IRelayPairing {
     private static let key = "irelay.pairingCode"
     private static let deviceIDKey = "irelay.deviceID"
-    private static let alphabet = Array("ABCDEFGHJKLMNPQRSTUVWXYZ23456789")
+    static let digits = 4
     private static let lock = NSLock()
     private static var failures: [String: (count: Int, until: Date)] = [:]
 
-    /// Eight characters from a 32-letter alphabet (40 bits), created once.
+    /// Four digits, created once (an earlier 8-letter code is replaced). Five
+    /// wrong codes lock a PC out for a minute, so guessing all 10 000 takes days.
     static var code: String {
-        if let stored = UserDefaults.standard.string(forKey: key), stored.count == 8 { return stored }
+        if let stored = UserDefaults.standard.string(forKey: key), isValid(stored) { return stored }
         return regenerate()
+    }
+
+    static func isValid(_ value: String) -> Bool {
+        value.count == digits && value.allSatisfy { $0.isASCII && $0.isNumber }
     }
 
     /// A random identifier for this install, sent in GET /info so iRelay finds
@@ -886,17 +906,17 @@ enum IRelayPairing {
         return value
     }
 
-    /// The code as shown on screen: ABCD-EFGH.
-    static var display: String {
-        let value = code
-        return String(value.prefix(4)) + "-" + String(value.suffix(4))
-    }
+    /// The code as shown on screen.
+    static var display: String { code }
 
     /// A new code; iRelay must be paired again.
     @discardableResult static func regenerate() -> String {
-        var bytes = [UInt8](repeating: 0, count: 8)
-        _ = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
-        let value = String(bytes.map { alphabet[Int($0) % alphabet.count] })
+        var value = ""
+        while value.count < digits {
+            var byte: UInt8 = 0
+            _ = SecRandomCopyBytes(kSecRandomDefault, 1, &byte)
+            if byte < 250 { value.append(Character(String(byte % 10))) }   // no modulo bias
+        }
         UserDefaults.standard.set(value, forKey: key)
         lock.lock(); failures.removeAll(); lock.unlock()
         return value
@@ -904,7 +924,7 @@ enum IRelayPairing {
 
     static func matches(_ candidate: String?) -> Bool {
         guard let candidate else { return false }
-        let given = Array(candidate.uppercased().filter { $0 != "-" && $0 != " " }.utf8)
+        let given = Array(candidate.filter { $0 != "-" && $0 != " " }.utf8)
         let expected = Array(code.utf8)
         guard given.count == expected.count else { return false }
         return zip(given, expected).reduce(0) { $0 | ($1.0 ^ $1.1) } == 0
@@ -929,6 +949,26 @@ enum IRelayPairing {
         lock.lock(); defer { lock.unlock() }
         guard let entry = failures[host] else { return false }
         return entry.count >= 5 && entry.until > Date()
+    }
+
+    private static var browser: NWBrowser?
+
+    /// Browsing for iDeck's own Bonjour type makes iOS ask for local network
+    /// access when iDeck starts; without it iRelay's connections never arrive.
+    /// A failed browser is simply dropped: it serves nothing.
+    static func requestLocalNetworkAccess() {
+        lock.lock(); defer { lock.unlock() }
+        guard browser == nil else { return }
+        let parameters = NWParameters()
+        parameters.prohibitedInterfaceTypes = [.cellular]
+        let found = NWBrowser(for: .bonjour(type: "_ideck._tcp", domain: nil), using: parameters)
+        found.stateUpdateHandler = { state in
+            if case .failed = state {
+                lock.lock(); browser?.cancel(); browser = nil; lock.unlock()
+            }
+        }
+        found.start(queue: .global(qos: .utility))
+        browser = found
     }
 
     static func host(of connection: NWConnection) -> String {

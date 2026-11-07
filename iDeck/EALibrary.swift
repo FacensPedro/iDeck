@@ -288,6 +288,8 @@ struct EAInstalledGame: Codable, Sendable {
     func pause(_ id: String) {
         if let current = active, current.id == id {
             current.task.cancel()
+            // Shown as paused at once: the task stops at its next chunk.
+            downloads[id]?.state = .paused
         } else if let index = queue.firstIndex(of: id) {
             queue.remove(at: index)
             downloads[id]?.state = .paused

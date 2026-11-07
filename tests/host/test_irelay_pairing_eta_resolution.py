@@ -26,7 +26,7 @@ class PairingETAResolutionTests(unittest.TestCase):
         self.assertIn("width ?? 1280", repo_text("iDeck/RuntimeConfiguration.swift"))
 
     def test_pairing_triggers_local_network_access_and_reports_refusals(self):
-        self.assertIn('NWListener.Service(type: "_ideck._tcp")', SERVICE)
+        self.assertIn('NWBrowser(for: .bonjour(type: "_ideck._tcp", domain: nil)', SERVICE)
         self.assertIn("<string>_ideck._tcp</string>", PLIST)
         self.assertIn('"deviceID": IRelayPairing.deviceID', SERVICE)
         self.assertIn("IRelayPairing.isLocked(peer)", SERVICE)
