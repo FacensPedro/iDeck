@@ -39,6 +39,9 @@ final class IRelayDeviceService: @unchecked Sendable {
     // with the emulation threads for CPU time.
     private let queue = DispatchQueue(label: "ideck.irelay.service", qos: .utility)
     private var listener: NWListener?
+    private var listenerState = "Not started"
+
+    var connectionStatus: String { queue.sync { listenerState } }
 
     /// Documents/wine/drive_c (as EpicLibrary.drive, usable off the main actor).
     static var drive: URL {
@@ -50,9 +53,11 @@ final class IRelayDeviceService: @unchecked Sendable {
     func start() {
         queue.async { [self] in
             guard listener == nil else { return }
+            listenerState = "Starting"
             let parameters = IRelayPairing.localNetworkParameters()
             guard let port = NWEndpoint.Port(rawValue: Self.port),
                   let listener = try? NWListener(using: parameters, on: port) else {
+                listenerState = "Failed to create TCP listener on port \(Self.port)"
                 AppLog.record("[irelay] could not listen on port \(Self.port)")
                 return
             }
@@ -65,13 +70,19 @@ final class IRelayDeviceService: @unchecked Sendable {
                 IRelayHTTPConnection(connection: connection, queue: self.queue, service: self).start()
             }
             listener.stateUpdateHandler = { [weak self] state in
-                if case .failed(let error) = state {
+                guard let self else { return }
+                switch state {
+                case .ready: self.listenerState = "Listening on port \(Self.port)"
+                case .waiting(let error): self.listenerState = "Waiting: \(error.localizedDescription)"
+                case .failed(let error):
+                    self.listenerState = "Failed: \(error.localizedDescription)"
                     AppLog.record("[irelay] service failed: \(error)")
-                    self?.queue.asyncAfter(deadline: .now() + 2) {
-                        self?.listener?.cancel()
-                        self?.listener = nil
-                        self?.start()
+                    self.queue.asyncAfter(deadline: .now() + 2) {
+                        self.listener?.cancel()
+                        self.listener = nil
+                        self.start()
                     }
+                default: break
                 }
             }
             listener.start(queue: queue)

@@ -20,6 +20,16 @@ class IRelayLocalNetworkTests(unittest.TestCase):
         self.assertIn("if port == Self.localPort { parameters.requiredInterfaceType = .loopback }", client)
         self.assertIn("IRelayPairing.display", client)
 
+    def test_settings_reports_listener_and_missing_pc_tunnel(self):
+        client = repo_text("iDeck/IRelayClient.swift")
+        service = repo_text("iDeck/IRelayDeviceService.swift")
+        self.assertIn("Button(tr(\"Refresh connection\"))", client)
+        self.assertIn("IRelayDeviceService.shared.connectionStatus", client)
+        self.assertIn("guard IRelayTunnel.shared.pcConnected else", client)
+        self.assertIn("case .ready: self.listenerState", service)
+        self.assertIn("case .waiting(let error): self.listenerState", service)
+        self.assertIn("case .failed(let error):", service)
+
     def test_no_usb_transport_left(self):
         for path in ("iDeck/IRelayClient.swift", "iDeck/IRelayDeviceService.swift"):
             text = repo_text(path)
