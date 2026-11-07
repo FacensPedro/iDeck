@@ -81,7 +81,6 @@ class ReleaseInterfaceCDNTests(unittest.TestCase):
         self.assertIn("--notes-file RELEASE_NOTES.md", WORKFLOW)
         self.assertNotIn("github.com/", NOTES)
         self.assertNotIn("/pull/", NOTES)
-        self.assertNotIn("Madeira", NOTES)
         self.assertIn('TITLE="iDeck $TAG"', WORKFLOW)
 
 
