@@ -219,7 +219,7 @@ python3 scripts/stamp_ideck_runtime_profile.py --app "$APP" ${PROFILE_ARGS[@]+"$
 # Stream the app directly into a valid IPA, with fast compression and
 # symlink/executable-bit preservation; do not duplicate the native app as
 # a temporary Payload tree or recompress PNG/ZIP/GZ assets.
-python3 scripts/package_ipa.py --app "$APP" --output iDeck.ipa
+python3 scripts/package_ipa.py --app "$APP" --output iDeck.ipa --duplicate-report build/iDeck-duplicate-audit.json
 if [[ "${IDECK_REQUIRE_MADEIRA:-0}" == "1" && "${IDECK_MADEIRA_GRAPHICS:-d3d11}" == "d3d12" && -n "${IDECK_MSC_PKG:-}" ]]; then
   python3 scripts/verify_apple_msc_beta3_bundle.py \
     --source "${IDECK_MADEIRA_ROOT:-$(pwd)/vendor/Madeira}/app/Madeira" \
