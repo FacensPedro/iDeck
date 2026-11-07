@@ -565,6 +565,25 @@ enum GameRecommendations {
     /// that reserves, releases and reserves again inside the same range never gets it
     /// back: Madeira Dock spun on "Loading Steam" before Thumper. The game lists that
     /// were tested with those defaults keep them. No switches.
+    /// Crash Bandicoot N. Sane Trilogy (Steam 731490). After loading its
+    /// permanent shader chunk the game reads the last entry of a display-mode
+    /// list without checking that the list has any: with DXGI's synthetic
+    /// three-mode list (640x480, 800x600, the desktop) that did not match
+    /// user32's, the list came back empty and the game read address -24
+    /// (CrashBandicootNSaneTrilogy.exe+0x2fef7a, `mov eax,[rdx+rax*8]` with
+    /// rdx = 0, rax = -3: entry count - 1 of 24-byte entries). DXGI now lists
+    /// win32u's mode table, the same as EnumDisplaySettings, as for RDR2.
+    static let crashBandicootNSane = GameRecommendation(
+        id: "crash-nsane", title: "Crash Bandicoot N. Sane Trilogy", version: 1,
+        config: """
+        # Recommended settings for Crash Bandicoot N. Sane Trilogy.
+        # Reset to Recommended, at the bottom of the game's settings, brings them back.
+        env.DXMT_WSI_MONITOR_IDENTITY = 1
+        env.DXMT_WSI_MODE_TABLE = 1
+        env.MADEIRA_EC_HOOK_TRACE = 0
+        """,
+        avx: false, resolution: "1280x720", display: "fit")
+
     static let standard = GameRecommendation(
         id: "standard", title: "games without a list of their own", version: 3,
         config: """
@@ -574,7 +593,7 @@ enum GameRecommendations {
         """)
 
     static let all = [rdr2Steam, rdr2Other, gta5EnhancedSteam, gta5EnhancedOther, ghostOfTsushima, godOfWar, horizonZeroDawn,
-                      darkSoulsRemastered, darkSoulsIII, falloutNewVegas, fallout3, blackOps2, standard]
+                      darkSoulsRemastered, darkSoulsIII, falloutNewVegas, fallout3, blackOps2, crashBandicootNSane, standard]
 
     // MARK: Recognising a game
 
@@ -584,6 +603,7 @@ enum GameRecommendations {
     static let falloutNewVegasAppID = 22380, fallout3AppIDs: Set<Int> = [22300, 22370]   // Fallout 3, its GOTY Edition
     /// Black Ops II's campaign, Zombies and multiplayer.
     static let blackOps2AppIDs: Set<Int> = [202970, 212910, 202990]
+    static let crashBandicootNSaneAppID = 731490
 
     /// The recommendation for a game, or nil.
     /// - windowsPath: a program ("C:\Games\GoW\GoW.exe"), or a library Steam
@@ -611,6 +631,7 @@ enum GameRecommendations {
             if steamAppID.map(fallout3AppIDs.contains) == true || installFolder == "fallout 3"
                 || installFolder == "fallout 3 goty" { return fallout3 }
             if blackOps2AppIDs.contains(steamAppID ?? 0) || installFolder == "call of duty black ops ii" { return blackOps2 }
+            if steamAppID == crashBandicootNSaneAppID || installFolder == "crash bandicoot - n sane trilogy" { return crashBandicootNSane }
             return nil
         }
         // A program, wherever it was installed: only the game's own programs, so a
@@ -641,6 +662,8 @@ enum GameRecommendations {
             return fallout3
         case "t6sp.exe", "t6zm.exe", "t6mp.exe":
             return blackOps2
+        case "crashbandicootnsanetrilogy.exe":
+            return crashBandicootNSane
         default:
             return nil
         }

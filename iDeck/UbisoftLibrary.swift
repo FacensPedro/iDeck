@@ -12,7 +12,8 @@ import Foundation
 ///   (HKLM\Software\Ubisoft\Launcher\Installs\<id> InstallDir) and starts the game
 ///   through the client: `UbisoftConnect.exe uplay://launch/<id>/0`.
 ///
-/// Whether a game then runs depends on Ubisoft Connect working under Wine.
+/// Without Ubisoft Connect installed, the game's own executable is started
+/// directly (`gameExecutable`); nothing asks for the launcher first.
 struct UbisoftInstalledGame: Codable, Sendable, Equatable, Identifiable {
     var id: String          // Ubisoft's install id (the registry key name)
     var title: String
@@ -39,6 +40,31 @@ struct UbisoftInstalledGame: Codable, Sendable, Equatable, Identifiable {
 
     static var clientInstalled: Bool {
         FileManager.default.fileExists(atPath: EpicLibrary.drive.appendingPathComponent(client).path)
+    }
+
+    /// Names that are never the game itself.
+    private static let notTheGame = ["unins", "setup", "install", "crash", "report", "redist", "vcredist", "dxsetup",
+                                     "directx", "dotnet", "ubisoftconnect", "uplay", "upc", "eac", "easyanticheat",
+                                     "battleye", "be_service", "launcherpatcher", "touchup", "cleanup"]
+
+    /// The game's own executable: the largest .exe in its folder (three levels
+    /// at most) that is not an installer, crash reporter or launcher.
+    static func gameExecutable(_ game: UbisoftInstalledGame) -> URL? {
+        let root = EpicLibrary.drive.appendingPathComponent(game.folder, isDirectory: true)
+        guard let walker = FileManager.default.enumerator(at: root, includingPropertiesForKeys: [.fileSizeKey, .isRegularFileKey],
+                                                          options: [.skipsHiddenFiles]) else { return nil }
+        var best: (url: URL, size: Int)?
+        for case let url as URL in walker {
+            if walker.level > 3 { walker.skipDescendants(); continue }
+            guard url.pathExtension.lowercased() == "exe" else { continue }
+            let name = url.deletingPathExtension().lastPathComponent.lowercased().replacingOccurrences(of: " ", with: "")
+            if notTheGame.contains(where: { name.contains($0) }) { continue }
+            let values = try? url.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey])
+            guard values?.isRegularFile == true else { continue }
+            let size = values?.fileSize ?? 0
+            if best == nil || size > best!.size { best = (url, size) }
+        }
+        return best?.url
     }
 
     static var installerDownloaded: Bool {

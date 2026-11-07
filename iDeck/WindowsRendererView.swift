@@ -103,11 +103,33 @@ struct WindowsRendererView: UIViewRepresentable {
         return requestedSize ?? CGSize(width: 1280, height: 720)
     }
 
+    private typealias ClientRect = @convention(c) (UnsafeMutablePointer<Int32>?, UnsafeMutablePointer<Int32>?,
+                                                    UnsafeMutablePointer<Int32>?, UnsafeMutablePointer<Int32>?) -> Int32
+
+    /// The game window's client area on the guest monitor, as Madeira's own
+    /// touch mapping reads it (winios_game_client_rect), or nil while no game
+    /// window owns input (a dialog, the desktop, or before the window exists).
+    private static var gameClientRect: CGRect? {
+        guard let symbol = NativeSymbol.address("winios_game_client_rect") else { return nil }
+        var x: Int32 = 0, y: Int32 = 0, w: Int32 = 0, h: Int32 = 0
+        guard unsafeBitCast(symbol, to: ClientRect.self)(&x, &y, &w, &h) != 0, w > 0, h > 0 else { return nil }
+        return CGRect(x: Int(x), y: Int(y), width: Int(w), height: Int(h))
+    }
+
     // Shared geometric mapping, also used by touch overlays. Returns guest
     // monitor coordinates from the physical active UIWindow's coordinate space.
+    // As Madeira (ContentView.mapPoint): a finger's place on the presented
+    // picture is the same place in the game window's client area, which need
+    // not be the whole monitor (a game whose window is not the monitor's size,
+    // or that sits at an offset). Mapping onto the monitor instead put taps
+    // off target whenever the two differed.
     static func guestPoint(fromWindow point: CGPoint) -> CGPoint? {
         guard let surface = currentSurface else { return nil }
-        return RuntimeConfiguration.guestPoint(point, guest: surface.guest,
+        guard let client = gameClientRect else {
+            return RuntimeConfiguration.guestPoint(point, guest: surface.guest,
+                drawable: surface.drawable, bounds: surface.bounds, mode: surface.mode)
+        }
+        return RuntimeConfiguration.clientPoint(point, client: client, guest: surface.guest,
             drawable: surface.drawable, bounds: surface.bounds, mode: surface.mode)
     }
 

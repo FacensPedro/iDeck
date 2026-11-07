@@ -734,13 +734,12 @@ class WindowsEnvironment {
         unsetenv("MADEIRA_HIDPAD")
         unsetenv("MADEIRA_HIDPAD_NAME")
         // The game's screen: the active window scene's (UIScreen.main is deprecated).
+        // Off the main thread the size last read on it: a fixed 12.9-inch
+        // iPad Pro size made MetalFX scale to the wrong size and, at "Device
+        // native", render a 4:3 picture on every other screen shape.
         let screen: CGSize = Thread.isMainThread
-            ? MainActor.assumeIsolated {
-                UIApplication.shared.connectedScenes
-                    .compactMap { ($0 as? UIWindowScene)?.screen.nativeBounds.size }
-                    .first ?? CGSize(width: 2732, height: 2048)
-            }
-            : CGSize(width: 2732, height: 2048)
+            ? MainActor.assumeIsolated { Self.readScreenPixels() }
+            : Self.screenPixels
         // MetalFX at "Device native": the game renders at 2/3 of the screen
         // and MetalFX enlarges it 1.5x, about 55% fewer pixels for the GPU to
         // shade with little visible loss.
@@ -788,6 +787,7 @@ class WindowsEnvironment {
         }
 
         setenv("IDECK_FPS_LIMIT", profile.fpsLimit, 1)
+        Self.applyFrameRateLimit(profile.fpsLimit)
         // "Auto": Madeira's frame-cap governor holds the CPU near 1.5 W by
         // moving the cap between 60 and 20 fps (read at session start).
         if profile.fpsLimit == "Auto" {
@@ -807,6 +807,51 @@ class WindowsEnvironment {
             options.append(String(format: "d3d11.metalSpatialUpscaleFactor = %.2f", factor))
         }
         setenv("DXMT_CONFIG", options.joined(separator: ";"), 1)
+    }
+
+    /// DXMT's present mode on iOS (madeira_set_vsync_locked): 1 = 60, 3 = 30,
+    /// 4 = 40, 0 = the display's maximum. This is the cap that works: DXMT's
+    /// d3d11.preferredMaxFrameRate is ignored on iOS (its present path drops
+    /// the minimum duration), so a 30 FPS limit used to run at 60.
+    static func vsyncMode(for fpsLimit: String) -> Int32 {
+        switch fpsLimit {
+        case "30": return 3
+        case "40": return 4
+        case "Uncapped": return 0
+        default: return 1   // "60" and "Auto" (whose governor lowers it further)
+        }
+    }
+
+    private static let screenLock = NSLock()
+    private static var cachedScreenPixels: CGSize?
+
+    /// The active scene's screen in pixels, as last read on the main thread.
+    static var screenPixels: CGSize {
+        screenLock.lock(); defer { screenLock.unlock() }
+        return cachedScreenPixels ?? CGSize(width: 2732, height: 2048)
+    }
+
+    /// Reads (and remembers) the active scene's screen size in pixels.
+    @MainActor @discardableResult static func readScreenPixels() -> CGSize {
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        let active = scenes.first { $0.activationState == .foregroundActive } ?? scenes.first
+        guard let size = active?.screen.nativeBounds.size, size.width > 0, size.height > 0 else { return screenPixels }
+        screenLock.lock(); cachedScreenPixels = size; screenLock.unlock()
+        return size
+    }
+
+    private typealias SetVsyncMode = @convention(c) (Int32) -> Void
+
+    /// Applies an FPS limit at once, also while a game runs (it is read on
+    /// every present).
+    static func applyFrameRateLimit(_ fpsLimit: String) {
+        let mode = vsyncMode(for: fpsLimit)
+        guard let symbol = NativeSymbol.address("madeira_set_vsync_locked") else {
+            SteamLog.event("[fps] madeira_set_vsync_locked is not linked; limit \(fpsLimit) not applied")
+            return
+        }
+        unsafeBitCast(symbol, to: SetVsyncMode.self)(mode)
+        SteamLog.event("[fps] limit \(fpsLimit) -> present mode \(mode)")
     }
 
     /// The resolution the game renders at: "Device native" with MetalFX on

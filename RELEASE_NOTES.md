@@ -1,7 +1,12 @@
 ## What's Changed
-- Pairing with iRelay fixed: iOS now asks for local network access when iDeck starts, a refused code is reported to iRelay instead of locking the PC out, and a new pairing code lets the PC pair again at once. Use iRelay 3.7.2.
-- iRelay finds a paired iPad again when the network gives it a new address.
-- Download time left shows the real minutes and hours instead of "(seconds / 60)m".
-- New games start at 1280x720; games still on the old 960x540 default move to 1280x720.
-- EA app and Ubisoft Connect are in the store list with their icons.
-- Updated the application version to 1.2.1 (build 19).
+- The FPS limit now caps the game: 30, 40 and 60 hold the game to that rate and Uncapped runs at the display's maximum. A change during play applies at once.
+- Touch lands where the finger is when the game's window is not the size of the screen or sits at an offset.
+- MetalFX upscales to this device's screen size instead of a fixed iPad Pro size, which also fixes the picture shape at Device native.
+- Crash Bandicoot N. Sane Trilogy: recommended settings so the game finds its display modes; it stopped right after loading its shaders.
+- Ubisoft Connect: games copied from your PC with iRelay start directly; iDeck no longer asks you to install the launcher first.
+- Faster transfers from iRelay: larger network reads and fewer copies on the device. Use iRelay 3.7.3.
+- Bug log times follow the device's clock and time zone.
+- Settings: simpler Graphics & Performance page, with renderer, memory and sync choices under Advanced.
+- Settings: the store names under Stores & launchers, the runtime label under JIT active and the network note on the iRelay page were removed.
+- The GOG icon in Game stores has no background color.
+- Updated the application version to 1.2.3 (build 21).

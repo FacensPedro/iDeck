@@ -12,6 +12,9 @@ enum AppLog {
     private static let stamp: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        // The device's own clock and time zone (ISO 8601 defaults to UTC, "Z"):
+        // log times match the time shown on the iPad.
+        formatter.timeZone = .current
         return formatter
     }()
 

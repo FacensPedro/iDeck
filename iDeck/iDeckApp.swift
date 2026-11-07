@@ -34,6 +34,8 @@ struct iDeckApp: App {
         WindowGroup {
             MainView(coordinator: coordinator)
                 .preferredColorScheme(.dark)
+                // Remembered for launches prepared off the main thread (MetalFX size).
+                .onAppear { WindowsEnvironment.readScreenPixels() }
         }
     }
 }
