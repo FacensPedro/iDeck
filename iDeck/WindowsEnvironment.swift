@@ -263,8 +263,11 @@ class WindowsEnvironment {
             setenv("MADEIRA_DEBUG_VERBOSE", "1", 1)
             setenv("WINEDEBUG", "err+all", 1)
         } else {
-            // Match Madeira's lightweight default; do not suppress errors.
-            setenv("WINEDEBUG", "err+all,err-virtual,fixme-d3dcompiler", 1)
+            // Lean default: only exceptions (seh) and process errors, which the
+            // bug report diagnoses crashes from. err+all wrote thousands of
+            // lines per launch (thread, module, sync...), costing CPU and disk
+            // while the game started.
+            setenv("WINEDEBUG", "-all,err+seh,err+process", 1)
         }
         setenv("WINEARCH", "win64", 1)
         setenv("STEAM_COMPAT_CLIENT_INSTALL_PATH", prefix + "/drive_c/Program Files (x86)/Steam", 1)
@@ -666,15 +669,14 @@ class WindowsEnvironment {
         if [1, 2, 4, 8].contains(profile.anisotropyLimit) { setenv("DXMT_D9_ANISO_LIMIT", String(profile.anisotropyLimit), 1) }
         else { unsetenv("DXMT_D9_ANISO_LIMIT") }
         if profile.frameGeneration { setenv("MADEIRA_FRAMEGEN", "1", 1) } else { unsetenv("MADEIRA_FRAMEGEN") }
-        if profile.reportNVIDIA {
-            setenv("DXMT_ENABLE_NVEXT", "1", 1)
-            setenv("DXMT_WSI_MONITOR_IDENTITY", "1", 1)
-            setenv("DXMT_WSI_MODE_TABLE", "1", 1)
-        } else {
-            unsetenv("DXMT_ENABLE_NVEXT")
-            unsetenv("DXMT_WSI_MONITOR_IDENTITY")
-            unsetenv("DXMT_WSI_MODE_TABLE")
-        }
+        if profile.reportNVIDIA { setenv("DXMT_ENABLE_NVEXT", "1", 1) } else { unsetenv("DXMT_ENABLE_NVEXT") }
+        // Every game: DXGI lists the same monitor and display modes as
+        // user32 (win32u's mode table). DXGI's own three-mode list disagreed
+        // with EnumDisplaySettings, and games that match the two found an
+        // empty list: Crash Bandicoot N. Sane Trilogy read the last entry of
+        // it and stopped right after loading its shaders.
+        setenv("DXMT_WSI_MONITOR_IDENTITY", "1", 1)
+        setenv("DXMT_WSI_MODE_TABLE", "1", 1)
         // Fastsync's per-game switches, only when Settings chose Fastsync.
         if MadeiraSyncEngine.current == .fastsync {
             let mode = MadeiraConfig.get("env.MADEIRA_FASTSYNC") ?? "auto"
