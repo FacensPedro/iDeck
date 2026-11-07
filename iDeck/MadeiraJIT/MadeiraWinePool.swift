@@ -5,15 +5,20 @@ import Foundation
 /// StikJITHelper.allocatePool, the WINE_IOS_JIT_* exports, and the early detach
 /// of the debugger right after, while the VM map is still small.
 enum MadeiraWinePool {
-    /// 896 MB as Madeira; madeira.cfg `pool` (256 to 1152) wins, then iDeck's
-    /// Settings choice.
+    /// A game's explicit Madeira configuration wins. The per-executable JIT
+    /// pool list then takes precedence over the global Madeira/default pool,
+    /// so a title that needs a smaller contiguous RX mapping does not silently
+    /// inherit a global 896 MB request.
     static var sizeMB: Int {
-        if let txt = MadeiraConfig.gameValue("pool") ?? MadeiraConfig.get("pool"),
-           let mb = Int(txt.trimmingCharacters(in: .whitespacesAndNewlines)), mb >= 256, mb <= 1152 {
+        if let txt = MadeiraConfig.gameValue("pool"),
+           let mb = Int(txt.trimmingCharacters(in: .whitespacesAndNewlines)), (256...1152).contains(mb) {
             return mb
         }
-        // iDeck: the game's line in Documents/jit-pool.txt (JITPoolList).
         if let mb = JITPoolList.size(forCurrentGame: ()) { return mb }
+        if let txt = MadeiraConfig.get("pool"),
+           let mb = Int(txt.trimmingCharacters(in: .whitespacesAndNewlines)), (256...1152).contains(mb) {
+            return mb
+        }
         let chosen = UserDefaults.standard.integer(forKey: "wineJITPoolMiB")
         return (256...1152).contains(chosen) ? chosen : 896
     }
