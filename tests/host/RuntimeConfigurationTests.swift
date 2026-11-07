@@ -51,6 +51,18 @@ struct WindowsGameProfile {
                 CGPoint(x: -1e6, y: -1e6), guest: game, bounds: available, mode: mode)
             precondition(clamped == .zero)
         }
+        // A game window smaller than the monitor, at an offset: the centre of
+        // the picture is the centre of the client area, the corners its corners.
+        let client = CGRect(x: 100, y: 50, width: 800, height: 450)
+        let picture = RuntimeConfiguration.surfaceRect(guest: game, bounds: available, mode: .fit)
+        let centre = RuntimeConfiguration.clientPoint(CGPoint(x: picture.midX, y: picture.midY), client: client,
+                                                      guest: game, bounds: available, mode: .fit)!
+        precondition(abs(centre.x - 500) < 0.01 && abs(centre.y - 275) < 0.01)
+        let corner = RuntimeConfiguration.clientPoint(CGPoint(x: -1e6, y: 1e6), client: client,
+                                                      guest: game, bounds: available, mode: .fit)!
+        precondition(corner.x == 100 && corner.y == 499)
+        precondition(RuntimeConfiguration.clientPoint(.zero, client: .zero, guest: game,
+                                                      bounds: available, mode: .fit) == nil)
         precondition(RuntimeConfiguration.SurfaceMode(saved: "legacy") == .fit)
         precondition(RuntimeConfiguration.guestPoint(.zero, guest: .zero,
                                                      bounds: available, mode: .fit) == nil)

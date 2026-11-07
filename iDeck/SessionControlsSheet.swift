@@ -34,11 +34,17 @@ struct SessionControlsSheet: View {
                 }
                 Section {
                     Toggle(tr("MetalFX Upscaling"), isOn: binding(\.metalFXEnabled, false))
-                    Picker(tr("Frame rate limit"), selection: binding(\.fpsLimit, "60")) {
+                    Picker(tr("Frame rate limit"), selection: Binding(
+                        get: { profile?.fpsLimit ?? "60" },
+                        set: { limit in
+                            binding(\.fpsLimit, "60").wrappedValue = limit
+                            // The cap is read on every present: it applies now.
+                            WindowsEnvironment.applyFrameRateLimit(limit)
+                        })) {
                         ForEach(WindowsGameProfile.fpsLimits, id: \.self) { Text(tr($0)).tag($0) }
                     }
                 } footer: {
-                    Text(tr("MetalFX and the FPS limit take effect the next time a game starts. A lower limit uses less CPU, GPU and battery."))
+                    Text(tr("The FPS limit applies at once; MetalFX takes effect the next time the game starts. A lower limit uses less CPU, GPU and battery."))
                 }
                 .disabled(profile == nil)
             }

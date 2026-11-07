@@ -54,6 +54,21 @@ enum RuntimeConfiguration {
                        y: min(max(0, y), guest.height - 1))
     }
 
+    /// A window point on the presented picture to the same relative place in
+    /// the game window's client area (guest monitor pixels).
+    static func clientPoint(_ point: CGPoint, client: CGRect, guest: CGSize, drawable: CGSize = .zero,
+                            bounds: CGRect, mode: SurfaceMode) -> CGPoint? {
+        guard client.width > 0, client.height > 0, client.width.isFinite, client.height.isFinite else { return nil }
+        let rect = surfaceRect(guest: guest, drawable: drawable, bounds: bounds, mode: mode)
+        guard rect.width.isFinite, rect.height.isFinite, rect.width > 0, rect.height > 0 else { return nil }
+        let u = min(max(0, (point.x - rect.minX) / rect.width), 1)
+        let v = min(max(0, (point.y - rect.minY) / rect.height), 1)
+        let x = client.minX + u * client.width
+        let y = client.minY + v * client.height
+        guard x.isFinite, y.isFinite else { return nil }
+        return CGPoint(x: min(x, client.maxX - 1), y: min(y, client.maxY - 1))
+    }
+
     struct Settings: Equatable {
         let resolutionWidth: Int
         let resolutionHeight: Int
