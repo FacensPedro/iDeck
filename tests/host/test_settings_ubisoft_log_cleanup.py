@@ -17,6 +17,18 @@ class SettingsUbisoftLogCleanupTests(unittest.TestCase):
         self.assertIn("static func gameExecutable", UBISOFT)
         self.assertNotIn("nonisolated static func gameExecutable", UBISOFT)
 
+    def test_ea_games_open_details_and_keep_download_actions(self):
+        self.assertIn(".sheet(item: $selectedEAGame)", MAIN)
+        self.assertIn("private struct EAGameDetailsSheet: View", MAIN)
+        card = MAIN.split("private func eaCard(", 1)[1].split("/// Licence, registry", 1)[0]
+        self.assertIn("selectedEAGame = game", card)
+        self.assertIn("downloadCoverButton { eaLibrary.install(game.id) }", card)
+        details = MAIN.split("private struct EAGameDetailsSheet: View", 1)[1].split("/// Epic game page.", 1)[0]
+        self.assertIn("StoreGameDetailsView(", details)
+        self.assertIn("ea.loadSize(game.id)", details)
+        self.assertIn("ea.checkForUpdate(game.id)", details)
+        self.assertIn("ea.repair(game.id)", details)
+
     def test_settings_rows_are_trimmed(self):
         self.assertNotIn('value: tr("Steam, GOG, Epic, EA, Ubisoft")', SETTINGS)
         overview = SETTINGS.split('tr("JIT active")', 1)[1].split("}", 1)[0]
