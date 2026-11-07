@@ -19,7 +19,7 @@ class ReleaseInterfaceCDNTests(unittest.TestCase):
         import re
 
         requested = repo_text(".github/release-request.txt").strip()
-        versions = re.findall(r"MARKETING_VERSION = ([0-9]+\\.[0-9]+\\.[0-9]+);", PROJECT)
+        versions = re.findall(r"MARKETING_VERSION = ([0-9]+\.[0-9]+\.[0-9]+);", PROJECT)
         builds = re.findall(r"CURRENT_PROJECT_VERSION = ([0-9]+);", PROJECT)
         self.assertEqual(len(versions), 6)
         self.assertEqual(set(versions), {requested})
