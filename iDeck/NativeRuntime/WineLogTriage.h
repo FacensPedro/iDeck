@@ -16,7 +16,12 @@ typedef enum {
     IDECK_WINE_LOG_MISSING_DLL = 5,
     IDECK_WINE_LOG_WOW64_ADDRESS_SPACE = 6,
     IDECK_WINE_LOG_ARM64EC_EXCEPTION = 7,
-    IDECK_WINE_LOG_ARM64EC_STALE_IAT_FAULT = 8
+    IDECK_WINE_LOG_ARM64EC_STALE_IAT_FAULT = 8,
+    IDECK_WINE_LOG_WINESERVER = 9,
+    IDECK_WINE_LOG_GRAPHICS = 10,
+    IDECK_WINE_LOG_UNSUPPORTED_INSTRUCTION = 11,
+    IDECK_WINE_LOG_IRELAY = 12,
+    IDECK_WINE_LOG_DOWNLOAD_INTEGRITY = 13
 } IDeckWineLogDiagnosis;
 int32_t ideck_wine_log_diagnose(const char *path);
 // Detect fatal guest access violations written after a particular launch began.
