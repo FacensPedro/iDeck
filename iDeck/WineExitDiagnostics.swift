@@ -18,6 +18,10 @@ enum WineExitDiagnostics {
                 detail = "A Windows DLL initialization failed."
             case 0xC0000139:
                 detail = "A required DLL entry point was not found."
+            case 0xC0000018:
+                detail = "The Windows loader detected an address conflict. Inspect Wine/FEX memory mappings and DLL load addresses; this status alone does not identify the offending module."
+            case 0xC0000017:
+                detail = "The Windows process could not reserve sufficient memory or address space."
             default:
                 detail = "Check the Wine/FEX runtime logs for the underlying error."
             }
