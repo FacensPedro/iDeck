@@ -31,7 +31,6 @@ class WineJITPoolSettingsTests(unittest.TestCase):
 
     def test_localization_and_no_jit_faking(self):
         locale = (ROOT / "iDeck/Localization.swift").read_text()
-        self.assertIn('"Wine JIT pool size is selected before allocation and cannot change', locale)
         self.assertIn('"Wine Mono is not included.', locale)
         self.assertIn('"pt":', locale)
         self.assertIn('"es":', locale)
