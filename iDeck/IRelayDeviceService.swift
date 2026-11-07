@@ -44,7 +44,12 @@ final class IRelayDeviceService: @unchecked Sendable {
     /// app was suspended is created again, so iRelay finds the iPad at once.
     func restartIfStopped() {
         queue.async { [self] in
-            guard !isListening else { return }
+            if let listener {
+                switch listener.state {
+                case .setup, .waiting, .preparing, .ready: return
+                default: break
+                }
+            }
             listener?.cancel()
             listener = nil
             AppLog.record("[irelay] service restarted after returning to the foreground")
@@ -65,6 +70,7 @@ final class IRelayDeviceService: @unchecked Sendable {
         queue.async { [self] in
             guard listener == nil else { return }
             listenerState = "Starting"
+            isListening = false
             let parameters = IRelayPairing.localNetworkParameters()
             guard let port = NWEndpoint.Port(rawValue: Self.port),
                   let listener = try? NWListener(using: parameters, on: port) else {
