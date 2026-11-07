@@ -1,4 +1,6 @@
 ## What's Changed
+- Bully: Scholarship Edition starts directly instead of through the Steam client, which stopped its 32-bit process at its first instruction (0xC000001D).
+- Every game's DXGI lists the same display modes as Windows (user32). Crash Bandicoot N. Sane Trilogy found an empty list and stopped right after loading its shaders.
 - Lighter runtime by default: Wine logs only exceptions and process errors (it wrote thousands of lines per launch), so games start with less CPU and disk work. Settings › Bugs & logs › Detailed diagnostics still records everything.
 - The JIT pool defaults to 624 MB, the size this iPad actually gets: iDeck no longer reserves 896 MB first and then shrinks it, which used more memory at start.
 - New games are limited to 30 FPS by default, using less GPU, CPU and battery; each game can still choose 40, 60 or Uncapped.

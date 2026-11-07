@@ -944,7 +944,16 @@ class SystemCoordinator: ObservableObject {
 
     /// Launches a Steam game in its original installation directory, preserving
     /// relative DLL and asset paths instead of copying the executable elsewhere.
+    /// Steam games that need no Steam client to run and fail when Valve's
+    /// client spawns them: Bully: Scholarship Edition (12200) is a 32-bit
+    /// program, and as a child of the 64-bit Steam client its i386 process
+    /// started without an emulator CPU area (x28 = 0) and stopped at its first
+    /// instruction (0xC000001D). Started directly, it is the session's own
+    /// WoW64 process, set up like any other 32-bit game.
+    static let directSteamLaunchAppIDs: Set<UInt32> = [12200]
+
     func launchSteamGame(game: SteamAppInfo, profile: WindowsGameProfile, prefixPath: URL, skipSteamClient: Bool = false) {
+        let skipSteamClient = skipSteamClient || Self.directSteamLaunchAppIDs.contains(game.appID)
         guard !isClosingWindowsSession else { return }
         isSteamSession = true
         recordGameContext(game.name, launcher: "Steam")
