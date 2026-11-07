@@ -11,7 +11,7 @@ struct SettingsView: View {
     @AppStorage("controllerRightSensitivity") private var controllerRightSensitivity = 1.0
     @AppStorage("controllerDeadzone") private var controllerDeadzone = 0.10
     @AppStorage("wineControllerAPI") private var wineControllerAPI = "XInput"
-    @AppStorage("wineJITPoolMiB") private var wineJITPoolMiB = 896
+    @AppStorage("wineJITPoolMiB") private var wineJITPoolMiB = 624
     @AppStorage(BackgroundDownloads.continuedKey) private var continueDownloadsInBackground = true
     @AppStorage(BackgroundDownloads.notificationsKey) private var downloadNotifications = true
     @AppStorage(SystemCoordinator.jitMethodKey) private var jitMethod = "stikdebug"
@@ -300,7 +300,7 @@ struct SettingsView: View {
             Section {
                 Picker(selection: $wineJITPoolMiB) {
                     Text(tr("Automatic")).tag(0)
-                    ForEach([384, 512, 640, 768, 896, 1152], id: \.self) { size in
+                    ForEach([384, 512, 624, 640, 768, 896, 1152], id: \.self) { size in
                         Text("\(size) MiB").tag(size)
                     }
                 } label: {
