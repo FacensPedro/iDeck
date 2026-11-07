@@ -150,6 +150,13 @@ class SystemCoordinator: ObservableObject {
             ResourceGovernor.shared.onActivityChange = { [weak self] in self?.applyMaxRefreshRate() }
             ResourceGovernor.shared.start()
         }
+        // 896 MB was the old default and never fits beside the game on these
+        // devices (the start stopped while reserving it): saved once as 624.
+        if UserDefaults.standard.object(forKey: "wineJITPoolMiB") as? Int == 896,
+           !UserDefaults.standard.bool(forKey: "wineJITPool624Migrated") {
+            UserDefaults.standard.set(624, forKey: "wineJITPoolMiB")
+        }
+        UserDefaults.standard.set(true, forKey: "wineJITPool624Migrated")
         Self.exportWineJITPreference(UserDefaults.standard.object(forKey: "wineJITPoolMiB") as? Int ?? 624)
         Self.exportLastGoodPool()
         // Keep app startup free of native Wine/JIT probes and Keychain reads.
