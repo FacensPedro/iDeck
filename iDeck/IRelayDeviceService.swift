@@ -692,8 +692,9 @@ final class IRelayHTTPConnection: @unchecked Sendable {
     }
 
     private func receive(_ then: @escaping (Data?) -> Void) {
-        // Smaller receive slabs reduce peak Data allocation under memory pressure.
-        connection.receive(minimumIncompleteLength: 1, maximumLength: 256 << 10) { data, _, complete, error in
+        // 1 MB slabs: four times fewer receive callbacks and file writes per
+        // gigabyte than 256 KB, still small next to the game's memory.
+        connection.receive(minimumIncompleteLength: 1, maximumLength: 1 << 20) { data, _, complete, error in
             if let data, !data.isEmpty { then(data) } else if complete || error != nil { then(nil) } else { then(Data()) }
         }
     }
@@ -793,9 +794,12 @@ final class IRelayHTTPConnection: @unchecked Sendable {
         if !buffer.isEmpty && upload.remaining > 0 {
             let take = min(buffer.count, upload.remaining)
             if upload.request.uploadError == nil, let handle = upload.handle {
-                do { try handle.write(contentsOf: buffer.prefix(take)) } catch { upload.request.uploadError = error.localizedDescription }
+                do { try handle.write(contentsOf: take == buffer.count ? buffer : buffer.prefix(take)) }
+                catch { upload.request.uploadError = error.localizedDescription }
             }
-            buffer.removeFirst(take)
+            // The usual case, the whole slab is file data: drop it without
+            // copying what follows it.
+            if take == buffer.count { buffer = Data() } else { buffer.removeFirst(take) }
             upload.remaining -= take
         }
         if upload.remaining == 0 { return finishUpload(upload) }

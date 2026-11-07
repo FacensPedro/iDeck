@@ -43,8 +43,9 @@ class DownloadPauseContractTests(unittest.TestCase):
         self.assertIn("[irelay] poll unavailable", downloader)
         self.assertIn("await pc.cancelProcess(job)", downloader)
 
-    def test_http_receiver_uses_small_network_slabs(self):
-        self.assertIn("maximumLength: 256 << 10", RELAY)
+    def test_http_receiver_uses_bounded_one_megabyte_slabs(self):
+        self.assertIn("maximumLength: 1 << 20", RELAY)
+        self.assertIn("if take == buffer.count { buffer = Data() }", RELAY)
         self.assertIn('case ("PUT", "/write"):', RELAY)
         self.assertIn('SHA-1 mismatch', RELAY)
 

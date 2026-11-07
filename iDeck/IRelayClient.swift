@@ -224,8 +224,6 @@ struct IRelaySettingsSection: View {
             }
         } header: {
             Text("iRelay")
-        } footer: {
-            Text(tr("Keep the PC and this iPad on the same network. In iRelay, choose this iPad (or type its address) and enter the pairing code."))
         }
         Section {
             Button(testing ? tr("Connecting…") : tr("Test connection")) { test() }

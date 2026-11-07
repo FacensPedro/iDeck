@@ -39,8 +39,7 @@ struct SettingsView: View {
                 Section(tr("Services")) {
                     NavigationLink { accountsPage } label: {
                         SettingsRow(icon: "square.grid.2x2.fill", color: .blue,
-                                    title: tr("Stores & launchers"),
-                                    value: tr("Steam, GOG, Epic, EA, Ubisoft"))
+                                    title: tr("Stores & launchers"))
                     }
                     NavigationLink { irelayPage } label: {
                         SettingsRow(icon: "wifi", color: .blue, title: "iRelay",
@@ -138,8 +137,6 @@ struct SettingsView: View {
                 VStack(alignment: .trailing, spacing: 4) {
                     SettingsStatusPill(text: coordinator.isJITEnabled ? tr("JIT active") : tr("JIT off"),
                                color: coordinator.isJITEnabled ? .green : .orange)
-                    SettingsStatusPill(text: tr(MadeiraBundleIdentity.isNative ? "Madeira-native" : "Interface-only"),
-                               color: MadeiraBundleIdentity.isNative ? .green : .orange)
                 }
             }
             .padding(.vertical, 4)
@@ -235,7 +232,7 @@ struct SettingsView: View {
                 NavigationLink { gogPage } label: {
                     SettingsRow(icon: "shippingbox.fill", color: .purple, title: "GOG",
                                 value: gogLibrary.isSignedIn ? (gogLibrary.username ?? tr("Connected")) : tr("Not connected"),
-                                asset: "StoreBadgeGOG")
+                                asset: "StoreBadgeGOG", assetPlain: true)
                 }
                 NavigationLink { epicPage } label: {
                     SettingsRow(icon: "e.square.fill", color: .gray, title: "Epic Games",
@@ -313,7 +310,7 @@ struct SettingsView: View {
             } header: {
                 launcherHeader("Ubisoft Connect", asset: "StoreBadgeUbisoft")
             } footer: {
-                Text(tr("Ubisoft games ask Ubisoft Connect for their licence. Install it here, then copy games installed on your PC with iRelay; they start through Ubisoft Connect. This does not guarantee sign-in, DRM, or games will work under Wine."))
+                Text(tr("Optional. Games copied from your PC with iRelay start directly; install Ubisoft Connect only for a game that asks for it."))
             }
         }
         .navigationTitle("Ubisoft Connect")
@@ -434,12 +431,20 @@ struct SettingsView: View {
 
     private var graphicsPage: some View {
         Form {
+            // The everyday choices only; renderers, memory and sync are under Advanced.
             settingsSection(title: tr("Graphics & Performance")) {
                 toggleRow(title: tr("Hold Display at Maximum Rate"), isOn: $coordinator.isMaxRefreshRateEnabled)
                 toggleRow(title: tr("Pause games in the background"), isOn: $pauseGamesInBackground)
             }
-            MadeiraGraphicsSettings()
-            MadeiraMemorySyncSettings()
+            Section {
+                NavigationLink(tr("Advanced")) {
+                    Form {
+                        MadeiraGraphicsSettings()
+                        MadeiraMemorySyncSettings()
+                    }
+                    .navigationTitle(tr("Advanced"))
+                }
+            }
         }
         .navigationTitle(tr("Graphics & Performance"))
     }
@@ -593,14 +598,16 @@ struct SettingsRow: View {
     var asset: String? = nil
     /// Draws the asset in its own colors filling the tile (Steam's round logo).
     var assetKeepsColors = false
+    /// Draws a one-color asset in the text color with no tile behind it (GOG).
+    var assetPlain = false
 
     var body: some View {
         HStack(spacing: 12) {
             iconView
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(.white)
+                .foregroundStyle(assetPlain ? Color.primary : Color.white)
                 .frame(width: 28, height: 28)
-                .background(assetKeepsColors ? Color.clear : color,
+                .background(assetKeepsColors || assetPlain ? Color.clear : color,
                             in: RoundedRectangle(cornerRadius: 7, style: .continuous))
             Text(title)
             Spacer(minLength: 8)
@@ -617,7 +624,7 @@ struct SettingsRow: View {
             Image(asset).renderingMode(.original).resizable().scaledToFit()
         } else if let asset {
             Image(asset).renderingMode(.template).resizable().scaledToFit()
-                .padding(5)
+                .padding(assetPlain ? 2 : 5)
         } else {
             Image(systemName: icon)
         }
