@@ -1,210 +1,71 @@
 # iDeck
 
-**iDeck is an experimental iOS and iPadOS app that combines a Steam game library and a Windows compatibility environment powered by [Madeira](https://github.com/willfaust/madeira).**
+**iDeck** is an experimental Windows game compatibility app for iPhone and iPad, built around the [Madeira](https://github.com/willfaust/madeira) runtime. It brings game libraries, downloads, and Windows game launching together in a native iOS/iPadOS interface.
 
-> **Project status:** An **interface-only IPA cannot run Windows games**. A **Madeira-native IPA** includes native FEX, Wine ARM64EC, DXMT, WineMetal, and D3D12 components, but successful compilation does **not** guarantee that a game starts, renders, or runs correctly on an iPad.
-
-[Features](#features) · [Requirements](#requirements) · [Build an IPA](#build-an-ipa) · [Automatic Visual C++ setup](#automatic-microsoft-visual-c-setup) · [Troubleshooting](#troubleshooting) · [Documentation](#documentation)
+> **Status:** Under active development. A successful build does not guarantee that a Windows game will launch or run correctly. Windows execution requires a Madeira-native build; interface-only builds cannot run Windows applications.
 
 ## Features
 
-| Component | What iDeck provides | Limitations |
-| --- | --- | --- |
-| Steam | Sign-in, owned-game library, metadata, and downloads | Some games require Steam's Windows client and DRM authentication |
-| Windows | EXE import, Wine prefixes, game profiles, and the Madeira runtime | Requires an actual native IPA, FEX/JIT, and compatible Wine functionality |
-| WoW64 (32-bit x86) | Native Madeira builds include the i386 FEX translator, 32-bit Wine DLL farm and WoW64 host DLLs by default | Real device compatibility depends on the JIT pool, Wine prefix and individual game requirements |
-| Graphics | Metal adapters, DXMT, WineMetal, D3D12, OpenGL (Mesa Zink or OpenGL ES), Vulkan (MoltenVK), and MetalFX settings | Game rendering and performance require hardware testing; Vulkan is x64-only |
-| JIT | Integration with the external [StikDebug](https://github.com/StikDebug/StikDebug) workflow | iDeck cannot independently grant JIT permissions or bypass iOS security |
-| Runtime caching | Precompiled Madeira kits through GitHub Actions cache or Git LFS | Requires a legitimate native build and permission to redistribute components |
+- **Game libraries:** Steam, GOG, Epic Games and EA integration, with game management and downloads.
+- **Windows compatibility:** Madeira Core with FEX, Wine ARM64EC, WineServer and optional WoW64 support for 32-bit applications.
+- **Graphics:** DXMT, WineMetal and Direct3D 12 integration, with graphics options including MetalFX and experimental alternative renderers.
+- **Game controls:** Game controller and touch-input support.
+- **Runtime setup:** Wine prefixes, Madeira Dock, Wine Mono, Wine Gecko and Visual C++ dependency preparation.
+- **JIT:** Integration with StikDebug for devices and configurations that support it.
+- **iRelay:** Companion-device transfer integration, including local game installation workflows.
+- **Diagnostics:** Wine logs, runtime status and troubleshooting information.
 
-iDeck combines SwiftUI, C/C++, Objective-C++, Wine, and native Metal interfaces. Its host adapters are not substitutes for a fully functional FEX or Wine runtime.
+Feature availability depends on the build configuration, installed runtime components and device compatibility.
 
 ## Requirements
 
-- **To build:** macOS, a compatible Xcode installation with the iOS/iPadOS 27 SDK, and the appropriate native toolchains.
-- **To install:** An IPA properly signed and provisioned for your device.
-- **To run Windows games:** A verified Madeira-native IPA, a functioning Wine prefix, appropriate graphics components, and JIT when required.
-- **For 32-bit Windows installers and games (PE32/i386):** WoW64 is enabled by default in Madeira-native builds. The IPA must contain a complete, validated i386 Wine DLL farm and FEX/WoW64 components; interface-only IPAs cannot execute Windows programs.
+- An iPhone or iPad running **iOS/iPadOS 26.0 or later**.
+- A correctly signed iDeck IPA.
+- A complete **Madeira-native** build to run Windows software.
+- Working JIT permissions and a compatible Wine environment when required.
 
-The Xcode project currently targets **iOS/iPadOS 26.0** as its minimum OS version. Compilation still requires the **iOS 27 SDK**. Signed IPA launch compatibility and native JIT functionality must be checked on a real device; lowering the deployment target does not grant executable-memory permissions.
+Building from source requires macOS, Xcode with the iOS 27 SDK and the appropriate native toolchains. Some optional graphics components have separate licensing requirements.
 
-## Build an IPA
+## Installation
 
-### GitHub Actions
+Download a build from [Releases](https://github.com/FacensPedro/iDeck/releases) and install the IPA using a compatible signing method. Complete the initial runtime setup in iDeck before launching Windows games.
 
-1. Open [Actions → iOS Build](https://github.com/FacensPedro/iDeck/actions/workflows/ios.yml).
-2. Choose the branch and select **Run workflow**.
-3. For an interface-only build, disable **Require Madeira runtime**.
-4. On **Run workflow**, the defaults request **Require Madeira runtime = on**, **Native renderer = d3d11**, **Build WoW64 = on**, **Wine Mono = on**, **Metal Shader Converter = off**, **Export runtime kit = off** and an empty release tag.
-5. Enable the converter license option **only** when selecting the optional D3D12 profile and only after confirming the necessary rights. Unlicensed D3D12 compilation is rejected.
-6. Download the exact `iDeck.ipa` artifact from that manual native run, not the IPA of a pull request or an ordinary push without owner-approved native distribution. PRs build an **interface-only** IPA and cannot run Windows games. A successful native build still requires code signing, JIT and on-device validation.
+**Important:** Not every release or CI artifact contains the native Madeira runtime. An interface-only IPA provides the interface but cannot execute Windows games.
 
-The public D3D11 FEX/Wine/DXMT kit is cached under its **own graphics/WoW64/Mono** key. A compatible second manual build can restore it instead of rebuilding the native components. A D3D11 kit must not contain the proprietary Metal Shader Converter or any D3D12 PE modules; D3D12 kits use an independent key and retain explicit license checks. See [precompiled native runtime](docs/MADEIRA_PREBUILT_RUNTIME.md).
+## Building
 
-Automatic push and pull-request builds may produce only the interface-only IPA. Build success in Xcode does not necessarily mean final IPA packaging succeeded.
+Use [GitHub Actions — iOS Build](https://github.com/FacensPedro/iDeck/actions/workflows/ios.yml) for automated builds. Select a Madeira-native build when Windows game execution is required, and enable WoW64 if you need 32-bit Windows compatibility.
 
-### Local builds on macOS
-
-Interface-only:
+For a local interface-only build on macOS:
 
 ```bash
 bash scripts/build_ipa.sh
 ```
 
-Native build (WoW64 for i386 Windows apps is included by default, with the required toolchains and appropriate license rights):
+Native builds require the Madeira dependencies and supported build configuration. See [Native build documentation](docs/IDECK_MADEIRA_NATIVE_BUILD.md) and [Precompiled runtime](docs/MADEIRA_PREBUILT_RUNTIME.md).
 
-```bash
-IDECK_REQUIRE_MADEIRA=1 \
-IDECK_ACCEPT_METAL_CONVERTER_LICENSE=1 \
-bash scripts/build_native_runtime.sh
-```
+## Compatibility and limitations
 
-The output is `iDeck.ipa` when the required steps succeed. The default unsigned
-bundle identifier is **`com.ideck.ideck`**; its VPN extension uses
-`com.ideck.ideck.VPNExtension` and the extension's App Group entitlement
-is `group.com.ideck.ideck`. Configure compatible signing identities,
-provisioning profiles and App Group capabilities when signing. Third-party
-sideloaders such as AltStore may append a team-specific suffix (for example,
-`com.ideck.ideck.<suffix>`) or rewrite identifiers while resigning: that
-suffix cannot be controlled by changing the Xcode project's default ID.
-Make sure any extension remains signed and its bundle ID matches the main
-app's VPN provider reference. **Changing the app identifier is treated as
-a separate app by iPadOS** and may prevent access to data stored under the
-old identifier; back up the existing iDeck data before replacing the app.
+iDeck uses Madeira's FEX and Wine components to provide Windows compatibility on Apple hardware. DXMT and the Direct3D 12 integration translate supported graphics workloads for Metal. WoW64 supports 32-bit Windows applications when its required components are included in the IPA.
 
-### WoW64: 32-bit Windows applications
-
-**WoW64 is included by default in Madeira-native builds.** It combines the
-32-bit x86 guest translator (`aarch64-windows/xtajit.dll`), Madeira's
-`wow64.dll` and `wow64win.dll` host modules, and the i386 Wine/DXMT
-DLLs under `i386-windows/`. The native launcher detects PE32/i386
-executables and routes them through Wine's WoW64 path, including the
-`C:\\windows\\syswow64` prefix farm. A 64-bit Wine prefix (`WINEARCH=win64`)
-is intentional: WoW64 runs 32-bit apps inside that environment.
-
-To build from source with both 64-bit and 32-bit support:
-
-```bash
-IDECK_REQUIRE_MADEIRA=1 \
-IDECK_ACCEPT_METAL_CONVERTER_LICENSE=1 \
-IDECK_BUILD_WOW64=1 \
-bash scripts/build_ipa.sh
-```
-
-GitHub Actions → **iOS Build** → **Build WoW64** is enabled by default.
-For an intentionally 64-bit-only IPA, set `IDECK_BUILD_WOW64=0` or
-disable that checkbox. WoW64 is not provided by an interface-only IPA.
-
-The build rejects missing WoW64 components when enabled; runtime checks
-also verify the bundle manifest and required DLLs before attempting a
-32-bit launch. This is **experimental compatibility**, not proof that
-a particular 32-bit game, installer, DRM component or Steam client will
-run on an iPad. A compatible native IPA, JIT/debugger preparation and
-on-device testing are still necessary.
-
-### Reuse precompiled FEX, Wine, and DXMT
-
-iDeck can reuse compatible native kits stored in `runtime/prebuilt/ios-arm64/` (Git LFS) or `build/native-cache/` (Actions cache). To **require** an already-compiled runtime and prevent source compilation:
-
-```bash
-IDECK_REQUIRE_MADEIRA=1 \
-IDECK_ACCEPT_METAL_CONVERTER_LICENSE=1 \
-IDECK_PREBUILT_MODE=only \
-bash scripts/build_ipa.sh
-```
-
-Without a matching kit, this mode fails rather than creating placeholder binaries. See [Precompiled Madeira runtime](docs/MADEIRA_PREBUILT_RUNTIME.md).
-
-## Faster Steam game installations
-
-iDeck fetches authorized Steam depot chunks concurrently from geographically selected CDN hosts. For game updates, interrupted downloads and repairs, the installer verifies existing file chunks in bounded, sequential read blocks before downloading. Every reusable chunk must match the manifest's SHA-1; only changed or missing chunks are fetched. This reduces redundant network traffic, especially when files are already on the device.
-
-Concurrent downloads automatically respect device thermal conditions and Low Power Mode. Existing download journals are preserved on cancellation; progress distinguishes **Checking existing files** from **Downloading** and reports the amount of verified content reused. Actual transfer speed depends on network, CDN and device conditions; no fixed 2× performance guarantee is made.
-
-## Automatic Microsoft Visual C++ setup on the iPad
-
-Some Windows games depend on Microsoft x64 C++ runtime DLLs such as `vcruntime140.dll`, `msvcp140.dll`, and optional MFC components.
-
-**The first time you launch a Windows game or imported EXE, iDeck can prepare the Microsoft DLLs directly on the iPad:**
-
-1. iDeck checks for a complete, previously verified set of 14 Microsoft x64 DLLs in `Documents/vcruntime` or the app bundle.
-2. If missing, iDeck asks for permission to download and extract the [official Microsoft x64 Visual C++ Redistributable](https://aka.ms/vc14/vc_redist.x64.exe).
-3. On approval, iDeck downloads the official Microsoft installer over HTTPS and **extracts its embedded CAB archives locally on the iPad**, including nested Microsoft CAB payloads such as `a10` and `a11`, using a bundled open-source CAB decoder (`libmspack`). **The Windows installer is not executed.**
-4. iDeck checks that all 14 required DLLs are present, Windows x64 PE files and contain an Authenticode certificate-table structure, then installs the files in `Documents/vcruntime`.
-5. The Madeira Wine bridge makes the DLLs available to games through the prefix, preserving its native ARM64EC exemptions. Only when the files are successfully prepared does iDeck continue the game launch. Later launches reuse the files without downloading them again.
-
-This is a **best-effort** compatibility feature. Cabinet contents can change between Microsoft versions; some release formats might not expose the CAB data in a way this decoder recognizes. Validating the presence of a PE certificate table is **not cryptographic verification of the Authenticode signature**. The app never claims successful installation if extraction fails. You may choose **Play without installing** to proceed without this prerequisite.
-
-**Microsoft DLLs are not bundled into the GitHub repository or IPA.** The user downloads them directly from Microsoft upon approval. Review Microsoft's [license and redistribution conditions](https://learn.microsoft.com/en-us/cpp/windows/redistributing-visual-cpp-files). The bundled CAB decoder is **libmspack (LGPL-2.1)**; see [its license and source](iDeck/ThirdParty/libmspack/UPSTREAM.md).
-
-### Manual fallback
-
-If extraction fails or you already have compatible DLLs that you are authorized to use, place the necessary x64 DLLs under **Files → On My iPad → iDeck → vcruntime**. Create the folder manually with the Files app if automatic installation has not already created it.
-
-See the [Microsoft Visual C++ DLL guide](docs/MICROSOFT_VISUAL_CPP_DLLS.md) and [official Microsoft downloads](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist).
-
-## JIT and platform restrictions
-
-StikDebug may provide the necessary JIT debugging workflow on supported devices. Request it from **inside iDeck**, which passes the bundled `universal.js` BRK handler to StikDebug; enabling JIT in the StikDebug app list alone may detach the debugger before Wine can map its RX/RW pool. A JIT indicator does not prove FEX executable-memory allocation succeeded. Windows games, hosted apps, and native components remain subject to iOS/iPadOS signing, entitlements, and sandbox limitations.
-
-## Wine session progress and close button
-
-The emulated-game screen shows a **startup milestone percentage** for environment preparation, Wine/FEX startup and the first rendered Metal frame. This number is not the game's own loading progress: reaching 90% only means Wine started and the app is waiting for the first frame. 100% is shown only after the presentation counter advances.
-
-The **X** button requests a graceful Windows close using the same Alt+F4 keyboard event queue as Madeira. If the game remains active, the Metal surface is **not** detached. If the keyboard bridge is unavailable or the game is frozen, use the game's own menu or close iDeck using the iPadOS app switcher. As with Madeira, the current in-process Wine server can run only one session in each iDeck process.
-
-For launchers that create a child game process and exit, each game's settings offer **Keep child game processes running (experimental)**. It enables Madeira's opt-in `MADEIRA_WAIT_CHILDREN=1` for that game only. Leave it off for ordinary programs: it can extend or hang the Wine session after gameplay.
-
-The IPA requests **increased-memory-limit** when its signing profile permits it. The entitlement is never guaranteed by declaring it in the project file; check the signed application's granted entitlements.
+Game compatibility varies. JIT availability, Wine dependencies, DRM, launchers, graphics features, memory limits and iOS restrictions can prevent a game from starting or rendering correctly. iDeck does not bypass iOS security restrictions or guarantee compatibility with individual games.
 
 ## Troubleshooting
 
-| Symptom | What to check |
-| --- | --- |
-| App closes immediately when opened | The iDeck home screen no longer probes Wine/FEX JIT, Steam Keychain or native memory pools. Check the signed IPA, iPadOS 26.0+ requirement and the iPadOS `.ips` crash report. If the console never shows `[iDeck startup] SwiftUI App initialized`, investigate dyld/loading, code signing or OS compatibility; a passing GitHub build cannot verify device launch. |
-| No Windows EXE starts | Confirm the IPA is `iDeck-Madeira-native`, the Wine prefix is prepared, and JIT/FEX is ready |
-| Wine ARM64EC JIT pool allocation fails | Request JIT from iDeck so StikDebug loads its bundled `universal.js`, leave the debugger connected until the RX/RW pools are mapped, and look for `[iDeck Wine JIT]` logs showing the first failed allocation, remap or protection step. The native runtime retries 384/256/192/128/96/64 MiB; insufficient virtual address space or a debugger without the BRK handler can still prevent startup. |
-| Screen stays black | Check Wine initialization, DXMT/D3D12, Metal presentation, and game-specific requirements |
-| Wine stops or exits instantly | Read the exact Wine exit code or NTSTATUS (e.g. `0xC0000135`: missing DLL); inspect Wine/FEX logs. Some games also require the real Steam client or hand off to another process. |
-| Automatic Visual C++ setup fails | Check Internet access, download availability, WoW64 support, and whether Wine can run Microsoft's installer |
-| Visual C++ download succeeds but DLL verification fails | The Windows installer may not have completed; review the Wine logs and use the manual fallback if appropriate |
-| A 32-bit Windows app fails | Confirm that WoW64 is actually included and operational |
-| GitHub Actions fails after `BUILD SUCCEEDED` | Inspect the **first real error** in packaging or native runtime validation |
-| iDeck terminates after a few minutes | Inspect the full iPadOS `.ips` diagnostic; a blank screen alone does not establish that Metal caused the termination |
+If a game does not start, verify that the installed IPA includes the native runtime, that the Wine environment is prepared and that JIT is active when needed. Review the Wine and iDeck diagnostic logs for the actual error rather than relying on the loading screen alone.
 
-For more detail, read [Game startup and black-screen diagnostics](docs/IDECK_GAME_STARTUP_DIAGNOSTICS.md).
+See [Game startup diagnostics](docs/IDECK_GAME_STARTUP_DIAGNOSTICS.md) and [Architecture](docs/ARCHITECTURE.md).
 
-## Documentation
+## Credits and licenses
 
-- [Microsoft Visual C++ DLL setup](docs/MICROSOFT_VISUAL_CPP_DLLS.md)
-- [Precompiled Madeira runtime](docs/MADEIRA_PREBUILT_RUNTIME.md)
-- [Game startup diagnostics](docs/IDECK_GAME_STARTUP_DIAGNOSTICS.md)
-- [Madeira vs. iDeck Windows runtime differences](docs/archive/WINE_RUNTIME_GAP_ANALYSIS.md)
-- [Madeira integration status](docs/archive/MADEIRA_RUNTIME_INTEGRATION.md)
-- [Optional D3D12 MSC 4.0 Beta 3, WoW64 and on-device acceptance](docs/archive/MADEIRA_EXPANDED_PROFILES.md)
-- [Native Madeira build](docs/IDECK_MADEIRA_NATIVE_BUILD.md)
-- [Native linking and verification](docs/archive/MADEIRA_NATIVE_LINKING.md)
-- [Architecture](docs/ARCHITECTURE.md)
-- [iPadOS memory management](docs/archive/IOS_MEMORY_MANAGEMENT.md)
-- [Native performance](docs/archive/NATIVE_PERFORMANCE.md)
-- [Steam download performance](docs/archive/STEAM_DOWNLOAD_PERFORMANCE.md)
+iDeck integrates and adapts work from [Madeira](https://github.com/willfaust/madeira), [FEX](https://github.com/FEX-Emu/FEX), [Wine](https://www.winehq.org/), [DXMT](https://github.com/3Shain/dxmt) and [StikDebug](https://github.com/StikDebug/StikDebug).
 
-## Licenses, security, and attribution
-
-## Startup and releases
-
-iDeck opens directly into the Madeira library. The Home mode picker and iOS guest-app host have been removed. The Wine prefix remains under Documents/wine.
-
-The app version is **1.0.10** (build 11). A maintainer can run **Actions → iOS Build** with `release_tag=auto` to publish a verified native IPA using the version embedded in the IPA. A custom tag must match that version. Leave the input blank to build only. Native runtime verification and licensed-component checks remain enforced.
-
-iDeck integrates or adapts code and techniques from [Madeira](https://github.com/willfaust/madeira), [FEX](https://github.com/FEX-Emu/FEX), [Wine](https://www.winehq.org/), [DXMT](https://github.com/3Shain/dxmt), [StikDebug](https://github.com/StikDebug/StikDebug).
-
-Review the repository's [license notices](LICENSES) and the applicable upstream terms. Do not upload proprietary Microsoft DLLs, the Apple Metal Shader Converter, or distributing artifacts that contain them without the appropriate redistribution rights. Remove credentials, account tokens, and personal data from diagnostics.
+See [LICENSES](LICENSES) for applicable licenses and attribution. Proprietary components must only be used or redistributed when permitted by their respective licenses.
 
 ## Contributing
 
-When reporting an issue, include the iPad/iPhone model, iOS/iPadOS version, game, IPA type (interface-only or Madeira-native), and relevant build or device logs. Reproducible test cases and focused pull requests are welcome.
+Issues and pull requests are welcome. Bug reports should include the device model, iOS/iPadOS version, iDeck build, affected game and relevant diagnostic logs. Remove personal information and account credentials before sharing logs.
 
 ---
 
-**iDeck is an experimental project, not a verified Windows compatibility product for iOS/iPadOS.**
+*iDeck is an independent experimental project and is not affiliated with Valve, Microsoft or Apple.*
