@@ -69,8 +69,8 @@ enum RuntimeConfiguration {
         let height = dimensions.count == 2 ? Int(dimensions[1]) : nil
         let fps = Int(profile.fpsLimit)
         return Settings(
-            resolutionWidth: min(max(width ?? 960, 320), 7680),
-            resolutionHeight: min(max(height ?? 540, 240), 4320),
+            resolutionWidth: min(max(width ?? 1280, 320), 7680),
+            resolutionHeight: min(max(height ?? 720, 240), 4320),
             framesPerSecond: min(max(fps ?? 30, 15), 240),
             graphicsAPI: ["Automatic", "DXMT", "D3D12"].contains(profile.graphicsAPI) ? profile.graphicsAPI : "Automatic",
             metalFXEnabled: profile.metalFXEnabled,

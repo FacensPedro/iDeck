@@ -340,7 +340,11 @@ final class IRelayTunnel: @unchecked Sendable {
             guard let self, let data, data.count == Self.preambleLength,
                   let text = String(data: data, encoding: .utf8), text.hasPrefix("IRELAY "), text.hasSuffix("\n"),
                   IRelayPairing.authorize(String(text.dropFirst(7).dropLast()), from: peer) else {
-                connection.cancel()
+                // Tells iRelay the code was refused, so it stops reconnecting
+                // with it (each refusal counts toward the one-minute lockout)
+                // and asks for the code shown in Settings.
+                connection.send(content: Data("IRELAY-DENIED\n".utf8), contentContext: .finalMessage, isComplete: true,
+                                completion: .contentProcessed { _ in connection.cancel() })
                 return
             }
             self.addToPool(connection)

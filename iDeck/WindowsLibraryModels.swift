@@ -7,7 +7,10 @@ struct WindowsGameProfile: Codable, Equatable, Identifiable {
     var id: String
     var title: String
     var arguments: String = ""
-    var resolution: String = "960x540"
+    var resolution: String = "1280x720"
+    /// 2 since 1280x720 became the default. Profiles saved before it still
+    /// hold the old 960x540 default and are moved to 1280x720 once.
+    var resolutionDefaults: Int = 2
     var surfaceScaling: String = "fit"
     /// Always "Automatic": Direct3D 11 and 12 are chosen per game at launch
     /// (WindowsEnvironment.prepareGraphicsAPI). Kept so saved profiles load.
@@ -58,13 +61,13 @@ struct WindowsGameProfile: Codable, Equatable, Identifiable {
     var updatedAt: Date = Date()
 
     private enum CodingKeys: String, CodingKey {
-        case id, title, arguments, resolution, surfaceScaling, graphicsAPI, controllerAPI, metalFXEnabled, fpsLimit, avxEnabled, keepChildProcessesRunning, artworkFilename, updatedAt, vulkanMode, openGLBackend, useRecommended, launchThroughSteam, codeChecks, d3d12Renderer, reducedX87, cpuCount, anisotropyLimit, frameGeneration, reportNVIDIA, fastSync
+        case id, title, arguments, resolution, surfaceScaling, graphicsAPI, controllerAPI, metalFXEnabled, fpsLimit, avxEnabled, keepChildProcessesRunning, artworkFilename, updatedAt, vulkanMode, openGLBackend, useRecommended, launchThroughSteam, codeChecks, d3d12Renderer, reducedX87, cpuCount, anisotropyLimit, frameGeneration, reportNVIDIA, fastSync, resolutionDefaults
     }
 
     static let vulkanModes = ["Automatic", "On", "Off"]
     static let openGLBackends = ["Automatic", "Desktop OpenGL", "OpenGL ES"]
 
-    init(id: String, title: String, arguments: String = "", resolution: String = "960x540", surfaceScaling: String = "fit", graphicsAPI: String = "Automatic", controllerAPI: String = "Automatic", metalFXEnabled: Bool = false, fpsLimit: String = "60", avxEnabled: Bool = false, keepChildProcessesRunning: Bool = false, artworkFilename: String? = nil, updatedAt: Date = Date(), vulkanMode: String = "Automatic", openGLBackend: String = "Automatic") {
+    init(id: String, title: String, arguments: String = "", resolution: String = "1280x720", surfaceScaling: String = "fit", graphicsAPI: String = "Automatic", controllerAPI: String = "Automatic", metalFXEnabled: Bool = false, fpsLimit: String = "60", avxEnabled: Bool = false, keepChildProcessesRunning: Bool = false, artworkFilename: String? = nil, updatedAt: Date = Date(), vulkanMode: String = "Automatic", openGLBackend: String = "Automatic") {
         self.id = id
         self.title = title
         self.arguments = arguments
@@ -87,7 +90,10 @@ struct WindowsGameProfile: Codable, Equatable, Identifiable {
         id = try values.decode(String.self, forKey: .id)
         title = try values.decode(String.self, forKey: .title)
         arguments = try values.decodeIfPresent(String.self, forKey: .arguments) ?? ""
-        resolution = try values.decodeIfPresent(String.self, forKey: .resolution) ?? "960x540"
+        let savedResolution = try values.decodeIfPresent(String.self, forKey: .resolution) ?? "1280x720"
+        let savedDefaults = (try? values.decodeIfPresent(Int.self, forKey: .resolutionDefaults)) ?? nil
+        resolution = savedDefaults == nil && savedResolution == "960x540" ? "1280x720" : savedResolution
+        resolutionDefaults = 2
         surfaceScaling = {
             let saved = (try? values.decodeIfPresent(String.self, forKey: .surfaceScaling)) ?? "fit"
             return ["fit", "fill", "stretch", "aspect"].contains(saved) ? saved : "fit"
