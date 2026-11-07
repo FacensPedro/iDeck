@@ -656,7 +656,7 @@ class SystemCoordinator: ObservableObject {
         }
     }
     
-    private func withPreparedMetalDisplay(expectedStatus: String, remainingChecks: Int = 80, perform: @escaping () -> Void) {
+    private func withPreparedMetalDisplay(expectedStatus: String, remainingChecks: Int = 300, perform: @escaping () -> Void) {
         if !Thread.isMainThread {
             DispatchQueue.main.async { [weak self] in
                 self?.withPreparedMetalDisplay(expectedStatus: expectedStatus, remainingChecks: remainingChecks, perform: perform)
@@ -1233,8 +1233,11 @@ class SystemCoordinator: ObservableObject {
                     // A missing or invalid cmd.exe cannot run the Steamworks
                     // install script. Never forge its HasRun registry values:
                     // that made a failed prerequisite appear installed.
-                    SteamLog.event("[dock-installers] blocked: valid Windows cmd.exe unavailable; prerequisites remain pending")
-                    throw DockError.message("Steam's one-time installers could not start because Wine cmd.exe is missing or invalid. Rebuild the native IPA with a verified Windows command interpreter.")
+                    // The game itself still starts: Visual C++ is built into
+                    // iDeck and most games need nothing else. Blocking here
+                    // left games such as Bully unable to start at all.
+                    SteamLog.event("[dock-installers] skipped: valid Windows cmd.exe unavailable; prerequisites remain pending, starting the game")
+                    DockInstallers.skipScript()
                 }
                 if DockInstallers.installsOnly, let script = DockInstallers.script {
                     // No host runs in this session: nothing will take the sign-in transfer.

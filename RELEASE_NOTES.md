@@ -1,5 +1,4 @@
 ## What's Changed
-- Improved Maneater startup compatibility by selecting a 512 MiB JIT pool for its launcher and Unreal Engine shipping executable.
-- Per-game JIT pool settings now take precedence over the global runtime pool setting, while explicit game-specific configuration remains authoritative.
-- Kept the game cover interaction and removed Ubisoft Connect support introduced in 1.2.7.
-- Updated the application version to 1.3.0 (build 26).
+- Steam games start even when Steam's one-time installers cannot run (no valid cmd.exe in the build). The installers stay pending; nothing is marked as installed.
+- iDeck waits up to 15 seconds for the game display before reporting that it did not become ready.
+- Updated the application version to 1.3.1 (build 27).

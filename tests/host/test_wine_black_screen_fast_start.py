@@ -45,7 +45,7 @@ class WineBlackScreenAndFastStartupTests(unittest.TestCase):
     def test_missing_native_renderer_fails_fast_instead_of_waiting_on_black_screen(self):
         self.assertIn("guard WindowsRendererView.isNativeDisplayLinked else {", COORDINATOR)
         self.assertIn("this IPA has no linked Madeira Metal display backend", COORDINATOR)
-        self.assertIn("remainingChecks: Int = 80", COORDINATOR)
+        self.assertIn("remainingChecks: Int = 300", COORDINATOR)
         self.assertIn("deadline: .now() + 0.05", COORDINATOR)
         self.assertIn("WindowsRendererView.isReadyForFrames", COORDINATOR)
 
