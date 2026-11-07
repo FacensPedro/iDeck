@@ -46,7 +46,7 @@ final class IRelayDeviceService: @unchecked Sendable {
         queue.async { [self] in
             if let listener {
                 switch listener.state {
-                case .setup, .waiting, .preparing, .ready: return
+                case .setup, .waiting, .ready: return
                 default: break
                 }
             }
