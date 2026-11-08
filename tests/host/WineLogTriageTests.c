@@ -83,6 +83,17 @@ int main(void) {
         "[wine-exit] Windows program stopped (Wine exit code 1)\n");
     assert(ideck_wine_log_diagnose(path) == IDECK_WINE_LOG_ARM64EC_EXCEPTION);
 
+    // Crash Bandicoot N. Sane Trilogy: an x18 decline plus an unhandled
+    // Mach exception, but the real status is an access violation with a
+    // stale pool IAT entry. This must not be reported as 0xC000001D.
+    write_log(path,
+        "[wineserver-bridge] ws_log test - log file set up OK\n"
+        "[ec-bind] rpcrt4.dll.NdrClientCall2 POOL STALE\n"
+        "[x18-decline] pc=0x151914774 x18=0\n"
+        "[mach_exc] UNHANDLED #1 type=1\n"
+        "[exc-disp] raise tid=0024 code=c0000005 addr=0x30\n");
+    assert(ideck_wine_log_diagnose(path) == IDECK_WINE_LOG_ARM64EC_STALE_IAT_FAULT);
+
     // The append-only Wine log can include several sessions. Only diagnose
     // the latest session marker; otherwise an earlier crash would appear
     // as the reason a later, healthy launch failed.
