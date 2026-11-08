@@ -177,6 +177,14 @@ if ! git -C "$DEST" apply --reverse --check "$UNALIGNED_PATCH" >/dev/null 2>&1; 
   git -C "$DEST" apply "$UNALIGNED_PATCH"
 fi
 
+# Pure ARM64 importers (wow64.dll, xtajit.dll in WoW64 children) must bind
+# to ARM64EC native targets, never to x86_64 export thunks.
+ARM64_IMPORTER_PATCH="$ROOT/patches/madeira-arm64-importer-native-bind.patch"
+if ! git -C "$DEST" apply --reverse --check "$ARM64_IMPORTER_PATCH" >/dev/null 2>&1; then
+  git -C "$DEST" apply --check "$ARM64_IMPORTER_PATCH"
+  git -C "$DEST" apply "$ARM64_IMPORTER_PATCH"
+fi
+
 # The stock Wine worker reports g_wine_running=0 before joining wineserver,
 # and wineserver_start never clears the prior session's stop flag.
 # Both make game B fail after game A ends in the same iDeck process.
