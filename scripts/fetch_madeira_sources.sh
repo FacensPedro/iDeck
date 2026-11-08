@@ -169,6 +169,14 @@ grep -Fq 'brk #0x5a5a' "$ARM64EC_SOURCE" || {
   exit 2
 }
 
+# Unaligned LDAR/STLR rewrites must not overwrite a live neighbouring JIT
+# instruction with their half-barrier; emulate the access instead.
+UNALIGNED_PATCH="$ROOT/patches/madeira-unaligned-live-neighbour.patch"
+if ! git -C "$DEST" apply --reverse --check "$UNALIGNED_PATCH" >/dev/null 2>&1; then
+  git -C "$DEST" apply --check "$UNALIGNED_PATCH"
+  git -C "$DEST" apply "$UNALIGNED_PATCH"
+fi
+
 # The stock Wine worker reports g_wine_running=0 before joining wineserver,
 # and wineserver_start never clears the prior session's stop flag.
 # Both make game B fail after game A ends in the same iDeck process.
