@@ -566,7 +566,13 @@ struct EACRC32 {
     private(set) var value: UInt32 = 0xFFFF_FFFF
     mutating func update(_ data: Data) {
         var c = value
-        for byte in data { c = Self.table[Int((c ^ UInt32(byte)) & 0xFF)] ^ (c >> 8) }
+        // Through the raw bytes and table: Data's per-byte iterator was most of the
+        // time a large file spent in this loop.
+        Self.table.withUnsafeBufferPointer { table in
+            data.withUnsafeBytes { (raw: UnsafeRawBufferPointer) in
+                for byte in raw { c = table[Int((c ^ UInt32(byte)) & 0xFF)] ^ (c >> 8) }
+            }
+        }
         value = c
     }
     var checksum: UInt32 { value ^ 0xFFFF_FFFF }

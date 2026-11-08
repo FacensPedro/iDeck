@@ -1,7 +1,7 @@
 # iDeck JIT pool list
 #
 # The JIT pool memory each game starts with, in MB (256 to 1152).
-# Games without a line use 896 MB (or Settings › JIT).
+# Games without a line use 624 MB (or Settings › JIT).
 #
 # One game per line:  <Steam App ID or .exe name> = <MB>    # comment
 # Find a game's Steam App ID in its store link: store.steampowered.com/app/<ID>/
