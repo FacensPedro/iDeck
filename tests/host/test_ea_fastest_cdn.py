@@ -25,5 +25,14 @@ class EAMemoryTests(unittest.TestCase):
         self.assertIn("try autoreleasepool { try handle.write(contentsOf: out) }", DOWNLOADER)
 
 
+class EASegmentedTests(unittest.TestCase):
+    def test_large_files_download_in_parallel_ranges_like_steam(self):
+        self.assertIn("static let segmentedThreshold: Int64 = 16 << 20", DOWNLOADER)
+        self.assertIn("static let segmentsAtOnce = DownloadSpeed.steamChunks", DOWNLOADER)
+        self.assertIn("if entry.compressedSize >= segmentedThreshold {", DOWNLOADER)
+        self.assertIn("inflater.crc.checksum == entry.crc32", DOWNLOADER.split("private static func fetchSegmented", 1)[1])
+        self.assertIn("config.httpMaximumConnectionsPerHost = 16", DOWNLOADER)
+
+
 if __name__ == "__main__":
     unittest.main()
