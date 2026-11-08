@@ -1,3 +1,3 @@
 ## What's Changed
-- Dragon Age: Inquisition's ActivationUI.exe got further after 1.4.9 but still failed with 0xC000001D. wow64.dll and xtajit.dll were still linked to the x86-64 stubs of ntdll's Nt* system calls (NtWaitForDebugEvent and others). They now link to the native ARM64 entry points.
-- Updated the application version to 1.4.10 (build 37).
+- Fixed Borderlands 2's launcher (WPF, Epic) crashing when it loaded its graphics library. OpenGL's 32-bit thread setup treated the thread's 32-bit TEB address as host memory instead of an address inside the iOS WoW64 window.
+- Updated the application version to 1.4.11 (build 38).
