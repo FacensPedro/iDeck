@@ -1,4 +1,4 @@
 ## What's Changed
-- EA downloads fetch large files as many 4 MB pieces at once, as Steam downloads do, instead of one long transfer per file.
-- EA downloads use up to 16 connections per server.
-- Updated the application version to 1.4.4 (build 31).
+- Store covers and banners load at once while a download runs: they use their own cache and high priority, and EA download requests yield to them.
+- Covers and banners are kept on the device, so they no longer reload each time a page opens.
+- Updated the application version to 1.4.5 (build 32).
