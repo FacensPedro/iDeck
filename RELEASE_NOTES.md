@@ -1,7 +1,6 @@
 ## What's Changed
-- Added GOG Galaxy services for GOG games: while a GOG game runs, iDeck answers its Galaxy SDK on 127.0.0.1:9977 (sign-in, achievements, stats, leaderboards and play time) with a token GOG mints for that game's own client.
-- Registered the GalaxyCommunication service in the Wine prefix for Galaxy SDK versions that start it first.
-- Steam's DirectX June 2010 setup is no longer run: Wine's built-in DirectX DLLs are used. Running it stopped iDeck before Cuphead could start.
-- A saved 896 MB JIT pool (the old default, which never fits on these devices) moves to 624 MB once.
-- Windows runtime: ARM64 programs started inside an ARM64EC session (Wine's services.exe for Steam's installers) now get the emulator CPU state the session's ntdll expects, instead of stopping iDeck.
-- Updated the application version to 1.4.2 (build 29).
+- Added a Launch button to installed Epic Games, GOG and EA app game details.
+- Showed EA app games, installed or downloading, in the top shelf with the other games.
+- EA downloads now use the fastest EA server measured from the device's network, and fetch six files at once.
+- Capped the memory an EA download may hold while files are unpacked; iDeck reached 5.9 GB before.
+- Updated the application version to 1.4.3 (build 30).
