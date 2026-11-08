@@ -1,0 +1,55 @@
+diff --git a/wine/dlls/ntdll/loader.c b/wine/dlls/ntdll/loader.c
+index fcc026ae5e..77531ae4e4 100644
+--- a/wine/dlls/ntdll/loader.c
++++ b/wine/dlls/ntdll/loader.c
+@@ -2680,6 +2680,19 @@ static void fa_attach( HMODULE base )
+ }
+ #endif  /* __arm64ec__ */
+ 
++#ifdef __arm64ec__
++/* iDeck: a PURE ARM64 module (wow64.dll, xtajit.dll in a WoW64 child of an
++ * ARM64EC session) calls what it resolves with BLR, natively: it can never run
++ * an ARM64EC module's .hexpthk x86_64 export thunk. */
++static BOOL is_native_arm64_module( HMODULE module )
++{
++    const IMAGE_NT_HEADERS *nt = module ? RtlImageNtHeader( module ) : NULL;
++    return nt && nt->FileHeader.Machine == IMAGE_FILE_MACHINE_ARM64 &&
++           !arm64ec_get_module_metadata( module );
++}
++extern void *xlate_ios_jit_rev( void *ptr );
++#endif
++
+ NTSTATUS WINAPI LdrGetProcedureAddress(HMODULE module, const ANSI_STRING *name,
+                                        ULONG ord, PVOID *address)
+ {
+@@ -2734,6 +2747,21 @@ NTSTATUS WINAPI LdrGetProcedureAddress(HMODULE module, const ANSI_STRING *name,
+                     break;
+                 }
+             }
++            /* iDeck: GetProcAddress-style lookups from a pure ARM64 caller get
++             * the native target too, as import_dll and the delay-load path give
++             * such importers. The caller runs from its JIT-pool copy: translate
++             * the return address back to the PE image before looking it up. */
++            if (*address == proc)
++            {
++                void *caller = xlate_ios_jit_rev( __builtin_return_address( 0 ) );
++                LDR_DATA_TABLE_ENTRY *caller_mod;
++                const IMAGE_ARM64EC_METADATA *md;
++
++                if (!LdrFindEntryForAddress( caller, &caller_mod ) &&
++                    is_native_arm64_module( caller_mod->DllBase ) &&
++                    (md = arm64ec_get_module_metadata( module )))
++                    *address = arm64ec_redirect_ptr( module, proc, md );
++            }
+ #endif
+         }
+         else
+@@ -4844,7 +4872,7 @@ void* WINAPI LdrResolveDelayLoadedAPI( void* base, const IMAGE_DELAYLOAD_DESCRIP
+          * Only variadic callees are affected: non-variadic entry thunks never read x4, so
+          * everything except RPC worked. Gate on the importer being EC, exactly as
+          * import_dll does. */
+-        if (arm64ec_get_module_metadata( base ))
++        if (arm64ec_get_module_metadata( base ) || is_native_arm64_module( base ))
+         {
+             const IMAGE_ARM64EC_METADATA *tgt_metadata = arm64ec_get_module_metadata( *phmod );
+ 

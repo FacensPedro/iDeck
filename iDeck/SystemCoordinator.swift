@@ -106,7 +106,7 @@ class SystemCoordinator: ObservableObject {
     private var visualCRuntimeSkipAction: (() -> Void)?
     private var bypassVisualCRuntimeForPrefix: String?
 
-    private static let supportedWineJITPoolMiB: Set<Int> = [64, 96, 128, 192, 256, 384, 512, 624, 640, 768, 896, 1152]
+    private static let supportedWineJITPoolMiB: Set<Int> = [64, 96, 128, 192, 256, 384, 512, 560, 624, 640, 768, 896, 1152]
 
     /// The pool size that last prepared successfully on this device: the
     /// native side starts there instead of retrying larger sizes the
@@ -157,7 +157,14 @@ class SystemCoordinator: ObservableObject {
             UserDefaults.standard.set(624, forKey: "wineJITPoolMiB")
         }
         UserDefaults.standard.set(true, forKey: "wineJITPool624Migrated")
-        Self.exportWineJITPreference(UserDefaults.standard.object(forKey: "wineJITPoolMiB") as? Int ?? 624)
+        // 624 MB never fits beside the main thread's stack on these devices: every
+        // launch shrank it to 560 MB (ml1036). Saved 624 values move to 560 once.
+        if UserDefaults.standard.object(forKey: "wineJITPoolMiB") as? Int == 624,
+           !UserDefaults.standard.bool(forKey: "wineJITPool560Migrated") {
+            UserDefaults.standard.set(560, forKey: "wineJITPoolMiB")
+        }
+        UserDefaults.standard.set(true, forKey: "wineJITPool560Migrated")
+        Self.exportWineJITPreference(UserDefaults.standard.object(forKey: "wineJITPoolMiB") as? Int ?? 560)
         Self.exportLastGoodPool()
         // Keep app startup free of native Wine/JIT probes and Keychain reads.
         // In particular, a CS_DEBUGGED flag left behind by StikDebug or a
@@ -1382,6 +1389,21 @@ class SystemCoordinator: ObservableObject {
     // remain live for some time after the guest's running flag becomes false.
     // Reject a new launch before any prefix/JIT/Metal preparation until the
     // pinned Wine worker and the in-app wineserver have both exited.
+    /// Polls the native session release for up to `timeout` seconds. The pool
+    /// and the previous session's image copies are only reused after this
+    /// returns true (ideck_runtime_complete_session saw both threads stopped).
+    private func waitForSessionCleanup(timeout: TimeInterval = 5) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while true {
+            if ideck_wineprocess_thread_finished() && ideck_wineserver_running() {
+                _ = ideck_wineserver_stop_if_idle()
+            }
+            if ideck_runtime_complete_session() { return true }
+            if ideck_wineprocess_running() || Date() >= deadline { return false }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        }
+    }
+
     private func previousWineSessionStillFinishing() -> Bool {
         if ideck_wineprocess_running() {
             setWindowsStatus("A Windows session is already running. Close it before starting another game.")
@@ -1391,7 +1413,8 @@ class SystemCoordinator: ObservableObject {
             _ = ideck_wineserver_stop_if_idle()
         }
         let stillBusy = !ideck_wineprocess_running() &&
-            (ideck_wineserver_running() || !ideck_wineprocess_thread_finished())
+            (ideck_wineserver_running() || !ideck_wineprocess_thread_finished()) &&
+            !waitForSessionCleanup()
         if stillBusy {
             setWindowsStatus("Cannot start another Windows game: the previous Wine session or wineserver is still shutting down. Retry after it finishes.")
             SteamLog.event("[wine-session] blocked second launch: worker/server still active")
@@ -1401,8 +1424,12 @@ class SystemCoordinator: ObservableObject {
             // The previous guest may have exited normally without the user
             // pressing Close. Re-arm native session state before the next
             // launch only after both worker and wineserver are quiescent.
-            guard ideck_runtime_complete_session() else {
+            // The last guest thread and wineserver can take a moment to go
+            // quiescent after the game window closes: wait for them (the run
+            // loop keeps the UI responsive) instead of refusing the launch.
+            guard waitForSessionCleanup() else {
                 setWindowsStatus("Cannot start another Windows game: native Wine session cleanup is still in progress.")
+                SteamLog.event("[wine-session] cleanup did not finish within the wait; launch refused")
                 return true
             }
         }

@@ -283,6 +283,21 @@ enum StikJITHelper {
         return (mb: mb, exe: found.exe)
     }
 
+    /// True when iOS refused to exempt the pool's RW alias from the memory
+    /// footprint on this launch: then the whole pool counts toward jetsam's
+    /// limit and heavy games can be killed without a log.
+    static var poolCountsAgainstFootprint = false
+
+    static func reportNoFootprint(_ applied: Bool, poolBytes: Int) {
+        poolCountsAgainstFootprint = !applied
+        LogStore.shared.log("[no-footprint] pool applied=\(applied)", level: applied ? .success : .error)
+        if !applied {
+            LogStore.shared.log("⚠️ iOS did not exempt the \(poolBytes >> 20)MB JIT pool from the app's memory limit: "
+                + "it counts toward the limit this session, so heavy games may close without an error. "
+                + "Use a smaller JIT pool (Settings › JIT) if that happens.", level: .error)
+        }
+    }
+
     /// Allocate a JIT memory pool via BRK #0xf00d WITHOUT detaching the debugger.
     /// The debugger stays attached so Wine can use BRK to prepare PE code pages.
     static func allocatePool(poolSize requestedPoolSize: Int = 128 * 1024 * 1024) -> (rx: UnsafeMutableRawPointer, rw: UnsafeMutableRawPointer, size: Int)? {
@@ -1067,7 +1082,7 @@ enum StikJITHelper {
                         let exemptA = jit_make_region_no_footprint(rwPtr, poolSize, "pool-RW-alias")
                         let exemptB = jit_make_region_no_footprint(rwPtr + holeEnd, Int(second.size), "pool-RW-alias-2")
                         let exemptM = poolMid.map { jit_make_region_no_footprint(rwPtr + Int($0.base - rxAddrV), Int($0.size), "pool-RW-alias-mid") } ?? true
-                        LogStore.shared.log("[no-footprint] pool applied=\(exemptA && exemptB && exemptM)", level: exemptA && exemptB && exemptM ? .success : .error)
+                        reportNoFootprint(exemptA && exemptB && exemptM, poolBytes: poolSize)
                         splitHoles(aSize: poolSize, bOff: holeEnd, rxBase: rxAddrV)
                         if poolMid == nil {
                         LogStore.shared.log(String(format: "[pool-split] JIT pool = RX [0x%lx,0x%lx) %luMB + [0x%lx,0x%lx) %luMB as one "
@@ -1114,7 +1129,7 @@ enum StikJITHelper {
                     let exemptA = jit_make_region_no_footprint(rwPtr, poolSize, "pool-RW-alias")
                     let exemptB = jit_make_region_no_footprint(rwPtr + holeEnd, Int(second.size), "pool-RW-alias-2")
                     let exemptM = poolMid.map { jit_make_region_no_footprint(rwPtr + Int($0.base - rxAddrV), Int($0.size), "pool-RW-alias-mid") } ?? true
-                    LogStore.shared.log("[no-footprint] pool applied=\(exemptA && exemptB && exemptM)", level: exemptA && exemptB && exemptM ? .success : .error)
+                    reportNoFootprint(exemptA && exemptB && exemptM, poolBytes: poolSize)
                     splitHoles(aSize: poolSize, bOff: holeEnd, rxBase: rxAddrV)
                     if poolMid == nil {
                     LogStore.shared.log(String(format: "[pool-split] JIT pool = RX [0x%lx,0x%lx) %luMB + [0x%lx,0x%lx) %luMB as one "
@@ -1150,7 +1165,7 @@ enum StikJITHelper {
                     + "offset=0x\(String(Int(rw) - Int(rxAddrV), radix: 16)) windowHeld=\(windowHeld) rwOverlap=false",
                     level: .success)
                 let exempt = jit_make_region_no_footprint(rwPtr, poolSize, "pool-RW-alias")
-                LogStore.shared.log("[no-footprint] pool applied=\(exempt)", level: exempt ? .success : .error)
+                reportNoFootprint(exempt, poolBytes: poolSize)
                 lowReady(rwLow, low, rw)
                 LogStore.shared.log("JIT pool ready (debugger still attached).", level: .success)
                 poolTaken = true
@@ -1274,7 +1289,7 @@ enum StikJITHelper {
         // ml359: log the verdict through LogStore.log (which appends to the
         // file) — the ml358 run lost it because the jit_log callback only fed
         // the UI view. Detail (kr / footprint delta) is in the jit_log lines.
-        LogStore.shared.log("[no-footprint] pool applied=\(exempt)", level: exempt ? .success : .error)
+        reportNoFootprint(exempt, poolBytes: poolSize)
 
         LogStore.shared.log("JIT pool ready (debugger still attached).", level: .success)
         poolTaken = true
