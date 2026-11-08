@@ -1,0 +1,47 @@
+diff --git a/wine/dlls/ntdll/loader.c b/wine/dlls/ntdll/loader.c
+index f9f412be3d..fcc026ae5e 100644
+--- a/wine/dlls/ntdll/loader.c
++++ b/wine/dlls/ntdll/loader.c
+@@ -1476,8 +1476,24 @@ static BOOL import_dll( WINE_MODREF *wm, const IMAGE_IMPORT_DESCRIPTOR *descr, L
+      * corrupts the guest state, and crashes via dispatch_icall with
+      * x11=garbage. */
+     const IMAGE_ARM64EC_METADATA *imp_metadata = NULL;
++    BOOL imp_native_arm64 = FALSE;
+     if (arm64ec_get_module_metadata( module ))  /* importer is ARM64EC */
+         imp_metadata = arm64ec_get_module_metadata( imp_mod );
++    else
++    {
++        /* iDeck: a PURE ARM64 importer (wow64.dll, xtajit.dll in a WoW64
++         * child of an ARM64EC session) calls its IAT with BLR, natively. It
++         * can never execute the .hexpthk x86_64 thunk: Dragon Age:
++         * Inquisition's ActivationUI.exe died with 0xC000001D at
++         * ntdll!RtlRunOnceExecuteOnce's thunk (+4), reached by `blr x8` from
++         * wow64. Always bind such importers to the ARM64EC native target. */
++        const IMAGE_NT_HEADERS *imp_nt = RtlImageNtHeader( module );
++        if (imp_nt && imp_nt->FileHeader.Machine == IMAGE_FILE_MACHINE_ARM64)
++        {
++            imp_metadata = arm64ec_get_module_metadata( imp_mod );
++            imp_native_arm64 = (imp_metadata != NULL);
++        }
++    }
+ #endif
+ 
+     while (import_list->u1.Ordinal)
+@@ -1499,7 +1515,7 @@ static BOOL import_dll( WINE_MODREF *wm, const IMAGE_IMPORT_DESCRIPTOR *descr, L
+                      (void *)thunk_list->u1.Function );
+             }
+ #ifdef __arm64ec__
+-            else if (imp_metadata && !arm64ec_iat_is_exported_x64( module, thunk_list ))
++            else if (imp_metadata && (imp_native_arm64 || !arm64ec_iat_is_exported_x64( module, thunk_list )))
+                 thunk_list->u1.Function = (ULONG_PTR)arm64ec_redirect_ptr( imp_mod,
+                                                                            (void *)thunk_list->u1.Function,
+                                                                            imp_metadata );
+@@ -1522,7 +1538,7 @@ static BOOL import_dll( WINE_MODREF *wm, const IMAGE_IMPORT_DESCRIPTOR *descr, L
+                      (void *)thunk_list->u1.Function );
+             }
+ #ifdef __arm64ec__
+-            else if (imp_metadata && !arm64ec_iat_is_exported_x64( module, thunk_list ))
++            else if (imp_metadata && (imp_native_arm64 || !arm64ec_iat_is_exported_x64( module, thunk_list )))
+             {
+                 void *pre = (void *)thunk_list->u1.Function;
+ 
