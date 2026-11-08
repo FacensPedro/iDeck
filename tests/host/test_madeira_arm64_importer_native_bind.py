@@ -19,6 +19,15 @@ class MadeiraArm64ImporterNativeBindTests(unittest.TestCase):
                       repo_text("scripts/fetch_madeira_sources.sh"))
         self.assertIn('"patches/madeira-arm64-importer-syscall-bind.patch"', repo_text("scripts/madeira_native_kit.py"))
 
+    def test_lone_ret_exports_resolve_to_native_ret(self):
+        patch = (ROOT / "patches/madeira-arm64-importer-ret-bind.patch").read_text()
+        self.assertIn("+        if (bytes[0] == 0xc3)", patch)
+        self.assertIn("+            return xlate_ios_jit( (void *)__chkstk_arm64ec );", patch)
+        fetch = repo_text("scripts/fetch_madeira_sources.sh")
+        self.assertIn('RET_BIND_PATCH="$ROOT/patches/madeira-arm64-importer-ret-bind.patch"', fetch)
+        self.assertLess(fetch.index("madeira-arm64-importer-syscall-bind.patch"), fetch.index("RET_BIND_PATCH="))
+        self.assertIn('"patches/madeira-arm64-importer-ret-bind.patch"', repo_text("scripts/madeira_native_kit.py"))
+
     def test_patch_is_applied_and_invalidates_cached_kits(self):
         self.assertIn('ARM64_IMPORTER_PATCH="$ROOT/patches/madeira-arm64-importer-native-bind.patch"',
                       repo_text("scripts/fetch_madeira_sources.sh"))
