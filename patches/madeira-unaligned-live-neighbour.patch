@@ -1,0 +1,96 @@
+diff --git a/build/ntdll-unix/signal_arm64_ios.c b/build/ntdll-unix/signal_arm64_ios.c
+index 22265b6..336a77d 100644
+--- a/build/ntdll-unix/signal_arm64_ios.c
++++ b/build/ntdll-unix/signal_arm64_ios.c
+@@ -3905,7 +3905,90 @@ static void *ios_mach_exception_thread( void *arg )
+                         }
+                     }
+ 
+-                    if ((insn & LDAXR_MASK) == LDAR_INST ||
++                    /* iDeck: NEVER CLOBBER A LIVE NEIGHBOUR SLOT.
++                     *
++                     * The rewrites below put their half-barrier in rw_pc+4 (loads)
++                     * or rw_pc-4 (stores), assuming FEX reserved that slot with a
++                     * NOP. ml962 logs the slot after the fact and shows it is not
++                     * always a NOP; when it is live code the barrier permanently
++                     * destroys an instruction in a block that runs again. If that
++                     * instruction built the high half of a pointer, the pointer is
++                     * truncated to 32 bits and a later dereference faults. Crash
++                     * Bandicoot N. Sane Trilogy (iDeck 1.4.6 build 33) dies exactly
++                     * like that: ml962 "OPERAND IS FULL WIDTH -> the LOAD lost the
++                     * high half", then an AV at [x20+0x30] with x20=0 in ntdll.
++                     *
++                     * When the neighbour is not a NOP, leave the JIT code untouched
++                     * and emulate this one access through mach_vm, the way the
++                     * misaligned CAS/LSE paths below do. Full fences around it keep
++                     * the acquire/release ordering of the original instruction. The
++                     * next unaligned execution faults and is emulated again: slower,
++                     * but correct. A NOP neighbour keeps the existing fast rewrite. */
++                    int ideck_emulated = 0;
++                    {
++                        int is_load  = (insn & LDAXR_MASK) == LDAR_INST ||
++                                       (insn & LDAXR_MASK) == LDAPR_INST ||
++                                       (insn & RCPC2_MASK) == LDAPUR_INST;
++                        int is_store = (insn & LDAXR_MASK) == STLR_INST ||
++                                       (insn & RCPC2_MASK) == STLUR_INST;
++                        if (is_load || is_store)
++                        {
++                            uint32_t nb = __atomic_load_n((volatile uint32_t *)(is_load ? rw_pc + 4 : rw_pc - 4),
++                                                          __ATOMIC_ACQUIRE);
++                            if (nb != 0xD503201Fu /* nop */)
++                            {
++                                uint32_t Size = (insn >> 30) & 0x3;
++                                uint32_t Rn = (insn >> 5) & 0x1F;
++                                uint32_t Rt = insn & 0x1F;
++                                uint32_t nbytes = 1u << Size;
++                                uint64_t szmask = (Size == 3) ? ~0ULL : ((1ULL << (8u << Size)) - 1);
++                                uint64_t addr = (Rn == 31) ? __darwin_arm_thread_state64_get_sp(state)
++                                                           : state.__x[Rn];
++                                if ((insn & RCPC2_MASK) == LDAPUR_INST || (insn & RCPC2_MASK) == STLUR_INST)
++                                    addr += (uint64_t)(int64_t)(((int32_t)(insn << 11)) >> 23);  /* simm9 */
++                                uint64_t val = 0;
++                                mach_vm_size_t got = 0;
++                                kern_return_t ekr;
++                                __atomic_thread_fence(__ATOMIC_SEQ_CST);
++                                if (is_load)
++                                {
++                                    ekr = mach_vm_read_overwrite( mach_task_self(), addr, nbytes,
++                                                                  (mach_vm_address_t)&val, &got );
++                                    if (ekr == KERN_SUCCESS && got != nbytes) ekr = KERN_FAILURE;
++                                    if (ekr == KERN_SUCCESS && Rt != 31) state.__x[Rt] = val & szmask;
++                                }
++                                else
++                                {
++                                    val = ((Rt == 31) ? 0 : state.__x[Rt]) & szmask;
++                                    ekr = mach_vm_write( mach_task_self(), addr,
++                                                         (vm_offset_t)(uintptr_t)&val, nbytes );
++                                }
++                                __atomic_thread_fence(__ATOMIC_SEQ_CST);
++                                if (ekr != KERN_SUCCESS)
++                                    goto skip_unaligned_backpatch;  /* honest AV path */
++                                __darwin_arm_thread_state64_set_pc_fptr(
++                                    state, (void *)(uintptr_t)(fault_pc + 4));
++                                {
++                                    static volatile int emu_count;
++                                    int n = __sync_add_and_fetch(&emu_count, 1);
++                                    if (n <= 8 || (n % 256) == 0)
++                                        dprintf(STDERR_FILENO,
++                                                "[mach_exc] UNALIGNED-EMULATE ideck #%d %s pc=0x%llx insn=0x%08x "
++                                                "addr=0x%llx size=%u live-neighbour=0x%08x (not patched)\n",
++                                                n, is_load ? "load" : "store", (unsigned long long)fault_pc,
++                                                insn, (unsigned long long)addr, nbytes, nb);
++                                }
++                                ideck_emulated = 1;
++                                handled = 1;
++                            }
++                        }
++                    }
++
++                    if (ideck_emulated)
++                    {
++                        /* emulated above; JIT code left untouched */
++                    }
++                    else if ((insn & LDAXR_MASK) == LDAR_INST ||
+                         (insn & LDAXR_MASK) == LDAPR_INST)
+                     {
+                         /* LDAR/LDAPR → LDR + DMB_LD. Replace instruction in

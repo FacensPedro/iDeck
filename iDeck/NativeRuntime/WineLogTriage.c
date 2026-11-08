@@ -61,8 +61,12 @@ int32_t ideck_wine_log_diagnose(const char *path) {
         strstr(current_session, "c0000017")) {
         code = IDECK_WINE_LOG_WOW64_ADDRESS_SPACE;
     } else if (strstr(current_session, "[x18-decline]") &&
-               (strstr(current_session, "[mach_exc] unhandled") ||
-                strstr(current_session, "code=c000001d"))) {
+               (strstr(current_session, "code=c000001d") ||
+                (strstr(current_session, "[mach_exc] unhandled") &&
+                 !strstr(current_session, "c0000005")))) {
+        // Only report the x18/0xC000001D finding when the status really is
+        // 0xC000001D; an x18 decline followed by an access violation is a
+        // different failure (see the stale-IAT and AV branches below).
         code = IDECK_WINE_LOG_ARM64EC_EXCEPTION;
     } else if (strstr(current_session, "[ec-bind]") &&
                strstr(current_session, "pool stale") &&
