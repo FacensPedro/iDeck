@@ -61,7 +61,7 @@ final class EARangeClient: @unchecked Sendable {
         config.urlCache = nil
         config.timeoutIntervalForRequest = 60
         config.timeoutIntervalForResource = 24 * 3600
-        config.httpMaximumConnectionsPerHost = 6
+        config.httpMaximumConnectionsPerHost = 16
         config.httpAdditionalHeaders = ["User-Agent": EAAPI.userAgent]
         http = URLSession(configuration: config)
     }
@@ -538,6 +538,9 @@ final class EADownloader: @unchecked Sendable {
             return 0
         }
         guard entry.method == 0 || entry.method == 8 else { throw EADownloadError.file("compression method \(entry.method)") }
+        if entry.compressedSize >= segmentedThreshold {
+            return try await fetchSegmented(entry, archive: archive, client: client, destination: destination, meter: meter)
+        }
         let temporary = destination.deletingLastPathComponent().appendingPathComponent("." + destination.lastPathComponent + ".madeira-part")
         try? FileManager.default.removeItem(at: temporary)
         guard FileManager.default.createFile(atPath: temporary.path, contents: nil) else { throw EADownloadError.file("create") }
@@ -631,6 +634,110 @@ final class EADownloader: @unchecked Sendable {
                 try await Task.sleep(nanoseconds: UInt64(attempt) * 2_000_000_000)
             }
         }
+    }
+
+    // As iDeck's Steam downloads (DownloadSpeed.steamChunks): a large file is fetched
+    // as many small ranges at once instead of one long stream, which on EA's CDN
+    // was limited to a single connection's speed for files of several GB.
+    static let segmentedThreshold: Int64 = 16 << 20
+    static let segmentBytes: Int64 = 4 << 20
+    static let segmentsAtOnce = DownloadSpeed.steamChunks
+
+    /// One large file: its compressed bytes in `segmentBytes` ranges, `segmentsAtOnce`
+    /// at a time, written in place into a side file, then inflated from disk with the
+    /// same size and CRC-32 checks as the streamed path.
+    private static func fetchSegmented(_ entry: EAZipEntry, archive: EABuildArchive, client: EARangeClient,
+                                       destination: URL, meter: EAMeter) async throws -> UInt64 {
+        let folder = destination.deletingLastPathComponent()
+        let compressed = folder.appendingPathComponent("." + destination.lastPathComponent + ".madeira-gz")
+        let temporary = folder.appendingPathComponent("." + destination.lastPathComponent + ".madeira-part")
+        defer { try? FileManager.default.removeItem(at: compressed) }
+
+        // The local header's own length (its name and extra field can differ from the
+        // central directory's), so the data starts where it really does.
+        let start = entry.localHeaderOffset
+        let guess = 30 + Int64(entry.name.utf8.count) + 512
+        let header = try await client.bytes(archive.url, range: start..<min(archive.fileSize, start + guess))
+        guard let headerLength = EAZipDirectory.localHeaderLength(header) else { throw EADownloadError.file("local header") }
+        let dataStart = start + Int64(headerLength)
+        let total = entry.compressedSize
+        guard dataStart + total <= archive.fileSize else { throw EADownloadError.file("data bounds") }
+
+        try? FileManager.default.removeItem(at: compressed)
+        guard FileManager.default.createFile(atPath: compressed.path, contents: nil) else { throw EADownloadError.file("create") }
+        let output = try FileHandle(forWritingTo: compressed)
+        try output.truncate(atOffset: UInt64(total))
+        let writeLock = NSLock()
+        final class Added: @unchecked Sendable { var bytes: UInt64 = 0 }
+        let added = Added()
+        do {
+            let ranges = stride(from: Int64(0), to: total, by: segmentBytes).map { $0..<min($0 + segmentBytes, total) }
+            try await withThrowingTaskGroup(of: Void.self) { group in
+                var next = 0
+                func add() {
+                    guard next < ranges.count else { return }
+                    let range = ranges[next]; next += 1
+                    group.addTask {
+                        var attempt = 0
+                        while true {
+                            attempt += 1
+                            try Task.checkCancellation()
+                            do {
+                                let data = try await client.bytes(archive.url, range: (dataStart + range.lowerBound)..<(dataStart + range.upperBound))
+                                guard Int64(data.count) == range.count else { throw EADownloadError.file("short range") }
+                                try writeLock.withLock {
+                                    try output.seek(toOffset: UInt64(range.lowerBound))
+                                    try autoreleasepool { try output.write(contentsOf: data) }
+                                }
+                                writeLock.withLock { added.bytes += UInt64(data.count) }
+                                meter.add(UInt64(data.count))
+                                return
+                            } catch is CancellationError {
+                                throw CancellationError()
+                            } catch {
+                                if Task.isCancelled { throw CancellationError() }
+                                guard attempt < 4 else { throw error }
+                                try await Task.sleep(nanoseconds: UInt64(attempt) * 1_000_000_000)
+                            }
+                        }
+                    }
+                }
+                for _ in 0..<segmentsAtOnce { add() }
+                while try await group.next() != nil { add() }
+            }
+            try output.close()
+        } catch {
+            try? output.close()
+            // A failed file takes back what it counted, as the streamed path does.
+            meter.remove(writeLock.withLock { added.bytes })
+            throw error
+        }
+
+        // Inflate from disk, 4 MB at a time.
+        try? FileManager.default.removeItem(at: temporary)
+        guard FileManager.default.createFile(atPath: temporary.path, contents: nil) else { throw EADownloadError.file("create") }
+        let part = try FileHandle(forWritingTo: temporary)
+        var closed = false
+        defer { if !closed { try? part.close(); try? FileManager.default.removeItem(at: temporary) } }
+        let input = try FileHandle(forReadingFrom: compressed)
+        defer { try? input.close() }
+        let inflater = EAInflater(handle: part, inflate: entry.method == 8)
+        var remaining = total
+        while remaining > 0 {
+            try Task.checkCancellation()
+            let slab = try autoreleasepool { try input.read(upToCount: Int(min(remaining, 4 << 20))) } ?? Data()
+            guard !slab.isEmpty else { throw EADownloadError.file("short read") }
+            remaining -= Int64(slab.count)
+            try inflater.write(slab, last: remaining == 0)
+        }
+        try inflater.write(Data(), last: true)
+        guard inflater.written == entry.uncompressedSize, inflater.crc.checksum == entry.crc32 else {
+            throw EADownloadError.file("checksum " + destination.lastPathComponent)
+        }
+        try part.close(); closed = true
+        try? FileManager.default.removeItem(at: destination)
+        try FileManager.default.moveItem(at: temporary, to: destination)
+        return UInt64(total)
     }
 
     static func freeSpace(at url: URL) -> Int64? {
