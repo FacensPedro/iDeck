@@ -2041,6 +2041,16 @@ private struct StoreGameDetailsView<Extra: View>: View {
                 .buttonStyle(.bordered)
             }
         } else if installed {
+            // Starts the game; without JIT, StikDebug opens first.
+            Button {
+                dismiss()
+                onLaunch()
+            } label: {
+                Label(tr("Launch"), systemImage: "play.fill")
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+            }
+            .buttonStyle(.borderedProminent)
             if onUninstall != nil {
                 Button(role: .destructive) { confirmUninstall = true } label: {
                     Label(tr("Uninstall"), systemImage: "trash")
@@ -2278,6 +2288,8 @@ enum ShelfItem: Hashable {
     case gogInstalling(Int)
     case epic(String)
     case epicInstalling(String)
+    /// An EA app game, installed or installing (its offer id).
+    case ea(String)
     case exe(String)
 }
 
@@ -2289,7 +2301,18 @@ extension WindowsWorkspaceView {
             + installedGOGGames.map { .gog($0.gameID) }
             + installingEpicGames.map { .epicInstalling($0.appName) }
             + installedEpicGames.map { .epic($0.appName) }
+            + eaShelfIDs.map { .ea($0) }
             + windowsLibrary.executableURLs.map { .exe($0.path) }
+    }
+
+    /// EA games installed or installing, by title.
+    private var eaShelfIDs: [String] {
+        Set(eaLibrary.installed.keys).union(eaLibrary.downloads.keys)
+            .sorted { eaTitle($0).localizedCaseInsensitiveCompare(eaTitle($1)) == .orderedAscending }
+    }
+
+    private func eaTitle(_ id: String) -> String {
+        eaLibrary.game(id)?.title ?? eaLibrary.installed[id]?.title ?? "EA app"
     }
 
     /// The selected tile, or the Steam store when it no longer exists.
@@ -2375,6 +2398,8 @@ extension WindowsWorkspaceView {
             GOGArtworkView(urls: gogLibrary.games.first { $0.id == id }?.artworkCandidates ?? [], fallbackColor: panelColor)
         case .epic(let app), .epicInstalling(let app):
             GOGArtworkView(urls: [epicLibrary.game(app)?.cover].compactMap { $0 }, fallbackColor: panelColor)
+        case .ea(let id):
+            GOGArtworkView(urls: [eaLibrary.game(id)?.cover].compactMap { $0 }, fallbackColor: panelColor)
         case .exe(let path):
             WindowsExecutableArtworkView(executableURL: URL(fileURLWithPath: path), library: windowsLibrary, fallbackColor: panelColor)
         }
@@ -2404,6 +2429,9 @@ extension WindowsWorkspaceView {
             return Double(progress.doneBytes) / Double(progress.totalBytes)
         case .gogInstalling, .epicInstalling:
             return 0.5
+        case .ea(let id):
+            guard let download = eaLibrary.downloads[id] else { return nil }
+            return download.progress.fraction
         default:
             return nil
         }
@@ -2429,6 +2457,7 @@ extension WindowsWorkspaceView {
         case .gogInstalling(let id): return gogLibrary.games.first { $0.id == id }?.title ?? "GOG"
         case .epic(let app): return epicLibrary.installed[app]?.title ?? "Epic"
         case .epicInstalling(let app): return epicLibrary.game(app)?.title ?? "Epic"
+        case .ea(let id): return eaTitle(id)
         case .exe(let path): return URL(fileURLWithPath: path).deletingPathExtension().lastPathComponent
         }
     }
@@ -2605,6 +2634,8 @@ extension WindowsWorkspaceView {
             selectedGOGGame = gogLibrary.games.first { $0.id == id }
         case .epic(let app), .epicInstalling(let app):
             selectedEpicGame = SelectedEpicGame(id: app)
+        case .ea(let id):
+            selectedEAGame = eaLibrary.game(id)
         case .exe(let path):
             selectedExecutable = SelectedLibraryURL(url: URL(fileURLWithPath: path))
         default:

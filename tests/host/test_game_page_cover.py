@@ -23,5 +23,21 @@ class GamePageCoverTests(unittest.TestCase):
         self.assertIn("coordinator.launchWindowsExecutable(at: executableURL, profile: profile)", VIEW)
 
 
+class StoreDetailsLaunchTests(unittest.TestCase):
+    def test_store_details_show_launch_when_installed(self):
+        actions = VIEW.split("@ViewBuilder private var actions: some View {", 1)[1].split("/// GOG game page.", 1)[0]
+        installed = actions.split("} else if installed {", 1)[1].split("} else if canInstall {", 1)[0]
+        self.assertIn("onLaunch()", installed)
+        self.assertIn('Label(tr("Launch"), systemImage: "play.fill")', installed)
+
+
+class EAShelfTests(unittest.TestCase):
+    def test_ea_games_join_the_shelf(self):
+        self.assertIn("case ea(String)", VIEW)
+        self.assertIn("+ eaShelfIDs.map { .ea($0) }", VIEW)
+        self.assertIn("Set(eaLibrary.installed.keys).union(eaLibrary.downloads.keys)", VIEW)
+        self.assertIn("selectedEAGame = eaLibrary.game(id)", VIEW)
+
+
 if __name__ == "__main__":
     unittest.main()
