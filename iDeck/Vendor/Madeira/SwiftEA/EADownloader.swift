@@ -136,6 +136,47 @@ final class EARangeClient: @unchecked Sendable {
         }
     }
 
+    /// EA's CDNs that serve the same build paths. EA's download address names one;
+    /// which is fastest depends on the player's network (their IP's route to each).
+    static let mirrorHosts = ["origin-a.akamaihd.net", "lvlt.cdn.ea.com", "download.dm.origin.com"]
+
+    /// Measures the first 1 MB of the archive from EA's address and each mirror at once,
+    /// keeps only mirrors that serve the same file (206, same total size), and returns
+    /// the fastest. Any failure keeps EA's own address.
+    func fastestMirror(for url: URL, size: Int64) async -> URL {
+        guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false), let host = components.host else { return url }
+        var candidates = [url]
+        for mirror in Self.mirrorHosts where mirror != host {
+            components.host = mirror
+            if let alternate = components.url { candidates.append(alternate) }
+        }
+        let probeBytes: Int64 = min(1 << 20, size)
+        guard probeBytes > 0 else { return url }
+        let timings = await withTaskGroup(of: (URL, TimeInterval?).self) { group -> [(URL, TimeInterval)] in
+            for candidate in candidates {
+                group.addTask {
+                    var request = URLRequest(url: candidate, timeoutInterval: 8)
+                    request.setValue("bytes=0-\(probeBytes - 1)", forHTTPHeaderField: "Range")
+                    let start = Date()
+                    guard let (data, response) = try? await self.http.data(for: request),
+                          let reply = response as? HTTPURLResponse, reply.statusCode == 206,
+                          Int64(data.count) == probeBytes,
+                          reply.value(forHTTPHeaderField: "Content-Range")?.hasSuffix("/\(size)") == true else {
+                        return (candidate, nil)
+                    }
+                    return (candidate, Date().timeIntervalSince(start))
+                }
+            }
+            var results: [(URL, TimeInterval)] = []
+            for await (candidate, time) in group { if let time { results.append((candidate, time)) } }
+            return results
+        }
+        guard let best = timings.min(by: { $0.1 < $1.1 }) else { return url }
+        let summary = timings.map { "\($0.0.host ?? "?")=\(Int($0.1 * 1000))ms" }.joined(separator: " ")
+        EALog.event("[ea-download] cdn chosen=\(best.0.host ?? "?") \(summary)")
+        return best.0
+    }
+
     /// The archive's table of contents.
     func archive(_ url: URL) async throws -> EABuildArchive {
         let size = try await self.size(of: url)
@@ -322,9 +363,16 @@ final class EAJournal {
 final class EADownloader: @unchecked Sendable {
     private let client = EARangeClient()
     /// Files fetched at once. Each is one range request, streamed.
-    private let parallel = 4
+    private let parallel = 6
 
     func archive(_ url: URL) async throws -> EABuildArchive { try await client.archive(url) }
+
+    /// The archive on the EA CDN that answers fastest from this device's network.
+    func fastestMirror(_ archive: EABuildArchive) async -> EABuildArchive {
+        var chosen = archive
+        chosen.url = await client.fastestMirror(for: archive.url, size: archive.fileSize)
+        return chosen
+    }
 
     struct Result: Sendable {
         var filesWritten: Int
