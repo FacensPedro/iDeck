@@ -17,5 +17,13 @@ class EAFastestCDNTests(unittest.TestCase):
         self.assertIn("private let parallel = 6", DOWNLOADER)
 
 
+class EAMemoryTests(unittest.TestCase):
+    def test_delivery_waits_past_the_hard_limit_and_is_released(self):
+        self.assertIn("static let hardLimit = 24 << 20", DOWNLOADER)
+        self.assertIn("while waiting > EARangeStream.hardLimit && !finished {", DOWNLOADER)
+        self.assertIn("continuation.onTermination = { _ in flow.finish(); task.cancel() }", DOWNLOADER)
+        self.assertIn("try autoreleasepool { try handle.write(contentsOf: out) }", DOWNLOADER)
+
+
 if __name__ == "__main__":
     unittest.main()
