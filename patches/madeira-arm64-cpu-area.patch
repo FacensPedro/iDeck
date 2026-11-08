@@ -1,8 +1,35 @@
 diff --git a/build/ntdll-unix/thread_ios.c b/build/ntdll-unix/thread_ios.c
-index 0dfc99a..fb2bd52 100644
+index 0dfc99a..a90304f 100644
 --- a/build/ntdll-unix/thread_ios.c
 +++ b/build/ntdll-unix/thread_ios.c
-@@ -1757,8 +1757,16 @@ NTSTATUS init_thread_stack( TEB *teb, ULONG_PTR limit, SIZE_T reserve_size, SIZE
+@@ -1743,6 +1743,26 @@ NTSTATUS init_thread_stack( TEB *teb, ULONG_PTR limit, SIZE_T reserve_size, SIZE
+         wow_teb->Tib.StackBase = ios_wow_guest_addr( stack.StackBase );
+         wow_teb->Tib.StackLimit = ios_wow_guest_addr( stack.StackLimit );
+         wow_teb->DeallocationStack = ios_wow_guest_addr( stack.DeallocationStack );
++#ifdef __aarch64__
++        /* iDeck: a 32-bit child (Dragon Age: Inquisition's ActivationUI.exe,
++         * Bully) in an ARM64EC session also runs the session's ARM64EC ntdll,
++         * whose exception paths read TEB->ChpeV2CpuAreaInfo: with none it
++         * dereferenced NULL and stopped with 0xC000001D. Give its 64-bit TEB
++         * the CPU area the x64 threads get (256 KB, never entered by FEX). */
++        if (is_arm64ec() && !teb->ChpeV2CpuAreaInfo)
++        {
++            CHPE_V2_CPU_AREA_INFO *cpu_area;
++            ios_its_step = "WoW64 emulator area";
++            if ((status = virtual_alloc_thread_stack( &stack, limit_4g, 0, 0x40000, 0x40000, FALSE )))
++                return status;
++            cpu_area = stack.DeallocationStack;
++            cpu_area->ContextAmd64 = (ARM64EC_NT_CONTEXT *)&cpu_area->EmulatorDataInline;
++            cpu_area->EmulatorStackBase  = (ULONG_PTR)stack.StackBase;
++            cpu_area->EmulatorStackLimit = (ULONG_PTR)stack.StackLimit + page_size;
++            teb->ChpeV2CpuAreaInfo = cpu_area;
++            ERR("iOS arm64ec: WoW64 TEB %p ChpeV2CpuAreaInfo=%p (iDeck)\n", teb, cpu_area);
++        }
++#endif
+         return STATUS_SUCCESS;
+ #else
+         wow_teb->Tib.StackBase = wow_teb->TlsSlots[WOW64_TLS_CPURESERVED] = PtrToUlong( cpu );
+@@ -1757,8 +1777,16 @@ NTSTATUS init_thread_stack( TEB *teb, ULONG_PTR limit, SIZE_T reserve_size, SIZE
       * desktop need it, aarch64 threads must not get it. */
      extern const SECTION_IMAGE_INFORMATION *ios_image_info_for_peb( void *peb_id );
      const SECTION_IMAGE_INFORMATION *ios_ii = ios_image_info_for_peb( teb->Peb );
