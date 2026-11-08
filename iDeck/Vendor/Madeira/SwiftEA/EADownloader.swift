@@ -2,6 +2,7 @@
 // Copyright 2026 Madeira contributors
 // Madeira Converter Exception: see LICENSE-EXCEPTION.md
 
+import Compression
 import Foundation
 
 // Installing an EA build (docs/EA.md, "A download"): EA's CDN serves each build
@@ -284,20 +285,27 @@ struct EARangeStream: AsyncSequence {
 private final class EAInflater {
     /// The decoder, nil for a stored (uncompressed) entry.
     private var inflate: EAInflate?
+    /// Apple's DEFLATE decoder (Compression), several times faster than EAInflate.
+    /// Its result is checked like any other (size and CRC-32); a file it gets wrong
+    /// is decoded again with EAInflate (`native: false`).
+    private var native: EANativeInflate?
     private let handle: FileHandle
     private(set) var crc = EACRC32()
     private(set) var written: Int64 = 0
     /// The DEFLATE stream reached its final block's end (always true for a stored entry).
-    var ended: Bool { inflate?.finished ?? true }
+    var ended: Bool { native?.finished ?? inflate?.finished ?? true }
 
-    init(handle: FileHandle, inflate: Bool) {
+    init(handle: FileHandle, inflate: Bool, native useNative: Bool = true) {
         self.handle = handle
-        self.inflate = inflate ? EAInflate() : nil
+        if inflate, useNative, let decoder = EANativeInflate() { native = decoder }
+        else { self.inflate = inflate ? EAInflate() : nil }
     }
 
     func write(_ data: Data, last: Bool) throws {
         let out: Data
-        if inflate != nil {
+        if native != nil {
+            do { out = try native!.feed(data, last: last) } catch { throw EADownloadError.file("inflate") }
+        } else if inflate != nil {
             do { out = Data(try inflate!.feed(data)) } catch { throw EADownloadError.file("inflate") }
         } else {
             out = data
@@ -308,6 +316,58 @@ private final class EAInflater {
             try autoreleasepool { try handle.write(contentsOf: out) }
             crc.update(out); written += Int64(out.count)
         }
+    }
+}
+
+/// Raw DEFLATE through compression_stream (COMPRESSION_ZLIB is raw DEFLATE). Every
+/// call drains the decoder completely (it stops whenever its 1 MB output buffer
+/// fills, which a decoder fed in pieces must loop on), and the last call finalizes.
+private final class EANativeInflate {
+    private var stream = compression_stream(dst_ptr: UnsafeMutablePointer<UInt8>(bitPattern: 1)!, dst_size: 0,
+                                            src_ptr: UnsafePointer<UInt8>(bitPattern: 1)!, src_size: 0, state: nil)
+    private let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: 1 << 20)
+    private(set) var finished = false
+
+    init?() {
+        guard compression_stream_init(&stream, COMPRESSION_STREAM_DECODE, COMPRESSION_ZLIB) == COMPRESSION_STATUS_OK else {
+            buffer.deallocate(); return nil
+        }
+    }
+
+    deinit {
+        compression_stream_destroy(&stream)
+        buffer.deallocate()
+    }
+
+    func feed(_ data: Data, last: Bool) throws -> Data {
+        var out = Data()
+        guard !finished else { return out }
+        try data.withUnsafeBytes { (raw: UnsafeRawBufferPointer) in
+            let base = raw.bindMemory(to: UInt8.self).baseAddress
+            stream.src_ptr = base ?? UnsafePointer<UInt8>(bitPattern: 1)!
+            stream.src_size = data.count
+            let flags = last ? Int32(COMPRESSION_STREAM_FINALIZE.rawValue) : 0
+            while true {
+                stream.dst_ptr = buffer
+                stream.dst_size = 1 << 20
+                let status = compression_stream_process(&stream, flags)
+                let produced = (1 << 20) - stream.dst_size
+                if produced > 0 { out.append(buffer, count: produced) }
+                switch status {
+                case COMPRESSION_STATUS_END:
+                    finished = true
+                    return
+                case COMPRESSION_STATUS_OK:
+                    // Done with this input only when it is all taken and the output
+                    // buffer was not filled (a full buffer may hold more to give).
+                    if stream.src_size == 0 && produced < (1 << 20) && !last { return }
+                    if last && produced == 0 && stream.src_size == 0 { return }
+                default:
+                    throw EADownloadError.file("inflate")
+                }
+            }
+        }
+        return out
     }
 }
 
@@ -566,7 +626,8 @@ final class EADownloader: @unchecked Sendable {
             var counted: UInt64 = 0
             do {
                 try handle.truncate(atOffset: 0)
-                let inflater = EAInflater(handle: handle, inflate: entry.method == 8)
+                // Apple's decoder on the first attempt; a retry uses EAInflate.
+                let inflater = EAInflater(handle: handle, inflate: entry.method == 8, native: attempt == 1)
                 // The local header (30 bytes, its own name and extra field) then the data; the
                 // expected header length comes from the central directory, with a little room.
                 let nameLength = Int64(entry.name.utf8.count)
@@ -723,28 +784,40 @@ final class EADownloader: @unchecked Sendable {
             throw error
         }
 
-        // Inflate from disk, 4 MB at a time.
-        try? FileManager.default.removeItem(at: temporary)
-        guard FileManager.default.createFile(atPath: temporary.path, contents: nil) else { throw EADownloadError.file("create") }
-        let part = try FileHandle(forWritingTo: temporary)
-        var closed = false
-        defer { if !closed { try? part.close(); try? FileManager.default.removeItem(at: temporary) } }
-        let input = try FileHandle(forReadingFrom: compressed)
-        defer { try? input.close() }
-        let inflater = EAInflater(handle: part, inflate: entry.method == 8)
-        var remaining = total
-        while remaining > 0 {
-            try Task.checkCancellation()
-            let slab = try autoreleasepool { try input.read(upToCount: Int(min(remaining, 4 << 20))) } ?? Data()
-            guard !slab.isEmpty else { throw EADownloadError.file("short read") }
-            remaining -= Int64(slab.count)
-            try inflater.write(slab, last: remaining == 0)
+        // Inflate from disk, 4 MB at a time: Apple's decoder first, EAInflate if
+        // its result does not check out (no download again either way).
+        var inflatedOK = false
+        for useNative in [true, false] where !inflatedOK {
+            try? FileManager.default.removeItem(at: temporary)
+            guard FileManager.default.createFile(atPath: temporary.path, contents: nil) else { throw EADownloadError.file("create") }
+            let part = try FileHandle(forWritingTo: temporary)
+            let input = try FileHandle(forReadingFrom: compressed)
+            do {
+                let inflater = EAInflater(handle: part, inflate: entry.method == 8, native: useNative)
+                var remaining = total
+                while remaining > 0 {
+                    try Task.checkCancellation()
+                    let slab = try autoreleasepool { try input.read(upToCount: Int(min(remaining, 4 << 20))) } ?? Data()
+                    guard !slab.isEmpty else { throw EADownloadError.file("short read") }
+                    remaining -= Int64(slab.count)
+                    try inflater.write(slab, last: remaining == 0)
+                }
+                try inflater.write(Data(), last: true)
+                inflatedOK = inflater.written == entry.uncompressedSize && inflater.crc.checksum == entry.crc32
+                try? input.close(); try part.close()
+                if !inflatedOK && useNative {
+                    EALog.event("[ea-download] native inflate mismatch name=\(destination.lastPathComponent); decoding again")
+                }
+            } catch {
+                try? input.close(); try? part.close()
+                try? FileManager.default.removeItem(at: temporary)
+                if error is CancellationError || !useNative { throw error }
+            }
         }
-        try inflater.write(Data(), last: true)
-        guard inflater.written == entry.uncompressedSize, inflater.crc.checksum == entry.crc32 else {
+        guard inflatedOK else {
+            try? FileManager.default.removeItem(at: temporary)
             throw EADownloadError.file("checksum " + destination.lastPathComponent)
         }
-        try part.close(); closed = true
         try? FileManager.default.removeItem(at: destination)
         try FileManager.default.moveItem(at: temporary, to: destination)
         return UInt64(total)

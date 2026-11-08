@@ -34,5 +34,14 @@ class EASegmentedTests(unittest.TestCase):
         self.assertIn("config.httpMaximumConnectionsPerHost = 16", DOWNLOADER)
 
 
+class EANativeInflateTests(unittest.TestCase):
+    def test_apple_decoder_first_with_checked_fallback(self):
+        self.assertIn("compression_stream_init(&stream, COMPRESSION_STREAM_DECODE, COMPRESSION_ZLIB)", DOWNLOADER)
+        self.assertIn("for useNative in [true, false] where !inflatedOK {", DOWNLOADER)
+        self.assertIn("native: attempt == 1", DOWNLOADER)
+        crc = repo_text("iDeck/Vendor/Madeira/SwiftEA/EAFormats.swift")
+        self.assertIn("data.withUnsafeBytes { (raw: UnsafeRawBufferPointer) in", crc)
+
+
 if __name__ == "__main__":
     unittest.main()
