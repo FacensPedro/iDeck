@@ -1,0 +1,29 @@
+diff --git a/wine/dlls/opengl32/unix_private.h b/wine/dlls/opengl32/unix_private.h
+index 1eb571e173..8d805c874f 100644
+--- a/wine/dlls/opengl32/unix_private.h
++++ b/wine/dlls/opengl32/unix_private.h
+@@ -87,7 +87,23 @@ static inline void *copy_wow64_ptr32s( UINT_PTR address, ULONG count )
+ 
+ static inline TEB *get_teb64( ULONG teb32 )
+ {
+-    TEB32 *teb32_ptr = ULongToPtr( teb32 );
++    /* iDeck: on iOS the 32-bit guest address space is a 4 GB window high in
++     * the host address space, so the 32-bit TEB pointer the PE side passes is
++     * a GUEST address; ULongToPtr() on it faults (Borderlands 2's WPF launcher
++     * died in wow64_thread_attach reading TEB32->WowTebOffset at 0x7ffc2fdc).
++     * Resolve it through the current thread's own TEB, whose 32-bit TEB lives
++     * in the same window.  Elsewhere the window base is 0 and this is the
++     * upstream computation. */
++    TEB *cur = NtCurrentTeb();
++    TEB32 *teb32_ptr;
++
++    if (cur->WowTebOffset)
++    {
++        TEB32 *cur32 = (TEB32 *)((char *)cur + cur->WowTebOffset);
++        if (PtrToUlong( cur32 ) == teb32) return cur;
++        teb32_ptr = (TEB32 *)(((ULONG_PTR)cur32 & ~(ULONG_PTR)0xffffffff) | teb32);
++    }
++    else teb32_ptr = ULongToPtr( teb32 );
+     return (TEB *)((char *)teb32_ptr + teb32_ptr->WowTebOffset);
+ }
+ 

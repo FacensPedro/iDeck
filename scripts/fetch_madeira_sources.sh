@@ -193,6 +193,14 @@ if ! git -C "$DEST" apply --reverse --check "$ARM64_SYSCALL_PATCH" >/dev/null 2>
   git -C "$DEST" apply "$ARM64_SYSCALL_PATCH"
 fi
 
+# opengl32's wow64 thunks receive the 32-bit TEB as a guest address; resolve
+# it inside the iOS WoW64 window instead of dereferencing it as host memory.
+OPENGL_WOW_TEB_PATCH="$ROOT/patches/madeira-opengl32-wow-teb.patch"
+if ! git -C "$DEST" apply --reverse --check "$OPENGL_WOW_TEB_PATCH" >/dev/null 2>&1; then
+  git -C "$DEST" apply --check "$OPENGL_WOW_TEB_PATCH"
+  git -C "$DEST" apply "$OPENGL_WOW_TEB_PATCH"
+fi
+
 # The stock Wine worker reports g_wine_running=0 before joining wineserver,
 # and wineserver_start never clears the prior session's stop flag.
 # Both make game B fail after game A ends in the same iDeck process.
