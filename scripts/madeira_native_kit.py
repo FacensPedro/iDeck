@@ -41,7 +41,9 @@ EARLY_JIT_PATCH_SHA256 = hashlib.sha256(
     (ROOT / "patches/madeira-opengl32-wow-teb.patch").read_bytes() +
     (ROOT / "patches/madeira-arm64-getprocaddress-native.patch").read_bytes() +
     (ROOT / "patches/madeira-jit-alias-lifecycle.patch").read_bytes() +
-    (ROOT / "scripts/apply_madeira_opengl32_wow_ptrs.py").read_bytes()
+    (ROOT / "scripts/apply_madeira_opengl32_wow_ptrs.py").read_bytes() +
+    (ROOT / "scripts/apply_madeira_relink_cache.py").read_bytes() +
+    (ROOT / "patches/madeira-mscoree-fusion-negative-cache.patch").read_bytes()
 ).hexdigest()
 REPEAT_WINE_SESSION_PATCH_SHA256 = hashlib.sha256(
     (Path(__file__).resolve().parents[1] / "patches/madeira-repeat-wine-sessions.patch").read_bytes()

@@ -254,6 +254,14 @@ extern "C" int32_t ideck_runtime_launch(const char *executable_path,
         if (prepared != 0) return prepared;
         if (setenv("MADEIRA_ENV_LOCKED", "MADEIRA_EXE,MADEIRA_ARGS,MADEIRA_STEAM_APPID,MADEIRA_STEAM_APPPATH,MADEIRA_WORKDIR", 1))
             return errno;
+        // FEX's Windows build derives its user config directory from
+        // WINEHOMEDIR (\??\unix\var\...), drops the \??\ and is left with a
+        // RELATIVE "unix\var\..." path that Wine resolves from the game's
+        // folder: ~50 failed NtCreateFile walks per process (Borderlands 2).
+        // iDeck ships no FEX config files; name one absolute DOS directory so
+        // the lookup is a single miss. An explicit user value is kept.
+        setenv("FEX_APP_CONFIG_LOCATION", "C:\\ProgramData\\fex-emu\\", 0);
+        setenv("FEX_APP_DATA_LOCATION", "C:\\ProgramData\\fex-emu\\", 0);
         if (setenv("WINEPREFIX", wine_prefix, 1) != 0 ||
             setenv("MADEIRA_EXE", winExe.UTF8String, 1) != 0 ||
             setenv("MADEIRA_ARGS", argString.UTF8String, 1) != 0) return errno;

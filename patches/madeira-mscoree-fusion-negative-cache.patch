@@ -1,0 +1,23 @@
+diff --git a/wine/dlls/mscoree/metahost.c b/wine/dlls/mscoree/metahost.c
+index 143915d3e9..75e9979001 100644
+--- a/wine/dlls/mscoree/metahost.c
++++ b/wine/dlls/mscoree/metahost.c
+@@ -1754,10 +1754,18 @@ HRESULT get_file_from_strongname(WCHAR* stringnameW, WCHAR* assemblies_path, int
+     static const WCHAR fusiondll[] = {'f','u','s','i','o','n',0};
+     HMODULE hfusion=NULL;
+     static HRESULT (WINAPI *pCreateAssemblyCache)(IAssemblyCache**,DWORD);
++    /* iDeck: remember that fusion.dll is not there.  Without this every
++     * assembly Wine Mono resolves retried LoadLibraryShim and failed again
++     * (Borderlands 2's launcher: 15 identical c0000135 loads of
++     * Framework\v2.0.50727\fusion.dll before its window appeared). */
++    static HRESULT fusion_missing;
++
++    if (!pCreateAssemblyCache && fusion_missing) return fusion_missing;
+ 
+     if (!pCreateAssemblyCache)
+     {
+         hr = LoadLibraryShim(fusiondll, NULL, NULL, &hfusion);
++        if (FAILED(hr)) fusion_missing = hr;
+ 
+         if (SUCCEEDED(hr))
+         {

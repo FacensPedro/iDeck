@@ -246,6 +246,16 @@ python3 "$ROOT/scripts/apply_madeira_luajit_backport.py" --madeira "$DEST"
 # source overlay without modifying the public pinned Madeira revision.
 python3 "$ROOT/scripts/patch_madeira_wow64_import_closure.py" --madeira "$DEST"
 
+# Prefix links are replaced only when stale instead of rewritten every launch.
+python3 "$ROOT/scripts/apply_madeira_relink_cache.py" "$DEST"
+
+# mscoree remembers that fusion.dll is absent instead of retrying per assembly.
+FUSION_PATCH="$ROOT/patches/madeira-mscoree-fusion-negative-cache.patch"
+if ! git -C "$DEST" apply --reverse --check "$FUSION_PATCH" >/dev/null 2>&1; then
+  git -C "$DEST" apply --check "$FUSION_PATCH"
+  git -C "$DEST" apply "$FUSION_PATCH"
+fi
+
 echo "Madeira sources checked out at $REV"
 echo "Source checkout complete. Run bash scripts/build_native_runtime.sh on macOS to compile, link and package."
 echo "Read $DEST/docs/BUILDING.md for the platform toolchains and licensed prerequisites."
