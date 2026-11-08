@@ -8,6 +8,38 @@
 #include <string.h>
 #include <mutex>
 #include <initializer_list>
+#include <dispatch/dispatch.h>
+
+// iOS memory pressure for DXMT: 0 normal, 1 warning, 2 critical. A 64-bit
+// (ARM64EC) DXMT runs in this address space and reads the word directly
+// (IDECK_MEMORY_PRESSURE_ADDR) to drop its retained dynamic buffers early.
+static volatile uint32_t ideck_memory_pressure_word = 0;
+
+static void ideck_memory_pressure_publish(void) {
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        dispatch_source_t src = dispatch_source_create(
+            DISPATCH_SOURCE_TYPE_MEMORYPRESSURE, 0,
+            DISPATCH_MEMORYPRESSURE_NORMAL | DISPATCH_MEMORYPRESSURE_WARN | DISPATCH_MEMORYPRESSURE_CRITICAL,
+            dispatch_get_global_queue(QOS_CLASS_UTILITY, 0));
+        if (src) {
+            dispatch_source_set_event_handler(src, ^{
+                unsigned long level = dispatch_source_get_data(src);
+                uint32_t value = (level & DISPATCH_MEMORYPRESSURE_CRITICAL) ? 2
+                               : (level & DISPATCH_MEMORYPRESSURE_WARN) ? 1 : 0;
+                __atomic_store_n(&ideck_memory_pressure_word, value, __ATOMIC_RELEASE);
+                fprintf(stderr, "[iDeck memory] iOS memory pressure %s\n",
+                        value == 2 ? "CRITICAL" : value == 1 ? "warning" : "normal");
+            });
+            dispatch_resume(src);
+        }
+    });
+    char addr[32];
+    snprintf(addr, sizeof(addr), "%llx",
+             (unsigned long long)(uintptr_t)&ideck_memory_pressure_word);
+    setenv("IDECK_MEMORY_PRESSURE_ADDR", addr, 1);
+}
+
 #include <cstdio>
 
 #if defined(IDECK_NATIVE_MADEIRA_ENABLED) && IDECK_NATIVE_MADEIRA_ENABLED
@@ -260,6 +292,7 @@ extern "C" int32_t ideck_runtime_launch(const char *executable_path,
         // folder: ~50 failed NtCreateFile walks per process (Borderlands 2).
         // iDeck ships no FEX config files; name one absolute DOS directory so
         // the lookup is a single miss. An explicit user value is kept.
+        ideck_memory_pressure_publish();
         setenv("FEX_APP_CONFIG_LOCATION", "C:\\ProgramData\\fex-emu\\", 0);
         setenv("FEX_APP_DATA_LOCATION", "C:\\ProgramData\\fex-emu\\", 0);
         if (setenv("WINEPREFIX", wine_prefix, 1) != 0 ||

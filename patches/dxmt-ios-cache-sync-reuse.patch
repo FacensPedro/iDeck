@@ -1,0 +1,658 @@
+diff --git a/src/d3d11/d3d11_device.cpp b/src/d3d11/d3d11_device.cpp
+index 3cb10ab..e59cb92 100644
+--- a/src/d3d11/d3d11_device.cpp
++++ b/src/d3d11/d3d11_device.cpp
+@@ -1407,7 +1407,10 @@ public:
+   }
+ 
+   HRESULT STDMETHODCALLTYPE SetMaximumFrameLatency(UINT MaxLatency) override {
+-    cmd_queue_.SetMaxLatency(MaxLatency);
++    /* 0 means "the default" in D3D; it used to disable the throttle. */
++    if (MaxLatency > 16)
++      return E_INVALIDARG;
++    cmd_queue_.SetMaxLatency(MaxLatency ? MaxLatency : CommandQueue::DefaultMaxLatency());
+     return S_OK;
+   }
+ 
+diff --git a/src/d3d11/d3d11_pipeline.cpp b/src/d3d11/d3d11_pipeline.cpp
+index 0341e51..a2e695a 100644
+--- a/src/d3d11/d3d11_pipeline.cpp
++++ b/src/d3d11/d3d11_pipeline.cpp
+@@ -1,3 +1,4 @@
++#include "dxmt_pipeline_archive.hpp"
+ #include "Metal.hpp"
+ #include "d3d11_private.h"
+ #include "d3d11_pipeline.hpp"
+@@ -97,7 +98,10 @@ public:
+     info.immutable_vertex_buffers = (1 << 16) | (1 << 29) | (1 << 30);
+     info.immutable_fragment_buffers = (1 << 29) | (1 << 30);
+ 
++    auto &pipeline_archive = PipelineArchive::get(device_->GetMTLDevice(), device_->GetDXMTDevice().metalVersion());
++    pipeline_archive.attach(info);
+     state_ = device_->GetMTLDevice().newRenderPipelineState(info, err);
++    if (state_ != nullptr) pipeline_archive.noteCreated();
+ 
+     if (state_ == nullptr) {
+       ERR("Failed to create PSO: ", err.description().getUTF8String());
+@@ -173,7 +177,10 @@ public:
+     info.tgsize_is_multiple_of_sgwidth = tgsize_is_multiple_of_sgwidth;
+     info.immutable_buffers = (1 << 29) | (1 << 30);
+ 
++    auto &pipeline_archive = PipelineArchive::get(device_->GetMTLDevice(), device_->GetDXMTDevice().metalVersion());
++    pipeline_archive.attach(info);
+     state_ = device_->GetMTLDevice().newComputePipelineState(info, err);
++    if (state_) pipeline_archive.noteCreated();
+ 
+     if (!state_) {
+       ERR("Failed to create compute PSO: ", err.description().getUTF8String());
+diff --git a/src/d3d11/d3d11_pipeline_cache.cpp b/src/d3d11/d3d11_pipeline_cache.cpp
+index 014ccfa..a65c1ff 100644
+--- a/src/d3d11/d3d11_pipeline_cache.cpp
++++ b/src/d3d11/d3d11_pipeline_cache.cpp
+@@ -249,9 +249,12 @@ class PipelineCache : public MTLD3D11PipelineCacheBase {
+       return {};
+     };
+     virtual void update_cached_variant(Sha1Digest &variant_digest, WMT::DispatchData data) final {
+-      auto writer = cache->scache_.getWriter();
+-      if (writer)
+-        writer->set(std::make_pair(sha1_, variant_digest), data);
++      {
++        auto writer = cache->scache_.getWriter();
++        if (writer)
++          writer->set(std::make_pair(sha1_, variant_digest), data);
++      }
++      cache->scache_.noteWritten();
+     }
+   };
+ 
+diff --git a/src/d3d11/d3d11_pipeline_gs.cpp b/src/d3d11/d3d11_pipeline_gs.cpp
+index d121e74..2fd3a59 100644
+--- a/src/d3d11/d3d11_pipeline_gs.cpp
++++ b/src/d3d11/d3d11_pipeline_gs.cpp
+@@ -1,3 +1,4 @@
++#include "dxmt_pipeline_archive.hpp"
+ #include "Metal.hpp"
+ #include "airconv_public.h"
+ #include "d3d11_device.hpp"
+@@ -130,7 +131,10 @@ public:
+         return this;
+       }
+     }
++    auto &pipeline_archive = PipelineArchive::get(device_->GetMTLDevice(), device_->GetDXMTDevice().metalVersion());
++    pipeline_archive.attach(info);
+     state_mesh_ = device_->GetMTLDevice().newRenderPipelineState(info, err);
++    if (state_mesh_ != nullptr) pipeline_archive.noteCreated();
+ 
+     if (state_mesh_ == nullptr) {
+       /* ml754: say WHICH stage needed the mesh pipeline.
+diff --git a/src/d3d9/d3d9_device.cpp b/src/d3d9/d3d9_device.cpp
+index afd8c4d..6b7c501 100644
+--- a/src/d3d9/d3d9_device.cpp
++++ b/src/d3d9/d3d9_device.cpp
+@@ -12793,7 +12793,7 @@ MTLD3D9Device::SetMaximumFrameLatency(UINT MaxLatency) {
+   D9DeviceLock lock = LockDevice();
+   if (MaxLatency > 30)
+     return D3DERR_INVALIDCALL;
+-  m_frameLatency = (MaxLatency == 0) ? 3u : MaxLatency;
++  m_frameLatency = (MaxLatency == 0) ? env::defaultMaxFrameLatency() : MaxLatency;
+   // No queue push here; the swapchain's Present re-pushes
+   // min(m_frameLatency, BackBufferCount + 1u) per frame, mirroring DXVK
+   // d3d9_swapchain.cpp GetActualFrameLatency. Pushing the raw
+diff --git a/src/d3d9/d3d9_device.hpp b/src/d3d9/d3d9_device.hpp
+index 1fdd62a..ccb0c32 100644
+--- a/src/d3d9/d3d9_device.hpp
++++ b/src/d3d9/d3d9_device.hpp
+@@ -34,6 +34,8 @@
+ #include <unordered_map>
+ #include <vector>
+ 
++#include "util_env.hpp"
++
+ namespace dxmt {
+ 
+ // Forward declarations.
+@@ -1605,7 +1607,7 @@ private:
+   // d3d9_device.cpp). Read-only round-trip; Metal
+   // doesn't expose the equivalent waitable knob, but apps that poll
+   // GetMaximumFrameLatency expect their last Set value back.
+-  UINT m_frameLatency = 3;
++  UINT m_frameLatency = env::defaultMaxFrameLatency();
+   WMT::Reference<WMT::Device> m_metalDevice;
+   // See bcTexturesSupported(). Set once in the constructor body, never again.
+   bool m_bcSupported = true;
+diff --git a/src/d3d9/d3d9_shader.cpp b/src/d3d9/d3d9_shader.cpp
+index ff97c91..33d01c9 100644
+--- a/src/d3d9/d3d9_shader.cpp
++++ b/src/d3d9/d3d9_shader.cpp
+@@ -352,8 +352,10 @@ d9_cache_store(const std::pair<Sha1Digest, Sha1Digest> &key, uint64_t native_ptr
+   if (!writer)
+     return;
+   auto data = WMT::MakeDispatchData(native_ptr, size);
+-  if (data != nullptr)
++  if (data != nullptr) {
+     writer->set(key, data);
++    d9_shader_cache().noteWritten();
++  }
+ }
+ 
+ static WMT::Reference<WMT::Function>
+diff --git a/src/dxmt/dxmt_command_queue.cpp b/src/dxmt/dxmt_command_queue.cpp
+index 210ca6a..410262e 100644
+--- a/src/dxmt/dxmt_command_queue.cpp
++++ b/src/dxmt/dxmt_command_queue.cpp
+@@ -294,13 +294,11 @@ CommandQueue::WaitCPUFenceBounded(uint64_t seq, uint64_t timeout_ns) {
+   // the PE build, so the encode / finish threads (both TIME_CRITICAL) get the
+   // core the poller would otherwise have burned. The clock is read once per
+   // yield, because reading it is the expensive part of this loop.
++  // iDeck: phase 2 parks on the fence word (RtlWaitOnAddress, woken by the
++  // finish thread's signal) instead of SwitchToThread in a loop, which kept a
++  // core busy on iOS for the whole wait while FEX needed it.
+   const auto deadline = clock::now() + std::chrono::nanoseconds(timeout_ns);
+-  do {
+-    this_thread::yield();
+-    if (cpu_coherent.signaledValue() >= seq)
+-      return true;
+-  } while (clock::now() < deadline);
+-  return cpu_coherent.signaledValue() >= seq;
++  return cpu_coherent.wait_until<clock>(seq, deadline);
+ }
+ 
+ void
+diff --git a/src/dxmt/dxmt_command_queue.hpp b/src/dxmt/dxmt_command_queue.hpp
+index 3a0a0bf..f5112f6 100644
+--- a/src/dxmt/dxmt_command_queue.hpp
++++ b/src/dxmt/dxmt_command_queue.hpp
+@@ -1,6 +1,7 @@
+ #pragma once
+ 
+ #include "Metal.hpp"
++#include "util_env.hpp"
+ #include "dxmt_allocation.hpp"
+ #include "dxmt_capture.hpp"
+ #include "dxmt_command.hpp"
+@@ -218,7 +219,11 @@ private:
+   std::array<CommandChunk, kCommandChunkCount> chunks;
+   uint64_t encoder_seq = 1;
+   uint64_t frame_count = 0;
+-  uint32_t max_latency_ = 3;
++  /* iDeck: 2 frames in flight by default on iOS instead of 3 -- each frame in
++   * flight keeps its staging blocks alive (32 MB, 8 MB on i386) and adds input
++   * latency, while the JIT pool may already count against jetsam's limit.
++   * DXMT_MAX_FRAME_LATENCY=1..16 overrides it (per game via its config). */
++  uint32_t max_latency_ = DefaultMaxLatency();
+ 
+   dxmt::thread encodeThread;
+   dxmt::thread finishThread;
+@@ -330,6 +335,8 @@ public:
+ 
+   uint32_t GetMaxLatency() { return max_latency_; }
+ 
++  static uint32_t DefaultMaxLatency() { return env::defaultMaxFrameLatency(); }
++
+   void SetMaxLatency(uint32_t value) { max_latency_ = value; };
+ 
+   // Highest frame seq whose present chunk has retired, signaled on the frame
+diff --git a/src/dxmt/dxmt_dynamic.cpp b/src/dxmt/dxmt_dynamic.cpp
+index a8e0e1d..c594058 100644
+--- a/src/dxmt/dxmt_dynamic.cpp
++++ b/src/dxmt/dxmt_dynamic.cpp
+@@ -111,7 +111,9 @@ DynamicBuffer::allocate(uint64_t coherent_seq_id, bool *out_minted_fresh) {
+      * dropping from the front while the front is GPU-complete never touches a fenced
+      * entry; O(dropped), no walk. */
+     uint64_t freed = 0, freed_n = 0;
+-    while (fifo.size() > keep && fifo.front().will_free_at <= coherent_seq_id) {
++    /* iDeck: under iOS memory pressure keep nothing the GPU is done with. */
++    const uint32_t keep_now = env::iosMemoryPressure() ? 0 : keep;
++    while (fifo.size() > keep_now && fifo.front().will_free_at <= coherent_seq_id) {
+       const QueueEntry &f = fifo.front();
+       freed += f.allocation.ptr() ? f.allocation->census_bytes_ : 0;
+       freed_n++;
+@@ -160,7 +162,9 @@ DynamicBuffer::allocate(uint64_t coherent_seq_id, bool *out_minted_fresh) {
+      *
+      * A blanket depth cap would be a use-after-free: an entry whose
+      * will_free_at still exceeds coherent_seq_id can be in GPU use right now. */
+-    enum { DYN_KEEP_ELIGIBLE = 64 };
++    /* iDeck: the 64-entry working reserve is dropped while iOS reports memory
++     * pressure; only GPU-complete entries are ever released, as before. */
++    const uint64_t DYN_KEEP_ELIGIBLE = env::iosMemoryPressure() ? 0 : 64;
+     if (en > DYN_KEEP_ELIGIBLE) {
+       uint64_t drop = en - DYN_KEEP_ELIGIBLE, freed = 0, freed_n = 0;
+       while (drop && !fifo.empty()) {
+diff --git a/src/dxmt/dxmt_pipeline_archive.cpp b/src/dxmt/dxmt_pipeline_archive.cpp
+new file mode 100644
+index 0000000..ab9c1ab
+--- /dev/null
++++ b/src/dxmt/dxmt_pipeline_archive.cpp
+@@ -0,0 +1,64 @@
++#include "dxmt_pipeline_archive.hpp"
++#include "dxmt_shader_cache.hpp"
++#include "util_env.hpp"
++#include "util_string.hpp"
++#include "log/log.hpp"
++#include <memory>
++
++namespace dxmt {
++
++PipelineArchive &
++PipelineArchive::get(WMT::Device device, WMTMetalVersion version) {
++  /* Same two-slot pattern as ShaderCache::getInstance (ml724). */
++  static dxmt::mutex mutex;
++  static std::unique_ptr<PipelineArchive> archive_310;
++  static std::unique_ptr<PipelineArchive> archive_320;
++
++  std::lock_guard<dxmt::mutex> lock(mutex);
++  std::unique_ptr<PipelineArchive> &slot = (version == WMTMetal310) ? archive_310 : archive_320;
++  if (!slot)
++    slot = std::make_unique<PipelineArchive>(device, version);
++  return *slot;
++}
++
++PipelineArchive::PipelineArchive(WMT::Device device, WMTMetalVersion version) {
++  if (env::getEnvVar("DXMT_PIPELINE_ARCHIVE") != "1" || env::getEnvVar("DXMT_SHADER_CACHE") == "0")
++    return;
++  /* Relative paths are resolved to the shader cache directory by winemetal's
++   * unix side, exactly like shaders_*.db. The cache format version is part of
++   * the name, so a format change starts a new archive. */
++  path_ = GetDXMTShaderCacheDirectory() +
++          str::format("pipelines_", (unsigned int)version, "_v", kDXMTShaderCacheVersion, ".metalar");
++  WMT::Error err;
++  archive_ = device.newBinaryArchive(path_.c_str(), err);
++  if (!archive_ || err) {
++    WARN("PipelineArchive: cannot open ", path_, " -- starting an empty archive");
++    WMT::Error err2;
++    archive_ = device.newBinaryArchive(nullptr, err2);
++    if (!archive_ || err2) {
++      archive_ = WMT::Reference<WMT::BinaryArchive>();
++      ERR("PipelineArchive: Metal refused an empty archive; pipeline archive off");
++      return;
++    }
++  }
++  handle_ = archive_.handle;
++  WARN("PipelineArchive: on (", path_, ")");
++}
++
++void
++PipelineArchive::noteCreated() {
++  if (!archive_)
++    return;
++  if (since_serialize_.fetch_add(1, std::memory_order_relaxed) + 1 < kSerializeEvery)
++    return;
++  std::unique_lock<dxmt::mutex> lock(serialize_mutex_, std::try_to_lock);
++  if (!lock.owns_lock())
++    return;
++  since_serialize_.store(0, std::memory_order_relaxed);
++  WMT::Error err;
++  archive_.serialize(path_.c_str(), err);
++  if (err)
++    WARN("PipelineArchive: serialize failed: ", err.description().getUTF8String());
++}
++
++} // namespace dxmt
+diff --git a/src/dxmt/dxmt_pipeline_archive.hpp b/src/dxmt/dxmt_pipeline_archive.hpp
+new file mode 100644
+index 0000000..38e6ff6
+--- /dev/null
++++ b/src/dxmt/dxmt_pipeline_archive.hpp
+@@ -0,0 +1,53 @@
++#pragma once
++
++#include "Metal.hpp"
++#include "thread.hpp"
++#include <atomic>
++#include <string>
++
++namespace dxmt {
++
++/* iDeck: a Metal binary archive of compiled pipeline states, so the AIR->GPU
++ * compile of a pipeline seen in an earlier session is skipped (the DXBC->AIR
++ * step is already cached in shaders_*.db). Opt-in: DXMT_PIPELINE_ARCHIVE=1.
++ *
++ * Costs on a miss: winemetal adds the pipeline to the archive right after
++ * creating it, which compiles it a second time -- so a first session with the
++ * archive on stutters MORE, and only later sessions gain. The archive is
++ * written every kSerializeEvery additions (and is lost if the app is killed
++ * before that). A file Metal cannot open is deleted and started over. */
++class PipelineArchive {
++public:
++  static PipelineArchive &get(WMT::Device device, WMTMetalVersion version);
++
++  /* Fill the lookup / serialization fields of a pipeline descriptor. */
++  template <typename Info>
++  void
++  attach(Info &info) {
++    if (!archive_)
++      return;
++    info.binary_archives_for_lookup.set(&handle_);
++    info.num_binary_archives_for_lookup = 1;
++    info.binary_archive_for_serialization = handle_;
++    info.fail_on_binary_archive_miss = false;
++  }
++
++  /* After a successful pipeline creation with attach(). */
++  void noteCreated();
++
++  bool enabled() const { return archive_ != nullptr; }
++
++  PipelineArchive(WMT::Device device, WMTMetalVersion version);
++  PipelineArchive(const PipelineArchive &) = delete;
++
++private:
++  static constexpr uint32_t kSerializeEvery = 32;
++
++  WMT::Reference<WMT::BinaryArchive> archive_;
++  obj_handle_t handle_ = 0;
++  std::string path_;
++  std::atomic<uint32_t> since_serialize_{0};
++  dxmt::mutex serialize_mutex_;
++};
++
++} // namespace dxmt
+diff --git a/src/dxmt/dxmt_shader_cache.cpp b/src/dxmt/dxmt_shader_cache.cpp
+index 5387c62..7bc516c 100644
+--- a/src/dxmt/dxmt_shader_cache.cpp
++++ b/src/dxmt/dxmt_shader_cache.cpp
+@@ -65,6 +65,8 @@ ShaderCache::ShaderCache(WMTMetalVersion metal_version) {
+                       env::getEnvVar("DXMT_PRECISE_MINMAX") == "0" ? "_fastminmax" : "", ".db");
+   scache_writer_ = WMT::CacheWriter::alloc_init(path.c_str(), kDXMTShaderCacheVersion);
+   scache_reader_ = WMT::CacheReader::alloc_init(path.c_str(), kDXMTShaderCacheVersion);
++  cache_path_ = path;
++  cache_version_ = kDXMTShaderCacheVersion;
+ }
+ 
+ } // namespace dxmt
+\ No newline at end of file
+diff --git a/src/dxmt/dxmt_shader_cache.hpp b/src/dxmt/dxmt_shader_cache.hpp
+index 21192b7..758febb 100644
+--- a/src/dxmt/dxmt_shader_cache.hpp
++++ b/src/dxmt/dxmt_shader_cache.hpp
+@@ -1,4 +1,7 @@
+ #pragma once
++
++#include <atomic>
++#include <string>
+ #include "Metal.hpp"
+ #include "thread.hpp"
+ #include <string>
+@@ -54,11 +57,26 @@ public:
+ 
+   LockProtected<WMT::CacheReader>
+   getReader() {
++    /* iDeck: the reader is opened read-only when the device is created. On a
++     * game's first run the database (or its table) does not exist yet, the
++     * open fails and the session never read anything back, although the
++     * writer filled the file meanwhile. Retry once after each write. */
++    if (!scache_reader_ && reader_retry_.exchange(false, std::memory_order_acq_rel)) {
++      std::lock_guard<dxmt::mutex> lock(scache_reader_mutex_);
++      if (!scache_reader_ && !cache_path_.empty())
++        scache_reader_ = WMT::CacheReader::alloc_init(cache_path_.c_str(), cache_version_);
++    }
+     if (!scache_reader_)
+       return {};
+     return {scache_reader_mutex_, scache_reader_};
+   }
+ 
++  void
++  noteWritten() {
++    if (!scache_reader_)
++      reader_retry_.store(true, std::memory_order_release);
++  }
++
+   ShaderCache(WMTMetalVersion metal_version);
+   ShaderCache(const ShaderCache &copy) = delete;
+ 
+@@ -68,6 +86,10 @@ private:
+ 
+   WMT::Reference<WMT::CacheReader> scache_reader_;
+   dxmt::mutex scache_reader_mutex_;
++
++  std::string cache_path_;
++  uint64_t cache_version_ = 0;
++  std::atomic<bool> reader_retry_{false};
+ };
+ 
+ } // namespace dxmt
+\ No newline at end of file
+diff --git a/src/dxmt/meson.build b/src/dxmt/meson.build
+index 6e32aa5..8205bf3 100644
+--- a/src/dxmt/meson.build
++++ b/src/dxmt/meson.build
+@@ -19,6 +19,7 @@ dxmt_src = [
+   'dxmt_mem_census.cpp',
+   'dxmt_bcn.cpp',
+   'dxmt_shader_cache.cpp',
++  'dxmt_pipeline_archive.cpp',
+ ]
+ 
+ dxmt_shaders = [
+diff --git a/src/util/util_cpu_fence.hpp b/src/util/util_cpu_fence.hpp
+index 267a3d4..604402d 100644
+--- a/src/util/util_cpu_fence.hpp
++++ b/src/util/util_cpu_fence.hpp
+@@ -1,5 +1,7 @@
+ #pragma once
+ #include "util_futex.hpp"
++#include <chrono>
++#include <thread>
+ #include <atomic>
+ #include <cstdint>
+ 
+@@ -32,6 +34,26 @@ public:
+     dxmt::atomic_notify_all(value_);
+   }
+ 
++  /* iDeck: wait until \c value is signaled or \c timeout_ns passes, parked in
++   * the kernel (RtlWaitOnAddress) rather than yielding in a loop. Returns
++   * whether the value was reached. */
++  template <typename Clock>
++  bool wait_until(uint64_t value, typename Clock::time_point deadline) {
++    for (;;) {
++      uint64_t current = value_.load(std::memory_order_acquire);
++      if (current >= value)
++        return true;
++      auto now = Clock::now();
++      if (now >= deadline)
++        return false;
++      uint64_t left = (uint64_t)std::chrono::duration_cast<std::chrono::nanoseconds>(deadline - now).count();
++      if (futex::backend() == WaitBackend::AddressWait)
++        futex::address_wait_for(&value_, &current, sizeof(current), left);
++      else
++        std::this_thread::yield();
++    }
++  }
++
+   uint64_t signaledValue() {
+     return value_.load(std::memory_order_acquire);
+   }
+diff --git a/src/util/util_env.hpp b/src/util/util_env.hpp
+index aabe7b4..d026677 100644
+--- a/src/util/util_env.hpp
++++ b/src/util/util_env.hpp
+@@ -12,6 +12,10 @@
+ 
+ #include <string>
+ 
++#include <cstdint>
++
++#include <cstdlib>
++
+ namespace dxmt::env {
+ 
+ #ifdef _WIN32
+@@ -86,4 +90,35 @@ bool createDirectory(const std::string &path);
+ 
+ std::string getUnixPath(const std::string &path);
+ 
++/* iDeck: frames the CPU may run ahead of the GPU when the game does not choose
++ * (or passes 0 to SetMaximumFrameLatency). 2 on iOS: each frame in flight keeps
++ * its staging memory alive and adds input latency. DXMT_MAX_FRAME_LATENCY=1..16
++ * overrides it. */
++inline uint32_t
++defaultMaxFrameLatency() {
++  static const uint32_t value = [] {
++    const std::string v = getEnvVar("DXMT_MAX_FRAME_LATENCY");
++    long n = v.empty() ? 2 : std::strtol(v.c_str(), nullptr, 10);
++    return (uint32_t)(n >= 1 && n <= 16 ? n : 2);
++  }();
++  return value;
++}
++
++/* iDeck: the app publishes iOS memory pressure (0 normal, 1 warning,
++ * 2 critical) in a word of its own memory and passes its address in
++ * IDECK_MEMORY_PRESSURE_ADDR. A 64-bit (ARM64EC) DXMT shares that address
++ * space and can read it directly; a 32-bit build cannot reach it and always
++ * sees 0. */
++inline uint32_t
++iosMemoryPressure() {
++  static const volatile uint32_t *word = []() -> const volatile uint32_t * {
++    if (sizeof(void *) < 8)
++      return nullptr;
++    const std::string v = getEnvVar("IDECK_MEMORY_PRESSURE_ADDR");
++    unsigned long long a = v.empty() ? 0 : std::strtoull(v.c_str(), nullptr, 16);
++    return a ? (const volatile uint32_t *)(uintptr_t)a : nullptr;
++  }();
++  return word ? *word : 0;
++}
++
+ } // namespace dxmt::env
+diff --git a/src/util/util_futex.cpp b/src/util/util_futex.cpp
+index ea8858f..e217205 100644
+--- a/src/util/util_futex.cpp
++++ b/src/util/util_futex.cpp
+@@ -92,6 +92,13 @@ address_wait(const void *addr, const void *compare, size_t size) {
+   RtlWaitOnAddress(addr, compare, (SIZE_T)size, nullptr);
+ }
+ 
++void
++address_wait_for(const void *addr, const void *compare, size_t size, uint64_t timeout_ns) {
++  LARGE_INTEGER timeout;
++  timeout.QuadPart = -(LONGLONG)((timeout_ns + 99) / 100);   /* relative, 100 ns units */
++  RtlWaitOnAddress(addr, compare, (SIZE_T)size, &timeout);
++}
++
+ void
+ address_wake_one(const void *addr) {
+   RtlWakeAddressSingle(addr);
+@@ -112,6 +119,8 @@ address_wake_all(const void *addr) {
+ void
+ address_wait(const void *, const void *, size_t) {}
+ void
++address_wait_for(const void *, const void *, size_t, uint64_t) {}
++void
+ address_wake_one(const void *) {}
+ void
+ address_wake_all(const void *) {}
+diff --git a/src/util/util_futex.hpp b/src/util/util_futex.hpp
+index 5df1a3b..8e4659b 100644
+--- a/src/util/util_futex.hpp
++++ b/src/util/util_futex.hpp
+@@ -133,6 +133,14 @@ WaitBackend backend();
+  */
+ void address_wait(const void *addr, const void *compare, size_t size);
+ 
++/**
++ * \brief address_wait with a deadline: parks for at most \c timeout_ns.
++ *
++ * iDeck: lets a bounded poller sleep in the kernel instead of yielding in a
++ * loop. May return early or spuriously; the caller re-checks.
++ */
++void address_wait_for(const void *addr, const void *compare, size_t size, uint64_t timeout_ns);
++
+ void address_wake_one(const void *addr);
+ void address_wake_all(const void *addr);
+ 
+diff --git a/src/winemetal/unix/cache.c b/src/winemetal/unix/cache.c
+index 02fc844..b5c0ffc 100644
+--- a/src/winemetal/unix/cache.c
++++ b/src/winemetal/unix/cache.c
+@@ -1,3 +1,5 @@
++#include <stdlib.h>
++#include <sys/stat.h>
+ #import <Foundation/Foundation.h>
+ #include <TargetConditionals.h>
+ #include "sqlite3.h"
+@@ -92,6 +94,14 @@ resolve_cache_dir(NSString *path, bool path_is_file) {
+   return path;
+ }
+ 
++/* iDeck: the binary-archive calls in winemetal_unix.c resolve a relative path
++ * the way the shader cache does (DXMT's pipeline archive lives next to
++ * shaders_*.db). */
++NSString *
++wmt_resolve_cache_file(NSString *path) {
++  return resolve_cache_dir(path, true);
++}
++
+ @implementation CacheReader
+ 
+ - (instancetype)initWithPath:(NSString *)path version:(uint64_t)version {
+@@ -177,6 +187,24 @@ resolve_cache_dir(NSString *path, bool path_is_file) {
+     }
+     flock(fd, LOCK_EX);
+ 
++    /* iDeck: the cache had no bound. Old shaders of earlier game versions (and
++     * of earlier cache formats, whose tables stay in the file) piled up for
++     * ever. Past DXMT_SHADER_CACHE_MAX_MB (default 256, 0 = no limit) the file
++     * is started over, under the writer lock, before anything opens it. */
++    {
++      const char *cap_env = getenv("DXMT_SHADER_CACHE_MAX_MB");
++      long long cap_mb = cap_env && *cap_env ? atoll(cap_env) : 256;
++      struct stat st;
++      if (cap_mb > 0 && stat([dbPath fileSystemRepresentation], &st) == 0 &&
++          (long long)st.st_size > (cap_mb << 20)) {
++        NSLog(@"[CacheWriter] %@ is %lld MB, over the %lld MB limit: starting it over",
++              dbPath, (long long)st.st_size >> 20, cap_mb);
++        unlink([dbPath fileSystemRepresentation]);
++        unlink([[dbPath stringByAppendingString:@"-wal"] fileSystemRepresentation]);
++        unlink([[dbPath stringByAppendingString:@"-shm"] fileSystemRepresentation]);
++      }
++    }
++
+     if (sqlite3_open_v2(
+             [dbPath fileSystemRepresentation], &_db, //
+             SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_NOMUTEX, NULL
+diff --git a/src/winemetal/unix/winemetal_unix.c b/src/winemetal/unix/winemetal_unix.c
+index 3f7974e..323f299 100644
+--- a/src/winemetal/unix/winemetal_unix.c
++++ b/src/winemetal/unix/winemetal_unix.c
+@@ -5519,14 +5519,26 @@ _WMTGetOSVersion(void *obj) {
+   return STATUS_SUCCESS;
+ }
+ 
++extern NSString *wmt_resolve_cache_file(NSString *path);
++
++static NSString *
++binary_archive_path(const char *raw) {
++  NSString *path = [[NSString alloc] initWithCString:raw encoding:NSUTF8StringEncoding];
++  if (path && ![path hasPrefix:@"/"]) {
++    NSString *resolved = wmt_resolve_cache_file(path);
++    [path release];
++    return resolved ? [resolved retain] : nil;
++  }
++  return path;
++}
++
+ static NTSTATUS
+ _MTLDevice_newBinaryArchive(void *obj) {
+   struct unixcall_mtldevice_newbinaryarchive *params = obj;
+   NSString *path_str = NULL;
+   NSURL *url = NULL;
+   MTLBinaryArchiveDescriptor *desc = [[MTLBinaryArchiveDescriptor alloc] init];
+-  if (params->url.ptr != NULL) {
+-    path_str = [[NSString alloc] initWithCString:params->url.ptr encoding:NSUTF8StringEncoding];
++  if (params->url.ptr != NULL && (path_str = binary_archive_path(params->url.ptr)) != NULL) {
+     url = [[NSURL alloc] initFileURLWithPath:path_str];
+     desc.url = url;
+   }
+@@ -5544,7 +5556,11 @@ _MTLDevice_newBinaryArchive(void *obj) {
+ static NTSTATUS
+ _MTLBinaryArchive_serialize(void *obj) {
+   struct unixcall_mtlbinaryarchive_serialize *params = obj;
+-  NSString *path_str = [[NSString alloc] initWithCString:params->url.ptr encoding:NSUTF8StringEncoding];
++  NSString *path_str = binary_archive_path(params->url.ptr);
++  if (!path_str) {
++    params->ret_error = 0;
++    return STATUS_SUCCESS;
++  }
+   NSURL *url = [[NSURL alloc] initFileURLWithPath:path_str];
+   NSError *err = NULL;
+   [(id<MTLBinaryArchive>)params->archive serializeToURL:url error:&err];

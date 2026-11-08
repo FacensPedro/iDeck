@@ -100,6 +100,15 @@ if ! grep -Fq 'reinterpret_cast<threadgroup atomic_int *>(out_count), 1, memory_
   git -C "$DEST/dxmt" apply "$DXMT_PATCH"
 fi
 
+# iOS shader cache, CPU/GPU sync and resource reuse: reader reopened after the
+# first write, kernel wait instead of yield loops, memory-pressure trims,
+# 2 frames in flight by default, bounded shader DB, opt-in pipeline archive.
+DXMT_IOS_PATCH="$ROOT/patches/dxmt-ios-cache-sync-reuse.patch"
+if ! git -C "$DEST/dxmt" apply --reverse --check "$DXMT_IOS_PATCH" >/dev/null 2>&1; then
+  git -C "$DEST/dxmt" apply --check "$DXMT_IOS_PATCH"
+  git -C "$DEST/dxmt" apply "$DXMT_IOS_PATCH"
+fi
+
 # Backport only the upstream fixes verified against the pinned Madeira base:
 # - ARM64 shared-object alignment in wineserver (#377)
 # - iPad Documents/vcruntime directory precedence for VC++ DLLs
