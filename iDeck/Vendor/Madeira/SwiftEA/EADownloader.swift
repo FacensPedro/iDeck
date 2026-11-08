@@ -106,7 +106,7 @@ final class EARangeClient: @unchecked Sendable {
             let task = http.dataTask(with: request)
             task.delegate = delegate
             flow.task = task
-            continuation.onTermination = { _ in task.cancel() }
+            continuation.onTermination = { _ in flow.finish(); task.cancel() }
             task.resume()
         }
         return EARangeStream(inner: inner, flow: flow)
@@ -209,28 +209,45 @@ struct EARangeStream: AsyncSequence {
     static let highWater = 8 << 20
     static let lowWater = 2 << 20
 
+    /// Past this the delivering thread itself waits: suspend() alone did not stop
+    /// data already in flight (HTTP/2 windows), and memory still reached 5.9 GB.
+    static let hardLimit = 24 << 20
+
     final class Flow: @unchecked Sendable {
-        private let lock = NSLock()
+        private let condition = NSCondition()
         private var waiting = 0
         private var suspended = false
+        private var finished = false
         weak var task: URLSessionDataTask?
 
         func received(_ count: Int) {
-            lock.lock(); defer { lock.unlock() }
+            condition.lock(); defer { condition.unlock() }
             waiting += count
             if !suspended && waiting > EARangeStream.highWater {
                 suspended = true
                 task?.suspend()
             }
+            // True back-pressure: hold URLSession's delegate thread until the consumer
+            // has taken most of it (or the stream ended), at most 30 s.
+            let deadline = Date().addingTimeInterval(30)
+            while waiting > EARangeStream.hardLimit && !finished {
+                if !condition.wait(until: deadline) { break }
+            }
         }
 
         func consumed(_ count: Int) {
-            lock.lock(); defer { lock.unlock() }
+            condition.lock(); defer { condition.unlock() }
             waiting = Swift.max(0, waiting - count)
             if suspended && waiting < EARangeStream.lowWater {
                 suspended = false
                 task?.resume()
             }
+            condition.broadcast()
+        }
+
+        /// The stream ended or was cancelled: release a waiting delivery.
+        func finish() {
+            condition.lock(); finished = true; condition.broadcast(); condition.unlock()
         }
     }
 
@@ -276,7 +293,9 @@ private final class EAInflater {
             out = data
         }
         if !out.isEmpty {
-            handle.write(out)
+            // Each slab's bridged NSData is released at once, not when the task's
+            // pool drains.
+            try autoreleasepool { try handle.write(contentsOf: out) }
             crc.update(out); written += Int64(out.count)
         }
     }
