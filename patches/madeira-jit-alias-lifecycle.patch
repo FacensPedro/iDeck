@@ -1,0 +1,82 @@
+diff --git a/build/ntdll-unix/server_ios.c b/build/ntdll-unix/server_ios.c
+index c1a2038..be80d1a 100644
+--- a/build/ntdll-unix/server_ios.c
++++ b/build/ntdll-unix/server_ios.c
+@@ -5965,15 +5965,17 @@ void server_init_process_done(void)
+             uint64_t watchdog_teb_addr = (uint64_t)(uintptr_t)NtCurrentTeb();
+ 
+             void (^sample_thread)(int secs) = ^(int secs) {
+-                int kill_ret = pthread_kill(wine_pthread, 0);
+-                wine_log_write("[Wine WATCHDOG %ds] thread alive=%d (0=yes)", secs, kill_ret);
+-
+-                /* Suspend thread for consistent state reading */
++                /* iDeck: ask the Mach thread first.  pthread_kill() on a pthread
++                 * that already exited reads freed memory (undefined behaviour;
++                 * the 2s sample of a short-lived child thread hit exactly that:
++                 * "thread_suspend failed: 268435459" = MACH_SEND_INVALID_DEST).
++                 * A thread that is gone is simply done: nothing to sample. */
+                 kern_return_t skr = thread_suspend(wine_mach_thread);
+                 if (skr != KERN_SUCCESS) {
+-                    wine_log_write("[Wine WATCHDOG %ds] thread_suspend failed: %d", secs, skr);
++                    wine_log_write("[Wine WATCHDOG %ds] thread already exited (kr=%d): no sample", secs, skr);
+                     return;
+                 }
++                wine_log_write("[Wine WATCHDOG %ds] thread alive=0 (0=yes)", secs);
+ 
+                 arm_thread_state64_t state;
+                 mach_msg_type_number_t state_count = ARM_THREAD_STATE64_COUNT;
+diff --git a/build/ntdll-unix/virtual_ios.c b/build/ntdll-unix/virtual_ios.c
+index def1962..7e23bd2 100644
+--- a/build/ntdll-unix/virtual_ios.c
++++ b/build/ntdll-unix/virtual_ios.c
+@@ -14369,6 +14369,42 @@ static void ios_vh_dump( const void *addr )
+  *
+  * Deletes a view. virtual_mutex must be held by caller.
+  */
++/***********************************************************************
++ *           ios_jit_purge_image_aliases
++ *
++ * iDeck: an unloaded DLL takes its anon-JIT aliases with it.  The ml632
++ * classifier can register an anonymous RWX alias over the tail of an image
++ * (Borderlands 2: shcore, sechost, imm32, libmono, msacm32, dnsapi, each a
++ * 16KB host page shared with the image's last 4KB pages).  Without this the
++ * alias outlived the image: the next DLL mapped at that address had its pages
++ * claimed by a stale alias that iat-sync and the store emulator both honour.
++ * Same tombstone order as ios_jit_purge_window.
++ */
++static void ios_jit_purge_image_aliases( void *base, size_t size )
++{
++    uintptr_t lo = (uintptr_t)base, hi = lo + size;
++    int i, purged = 0;
++
++    if (!size) return;
++    pthread_mutex_lock( &ios_pool_lock );
++    for (i = 0; i < ios_jit_anon_alias_count; i++)
++    {
++        uintptr_t uv = ios_jit_anon_aliases[i].user_va;
++
++        if (!uv || uv >= hi || ios_jit_anon_aliases[i].user_va_end <= lo) continue;
++        if (purged < 8)
++            dprintf( 2, "[mixed-map] anon RWX alias %p..%p retired with its image %p+0x%lx\n",
++                     (void *)uv, (void *)ios_jit_anon_aliases[i].user_va_end, base,
++                     (unsigned long)size );
++        ios_jit_anon_aliases[i].user_va_end = 0;
++        __sync_synchronize();
++        ios_mono_alias_retire( uv );
++        ios_jit_anon_aliases[i].user_va = 0;
++        purged++;
++    }
++    pthread_mutex_unlock( &ios_pool_lock );
++}
++
+ static void delete_view( struct file_view *view ) /* [in] View */
+ {
+     ios_vh_note( 'd', view );   /* madeira-bcd: view history */
+@@ -14378,6 +14414,7 @@ static void delete_view( struct file_view *view ) /* [in] View */
+     if ((view->protect & SEC_IMAGE) && ios_jit_image_retire_enabled())
+         ios_jit_retire_image( view->base, view->size );
+     if (view->protect & SEC_IMAGE) ios_jit_note_image_unmapped( view->base, view->size );
++    if (view->protect & SEC_IMAGE) ios_jit_purge_image_aliases( view->base, view->size );
+     ios_swap_release_range( view->base, view->size, 0 );   /* ml1077 */
+     if (!(view->protect & VPROT_SYSTEM)) unmap_area( view->base, view->size );
+     if (ios_retire_trace_armed) ios_retire_mark( "D1u\n" );   /* unmap_area done */

@@ -15,9 +15,9 @@ class CupheadBendyFixesTests(unittest.TestCase):
 
 
 class DefaultPoolTests(unittest.TestCase):
-    def test_pool_without_a_setting_is_624(self):
+    def test_pool_without_a_setting_is_560(self):
         pool = repo_text("iDeck/MadeiraJIT/MadeiraWinePool.swift")
-        self.assertIn("return (256...1152).contains(chosen) ? chosen : 624", pool)
+        self.assertIn("return (256...1152).contains(chosen) ? chosen : 560", pool)
 
 
 if __name__ == "__main__":

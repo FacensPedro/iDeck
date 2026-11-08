@@ -19,11 +19,13 @@ enum MadeiraWinePool {
            let mb = Int(txt.trimmingCharacters(in: .whitespacesAndNewlines)), (256...1152).contains(mb) {
             return mb
         }
-        // Without a choice in Settings: 624 MB, what these devices actually fit
+        // Without a choice in Settings: 560 MB, the largest run these devices
+        // actually fit beside the main thread's stack (624 was shrunk to 560 by
+        // ml1036 on every launch)
         // (896 was always shrunk, here to as little as 336 MB, after the start
         // had already planned for it).
         let chosen = UserDefaults.standard.integer(forKey: "wineJITPoolMiB")
-        return (256...1152).contains(chosen) ? chosen : 624
+        return (256...1152).contains(chosen) ? chosen : 560
     }
 
     /// Runs on a background queue (allocatePool suspends the process for the

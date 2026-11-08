@@ -201,6 +201,25 @@ if ! git -C "$DEST" apply --reverse --check "$OPENGL_WOW_TEB_PATCH" >/dev/null 2
   git -C "$DEST" apply "$OPENGL_WOW_TEB_PATCH"
 fi
 
+# Pure ARM64 callers of LdrGetProcedureAddress and delay-load importers get
+# ARM64EC native targets too, not x86_64 export thunks.
+GETPROC_PATCH="$ROOT/patches/madeira-arm64-getprocaddress-native.patch"
+if ! git -C "$DEST" apply --reverse --check "$GETPROC_PATCH" >/dev/null 2>&1; then
+  git -C "$DEST" apply --check "$GETPROC_PATCH"
+  git -C "$DEST" apply "$GETPROC_PATCH"
+fi
+
+# An unloaded image retires the anon JIT aliases over its pages; the session
+# watchdog never touches a thread that already exited.
+ALIAS_LIFECYCLE_PATCH="$ROOT/patches/madeira-jit-alias-lifecycle.patch"
+if ! git -C "$DEST" apply --reverse --check "$ALIAS_LIFECYCLE_PATCH" >/dev/null 2>&1; then
+  git -C "$DEST" apply --check "$ALIAS_LIFECYCLE_PATCH"
+  git -C "$DEST" apply "$ALIAS_LIFECYCLE_PATCH"
+fi
+
+# opengl32's wow64 thunks: every 32-bit guest pointer gets the iOS window base.
+python3 "$ROOT/scripts/apply_madeira_opengl32_wow_ptrs.py" "$DEST"
+
 # The stock Wine worker reports g_wine_running=0 before joining wineserver,
 # and wineserver_start never clears the prior session's stop flag.
 # Both make game B fail after game A ends in the same iDeck process.
