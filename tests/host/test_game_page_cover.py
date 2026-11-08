@@ -23,5 +23,13 @@ class GamePageCoverTests(unittest.TestCase):
         self.assertIn("coordinator.launchWindowsExecutable(at: executableURL, profile: profile)", VIEW)
 
 
+class StoreDetailsLaunchTests(unittest.TestCase):
+    def test_store_details_show_launch_when_installed(self):
+        actions = VIEW.split("@ViewBuilder private var actions: some View {", 1)[1].split("/// GOG game page.", 1)[0]
+        installed = actions.split("} else if installed {", 1)[1].split("} else if canInstall {", 1)[0]
+        self.assertIn("onLaunch()", installed)
+        self.assertIn('Label(tr("Launch"), systemImage: "play.fill")', installed)
+
+
 if __name__ == "__main__":
     unittest.main()

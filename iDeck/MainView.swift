@@ -2041,6 +2041,16 @@ private struct StoreGameDetailsView<Extra: View>: View {
                 .buttonStyle(.bordered)
             }
         } else if installed {
+            // Starts the game; without JIT, StikDebug opens first.
+            Button {
+                dismiss()
+                onLaunch()
+            } label: {
+                Label(tr("Launch"), systemImage: "play.fill")
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+            }
+            .buttonStyle(.borderedProminent)
             if onUninstall != nil {
                 Button(role: .destructive) { confirmUninstall = true } label: {
                     Label(tr("Uninstall"), systemImage: "trash")
