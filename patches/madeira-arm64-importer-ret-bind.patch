@@ -1,0 +1,22 @@
+diff --git a/wine/dlls/ntdll/signal_arm64ec.c b/wine/dlls/ntdll/signal_arm64ec.c
+index c4c8c52421..4fa2784f7a 100644
+--- a/wine/dlls/ntdll/signal_arm64ec.c
++++ b/wine/dlls/ntdll/signal_arm64ec.c
+@@ -551,6 +551,17 @@ void *arm64ec_redirect_ptr( HMODULE module, void *ptr, const IMAGE_ARM64EC_METAD
+                     return xlate_ios_jit( arm64ec_syscalls[id] );
+             }
+         }
++        /* (d) iDeck: an x86_64 export that is a lone `ret`. ARM64EC ntdll's
++         * __chkstk is exactly that (0xc3), with no redirection entry; mingw's
++         * aarch64 xtajit.dll imports it, called the x86 byte natively and died
++         * with 0xC000001D (Dragon Age: Inquisition's ActivationUI.exe, 1.6.0:
++         * pc = the export, x16 = pc, bytes c3 00 00 00). A native `ret` does
++         * exactly the same, so hand out __chkstk_arm64ec. */
++        if (bytes[0] == 0xc3)
++        {
++            extern void __chkstk_arm64ec(void);
++            return xlate_ios_jit( (void *)__chkstk_arm64ec );
++        }
+         /* (b) fast-forward sequence */
+         if (bytes[0] == 0x48 && bytes[1] == 0x8b && bytes[2] == 0xc4 &&
+             bytes[3] == 0x48 && bytes[4] == 0x89 && bytes[5] == 0x58 &&

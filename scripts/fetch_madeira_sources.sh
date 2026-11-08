@@ -210,6 +210,14 @@ if ! git -C "$DEST" apply --reverse --check "$OPENGL_WOW_TEB_PATCH" >/dev/null 2
   git -C "$DEST" apply "$OPENGL_WOW_TEB_PATCH"
 fi
 
+# x86_64 exports that are a lone `ret` (ARM64EC ntdll's __chkstk) resolve to a
+# native `ret` for pure ARM64 importers (mingw's xtajit.dll imports __chkstk).
+RET_BIND_PATCH="$ROOT/patches/madeira-arm64-importer-ret-bind.patch"
+if ! git -C "$DEST" apply --reverse --check "$RET_BIND_PATCH" >/dev/null 2>&1; then
+  git -C "$DEST" apply --check "$RET_BIND_PATCH"
+  git -C "$DEST" apply "$RET_BIND_PATCH"
+fi
+
 # Pure ARM64 callers of LdrGetProcedureAddress and delay-load importers get
 # ARM64EC native targets too, not x86_64 export thunks.
 GETPROC_PATCH="$ROOT/patches/madeira-arm64-getprocaddress-native.patch"
