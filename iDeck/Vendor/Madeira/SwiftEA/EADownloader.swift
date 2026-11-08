@@ -671,7 +671,7 @@ final class EADownloader: @unchecked Sendable {
         final class Added: @unchecked Sendable { var bytes: UInt64 = 0 }
         let added = Added()
         do {
-            let ranges = stride(from: Int64(0), to: total, by: segmentBytes).map { $0..<min($0 + segmentBytes, total) }
+            let ranges = stride(from: Int64(0), to: total, by: Int(segmentBytes)).map { $0..<min($0 + segmentBytes, total) }
             try await withThrowingTaskGroup(of: Void.self) { group in
                 var next = 0
                 func add() {
