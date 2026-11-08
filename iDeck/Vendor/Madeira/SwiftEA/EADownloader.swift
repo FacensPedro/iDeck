@@ -84,7 +84,7 @@ final class EARangeClient: @unchecked Sendable {
     func bytes(_ url: URL, range: Range<Int64>) async throws -> Data {
         var request = URLRequest(url: url)
         request.setValue("bytes=\(range.lowerBound)-\(range.upperBound - 1)", forHTTPHeaderField: "Range")
-        let (data, response) = try await http.data(for: request)
+        let (data, response) = try await http.data(for: request, delegate: LowPriority.shared)
         guard let http = response as? HTTPURLResponse, http.statusCode == 206 || http.statusCode == 200 else {
             throw EADownloadError.file("HTTP \((response as? HTTPURLResponse)?.statusCode ?? 0)")
         }
@@ -104,12 +104,22 @@ final class EARangeClient: @unchecked Sendable {
         let inner = AsyncThrowingStream<Data, Error> { continuation in
             let delegate = StreamDelegate(continuation: continuation, flow: flow)
             let task = http.dataTask(with: request)
+            // Bulk data: covers and the rest of the app go first.
+            task.priority = URLSessionTask.lowPriority
             task.delegate = delegate
             flow.task = task
             continuation.onTermination = { _ in flow.finish(); task.cancel() }
             task.resume()
         }
         return EARangeStream(inner: inner, flow: flow)
+    }
+
+    /// Bulk ranges yield to covers and the rest of the app.
+    private final class LowPriority: NSObject, URLSessionTaskDelegate {
+        static let shared = LowPriority()
+        func urlSession(_ session: URLSession, didCreateTask task: URLSessionTask) {
+            task.priority = URLSessionTask.lowPriority
+        }
     }
 
     private final class StreamDelegate: NSObject, URLSessionDataDelegate {

@@ -142,6 +142,7 @@
 		BEEF20261107000000000410 /* EALicense.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEEF20261107000000000420 /* EALicense.swift */; };
 		BEEF20261107000000000310 /* EAFormats.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEEF20261107000000000320 /* EAFormats.swift */; };
 		BEEF20261107000000000210 /* EADownloader.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEEF20261107000000000220 /* EADownloader.swift */; };
+		C0FFEE20261108000000010 /* ArtworkLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE20261108000000020 /* ArtworkLoader.swift */; };
 		C0FFEE202611070000000100 /* GalaxyListener.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE202611070000000200 /* GalaxyListener.swift */; };
 		C0FFEE202611070000000110 /* GalaxyService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE202611070000000210 /* GalaxyService.swift */; };
 		C0FFEE202611070000000120 /* GalaxySupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE202611070000000220 /* GalaxySupport.swift */; };
@@ -280,6 +281,7 @@
 		BEEF20261107000000000420 /* EALicense.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Vendor/Madeira/SwiftEA/EALicense.swift"; sourceTree = "<group>"; };
 		BEEF20261107000000000320 /* EAFormats.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Vendor/Madeira/SwiftEA/EAFormats.swift"; sourceTree = "<group>"; };
 		BEEF20261107000000000220 /* EADownloader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Vendor/Madeira/SwiftEA/EADownloader.swift"; sourceTree = "<group>"; };
+		C0FFEE20261108000000020 /* ArtworkLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ArtworkLoader.swift"; sourceTree = "<group>"; };
 		C0FFEE202611070000000200 /* GalaxyListener.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Vendor/Madeira/SwiftGOG/Galaxy/GalaxyListener.swift"; sourceTree = "<group>"; };
 		C0FFEE202611070000000210 /* GalaxyService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Vendor/Madeira/SwiftGOG/Galaxy/GalaxyService.swift"; sourceTree = "<group>"; };
 		C0FFEE202611070000000220 /* GalaxySupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Vendor/Madeira/SwiftGOG/Galaxy/GalaxySupport.swift"; sourceTree = "<group>"; };
@@ -436,6 +438,7 @@
 				BEEF20261107000000000410 /* EALicense.swift in Sources */,
 				BEEF20261107000000000310 /* EAFormats.swift in Sources */,
 				BEEF20261107000000000210 /* EADownloader.swift in Sources */,
+				C0FFEE20261108000000010 /* ArtworkLoader.swift in Sources */,
 				C0FFEE202611070000000100 /* GalaxyListener.swift in Sources */,
 				C0FFEE202611070000000110 /* GalaxyService.swift in Sources */,
 				C0FFEE202611070000000120 /* GalaxySupport.swift in Sources */,
@@ -597,6 +600,7 @@
 				BEEF20261107000000000420 /* EALicense.swift */,
 				BEEF20261107000000000320 /* EAFormats.swift */,
 				BEEF20261107000000000220 /* EADownloader.swift */,
+				C0FFEE20261108000000020 /* ArtworkLoader.swift */,
 				C0FFEE202611070000000200 /* GalaxyListener.swift */,
 				C0FFEE202611070000000210 /* GalaxyService.swift */,
 				C0FFEE202611070000000220 /* GalaxySupport.swift */,
@@ -777,7 +781,7 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = VPNExtension/VPNExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 31;
+				CURRENT_PROJECT_VERSION = 32;
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = VPNExtension/Info.plist;
@@ -786,7 +790,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.4.4;
+				MARKETING_VERSION = 1.4.5;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ideck.ideck.VPNExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -802,7 +806,7 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = VPNExtension/VPNExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 31;
+				CURRENT_PROJECT_VERSION = 32;
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = VPNExtension/Info.plist;
@@ -811,7 +815,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.4.4;
+				MARKETING_VERSION = 1.4.5;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ideck.ideck.VPNExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -905,7 +909,7 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = iDeckJITHelper/iDeckJITHelper.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 31;
+				CURRENT_PROJECT_VERSION = 32;
 				DEVELOPMENT_TEAM = "";
 				"FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*]" = "$(SRCROOT)/Frameworks/StikJIT.xcframework/ios-arm64";
 				GENERATE_INFOPLIST_FILE = NO;
@@ -914,7 +918,7 @@
 					"$(inherited)",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.4.4;
+				MARKETING_VERSION = 1.4.5;
 				"OTHER_LDFLAGS[sdk=iphoneos*]" = (
 					"$(inherited)",
 					"-framework",
@@ -935,7 +939,7 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = iDeckJITHelper/iDeckJITHelper.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 31;
+				CURRENT_PROJECT_VERSION = 32;
 				DEVELOPMENT_TEAM = "";
 				"FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*]" = "$(SRCROOT)/Frameworks/StikJIT.xcframework/ios-arm64";
 				GENERATE_INFOPLIST_FILE = NO;
@@ -944,7 +948,7 @@
 					"$(inherited)",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.4.4;
+				MARKETING_VERSION = 1.4.5;
 				"OTHER_LDFLAGS[sdk=iphoneos*]" = (
 					"$(inherited)",
 					"-framework",
@@ -1026,7 +1030,7 @@
 				OTHER_LDFLAGS = "$(inherited) -lz -llzma $(IDECK_NATIVE_LINK_FLAGS)";
 				OTHER_CFLAGS = "$(inherited) $(IDECK_NATIVE_CFLAGS)";
 				OTHER_CPLUSPLUSFLAGS = "$(inherited) $(IDECK_NATIVE_CFLAGS)";
-				CURRENT_PROJECT_VERSION = 31;
+				CURRENT_PROJECT_VERSION = 32;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -1039,7 +1043,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.4.4;
+				MARKETING_VERSION = 1.4.5;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ideck.ideck;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -1063,7 +1067,7 @@
 				OTHER_LDFLAGS = "$(inherited) -lz -llzma $(IDECK_NATIVE_LINK_FLAGS)";
 				OTHER_CFLAGS = "$(inherited) $(IDECK_NATIVE_CFLAGS)";
 				OTHER_CPLUSPLUSFLAGS = "$(inherited) $(IDECK_NATIVE_CFLAGS)";
-				CURRENT_PROJECT_VERSION = 31;
+				CURRENT_PROJECT_VERSION = 32;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -1076,7 +1080,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.4.4;
+				MARKETING_VERSION = 1.4.5;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ideck.ideck;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;

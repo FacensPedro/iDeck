@@ -184,17 +184,19 @@ struct StoreBannerView: View {
     @State private var imageIndex = 0
 
     var body: some View {
-        AsyncImage(url: imageIndex < urls.count ? urls[imageIndex] : nil) { phase in
-            if let image = phase.image {
-                image.resizable().scaledToFit()
-            } else if phase.error != nil || urls.isEmpty {
-                Color.white.opacity(0.06)
-                    .onAppear { if imageIndex + 1 < urls.count { imageIndex += 1 } }
-            } else {
-                ZStack {
-                    Color.white.opacity(0.06)
-                    ProgressView().tint(.gray)
+        Group {
+            if imageIndex < urls.count {
+                ArtworkImage(url: urls[imageIndex], failed: { imageIndex += 1 }) { image in
+                    image.resizable().scaledToFit()
+                } placeholder: {
+                    ZStack {
+                        Color.white.opacity(0.06)
+                        ProgressView().tint(.gray)
+                    }
                 }
+                .id(imageIndex)
+            } else {
+                Color.white.opacity(0.06)
             }
         }
         .modifier(GameDetailsBannerFrame())
@@ -1272,15 +1274,10 @@ private struct GOGArtworkView: View {
     var body: some View {
         Group {
             if index < urls.count {
-                AsyncImage(url: urls[index]) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image.resizable().scaledToFit()
-                    case .failure:
-                        Color.clear.onAppear { index += 1 }
-                    default:
-                        fallbackColor.overlay(ProgressView().tint(.gray))
-                    }
+                ArtworkImage(url: urls[index], failed: { index += 1 }) { image in
+                    image.resizable().scaledToFit()
+                } placeholder: {
+                    fallbackColor.overlay(ProgressView().tint(.gray))
                 }
                 .id(index)
             } else {
