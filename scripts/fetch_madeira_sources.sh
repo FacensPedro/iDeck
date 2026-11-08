@@ -185,6 +185,14 @@ if ! git -C "$DEST" apply --reverse --check "$ARM64_IMPORTER_PATCH" >/dev/null 2
   git -C "$DEST" apply "$ARM64_IMPORTER_PATCH"
 fi
 
+# ...including Nt* syscall exports, whose x86_64 stubs have no redirection
+# entry: decode them to arm64ec_syscalls[id] like arm64x_check_call does.
+ARM64_SYSCALL_PATCH="$ROOT/patches/madeira-arm64-importer-syscall-bind.patch"
+if ! git -C "$DEST" apply --reverse --check "$ARM64_SYSCALL_PATCH" >/dev/null 2>&1; then
+  git -C "$DEST" apply --check "$ARM64_SYSCALL_PATCH"
+  git -C "$DEST" apply "$ARM64_SYSCALL_PATCH"
+fi
+
 # The stock Wine worker reports g_wine_running=0 before joining wineserver,
 # and wineserver_start never clears the prior session's stop flag.
 # Both make game B fail after game A ends in the same iDeck process.

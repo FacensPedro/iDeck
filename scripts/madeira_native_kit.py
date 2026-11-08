@@ -36,7 +36,8 @@ EARLY_JIT_PATCH_SHA256 = hashlib.sha256(
     (ROOT / "patches/madeira-arm64-cpu-area.patch").read_bytes() +
     # Nor is one that still clobbers live JIT slots on unaligned rewrites.
     (ROOT / "patches/madeira-unaligned-live-neighbour.patch").read_bytes() +
-    (ROOT / "patches/madeira-arm64-importer-native-bind.patch").read_bytes()
+    (ROOT / "patches/madeira-arm64-importer-native-bind.patch").read_bytes() +
+    (ROOT / "patches/madeira-arm64-importer-syscall-bind.patch").read_bytes()
 ).hexdigest()
 REPEAT_WINE_SESSION_PATCH_SHA256 = hashlib.sha256(
     (Path(__file__).resolve().parents[1] / "patches/madeira-repeat-wine-sessions.patch").read_bytes()
