@@ -1,3 +1,3 @@
 ## What's Changed
-- Fixed Dragon Age: Inquisition's ActivationUI.exe failing with 0xC000001D. In 32-bit helper processes, wow64.dll and xtajit.dll (pure ARM64) were linked to the x86-64 entry points of ARM64EC ntdll functions such as RtlRunOnceExecuteOnce. They now link to the native ARM64 code.
-- Updated the application version to 1.4.9 (build 36).
+- Dragon Age: Inquisition's ActivationUI.exe got further after 1.4.9 but still failed with 0xC000001D. wow64.dll and xtajit.dll were still linked to the x86-64 stubs of ntdll's Nt* system calls (NtWaitForDebugEvent and others). They now link to the native ARM64 entry points.
+- Updated the application version to 1.4.10 (build 37).

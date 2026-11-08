@@ -1,0 +1,37 @@
+diff --git a/wine/dlls/ntdll/signal_arm64ec.c b/wine/dlls/ntdll/signal_arm64ec.c
+index 9ed09f7e4d..8372e62909 100644
+--- a/wine/dlls/ntdll/signal_arm64ec.c
++++ b/wine/dlls/ntdll/signal_arm64ec.c
+@@ -525,6 +525,32 @@ void *arm64ec_redirect_ptr( HMODULE module, void *ptr, const IMAGE_ARM64EC_METAD
+      *       have to dispatch through it. */
+     {
+         const unsigned char *bytes = ptr;
++        /* (c) iDeck: x86_64 syscall stub of a hybrid_patchable Nt* export
++         * (__ASM_SYSCALL_FUNC for __arm64ec_x64__):
++         *   4c 8b d1 b8 <id32> f6 04 25 08 03 fe 7f 01 75 03 0f 05 c3
++         * arm64x_check_call decodes the same sequence at runtime into
++         * arm64ec_syscalls[id]; a pure ARM64 importer (wow64.dll, xtajit.dll)
++         * never goes through it and executed these x86 bytes natively --
++         * Dragon Age: Inquisition's ActivationUI.exe, 0xC000001D at the
++         * NtWaitForDebugEvent stub. Resolve it here too. */
++        {
++            static const unsigned char seq_head[4] = { 0x4c, 0x8b, 0xd1, 0xb8 };
++            static const unsigned char seq_tail[12] = { 0xf6, 0x04, 0x25, 0x08, 0x03, 0xfe, 0x7f, 0x01,
++                                                        0x75, 0x03, 0x0f, 0x05 };
++            enum { ideck_nb_syscalls = 0
++#define SYSCALL_ENTRY(id,name,args) + 1
++                ALL_SYSCALLS
++#undef SYSCALL_ENTRY
++            };
++            extern void * const arm64ec_syscalls[];
++            if (!memcmp( bytes, seq_head, sizeof(seq_head) ) &&
++                !memcmp( bytes + 8, seq_tail, sizeof(seq_tail) ))
++            {
++                ULONG id = *(const ULONG *)&bytes[4];
++                if (id < ideck_nb_syscalls && arm64ec_syscalls[id])
++                    return xlate_ios_jit( arm64ec_syscalls[id] );
++            }
++        }
+         /* (b) fast-forward sequence */
+         if (bytes[0] == 0x48 && bytes[1] == 0x8b && bytes[2] == 0xc4 &&
+             bytes[3] == 0x48 && bytes[4] == 0x89 && bytes[5] == 0x58 &&

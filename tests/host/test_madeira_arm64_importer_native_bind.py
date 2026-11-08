@@ -10,6 +10,15 @@ class MadeiraArm64ImporterNativeBindTests(unittest.TestCase):
         self.assertIn("imp_nt->FileHeader.Machine == IMAGE_FILE_MACHINE_ARM64", patch)
         self.assertEqual(patch.count("(imp_native_arm64 || !arm64ec_iat_is_exported_x64( module, thunk_list ))"), 2)
 
+    def test_syscall_stubs_resolve_to_native_targets(self):
+        patch = (ROOT / "patches/madeira-arm64-importer-syscall-bind.patch").read_text()
+        self.assertIn("+++ b/wine/dlls/ntdll/signal_arm64ec.c", patch)
+        self.assertIn("return xlate_ios_jit( arm64ec_syscalls[id] );", patch)
+        self.assertIn("if (id < ideck_nb_syscalls && arm64ec_syscalls[id])", patch)
+        self.assertIn('ARM64_SYSCALL_PATCH="$ROOT/patches/madeira-arm64-importer-syscall-bind.patch"',
+                      repo_text("scripts/fetch_madeira_sources.sh"))
+        self.assertIn('"patches/madeira-arm64-importer-syscall-bind.patch"', repo_text("scripts/madeira_native_kit.py"))
+
     def test_patch_is_applied_and_invalidates_cached_kits(self):
         self.assertIn('ARM64_IMPORTER_PATCH="$ROOT/patches/madeira-arm64-importer-native-bind.patch"',
                       repo_text("scripts/fetch_madeira_sources.sh"))
