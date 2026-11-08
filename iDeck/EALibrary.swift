@@ -355,7 +355,9 @@ struct EAInstalledGame: Codable, Sendable {
             step("Getting the download address")
             let url = try await api.downloadURL(offerID: id, buildID: build.buildID)
             step("Reading the build's file list")
-            let archive = try await downloader.archive(url)
+            var archive = try await downloader.archive(url)
+            step("Choosing the fastest server")
+            archive = await downloader.fastestMirror(archive)
             let record = installed[id]
             let folder = record?.folder ?? (Self.installRoot + "/" + Self.safeName(game?.installFolder ?? title))
             try? FileManager.default.createDirectory(at: Self.journalURL(id).deletingLastPathComponent(), withIntermediateDirectories: true)
