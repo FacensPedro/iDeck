@@ -123,6 +123,9 @@ class WindowsEnvironment {
         guard assets.allSatisfy({
             MadeiraRuntime.exists($0)
         }) else { return false }
+        // Wine's ntdll reads these three NLS files before anything else; without
+        // them the wineserver dies at start. Never start Wine without them.
+        guard MadeiraRuntime.missingNLSFiles().isEmpty, MadeiraRuntime.installedProblems().isEmpty else { return false }
         // A missing plist is not evidence that the native runtime is absent.
         // Actual linker symbols and native capabilities determine readiness.
         // This still correctly rejects placeholder bridge-only builds.
@@ -249,6 +252,10 @@ class WindowsEnvironment {
             }
         }
         if !native.metal_available { missing.append("Metal device") }
+        for name in MadeiraRuntime.missingNLSFiles() {
+            missing.append("Wine NLS file \(name) in \(MadeiraRuntime.resourceRoot.path)")
+        }
+        missing += MadeiraRuntime.installedProblems()
         return missing
     }
 

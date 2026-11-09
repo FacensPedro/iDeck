@@ -17,6 +17,7 @@ and the profile stamp, before packaging.
 """
 import argparse
 import hashlib
+import io
 import json
 import os
 import plistlib
@@ -48,9 +49,21 @@ def normalized(info: tarfile.TarInfo) -> tarfile.TarInfo:
     return info
 
 
-def archive(app: Path, folders, target: Path) -> int:
+def archive(app: Path, folders, target: Path, ident: str) -> int:
+    """The folders plus ideck-runtime-<id>.json (relative path -> SHA-256 of every
+    file), which the app checks each unpacked file against (MadeiraRuntime.validate)."""
     files = 0
+    hashes = {}
+    for folder in folders:
+        for root, dirs, names in os.walk(app / folder, followlinks=True):
+            for name in names:
+                path = Path(root) / name
+                hashes[str(path.relative_to(app))] = sha256(path)
+    manifest = json.dumps(hashes, sort_keys=True, indent=0).encode()
     with tarfile.open(target, "w:xz", preset=6, dereference=True, format=tarfile.GNU_FORMAT) as tar:
+        info = normalized(tarfile.TarInfo(f"ideck-runtime-{ident}.json"))
+        info.size = len(manifest)
+        tar.addfile(info, io.BytesIO(manifest))
         for folder in folders:
             base = app / folder
             for root, dirs, names in os.walk(base, followlinks=True):
@@ -83,7 +96,7 @@ def main() -> int:
         if not present:
             continue
         staging = out / f"{ident}.tar.xz"
-        count = archive(app, present, staging)
+        count = archive(app, present, staging, ident)
         digest = sha256(staging)
         name = f"{ident}-{digest[:16]}.tar.xz"
         staging.rename(out / name)

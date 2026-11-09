@@ -420,7 +420,21 @@ class SystemCoordinator: ObservableObject {
         let resume = jitResume
         jitResume = nil
         refreshJITStatus()
-        if ideck_wine_jit_pool_ready() || StikJITHelper.ready { return true }
+        // The StikDebug-compatible script iDeck sends (universal.jitscript) must be
+        // in the app: without it, neither StikDebug nor the built-in path can prepare
+        // Wine's pool, so nothing starts.
+        guard StikJITHelper.scriptData != nil else {
+            AppLog.record("[jit] universal.jitscript missing from the app; launch blocked")
+            setWindowsStatus("JIT cannot be prepared: this iDeck build is missing its JIT script.")
+            return false
+        }
+        // Validated preparation: CS_DEBUGGED on this process, and a live debugger to
+        // answer the pool request or this run's pool already prepared. Anything less
+        // never reaches Wine: iDeck starts the activation itself and the launch waits.
+        if Self.jitPreparationValidated() {
+            Self.recordLaunchJITState()
+            return true
+        }
         // As Madeira: without a live debugger (none yet, or CS_DEBUGGED left
         // behind by an earlier attach, where no new authorization was requested
         // before) StikDebug is opened and the launch continues once it is attached.
@@ -430,6 +444,25 @@ class SystemCoordinator: ObservableObject {
         if let resume { waitForDebuggerThenResume(resume) }
         requestStikDebugJIT()
         return false
+    }
+
+    /// JIT is ready for a launch: CS_DEBUGGED is set and the pool is prepared or a
+    /// debugger is attached to prepare it.
+    static func jitPreparationValidated() -> Bool {
+        guard ideck_process_has_jit_permission() else { return false }
+        return ideck_wine_jit_pool_ready() || StikJITHelper.ready
+    }
+
+    static let lastLaunchJITKey = "jit.lastLaunchState"
+
+    /// The JIT state at the last launch, kept for bug reports: a report made after a
+    /// crash runs in a new process, where CS_DEBUGGED is off again.
+    static func recordLaunchJITState() {
+        let snapshot = ideck_jit_snapshot()
+        let text = "debugged=\(ideck_process_has_jit_permission() ? 1 : 0) debugger=\(snapshot.debugger_attached ? 1 : 0) "
+            + "pool=\(ideck_wine_jit_pool_ready() ? 1 : 0) at \(ISO8601DateFormatter().string(from: Date()))"
+        UserDefaults.standard.set(text, forKey: lastLaunchJITKey)
+        AppLog.record("[jit] preparation validated for launch: \(text)")
     }
 
     /// Runs the pending launch once the debugger is attached, or reports why not.

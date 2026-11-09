@@ -148,6 +148,7 @@
 		C0FFEE202611070000000120 /* GalaxySupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE202611070000000220 /* GalaxySupport.swift */; };
 		C0FFEE202611070000000130 /* GalaxyWire.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE202611070000000230 /* GalaxyWire.swift */; };
 		C0FFEE202611070000000140 /* GOGGalaxy.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE202611070000000240 /* GOGGalaxy.swift */; };
+		C0FFEE202611090000000148 /* IOSCrashDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE202611090000010148 /* IOSCrashDiagnostics.swift */; };
 		C0FFEE202611090000000147 /* GOGLaunchServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE202611090000010147 /* GOGLaunchServices.swift */; };
 		C0FFEE202611090000000146 /* GOGSetup.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE202611090000010146 /* GOGSetup.swift */; };
 		C0FFEE202611090000000145 /* GOGInstallScript.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE202611090000010145 /* GOGInstallScript.swift */; };
@@ -293,6 +294,7 @@
 		C0FFEE202611070000000220 /* GalaxySupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Vendor/Madeira/SwiftGOG/Galaxy/GalaxySupport.swift"; sourceTree = "<group>"; };
 		C0FFEE202611070000000230 /* GalaxyWire.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Vendor/Madeira/SwiftGOG/Galaxy/GalaxyWire.swift"; sourceTree = "<group>"; };
 		C0FFEE202611070000000240 /* GOGGalaxy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GOGGalaxy.swift"; sourceTree = "<group>"; };
+		C0FFEE202611090000010148 /* IOSCrashDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "IOSCrashDiagnostics.swift"; sourceTree = "<group>"; };
 		C0FFEE202611090000010147 /* GOGLaunchServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GOGLaunchServices.swift"; sourceTree = "<group>"; };
 		C0FFEE202611090000010146 /* GOGSetup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GOGSetup.swift"; sourceTree = "<group>"; };
 		C0FFEE202611090000010145 /* GOGInstallScript.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GOGInstallScript.swift"; sourceTree = "<group>"; };
@@ -456,6 +458,7 @@
 				C0FFEE202611070000000120 /* GalaxySupport.swift in Sources */,
 				C0FFEE202611070000000130 /* GalaxyWire.swift in Sources */,
 				C0FFEE202611070000000140 /* GOGGalaxy.swift in Sources */,
+				C0FFEE202611090000000148 /* IOSCrashDiagnostics.swift in Sources */,
 				C0FFEE202611090000000147 /* GOGLaunchServices.swift in Sources */,
 				C0FFEE202611090000000146 /* GOGSetup.swift in Sources */,
 				C0FFEE202611090000000145 /* GOGInstallScript.swift in Sources */,
@@ -624,6 +627,7 @@
 				C0FFEE202611070000000220 /* GalaxySupport.swift */,
 				C0FFEE202611070000000230 /* GalaxyWire.swift */,
 				C0FFEE202611070000000240 /* GOGGalaxy.swift */,
+				C0FFEE202611090000010148 /* IOSCrashDiagnostics.swift */,
 				C0FFEE202611090000010147 /* GOGLaunchServices.swift */,
 				C0FFEE202611090000010146 /* GOGSetup.swift */,
 				C0FFEE202611090000010145 /* GOGInstallScript.swift */,

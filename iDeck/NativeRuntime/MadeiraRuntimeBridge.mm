@@ -85,6 +85,13 @@ extern "C" int32_t ideck_runtime_prepare(const char *wine_prefix) {
             return ENOENT;
         }
     }
+    // ntdll's read_nls_file rejects files of 4 KB or less; the wineserver dies
+    // without these three. Refuse to start Wine instead.
+    for (NSString *file in @[ @"nls/locale.nls", @"nls/l_intl.nls", @"nls/normnfc.nls" ]) {
+        NSDictionary *attributes = [[NSFileManager defaultManager]
+            attributesOfItemAtPath:[bundle stringByAppendingPathComponent:file] error:nil];
+        if ([attributes fileSize] <= 0x1000) return ENOENT;
+    }
 #else
     return ENOSYS;
 #endif
