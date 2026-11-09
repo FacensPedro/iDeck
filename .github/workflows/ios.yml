@@ -29,14 +29,10 @@ on:
         required: false
         default: false
       use_msc_pkg:
-        description: "Bundle the Apple Metal Shader Converter 4.0 beta 3 from your own macOS .pkg (URL from msc_pkg_url / IDECK_MSC_PKG_URL, or a private release via IDECK_MSC_PKG_REPO + IDECK_MSC_PKG_TOKEN; forces a full native rebuild)"
+        description: "Bundle the Apple Metal Shader Converter 4.0 beta 3 from your own macOS .pkg (private release via IDECK_MSC_PKG_REPO + IDECK_MSC_PKG_TOKEN, or the IDECK_MSC_PKG_URL secret; forces a full native rebuild)"
         type: boolean
         required: false
         default: false
-      msc_pkg_url:
-        description: "Direct download URL of the Apple MetalShaderConverter .pkg (leave blank to use the IDECK_MSC_PKG_URL secret)"
-        required: false
-        default: ""
       release_tag:
         description: "Use auto for the verified IPA version (currently 1.0.10), a matching version tag, or leave blank to build without publishing"
         required: false
@@ -672,7 +668,6 @@ jobs:
       - name: Download owner-supplied Apple Metal Shader Converter package
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.use_msc_pkg }}
         env:
-          MSC_PKG_URL_INPUT: ${{ inputs.msc_pkg_url }}
           MSC_PKG_URL_SECRET: ${{ secrets.IDECK_MSC_PKG_URL }}
           MSC_PKG_REPO: ${{ secrets.IDECK_MSC_PKG_REPO }}
           MSC_PKG_TOKEN: ${{ secrets.IDECK_MSC_PKG_TOKEN }}
@@ -683,7 +678,7 @@ jobs:
             exit 2
           fi
           PKG="$RUNNER_TEMP/MetalShaderConverter.pkg"
-          URL="${MSC_PKG_URL_INPUT:-$MSC_PKG_URL_SECRET}"
+          URL="$MSC_PKG_URL_SECRET"
           if [[ -n "$URL" ]]; then
             echo "::add-mask::$URL"
             curl -fL --retry 4 --retry-delay 2 -o "$PKG" "$URL"
@@ -697,7 +692,7 @@ jobs:
             [[ ${#FOUND[@]} -eq 1 && -s "${FOUND[0]}" ]] || { echo "::error::Expected exactly one .pkg in the latest release."; exit 2; }
             mv "${FOUND[0]}" "$PKG"
           else
-            echo "::error::Set msc_pkg_url, the IDECK_MSC_PKG_URL secret, or IDECK_MSC_PKG_REPO + IDECK_MSC_PKG_TOKEN."
+            echo "::error::Set the IDECK_MSC_PKG_REPO + IDECK_MSC_PKG_TOKEN secrets (or IDECK_MSC_PKG_URL)."
             exit 2
           fi
           echo "Downloaded $(stat -f%z "$PKG") bytes; SHA-256 $(shasum -a 256 "$PKG" | cut -d' ' -f1)"
