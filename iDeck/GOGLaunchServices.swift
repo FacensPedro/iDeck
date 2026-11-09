@@ -37,8 +37,18 @@ enum GOGLaunchServices {
     static let batchFolder = "C:\\ideck-games"
 
     /// After an install: what the game's first start needs.
+    /// An installer whose files did not download is left out with a note.
     static func record(_ plan: GOGContentPlan, folder: URL) {
-        GOGSetupRecord(language: plan.language, programs: plan.setupPrograms, notes: plan.setupNotes).save(folder: folder)
+        var notes = plan.setupNotes
+        let programs = plan.setupPrograms.filter { program in
+            let present = FileManager.default.fileExists(atPath: folder.appendingPathComponent(program.executable).path)
+            if !present {
+                notes.append(GOGSetupNote(id: program.id, name: program.name, note: "Not downloaded"))
+                AppLog.record("[gog-setup] \(program.id) left out: its installer did not download")
+            }
+            return present
+        }
+        GOGSetupRecord(language: plan.language, programs: programs, notes: notes).save(folder: folder)
     }
 
     /// The Windows path of a folder inside `drive` (drive_c).

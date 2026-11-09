@@ -65,6 +65,13 @@ DATA_ENV = '''            setenv("WINEDLLPATH", bundlePath.UTF8String, 1);
             /* iDeck: Wine's data files (nls/) are in the downloaded runtime too. */
             setenv("MADEIRA_DATA_DIR", bundlePath.UTF8String, 1);
 '''
+DATA_IOS = '''    /* iDeck: Wine's data files (nls/) come from the runtime the initial setup
+     * downloads, not from the app bundle (scripts/apply_madeira_runtime_root.py). */
+    {
+        const char *runtime_data = getenv( "MADEIRA_DATA_DIR" );
+        if (runtime_data && runtime_data[0] == '/') data_dir = strdup( runtime_data );
+    }
+'''
 DATA_LOADER = '''    set_dll_path();
     /* iDeck: Wine's data files (nls/) come from the runtime the initial setup
      * downloads, not from the app bundle (scripts/apply_madeira_runtime_root.py). */
@@ -86,15 +93,17 @@ def data_dir(root: Path) -> int:
             return 2
         bridge.write_text(text.replace(anchor, DATA_ENV))
         print("WineProcessBridge.m: MADEIRA_DATA_DIR names the runtime for ntdll")
-    loader = root / "wine/dlls/ntdll/unix/loader.c"
+    # iOS builds compile Madeira's build/ntdll-unix/loader_ios.c in place of Wine's
+    # dlls/ntdll/unix/loader.c; its init_paths sets data_dir to the bundle.
+    loader = root / "build/ntdll-unix/loader_ios.c"
     text = loader.read_text()
     if DATA_MARKER not in text:
-        anchor = "    set_dll_path();\n"
+        anchor = "    data_dir = strdup( exe_path );  /* NLS files at <bundle>/nls/ */\n"
         if text.count(anchor) != 1:
-            print("ERROR: ntdll loader.c: no set_dll_path anchor", file=sys.stderr)
+            print("ERROR: loader_ios.c: no data_dir anchor", file=sys.stderr)
             return 2
-        loader.write_text(text.replace(anchor, DATA_LOADER))
-        print("ntdll loader.c: data_dir follows MADEIRA_DATA_DIR")
+        loader.write_text(text.replace(anchor, anchor + DATA_IOS))
+        print("ntdll loader_ios.c: data_dir follows MADEIRA_DATA_DIR")
     return 0
 
 

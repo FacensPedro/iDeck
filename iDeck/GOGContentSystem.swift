@@ -83,6 +83,14 @@ enum GOGContentSystem {
         if format.contains("/{path}") { finalPath.removeFirst() }
         values["path"] = finalPath
         var text = format.replacingOccurrences(of: "\\/", with: "/")
+        // The redistributables' open link has no {path} in its format: the format is
+        // the store's address and the chunk's path follows it (as Madeira, Playport and
+        // heroic-gogdl build it). Without this, every redistributable chunk was the bare
+        // store address and answered HTTP 404.
+        if !text.contains("{path}") {
+            if text.hasSuffix("/") { values["path"] = String(finalPath.drop { $0 == "/" }) }
+            text += "{path}"
+        }
         for (name, value) in values {
             text = text.replacingOccurrences(of: "{\(name)}", with: value)
         }
@@ -359,8 +367,23 @@ final class GOGContentInstaller: @unchecked Sendable {
             }
         }
 
-        // Every other file, four at a time.
-        let files = plan.files.filter { plan.containerOf[$0.path] == nil }
+        // Every other file, four at a time. Redistributables come last and never fail
+        // the game's install (as Madeira): a missing one is logged and left out.
+        let files = plan.files.filter { plan.containerOf[$0.path] == nil && $0.productID != Self.redistProduct }
+        try await downloadAll(files, into: folder)
+        let redist = plan.files.filter { $0.productID == Self.redistProduct }
+        if !redist.isEmpty {
+            do {
+                try await downloadAll(redist, into: folder)
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                AppLog.record("[gog-setup] redistributables not downloaded: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    private func downloadAll(_ files: [GOGContentFile], into folder: URL) async throws {
         try await withThrowingTaskGroup(of: Void.self) { group in
             var next = 0
             func add() {
