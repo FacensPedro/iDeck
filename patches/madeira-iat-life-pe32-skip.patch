@@ -1,0 +1,19 @@
+diff --git a/wine/dlls/ntdll/loader.c b/wine/dlls/ntdll/loader.c
+index 77531ae4e4..50a211822d 100644
+--- a/wine/dlls/ntdll/loader.c
++++ b/wine/dlls/ntdll/loader.c
+@@ -4335,6 +4335,14 @@ static void iat_life_sweep( const char *when )
+         ULONG size;
+ 
+         if (!mod->DllBase) continue;
++        /* A WoW64 process lists its i386 main image here too.  PE32 thunks are
++         * 4 bytes: walking them as 64-bit IMAGE_THUNK_DATA turns two adjacent
++         * name RVAs into a wild pointer, and the strlen below faults inside the
++         * loader (ActivationUI.exe: AV -> endless unwind -> stack overflow). */
++        {
++            const IMAGE_NT_HEADERS *nt = RtlImageNtHeader( mod->DllBase );
++            if (!nt || nt->OptionalHeader.Magic != IMAGE_NT_OPTIONAL_HDR64_MAGIC) continue;
++        }
+         descr = RtlImageDirectoryEntryToData( mod->DllBase, TRUE, IMAGE_DIRECTORY_ENTRY_IMPORT, &size );
+         if (!descr) continue;
+ 

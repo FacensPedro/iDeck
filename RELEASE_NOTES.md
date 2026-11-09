@@ -1,3 +1,3 @@
 ## What's Changed
-- Dragon Age: Inquisition's ActivationUI.exe still failed with 0xC000001D in 1.6.0: the 32-bit side's xtajit.dll called the x86-64 version of ntdll's __chkstk (a single "return" instruction) as if it were ARM code. Exports like that now link to the native ARM64 equivalent.
-- Updated the application version to 1.6.1 (build 42).
+- Dragon Age: Inquisition's ActivationUI.exe still closed at startup in 1.6.1: a loader diagnostic read the 32-bit program's import table as if it were 64-bit, followed a garbage pointer and crashed (access violation, then a stack overflow while unwinding). The diagnostic now skips 32-bit images.
+- Updated the application version to 1.6.2 (build 43).
