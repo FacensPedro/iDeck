@@ -16,6 +16,7 @@ enum GOGContentError: LocalizedError {
     case invalidManifest
     case noDepots
     case checksum(String)
+    case unavailable(String)
 
     var errorDescription: String? {
         switch self {
@@ -23,6 +24,7 @@ enum GOGContentError: LocalizedError {
         case .invalidManifest: return "GOG returned an unreadable game manifest."
         case .noDepots: return "GOG lists no Windows files for this game in your language."
         case .checksum(let path): return "A downloaded part of \(path) is damaged."
+        case .unavailable(let path): return "GOG no longer serves \(path) (HTTP 404 on every CDN). Try again after GOG updates the game."
         }
     }
 }
@@ -83,6 +85,14 @@ enum GOGContentSystem {
         if format.contains("/{path}") { finalPath.removeFirst() }
         values["path"] = finalPath
         var text = format.replacingOccurrences(of: "\\/", with: "/")
+        // The redistributables' open link has no {path} in its format: the format is
+        // the store's address and the chunk's path follows it (as Madeira, Playport and
+        // heroic-gogdl build it). Without this, every redistributable chunk was the bare
+        // store address and answered HTTP 404.
+        if !text.contains("{path}") {
+            if text.hasSuffix("/") { values["path"] = String(finalPath.drop { $0 == "/" }) }
+            text += "{path}"
+        }
         for (name, value) in values {
             text = text.replacingOccurrences(of: "{\(name)}", with: value)
         }
@@ -359,8 +369,23 @@ final class GOGContentInstaller: @unchecked Sendable {
             }
         }
 
-        // Every other file, four at a time.
-        let files = plan.files.filter { plan.containerOf[$0.path] == nil }
+        // Every other file, four at a time. Redistributables come last and never fail
+        // the game's install (as Madeira): a missing one is logged and left out.
+        let files = plan.files.filter { plan.containerOf[$0.path] == nil && $0.productID != Self.redistProduct }
+        try await downloadAll(files, into: folder)
+        let redist = plan.files.filter { $0.productID == Self.redistProduct }
+        if !redist.isEmpty {
+            do {
+                try await downloadAll(redist, into: folder)
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                AppLog.record("[gog-setup] redistributables not downloaded: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    private func downloadAll(_ files: [GOGContentFile], into folder: URL) async throws {
         try await withThrowingTaskGroup(of: Void.self) { group in
             var next = 0
             func add() {
@@ -417,15 +442,55 @@ final class GOGContentInstaller: @unchecked Sendable {
         try manager.moveItem(at: partial, to: target)
     }
 
+    /// Chunks every CDN answered 404 or 410 for: permanently gone for this install.
+    private actor GoneChunks {
+        private var hashes = Set<String>()
+        func contains(_ hash: String) -> Bool { hashes.contains(hash) }
+        func insert(_ hash: String) { hashes.insert(hash) }
+    }
+    private let gone = GoneChunks()
+
+    /// One chunk, checked by both of its MD5s. Retries only what can change:
+    ///  - 404/410 from a CDN: the next CDN, without waiting; once every CDN said so,
+    ///    the chunk is gone for good and the install stops at once (no retries).
+    ///  - 403/401 on a signed CDN address: the signature expired; renew it once.
+    ///  - network errors, 5xx, 429 and damaged data: up to 5 retries with backoff.
     private func fetchChunk(_ chunk: GOGContentChunk, productID: String, label: String) async throws -> Data {
-        var attempt = 0
+        if await gone.contains(chunk.compressedMd5) { throw GOGContentError.unavailable(label) }
+        var transient = 0
+        var provider = 0
+        var notFound = Set<Int>()
+        var renewed = false
+        var renew = false
         while true {
             do {
                 try Task.checkCancellation()
-                let url = try await chunkURL(chunk.compressedMd5, productID: productID, attempt: attempt)
+                let (url, providers) = try await chunkURL(chunk.compressedMd5, productID: productID, provider: provider, renew: renew)
+                renew = false
                 let (data, response) = try await GOGAPI.session.data(from: url)
                 let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-                guard status == 200 else { throw status == 401 ? GOGError.notSignedIn : GOGError.http(status) }
+                switch status {
+                case 200:
+                    break
+                case 404, 410:
+                    notFound.insert(provider % max(providers, 1))
+                    if notFound.count >= providers {
+                        await gone.insert(chunk.compressedMd5)
+                        AppLog.record("[gog] \(label): HTTP \(status) on all \(providers) CDN(s); not retrying")
+                        throw GOGContentError.unavailable(label)
+                    }
+                    provider += 1
+                    continue
+                case 401, 403:
+                    // An expired or rejected signature: renew the signed addresses once.
+                    guard !renewed else { throw GOGError.http(status) }
+                    renewed = true
+                    renew = true
+                    AppLog.record("[gog] \(label): HTTP \(status) on a signed CDN address; renewing the signature")
+                    continue
+                default:
+                    throw GOGError.http(status)
+                }
                 // Check the *compressed* checksum before inflating. Each GOG
                 // content-system chunk has both hashes in its depot manifest.
                 guard Self.md5(data) == chunk.compressedMd5.lowercased() else {
@@ -440,13 +505,16 @@ final class GOGContentInstaller: @unchecked Sendable {
                 // URLSession translates task-group cancellation into -999.
                 // It is never a CDN failure, and must not be retried.
                 throw CancellationError()
+            } catch GOGContentError.unavailable(let path) {
+                throw GOGContentError.unavailable(path)
             } catch {
                 try Task.checkCancellation()
                 if case GOGError.notSignedIn = error { throw error }
-                attempt += 1
-                guard attempt <= 5 else { throw error }
-                AppLog.record("[gog] chunk of \(label) failed (\(error.localizedDescription)); retry \(attempt)/5 with refreshed or alternate CDN")
-                try await Task.sleep(nanoseconds: UInt64(attempt) * 1_000_000_000)
+                transient += 1
+                guard transient <= 5 else { throw error }
+                provider += 1
+                AppLog.record("[gog] chunk of \(label) failed (\(error.localizedDescription)); retry \(transient)/5 on the next CDN")
+                try await Task.sleep(nanoseconds: UInt64(transient) * 1_000_000_000)
             }
         }
     }
@@ -458,12 +526,13 @@ final class GOGContentInstaller: @unchecked Sendable {
     /// Obtain signed links from the official GOG content system. Rotate all
     /// returned CDN providers before renewing a token. Never log signed URLs
     /// or bearer credentials; links are scoped to each product ID.
-    private func chunkURL(_ hash: String, productID: String, attempt: Int) async throws -> URL {
+    /// The signed address of `hash` on CDN number `provider` (wrapping), and how many
+    /// CDNs there are. Signed addresses are fetched once per product and renewed when
+    /// older than 10 minutes or when `renew` is set (an expired signature).
+    private func chunkURL(_ hash: String, productID: String, provider: Int, renew: Bool) async throws -> (URL, Int) {
         var saved = await linkCache.entry(for: productID)
         let expired = saved.map { Date().timeIntervalSince($0.fetched) > 600 } ?? true
-        let exhausted = attempt > 0 && (saved?.providers.isEmpty != false ||
-                                         attempt % max(1, saved?.providers.count ?? 1) == 0)
-        if expired || exhausted {
+        if expired || renew || saved?.providers.isEmpty != false {
             let redist = productID == Self.redistProduct
             let url = redist
                 ? URL(string: "https://content-system.gog.com/open_link?generation=2&_version=2&path=/dependencies/store/")!
@@ -481,7 +550,12 @@ final class GOGContentInstaller: @unchecked Sendable {
                 guard let format = item["url_format"] as? String,
                       let raw = item["parameters"] as? [String: Any] else { return nil }
                 var parameters: [String: String] = [:]
-                for (key, value) in raw { parameters[key] = String(describing: value) }
+                // Text as it is, numbers by their plain value (as Madeira reads them);
+                // String(describing:) turned NSNull into "<null>" inside signed paths.
+                for (key, value) in raw {
+                    if let text = value as? String { parameters[key] = text }
+                    else if let number = value as? NSNumber { parameters[key] = number.stringValue }
+                }
                 // Reject malformed and non-HTTPS templates before caching.
                 guard GOGContentSystem.signedChunkURL(
                     format: format, parameters: parameters, hash: hash) != nil else { return nil }
@@ -513,11 +587,11 @@ final class GOGContentInstaller: @unchecked Sendable {
         guard let choices = saved?.providers, !choices.isEmpty else {
             throw GOGContentError.invalidManifest
         }
-        let server = choices[attempt % choices.count]
+        let server = choices[provider % choices.count]
         guard let url = GOGContentSystem.signedChunkURL(
             format: server.format, parameters: server.parameters, hash: hash) else {
             throw GOGContentError.invalidManifest
         }
-        return url
+        return (url, choices.count)
     }
 }

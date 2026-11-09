@@ -27,6 +27,8 @@ struct iDeckApp: App {
         MadeiraDock.linkPrefix()
         IRelayRuntime.start()
         JITPoolList.ensureFile()
+        // iOS crash reports (MetricKit) for wineserver and loader crashes in-process.
+        IOSCrashDiagnostics.shared.start()
         NSLog("[iDeck startup] SwiftUI App initialized without native runtime setup")
     }
 

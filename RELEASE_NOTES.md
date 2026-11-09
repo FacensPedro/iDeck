@@ -1,7 +1,12 @@
 ## What's Changed
-- The initial setup's Windows runtime step installs only the x64 and x86 Wine environments. The Steam client and Steam's DLLs are installed only from the Madeira Dock step.
-- GOG works like Madeira: iDeck no longer installs the GOG Galaxy client, and the initial setup's GOG Galaxy step is gone. iDeck does what Galaxy does around a game:
-  - Before each start, the game's install script registry values are written. Some launchers quit without them, such as The Witcher: Enhanced Edition's.
-  - The build's redistributables (openAL, older Visual C++ and others) are downloaded with the game, and their installers run once before its first start.
-  - Galaxy game services (sign-in, achievements, stats) keep working through iDeck.
-- Updated the application version to 1.6.6 (build 47).
+- **JIT:** iDeck starts the activation itself, sending StikDebug its JIT script, and a game starts only after the preparation is validated: CS_DEBUGGED on the process, plus a live debugger or a prepared pool. The JIT state at each launch is recorded, so bug reports made after a crash (in a new process) show it.
+- **Wine NLS:** iOS builds compile Madeira's own loader_ios.c, so the 1.6.4 fix never took effect. That loader now reads the NLS files from the downloaded runtime. Wine never falls back to the app bundle for them, and it does not start until locale.nls, l_intl.nls and normnfc.nls are present and complete.
+- **Runtime packages:** after download, every file of wine-x64 and wine-x86 is checked against the package's SHA-256 manifest. The ARM64EC, ARM64 and i386 libraries and the DXMT components (d3d11, dxgi, d3d10core, WineMetal) are also checked by PE architecture before they are installed.
+- **Crash diagnostics:** iOS crash reports (MetricKit) are summarised in the log as `[ios-crash]` lines and saved in Documents/Diagnostics. Bug reports replace Wine's generic "ulimit -c" advice with these. Madeira's informational lines (commit-zero, ml990, master_socket_timeout) are no longer listed as problems.
+- **GOG:**
+  - Redistributable chunk addresses now include the chunk path, which fixes the HTTP 404s.
+  - A file every CDN answers 404/410 for stops the install at once, instead of being retried 5 times.
+  - An expired signed address is renewed once.
+  - Signed URL parameters are read as plain values.
+  - A redistributable that cannot be downloaded never fails the game's install.
+- Updated the application version to 1.6.7 (build 48).

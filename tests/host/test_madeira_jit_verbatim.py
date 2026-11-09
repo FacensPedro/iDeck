@@ -36,7 +36,11 @@ class MadeiraJITVerbatimTests(unittest.TestCase):
     def test_jit_request_is_madeiras(self):
         coordinator = read("iDeck/SystemCoordinator.swift")
         self.assertIn("StikJITHelper.enableJIT {", coordinator)
-        self.assertIn("if ideck_wine_jit_pool_ready() || StikJITHelper.ready { return true }", coordinator)
+        # Validated preparation: CS_DEBUGGED plus the pool or a live debugger.
+        self.assertIn("guard ideck_process_has_jit_permission() else { return false }", coordinator)
+        self.assertIn("return ideck_wine_jit_pool_ready() || StikJITHelper.ready", coordinator)
+        self.assertIn("guard StikJITHelper.scriptData != nil else {", coordinator)
+        self.assertIn("Self.recordLaunchJITState()", coordinator)
 
 
 if __name__ == "__main__":

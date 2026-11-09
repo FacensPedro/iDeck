@@ -64,13 +64,84 @@ enum MadeiraRuntime {
     /// A package this build lists is missing or older (a new IPA brings a new runtime).
     static var needsDownload: Bool { packages.contains { !installed($0.id) } }
 
-    /// Where the Windows files are: the downloaded runtime once it is here, else the bundle.
+    /// Where the Windows files are. A build that downloads its runtime never falls
+    /// back to the bundle, which has no Windows files: a missing runtime must show up
+    /// as missing files, not as Wine reading nls/ from iDeck.app.
     static var resourceRoot: URL {
         let downloaded = root
-        if FileManager.default.fileExists(atPath: downloaded.appendingPathComponent("arm64ec-windows/ntdll.dll").path) {
+        if downloadsRuntime || FileManager.default.fileExists(atPath: downloaded.appendingPathComponent("arm64ec-windows/ntdll.dll").path) {
             return downloaded
         }
         return Bundle.main.bundleURL
+    }
+
+    // MARK: Validation
+
+    /// The NLS files Wine's ntdll reads at start; it rejects files of 4 KB or less.
+    static let nlsFiles = ["nls/locale.nls", "nls/l_intl.nls", "nls/normnfc.nls"]
+
+    /// What each package must hold, with the PE machine each file must have:
+    /// 0x8664/0xA641 ARM64EC (0xAA64 when built as ARM64X), 0xAA64 ARM64, 0x014C i386, 0 any data file.
+    static let requiredFiles: [String: [(String, Set<UInt16>)]] = {
+        let ec: Set<UInt16> = [0x8664, 0xA641, 0xAA64], arm: Set<UInt16> = [0xAA64], x86: Set<UInt16> = [0x014C]
+        var x64: [(String, Set<UInt16>)] = []
+        // Wine's core ARM64EC libraries and FEX's ARM64EC translator.
+        for name in ["ntdll", "kernel32", "kernelbase", "user32", "gdi32", "xtajit64"] { x64.append(("arm64ec-windows/\(name).dll", ec)) }
+        // DXMT: Direct3D 10/11 and DXGI over WineMetal, ARM64EC and ARM64.
+        for name in ["d3d11", "dxgi", "d3d10core", "winemetal"] { x64.append(("arm64ec-windows/\(name).dll", ec)) }
+        for name in ["d3d11", "dxgi", "winemetal", "kernel32"] { x64.append(("aarch64-windows/\(name).dll", arm)) }
+        x64.append(("arm64ec-windows/cmd.exe", ec))
+        for name in nlsFiles { x64.append((name, [])) }
+        var wow: [(String, Set<UInt16>)] = []
+        for name in ["ntdll", "kernel32", "user32", "d3d11", "dxgi"] { wow.append(("i386-windows/\(name).dll", x86)) }
+        return ["wine-x64": x64, "wine-x86": wow]
+    }()
+
+    /// The problems with `id`'s files under `folder` (empty when it is complete):
+    /// each file in the package's manifest by size and SHA-256, then the required
+    /// libraries by PE machine, and the NLS files by size.
+    static func validate(_ id: String, in folder: URL, manifest: [String: String]? = nil, checkHashes: Bool = true) -> [String] {
+        var problems: [String] = []
+        let fm = FileManager.default
+        if checkHashes, let manifest {
+            for (relative, sha) in manifest.sorted(by: { $0.key < $1.key }) {
+                let url = folder.appendingPathComponent(relative)
+                guard fm.fileExists(atPath: url.path) else { problems.append("missing \(relative)"); continue }
+                if (try? WineMonoInstaller.sha256(of: url)) != sha { problems.append("damaged \(relative)") }
+                if problems.count > 20 { break }
+            }
+        }
+        for (relative, machines) in requiredFiles[id] ?? [] {
+            let url = folder.appendingPathComponent(relative)
+            let size = (try? fm.attributesOfItem(atPath: url.path)[.size] as? NSNumber)?.intValue ?? 0
+            if relative.hasPrefix("nls/") {
+                if size <= 0x1000 { problems.append("missing NLS file \(relative)") }
+                continue
+            }
+            guard size > 0 else { problems.append("missing \(relative)"); continue }
+            let machine = url.path.withCString { ideck_native_pe_machine($0) }
+            if !machines.contains(machine) {
+                problems.append(String(format: "%@ is not the expected architecture (machine 0x%04X)", relative, machine))
+            }
+        }
+        return problems
+    }
+
+    /// The NLS files Wine needs, missing or truncated, in the folder Wine will read.
+    static func missingNLSFiles() -> [String] {
+        nlsFiles.filter { name in
+            let size = (try? FileManager.default.attributesOfItem(atPath: file(name).path)[.size] as? NSNumber)?.intValue ?? 0
+            return size <= 0x1000
+        }
+    }
+
+    /// The installed runtime's problems (structure only: hashes are checked at install).
+    static func installedProblems() -> [String] {
+        guard downloadsRuntime else { return [] }
+        return packages.flatMap { package in
+            installed(package.id) ? validate(package.id, in: root, checkHashes: false)
+                                  : ["\(package.title) is not installed"]
+        }
     }
 
     /// A runtime file by its bundle-relative path ("arm64ec-windows/ntdll.dll", "gl/…").
@@ -126,6 +197,20 @@ enum MadeiraRuntime {
         }.value
         defer { try? fm.removeItem(at: staging) }
 
+        // Every file against the package's own manifest, then the libraries Wine and
+        // DXMT need, before anything replaces the installed runtime.
+        progress("Verifying \(package.title)…", 0.97)
+        let manifestURL = staging.appendingPathComponent(manifestName(id))
+        let manifest = (try? Data(contentsOf: manifestURL)).flatMap { try? JSONDecoder().decode([String: String].self, from: $0) }
+        let problems = await Task.detached(priority: .userInitiated) {
+            MadeiraRuntime.validate(id, in: staging, manifest: manifest)
+        }.value
+        if manifest == nil { AppLog.record("[runtime] \(package.id) has no file manifest; checked structure only") }
+        guard problems.isEmpty else {
+            for problem in problems.prefix(20) { AppLog.record("[runtime] \(package.id): \(problem)") }
+            throw InstallError.message("\(package.title) failed verification: \(problems.prefix(3).joined(separator: "; ")).")
+        }
+
         // Swap each top-level folder in; the marker is written last.
         try? fm.removeItem(at: marker(id))
         for name in try fm.contentsOfDirectory(atPath: staging.path) where downloadedFolders.contains(name) {
@@ -138,11 +223,16 @@ enum MadeiraRuntime {
         progress("\(package.title) installed.", 1)
     }
 
+    /// relative path -> SHA-256 of every file in package `id`.
+    static func manifestName(_ id: String) -> String { "ideck-runtime-\(id).json" }
+
     /// A tar entry's path under the runtime folder, or nil to skip it: relative, no
     /// "." or "..", inside one of the runtime folders.
     static func archivePath(_ entry: String) -> String? {
         var parts = entry.split(separator: "/", omittingEmptySubsequences: true).map(String.init)
         if parts.first == "." { parts.removeFirst() }
+        // The package's file manifest (split_runtime_downloads.py), at the archive's root.
+        if parts.count == 1, parts[0].hasPrefix("ideck-runtime-"), parts[0].hasSuffix(".json") { return parts[0] }
         guard !entry.hasPrefix("/"), !parts.isEmpty, !parts.contains(".."), !parts.contains("."),
               downloadedFolders.contains(parts[0]) else { return nil }
         return parts.joined(separator: "/")

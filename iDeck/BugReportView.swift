@@ -84,8 +84,12 @@ enum LogIssueScanner {
         "denied", "warning", "warn:", "missing", "stale", "mprotect", "invalid",
         "wineserver timeout", "usbmux timeout", "no drawable available",
     ]
-    /// Wine debug channels that print "err:" for harmless probing.
-    private static let noise = ["fixme:", "err:ole:", "err:winediag:"]
+    /// Wine debug channels that print "err:" for harmless probing, and Madeira's
+    /// informational lines that only look like failures: commit-zero's success
+    /// counters ("stale=0/0"), ml990's address-space cap, the wineserver's infinite
+    /// master-socket timeout and the iOS environment listing.
+    private static let noise = ["fixme:", "err:ole:", "err:winediag:", "[commit-zero]", "guest ok",
+                                "ml990:", "master_socket_timeout", "[ios env]"]
     /// Counters that report no problem at all ("launch-client-error=0").
     private static let zeroCount = try! NSRegularExpression(pattern: #"\b(error|errors|failed|failures|missing)\s*[=:]\s*0\b"#)
     /// Lines from iDeck's Steam client, downloads and Madeira Dock.
@@ -101,11 +105,17 @@ enum LogIssueScanner {
             guard !original.isEmpty else { continue }
             // Native Wine output may include very long diagnostic lines.
             // Preserve both ends instead of silently discarding the problem.
-            let line = original.count <= 2000
+            var line = original.count <= 2000
                 ? String(original)
                 : String(original.prefix(1200)) + " … " + String(original.suffix(750))
-            let lower = line.lowercased()
+            var lower = line.lowercased()
             if noise.contains(where: lower.contains) { continue }
+            // Wine's generic advice ("enable coredumps (ulimit -c unlimited)") does
+            // not apply on iPadOS: point at the iOS crash diagnostics instead.
+            if lower.contains("wineserver crashed") {
+                line = "wineserver stopped unexpectedly. Wine's \"ulimit -c\" advice does not apply on iPadOS: see the [ios-crash] lines (MetricKit) and Settings › Privacy & Security › Analytics Data › iDeck."
+                lower = line.lowercased()
+            }
             if !steamSession, steamTags.contains(where: lower.contains) { continue }
             // Counts such as missing=0, errors=0 or failed=0 are normal
             // success telemetry. Remove only those zero-valued terms so a
@@ -195,7 +205,12 @@ final class BugReportModel: ObservableObject {
         var lines: [(Int, String)] = []
         let snapshot = ideck_jit_snapshot()
         if !ideck_process_has_jit_permission() {
-            lines.append((1, "JIT is not enabled for this iDeck process (CS_DEBUGGED off). Enable it in Settings › JIT."))
+            // A report made after a crash runs in a new process, where CS_DEBUGGED is
+            // off again: say what JIT was at the last launch, too.
+            let last = UserDefaults.standard.string(forKey: SystemCoordinator.lastLaunchJITKey)
+            lines.append((1, "JIT is not enabled in this iDeck process (CS_DEBUGGED off) at report time"
+                + (last.map { "; at the last launch: " + $0 } ?? "; no launch had JIT prepared")
+                + ". iDeck opens StikDebug itself at the next launch."))
         } else if !snapshot.debugger_attached && !snapshot.wine_pool_prepared {
             lines.append((1, "JIT permission is active but the debugger is detached, so Wine's JIT pool cannot be prepared."))
         }

@@ -148,6 +148,7 @@
 		C0FFEE202611070000000120 /* GalaxySupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE202611070000000220 /* GalaxySupport.swift */; };
 		C0FFEE202611070000000130 /* GalaxyWire.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE202611070000000230 /* GalaxyWire.swift */; };
 		C0FFEE202611070000000140 /* GOGGalaxy.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE202611070000000240 /* GOGGalaxy.swift */; };
+		C0FFEE202611090000000148 /* IOSCrashDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE202611090000010148 /* IOSCrashDiagnostics.swift */; };
 		C0FFEE202611090000000147 /* GOGLaunchServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE202611090000010147 /* GOGLaunchServices.swift */; };
 		C0FFEE202611090000000146 /* GOGSetup.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE202611090000010146 /* GOGSetup.swift */; };
 		C0FFEE202611090000000145 /* GOGInstallScript.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE202611090000010145 /* GOGInstallScript.swift */; };
@@ -293,6 +294,7 @@
 		C0FFEE202611070000000220 /* GalaxySupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Vendor/Madeira/SwiftGOG/Galaxy/GalaxySupport.swift"; sourceTree = "<group>"; };
 		C0FFEE202611070000000230 /* GalaxyWire.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Vendor/Madeira/SwiftGOG/Galaxy/GalaxyWire.swift"; sourceTree = "<group>"; };
 		C0FFEE202611070000000240 /* GOGGalaxy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GOGGalaxy.swift"; sourceTree = "<group>"; };
+		C0FFEE202611090000010148 /* IOSCrashDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "IOSCrashDiagnostics.swift"; sourceTree = "<group>"; };
 		C0FFEE202611090000010147 /* GOGLaunchServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GOGLaunchServices.swift"; sourceTree = "<group>"; };
 		C0FFEE202611090000010146 /* GOGSetup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GOGSetup.swift"; sourceTree = "<group>"; };
 		C0FFEE202611090000010145 /* GOGInstallScript.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GOGInstallScript.swift"; sourceTree = "<group>"; };
@@ -456,6 +458,7 @@
 				C0FFEE202611070000000120 /* GalaxySupport.swift in Sources */,
 				C0FFEE202611070000000130 /* GalaxyWire.swift in Sources */,
 				C0FFEE202611070000000140 /* GOGGalaxy.swift in Sources */,
+				C0FFEE202611090000000148 /* IOSCrashDiagnostics.swift in Sources */,
 				C0FFEE202611090000000147 /* GOGLaunchServices.swift in Sources */,
 				C0FFEE202611090000000146 /* GOGSetup.swift in Sources */,
 				C0FFEE202611090000000145 /* GOGInstallScript.swift in Sources */,
@@ -624,6 +627,7 @@
 				C0FFEE202611070000000220 /* GalaxySupport.swift */,
 				C0FFEE202611070000000230 /* GalaxyWire.swift */,
 				C0FFEE202611070000000240 /* GOGGalaxy.swift */,
+				C0FFEE202611090000010148 /* IOSCrashDiagnostics.swift */,
 				C0FFEE202611090000010147 /* GOGLaunchServices.swift */,
 				C0FFEE202611090000010146 /* GOGSetup.swift */,
 				C0FFEE202611090000010145 /* GOGInstallScript.swift */,
@@ -805,7 +809,7 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = VPNExtension/VPNExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 47;
+				CURRENT_PROJECT_VERSION = 48;
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = VPNExtension/Info.plist;
@@ -814,7 +818,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.6.6;
+				MARKETING_VERSION = 1.6.7;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ideck.ideck.VPNExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -830,7 +834,7 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = VPNExtension/VPNExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 47;
+				CURRENT_PROJECT_VERSION = 48;
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = VPNExtension/Info.plist;
@@ -839,7 +843,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.6.6;
+				MARKETING_VERSION = 1.6.7;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ideck.ideck.VPNExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -933,7 +937,7 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = iDeckJITHelper/iDeckJITHelper.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 47;
+				CURRENT_PROJECT_VERSION = 48;
 				DEVELOPMENT_TEAM = "";
 				"FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*]" = "$(SRCROOT)/Frameworks/StikJIT.xcframework/ios-arm64";
 				GENERATE_INFOPLIST_FILE = NO;
@@ -942,7 +946,7 @@
 					"$(inherited)",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.6.6;
+				MARKETING_VERSION = 1.6.7;
 				"OTHER_LDFLAGS[sdk=iphoneos*]" = (
 					"$(inherited)",
 					"-framework",
@@ -963,7 +967,7 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = iDeckJITHelper/iDeckJITHelper.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 47;
+				CURRENT_PROJECT_VERSION = 48;
 				DEVELOPMENT_TEAM = "";
 				"FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*]" = "$(SRCROOT)/Frameworks/StikJIT.xcframework/ios-arm64";
 				GENERATE_INFOPLIST_FILE = NO;
@@ -972,7 +976,7 @@
 					"$(inherited)",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.6.6;
+				MARKETING_VERSION = 1.6.7;
 				"OTHER_LDFLAGS[sdk=iphoneos*]" = (
 					"$(inherited)",
 					"-framework",
@@ -1054,7 +1058,7 @@
 				OTHER_LDFLAGS = "$(inherited) -lz -llzma $(IDECK_NATIVE_LINK_FLAGS)";
 				OTHER_CFLAGS = "$(inherited) $(IDECK_NATIVE_CFLAGS)";
 				OTHER_CPLUSPLUSFLAGS = "$(inherited) $(IDECK_NATIVE_CFLAGS)";
-				CURRENT_PROJECT_VERSION = 47;
+				CURRENT_PROJECT_VERSION = 48;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -1067,7 +1071,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.6.6;
+				MARKETING_VERSION = 1.6.7;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ideck.ideck;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -1091,7 +1095,7 @@
 				OTHER_LDFLAGS = "$(inherited) -lz -llzma $(IDECK_NATIVE_LINK_FLAGS)";
 				OTHER_CFLAGS = "$(inherited) $(IDECK_NATIVE_CFLAGS)";
 				OTHER_CPLUSPLUSFLAGS = "$(inherited) $(IDECK_NATIVE_CFLAGS)";
-				CURRENT_PROJECT_VERSION = 47;
+				CURRENT_PROJECT_VERSION = 48;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -1104,7 +1108,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.6.6;
+				MARKETING_VERSION = 1.6.7;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ideck.ideck;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;

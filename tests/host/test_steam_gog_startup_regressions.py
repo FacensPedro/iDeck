@@ -15,8 +15,11 @@ class SteamSetupAndGOGCDNTests(unittest.TestCase):
     def test_gog_rotates_providers_and_never_retries_cancellation(self):
         source = GOG.read_text(encoding="utf-8")
         self.assertIn('let providers: [SignedCDN] = urls.compactMap', source)
-        self.assertIn('attempt % choices.count', source)
-        self.assertIn('let exhausted = attempt > 0', source)
+        self.assertIn('let server = choices[provider % choices.count]', source)
+        # A chunk every CDN answers 404/410 for is gone: no retries, no waiting.
+        self.assertIn('if notFound.count >= providers {', source)
+        self.assertIn('throw GOGContentError.unavailable(label)', source)
+        self.assertIn('case 401, 403:', source)
         self.assertIn('await linkCache.store(entry, for: productID)', source)
         self.assertIn('Self.md5(data) == chunk.compressedMd5.lowercased()', source)
         self.assertIn('catch let error as URLError where error.code == .cancelled', source)

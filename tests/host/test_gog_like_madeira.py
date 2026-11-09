@@ -41,6 +41,14 @@ class GOGLikeMadeiraTests(unittest.TestCase):
         self.assertIn('setup.arguments = "/c \\"\\(batch)\\""', view)
         self.assertIn("GOGLaunchServices.record(plan, folder: final)", repo_text("iDeck/GOGLibrary.swift"))
 
+    def test_open_link_chunks_get_their_path_and_never_fail_the_game(self):
+        content = repo_text("iDeck/GOGContentSystem.swift")
+        self.assertIn('if !text.contains("{path}") {', content)
+        self.assertIn('text += "{path}"', content)
+        self.assertIn("$0.productID != Self.redistProduct", content)
+        self.assertIn("[gog-setup] redistributables not downloaded", content)
+        self.assertIn('note: "Not downloaded"', repo_text("iDeck/GOGLaunchServices.swift"))
+
     def test_sources_are_in_the_project(self):
         project = repo_text("iDeck.xcodeproj/project.pbxproj")
         for name in ("GOGInstallScript.swift", "GOGSetup.swift", "GOGLaunchServices.swift"):
