@@ -426,9 +426,8 @@ final class GOGLibraryModel: ObservableObject {
                 } else {
                     try manager.moveItem(at: staging, to: final)
                 }
-                if !plan.dependencies.isEmpty {
-                    AppLog.record("[gog] game \(game.id) lists redistributables: \(plan.dependencies.joined(separator: ", "))")
-                }
+                // Install script and redistributables, used before each start (GOGLaunchServices).
+                GOGLaunchServices.record(plan, folder: final)
                 AppLog.record("[gog] game \(game.id) installed into C:\\GOG Games\\\(name)")
                 outcome = .completed
                 refreshInstalled(prefixPath: prefixPath)

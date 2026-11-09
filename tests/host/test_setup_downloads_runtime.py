@@ -50,26 +50,19 @@ class SetupDownloadsRuntimeTests(unittest.TestCase):
         build = repo_text("scripts/build_ipa.sh")
         self.assertIn("scripts/split_runtime_downloads.py", build)
 
-    def test_initial_setup_installs_everything(self):
+    def test_initial_setup_installs_the_runtime(self):
         view = repo_text("iDeck/MainView.swift")
-        for step in ("MadeiraRuntime.install(package.id)", "coordinator.installMadeiraDock()", "GOGGalaxyApp.downloadSetup",
-                     "GOGGalaxyApp.setupProfile", "MadeiraRuntime.needsDownload"):
+        for step in ("MadeiraRuntime.install(package.id)", "coordinator.installMadeiraDock()", "MadeiraRuntime.needsDownload"):
             self.assertIn(step, view)
-        galaxy = repo_text("iDeck/GOGGalaxyApp.swift")
-        self.assertIn("https://remote-config.gog.com/components/webinstaller?component_version=2.0.0", galaxy)
-        self.assertIn("/VERYSILENT", galaxy)
         project = repo_text("iDeck.xcodeproj/project.pbxproj")
-        for name in ("MadeiraRuntime.swift", "GOGGalaxyApp.swift"):
-            self.assertEqual(project.count(f"/* {name} in Sources */"), 2, name)
+        self.assertEqual(project.count("/* MadeiraRuntime.swift in Sources */"), 2)
 
     def test_downloads_report_real_progress(self):
         observed = repo_text("iDeck/ObservedDownload.swift")
         self.assertIn("URLSession(configuration: configuration, delegate: download, delegateQueue: nil)", observed)
         self.assertIn("didWriteData", observed)
         self.assertIn("ObservedDownload.run(", repo_text("iDeck/MadeiraRuntime.swift"))
-        self.assertIn("ObservedDownload.run(", repo_text("iDeck/GOGGalaxyApp.swift"))
         self.assertNotIn("URLSession.shared.download(from:", repo_text("iDeck/MadeiraRuntime.swift"))
-        self.assertIn("ideck_wineprocess_running()", repo_text("iDeck/MainView.swift"))
         project = repo_text("iDeck.xcodeproj/project.pbxproj")
         self.assertEqual(project.count("/* ObservedDownload.swift in Sources */"), 2)
 
