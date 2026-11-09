@@ -2672,7 +2672,6 @@ private struct IDeckFirstRunSetupView: View {
     private var x86Ready: Bool {
         MadeiraRuntime.installed("wine-x86") && coordinator.windowsEnvironment.hasWoW64Runtime() && prefixReady
     }
-    private var steamClientReady: Bool { MadeiraDock.clientInstalled }
     private var galaxyReady: Bool { GOGGalaxyApp.installed(prefix: MadeiraDock.prefix) }
     private var steamDLLsReady: Bool {
         guard let folder = SteamDLLRepair.sourceFolder else { return false }
@@ -2684,7 +2683,7 @@ private struct IDeckFirstRunSetupView: View {
         }
     }
     private var windowsReady: Bool {
-        x64Ready && x86Ready && steamDLLsReady && steamClientReady
+        x64Ready && x86Ready
     }
 
     var body: some View {
@@ -2776,11 +2775,9 @@ private struct IDeckFirstRunSetupView: View {
         VStack(alignment: .leading, spacing: 12) {
             Label("Windows runtime", systemImage: "square.stack.3d.up.fill")
                 .font(.title2.bold())
-            Text("Downloads the x64 and x86 Wine environments with Wine's own DLLs, and Valve's Steam client. None of it is part of the app download.")
+            Text("Downloads the x64 and x86 Wine environments with Wine's own DLLs. None of it is part of the app download. The Steam client and its DLLs are installed in the Madeira Dock step.")
             statusRow("x64 Wine environment", x64Ready)
             statusRow("x86 (WoW64) environment", x86Ready)
-            statusRow("Steam client", steamClientReady)
-            statusRow("Steam DLLs (video client, SDL3)", steamDLLsReady)
             Button(windowsReady ? "Installed" : (installing ? "Installing…" : "Install all")) {
                 installWindowsRuntime()
             }
@@ -2844,28 +2841,6 @@ private struct IDeckFirstRunSetupView: View {
             }
             refresh += 1
             // Visual C++ and Wine Mono are installed on demand (WindowsInstallerEnvironment).
-            // 5. Steam's official x64 video DLLs and SDL3.dll.
-            if !steamDLLsReady {
-                do {
-                    try await SteamVideoLibraries.fetch { message in
-                        await MainActor.run { installerStatus = message }
-                    }
-                } catch {
-                    installerStatus = "Steam DLLs: \(error.localizedDescription)"
-                    return
-                }
-            }
-            refresh += 1
-            // 6. Valve's Steam client (from Valve's update server).
-            if !steamClientReady {
-                installerStatus = "Installing the Steam client…"
-                coordinator.installMadeiraDock()
-                try? await Task.sleep(nanoseconds: 500_000_000)
-                for _ in 0..<1800 where coordinator.steamComponentsInstalling && !steamClientReady {
-                    if let progress = coordinator.steamComponentsProgress { installerStatus = progress }
-                    try? await Task.sleep(nanoseconds: 1_000_000_000)
-                }
-            }
             installerStatus = windowsReady ? "Windows runtime installed." : "Some components are missing. Tap Install all to retry."
         }
     }
