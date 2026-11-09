@@ -525,7 +525,7 @@ struct WindowsWorkspaceView: View {
         }
         .fileImporter(
             isPresented: $isExecutablePickerPresented,
-            allowedContentTypes: [UTType(filenameExtension: "exe") ?? .data, .data],
+            allowedContentTypes: [UTType(filenameExtension: "exe") ?? .data, UTType(filenameExtension: "msi") ?? .data, .data],
             allowsMultipleSelection: false
         ) { result in
             guard case .success(let urls) = result, let url = urls.first, let prefixPath else { return }
@@ -1120,7 +1120,7 @@ struct WindowsWorkspaceView: View {
             do {
                 try await eaLibrary.prepareLaunch(offerID: game.offerID, nvidiaGPU: profile.reportNVIDIA, avx: profile.avxEnabled)
                 profile.arguments = [profile.arguments, game.arguments].filter { !$0.isEmpty }.joined(separator: " ")
-                coordinator.launchWindowsExecutable(at: executable, profile: profile)
+                coordinator.launchWindowsProgram(at: executable, profile: profile, detectInstaller: false)
             } catch {
                 installMessage = error.localizedDescription
                 isShowingInstallResult = true
@@ -1136,7 +1136,7 @@ struct WindowsWorkspaceView: View {
                 let epicArguments = try await epicLibrary.launchArguments(appName: game.appName)
                 var profile = savedProfile
                 profile.arguments = [profile.arguments, epicArguments].filter { !$0.isEmpty }.joined(separator: " ")
-                coordinator.launchWindowsExecutable(at: executable, profile: profile)
+                coordinator.launchWindowsProgram(at: executable, profile: profile, detectInstaller: false)
             } catch {
                 installMessage = error.localizedDescription
                 isShowingInstallResult = true
@@ -1210,7 +1210,7 @@ struct WindowsWorkspaceView: View {
         // with a token minted for its own client, before Wine starts.
         Task { @MainActor in
             await GOGGalaxy.shared.prepare(gameID: game.gameID, drive: EpicLibrary.drive)
-            coordinator.launchWindowsExecutable(at: game.executable, profile: profile)
+            coordinator.launchWindowsProgram(at: game.executable, profile: profile, detectInstaller: false)
         }
     }
 
@@ -1365,7 +1365,7 @@ private struct WindowsExecutableDetailsView: View {
                     Button {
                         library.save(profile)
                         dismiss()
-                        coordinator.launchWindowsExecutable(at: executableURL, profile: profile)
+                        coordinator.launchWindowsProgram(at: executableURL, profile: profile)
                     } label: {
                         Label(tr("Launch"), systemImage: "play.fill")
                             .frame(maxWidth: .infinity)
@@ -2674,8 +2674,6 @@ private struct IDeckFirstRunSetupView: View {
     }
     private var steamClientReady: Bool { MadeiraDock.clientInstalled }
     private var galaxyReady: Bool { GOGGalaxyApp.installed(prefix: MadeiraDock.prefix) }
-    private var visualCx64Ready: Bool { VisualCRuntimeBootstrap.installed(in: MadeiraDock.prefix, documents: documents) }
-    private var visualCx86Ready: Bool { VisualCRuntimeLegacy.installed(documents: documents) }
     private var steamDLLsReady: Bool {
         guard let folder = SteamDLLRepair.sourceFolder else { return false }
         let root = MadeiraDock.prefix.appendingPathComponent("drive_c")
@@ -2686,8 +2684,7 @@ private struct IDeckFirstRunSetupView: View {
         }
     }
     private var windowsReady: Bool {
-        x64Ready && x86Ready && visualCx64Ready && visualCx86Ready && WineMonoModel.available && steamDLLsReady
-            && steamClientReady
+        x64Ready && x86Ready && steamDLLsReady && steamClientReady
     }
 
     var body: some View {
@@ -2779,12 +2776,9 @@ private struct IDeckFirstRunSetupView: View {
         VStack(alignment: .leading, spacing: 12) {
             Label("Windows runtime", systemImage: "square.stack.3d.up.fill")
                 .font(.title2.bold())
-            Text("Downloads and installs everything Windows games need: the x64 and x86 Wine environments, Microsoft Visual C++, .NET (Wine Mono) and Valve's Steam client. None of it is part of the app download.")
+            Text("Downloads the x64 and x86 Wine environments with Wine's own DLLs, and Valve's Steam client. None of it is part of the app download.")
             statusRow("x64 Wine environment", x64Ready)
             statusRow("x86 (WoW64) environment", x86Ready)
-            statusRow("Visual C++ x64 (2015-2022)", visualCx64Ready)
-            statusRow("Visual C++ x86 (2005-2013)", visualCx86Ready)
-            statusRow(".NET support (Wine Mono)", WineMonoModel.available, detail: wineMono.busy ? wineMono.status : nil)
             statusRow("Steam client", steamClientReady)
             statusRow("Steam DLLs (video client, SDL3)", steamDLLsReady)
             Button(windowsReady ? "Installed" : (installing ? "Installing…" : "Install all")) {
@@ -2796,7 +2790,8 @@ private struct IDeckFirstRunSetupView: View {
             else if !installerStatus.isEmpty {
                 Text(installerStatus).font(.caption).foregroundStyle(.secondary)
             }
-            if let error = wineMono.error { Text(error).font(.caption).foregroundStyle(.orange) }
+            Text("Microsoft Visual C++ and .NET (Wine Mono) are installed on demand: before a program or installer starts, iDeck reads which runtimes it uses and installs only those. MSI, Inno Setup, NSIS, InstallShield, WiX and 7-Zip installers are recognised automatically.")
+                .font(.caption).foregroundStyle(.secondary)
             if !MadeiraRuntime.available {
                 Text("This IPA does not include the Windows runtime. Install a native iDeck IPA.")
                     .font(.caption).foregroundStyle(.orange)
@@ -2848,33 +2843,7 @@ private struct IDeckFirstRunSetupView: View {
                 }
             }
             refresh += 1
-            // 2. Visual C++ x64: bundled in the IPA, otherwise Microsoft's redistributable.
-            if !visualCx64Ready {
-                installerStatus = "Installing Visual C++ x64…"
-                if !VisualCRuntimeBootstrap.installBundled(documents: documents) || !visualCx64Ready {
-                    if let failure = await downloadVisualC() {
-                        installerStatus = failure
-                        return
-                    }
-                }
-            }
-            refresh += 1
-            // 3. Visual C++ x86 and 2005-2013.
-            if !visualCx86Ready {
-                installerStatus = "Installing Visual C++ x86 and 2005-2013…"
-                let failures = await VisualCRuntimeLegacy.installAll(documents: documents) { name in
-                    AppLog.record("[vcrt] installing Visual C++ \(name)")
-                }
-                for failure in failures { AppLog.record("[vcrt] \(failure)") }
-            }
-            refresh += 1
-            // 4. Wine Mono (.NET Framework).
-            if !WineMonoModel.available {
-                installerStatus = "Installing Wine Mono…"
-                wineMono.install()
-                while wineMono.busy { try? await Task.sleep(nanoseconds: 500_000_000) }
-            }
-            refresh += 1
+            // Visual C++ and Wine Mono are installed on demand (WindowsInstallerEnvironment).
             // 5. Steam's official x64 video DLLs and SDL3.dll.
             if !steamDLLsReady {
                 do {
@@ -2898,25 +2867,6 @@ private struct IDeckFirstRunSetupView: View {
                 }
             }
             installerStatus = windowsReady ? "Windows runtime installed." : "Some components are missing. Tap Install all to retry."
-        }
-    }
-
-    private func downloadVisualC() async -> String? {
-        await withCheckedContinuation { continuation in
-            VisualCRuntimeBootstrap.download(in: MadeiraDock.prefix) { result in
-                switch result {
-                case .failure(let error):
-                    continuation.resume(returning: error.localizedDescription)
-                case .success(let installer):
-                    VisualCRuntimeBootstrap.extractAndInstall(installer: installer, documents: documents) { outcome in
-                        try? FileManager.default.removeItem(at: installer)
-                        switch outcome {
-                        case .success: continuation.resume(returning: nil)
-                        case .failure(let error): continuation.resume(returning: error.localizedDescription)
-                        }
-                    }
-                }
-            }
         }
     }
 

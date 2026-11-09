@@ -171,7 +171,7 @@ final class WindowsLibraryStore: ObservableObject {
                 at: directory,
                 includingPropertiesForKeys: [.isRegularFileKey]
             )
-            .filter { $0.pathExtension.lowercased() == "exe" }
+            .filter { ["exe", "msi"].contains($0.pathExtension.lowercased()) }
             .filter { (try? $0.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true }
             .sorted { $0.lastPathComponent.localizedCaseInsensitiveCompare($1.lastPathComponent) == .orderedAscending }
         } catch {
@@ -268,7 +268,7 @@ final class WindowsLibraryStore: ObservableObject {
         defer { if hasScope { source.stopAccessingSecurityScopedResource() } }
 
         let fileExtension = source.pathExtension.lowercased()
-        guard fileExtension == "exe" else {
+        guard fileExtension == "exe" || fileExtension == "msi" else {
             throw WindowsLibraryError.unsupportedExecutable
         }
 
@@ -294,7 +294,7 @@ final class WindowsLibraryStore: ObservableObject {
         let directory = prefixPath.appendingPathComponent("drive_c/WindowsDownloads", isDirectory: true).standardizedFileURL
         let target = url.standardizedFileURL
         guard target.deletingLastPathComponent() == directory,
-              target.pathExtension.lowercased() == "exe",
+              ["exe", "msi"].contains(target.pathExtension.lowercased()),
               target.resolvingSymlinksInPath().deletingLastPathComponent() == directory.resolvingSymlinksInPath() else {
             throw WindowsLibraryError.unsafePath
         }
@@ -343,7 +343,7 @@ enum WindowsLibraryError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .unsupportedExecutable:
-            return "Choose a Windows .exe file."
+            return "Choose a Windows .exe or .msi file."
         case .unsafePath:
             return "iDeck refused to remove a file outside its Windows library."
         case .unsupportedArtwork:

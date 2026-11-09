@@ -20,7 +20,7 @@ class GamePageCoverTests(unittest.TestCase):
     def test_game_tile_opens_details_with_launch(self):
         self.assertIn("if case .store = item {} else { openSettings(item) }", VIEW)
         self.assertIn("coordinator: coordinator) { game in launchSteamGame(game) }", VIEW)
-        self.assertIn("coordinator.launchWindowsExecutable(at: executableURL, profile: profile)", VIEW)
+        self.assertIn("coordinator.launchWindowsProgram(at: executableURL, profile: profile)", VIEW)
 
 
 class StoreDetailsLaunchTests(unittest.TestCase):

@@ -49,8 +49,7 @@ class SetupDownloadsRuntimeTests(unittest.TestCase):
 
     def test_initial_setup_installs_everything(self):
         view = repo_text("iDeck/MainView.swift")
-        for step in ("MadeiraRuntime.install(package.id)", "VisualCRuntimeLegacy.installAll", "wineMono.install()",
-                     "coordinator.installMadeiraDock()", "GOGGalaxyApp.downloadSetup",
+        for step in ("MadeiraRuntime.install(package.id)", "coordinator.installMadeiraDock()", "GOGGalaxyApp.downloadSetup",
                      "GOGGalaxyApp.setupProfile", "MadeiraRuntime.needsDownload"):
             self.assertIn(step, view)
         galaxy = repo_text("iDeck/GOGGalaxyApp.swift")

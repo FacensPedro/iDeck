@@ -148,6 +148,7 @@
 		C0FFEE202611070000000120 /* GalaxySupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE202611070000000220 /* GalaxySupport.swift */; };
 		C0FFEE202611070000000130 /* GalaxyWire.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE202611070000000230 /* GalaxyWire.swift */; };
 		C0FFEE202611070000000140 /* GOGGalaxy.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE202611070000000240 /* GOGGalaxy.swift */; };
+		C0FFEE202611090000000143 /* WindowsInstallerEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE202611090000010143 /* WindowsInstallerEnvironment.swift */; };
 		C0FFEE202611090000000142 /* GOGGalaxyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE202611090000010142 /* GOGGalaxyApp.swift */; };
 		C0FFEE202611090000000141 /* MadeiraRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE202611090000010141 /* MadeiraRuntime.swift */; };
 		C0FFEE202611070000000150 /* madeira-galaxy-service.exe in Resources */ = {isa = PBXBuildFile; fileRef = C0FFEE202611070000000250 /* madeira-galaxy-service.exe */; };
@@ -289,6 +290,7 @@
 		C0FFEE202611070000000220 /* GalaxySupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Vendor/Madeira/SwiftGOG/Galaxy/GalaxySupport.swift"; sourceTree = "<group>"; };
 		C0FFEE202611070000000230 /* GalaxyWire.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Vendor/Madeira/SwiftGOG/Galaxy/GalaxyWire.swift"; sourceTree = "<group>"; };
 		C0FFEE202611070000000240 /* GOGGalaxy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GOGGalaxy.swift"; sourceTree = "<group>"; };
+		C0FFEE202611090000010143 /* WindowsInstallerEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WindowsInstallerEnvironment.swift"; sourceTree = "<group>"; };
 		C0FFEE202611090000010142 /* GOGGalaxyApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GOGGalaxyApp.swift"; sourceTree = "<group>"; };
 		C0FFEE202611090000010141 /* MadeiraRuntime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MadeiraRuntime.swift"; sourceTree = "<group>"; };
 		C0FFEE202611070000000250 /* madeira-galaxy-service.exe */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Resources/Galaxy/madeira-galaxy-service.exe"; sourceTree = "<group>"; };
@@ -448,6 +450,7 @@
 				C0FFEE202611070000000120 /* GalaxySupport.swift in Sources */,
 				C0FFEE202611070000000130 /* GalaxyWire.swift in Sources */,
 				C0FFEE202611070000000140 /* GOGGalaxy.swift in Sources */,
+				C0FFEE202611090000000143 /* WindowsInstallerEnvironment.swift in Sources */,
 				C0FFEE202611090000000142 /* GOGGalaxyApp.swift in Sources */,
 				C0FFEE202611090000000141 /* MadeiraRuntime.swift in Sources */,
 				BEEF20261107000000000110 /* EAAPI.swift in Sources */,
@@ -612,6 +615,7 @@
 				C0FFEE202611070000000220 /* GalaxySupport.swift */,
 				C0FFEE202611070000000230 /* GalaxyWire.swift */,
 				C0FFEE202611070000000240 /* GOGGalaxy.swift */,
+				C0FFEE202611090000010143 /* WindowsInstallerEnvironment.swift */,
 				C0FFEE202611090000010142 /* GOGGalaxyApp.swift */,
 				C0FFEE202611090000010141 /* MadeiraRuntime.swift */,
 				C0FFEE202611070000000250 /* madeira-galaxy-service.exe */,

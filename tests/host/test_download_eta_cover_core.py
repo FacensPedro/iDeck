@@ -37,9 +37,10 @@ class DownloadETACoreContract(unittest.TestCase):
         self.assertIn('coordinator.installMadeiraDock()', view)
         self.assertIn('case windows, dock, jit, gog, summary', view)
         self.assertIn('coordinator.openMadeiraWorkspace()', view)
-        for component in ('VisualCRuntimeLegacy.installAll', 'wineMono.install()',
-                          'SteamVideoLibraries.fetch'):
-            self.assertIn(component, view)
+        self.assertIn('SteamVideoLibraries.fetch', view)
+        # Visual C++ and Wine Mono are installed on demand, not by the setup.
+        for component in ('VisualCRuntimeLegacy.installAll', 'wineMono.install()'):
+            self.assertNotIn(component, view)
         windows = source("iDeck/WindowsEnvironment.swift")
         self.assertIn('setenv("WINEARCH", "win64", 1)', windows)
 
