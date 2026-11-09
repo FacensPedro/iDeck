@@ -2956,8 +2956,11 @@ private struct IDeckFirstRunSetupView: View {
             defer { installing = false; refresh += 1 }
             let setup: URL
             do {
-                setup = try await GOGGalaxyApp.downloadSetup(prefix: prefix) { fraction in
-                    Task { @MainActor in installerStatus = "Downloading GOG Galaxy… \(Int(fraction * 100))%" }
+                setup = try await GOGGalaxyApp.downloadSetup(prefix: prefix) { done, total in
+                    let text = total > 0
+                        ? "\(ObservedDownload.megabytes(done)) / \(ObservedDownload.megabytes(total)) (\(Int(Double(done) / Double(total) * 100))%)"
+                        : ObservedDownload.megabytes(done)
+                    Task { @MainActor in installerStatus = "Downloading GOG Galaxy… " + text }
                 }
             } catch {
                 installerStatus = error.localizedDescription
@@ -2967,7 +2970,14 @@ private struct IDeckFirstRunSetupView: View {
             installerStatus = "Installing GOG Galaxy…"
             coordinator.launchWindowsExecutable(at: setup, profile: GOGGalaxyApp.setupProfile)
             // The silent setup finishes when GalaxyClient.exe is in place (up to 20 minutes).
-            for _ in 0..<1200 where !GOGGalaxyApp.installed(prefix: prefix) {
+            // Wine stopping first means the setup ended or could not start.
+            var started = false
+            for second in 0..<1200 where !GOGGalaxyApp.installed(prefix: prefix) {
+                let running = ideck_wineprocess_running()
+                if running { started = true }
+                if (started && !running) || (!started && second >= 120) { break }
+                installerStatus = "Installing GOG Galaxy… \(second / 60):\(String(format: "%02d", second % 60))"
+                    + (coordinator.windowsStatus.isEmpty ? "" : " — " + coordinator.windowsStatus)
                 try? await Task.sleep(nanoseconds: 1_000_000_000)
             }
             if GOGGalaxyApp.installed(prefix: prefix) {

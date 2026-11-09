@@ -47,23 +47,61 @@ enum GOGGalaxyApp {
 
     /// Downloads GOG Galaxy's setup into the prefix (C:\ProgramData\iDeck), checked as a
     /// Windows program. `progress` gets the fraction downloaded.
-    static func downloadSetup(prefix: URL, progress: @escaping @Sendable (Double) -> Void) async throws -> URL {
-        let url = try await setupURL()
-        AppLog.record("[gog-galaxy] downloading \(url.lastPathComponent)")
+    /// `progress` gets the bytes downloaded and the expected total (0 when unknown).
+    /// A complete setup left by an earlier attempt is used again.
+    static func downloadSetup(prefix: URL, progress: @escaping @Sendable (Int64, Int64) -> Void) async throws -> URL {
         let folder = prefix.appendingPathComponent("drive_c/ProgramData/iDeck", isDirectory: true)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        let delegate = GalaxySetupDownloadDelegate(progress: progress)
-        let (temporary, response) = try await URLSession.shared.download(from: url, delegate: delegate)
-        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-        guard status == 200 else { throw InstallError.message("The GOG Galaxy download failed (HTTP \(status)).") }
-        let handle = try FileHandle(forReadingFrom: temporary)
-        let magic = try handle.read(upToCount: 2)
-        try? handle.close()
-        guard magic == Data([0x4d, 0x5a]) else { throw InstallError.message("The GOG Galaxy download is not a Windows program.") }
         let setup = folder.appendingPathComponent("setup_galaxy.exe")
-        try? FileManager.default.removeItem(at: setup)
-        try FileManager.default.moveItem(at: temporary, to: setup)
-        return setup
+        if isWindowsProgram(setup) {
+            AppLog.record("[gog-galaxy] using the setup downloaded earlier")
+            return setup
+        }
+        let url = try await setupURL()
+        AppLog.record("[gog-galaxy] downloading \(url.lastPathComponent)")
+        var request = URLRequest(url: url)
+        request.setValue(GOGAPI.userAgent, forHTTPHeaderField: "User-Agent")
+        var attempt = 0
+        var resume: Data?
+        while true {
+            do {
+                let (temporary, response) = try await ObservedDownload.run(request, resumeData: resume, progress: progress)
+                let status = response.statusCode
+                if (status == 429 || (500...599).contains(status)) && attempt < 6 {
+                    try? FileManager.default.removeItem(at: temporary)
+                    attempt += 1
+                    resume = nil
+                    AppLog.record("[gog-galaxy] download got HTTP \(status); retry \(attempt)/6")
+                    try await Task.sleep(nanoseconds: UInt64(attempt) * 2_000_000_000)
+                    continue
+                }
+                guard status == 200 else {
+                    try? FileManager.default.removeItem(at: temporary)
+                    throw InstallError.message("The GOG Galaxy download failed (HTTP \(status)).")
+                }
+                guard isWindowsProgram(temporary) else {
+                    try? FileManager.default.removeItem(at: temporary)
+                    throw InstallError.message("The GOG Galaxy download is not a Windows program.")
+                }
+                try? FileManager.default.removeItem(at: setup)
+                try FileManager.default.moveItem(at: temporary, to: setup)
+                AppLog.record("[gog-galaxy] setup downloaded")
+                return setup
+            } catch let failure as ObservedDownload.Failure {
+                guard let error = failure.error as? URLError, error.code != .cancelled, attempt < 6 else { throw failure.error }
+                attempt += 1
+                resume = failure.resumeData ?? resume
+                AppLog.record("[gog-galaxy] download interrupted (\(error.code.rawValue)); retry \(attempt)/6")
+                try await Task.sleep(nanoseconds: UInt64(attempt) * 2_000_000_000)
+            }
+        }
+    }
+
+    private static func isWindowsProgram(_ file: URL) -> Bool {
+        guard let handle = try? FileHandle(forReadingFrom: file) else { return false }
+        defer { try? handle.close() }
+        let size = (try? FileManager.default.attributesOfItem(atPath: file.path)[.size] as? NSNumber)?.int64Value ?? 0
+        return size > 1_000_000 && (try? handle.read(upToCount: 2)) == Data([0x4d, 0x5a])
     }
 
     static func removeSetup(prefix: URL) {
@@ -77,17 +115,4 @@ enum GOGGalaxyApp {
     static var launchProfile: WindowsGameProfile {
         WindowsGameProfile(id: "gog-galaxy", title: "GOG Galaxy")
     }
-}
-
-private final class GalaxySetupDownloadDelegate: NSObject, URLSessionDownloadDelegate, @unchecked Sendable {
-    let progress: @Sendable (Double) -> Void
-    init(progress: @escaping @Sendable (Double) -> Void) { self.progress = progress }
-
-    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64,
-                    totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
-        guard totalBytesExpectedToWrite > 0 else { return }
-        progress(min(Double(totalBytesWritten) / Double(totalBytesExpectedToWrite), 1))
-    }
-
-    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {}
 }

@@ -101,7 +101,11 @@ enum MadeiraRuntime {
 
         AppLog.record("[runtime] downloading \(package.id) (\(package.bytes) bytes)")
         progress("Downloading \(package.title)…", 0)
-        let archive = try await download(package) { fraction in progress("Downloading \(package.title)…", fraction * 0.7) }
+        let archive = try await download(package) { done, total in
+            let size = total > 0 ? "\(ObservedDownload.megabytes(done)) / \(ObservedDownload.megabytes(total))"
+                                 : ObservedDownload.megabytes(done)
+            progress("Downloading \(package.title)… \(size)", total > 0 ? min(Double(done) / Double(total), 1) * 0.7 : 0)
+        }
         defer { try? fm.removeItem(at: archive) }
 
         progress("Checking \(package.title)…", 0.7)
@@ -144,19 +148,14 @@ enum MadeiraRuntime {
         return parts.joined(separator: "/")
     }
 
-    private static func download(_ package: Package, progress: @escaping @Sendable (Double) -> Void) async throws -> URL {
-        let delegate = RuntimeDownloadDelegate(expected: package.bytes, progress: progress)
+    private static func download(_ package: Package, progress: @escaping @Sendable (Int64, Int64) -> Void) async throws -> URL {
         var attempt = 0
         var resume: Data?
         while true {
             do {
-                let (file, response): (URL, URLResponse)
-                if let resume {
-                    (file, response) = try await URLSession.shared.download(resumeFrom: resume, delegate: delegate)
-                } else {
-                    (file, response) = try await URLSession.shared.download(from: package.url, delegate: delegate)
-                }
-                let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+                let (file, response) = try await ObservedDownload.run(URLRequest(url: package.url), resumeData: resume,
+                                                                      expected: package.bytes, progress: progress)
+                let status = response.statusCode
                 // GitHub's release downloads answer 502/503/504 now and then: retry those.
                 if (status == 429 || (500...599).contains(status)) && attempt < 8 {
                     try? FileManager.default.removeItem(at: file)
@@ -166,35 +165,18 @@ enum MadeiraRuntime {
                     try await Task.sleep(nanoseconds: UInt64(min(attempt, 4)) * 2_000_000_000)
                     continue
                 }
-                guard status == 200 else { throw InstallError.message("The runtime download failed (HTTP \(status)). Try again.") }
-                let kept = FileManager.default.temporaryDirectory.appendingPathComponent("runtime-\(package.id)-\(UUID().uuidString).tar.xz")
-                try FileManager.default.moveItem(at: file, to: kept)
-                return kept
-            } catch let error as URLError where attempt < 8 && [.networkConnectionLost, .timedOut,
-                                                                .notConnectedToInternet, .cannotConnectToHost].contains(error.code) {
+                guard status == 200 else {
+                    try? FileManager.default.removeItem(at: file)
+                    throw InstallError.message("The runtime download failed (HTTP \(status)). Try again.")
+                }
+                return file
+            } catch let failure as ObservedDownload.Failure {
+                guard let error = failure.error as? URLError, error.code != .cancelled, attempt < 8 else { throw failure.error }
                 attempt += 1
-                resume = error.downloadTaskResumeData ?? resume
+                resume = failure.resumeData ?? resume
                 AppLog.record("[runtime] download of \(package.id) interrupted (\(error.code.rawValue)); retry \(attempt)/8")
-                try await Task.sleep(nanoseconds: UInt64(attempt) * 2_000_000_000)
+                try await Task.sleep(nanoseconds: UInt64(min(attempt, 4)) * 2_000_000_000)
             }
         }
     }
-}
-
-private final class RuntimeDownloadDelegate: NSObject, URLSessionDownloadDelegate, @unchecked Sendable {
-    let expected: Int64
-    let progress: @Sendable (Double) -> Void
-    init(expected: Int64, progress: @escaping @Sendable (Double) -> Void) {
-        self.expected = expected
-        self.progress = progress
-    }
-
-    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64,
-                    totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
-        let total = totalBytesExpectedToWrite > 0 ? totalBytesExpectedToWrite : expected
-        guard total > 0 else { return }
-        progress(min(Double(totalBytesWritten) / Double(total), 1))
-    }
-
-    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {}
 }
