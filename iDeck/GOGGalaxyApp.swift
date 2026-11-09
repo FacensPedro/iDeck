@@ -7,7 +7,7 @@ import Foundation
 // Setup program, run silently through Wine into C:\Program Files (x86)\GOG Galaxy.
 // Nothing of it is in the IPA. Log tag: [gog-galaxy].
 
-enum GOGGalaxyClient {
+enum GOGGalaxyApp {
     static let remoteConfig = URL(string: "https://remote-config.gog.com/components/webinstaller?component_version=2.0.0")!
     static let relativeFolder = "Program Files (x86)/GOG Galaxy"
     static let windowsExecutable = "C:\\Program Files (x86)\\GOG Galaxy\\GalaxyClient.exe"

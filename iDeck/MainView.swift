@@ -2673,7 +2673,7 @@ private struct IDeckFirstRunSetupView: View {
         MadeiraRuntime.installed("wine-x86") && coordinator.windowsEnvironment.hasWoW64Runtime() && prefixReady
     }
     private var steamClientReady: Bool { MadeiraDock.clientInstalled }
-    private var galaxyReady: Bool { GOGGalaxyClient.installed(prefix: MadeiraDock.prefix) }
+    private var galaxyReady: Bool { GOGGalaxyApp.installed(prefix: MadeiraDock.prefix) }
     private var visualCx64Ready: Bool { VisualCRuntimeBootstrap.installed(in: MadeiraDock.prefix, documents: documents) }
     private var visualCx86Ready: Bool { VisualCRuntimeLegacy.installed(documents: documents) }
     private var steamDLLsReady: Bool {
@@ -3006,7 +3006,7 @@ private struct IDeckFirstRunSetupView: View {
             defer { installing = false; refresh += 1 }
             let setup: URL
             do {
-                setup = try await GOGGalaxyClient.downloadSetup(prefix: prefix) { fraction in
+                setup = try await GOGGalaxyApp.downloadSetup(prefix: prefix) { fraction in
                     Task { @MainActor in installerStatus = "Downloading GOG Galaxy… \(Int(fraction * 100))%" }
                 }
             } catch {
@@ -3015,13 +3015,13 @@ private struct IDeckFirstRunSetupView: View {
                 return
             }
             installerStatus = "Installing GOG Galaxy…"
-            coordinator.launchWindowsExecutable(at: setup, profile: GOGGalaxyClient.setupProfile)
+            coordinator.launchWindowsExecutable(at: setup, profile: GOGGalaxyApp.setupProfile)
             // The silent setup finishes when GalaxyClient.exe is in place (up to 20 minutes).
-            for _ in 0..<1200 where !GOGGalaxyClient.installed(prefix: prefix) {
+            for _ in 0..<1200 where !GOGGalaxyApp.installed(prefix: prefix) {
                 try? await Task.sleep(nanoseconds: 1_000_000_000)
             }
-            if GOGGalaxyClient.installed(prefix: prefix) {
-                GOGGalaxyClient.removeSetup(prefix: prefix)
+            if GOGGalaxyApp.installed(prefix: prefix) {
+                GOGGalaxyApp.removeSetup(prefix: prefix)
                 installerStatus = "GOG Galaxy installed."
                 AppLog.record("[gog-galaxy] installed")
             } else {

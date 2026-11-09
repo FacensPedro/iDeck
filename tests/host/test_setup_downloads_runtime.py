@@ -50,14 +50,14 @@ class SetupDownloadsRuntimeTests(unittest.TestCase):
     def test_initial_setup_installs_everything(self):
         view = repo_text("iDeck/MainView.swift")
         for step in ("MadeiraRuntime.install(package.id)", "VisualCRuntimeLegacy.installAll", "wineMono.install()",
-                     "coordinator.installMadeiraDock()", "GOGGalaxyClient.downloadSetup",
-                     "GOGGalaxyClient.setupProfile", "MadeiraRuntime.needsDownload"):
+                     "coordinator.installMadeiraDock()", "GOGGalaxyApp.downloadSetup",
+                     "GOGGalaxyApp.setupProfile", "MadeiraRuntime.needsDownload"):
             self.assertIn(step, view)
-        galaxy = repo_text("iDeck/GOGGalaxyClient.swift")
+        galaxy = repo_text("iDeck/GOGGalaxyApp.swift")
         self.assertIn("https://remote-config.gog.com/components/webinstaller?component_version=2.0.0", galaxy)
         self.assertIn("/VERYSILENT", galaxy)
         project = repo_text("iDeck.xcodeproj/project.pbxproj")
-        for name in ("MadeiraRuntime.swift", "GOGGalaxyClient.swift"):
+        for name in ("MadeiraRuntime.swift", "GOGGalaxyApp.swift"):
             self.assertEqual(project.count(f"/* {name} in Sources */"), 2, name)
 
     def test_workflow_publishes_runtime(self):
