@@ -692,29 +692,12 @@ jobs:
             echo "::add-mask::$MSC_PKG_REPO"
             DL="$RUNNER_TEMP/msc-download"
             mkdir -p "$DL"
-            GH_TOKEN="$MSC_PKG_TOKEN" gh release download --repo "$MSC_PKG_REPO" --pattern '*.pkg' --pattern '*.zip' --dir "$DL"
-            mv "$DL"/*.pkg "$PKG" 2>/dev/null || true
+            GH_TOKEN="$MSC_PKG_TOKEN" gh release download --repo "$MSC_PKG_REPO" --pattern '*.pkg' --dir "$DL"
+            FOUND=("$DL"/*.pkg)
+            [[ ${#FOUND[@]} -eq 1 && -s "${FOUND[0]}" ]] || { echo "::error::Expected exactly one .pkg in the latest release."; exit 2; }
+            mv "${FOUND[0]}" "$PKG"
           else
             echo "::error::Set msc_pkg_url, the IDECK_MSC_PKG_URL secret, or IDECK_MSC_PKG_REPO + IDECK_MSC_PKG_TOKEN."
-            exit 2
-          fi
-          # GitHub releases and some hosts refuse .pkg uploads: accept the .pkg zipped.
-          ZIP=""
-          if [[ ! -s "$PKG" ]]; then
-            ZIP="$(ls "$RUNNER_TEMP"/msc-download/*.zip 2>/dev/null | head -1 || true)"
-          fi
-          if [[ -s "$PKG" ]] && unzip -tqq "$PKG" >/dev/null 2>&1; then
-            mv "$PKG" "$RUNNER_TEMP/msc-download.zip"; ZIP="$RUNNER_TEMP/msc-download.zip"
-          fi
-          if [[ -n "$ZIP" && -s "$ZIP" ]]; then
-            X="$RUNNER_TEMP/msc-unzip"; rm -rf "$X"; mkdir -p "$X"
-            unzip -q "$ZIP" -d "$X"
-            FOUND="$(find "$X" -name '*.pkg' -not -path '*/__MACOSX/*' -type f | head -2)"
-            [[ "$(printf '%s\n' "$FOUND" | grep -c .)" -eq 1 ]] || { echo "::error::Expected exactly one .pkg inside the zip."; exit 2; }
-            mv "$FOUND" "$PKG"
-          fi
-          if [[ ! -s "$PKG" ]]; then
-            echo "::error::No .pkg (or .zip containing it) was downloaded."
             exit 2
           fi
           echo "Downloaded $(stat -f%z "$PKG") bytes; SHA-256 $(shasum -a 256 "$PKG" | cut -d' ' -f1)"
