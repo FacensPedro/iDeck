@@ -1,12 +1,3 @@
 ## What's Changed
-- **JIT:** iDeck starts the activation itself, sending StikDebug its JIT script, and a game starts only after the preparation is validated: CS_DEBUGGED on the process, plus a live debugger or a prepared pool. The JIT state at each launch is recorded, so bug reports made after a crash (in a new process) show it.
-- **Wine NLS:** iOS builds compile Madeira's own loader_ios.c, so the 1.6.4 fix never took effect. That loader now reads the NLS files from the downloaded runtime. Wine never falls back to the app bundle for them, and it does not start until locale.nls, l_intl.nls and normnfc.nls are present and complete.
-- **Runtime packages:** after download, every file of wine-x64 and wine-x86 is checked against the package's SHA-256 manifest. The ARM64EC, ARM64 and i386 libraries and the DXMT components (d3d11, dxgi, d3d10core, WineMetal) are also checked by PE architecture before they are installed.
-- **Crash diagnostics:** iOS crash reports (MetricKit) are summarised in the log as `[ios-crash]` lines and saved in Documents/Diagnostics. Bug reports replace Wine's generic "ulimit -c" advice with these. Madeira's informational lines (commit-zero, ml990, master_socket_timeout) are no longer listed as problems.
-- **GOG:**
-  - Redistributable chunk addresses now include the chunk path, which fixes the HTTP 404s.
-  - A file every CDN answers 404/410 for stops the install at once, instead of being retried 5 times.
-  - An expired signed address is renewed once.
-  - Signed URL parameters are read as plain values.
-  - A redistributable that cannot be downloaded never fails the game's install.
-- Updated the application version to 1.6.7 (build 48).
+- Fixed "x64 Wine environment failed verification: aarch64-windows/d3d11.dll is not the expected architecture (machine 0x0000)". The 1.6.7 check read the PE machine with a function that recognizes only programs Wine may start (i386, x64, ARM64EC) and reported ARM64 libraries as 0x0000. The package check now reads each file's own machine field.
+- Updated the application version to 1.6.8 (build 49).
