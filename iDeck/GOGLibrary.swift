@@ -3,8 +3,8 @@ import Security
 import SwiftUI
 import WebKit
 
-// GOG integration: sign-in, owned library, installer downloads and the games
-// those installers put in the Wine prefix.
+// GOG integration: sign-in, the GOG Galaxy library, Galaxy installs and the games
+// installed in the Wine prefix.
 //
 // GOG has no public store API; these are the endpoints GOG Galaxy itself uses
 // (documented at https://gogapidocs.readthedocs.io and used by Heroic, Lutris
@@ -72,7 +72,7 @@ enum GOGError: LocalizedError {
     case signInRejected
     case http(Int)
     case invalidResponse
-    case noWindowsInstaller
+    case noGalaxyBuild
 
     var errorDescription: String? {
         switch self {
@@ -80,7 +80,7 @@ enum GOGError: LocalizedError {
         case .signInRejected: return "GOG did not accept the sign-in. Try again."
         case .http(let code): return "GOG returned HTTP \(code). Try again later."
         case .invalidResponse: return "GOG sent an unexpected response."
-        case .noWindowsInstaller: return "GOG offers no Windows installer for this game."
+        case .noGalaxyBuild: return "GOG Galaxy has no Windows build of this game."
         }
     }
 }
@@ -97,28 +97,6 @@ struct GOGGame: Identifiable, Hashable, Codable {
         guard let image, !image.isEmpty else { return [] }
         let base = image.hasPrefix("//") ? "https:" + image : image
         return ["_glx_vertical_cover.webp", "_392.jpg", ".jpg"].compactMap { URL(string: base + $0) }
-    }
-}
-
-struct GOGInstallerFile: Hashable {
-    let manualURL: String
-    let name: String
-    /// GOG's size label ("1.2 GB", "540 MB"), when listed.
-    var size: String = ""
-
-    /// The size label in bytes, or 0 when it is missing or unreadable.
-    var sizeBytes: Int64 {
-        let parts = size.replacingOccurrences(of: ",", with: ".").split(separator: " ")
-        guard parts.count == 2, let value = Double(parts[0]) else { return 0 }
-        let unit: Double
-        switch parts[1].uppercased() {
-        case "KB": unit = 1_000
-        case "MB": unit = 1_000_000
-        case "GB": unit = 1_000_000_000
-        case "TB": unit = 1_000_000_000_000
-        default: return 0
-        }
-        return Int64(value * unit)
     }
 }
 
@@ -197,57 +175,58 @@ enum GOGAPI {
         return try JSONSerialization.jsonObject(with: data)
     }
 
-    /// Every owned game (all pages of the account's filtered product list).
+    /// Every owned game, from GOG Galaxy's own library (galaxy-library.gog.com,
+    /// the list GOG Galaxy shows), with titles and artwork from api.gog.com.
     static func ownedGames(tokens: GOGTokens) async throws -> [GOGGame] {
-        var games: [GOGGame] = []
-        var page = 1
-        var pages = 1
+        guard !tokens.userID.isEmpty else { throw GOGError.notSignedIn }
+        var ids: [Int] = []
+        var seen = Set<Int>()
+        var pageToken: String?
+        var pages = 0
         repeat {
-            guard let json = try await fetchJSON("/account/getFilteredProducts?mediaType=1&sortBy=title&page=\(page)",
-                                             tokens: tokens) as? [String: Any],
-                  let products = json["products"] as? [[String: Any]] else { throw GOGError.invalidResponse }
-            pages = (json["totalPages"] as? Int) ?? 1
-            for product in products {
-                guard let id = product["id"] as? Int, let title = product["title"] as? String,
-                      (product["isGame"] as? Bool) ?? true else { continue }
-                let worksOn = product["worksOn"] as? [String: Any]
-                games.append(GOGGame(id: id, title: title, image: product["image"] as? String,
-                                     worksOnWindows: (worksOn?["Windows"] as? Bool) ?? true))
+            var components = URLComponents(string: "https://galaxy-library.gog.com/users/\(tokens.userID)/releases")!
+            if let pageToken { components.queryItems = [URLQueryItem(name: "page_token", value: pageToken)] }
+            guard let json = try await fetchJSON(components.url!.absoluteString, tokens: tokens) as? [String: Any],
+                  let items = json["items"] as? [[String: Any]] else { throw GOGError.invalidResponse }
+            for item in items where (item["platform_id"] as? String) == "gog" {
+                let raw = item["external_id"]
+                guard let id = (raw as? Int) ?? (raw as? String).flatMap(Int.init), seen.insert(id).inserted else { continue }
+                ids.append(id)
             }
-            page += 1
-        } while page <= pages && page <= 200
-        return games
+            pageToken = json["next_page_token"] as? String
+            pages += 1
+        } while pageToken?.isEmpty == false && pages < 200
+        var games: [GOGGame] = []
+        for start in stride(from: 0, to: ids.count, by: 50) {
+            let batch = ids[start..<min(start + 50, ids.count)]
+            let path = "https://api.gog.com/products?ids=" + batch.map(String.init).joined(separator: ",")
+            guard let products = try await fetchJSON(path, tokens: tokens) as? [[String: Any]] else { throw GOGError.invalidResponse }
+            for product in products {
+                guard let id = product["id"] as? Int, let title = product["title"] as? String else { continue }
+                if let type = product["game_type"] as? String, type != "game" { continue }
+                let images = product["images"] as? [String: Any]
+                let compatibility = product["content_system_compatibility"] as? [String: Any]
+                games.append(GOGGame(id: id, title: title,
+                                     image: imageBase((images?["logo2x"] ?? images?["logo"] ?? images?["background"]) as? String),
+                                     worksOnWindows: (compatibility?["windows"] as? Bool) ?? true))
+            }
+        }
+        return games.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+    }
+
+    /// "//images-4.gog-statics.com/<hash>_glx_logo.jpg" -> "//images-4.gog-statics.com/<hash>".
+    static func imageBase(_ url: String?) -> String? {
+        guard let url, let slash = url.lastIndex(of: "/") else { return nil }
+        let name = url[url.index(after: slash)...]
+        let hash = name.prefix { $0.isHexDigit }
+        guard hash.count >= 32 else { return nil }
+        return String(url[...slash]) + hash
     }
 
     static func username(tokens: GOGTokens) async -> String? {
         (try? await fetchJSON("/userData.json", tokens: tokens) as? [String: Any])?["username"] as? String
     }
 
-    /// The Windows offline installer files, in the user's language when GOG
-    /// offers it, otherwise English, otherwise the first language listed.
-    /// `account/gameDetails` lists downloads as [[language, {windows: [...]}]].
-    static func windowsInstaller(gameID: Int, tokens: GOGTokens) async throws -> [GOGInstallerFile] {
-        guard let json = try await fetchJSON("/account/gameDetails/\(gameID).json", tokens: tokens) as? [String: Any],
-              let downloads = json["downloads"] as? [[Any]] else { throw GOGError.invalidResponse }
-        var byLanguage: [(String, [GOGInstallerFile])] = []
-        for entry in downloads where entry.count == 2 {
-            guard let language = entry[0] as? String,
-                  let platforms = entry[1] as? [String: Any],
-                  let windows = platforms["windows"] as? [[String: Any]] else { continue }
-            let files = windows.compactMap { file -> GOGInstallerFile? in
-                guard let manual = file["manualUrl"] as? String else { return nil }
-                return GOGInstallerFile(manualURL: manual, name: (file["name"] as? String) ?? "",
-                                        size: (file["size"] as? String) ?? "")
-            }
-            if !files.isEmpty { byLanguage.append((language, files)) }
-        }
-        let preferred = Locale.current.localizedString(forLanguageCode: Locale.current.language.languageCode?.identifier ?? "en") ?? "English"
-        let chosen = byLanguage.first { $0.0.localizedCaseInsensitiveContains(preferred) }
-            ?? byLanguage.first { $0.0.localizedCaseInsensitiveContains("English") }
-            ?? byLanguage.first
-        guard let files = chosen?.1, !files.isEmpty else { throw GOGError.noWindowsInstaller }
-        return files
-    }
 }
 
 // MARK: - Installed games
@@ -357,12 +336,12 @@ final class GOGLibraryModel: ObservableObject {
     }
 
     @Published private(set) var pausedDownloads: Set<Int> = []
-    /// Download size of each game's Windows installer, from GOG; 0 = unknown.
+    /// Install size of each game's Galaxy build, from GOG; 0 = unknown.
     @Published private(set) var downloadSizes: [Int: Int64] = [:]
     /// Size on disk of installed games, measured from their install folder.
     @Published private(set) var installedSizes: [Int: Int64] = [:]
 
-    /// Fetches the installer size for the game details page (once).
+    /// Fetches the Galaxy build size for the game details page (once).
     func loadSize(for game: GOGGame) async {
         if let folder = installed[game.id]?.executable.deletingLastPathComponent(), installedSizes[game.id] == nil {
             let root = Self.installFolder(containing: folder)
@@ -372,24 +351,19 @@ final class GOGLibraryModel: ObservableObject {
         guard downloadSizes[game.id] == nil, let tokens = try? await tokens() else { return }
         if let plan = try? await GOGContentSystem.plan(gameID: game.id, tokens: tokens) {
             downloadSizes[game.id] = plan.installBytes
-            return
         }
-        guard let files = try? await GOGAPI.windowsInstaller(gameID: game.id, tokens: tokens) else { return }
-        downloadSizes[game.id] = files.reduce(0) { $0 + $1.sizeBytes }
     }
 
     enum InstallOutcome {
         /// The game's files are in C:\GOG Games\<folder>.
         case installed
-        /// GOG has no Galaxy build: the offline installer was downloaded instead.
-        case installer(URL)
         case failed
     }
 
     /// Installs a game the way GOG Galaxy does: every file of the newest
     /// Windows build is downloaded from GOG's content system straight into
-    /// C:\GOG Games\<installDirectory>. Nothing runs in Wine. Games without
-    /// a Galaxy build fall back to the offline installer.
+    /// C:\GOG Games\<installDirectory>. Nothing runs in Wine. Only GOG
+    /// Galaxy builds are installed; no offline installer is used.
     func install(_ game: GOGGame, prefixPath: URL, completion: @escaping (InstallOutcome) -> Void) {
         guard downloadTasks[game.id] == nil else { return }
         pausedDownloads.remove(game.id)
@@ -403,14 +377,11 @@ final class GOGLibraryModel: ObservableObject {
         BackgroundDownloads.gog.started(name: game.title)
         downloadTasks[game.id] = Task {
             var outcome = BackgroundDownloads.Outcome.paused
-            var fallback = false
             defer {
                 resetDownloadETA(gameID: game.id)
                 downloadTasks[game.id] = nil
-                if !fallback {
-                    if !pausedDownloads.contains(game.id) { downloadProgress[game.id] = nil }
-                    BackgroundDownloads.gog.ended(name: game.title, outcome: outcome, queueEmpty: downloadTasks.isEmpty)
-                }
+                if !pausedDownloads.contains(game.id) { downloadProgress[game.id] = nil }
+                BackgroundDownloads.gog.ended(name: game.title, outcome: outcome, queueEmpty: downloadTasks.isEmpty)
                 if !pausedDownloads.contains(game.id) { resumeDownloads.removeValue(forKey: game.id) }
             }
             do {
@@ -419,16 +390,7 @@ final class GOGLibraryModel: ObservableObject {
                 do {
                     plan = try await GOGContentSystem.plan(gameID: game.id, tokens: tokens)
                 } catch GOGContentError.noBuild {
-                    AppLog.record("[gog] game \(game.id) has no Galaxy build; using the offline installer")
-                    fallback = true
-                    BackgroundDownloads.gog.ended(name: game.title, outcome: .paused, queueEmpty: true)
-                    downloadProgress[game.id] = nil
-                    DispatchQueue.main.async {
-                        self.downloadInstaller(game, prefixPath: prefixPath) { setup in
-                            completion(setup.map { .installer($0) } ?? .failed)
-                        }
-                    }
-                    return
+                    throw GOGError.noGalaxyBuild
                 }
                 let name = GOGContentSystem.safePath(plan.installDirectory)?.replacingOccurrences(of: "/", with: " ")
                     ?? "Game \(game.id)"
@@ -471,22 +433,6 @@ final class GOGLibraryModel: ObservableObject {
                 outcome = .completed
                 refreshInstalled(prefixPath: prefixPath)
                 completion(.installed)
-            } catch GOGError.http(404) {
-                // An unavailable Galaxy v2 chunk may be gone permanently,
-                // even after refreshing its signed CDN URL and trying every
-                // provider. Do not loop indefinitely or claim installation
-                // completed: retrieve GOG's own offline setup instead.
-                guard !Task.isCancelled else { completion(.failed); return }
-                AppLog.record("[gog] Galaxy chunk or manifest returned HTTP 404 for game \(game.id); trying the official offline Windows installer")
-                fallback = true
-                BackgroundDownloads.gog.ended(name: game.title, outcome: .paused, queueEmpty: true)
-                downloadProgress[game.id] = nil
-                DispatchQueue.main.async {
-                    self.downloadInstaller(game, prefixPath: prefixPath) { setup in
-                        completion(setup.map { .installer($0) } ?? .failed)
-                    }
-                }
-                return
             } catch {
                 if Task.isCancelled || error is CancellationError || (error as? URLError)?.code == .cancelled {
                     completion(.failed)
@@ -601,7 +547,6 @@ final class GOGLibraryModel: ObservableObject {
             installed = await Task.detached(priority: .utility) {
                 GOGInstallScanner.installed(in: drive)
             }.value
-            removeFinishedInstallers()
         }
     }
 
@@ -626,92 +571,6 @@ final class GOGLibraryModel: ObservableObject {
         let base = image.hasPrefix("//") ? "https:" + image : image
         return ["_glx_bg_top_padding_7.webp", "_bg_crop_1366x655.jpg", "_product_card_v2_mobile_slider_639.jpg"]
             .compactMap { URL(string: base + $0) }
-    }
-
-    /// Downloads the Windows offline installer (setup .exe plus any .bin
-    /// parts, which must sit next to it) into the prefix's WindowsDownloads
-    /// folder, where it shows up as a Windows app to run.
-    func downloadInstaller(_ game: GOGGame, prefixPath: URL, completion: @escaping (URL?) -> Void) {
-        guard downloadTasks[game.id] == nil else { return }
-        pausedDownloads.remove(game.id)
-        resumeDownloads[game.id] = { [weak self] in self?.downloadInstaller(game, prefixPath: prefixPath, completion: completion) }
-        downloadErrors[game.id] = nil
-        downloadProgress[game.id] = 0
-        resetDownloadETA(gameID: game.id)
-        let folder = prefixPath.appendingPathComponent("drive_c/WindowsDownloads", isDirectory: true)
-        BackgroundDownloads.gog.attach(active: { [weak self] in !(self?.downloadTasks.isEmpty ?? true) },
-                                       pause: {}, resume: {})
-        BackgroundDownloads.gog.started(name: game.title)
-        downloadTasks[game.id] = Task {
-            var outcome = BackgroundDownloads.Outcome.paused
-            defer {
-                downloadTasks[game.id] = nil
-                if !pausedDownloads.contains(game.id) { downloadProgress[game.id] = nil }
-                if !pausedDownloads.contains(game.id) { resumeDownloads.removeValue(forKey: game.id) }
-                BackgroundDownloads.gog.ended(name: game.title, outcome: outcome, queueEmpty: downloadTasks.isEmpty)
-            }
-            do {
-                let tokens = try await tokens()
-                let files = try await GOGAPI.windowsInstaller(gameID: game.id, tokens: tokens)
-                try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-                var setup: URL?
-                var saved: [URL] = []
-                let totalBytes = files.reduce(Int64(0)) { $0 + max(0, $1.sizeBytes) }
-                var previousBytes: Int64 = 0
-                for (index, file) in files.enumerated() {
-                    try Task.checkCancellation()
-                    let partBytes = max(0, file.sizeBytes)
-                    let baseBytes = previousBytes
-                    let part = try await download(file, into: folder, tokens: tokens) { fraction in
-                        let overall = (Double(index) + fraction) / Double(files.count)
-                        self.downloadProgress[game.id] = overall
-                        if totalBytes > 0 {
-                            let doneBytes = baseBytes + Int64(Double(partBytes) * fraction)
-                            self.updateDownloadETA(gameID: game.id,
-                                                   done: UInt64(max(0, doneBytes)),
-                                                   total: UInt64(totalBytes))
-                        }
-                        BackgroundDownloads.gog.progress(done: UInt64(overall * 10_000), total: 10_000)
-                    }
-                    previousBytes += partBytes
-                    saved.append(part)
-                    if setup == nil, part.pathExtension.lowercased() == "exe" { setup = part }
-                }
-                installerFiles[game.id] = saved
-                AppLog.record("[gog] installer downloaded for game \(game.id)")
-                outcome = .completed
-                completion(setup)
-            } catch {
-                if !(Task.isCancelled || error is CancellationError || (error as? URLError)?.code == .cancelled) {
-                    downloadErrors[game.id] = error.localizedDescription
-                    outcome = .failed(error.localizedDescription)
-                    AppLog.record("[gog] installer download failed for game \(game.id): \(error.localizedDescription)")
-                }
-                completion(nil)
-            }
-        }
-    }
-
-    /// Installer files downloaded per game, removed once the game is installed.
-    private var installerFiles: [Int: [URL]] = [:]
-
-    /// The command line that installs a GOG offline installer (Inno Setup)
-    /// without any windows, into C:\GOG Games\<title>.
-    static func silentInstallArguments(for game: GOGGame) -> String {
-        let folder = String(game.title.unicodeScalars.filter {
-            !"\\/:*?\"<>|".unicodeScalars.contains($0) && $0.value >= 32
-        }.map(Character.init)).trimmingCharacters(in: CharacterSet(charactersIn: " ."))
-        let name = folder.isEmpty ? "Game \(game.id)" : folder
-        return "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /NOICONS /DIR=\"C:\\GOG Games\\\(name)\""
-    }
-
-    /// After a Wine session: removes the installers of games that are now installed.
-    func removeFinishedInstallers() {
-        for (id, files) in installerFiles where installed[id] != nil {
-            for file in files { try? FileManager.default.removeItem(at: file) }
-            installerFiles[id] = nil
-            AppLog.record("[gog] game \(id) installed; installer removed")
-        }
     }
 
     /// Pause cancels network activity while retaining GOG's staged files.
@@ -752,45 +611,6 @@ final class GOGLibraryModel: ObservableObject {
         let cleanup = cancellationCleanup[game.id]
         await cleanup?.value
     }
-
-    /// `manualUrl` answers with a redirect to a signed CDN URL; URLSession
-    /// follows it (the bearer token is not forwarded to the CDN host).
-    private func download(_ file: GOGInstallerFile, into folder: URL, tokens: GOGTokens,
-                          progress: @escaping @MainActor (Double) -> Void) async throws -> URL {
-        var request = URLRequest(url: URL(string: "https://www.gog.com" + file.manualURL)!)
-        request.setValue("Bearer " + tokens.accessToken, forHTTPHeaderField: "Authorization")
-        let delegate = GOGDownloadDelegate(progress: progress)
-        // Large installers often outlive a Wi-Fi hiccup: resume up to five
-        // times from where the connection dropped instead of failing.
-        var resumeData: Data?
-        var attempt = 0
-        var result: (URL, URLResponse)
-        while true {
-            do {
-                if let data = resumeData {
-                    result = try await GOGAPI.session.download(resumeFrom: data, delegate: delegate)
-                } else {
-                    result = try await GOGAPI.session.download(for: request, delegate: delegate)
-                }
-                break
-            } catch let error as URLError where attempt < 5 && [.networkConnectionLost, .timedOut,
-                                                                .notConnectedToInternet, .cannotConnectToHost].contains(error.code) {
-                attempt += 1
-                resumeData = error.downloadTaskResumeData ?? resumeData
-                AppLog.record("[gog] download interrupted (\(error.code.rawValue)); retry \(attempt)/5")
-                try await Task.sleep(nanoseconds: UInt64(attempt) * 2_000_000_000)
-            }
-        }
-        let (temporary, response) = result
-        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-        guard status == 200 else { throw GOGError.http(status) }
-        var name = response.suggestedFilename ?? response.url?.lastPathComponent ?? file.name
-        name = name.replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: ":", with: "_")
-        let destination = folder.appendingPathComponent(name)
-        try? FileManager.default.removeItem(at: destination)
-        try FileManager.default.moveItem(at: temporary, to: destination)
-        return destination
-    }
 }
 
 /// Bytes downloaded so far, shared by the parallel file downloads.
@@ -802,20 +622,6 @@ final class GOGByteCounter: @unchecked Sendable {
         total += bytes
         return total
     }
-}
-
-private final class GOGDownloadDelegate: NSObject, URLSessionDownloadDelegate, @unchecked Sendable {
-    let progress: @MainActor (Double) -> Void
-    init(progress: @escaping @MainActor (Double) -> Void) { self.progress = progress }
-
-    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64,
-                    totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
-        guard totalBytesExpectedToWrite > 0 else { return }
-        let fraction = Double(totalBytesWritten) / Double(totalBytesExpectedToWrite)
-        Task { @MainActor in self.progress(fraction) }
-    }
-
-    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {}
 }
 
 // MARK: - Sign-in

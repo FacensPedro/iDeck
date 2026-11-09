@@ -1212,19 +1212,12 @@ struct WindowsWorkspaceView: View {
         }
     }
 
-    /// Installs a GOG game from GOG's content system (the game's own files,
-    /// no installer). Games without a Galaxy build fall back to the offline
-    /// installer, run without any installer windows.
+    /// Installs a GOG game the way GOG Galaxy does: the game's Galaxy build,
+    /// straight from GOG's content system. No offline installer.
     private func downloadGOGInstaller(_ game: GOGGame) {
         guard let prefixPath else { return }
-        gogLibrary.install(game, prefixPath: prefixPath) { outcome in
+        gogLibrary.install(game, prefixPath: prefixPath) { _ in
             windowsLibrary.refresh(prefixPath: prefixPath)
-            guard case .installer(let setup) = outcome else { return }
-            // The offline GOG installer uses the same JIT handshake as any
-            // executable; it remains queued while StikDebug attaches.
-            let profile = WindowsGameProfile(id: "gog-setup:\(game.id)", title: game.title,
-                                             arguments: GOGLibraryModel.silentInstallArguments(for: game))
-            coordinator.launchWindowsExecutable(at: setup, profile: profile)
         }
     }
 

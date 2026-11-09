@@ -19,7 +19,7 @@ class LauncherJITAndDiagnosticsTests(unittest.TestCase):
 
     def test_gog_installer_uses_real_pe_architecture(self):
         self.assertIn("WindowsEnvironment.isPE32WindowsExecutable(destination)", COORD)
-        self.assertIn("coordinator.launchWindowsExecutable(at: setup, profile: profile)", MAIN)
+        self.assertNotIn("coordinator.launchWindowsExecutable(at: setup, profile: profile)", MAIN)
 
     def test_bug_reports_contain_game_launcher_and_real_device(self):
         for key in ("diagnostics.lastGame", "diagnostics.lastLauncher"):
