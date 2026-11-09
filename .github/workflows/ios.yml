@@ -28,6 +28,15 @@ on:
         type: boolean
         required: false
         default: false
+      use_msc_pkg:
+        description: "Bundle the Apple Metal Shader Converter 4.0 beta 3 from your own macOS .pkg (URL from msc_pkg_url or the IDECK_MSC_PKG_URL secret; forces a full native rebuild)"
+        type: boolean
+        required: false
+        default: false
+      msc_pkg_url:
+        description: "Direct download URL of the Apple MetalShaderConverter .pkg (leave blank to use the IDECK_MSC_PKG_URL secret)"
+        required: false
+        default: ""
       release_tag:
         description: "Use auto for the verified IPA version (currently 1.0.10), a matching version tag, or leave blank to build without publishing"
         required: false
@@ -659,6 +668,29 @@ jobs:
         with:
           path: build/i386-farm-cache
           key: madeira-i386-farm-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/fetch_madeira_sources.sh', 'patches/**') }}
+
+      - name: Download owner-supplied Apple Metal Shader Converter package
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.use_msc_pkg }}
+        env:
+          MSC_PKG_URL_INPUT: ${{ inputs.msc_pkg_url }}
+          MSC_PKG_URL_SECRET: ${{ secrets.IDECK_MSC_PKG_URL }}
+        run: |
+          set -euo pipefail
+          if [[ "$IDECK_NATIVE_BUILD" != "1" || "$IDECK_ACCEPT_METAL_CONVERTER_LICENSE" != "1" ]]; then
+            echo "::error::use_msc_pkg needs require_madeira and accept_converter_license enabled."
+            exit 2
+          fi
+          URL="${MSC_PKG_URL_INPUT:-$MSC_PKG_URL_SECRET}"
+          if [[ -z "$URL" ]]; then
+            echo "::error::Set msc_pkg_url or the IDECK_MSC_PKG_URL repository secret."
+            exit 2
+          fi
+          echo "::add-mask::$URL"
+          PKG="$RUNNER_TEMP/MetalShaderConverter.pkg"
+          curl -fL --retry 4 --retry-delay 2 -o "$PKG" "$URL"
+          echo "Downloaded $(stat -f%z "$PKG") bytes; SHA-256 $(shasum -a 256 "$PKG" | cut -d' ' -f1)"
+          # prepare_apple_msc_beta3.py rejects any package other than the audited 4.0 beta 3.
+          echo "IDECK_MSC_PKG=$PKG" >> "$GITHUB_ENV"
 
       - name: Build and package iDeck.ipa
         env:
