@@ -6,10 +6,13 @@ from support import repo_text
 class LaunchValidationTests(unittest.TestCase):
     def test_runtime_packages_are_verified(self):
         runtime = repo_text("iDeck/MadeiraRuntime.swift")
-        for marker in ('"nls/locale.nls", "nls/l_intl.nls", "nls/normnfc.nls"', "ideck_native_pe_machine",
+        for marker in ('"nls/locale.nls", "nls/l_intl.nls", "nls/normnfc.nls"', "static func peMachine(_ url: URL) -> UInt16",
                        '"xtajit64"', '"winemetal"', '"d3d10core"', "manifestName(id)", "failed verification"):
             self.assertIn(marker, runtime)
         self.assertIn("if downloadsRuntime || FileManager.default.fileExists", runtime)
+        # ARM64 libraries (0xAA64) are read by the raw COFF field, not by the launch check.
+        self.assertIn("let machine = peMachine(url)", runtime)
+        self.assertNotIn("ideck_native_pe_machine($0)", runtime)
         split = repo_text("scripts/split_runtime_downloads.py")
         self.assertIn('f"ideck-runtime-{ident}.json"', split)
 

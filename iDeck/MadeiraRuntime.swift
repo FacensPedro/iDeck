@@ -119,12 +119,26 @@ enum MadeiraRuntime {
                 continue
             }
             guard size > 0 else { problems.append("missing \(relative)"); continue }
-            let machine = url.path.withCString { ideck_native_pe_machine($0) }
+            let machine = peMachine(url)
             if !machines.contains(machine) {
                 problems.append(String(format: "%@ is not the expected architecture (machine 0x%04X)", relative, machine))
             }
         }
         return problems
+    }
+
+    /// A PE file's COFF machine field, whatever the architecture (0 when not PE).
+    /// ideck_native_pe_machine only answers for programs Wine may start (i386, x64,
+    /// ARM64EC) and returns 0 for ARM64 libraries, so it cannot check aarch64-windows.
+    static func peMachine(_ url: URL) -> UInt16 {
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return 0 }
+        defer { try? handle.close() }
+        guard let dos = try? handle.read(upToCount: 64), dos.count == 64, dos[0] == 0x4D, dos[1] == 0x5A else { return 0 }
+        let offset = UInt64(dos[0x3C]) | UInt64(dos[0x3D]) << 8 | UInt64(dos[0x3E]) << 16 | UInt64(dos[0x3F]) << 24
+        guard offset >= 64, offset < 64 << 20, (try? handle.seek(toOffset: offset)) != nil,
+              let header = try? handle.read(upToCount: 6), header.count == 6,
+              header[0] == 0x50, header[1] == 0x45, header[2] == 0, header[3] == 0 else { return 0 }
+        return UInt16(header[4]) | UInt16(header[5]) << 8
     }
 
     /// The NLS files Wine needs, missing or truncated, in the folder Wine will read.
