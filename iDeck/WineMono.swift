@@ -74,7 +74,8 @@ enum WineMonoInstaller {
     /// through GNU 'L' entries or pax headers. `progress` gets the tar bytes read so far.
     /// Returns the number of files written.
     @discardableResult
-    static func unpack(tarXZ: URL, into destination: URL, progress: (Int64) -> Void = { _ in }) throws -> Int {
+    static func unpack(tarXZ: URL, into destination: URL, map: @escaping (String) -> String? = WineMonoInstaller.relativePath,
+                       progress: (Int64) -> Void = { _ in }) throws -> Int {
         let fm = FileManager.default
         try fm.createDirectory(at: destination, withIntermediateDirectories: true)
         let input = try FileHandle(forReadingFrom: tarXZ)
@@ -92,7 +93,7 @@ enum WineMonoInstaller {
         let outBuf = UnsafeMutablePointer<UInt8>.allocate(capacity: outCap)
         defer { inBuf.deallocate(); outBuf.deallocate() }
 
-        var tar = TarReader(destination: destination)
+        var tar = TarReader(destination: destination, map: map)
         var inputDone = false, finished = false, read: Int64 = 0
         while !finished {
             if stream.src_size == 0 && !inputDone {
@@ -151,6 +152,7 @@ enum WineMonoInstaller {
 /// A streaming tar reader: header blocks, GNU long names, pax paths, file data.
 private struct TarReader {
     let destination: URL
+    let map: (String) -> String?
     private(set) var files = 0
     private var header = [UInt8]()
     private var remaining: Int64 = 0         // data bytes of the current entry still to come
@@ -161,7 +163,7 @@ private struct TarReader {
     private var nextName: String?
     private var zeroBlocks = 0
 
-    init(destination: URL) { self.destination = destination }
+    init(destination: URL, map: @escaping (String) -> String?) { self.destination = destination; self.map = map }
 
     mutating func consume(_ bytes: UnsafeBufferPointer<UInt8>) throws {
         var i = 0
@@ -227,12 +229,12 @@ private struct TarReader {
         case UInt8(ascii: "g"):
             break                                               // a global pax header: nothing needed here
         case UInt8(ascii: "5"):
-            if let path = WineMonoInstaller.relativePath(name) {
+            if let path = map(name) {
                 try FileManager.default.createDirectory(at: destination.appendingPathComponent(path, isDirectory: true),
                                                         withIntermediateDirectories: true)
             }
         case UInt8(ascii: "0"), 0, UInt8(ascii: "7"):
-            if let path = WineMonoInstaller.relativePath(name) {
+            if let path = map(name) {
                 let url = destination.appendingPathComponent(path)
                 try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
                 guard FileManager.default.createFile(atPath: url.path, contents: nil) else {

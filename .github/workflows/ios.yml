@@ -740,8 +740,30 @@ jobs:
           import plistlib
           from zipfile import ZipFile
 
+          import json
+          import tarfile
+          from pathlib import Path
+
           with ZipFile("iDeck.ipa") as archive:
               prefix = "Payload/iDeck.app/"
+              # Wine's Windows files are release downloads (split_runtime_downloads.py):
+              # check them inside their archives, listed by the IPA's download manifest.
+              names = set(archive.namelist())
+              release = Path("build/runtime-downloads/runtime-release.json")
+              if release.is_file():
+                  if prefix + "iDeckRuntimeDownloads.plist" not in names:
+                      raise SystemExit("Split runtime without iDeckRuntimeDownloads.plist in the IPA")
+                  listed = plistlib.loads(archive.read(prefix + "iDeckRuntimeDownloads.plist"))
+                  info = json.loads(release.read_text())
+                  if listed.get("tag") != info["tag"] or len(listed.get("packages", [])) != len(info["packages"]):
+                      raise SystemExit("IPA runtime download manifest differs from the built archives")
+                  for package in info["packages"]:
+                      with tarfile.open(release.parent / package["file"], "r:xz") as tar:
+                          names |= {prefix + member.name for member in tar.getmembers()}
+                  leaked = [n for n in archive.namelist() if n.split("/")[2:3] and n.split("/")[2] in
+                            ("aarch64-windows", "arm64ec-windows", "i386-windows", "nls", "wine-mono", "vcruntime-bundle")]
+                  if leaked:
+                      raise SystemExit("Split runtime still inside the IPA: " + ", ".join(leaked[:10]))
               required = (
                   "MadeiraRuntimeManifest.plist",
                   "arm64ec-windows/xtajit64.dll",
@@ -767,7 +789,7 @@ jobs:
                                "arm64ec-windows/d3d12.dll",
                                "arm64ec-windows/d3d12core.dll",
                                "d3d12/libmetalirconverter.dylib")
-              missing = [name for name in required if prefix + name not in archive.namelist()]
+              missing = [name for name in required if prefix + name not in names]
               if missing:
                   raise SystemExit("Missing actual Madeira native IPA resources: " + ", ".join(missing))
               flags = plistlib.loads(archive.read(prefix + "MadeiraRuntimeManifest.plist"))
@@ -803,12 +825,36 @@ jobs:
                       "aarch64-windows/wow64win.dll",
                       "aarch64-windows/xtajit.dll",
                   )
-                  missing_wow64 = [name for name in required_wow64 if prefix + name not in archive.namelist()]
+                  missing_wow64 = [name for name in required_wow64 if prefix + name not in names]
                   if missing_wow64:
                       raise SystemExit("WoW64 requested but missing: " + ", ".join(missing_wow64))
           print("Confirmed IPA includes Madeira native manifest and Windows runtime payload")
           PY
           fi
+
+      - name: Publish Windows runtime downloads
+        # The initial setup downloads Wine's x64/x86 Windows files from a release
+        # tagged by their content hash; an existing tag already holds the same files.
+        if: ${{ env.IDECK_NATIVE_BUILD == '1' && hashFiles('build/runtime-downloads/runtime-release.json') != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="$(python3 -c 'import json;print(json.load(open("build/runtime-downloads/runtime-release.json"))["tag"])')"
+          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --prerelease --latest=false \
+              --target "$GITHUB_SHA" --title "iDeck Windows runtime $TAG" \
+              --notes "Wine x64 and x86 (WoW64) Windows files downloaded by iDeck's initial setup. Not an app release."
+          fi
+          EXISTING="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')"
+          for file in build/runtime-downloads/*.tar.xz; do
+            name="$(basename "$file")"
+            if grep -Fxq "$name" <<<"$EXISTING"; then
+              echo "$name already published"
+            else
+              gh release upload "$TAG" "$file" --repo "$GITHUB_REPOSITORY"
+            fi
+          done
 
       - name: Prepare authorized compiled runtime export
         if: ${{ env.IDECK_NATIVE_BUILD == '1' && env.IDECK_MADEIRA_GRAPHICS == 'd3d12' && inputs.export_runtime_kit && env.IDECK_ACCEPT_METAL_CONVERTER_LICENSE == '1' }}

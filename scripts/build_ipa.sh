@@ -184,9 +184,9 @@ done
 if [ "${IDECK_REQUIRE_MADEIRA:-0}" = "1" ]; then
   IDECK_MADEIRA_APP_ROOT="$NATIVE_ASSET_SOURCE" \
     bash scripts/stage_madeira_payload.sh "$APP"
-  # Microsoft's Visual C++ runtimes, extracted at build time: no install on
-  # the device. IDECK_BUNDLE_VCRUNTIME=0 leaves them out.
-  if [[ "${IDECK_BUNDLE_VCRUNTIME:-1}" != "0" ]]; then
+  # Microsoft's Visual C++ runtimes are downloaded by the initial setup. Only a
+  # build that keeps the runtime in the IPA (IDECK_SPLIT_RUNTIME=0) bundles them.
+  if [[ "${IDECK_SPLIT_RUNTIME:-1}" == "0" && "${IDECK_BUNDLE_VCRUNTIME:-1}" != "0" ]]; then
     bash scripts/bundle_vcruntime.sh "$APP"
   fi
   # Native builds use the Debug configuration (upstream Madeira's guest code
@@ -215,6 +215,13 @@ if [[ "${IDECK_REQUIRE_MADEIRA:-0}" == "1" ]]; then
   PROFILE_ARGS+=(--require-native --expected-graphics "$IDECK_MADEIRA_GRAPHICS")
 fi
 python3 scripts/stamp_ideck_runtime_profile.py --app "$APP" ${PROFILE_ARGS[@]+"${PROFILE_ARGS[@]}"}
+
+# Wine's x64/x86 Windows files, Wine Mono and Visual C++ are not shipped in the
+# IPA: the farms become release downloads the initial setup fetches, and Mono and
+# Visual C++ come from WineHQ and Microsoft. IDECK_SPLIT_RUNTIME=0 keeps them in.
+if [[ "${IDECK_REQUIRE_MADEIRA:-0}" == "1" && "${IDECK_SPLIT_RUNTIME:-1}" != "0" ]]; then
+  python3 scripts/split_runtime_downloads.py --app "$APP" --out build/runtime-downloads
+fi
 
 # Stream the app directly into a valid IPA, with fast compression and
 # symlink/executable-bit preservation; do not duplicate the native app as

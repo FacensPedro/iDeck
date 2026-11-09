@@ -185,6 +185,8 @@ class SystemCoordinator: ObservableObject {
     /// The installer's latest message while components download for a launch.
     @Published var steamComponentsProgress: String?
     private var steamComponentsTask: Task<Void, Never>?
+    /// Valve's client components are being fetched (the initial setup waits on it).
+    var steamComponentsInstalling: Bool { steamComponentsTask != nil }
     private var dockInstallAfterPrefix = false
     private var isPreparingWindowsPrefix = false
 

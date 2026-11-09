@@ -43,6 +43,7 @@ EARLY_JIT_PATCH_SHA256 = hashlib.sha256(
     (ROOT / "patches/madeira-jit-alias-lifecycle.patch").read_bytes() +
     (ROOT / "scripts/apply_madeira_opengl32_wow_ptrs.py").read_bytes() +
     (ROOT / "scripts/apply_madeira_relink_cache.py").read_bytes() +
+    (ROOT / "scripts/apply_madeira_runtime_root.py").read_bytes() +
     (ROOT / "patches/madeira-mscoree-fusion-negative-cache.patch").read_bytes() +
     (ROOT / "patches/dxmt-ios-cache-sync-reuse.patch").read_bytes() +
     (ROOT / "patches/madeira-arm64-importer-ret-bind.patch").read_bytes() +

@@ -298,7 +298,8 @@ extension MadeiraDock {
 
     /// Copies the bundled host to C:\windows\system32\dockhost.exe when it changed.
     static func stageHost() throws -> URL {
-        guard let source = Bundle.main.url(forResource: "dockhost", withExtension: "exe", subdirectory: "arm64ec-windows") else {
+        let source = MadeiraRuntime.file("arm64ec-windows/dockhost.exe")
+        guard FileManager.default.fileExists(atPath: source.path) else {
             throw DockError.message("Madeira Dock is not built into this IPA.")
         }
         let target = drive.appendingPathComponent("windows/system32/dockhost.exe")
@@ -333,7 +334,7 @@ extension MadeiraDock {
         // its target; replace the link only after validating a bundled PE
         // interpreter, retaining the previous staging behavior.
         guard let source = ["arm64ec-windows", "x86_64-windows", "aarch64-windows"]
-            .map({ Bundle.main.bundleURL.appendingPathComponent($0 + "/cmd.exe") })
+            .map({ MadeiraRuntime.file($0 + "/cmd.exe") })
             .first(where: validCommandShell) else {
             AppLog.record("[dock-installers] no valid x64/ARM64EC Wine cmd.exe in the IPA")
             return nil

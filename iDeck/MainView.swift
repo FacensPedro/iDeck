@@ -29,6 +29,8 @@ struct MainView: View {
             // the external debugger and the stored Steam session.
             NSLog("[iDeck startup] Madeira library is the root view")
             UIApplication.shared.isIdleTimerDisabled = true
+            // A new IPA can bring a new Windows runtime: the setup downloads it again.
+            if firstRunSetupComplete && MadeiraRuntime.needsDownload { firstRunSetupComplete = false }
             if !firstRunSetupComplete {
                 DispatchQueue.main.async { isFirstRunSetupPresented = true }
             }
@@ -2650,12 +2652,13 @@ private struct IDeckFirstRunSetupView: View {
     @State private var pairingImporterPresented = false
 
     private enum Step: Int, CaseIterable {
-        case windows, dock, jit, summary
+        case windows, dock, jit, gog, summary
         var title: String {
             switch self {
             case .windows: return "Windows runtime"
             case .dock: return "Madeira Dock"
             case .jit: return "JIT configuration"
+            case .gog: return "GOG Galaxy"
             case .summary: return "Setup summary"
             }
         }
@@ -2665,8 +2668,12 @@ private struct IDeckFirstRunSetupView: View {
         FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
     }
     private var prefixReady: Bool { PrefixInstaller.isPrefixInstalled(at: MadeiraDock.prefix) }
-    private var x64Ready: Bool { MadeiraBundleIdentity.isNative && prefixReady }
-    private var x86Ready: Bool { coordinator.windowsEnvironment.hasWoW64Runtime() && prefixReady }
+    private var x64Ready: Bool { MadeiraBundleIdentity.isNative && MadeiraRuntime.installed("wine-x64") && prefixReady }
+    private var x86Ready: Bool {
+        MadeiraRuntime.installed("wine-x86") && coordinator.windowsEnvironment.hasWoW64Runtime() && prefixReady
+    }
+    private var steamClientReady: Bool { MadeiraDock.clientInstalled }
+    private var galaxyReady: Bool { GOGGalaxyClient.installed(prefix: MadeiraDock.prefix) }
     private var visualCx64Ready: Bool { VisualCRuntimeBootstrap.installed(in: MadeiraDock.prefix, documents: documents) }
     private var visualCx86Ready: Bool { VisualCRuntimeLegacy.installed(documents: documents) }
     private var steamDLLsReady: Bool {
@@ -2680,6 +2687,7 @@ private struct IDeckFirstRunSetupView: View {
     }
     private var windowsReady: Bool {
         x64Ready && x86Ready && visualCx64Ready && visualCx86Ready && WineMonoModel.available && steamDLLsReady
+            && steamClientReady
     }
 
     var body: some View {
@@ -2718,6 +2726,7 @@ private struct IDeckFirstRunSetupView: View {
                             case .windows: windowsStep
                             case .dock: dockStep
                             case .jit: jitStep
+                            case .gog: gogStep
                             case .summary: completeStep
                             }
                         }
@@ -2770,24 +2779,25 @@ private struct IDeckFirstRunSetupView: View {
         VStack(alignment: .leading, spacing: 12) {
             Label("Windows runtime", systemImage: "square.stack.3d.up.fill")
                 .font(.title2.bold())
-            Text("Installs everything Windows games need: the x64 and x86 environments, Microsoft Visual C++ DLLs, .NET (Wine Mono) and Steam's DLLs.")
+            Text("Downloads and installs everything Windows games need: the x64 and x86 Wine environments, Microsoft Visual C++, .NET (Wine Mono) and Valve's Steam client. None of it is part of the app download.")
             statusRow("x64 Wine environment", x64Ready)
             statusRow("x86 (WoW64) environment", x86Ready)
-            statusRow("Visual C++ DLLs x64 (2015-2022)", visualCx64Ready)
-            statusRow("Visual C++ DLLs x86 + 2005-2013", visualCx86Ready)
+            statusRow("Visual C++ x64 (2015-2022)", visualCx64Ready)
+            statusRow("Visual C++ x86 (2005-2013)", visualCx86Ready)
             statusRow(".NET support (Wine Mono)", WineMonoModel.available, detail: wineMono.busy ? wineMono.status : nil)
+            statusRow("Steam client", steamClientReady)
             statusRow("Steam DLLs (video client, SDL3)", steamDLLsReady)
             Button(windowsReady ? "Installed" : (installing ? "Installing…" : "Install all")) {
                 installWindowsRuntime()
             }
             .buttonStyle(.borderedProminent)
-            .disabled(installing || windowsReady || !MadeiraDock.bundled)
+            .disabled(installing || windowsReady || !MadeiraRuntime.available)
             if installing { ProgressView(installerStatus.isEmpty ? coordinator.windowsStatus : installerStatus).font(.caption) }
             else if !installerStatus.isEmpty {
                 Text(installerStatus).font(.caption).foregroundStyle(.secondary)
             }
             if let error = wineMono.error { Text(error).font(.caption).foregroundStyle(.orange) }
-            if !MadeiraDock.bundled {
+            if !MadeiraRuntime.available {
                 Text("This IPA does not include the Windows runtime. Install a native iDeck IPA.")
                     .font(.caption).foregroundStyle(.orange)
             }
@@ -2811,6 +2821,20 @@ private struct IDeckFirstRunSetupView: View {
         installing = true
         Task { @MainActor in
             defer { installing = false; refresh += 1 }
+            // 0. Wine's x64 and x86 Windows files (not in the IPA).
+            for package in MadeiraRuntime.packages where !MadeiraRuntime.installed(package.id) {
+                do {
+                    try await MadeiraRuntime.install(package.id) { message, fraction in
+                        Task { @MainActor in
+                            installerStatus = "\(message) \(Int(fraction * 100))%"
+                        }
+                    }
+                } catch {
+                    installerStatus = error.localizedDescription
+                    return
+                }
+                refresh += 1
+            }
             // 1. x64 prefix with x86 WoW64.
             if !prefixReady {
                 installerStatus = "Preparing x64 + x86 Wine environment…"
@@ -2860,6 +2884,17 @@ private struct IDeckFirstRunSetupView: View {
                 } catch {
                     installerStatus = "Steam DLLs: \(error.localizedDescription)"
                     return
+                }
+            }
+            refresh += 1
+            // 6. Valve's Steam client (from Valve's update server).
+            if !steamClientReady {
+                installerStatus = "Installing the Steam client…"
+                coordinator.installMadeiraDock()
+                try? await Task.sleep(nanoseconds: 500_000_000)
+                for _ in 0..<1800 where coordinator.steamComponentsInstalling && !steamClientReady {
+                    if let progress = coordinator.steamComponentsProgress { installerStatus = progress }
+                    try? await Task.sleep(nanoseconds: 1_000_000_000)
                 }
             }
             installerStatus = windowsReady ? "Windows runtime installed." : "Some components are missing. Tap Install all to retry."
@@ -2938,6 +2973,64 @@ private struct IDeckFirstRunSetupView: View {
         }
     }
 
+    // MARK: - GOG Galaxy
+
+    private var gogStep: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label("GOG Galaxy", systemImage: "shippingbox.fill")
+                .font(.title2.bold())
+            Text("Installs GOG's own client, GOG Galaxy 2.0, in the Windows environment. The current release is downloaded from GOG and installed silently.")
+            statusRow("GOG Galaxy", galaxyReady)
+            Button(galaxyReady ? "Installed" : (installing ? "Installing…" : "Install GOG Galaxy")) {
+                installGOGGalaxy()
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(installing || galaxyReady || !x86Ready)
+            if installing { ProgressView(installerStatus.isEmpty ? coordinator.windowsStatus : installerStatus).font(.caption) }
+            else if !installerStatus.isEmpty {
+                Text(installerStatus).font(.caption).foregroundStyle(.secondary)
+            }
+            if !x86Ready {
+                Text("Install the Windows runtime first.").font(.caption).foregroundStyle(.orange)
+            } else if !coordinator.isJITEnabled {
+                Text("GOG Galaxy's installer runs in Wine: enable JIT first.").font(.caption).foregroundStyle(.orange)
+            }
+        }
+    }
+
+    private func installGOGGalaxy() {
+        guard !installing else { return }
+        installing = true
+        let prefix = MadeiraDock.prefix
+        Task { @MainActor in
+            defer { installing = false; refresh += 1 }
+            let setup: URL
+            do {
+                setup = try await GOGGalaxyClient.downloadSetup(prefix: prefix) { fraction in
+                    Task { @MainActor in installerStatus = "Downloading GOG Galaxy… \(Int(fraction * 100))%" }
+                }
+            } catch {
+                installerStatus = error.localizedDescription
+                AppLog.record("[gog-galaxy] download failed: \(error.localizedDescription)")
+                return
+            }
+            installerStatus = "Installing GOG Galaxy…"
+            coordinator.launchWindowsExecutable(at: setup, profile: GOGGalaxyClient.setupProfile)
+            // The silent setup finishes when GalaxyClient.exe is in place (up to 20 minutes).
+            for _ in 0..<1200 where !GOGGalaxyClient.installed(prefix: prefix) {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+            }
+            if GOGGalaxyClient.installed(prefix: prefix) {
+                GOGGalaxyClient.removeSetup(prefix: prefix)
+                installerStatus = "GOG Galaxy installed."
+                AppLog.record("[gog-galaxy] installed")
+            } else {
+                installerStatus = "GOG Galaxy was not installed: \(coordinator.windowsStatus)"
+                AppLog.record("[gog-galaxy] setup ended without GalaxyClient.exe")
+            }
+        }
+    }
+
     // MARK: - Summary
 
     private var completeStep: some View {
@@ -2946,6 +3039,7 @@ private struct IDeckFirstRunSetupView: View {
                 .font(.title2.bold())
             statusRow("Windows runtime", windowsReady)
             statusRow("Madeira Dock", MadeiraDock.clientInstalled)
+            statusRow("GOG Galaxy", galaxyReady)
             statusRow("JIT", coordinator.isJITEnabled && (coordinator.isStikDebugAttached || coordinator.isWineJITPrepared))
             Text("Unfinished steps can be revisited from Settings.")
                 .font(.caption).foregroundStyle(.secondary)
