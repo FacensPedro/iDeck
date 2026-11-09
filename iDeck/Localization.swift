@@ -390,7 +390,7 @@ enum Translations {
         "GOG": ["pt": "GOG", "es": "GOG"],
         "GOG did not accept the sign-in. Try again.": ["pt": "A GOG não aceitou o login. Tente novamente.", "es": "GOG no aceptó el inicio de sesión. Inténtalo de nuevo."],
         "GOG games: %d": ["pt": "Jogos da GOG: %d", "es": "Juegos de GOG: %d"],
-        "GOG offers no Windows installer for this game.": ["pt": "A GOG não oferece instalador para Windows deste jogo.", "es": "GOG no ofrece instalador de Windows para este juego."],
+        "GOG Galaxy has no Windows build of this game.": ["pt": "A GOG Galaxy não tem uma versão para Windows deste jogo.", "es": "GOG Galaxy no tiene una versión de Windows de este juego."],
         "GOG sent an unexpected response.": ["pt": "A GOG enviou uma resposta inesperada.", "es": "GOG envió una respuesta inesperada."],
         "GOG sign-in": ["pt": "Login na GOG", "es": "Inicio de sesión en GOG"],
         "Hide list": ["pt": "Ocultar lista", "es": "Ocultar lista"],

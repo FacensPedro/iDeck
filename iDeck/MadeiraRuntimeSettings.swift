@@ -124,7 +124,7 @@ struct MadeiraGraphicsSettings: View {
     static let vulkanChoices: [(String, String)] = [("", "Automatic"), ("moltenvk", "MoltenVK"), ("kosmickrisp", "KosmicKrisp")]
 
     static func bundled(_ path: String) -> Bool {
-        FileManager.default.fileExists(atPath: Bundle.main.bundleURL.appendingPathComponent(path).path)
+        MadeiraRuntime.exists(path)
     }
     /// gl/libvulkan_kosmickrisp.dylib (docs/KOSMICKRISP.md); without it vulkan = kosmickrisp keeps Vulkan off.
     static let hasKosmicKrisp = bundled("gl/libvulkan_kosmickrisp.dylib")

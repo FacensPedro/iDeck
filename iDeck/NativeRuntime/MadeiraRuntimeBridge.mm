@@ -56,6 +56,18 @@ static bool ideck_valid_wine_prefix(const char *path) {
            [fm fileExistsAtPath:[base stringByAppendingPathComponent:@"drive_c/windows"]];
 }
 
+/// Wine's Windows files: Library/Application Support/MadeiraRuntime once the initial
+/// setup downloaded them (MadeiraRuntime.swift), else the app bundle.
+__attribute__((unused)) static NSString *ideck_runtime_root(void) {
+    NSString *support = NSSearchPathForDirectoriesInDomains(NSApplicationSupportDirectory, NSUserDomainMask, YES).firstObject;
+    if (support) {
+        NSString *root = [support stringByAppendingPathComponent:@"MadeiraRuntime"];
+        if ([NSFileManager.defaultManager fileExistsAtPath:[root stringByAppendingPathComponent:@"arm64ec-windows/ntdll.dll"]])
+            return root;
+    }
+    return NSBundle.mainBundle.bundlePath;
+}
+
 extern "C" int32_t ideck_runtime_prepare(const char *wine_prefix) {
     if (wine_prefix == nullptr || wine_prefix[0] == '\0') return EINVAL;
     struct stat info {};
@@ -64,7 +76,7 @@ extern "C" int32_t ideck_runtime_prepare(const char *wine_prefix) {
     // Seed the registry and DOS links before starting wineserver.
     madeira_seed_prefix_if_needed(wine_prefix);
     if (!ideck_valid_wine_prefix(wine_prefix)) return ENOENT;
-    NSString *bundle = NSBundle.mainBundle.bundlePath;
+    NSString *bundle = ideck_runtime_root();
     for (NSString *file in @[ @"arm64ec-windows/xtajit64.dll",
                               @"arm64ec-windows/ntdll.dll",
                               @"arm64ec-windows/winemetal.dll",
@@ -182,7 +194,7 @@ extern "C" int32_t ideck_runtime_launch(const char *executable_path,
             // Never trust the is32Bit JSON hint: imported games can bypass
             // the Swift launcher, but the actual PE32 image still requires
             // i386 Wine plus FEX WoW64 host modules.
-            NSString *bundlePath = NSBundle.mainBundle.bundlePath;
+            NSString *bundlePath = ideck_runtime_root();
             NSFileManager *manager = NSFileManager.defaultManager;
             for (NSString *name in @[ @"i386-windows/ntdll.dll",
                                       @"i386-windows/kernel32.dll",

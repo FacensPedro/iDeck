@@ -57,7 +57,7 @@ enum MadeiraDock {
     /// `env.MADEIRA_DOCK = 0` hides Dock. Without a built dockhost.exe it is hidden too.
     static var enabled: Bool { SteamSignIn.flag("MADEIRA_DOCK", default: true) && bundled }
     static var bundled: Bool {
-        Bundle.main.url(forResource: "dockhost", withExtension: "exe", subdirectory: "arm64ec-windows") != nil
+        MadeiraRuntime.exists("arm64ec-windows/dockhost.exe")
     }
     static let executable = "C:\\windows\\system32\\dockhost.exe"
 

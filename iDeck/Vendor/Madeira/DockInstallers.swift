@@ -715,8 +715,7 @@ enum DockInstallers {
         ["aarch64-windows", "arm64ec-windows", "i386-windows"].contains { bundled($0 + "/msiexec.exe") }
     }
     nonisolated private static func bundled(_ relative: String) -> Bool {
-        guard let root = Bundle.main.resourceURL else { return false }
-        return FileManager.default.fileExists(atPath: root.appendingPathComponent(relative).path)
+        MadeiraRuntime.exists(relative)
     }
 
     // MARK: The choice
@@ -862,7 +861,7 @@ enum DockInstallers {
     /// `others`: the prefix's other Dock games (a reset's shared installs, applyRequest).
     static func prepare(_ game: DockGame, drive: URL, prefix: URL, others: [DockGame] = [],
                         has32Bit: Bool = DockInstallers.bundleHas32Bit, hasMsiexec: Bool = DockInstallers.bundleHasMsiexec,
-                        fusionSource: URL? = Bundle.main.resourceURL?.appendingPathComponent("i386-windows/fusion.dll")) {
+                        fusionSource: URL? = MadeiraRuntime.file("i386-windows/fusion.dll")) {
         script = nil; serverSync = false; note = nil; finishedAt = nil; logged = []; runningSince = nil; installsOnly = false
         allSucceeded = false
         let app = game.id
@@ -874,7 +873,7 @@ enum DockInstallers {
         // session links Madeira's stand-in (DockReset.restoreStandIn).
         if flag("MADEIRA_DOCK_VULKAN_STANDIN"),   // 0: a Vulkan loader an installer wrote stays in system32
            let moved = DockReset.restoreStandIn(drive: drive, documents: prefix.deletingLastPathComponent(),
-                                                standIn: Bundle.main.resourceURL?.appendingPathComponent("arm64ec-windows/vulkan-1.dll")) {
+                                                standIn: MadeiraRuntime.file("arm64ec-windows/vulkan-1.dll")) {
             LogStore.shared.log("[dock-installers] C:\\" + moved.replacingOccurrences(of: "/", with: "\\") +
                                 " (an installer's Vulkan loader) moved to Documents/madeira-reset-backup; this session links Madeira's stand-in")
         }

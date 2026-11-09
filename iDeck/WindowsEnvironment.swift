@@ -121,7 +121,7 @@ class WindowsEnvironment {
                        "d3d12/canary_vs.dxil", "d3d12/canary_ps.dxil"]
         }
         guard assets.allSatisfy({
-            FileManager.default.fileExists(atPath: Bundle.main.bundleURL.appendingPathComponent($0).path)
+            MadeiraRuntime.exists($0)
         }) else { return false }
         // A missing plist is not evidence that the native runtime is absent.
         // Actual linker symbols and native capabilities determine readiness.
@@ -171,7 +171,7 @@ class WindowsEnvironment {
             "aarch64-windows/wow64win.dll"
         ]
         return assets.allSatisfy { name in
-            let file = bundle.appendingPathComponent(name)
+            let file = MadeiraRuntime.file(name)
             guard let attributes = try? FileManager.default.attributesOfItem(atPath: file.path),
                   let size = attributes[.size] as? NSNumber, size.intValue >= 1024,
                   let handle = try? FileHandle(forReadingFrom: file) else {
@@ -227,9 +227,7 @@ class WindowsEnvironment {
             assets["d3d12/canary_ps.dxil"] = "D3D12 pixel shader fixture"
         }
         for (relativePath, label) in assets {
-            if !FileManager.default.fileExists(
-                atPath: Bundle.main.bundleURL.appendingPathComponent(relativePath).path
-            ) {
+            if !MadeiraRuntime.exists(relativePath) {
                 missing.append(label)
             }
         }
@@ -433,19 +431,13 @@ class WindowsEnvironment {
 
     /// Whether this IPA carries Madeira's OpenGL/Vulkan runtime (gl/ and vulkan/).
     static var hasGLVulkanRuntime: Bool {
-        let bundle = Bundle.main.bundleURL
-        return ["gl/libMoltenVK.dylib", "vulkan/arm64ec-windows/winevulkan.dll",
-                "vulkan/arm64ec-windows/vulkan-1.dll"].allSatisfy {
-            FileManager.default.fileExists(atPath: bundle.appendingPathComponent($0).path)
-        }
+        ["gl/libMoltenVK.dylib", "vulkan/arm64ec-windows/winevulkan.dll",
+         "vulkan/arm64ec-windows/vulkan-1.dll"].allSatisfy(MadeiraRuntime.exists)
     }
 
     /// Whether this IPA carries vkd3d-proton (build/vkd3d-proton/build.sh output).
     static var hasVKD3DProton: Bool {
-        let bundle = Bundle.main.bundleURL
-        return hasGLVulkanRuntime && ["vulkan/arm64ec-windows/d3d12.dll", "vulkan/arm64ec-windows/d3d12core.dll"].allSatisfy {
-            FileManager.default.fileExists(atPath: bundle.appendingPathComponent($0).path)
-        }
+        hasGLVulkanRuntime && ["vulkan/arm64ec-windows/d3d12.dll", "vulkan/arm64ec-windows/d3d12core.dll"].allSatisfy(MadeiraRuntime.exists)
     }
 
     /// Graphics APIs a game can use: its executable and, for Unity games,

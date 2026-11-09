@@ -12,10 +12,11 @@ class FirstRunLaunchersContract(unittest.TestCase):
             "Wine Mono",
             "requestStikDebugJIT()",
             "requestBuiltInJIT()",
-            "VisualCRuntimeBootstrap.download",
-            "VisualCRuntimeBootstrap.extractAndInstall",
         ):
             self.assertIn(phrase, swift)
+        environment = (ROOT / "iDeck/WindowsInstallerEnvironment.swift").read_text()
+        self.assertIn("VisualCRuntimeBootstrap.download", environment)
+        self.assertIn("VisualCRuntimeBootstrap.extractAndInstall", environment)
 
     def test_madeira_cmd_and_mono_are_required_in_native_ipa(self):
         stage = repo_text("scripts/stage_madeira_payload.sh")

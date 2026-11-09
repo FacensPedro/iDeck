@@ -22,12 +22,14 @@ class GOGIntegrationTests(unittest.TestCase):
 
     def test_library_installer_and_installed_detection(self):
         gog = read("iDeck/GOGLibrary.swift")
-        self.assertIn("/account/getFilteredProducts?mediaType=1&sortBy=title&page=", gog)
-        self.assertIn('"/account/gameDetails/\\(gameID).json"', gog)
-        self.assertIn('URL(string: "https://www.gog.com" + file.manualURL)', gog)
+        self.assertIn('"https://galaxy-library.gog.com/users/\\(tokens.userID)/releases"', gog)
+        self.assertIn('(item["platform_id"] as? String) == "gog"', gog)
+        self.assertIn('"https://api.gog.com/products?ids="', gog)
+        self.assertNotIn("getFilteredProducts", gog)
+        self.assertNotIn("gameDetails", gog)
+        self.assertNotIn("manualURL", gog)
         self.assertIn('file.hasPrefix("goggame-") && file.hasSuffix(".info")', gog)
         self.assertIn('!relative.contains("..")', gog)
-        self.assertIn('"drive_c/WindowsDownloads"', gog)
 
     def test_new_sources_are_in_the_xcode_project(self):
         project = read("iDeck.xcodeproj/project.pbxproj")
@@ -124,14 +126,14 @@ class GOGContentSystemTests(unittest.TestCase):
         main = read("iDeck/MainView.swift")
         self.assertIn("gogLibrary.install(game, prefixPath: prefixPath)", main)
 
-    def test_galaxy_404_uses_verified_offline_installer_fallback(self):
+    def test_gog_installs_only_through_galaxy(self):
         gog = read("iDeck/GOGLibrary.swift")
-        self.assertIn("catch GOGError.http(404)", gog)
-        self.assertIn("guard !Task.isCancelled", gog)
-        self.assertIn('outcome: .paused', gog)
-        self.assertIn("self.downloadInstaller(game, prefixPath: prefixPath)", gog)
-        self.assertIn("completion(setup.map { .installer($0) } ?? .failed)", gog)
-        self.assertIn("fallback = true", gog)
+        self.assertIn("throw GOGError.noGalaxyBuild", gog)
+        for gone in ("downloadInstaller", "silentInstallArguments", "windowsInstaller", "case installer(", "fallback = true"):
+            self.assertNotIn(gone, gog)
+        main = read("iDeck/MainView.swift")
+        self.assertNotIn("silentInstallArguments", main)
+        self.assertNotIn(".installer(", main)
 
     def test_content_source_is_in_the_xcode_project(self):
         project = read("iDeck.xcodeproj/project.pbxproj")

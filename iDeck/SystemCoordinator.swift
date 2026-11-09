@@ -185,6 +185,8 @@ class SystemCoordinator: ObservableObject {
     /// The installer's latest message while components download for a launch.
     @Published var steamComponentsProgress: String?
     private var steamComponentsTask: Task<Void, Never>?
+    /// Valve's client components are being fetched (the initial setup waits on it).
+    var steamComponentsInstalling: Bool { steamComponentsTask != nil }
     private var dockInstallAfterPrefix = false
     private var isPreparingWindowsPrefix = false
 
@@ -717,48 +719,39 @@ class SystemCoordinator: ObservableObject {
         action?()
     }
 
-    private func prepareVisualCRuntimeIfNeeded(prefix: URL, resume: @escaping () -> Void) -> Bool {
+    /// Programs whose dependencies were already offered this run (a failed download
+    /// does not block every launch).
+    private var onDemandAttempted = Set<String>()
+    private var onDemandInstallTask: Task<Void, Never>?
+
+    /// On demand, before Wine starts: the Visual C++ runtime (by version and
+    /// architecture) and .NET support (Wine Mono) that `executable` imports, and
+    /// nothing else. Returns true when it installs and calls `resume` afterwards.
+    private func prepareVisualCRuntimeIfNeeded(prefix: URL, executable: URL?, resume: @escaping () -> Void) -> Bool {
         if !Thread.isMainThread {
             DispatchQueue.main.async { [weak self] in
-                _ = self?.prepareVisualCRuntimeIfNeeded(prefix: prefix, resume: resume)
+                _ = self?.prepareVisualCRuntimeIfNeeded(prefix: prefix, executable: executable, resume: resume)
             }
             return true
         }
-        if legacyVisualCRuntimeTask != nil { return true }
-        let prefix = prefix.standardizedFileURL
+        if onDemandInstallTask != nil { return true }
         let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
-        // Visual C++ built into the app: in place without installing anything.
+        // Visual C++ built into a development app: in place without installing anything.
         if let documents { VisualCRuntimeBootstrap.installBundled(documents: documents) }
-        if VisualCRuntimeBootstrap.installed(in: prefix, documents: documents) {
-            // Visual C++ 2005-2013 and the 32-bit runtimes, once, for users who
-            // accepted Microsoft's runtime (it is in Documents/vcruntime).
-            if let documents, !legacyVisualCRuntimeAttempted,
-               !VisualCRuntimeLegacy.installed(documents: documents),
-               FileManager.default.fileExists(atPath: documents.appendingPathComponent("vcruntime").path) {
-                beginLegacyVisualCRuntimeInstallation(documents: documents, resume: resume)
-                return true
+        guard let executable, let pe = WindowsPEInfo.read(executable),
+              !onDemandAttempted.contains(executable.path) else { return false }
+        let needed = MainActor.assumeIsolated { WindowsInstallerEnvironment.missing(WindowsRequirements.of(pe)) }
+        guard !needed.isEmpty else { return false }
+        onDemandAttempted.insert(executable.path)
+        AppLog.record("[installer] \(executable.lastPathComponent) needs \(needed)")
+        onDemandInstallTask = Task { @MainActor [weak self] in
+            let failures = await WindowsInstallerEnvironment.install(needed) { [weak self] message in
+                self?.setWindowsStatus(message)
             }
-            return false
-        }
-        if bypassVisualCRuntimeForPrefix == prefix.path {
-            bypassVisualCRuntimeForPrefix = nil
-            return false
-        }
-        if needsVisualCRuntimeConsent || windowsStatus == VisualCRuntimeBootstrap.installStatus {
-            return true
-        }
-        if UserDefaults.standard.bool(forKey: "ideckInstallOfficialVisualCRedist") {
-            beginVisualCRuntimeInstallation(prefix: prefix, resume: resume)
-            return true
-        }
-        visualCRuntimeConsentAction = { [weak self] in
-            self?.beginVisualCRuntimeInstallation(prefix: prefix, resume: resume)
-        }
-        visualCRuntimeSkipAction = { [weak self] in
-            self?.bypassVisualCRuntimeForPrefix = prefix.path
+            self?.onDemandInstallTask = nil
+            if !failures.isEmpty { self?.setWindowsStatus(failures.joined(separator: "\n")) }
             resume()
         }
-        needsVisualCRuntimeConsent = true
         return true
     }
 
@@ -816,6 +809,37 @@ class SystemCoordinator: ObservableObject {
                     }
                 }
             }
+        }
+    }
+
+    /// Starts any Windows program or installer through the universal installer
+    /// environment: installs the Visual C++ runtime or .NET support it imports, picks
+    /// the installer technology's switches (an .msi runs through msiexec), then starts it.
+    /// Store games pass `detectInstaller: false`: only their dependencies are handled.
+    func launchWindowsProgram(at url: URL, profile: WindowsGameProfile? = nil, silent: Bool = false,
+                              detectInstaller: Bool = true) {
+        let prefix = MadeiraDock.prefix
+        guard let plan = WindowsInstallerEnvironment.plan(for: url, prefix: prefix, silent: silent,
+                                                          detectInstaller: detectInstaller) else {
+            launchWindowsExecutable(at: url, profile: profile)
+            return
+        }
+        if let kind = plan.kind { AppLog.record("[installer] \(url.lastPathComponent): \(kind.rawValue)") }
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            if !WindowsInstallerEnvironment.missing(plan.requirements).isEmpty {
+                let failures = await WindowsInstallerEnvironment.install(plan.requirements) { [weak self] message in
+                    self?.setWindowsStatus(message)
+                }
+                if !failures.isEmpty { self.setWindowsStatus(failures.joined(separator: "\n")) }
+            }
+            var launch = profile ?? WindowsGameProfile(id: "windows:" + url.lastPathComponent.lowercased(),
+                                                       title: url.deletingPathExtension().lastPathComponent)
+            // The profile's own arguments win; the technology's switches come first.
+            if plan.kind != nil {
+                launch.arguments = [plan.arguments, launch.arguments].filter { !$0.isEmpty }.joined(separator: " ")
+            }
+            self.launchWindowsExecutable(at: plan.executable, profile: launch)
         }
     }
 
@@ -898,7 +922,7 @@ class SystemCoordinator: ObservableObject {
                         return
                     }
                     let prefix = URL(fileURLWithPath: mountPath, isDirectory: true)
-                    if self.prepareVisualCRuntimeIfNeeded(prefix: prefix, resume: { [weak self] in
+                    if self.prepareVisualCRuntimeIfNeeded(prefix: prefix, executable: destination, resume: { [weak self] in
                         self?.launchWindowsExecutable(at: destination, profile: profile)
                     }) { return }
                     self.jitResume = { [weak self] in self?.launchWindowsExecutable(at: destination, profile: profile) }
@@ -1053,7 +1077,7 @@ class SystemCoordinator: ObservableObject {
         // Downloads first (Visual C++, Steam's client components), JIT last: the
         // debugger must be attached only for the launch itself. A StikDebug
         // session that ends during a long download takes iDeck down with it.
-        if prepareVisualCRuntimeIfNeeded(prefix: prefixPath, resume: { [weak self] in
+        if prepareVisualCRuntimeIfNeeded(prefix: prefixPath, executable: executableURL, resume: { [weak self] in
             self?.launchSteamGame(game: game, profile: profile, prefixPath: prefixPath, skipSteamClient: skipSteamClient)
         }) { return }
         if !skipSteamClient && MadeiraDock.bundled && !MadeiraDock.clientInstalled {

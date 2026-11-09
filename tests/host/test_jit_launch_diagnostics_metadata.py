@@ -14,12 +14,12 @@ class LauncherJITAndDiagnosticsTests(unittest.TestCase):
         self.assertNotIn("private func requireJIT()", MAIN)
         self.assertIn("StikJITHelper.enableJIT", COORD)
         self.assertIn("guard self.ensureJITForGameLaunch() else { return }", COORD)
-        self.assertIn("coordinator.launchWindowsExecutable(at: executable, profile: profile)", MAIN)
-        self.assertIn("coordinator.launchWindowsExecutable(at: game.executable, profile: profile)", MAIN)
+        self.assertIn("coordinator.launchWindowsProgram(at: executable, profile: profile, detectInstaller: false)", MAIN)
+        self.assertIn("coordinator.launchWindowsProgram(at: game.executable, profile: profile, detectInstaller: false)", MAIN)
 
     def test_gog_installer_uses_real_pe_architecture(self):
         self.assertIn("WindowsEnvironment.isPE32WindowsExecutable(destination)", COORD)
-        self.assertIn("coordinator.launchWindowsExecutable(at: setup, profile: profile)", MAIN)
+        self.assertNotIn("coordinator.launchWindowsExecutable(at: setup, profile: profile)", MAIN)
 
     def test_bug_reports_contain_game_launcher_and_real_device(self):
         for key in ("diagnostics.lastGame", "diagnostics.lastLauncher"):
