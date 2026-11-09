@@ -157,15 +157,24 @@ enum MadeiraRuntime {
                     (file, response) = try await URLSession.shared.download(from: package.url, delegate: delegate)
                 }
                 let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-                guard status == 200 else { throw InstallError.message("The runtime download failed (HTTP \(status)).") }
+                // GitHub's release downloads answer 502/503/504 now and then: retry those.
+                if (status == 429 || (500...599).contains(status)) && attempt < 8 {
+                    try? FileManager.default.removeItem(at: file)
+                    attempt += 1
+                    resume = nil
+                    AppLog.record("[runtime] download of \(package.id) got HTTP \(status); retry \(attempt)/8")
+                    try await Task.sleep(nanoseconds: UInt64(min(attempt, 4)) * 2_000_000_000)
+                    continue
+                }
+                guard status == 200 else { throw InstallError.message("The runtime download failed (HTTP \(status)). Try again.") }
                 let kept = FileManager.default.temporaryDirectory.appendingPathComponent("runtime-\(package.id)-\(UUID().uuidString).tar.xz")
                 try FileManager.default.moveItem(at: file, to: kept)
                 return kept
-            } catch let error as URLError where attempt < 5 && [.networkConnectionLost, .timedOut,
+            } catch let error as URLError where attempt < 8 && [.networkConnectionLost, .timedOut,
                                                                 .notConnectedToInternet, .cannotConnectToHost].contains(error.code) {
                 attempt += 1
                 resume = error.downloadTaskResumeData ?? resume
-                AppLog.record("[runtime] download of \(package.id) interrupted (\(error.code.rawValue)); retry \(attempt)/5")
+                AppLog.record("[runtime] download of \(package.id) interrupted (\(error.code.rawValue)); retry \(attempt)/8")
                 try await Task.sleep(nanoseconds: UInt64(attempt) * 2_000_000_000)
             }
         }
