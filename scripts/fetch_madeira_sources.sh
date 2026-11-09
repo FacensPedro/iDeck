@@ -226,6 +226,14 @@ if ! git -C "$DEST" apply --reverse --check "$GETPROC_PATCH" >/dev/null 2>&1; th
   git -C "$DEST" apply "$GETPROC_PATCH"
 fi
 
+# The [iat-life] loader probe must not walk a WoW64 process's i386 image with
+# 64-bit thunks: the wild name pointer killed ActivationUI.exe at startup.
+IAT_PE32_PATCH="$ROOT/patches/madeira-iat-life-pe32-skip.patch"
+if ! git -C "$DEST" apply --reverse --check "$IAT_PE32_PATCH" >/dev/null 2>&1; then
+  git -C "$DEST" apply --check "$IAT_PE32_PATCH"
+  git -C "$DEST" apply "$IAT_PE32_PATCH"
+fi
+
 # An unloaded image retires the anon JIT aliases over its pages; the session
 # watchdog never touches a thread that already exited.
 ALIAS_LIFECYCLE_PATCH="$ROOT/patches/madeira-jit-alias-lifecycle.patch"

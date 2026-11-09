@@ -45,7 +45,8 @@ EARLY_JIT_PATCH_SHA256 = hashlib.sha256(
     (ROOT / "scripts/apply_madeira_relink_cache.py").read_bytes() +
     (ROOT / "patches/madeira-mscoree-fusion-negative-cache.patch").read_bytes() +
     (ROOT / "patches/dxmt-ios-cache-sync-reuse.patch").read_bytes() +
-    (ROOT / "patches/madeira-arm64-importer-ret-bind.patch").read_bytes()
+    (ROOT / "patches/madeira-arm64-importer-ret-bind.patch").read_bytes() +
+    (ROOT / "patches/madeira-iat-life-pe32-skip.patch").read_bytes()
 ).hexdigest()
 REPEAT_WINE_SESSION_PATCH_SHA256 = hashlib.sha256(
     (Path(__file__).resolve().parents[1] / "patches/madeira-repeat-wine-sessions.patch").read_bytes()
