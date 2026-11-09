@@ -62,6 +62,17 @@ class SetupDownloadsRuntimeTests(unittest.TestCase):
         for name in ("MadeiraRuntime.swift", "GOGGalaxyApp.swift"):
             self.assertEqual(project.count(f"/* {name} in Sources */"), 2, name)
 
+    def test_downloads_report_real_progress(self):
+        observed = repo_text("iDeck/ObservedDownload.swift")
+        self.assertIn("URLSession(configuration: configuration, delegate: download, delegateQueue: nil)", observed)
+        self.assertIn("didWriteData", observed)
+        self.assertIn("ObservedDownload.run(", repo_text("iDeck/MadeiraRuntime.swift"))
+        self.assertIn("ObservedDownload.run(", repo_text("iDeck/GOGGalaxyApp.swift"))
+        self.assertNotIn("URLSession.shared.download(from:", repo_text("iDeck/MadeiraRuntime.swift"))
+        self.assertIn("ideck_wineprocess_running()", repo_text("iDeck/MainView.swift"))
+        project = repo_text("iDeck.xcodeproj/project.pbxproj")
+        self.assertEqual(project.count("/* ObservedDownload.swift in Sources */"), 2)
+
     def test_workflow_publishes_runtime(self):
         workflow = repo_text(".github/workflows/ios.yml")
         self.assertIn("Publish Windows runtime downloads", workflow)
