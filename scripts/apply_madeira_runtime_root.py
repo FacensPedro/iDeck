@@ -60,13 +60,51 @@ def convert(path: Path, minimum: int) -> int:
     return 0
 
 
+DATA_MARKER = "MADEIRA_DATA_DIR"
+DATA_ENV = '''            setenv("WINEDLLPATH", bundlePath.UTF8String, 1);
+            /* iDeck: Wine's data files (nls/) are in the downloaded runtime too. */
+            setenv("MADEIRA_DATA_DIR", bundlePath.UTF8String, 1);
+'''
+DATA_LOADER = '''    set_dll_path();
+    /* iDeck: Wine's data files (nls/) come from the runtime the initial setup
+     * downloads, not from the app bundle (scripts/apply_madeira_runtime_root.py). */
+    {
+        const char *runtime_data = getenv( "MADEIRA_DATA_DIR" );
+        if (runtime_data && runtime_data[0] == '/') data_dir = strdup( runtime_data );
+    }
+'''
+
+
+def data_dir(root: Path) -> int:
+    """ntdll reads nls/ from data_dir, derived from the app executable's folder."""
+    bridge = root / "app/Madeira/WineProcessBridge.m"
+    text = bridge.read_text()
+    if DATA_MARKER not in text:
+        anchor = '            setenv("WINEDLLPATH", bundlePath.UTF8String, 1);\n'
+        if text.count(anchor) != 1:
+            print("ERROR: WineProcessBridge.m: no WINEDLLPATH anchor", file=sys.stderr)
+            return 2
+        bridge.write_text(text.replace(anchor, DATA_ENV))
+        print("WineProcessBridge.m: MADEIRA_DATA_DIR names the runtime for ntdll")
+    loader = root / "wine/dlls/ntdll/unix/loader.c"
+    text = loader.read_text()
+    if DATA_MARKER not in text:
+        anchor = "    set_dll_path();\n"
+        if text.count(anchor) != 1:
+            print("ERROR: ntdll loader.c: no set_dll_path anchor", file=sys.stderr)
+            return 2
+        loader.write_text(text.replace(anchor, DATA_LOADER))
+        print("ntdll loader.c: data_dir follows MADEIRA_DATA_DIR")
+    return 0
+
+
 def main(root: str) -> int:
     base = Path(root) / "app/Madeira"
     for name, minimum in (("WineProcessBridge.m", 3), ("WineServerBridge.m", 1)):
         status = convert(base / name, minimum)
         if status:
             return status
-    return 0
+    return data_dir(Path(root))
 
 
 if __name__ == "__main__":

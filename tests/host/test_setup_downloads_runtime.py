@@ -44,6 +44,9 @@ class SetupDownloadsRuntimeTests(unittest.TestCase):
         self.assertIn('python3 "$ROOT/scripts/apply_madeira_runtime_root.py" "$DEST"', repo_text("scripts/fetch_madeira_sources.sh"))
         self.assertIn('"scripts/apply_madeira_runtime_root.py"', repo_text("scripts/madeira_native_kit.py"))
         self.assertIn("ideck_runtime_root()", repo_text("iDeck/NativeRuntime/MadeiraRuntimeBridge.mm"))
+        self.assertIn('setenv("MADEIRA_DATA_DIR", bundlePath.UTF8String, 1);', script)
+        self.assertIn('getenv( "MADEIRA_DATA_DIR" )', script)
+        self.assertIn('wine/dlls/ntdll/unix/loader.c', script)
         build = repo_text("scripts/build_ipa.sh")
         self.assertIn("scripts/split_runtime_downloads.py", build)
 
