@@ -73,6 +73,14 @@ class SetupDownloadsRuntimeTests(unittest.TestCase):
         project = repo_text("iDeck.xcodeproj/project.pbxproj")
         self.assertEqual(project.count("/* ObservedDownload.swift in Sources */"), 2)
 
+    def test_setup_steps_aside_for_windows_installers(self):
+        view = repo_text("iDeck/MainView.swift")
+        self.assertIn("onSuspend(true)", view)
+        self.assertIn("defer { onSuspend(false) }", view)
+        self.assertIn("isFirstRunSetupPresented = !suspended && !firstRunSetupComplete", view)
+        self.assertLess(view.index("onSuspend(true)"),
+                        view.index("coordinator.launchWindowsExecutable(at: setup, profile: GOGGalaxyApp.setupProfile)"))
+
     def test_workflow_publishes_runtime(self):
         workflow = repo_text(".github/workflows/ios.yml")
         self.assertIn("Publish Windows runtime downloads", workflow)

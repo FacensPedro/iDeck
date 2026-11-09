@@ -39,10 +39,14 @@ struct MainView: View {
             if !complete { isFirstRunSetupPresented = true }
         }
         .fullScreenCover(isPresented: $isFirstRunSetupPresented) {
-            IDeckFirstRunSetupView(coordinator: coordinator) {
+            IDeckFirstRunSetupView(coordinator: coordinator, onFinish: {
                 firstRunSetupComplete = true
                 isFirstRunSetupPresented = false
-            }
+            }, onSuspend: { suspended in
+                // A Windows installer started from the setup needs the Metal display
+                // surface on screen: the setup steps aside and comes back afterwards.
+                isFirstRunSetupPresented = !suspended && !firstRunSetupComplete
+            })
         }
         .onChange(of: scenePhase) { _, phase in
             UIApplication.shared.isIdleTimerDisabled = phase == .active
@@ -2642,10 +2646,11 @@ extension WindowsWorkspaceView {
 private struct IDeckFirstRunSetupView: View {
     @ObservedObject var coordinator: SystemCoordinator
     let onFinish: () -> Void
+    let onSuspend: (Bool) -> Void
 
     @AppStorage(SystemCoordinator.jitMethodKey) private var jitMethod = "stikdebug"
     @ObservedObject private var wineMono = WineMonoModel.shared
-    @State private var step = 0
+    @AppStorage("firstRunSetup.step.v1") private var step = 0
     @State private var installing = false
     @State private var installerStatus = ""
     @State private var refresh = 0
@@ -2743,7 +2748,7 @@ private struct IDeckFirstRunSetupView: View {
                                     .buttonStyle(.borderedProminent)
                                     .disabled(installing || (current == .windows && (!x64Ready || !x86Ready)))
                             } else {
-                                Button("Finish setup", action: onFinish)
+                                Button("Finish setup") { step = 0; onFinish() }
                                     .buttonStyle(.borderedProminent)
                             }
                         }
@@ -2943,6 +2948,10 @@ private struct IDeckFirstRunSetupView: View {
                 return
             }
             installerStatus = "Installing GOG Galaxy…"
+            // Wine draws into the workspace's Metal surface: show it while the setup runs.
+            onSuspend(true)
+            defer { onSuspend(false) }
+            try? await Task.sleep(nanoseconds: 700_000_000)
             coordinator.launchWindowsExecutable(at: setup, profile: GOGGalaxyApp.setupProfile)
             // The silent setup finishes when GalaxyClient.exe is in place (up to 20 minutes).
             // Wine stopping first means the setup ended or could not start.
