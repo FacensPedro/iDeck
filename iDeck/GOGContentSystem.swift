@@ -51,6 +51,11 @@ struct GOGContentPlan {
     var containers: [(id: String, productID: String, chunks: [GOGContentChunk])] = []
     var containerOf: [String: String] = [:]   // file path -> container id
     var dependencies: [String] = []
+    /// The depot language chosen ("en-us"), for the install script's actions.
+    var language = "en-us"
+    /// Redistributables' installers the game's first start runs once (GOGSetup).
+    var setupPrograms: [GOGSetupProgram] = []
+    var setupNotes: [GOGSetupNote] = []
 
     var downloadBytes: Int64 {
         files.filter { containerOf[$0.path] == nil }.flatMap(\.chunks).reduce(0) { $0 + $1.compressedSize }
@@ -190,6 +195,7 @@ enum GOGContentSystem {
 
         var plan = GOGContentPlan(installDirectory: installDirectory)
         plan.dependencies = manifest["dependencies"] as? [String] ?? []
+        plan.language = language ?? "en-us"
         var seen = Set<String>()
         for depot in depots {
             guard let hash = depot["manifest"] as? String else { continue }
@@ -205,7 +211,23 @@ enum GOGContentSystem {
                 }
             }
             for item in (body["items"] as? [[String: Any]]) ?? [] {
-                guard let raw = item["path"] as? String, let path = safePath(raw) else { continue }
+                guard var raw = item["path"] as? String else { continue }
+                // Support files (GOG Galaxy's installer scripts) are left out, except the
+                // install script goggame-<id>.script, which goes to the folder's root for
+                // its registry values (GOGInstallScript), and the support folder's app/
+                // files, which its supportData action copies into the game's folder.
+                if (item["flags"] as? [String] ?? []).contains("support") {
+                    let parts = raw.replacingOccurrences(of: "\\", with: "/").split(separator: "/").map(String.init)
+                    let name = parts.last ?? ""
+                    if GOGInstallScript.isScriptName(name) {
+                        raw = name
+                    } else if parts.count > 1, parts[0].lowercased() == "app" {
+                        raw = parts.dropFirst().joined(separator: "/")
+                    } else {
+                        continue
+                    }
+                }
+                guard let path = safePath(raw) else { continue }
                 switch item["type"] as? String {
                 case "DepotDirectory":
                     plan.directories.append(path)
@@ -224,7 +246,45 @@ enum GOGContentSystem {
             }
         }
         guard !plan.files.isEmpty else { throw GOGContentError.noDepots }
+        await addRedistributables(to: &plan)
         return plan
+    }
+
+    static let contentHost = "https://content-system.gog.com"
+
+    /// The build's redistributables (GOGSetup): their files join the plan under the
+    /// "redist" product (GOG's open link, no sign-in), and the installers the game's
+    /// first start runs are kept on the plan. A failure here never fails the install:
+    /// the game is installed without them and the reason is kept.
+    static func addRedistributables(to plan: inout GOGContentPlan) async {
+        guard !plan.dependencies.isEmpty else { return }
+        do {
+            let pointer = try json(try await get(URL(string: contentHost + "/dependencies/repository?generation=2")!, tokens: nil))
+            guard let text = pointer["repository_manifest"] as? String, let url = URL(string: text), url.scheme == "https" else {
+                throw GOGContentError.invalidManifest
+            }
+            let repository = GOGDependency.parse(try json(try await get(url, tokens: nil)))
+            let setup = GOGSetup.plan(plan.dependencies, repository: repository, hasMsiexec: DockInstallers.bundleHasMsiexec)
+            var seen = Set(plan.files.map { $0.path.lowercased() })
+            for dependency in setup.download {
+                guard let meta = URL(string: "https://cdn.gog.com/content-system/v2/dependencies/meta/" + galaxyPath(dependency.manifest)) else { continue }
+                let depot = try json(try await get(meta, tokens: nil))
+                for item in ((depot["depot"] as? [String: Any])?["items"] as? [[String: Any]]) ?? [] {
+                    // Redistributables' depots have no small-files container; skip a packed file.
+                    guard item["type"] as? String == "DepotFile", item["sfcRef"] == nil, let raw = item["path"] as? String,
+                          let path = safePath(raw), seen.insert(path.lowercased()).inserted else { continue }
+                    plan.files.append(GOGContentFile(path: path, productID: GOGContentInstaller.redistProduct,
+                                                     chunks: parseChunks(item["chunks"]), containerSlice: nil))
+                }
+            }
+            plan.setupPrograms = setup.run
+            plan.setupNotes = setup.notes
+            AppLog.record("[gog-setup] ids=\(plan.dependencies.joined(separator: ",")) run=\(setup.run.map(\.id).joined(separator: ",")) skipped=\(setup.notes.map(\.id).joined(separator: ","))")
+        } catch {
+            AppLog.record("[gog-setup] redistributables not downloaded: \(error.localizedDescription)")
+            plan.setupNotes = [GOGSetupNote(id: "", name: "Redistributables",
+                                            note: "Not downloaded: \(error.localizedDescription)")]
+        }
     }
 
     private static func parseChunks(_ value: Any?) -> [GOGContentChunk] {
@@ -263,6 +323,8 @@ final class GOGContentInstaller: @unchecked Sendable {
         func store(_ entry: Entry, for productID: String) { values[productID] = entry }
     }
     private let linkCache = SecureLinkCache()
+    /// The product id of redistributables' chunks, served by GOG's open link.
+    static let redistProduct = "redist"
 
     init(tokens: GOGTokens, progress: @escaping @Sendable (Int64) -> Void) {
         self.tokens = tokens
@@ -402,9 +464,12 @@ final class GOGContentInstaller: @unchecked Sendable {
         let exhausted = attempt > 0 && (saved?.providers.isEmpty != false ||
                                          attempt % max(1, saved?.providers.count ?? 1) == 0)
         if expired || exhausted {
-            let url = URL(string: "https://content-system.gog.com/products/\(productID)/secure_link?generation=2&path=/&_version=2")!
+            let redist = productID == Self.redistProduct
+            let url = redist
+                ? URL(string: "https://content-system.gog.com/open_link?generation=2&_version=2&path=/dependencies/store/")!
+                : URL(string: "https://content-system.gog.com/products/\(productID)/secure_link?generation=2&path=/&_version=2")!
             var request = URLRequest(url: url)
-            request.setValue("Bearer " + tokens.accessToken, forHTTPHeaderField: "Authorization")
+            if !redist { request.setValue("Bearer " + tokens.accessToken, forHTTPHeaderField: "Authorization") }
             let (data, response) = try await GOGAPI.session.data(for: request)
             let status = (response as? HTTPURLResponse)?.statusCode ?? 0
             guard status == 200 else { throw status == 401 ? GOGError.notSignedIn : GOGError.http(status) }

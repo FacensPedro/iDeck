@@ -39,14 +39,10 @@ struct MainView: View {
             if !complete { isFirstRunSetupPresented = true }
         }
         .fullScreenCover(isPresented: $isFirstRunSetupPresented) {
-            IDeckFirstRunSetupView(coordinator: coordinator, onFinish: {
+            IDeckFirstRunSetupView(coordinator: coordinator) {
                 firstRunSetupComplete = true
                 isFirstRunSetupPresented = false
-            }, onSuspend: { suspended in
-                // A Windows installer started from the setup needs the Metal display
-                // surface on screen: the setup steps aside and comes back afterwards.
-                isFirstRunSetupPresented = !suspended && !firstRunSetupComplete
-            })
+            }
         }
         .onChange(of: scenePhase) { _, phase in
             UIApplication.shared.isIdleTimerDisabled = phase == .active
@@ -1214,6 +1210,19 @@ struct WindowsWorkspaceView: View {
         // with a token minted for its own client, before Wine starts.
         Task { @MainActor in
             await GOGGalaxy.shared.prepare(gameID: game.gameID, drive: EpicLibrary.drive)
+            // What GOG Galaxy does after an install, done before the start (as Madeira):
+            // the install script's registry values, then the redistributables' installers.
+            let drive = EpicLibrary.drive
+            let folder = GOGLibraryModel.installFolder(containing: game.executable.deletingLastPathComponent())
+            GOGLaunchServices.applyInstallScripts(folder: folder, drive: drive)
+            if let batch = GOGLaunchServices.setupBatch(gameID: game.gameID, folder: folder, executable: game.executable,
+                                                        arguments: profile.arguments, drive: drive),
+               let shell = MadeiraDock.stageCommandShell() {
+                var setup = profile
+                setup.arguments = "/c \"\(batch)\""
+                coordinator.launchWindowsExecutable(at: shell, profile: setup)
+                return
+            }
             coordinator.launchWindowsProgram(at: game.executable, profile: profile, detectInstaller: false)
         }
     }
@@ -2646,7 +2655,6 @@ extension WindowsWorkspaceView {
 private struct IDeckFirstRunSetupView: View {
     @ObservedObject var coordinator: SystemCoordinator
     let onFinish: () -> Void
-    let onSuspend: (Bool) -> Void
 
     @AppStorage(SystemCoordinator.jitMethodKey) private var jitMethod = "stikdebug"
     @ObservedObject private var wineMono = WineMonoModel.shared
@@ -2657,13 +2665,12 @@ private struct IDeckFirstRunSetupView: View {
     @State private var pairingImporterPresented = false
 
     private enum Step: Int, CaseIterable {
-        case windows, dock, jit, gog, summary
+        case windows, dock, jit, summary
         var title: String {
             switch self {
             case .windows: return "Windows runtime"
             case .dock: return "Madeira Dock"
             case .jit: return "JIT configuration"
-            case .gog: return "GOG Galaxy"
             case .summary: return "Setup summary"
             }
         }
@@ -2677,7 +2684,6 @@ private struct IDeckFirstRunSetupView: View {
     private var x86Ready: Bool {
         MadeiraRuntime.installed("wine-x86") && coordinator.windowsEnvironment.hasWoW64Runtime() && prefixReady
     }
-    private var galaxyReady: Bool { GOGGalaxyApp.installed(prefix: MadeiraDock.prefix) }
     private var steamDLLsReady: Bool {
         guard let folder = SteamDLLRepair.sourceFolder else { return false }
         let root = MadeiraDock.prefix.appendingPathComponent("drive_c")
@@ -2727,7 +2733,6 @@ private struct IDeckFirstRunSetupView: View {
                             case .windows: windowsStep
                             case .dock: dockStep
                             case .jit: jitStep
-                            case .gog: gogStep
                             case .summary: completeStep
                             }
                         }
@@ -2903,78 +2908,6 @@ private struct IDeckFirstRunSetupView: View {
         }
     }
 
-    // MARK: - GOG Galaxy
-
-    private var gogStep: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Label("GOG Galaxy", systemImage: "shippingbox.fill")
-                .font(.title2.bold())
-            Text("Installs GOG's own client, GOG Galaxy 2.0, in the Windows environment. The current release is downloaded from GOG and installed silently.")
-            statusRow("GOG Galaxy", galaxyReady)
-            Button(galaxyReady ? "Installed" : (installing ? "Installing…" : "Install GOG Galaxy")) {
-                installGOGGalaxy()
-            }
-            .buttonStyle(.borderedProminent)
-            .disabled(installing || galaxyReady || !x86Ready)
-            if installing { ProgressView(installerStatus.isEmpty ? coordinator.windowsStatus : installerStatus).font(.caption) }
-            else if !installerStatus.isEmpty {
-                Text(installerStatus).font(.caption).foregroundStyle(.secondary)
-            }
-            if !x86Ready {
-                Text("Install the Windows runtime first.").font(.caption).foregroundStyle(.orange)
-            } else if !coordinator.isJITEnabled {
-                Text("GOG Galaxy's installer runs in Wine: enable JIT first.").font(.caption).foregroundStyle(.orange)
-            }
-        }
-    }
-
-    private func installGOGGalaxy() {
-        guard !installing else { return }
-        installing = true
-        let prefix = MadeiraDock.prefix
-        Task { @MainActor in
-            defer { installing = false; refresh += 1 }
-            let setup: URL
-            do {
-                setup = try await GOGGalaxyApp.downloadSetup(prefix: prefix) { done, total in
-                    let text = total > 0
-                        ? "\(ObservedDownload.megabytes(done)) / \(ObservedDownload.megabytes(total)) (\(Int(Double(done) / Double(total) * 100))%)"
-                        : ObservedDownload.megabytes(done)
-                    Task { @MainActor in installerStatus = "Downloading GOG Galaxy… " + text }
-                }
-            } catch {
-                installerStatus = error.localizedDescription
-                AppLog.record("[gog-galaxy] download failed: \(error.localizedDescription)")
-                return
-            }
-            installerStatus = "Installing GOG Galaxy…"
-            // Wine draws into the workspace's Metal surface: show it while the setup runs.
-            onSuspend(true)
-            defer { onSuspend(false) }
-            try? await Task.sleep(nanoseconds: 700_000_000)
-            coordinator.launchWindowsExecutable(at: setup, profile: GOGGalaxyApp.setupProfile)
-            // The silent setup finishes when GalaxyClient.exe is in place (up to 20 minutes).
-            // Wine stopping first means the setup ended or could not start.
-            var started = false
-            for second in 0..<1200 where !GOGGalaxyApp.installed(prefix: prefix) {
-                let running = ideck_wineprocess_running()
-                if running { started = true }
-                if (started && !running) || (!started && second >= 120) { break }
-                installerStatus = "Installing GOG Galaxy… \(second / 60):\(String(format: "%02d", second % 60))"
-                    + (coordinator.windowsStatus.isEmpty ? "" : " — " + coordinator.windowsStatus)
-                try? await Task.sleep(nanoseconds: 1_000_000_000)
-            }
-            if GOGGalaxyApp.installed(prefix: prefix) {
-                GOGGalaxyApp.removeSetup(prefix: prefix)
-                installerStatus = "GOG Galaxy installed."
-                AppLog.record("[gog-galaxy] installed")
-            } else {
-                installerStatus = "GOG Galaxy was not installed: \(coordinator.windowsStatus)"
-                AppLog.record("[gog-galaxy] setup ended without GalaxyClient.exe")
-            }
-        }
-    }
-
     // MARK: - Summary
 
     private var completeStep: some View {
@@ -2983,7 +2916,6 @@ private struct IDeckFirstRunSetupView: View {
                 .font(.title2.bold())
             statusRow("Windows runtime", windowsReady)
             statusRow("Madeira Dock", MadeiraDock.clientInstalled)
-            statusRow("GOG Galaxy", galaxyReady)
             statusRow("JIT", coordinator.isJITEnabled && (coordinator.isStikDebugAttached || coordinator.isWineJITPrepared))
             Text("Unfinished steps can be revisited from Settings.")
                 .font(.caption).foregroundStyle(.secondary)

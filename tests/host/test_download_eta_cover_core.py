@@ -35,7 +35,7 @@ class DownloadETACoreContract(unittest.TestCase):
         self.assertIn('private func installWindowsRuntime()', view)
         self.assertIn('hasWoW64Runtime()', view)
         self.assertIn('coordinator.installMadeiraDock()', view)
-        self.assertIn('case windows, dock, jit, gog, summary', view)
+        self.assertIn('case windows, dock, jit, summary', view)
         self.assertIn('coordinator.openMadeiraWorkspace()', view)
         # Steam's client and DLLs are installed only by the Madeira Dock step.
         self.assertNotIn('SteamVideoLibraries.fetch', view)
