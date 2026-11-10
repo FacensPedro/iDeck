@@ -186,6 +186,10 @@ enum MadeiraRuntime {
         var rootURL = root
         try? rootURL.setResourceValues(values)
 
+        let staging = root.appendingPathComponent(".staging-\(package.id)", isDirectory: true)
+        if fm.fileExists(atPath: staging.path) { try fm.removeItem(at: staging) }
+        defer { try? fm.removeItem(at: staging) }
+
         AppLog.record("[runtime] downloading \(package.id) (\(package.bytes) bytes)")
         progress("Downloading \(package.title)…", 0)
         let archive = try await download(package) { done, total in
@@ -202,8 +206,6 @@ enum MadeiraRuntime {
             throw InstallError.message("\(package.title) did not match its checksum. Try again.")
         }
 
-        let staging = root.appendingPathComponent(".staging-\(package.id)-\(UUID().uuidString)", isDirectory: true)
-        defer { try? fm.removeItem(at: staging) }
         progress("Installing \(package.title)…", 0.75)
         let total = max(package.bytes * 3, 1)
         try await Task.detached(priority: .userInitiated) {
