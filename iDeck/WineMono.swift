@@ -49,14 +49,6 @@ enum WineMonoInstallError: LocalizedError {
 /// Unpacks and patches; no network, UI or app state, so the host check runs it on the
 /// real tarball.
 enum WineMonoInstaller {
-    static func sha256(of file: URL) throws -> String {
-        let handle = try FileHandle(forReadingFrom: file)
-        defer { try? handle.close() }
-        var hasher = SHA256()
-        while let chunk = try handle.read(upToCount: 1 << 20), !chunk.isEmpty { hasher.update(data: chunk) }
-        return hasher.finalize().map { String(format: "%02x", $0) }.joined()
-    }
-
     /// The path under the runtime folder a tar entry unpacks to, or nil to leave it out:
     /// the leading wine-mono-<version>/ is dropped, the lib/mono/*-api reference
     /// assemblies are skipped, and nothing may leave the folder.
@@ -372,7 +364,7 @@ private struct TarReader {
             let staging = root.appendingPathComponent("wine-mono.partial", isDirectory: true)
             let fm = FileManager.default
             do {
-                guard try WineMonoInstaller.sha256(of: archive) == WineMonoPin.tarSHA256 else {
+                guard try FileChecksum.sha256(of: archive) == WineMonoPin.tarSHA256 else {
                     throw WineMonoInstallError.message("The download does not match the pinned Wine Mono \(WineMonoPin.version).")
                 }
                 try? fm.removeItem(at: staging)

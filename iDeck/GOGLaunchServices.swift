@@ -53,10 +53,7 @@ enum GOGLaunchServices {
 
     /// The Windows path of a folder inside `drive` (drive_c).
     static func windowsPath(_ url: URL, drive: URL) -> String? {
-        let root = drive.standardizedFileURL.path
-        let path = url.standardizedFileURL.path
-        guard path.hasPrefix(root + "/") else { return nil }
-        return "C:\\" + path.dropFirst(root.count + 1).replacingOccurrences(of: "/", with: "\\")
+        WindowsDrivePath.relative(url, drive: drive)
     }
 
     /// Writes the install scripts' registry values. Only while Wine is stopped: the

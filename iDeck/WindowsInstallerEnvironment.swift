@@ -233,10 +233,7 @@ enum WindowsInstallerEnvironment {
 
     /// The Windows path of a file inside the prefix's drive_c.
     static func windowsPath(_ file: URL, prefix: URL) -> String? {
-        let drive = prefix.appendingPathComponent("drive_c").standardizedFileURL.path
-        let path = file.standardizedFileURL.path
-        guard path.hasPrefix(drive + "/") else { return nil }
-        return "C:\\" + path.dropFirst(drive.count + 1).replacingOccurrences(of: "/", with: "\\")
+        WindowsDrivePath.relative(file, drive: prefix.appendingPathComponent("drive_c"))
     }
 
     static func plan(for file: URL, prefix: URL, silent: Bool = false, detectInstaller: Bool = true) -> Plan? {

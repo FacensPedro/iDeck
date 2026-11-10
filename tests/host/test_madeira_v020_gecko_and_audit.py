@@ -21,7 +21,7 @@ class MadeiraV020GeckoTests(unittest.TestCase):
         self.assertIn("e590b7d988a32d6aa4cf1d8aa3aa3d33766fdd4cf4c89c2dcc2095ecb28d066f", GECKO)
         self.assertIn("https://dl.winehq.org/wine/wine-gecko/", GECKO)
         self.assertIn('prefix.appendingPathComponent(".cache/wine"', GECKO)
-        self.assertIn("digest.finalize()", GECKO)
+        self.assertIn("FileChecksum.sha256(of: url)", GECKO)
         self.assertIn("settings.allowsExpensiveNetworkAccess = false", GECKO)
         self.assertIn("settings.allowsConstrainedNetworkAccess = false", GECKO)
         self.assertIn("wine_process_is_running() == 0, wineserver_is_running() == 0", GECKO)

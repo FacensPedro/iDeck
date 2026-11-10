@@ -1,4 +1,3 @@
-import CryptoKit
 import Foundation
 
 // Madeira v0.2.0 Wine Gecko parity. Wine's own appwiz.cpl looks for these
@@ -30,16 +29,8 @@ enum WineGeckoRuntime {
     static func valid(_ url: URL, for pin: Pin) -> Bool {
         guard let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey]),
               values.isRegularFile == true, values.isSymbolicLink != true,
-              let size = values.fileSize, (4096...256 * 1024 * 1024).contains(size),
-              let handle = try? FileHandle(forReadingFrom: url) else { return false }
-        defer { try? handle.close() }
-        var digest = SHA256()
-        do {
-            while let chunk = try handle.read(upToCount: 1 << 20), !chunk.isEmpty {
-                digest.update(data: chunk)
-            }
-        } catch { return false }
-        return digest.finalize().map { String(format: "%02x", $0) }.joined() == pin.sha256
+              let size = values.fileSize, (4096...256 * 1024 * 1024).contains(size) else { return false }
+        return (try? FileChecksum.sha256(of: url)) == pin.sha256
     }
 
     // The manager is an actor: repeated Steam / GOG library callbacks cannot
