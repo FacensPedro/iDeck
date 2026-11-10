@@ -49,6 +49,10 @@ class GOGLikeMadeiraTests(unittest.TestCase):
         self.assertIn("[gog-setup] redistributables not downloaded", content)
         self.assertIn('note: "Not downloaded"', repo_text("iDeck/GOGLaunchServices.swift"))
 
+    def test_offline_depot_is_not_installed(self):
+        content = repo_text("iDeck/GOGContentSystem.swift")
+        self.assertNotIn('manifest["offlineDepot"]', content)
+
     def test_sources_are_in_the_project(self):
         project = repo_text("iDeck.xcodeproj/project.pbxproj")
         for name in ("GOGInstallScript.swift", "GOGSetup.swift", "GOGLaunchServices.swift"):

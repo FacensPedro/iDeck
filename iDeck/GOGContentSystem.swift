@@ -7,7 +7,7 @@ import Foundation
 // the game folder. No offline installer is downloaded or run.
 //
 //   builds:   content-system.gog.com/products/<id>/os/windows/builds?generation=2
-//   manifest: the build's link (zlib JSON): depots, installDirectory, offlineDepot
+//   manifest: the build's link (zlib JSON): depots, installDirectory
 //   depot:    gog-cdn-fastly.gog.com/content-system/v2/meta/<aa>/<bb>/<hash>
 //   chunks:   secure_link URL + /<aa>/<bb>/<compressedMd5>
 
@@ -200,7 +200,9 @@ enum GOGContentSystem {
             let list = (depot["languages"] as? [String] ?? ["*"]).map { $0.lowercased() }
             return list.contains("*") || (language.map(list.contains) ?? false)
         }
-        if let offline = manifest["offlineDepot"] as? [String: Any] { depots.append(offline) }
+        // The build's offlineDepot (GOG's offline-installer support files, such as
+        // project.json) is not served from the Galaxy content store: every CDN answers
+        // 404. GOG Galaxy, gogdl and Madeira install only the build's depots.
         guard !depots.isEmpty else { throw GOGContentError.noDepots }
 
         var plan = GOGContentPlan(installDirectory: installDirectory)
