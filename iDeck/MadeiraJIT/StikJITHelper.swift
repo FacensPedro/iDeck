@@ -209,9 +209,6 @@ enum StikJITHelper {
                                    Int(scLayout2Alias), kr), level: .error)
     }
 
-    // 0 treats JIT as ready whenever CS_DEBUGGED is set, as before, without asking whether a debugger is attached.
-    private static let attachCheck = MadeiraConfig.flag("MADEIRA_JIT_ATTACH_CHECK")
-
     /// JIT can serve a launch: CS_DEBUGGED is set, and either a debugger is
     /// attached to answer the pool request or this run's pool exists already.
     /// CS_DEBUGGED alone is not enough: it stays set after a debugger leaves, which
@@ -220,7 +217,7 @@ enum StikJITHelper {
     /// polls this every 2 s for the whole app run (and waitForDebugger every 0.5 s).
     static var ready: Bool {
         guard SigningStatus.current.debugged else { return false }
-        return !attachCheck || poolTaken || isDebuggerAttached()
+        return ideck_wine_jit_pool_ready() || isDebuggerAttached()
     }
 
     /// CS_DEBUGGED is set but nothing can answer a pool request: JIT has to be
@@ -872,6 +869,14 @@ enum StikJITHelper {
             LogStore.shared.log("BAD POOL: no valid placement after retries. Wine was not started; iDeck remains open.", level: .error)
             return nil
         }
+        // The primary RX region belongs to this attempt until an alias succeeds.
+        // Do not retain it when vm_remap/vm_protect fails later.
+        var retainPrimaryRX = false
+        defer {
+            if !retainPrimaryRX {
+                vm_deallocate(mach_task_self_, vm_address_t(bitPattern: rxPtr), vm_size_t(poolSize))
+            }
+        }
         let rxAddr = Int(bitPattern: rxPtr)
         LogStore.shared.log("RX pool at \(String(format: "%p", rxAddr))")
 
@@ -1097,6 +1102,7 @@ enum StikJITHelper {
                         lowReady(rwLow, low, rw)
                         LogStore.shared.log("JIT pool ready (debugger still attached).", level: .success)
                         poolTaken = true
+                        retainPrimaryRX = true
                         return (rx: rxPtr, rw: rwPtr, size: span)
                     }
                     dropLowRegion("no RW alias for the split pool with region C")
@@ -1143,6 +1149,7 @@ enum StikJITHelper {
                     }
                     LogStore.shared.log("JIT pool ready (debugger still attached).", level: .success)
                     poolTaken = true
+                    retainPrimaryRX = true
                     return (rx: rxPtr, rw: rwPtr, size: span)
                 }
                 let dkr = vm_deallocate(mach_task_self_, second.base, vm_size_t(second.size))
@@ -1169,6 +1176,7 @@ enum StikJITHelper {
                 lowReady(rwLow, low, rw)
                 LogStore.shared.log("JIT pool ready (debugger still attached).", level: .success)
                 poolTaken = true
+                retainPrimaryRX = true
                 return (rx: rxPtr, rw: rwPtr, size: poolSize)
             }
             dropLowRegion("no RW alias for the pool with region C")
@@ -1293,8 +1301,39 @@ enum StikJITHelper {
 
         LogStore.shared.log("JIT pool ready (debugger still attached).", level: .success)
         poolTaken = true
+        retainPrimaryRX = true
 
         return (rx: rxPtr, rw: rwPtr, size: poolSize)
+    }
+
+    /// Only for a newly allocated pool rejected before Wine starts. Never unmap
+    /// RX holes: they can contain the application's live main-thread stack.
+    static func discardPool(_ pool: (rx: UnsafeMutableRawPointer, rw: UnsafeMutableRawPointer, size: Int)) {
+        let rx = vm_address_t(bitPattern: pool.rx)
+        let rw = vm_address_t(bitPattern: pool.rw)
+        let holes = [poolHole, poolHole2].compactMap { $0 }.sorted { $0.off < $1.off }
+        var cursor = 0
+        for hole in holes {
+            if hole.off > cursor {
+                vm_deallocate(mach_task_self_, rx + vm_address_t(cursor), vm_size_t(hole.off - cursor))
+            }
+            cursor = hole.end
+        }
+        if cursor < pool.size {
+            vm_deallocate(mach_task_self_, rx + vm_address_t(cursor), vm_size_t(pool.size - cursor))
+        }
+        var rwStart = rw
+        if let low = poolLow {
+            let lowRX = vm_address_t(low.rx)
+            if lowRX < rx, rw >= rx - lowRX { rwStart = rw - (rx - lowRX) }
+            vm_deallocate(mach_task_self_, lowRX, vm_size_t(low.size))
+        }
+        vm_deallocate(mach_task_self_, rwStart, vm_size_t(rw - rwStart) + vm_size_t(pool.size))
+        poolTaken = false
+        poolHole = nil
+        poolHole2 = nil
+        poolMid = nil
+        poolLow = nil
     }
 
     /// Default requests retain the 16MB rounding. The page-fit opt-in never

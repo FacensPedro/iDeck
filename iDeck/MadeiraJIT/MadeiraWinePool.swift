@@ -5,6 +5,9 @@ import Foundation
 /// StikJITHelper.allocatePool, the WINE_IOS_JIT_* exports, and the early detach
 /// of the debugger right after, while the VM map is still small.
 enum MadeiraWinePool {
+    private static let preparationLock = NSLock()
+    private static let exports = ["WINE_IOS_JIT_RX", "WINE_IOS_JIT_RW", "WINE_IOS_JIT_SIZE",
+                                  "WINE_IOS_JIT_HOLE", "WINE_IOS_JIT_HOLE2", "WINE_IOS_JIT_TAIL_REGION"]
     /// A game's explicit Madeira configuration wins. The per-executable JIT
     /// pool list then takes precedence over the global Madeira/default pool,
     /// so a title that needs a smaller contiguous RX mapping does not silently
@@ -31,7 +34,10 @@ enum MadeiraWinePool {
     /// Runs on a background queue (allocatePool suspends the process for the
     /// debugger's BRK round trips). nil on success, else the reason.
     static func prepare() -> String? {
+        preparationLock.lock()
+        defer { preparationLock.unlock() }
         if ideck_wine_jit_pool_ready() { return nil }
+        for key in exports { unsetenv(key) }
         let poolSizeMB = sizeMB
         LogStore.shared.log("Allocating \(poolSizeMB)MB JIT pool (BRK will suspend process)...")
         let t0 = CFAbsoluteTimeGetCurrent()
@@ -59,6 +65,13 @@ enum MadeiraWinePool {
             setenv("WINE_IOS_JIT_TAIL_REGION", String(format: "%lx:%lx", low.rx, low.size), 1)
         } else {
             unsetenv("WINE_IOS_JIT_TAIL_REGION")
+        }
+        guard ideck_wine_jit_pool_ready() else {
+            for key in exports { unsetenv(key) }
+            StikJITHelper.discardPool(pool)
+            let reason = "The JIT pool failed executable/writable memory validation. Wine was not started. Reconnect StikDebug and try again."
+            LogStore.shared.log(reason, level: .error)
+            return reason
         }
         // Step 1b (ml524): detach the debugger now, while the VM map is small.
         // StikDebug spends its CPU budget servicing a long session and its
