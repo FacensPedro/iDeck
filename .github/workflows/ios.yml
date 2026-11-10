@@ -679,6 +679,24 @@ jobs:
           fi
           PKG="$RUNNER_TEMP/MetalShaderConverter.pkg"
           URL="$MSC_PKG_URL_SECRET"
+          REPO="$MSC_PKG_REPO"
+          # IDECK_MSC_PKG_URL may hold an owner/repo instead of a URL: use it as the
+          # release repository rather than handing curl a bare name as a host.
+          # A repository page (https://github.com/owner/repo) counts as owner/repo too.
+          if [[ "$URL" =~ ^https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/?$ ]]; then
+            URL="${URL#https://github.com/}"
+          fi
+          if [[ -n "$URL" && ! "$URL" =~ ^https?:// ]]; then
+            URL="${URL%/}"
+            if [[ "$URL" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
+              [[ -n "$REPO" ]] || REPO="$URL"
+              URL=""
+            else
+              echo "::error::IDECK_MSC_PKG_URL must be an https:// URL to the .pkg, or owner/repo of a release that holds it."
+              exit 2
+            fi
+          fi
+          MSC_PKG_REPO="$REPO"
           if [[ -n "$URL" ]]; then
             echo "::add-mask::$URL"
             curl -fL --retry 4 --retry-delay 2 -o "$PKG" "$URL"
