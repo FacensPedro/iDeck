@@ -21,4 +21,8 @@
 - "Run first-time setup again" is now a "Setup assistant" row in the style of the other settings.
 - In Bugs & logs, the Bugs and JIT groups start collapsed.
 
+### Fixes
+- Vulkan could not start since the runtime moved out of the IPA ("Failed to load MADEIRA_VULKAN_LIBRARY"): MoltenVK was looked up in the downloaded runtime, but it is in the app. This affected Vulkan games and the DXVK and vkd3d options.
+- A cancelled GOG install is no longer logged as a redistributable failure.
+
 - Updated the application version to 1.7.0 (build 52).

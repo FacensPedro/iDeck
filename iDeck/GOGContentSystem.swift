@@ -293,6 +293,8 @@ enum GOGContentSystem {
             plan.setupNotes = setup.notes
             AppLog.record("[gog-setup] ids=\(plan.dependencies.joined(separator: ",")) run=\(setup.run.map(\.id).joined(separator: ",")) skipped=\(setup.notes.map(\.id).joined(separator: ","))")
         } catch {
+            // A cancelled or paused install is not a redistributable failure.
+            if error is CancellationError || Task.isCancelled { return }
             AppLog.record("[gog-setup] redistributables not downloaded: \(error.localizedDescription)")
             plan.setupNotes = [GOGSetupNote(id: "", name: "Redistributables",
                                             note: "Not downloaded: \(error.localizedDescription)")]

@@ -45,5 +45,13 @@ class Release17Tests(unittest.TestCase):
         self.assertEqual(project.count("MARKETING_VERSION = 1.7.0;"), 6)
 
 
+class VulkanHostLibraryTests(unittest.TestCase):
+    def test_moltenvk_is_read_from_the_app_bundle(self):
+        script = repo_text("scripts/apply_madeira_runtime_root.py")
+        self.assertIn('[bundle stringByAppendingPathComponent:@"gl/', script)
+        self.assertIn('[[[NSBundle mainBundle] bundlePath] stringByAppendingPathComponent:@"gl/', script)
+        self.assertIn("return status or host_libraries(Path(root))", script)
+
+
 if __name__ == "__main__":
     unittest.main()
