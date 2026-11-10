@@ -39,6 +39,8 @@ def package(path: Path, library: bytes, license_text=b"APPLE SOFTWARE LICENSE AG
             cpio("./usr/local/include/" + name, ("SDK header: " + name).encode() * 8)
             for name in msc.REQUIRED_HEADERS
         ) +
+        # The real 4.0 beta 3 package ships documentation beside the headers.
+        cpio("./usr/local/include/metal_irconverter/Acknowledgements.rtf", b"{\\rtf1 notices}") +
         cpio("TRAILER!!!", b""),
         compresslevel=1,
     )
@@ -101,6 +103,8 @@ class AppleMSC4Beta3PackageTests(unittest.TestCase):
             self.assertTrue(header.is_file())
             self.assertEqual(msc.digest(header), receipt["headers_sha256"][name])
         self.assertFalse((self.out / "metal_irconverter").exists())
+        # Documentation in a header folder is skipped, not treated as a header.
+        self.assertFalse((include / "metal_irconverter" / "Acknowledgements.rtf").exists())
 
     def test_requires_explicit_apple_license_acceptance(self):
         with self.assertRaisesRegex(ValueError, "acknowledge-license"):

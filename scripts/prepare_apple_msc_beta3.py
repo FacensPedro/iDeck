@@ -145,12 +145,13 @@ def extract_ios_library(pkg: Path, toc, start: int, destination: Path, headers: 
                     ):
                         from pathlib import PurePosixPath
                         parts = PurePosixPath(relative).parts
-                        if (
-                            ".." in parts or len(parts) != 2 or
-                            not relative.endswith((".h", ".inc", ".txt")) or
-                            data_length > 4_000_000
-                        ):
+                        if ".." in parts or len(parts) != 2 or data_length > 4_000_000:
                             raise ValueError("unsafe or unsupported converter SDK header: " + name)
+                        if not relative.endswith((".h", ".inc", ".txt")):
+                            # Documentation the package ships beside the headers
+                            # (Acknowledgements.rtf): not needed to build, skipped.
+                            copy_exact(stream, None, data_length)
+                            continue
                         target = headers.joinpath(*parts)
                         target.parent.mkdir(parents=True, exist_ok=True)
                         with target.open("wb") as output:
