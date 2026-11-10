@@ -4,6 +4,10 @@ import argparse
 import hashlib
 import json
 import plistlib
+import shutil
+import struct
+import subprocess
+import tempfile
 import sys
 import zipfile
 from pathlib import Path
@@ -17,6 +21,39 @@ EXPECTED_IOS_LIBRARY_BYTES = 30_189_152
 
 def digest(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
+
+
+def signature_equivalent(source: Path, staged: Path) -> bool:
+    """Accept only a valid re-sign of the exact original Mach-O payload."""
+    codesign = shutil.which("codesign")
+    if codesign is None:
+        return False
+    try:
+        subprocess.run([codesign, "--verify", "--strict", str(staged)], check=True,
+                       capture_output=True, timeout=30)
+        with tempfile.TemporaryDirectory(prefix="ideck-msc-signature-") as tmp:
+            copies = []
+            for index, original in enumerate((source, staged)):
+                target = Path(tmp) / f"converter-{index}.dylib"
+                shutil.copyfile(original, target)
+                # An unsigned development source has no signature to strip.
+                data = target.read_bytes()
+                count = struct.unpack_from("<I", data, 16)[0]
+                offset = 32
+                signed = False
+                for _ in range(count):
+                    command, size = struct.unpack_from("<II", data, offset)
+                    if size < 8 or offset + size > len(data):
+                        return False
+                    signed |= command == 0x1D  # LC_CODE_SIGNATURE
+                    offset += size
+                if signed:
+                    subprocess.run([codesign, "--remove-signature", str(target)], check=True,
+                                   capture_output=True, timeout=30)
+                copies.append(target.read_bytes())
+            return copies[0] == copies[1]
+    except (OSError, ValueError, struct.error, subprocess.SubprocessError):
+        return False
 
 
 def verify(source: Path, app: Path, ipa: Path | None = None) -> list[str]:
@@ -45,7 +82,7 @@ def verify(source: Path, app: Path, ipa: Path | None = None) -> list[str]:
             library_path = directory / LIBRARY_NAME
             library = library_path.read_bytes()
             license_data = (directory / LICENSE_NAME).read_bytes()
-            if len(library) != EXPECTED_IOS_LIBRARY_BYTES:
+            if directory == paths[0] and len(library) != EXPECTED_IOS_LIBRARY_BYTES:
                 errors.append(f"wrong Apple beta 3 iOS dylib byte length at {directory}")
             try:
                 details = ios_macho_details(library_path)
@@ -57,7 +94,8 @@ def verify(source: Path, app: Path, ipa: Path | None = None) -> list[str]:
             if not license_data.startswith(b"{\\rtf"):
                 errors.append(f"Apple converter license is not an RTF document at {directory}")
             if digest(library) != receipt.get("library_sha256"):
-                errors.append(f"Apple converter does not match audited library: {directory}")
+                if directory == paths[0] or not signature_equivalent(paths[0] / LIBRARY_NAME, library_path):
+                    errors.append(f"Apple converter does not match audited code/signature: {directory}")
             if digest(license_data) != receipt.get("license_sha256"):
                 errors.append(f"Apple converter license does not match source package: {directory}")
             if (directory / PROVENANCE_NAME).read_bytes() != (paths[0] / PROVENANCE_NAME).read_bytes():

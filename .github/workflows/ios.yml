@@ -165,6 +165,7 @@ jobs:
           bash -n scripts/fetch_madeira_sources.sh
           bash -n scripts/build_madeira_components.sh
           python3 -m unittest discover -s tests/host -p 'test_dxmt_shader_patch.py' -v
+          python3 -m unittest discover -s tests/host -p 'test_shader_cache_safety.py' -v
           python3 -m unittest discover -s tests/host -p 'test_madeira_game_backports.py' -v
 
       - name: Test native ARM64EC syscall context restoration
@@ -229,6 +230,7 @@ jobs:
           python3 -m unittest discover -s tests/host -p 'test_steam_dll_repair.py' -v
           python3 -m unittest discover -s tests/host -p 'test_madeira_v020_gecko_and_audit.py' -v
           python3 -m unittest discover -s tests/host -p 'test_apple_msc_beta3.py' -v
+          python3 -m unittest discover -s tests/host -p 'test_apple_msc_beta3_bundle.py' -v
           python3 -m unittest discover -s tests/host -p 'test_madeira_device_acceptance.py' -v
           python3 -m unittest discover -s tests/host -p 'test_madeira_legal_notices.py' -v
           python3 -m unittest discover -s tests/host -p 'test_madeira_toolchain_gate.py' -v
