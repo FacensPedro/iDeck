@@ -9,6 +9,8 @@ class DXMTiOSCacheSyncReuseTests(unittest.TestCase):
 
     def test_reader_reopens_after_first_write(self):
         self.assertIn("reader_retry_.exchange(false", self.patch)
+        self.assertIn("std::unique_lock<dxmt::mutex> lock(scache_reader_mutex_)", self.patch)
+        self.assertIn("std::adopt_lock", self.patch)
         self.assertIn("+      cache->scache_.noteWritten();", self.patch)
         self.assertIn("+    d9_shader_cache().noteWritten();", self.patch)
 

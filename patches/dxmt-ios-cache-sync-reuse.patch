@@ -362,18 +362,28 @@ index 5387c62..7bc516c 100644
  } // namespace dxmt
 \ No newline at end of file
 diff --git a/src/dxmt/dxmt_shader_cache.hpp b/src/dxmt/dxmt_shader_cache.hpp
-index 21192b7..758febb 100644
+index 21192b7..87c0056 100644
 --- a/src/dxmt/dxmt_shader_cache.hpp
 +++ b/src/dxmt/dxmt_shader_cache.hpp
-@@ -1,4 +1,7 @@
+@@ -1,4 +1,8 @@
  #pragma once
 +
 +#include <atomic>
++#include <mutex>
 +#include <string>
  #include "Metal.hpp"
  #include "thread.hpp"
  #include <string>
-@@ -54,11 +57,26 @@ public:
+@@ -18,6 +22,8 @@ public:
+     [[nodiscard]] LockProtected(dxmt::mutex &mutex, T object) : object(object), mutex_(&mutex) {
+       mutex_->lock();
+     }
++    [[nodiscard]] LockProtected(dxmt::mutex &mutex, T object, std::adopt_lock_t)
++        : object(object), mutex_(&mutex) {}
+     [[nodiscard]] LockProtected() : object({}), mutex_(nullptr) {}
+     ~LockProtected() {
+       if (mutex_) {
+@@ -54,9 +60,24 @@ public:
  
    LockProtected<WMT::CacheReader>
    getReader() {
@@ -381,26 +391,25 @@ index 21192b7..758febb 100644
 +     * game's first run the database (or its table) does not exist yet, the
 +     * open fails and the session never read anything back, although the
 +     * writer filled the file meanwhile. Retry once after each write. */
-+    if (!scache_reader_ && reader_retry_.exchange(false, std::memory_order_acq_rel)) {
-+      std::lock_guard<dxmt::mutex> lock(scache_reader_mutex_);
-+      if (!scache_reader_ && !cache_path_.empty())
-+        scache_reader_ = WMT::CacheReader::alloc_init(cache_path_.c_str(), cache_version_);
-+    }
++    std::unique_lock<dxmt::mutex> lock(scache_reader_mutex_);
++    if (reader_retry_.exchange(false, std::memory_order_acq_rel) && !scache_reader_ && !cache_path_.empty())
++      scache_reader_ = WMT::CacheReader::alloc_init(cache_path_.c_str(), cache_version_);
      if (!scache_reader_)
        return {};
-     return {scache_reader_mutex_, scache_reader_};
-   }
- 
-+  void
-+  noteWritten() {
-+    if (!scache_reader_)
-+      reader_retry_.store(true, std::memory_order_release);
+-    return {scache_reader_mutex_, scache_reader_};
++    // Keep the lock held while copying the reader into the returned guard.
++    lock.release();
++    return {scache_reader_mutex_, scache_reader_, std::adopt_lock};
 +  }
 +
-   ShaderCache(WMTMetalVersion metal_version);
-   ShaderCache(const ShaderCache &copy) = delete;
++  void
++  noteWritten() {
++    // No reader-pointer access under the independent writer lock.
++    reader_retry_.store(true, std::memory_order_release);
+   }
  
-@@ -68,6 +86,10 @@ private:
+   ShaderCache(WMTMetalVersion metal_version);
+@@ -68,6 +89,10 @@ private:
  
    WMT::Reference<WMT::CacheReader> scache_reader_;
    dxmt::mutex scache_reader_mutex_;
@@ -561,16 +570,17 @@ index 5df1a3b..8e4659b 100644
  void address_wake_all(const void *addr);
  
 diff --git a/src/winemetal/unix/cache.c b/src/winemetal/unix/cache.c
-index 02fc844..b5c0ffc 100644
+index 02fc844..a0742e4 100644
 --- a/src/winemetal/unix/cache.c
 +++ b/src/winemetal/unix/cache.c
-@@ -1,3 +1,5 @@
+@@ -1,3 +1,6 @@
 +#include <stdlib.h>
-+#include <sys/stat.h>
++#include <limits.h>
++#include "cache_trim.h"
  #import <Foundation/Foundation.h>
  #include <TargetConditionals.h>
  #include "sqlite3.h"
-@@ -92,6 +94,14 @@ resolve_cache_dir(NSString *path, bool path_is_file) {
+@@ -92,6 +95,14 @@ resolve_cache_dir(NSString *path, bool path_is_file) {
    return path;
  }
  
@@ -585,31 +595,85 @@ index 02fc844..b5c0ffc 100644
  @implementation CacheReader
  
  - (instancetype)initWithPath:(NSString *)path version:(uint64_t)version {
-@@ -177,6 +187,24 @@ resolve_cache_dir(NSString *path, bool path_is_file) {
-     }
-     flock(fd, LOCK_EX);
+@@ -190,6 +201,19 @@ resolve_cache_dir(NSString *path, bool path_is_file) {
+     sqlite3_exec(_db, "PRAGMA journal_mode=WAL;", NULL, NULL, NULL);
+     sqlite3_exec(_db, "PRAGMA synchronous=NORMAL;", NULL, NULL, NULL);
  
-+    /* iDeck: the cache had no bound. Old shaders of earlier game versions (and
-+     * of earlier cache formats, whose tables stay in the file) piled up for
-+     * ever. Past DXMT_SHADER_CACHE_MAX_MB (default 256, 0 = no limit) the file
-+     * is started over, under the writer lock, before anything opens it. */
++    /* iDeck: trim live shader data through SQLite, never unlink open files.
++     * Busy readers/writers may defer compaction without invalidating them. */
 +    {
 +      const char *cap_env = getenv("DXMT_SHADER_CACHE_MAX_MB");
-+      long long cap_mb = cap_env && *cap_env ? atoll(cap_env) : 256;
-+      struct stat st;
-+      if (cap_mb > 0 && stat([dbPath fileSystemRepresentation], &st) == 0 &&
-+          (long long)st.st_size > (cap_mb << 20)) {
-+        NSLog(@"[CacheWriter] %@ is %lld MB, over the %lld MB limit: starting it over",
-+              dbPath, (long long)st.st_size >> 20, cap_mb);
-+        unlink([dbPath fileSystemRepresentation]);
-+        unlink([[dbPath stringByAppendingString:@"-wal"] fileSystemRepresentation]);
-+        unlink([[dbPath stringByAppendingString:@"-shm"] fileSystemRepresentation]);
-+      }
++      char *end = NULL;
++      long long cap_mb = cap_env && *cap_env ? strtoll(cap_env, &end, 10) : 256;
++      if (cap_env && *cap_env && (!end || *end || cap_mb < 0 || cap_mb > (LLONG_MAX >> 20)))
++        cap_mb = 256;
++      int trim = wmt_trim_shader_cache(_db, cap_mb * (1LL << 20));
++      if (trim != SQLITE_OK)
++        NSLog(@"[CacheWriter] cache trim deferred (%d): %@", trim, dbPath);
 +    }
 +
-     if (sqlite3_open_v2(
-             [dbPath fileSystemRepresentation], &_db, //
-             SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_NOMUTEX, NULL
+     NSString *tableName = [NSString stringWithFormat:@"cache_%llu", version];
+     NSString *sqlCreate = [NSString stringWithFormat:@"CREATE TABLE IF NOT EXISTS %@ ("
+                                                       "key BLOB PRIMARY KEY, "
+diff --git a/src/winemetal/unix/cache_trim.h b/src/winemetal/unix/cache_trim.h
+new file mode 100644
+index 0000000..26eca56
+--- /dev/null
++++ b/src/winemetal/unix/cache_trim.h
+@@ -0,0 +1,53 @@
++#pragma once
++#include <sqlite3.h>
++#include <stdint.h>
++#include <string.h>
++
++static sqlite3_int64 wmt_cache_scalar(sqlite3 *db, const char *sql) {
++  sqlite3_stmt *stmt = NULL;
++  sqlite3_int64 value = -1;
++  if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) == SQLITE_OK && sqlite3_step(stmt) == SQLITE_ROW)
++    value = sqlite3_column_int64(stmt, 0);
++  sqlite3_finalize(stmt);
++  return value;
++}
++
++/* All cleanup goes through SQLite's WAL/transaction locks. Existing readers
++ * retain their snapshots; never unlink a database, WAL or SHM under them. */
++static int wmt_trim_shader_cache(sqlite3 *db, sqlite3_int64 limit) {
++  if (limit <= 0) return SQLITE_OK;
++  sqlite3_int64 pages = wmt_cache_scalar(db, "PRAGMA page_count");
++  sqlite3_int64 free_pages = wmt_cache_scalar(db, "PRAGMA freelist_count");
++  sqlite3_int64 page_size = wmt_cache_scalar(db, "PRAGMA page_size");
++  if (pages < 0 || free_pages < 0 || free_pages > pages || page_size <= 0) return SQLITE_ERROR;
++  if (pages - free_pages <= limit / page_size) return SQLITE_OK;
++  int rc = sqlite3_exec(db, "BEGIN IMMEDIATE", NULL, NULL, NULL);
++  if (rc != SQLITE_OK) return rc; /* busy: leave the live cache intact */
++  sqlite3_stmt *tables = NULL;
++  rc = sqlite3_prepare_v2(db, "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'cache_%'", -1, &tables, NULL);
++  if (rc == SQLITE_OK) {
++    int step;
++    while ((step = sqlite3_step(tables)) == SQLITE_ROW) {
++      const char *name = (const char *)sqlite3_column_text(tables, 0);
++      if (!name || strncmp(name, "cache_", 6) != 0 || !name[6]) continue;
++      const char *digit = name + 6;
++      while (*digit >= '0' && *digit <= '9') ++digit;
++      if (*digit) continue;
++      char *sql = sqlite3_mprintf("DELETE FROM \"%w\"", name);
++      rc = sql ? sqlite3_exec(db, sql, NULL, NULL, NULL) : SQLITE_NOMEM;
++      sqlite3_free(sql);
++      if (rc != SQLITE_OK) break;
++    }
++    if (rc == SQLITE_OK && step != SQLITE_DONE) rc = step;
++  }
++  sqlite3_finalize(tables);
++  if (rc == SQLITE_OK) rc = sqlite3_exec(db, "COMMIT", NULL, NULL, NULL);
++  if (rc != SQLITE_OK) {
++    sqlite3_exec(db, "ROLLBACK", NULL, NULL, NULL);
++    return rc;
++  }
++  // Compaction is best effort: SQLITE_BUSY is safe when a reader is active.
++  sqlite3_exec(db, "VACUUM", NULL, NULL, NULL);
++  sqlite3_wal_checkpoint_v2(db, NULL, SQLITE_CHECKPOINT_PASSIVE, NULL, NULL);
++  return SQLITE_OK;
++}
 diff --git a/src/winemetal/unix/winemetal_unix.c b/src/winemetal/unix/winemetal_unix.c
 index 3f7974e..323f299 100644
 --- a/src/winemetal/unix/winemetal_unix.c
