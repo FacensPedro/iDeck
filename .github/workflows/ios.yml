@@ -697,6 +697,9 @@ jobs:
             fi
           fi
           MSC_PKG_REPO="$REPO"
+          # A token pasted with a trailing newline or spaces is rejected as
+          # "Bad credentials": strip whitespace before using it.
+          MSC_PKG_TOKEN="$(printf '%s' "$MSC_PKG_TOKEN" | tr -d '[:space:]')"
           if [[ -n "$URL" ]]; then
             echo "::add-mask::$URL"
             curl -fL --retry 4 --retry-delay 2 -o "$PKG" "$URL"
