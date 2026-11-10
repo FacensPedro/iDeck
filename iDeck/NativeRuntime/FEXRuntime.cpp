@@ -16,7 +16,6 @@
 #include <string>
 #include <limits>
 #include <mach/mach.h>
-#include <mach/mach_vm.h>
 
 namespace {
 std::mutex fex_mutex;
@@ -123,12 +122,12 @@ bool pool_permissions(uintptr_t begin, size_t bytes, bool executable) {
     if (!bytes || begin > UINTPTR_MAX - bytes) return false;
     const uintptr_t end = begin + bytes;
     while (begin < end) {
-        mach_vm_address_t address = begin;
-        mach_vm_size_t size = 0;
+        vm_address_t address = begin;
+        vm_size_t size = 0;
         vm_region_basic_info_data_64_t info {};
         mach_msg_type_number_t count = VM_REGION_BASIC_INFO_COUNT_64;
         mach_port_t object = MACH_PORT_NULL;
-        const kern_return_t kr = mach_vm_region(mach_task_self(), &address, &size,
+        const kern_return_t kr = vm_region_64(mach_task_self(), &address, &size,
             VM_REGION_BASIC_INFO_64, reinterpret_cast<vm_region_info_t>(&info), &count, &object);
         if (object != MACH_PORT_NULL) mach_port_deallocate(mach_task_self(), object);
         if (kr != KERN_SUCCESS || address > begin || !size || address > UINTPTR_MAX - size ||

@@ -5,8 +5,8 @@
 #include <cassert>
 #include <cstdlib>
 #include <cstdio>
-using mach_vm_address_t = uint64_t;
-using mach_vm_size_t = uint64_t;
+using vm_address_t = uint64_t;
+using vm_size_t = uint64_t;
 using mach_msg_type_number_t = unsigned;
 using mach_port_t = unsigned;
 using kern_return_t = int;
@@ -23,7 +23,7 @@ static std::vector<Region> regions;
 static unsigned ports_created=0, ports_released=0;
 static unsigned mach_task_self() { return 1; }
 static int mach_port_deallocate(unsigned, unsigned port) { assert(port==123); ++ports_released; return 0; }
-static int mach_vm_region(unsigned, uint64_t *address, uint64_t *size, unsigned, int *info, unsigned *, unsigned *object) {
+static int vm_region_64(unsigned, uint64_t *address, uint64_t *size, unsigned, int *info, unsigned *, unsigned *object) {
     for (auto region : regions) {
         if (region.end <= *address) continue;
         *address=region.begin; *size=region.end-region.begin;
