@@ -527,8 +527,19 @@ jobs:
       - name: Locate repository or cached Madeira runtime
         if: ${{ env.IDECK_NATIVE_BUILD == '1' }}
         id: madeira_kit
+        env:
+          USE_MSC_PKG: ${{ github.event_name == 'workflow_dispatch' && inputs.use_msc_pkg && '1' || '0' }}
         run: |
           set -euo pipefail
+          # The owner-supplied Apple converter package makes build_ipa.sh compile the
+          # runtime from source (IDECK_PREBUILT_MODE=off, to link the audited beta 3
+          # headers), so a cached kit cannot be used and the toolchain and dependency
+          # steps (meson, LLVM, Wine prerequisites) must run.
+          if [[ "$USE_MSC_PKG" == "1" ]]; then
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "Apple Metal Shader Converter package supplied: compiling the native runtime from source."
+            exit 0
+          fi
           OPTIONS=(--graphics "$IDECK_MADEIRA_GRAPHICS")
           if [[ "$IDECK_BUILD_WOW64" == "1" ]]; then OPTIONS+=(--wow64); fi
           if [[ "$IDECK_BUNDLE_WINE_MONO" == "1" ]]; then OPTIONS+=(--mono); fi
