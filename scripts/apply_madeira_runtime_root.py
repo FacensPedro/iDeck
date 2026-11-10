@@ -84,6 +84,7 @@ DATA_IOS = LEGACY_DATA_IOS.replace(
         }""",
 )
 FATAL_ANCHOR = '    os_log_error( OS_LOG_DEFAULT, "[Wine ntdll] FATAL: %{public}s", buf );\n'
+FATAL_EXIT = '    exit( 1 ); /* iDeck: iOS exit shim returns to Wine session cleanup. */\n'
 FATAL_STDERR = '    dprintf( 2, "[Wine ntdll] FATAL: %s", buf );\n'
 
 
@@ -119,6 +120,15 @@ def data_dir(root: Path) -> int:
             print("ERROR: loader_ios.c: no fatal error logging anchor", file=sys.stderr)
             return 2
         text = text.replace(FATAL_ANCHOR, FATAL_ANCHOR + FATAL_STDERR)
+    # ntdll is compiled with shims/wine_ios_exit.h: exit longjmps to the
+    # owning Wine worker, which publishes the exit code and stops wineserver.
+    # pthread_exit bypassed all of that and left the session permanently busy.
+    if FATAL_EXIT not in text:
+        anchor = FATAL_STDERR + "    pthread_exit( NULL );\n"
+        if text.count(anchor) != 1:
+            print("ERROR: loader_ios.c: no fatal thread-exit anchor", file=sys.stderr)
+            return 2
+        text = text.replace(anchor, FATAL_STDERR + FATAL_EXIT)
     loader.write_text(text)
     print("ntdll loader_ios.c: PE DLLs and NLS follow MADEIRA_DATA_DIR; fatal errors reach stderr")
     return 0

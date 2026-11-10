@@ -31,7 +31,7 @@ void init_paths(const char *exe_path) {
     data_dir = strdup( exe_path );  /* NLS files at <bundle>/nls/ */
 ''' + (overlay.LEGACY_DATA_IOS if legacy else "") + '''}
 #if 0
-''' + overlay.FATAL_ANCHOR + '''#endif
+''' + overlay.FATAL_ANCHOR + '    pthread_exit( NULL );\n' + '''#endif
 int main(int argc, char **argv) {
     char path[4096];
     init_paths(argv[1]);
