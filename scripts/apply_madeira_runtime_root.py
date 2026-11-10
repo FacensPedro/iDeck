@@ -65,21 +65,26 @@ DATA_ENV = '''            setenv("WINEDLLPATH", bundlePath.UTF8String, 1);
             /* iDeck: Wine's data files (nls/) are in the downloaded runtime too. */
             setenv("MADEIRA_DATA_DIR", bundlePath.UTF8String, 1);
 '''
-DATA_IOS = '''    /* iDeck: Wine's data files (nls/) come from the runtime the initial setup
+LEGACY_DATA_IOS = '''    /* iDeck: Wine's data files (nls/) come from the runtime the initial setup
      * downloads, not from the app bundle (scripts/apply_madeira_runtime_root.py). */
     {
         const char *runtime_data = getenv( "MADEIRA_DATA_DIR" );
         if (runtime_data && runtime_data[0] == '/') data_dir = strdup( runtime_data );
     }
 '''
-DATA_LOADER = '''    set_dll_path();
-    /* iDeck: Wine's data files (nls/) come from the runtime the initial setup
-     * downloads, not from the app bundle (scripts/apply_madeira_runtime_root.py). */
-    {
-        const char *runtime_data = getenv( "MADEIRA_DATA_DIR" );
-        if (runtime_data && runtime_data[0] == '/') data_dir = strdup( runtime_data );
-    }
-'''
+DATA_IOS = LEGACY_DATA_IOS.replace(
+    "if (runtime_data && runtime_data[0] == '/') data_dir = strdup( runtime_data );",
+    """if (runtime_data && runtime_data[0] == '/')
+        {
+            /* load_ntdll opens dll_dir directly, before WINEDLLPATH lookup. */
+            free( (void *)dll_dir );
+            free( (void *)data_dir );
+            dll_dir = strdup( runtime_data );
+            data_dir = strdup( runtime_data );
+        }""",
+)
+FATAL_ANCHOR = '    os_log_error( OS_LOG_DEFAULT, "[Wine ntdll] FATAL: %{public}s", buf );\n'
+FATAL_STDERR = '    dprintf( 2, "[Wine ntdll] FATAL: %s", buf );\n'
 
 
 def data_dir(root: Path) -> int:
@@ -97,13 +102,25 @@ def data_dir(root: Path) -> int:
     # dlls/ntdll/unix/loader.c; its init_paths sets data_dir to the bundle.
     loader = root / "build/ntdll-unix/loader_ios.c"
     text = loader.read_text()
-    if DATA_MARKER not in text:
-        anchor = "    data_dir = strdup( exe_path );  /* NLS files at <bundle>/nls/ */\n"
-        if text.count(anchor) != 1:
-            print("ERROR: loader_ios.c: no data_dir anchor", file=sys.stderr)
+    if DATA_IOS not in text:
+        if LEGACY_DATA_IOS in text:
+            text = text.replace(LEGACY_DATA_IOS, DATA_IOS)
+        elif DATA_MARKER not in text:
+            anchor = "    data_dir = strdup( exe_path );  /* NLS files at <bundle>/nls/ */\n"
+            if text.count(anchor) != 1:
+                print("ERROR: loader_ios.c: no data_dir anchor", file=sys.stderr)
+                return 2
+            text = text.replace(anchor, anchor + DATA_IOS)
+        else:
+            print("ERROR: loader_ios.c: unrecognized runtime path overlay", file=sys.stderr)
             return 2
-        loader.write_text(text.replace(anchor, anchor + DATA_IOS))
-        print("ntdll loader_ios.c: data_dir follows MADEIRA_DATA_DIR")
+    if FATAL_STDERR not in text:
+        if text.count(FATAL_ANCHOR) != 1:
+            print("ERROR: loader_ios.c: no fatal error logging anchor", file=sys.stderr)
+            return 2
+        text = text.replace(FATAL_ANCHOR, FATAL_ANCHOR + FATAL_STDERR)
+    loader.write_text(text)
+    print("ntdll loader_ios.c: PE DLLs and NLS follow MADEIRA_DATA_DIR; fatal errors reach stderr")
     return 0
 
 

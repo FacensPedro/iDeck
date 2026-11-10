@@ -432,6 +432,11 @@ jobs:
           bash -n scripts/build_madeira_dcomp.sh
           bash -n scripts/build_madeira_luajit.sh
 
+      - name: Test downloaded Wine startup paths
+        run: |
+          python3 -m unittest discover -s tests/host -p 'test_runtime_loader_paths.py' -v
+          python3 -m unittest discover -s tests/host -p 'test_setup_downloads_runtime.py' -v
+
       - name: Test fast direct IPA packaging
         run: python3 -m unittest discover -s tests/host -p 'test_fast_ipa_packaging.py' -v
 
