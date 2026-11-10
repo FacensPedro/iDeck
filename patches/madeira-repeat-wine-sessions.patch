@@ -49,6 +49,13 @@ diff --git a/app/Madeira/WineProcessBridge.m b/app/Madeira/WineProcessBridge.m
 +        __atomic_store_n(&g_wine_thread_finished, 1, __ATOMIC_RELEASE);
          return -1;
      }
+@@ -2331,5 +2340,6 @@
+             wine_launched_process_did_exit((int)0xc000000d); /* STATUS_INVALID_PARAMETER */
+             g_wine_running = 0;
+             wineserver_stop();
++            __atomic_store_n(&g_wine_thread_finished, 1, __ATOMIC_RELEASE);
+             return NULL;
+         }
 diff --git a/app/Madeira/WineServerBridge.m b/app/Madeira/WineServerBridge.m
 --- a/app/Madeira/WineServerBridge.m
 +++ b/app/Madeira/WineServerBridge.m

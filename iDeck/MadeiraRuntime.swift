@@ -57,8 +57,9 @@ enum MadeiraRuntime {
     /// Whether `id` is unpacked here at the SHA-256 this build lists.
     static func installed(_ id: String) -> Bool {
         guard let package = package(id) else { return !downloadsRuntime }
+        guard !FileManager.default.fileExists(atPath: RuntimePackageTransaction.directory(root: root, id: id).path) else { return false }
         let recorded = (try? String(contentsOf: marker(id), encoding: .utf8))?.trimmingCharacters(in: .whitespacesAndNewlines)
-        return recorded == package.sha256
+        return recorded == package.sha256 && validate(id, in: root, checkHashes: false).isEmpty
     }
 
     /// A package this build lists is missing or older (a new IPA brings a new runtime).
@@ -176,6 +177,7 @@ enum MadeiraRuntime {
     /// Downloads, checks and unpacks `id`. `progress` gets a status and a fraction (0…1).
     static func install(_ id: String, progress: @escaping @Sendable (String, Double) -> Void) async throws {
         guard let package = package(id) else { return }
+        try RuntimePackageTransaction.recover(root: root, id: id)
         if installed(id) { return }
         let fm = FileManager.default
         try fm.createDirectory(at: root, withIntermediateDirectories: true)
@@ -183,6 +185,10 @@ enum MadeiraRuntime {
         values.isExcludedFromBackup = true
         var rootURL = root
         try? rootURL.setResourceValues(values)
+
+        let staging = root.appendingPathComponent(".staging-\(package.id)", isDirectory: true)
+        if fm.fileExists(atPath: staging.path) { try fm.removeItem(at: staging) }
+        defer { try? fm.removeItem(at: staging) }
 
         AppLog.record("[runtime] downloading \(package.id) (\(package.bytes) bytes)")
         progress("Downloading \(package.title)…", 0)
@@ -200,8 +206,6 @@ enum MadeiraRuntime {
             throw InstallError.message("\(package.title) did not match its checksum. Try again.")
         }
 
-        let staging = root.appendingPathComponent(".staging-\(package.id)", isDirectory: true)
-        try? fm.removeItem(at: staging)
         progress("Installing \(package.title)…", 0.75)
         let total = max(package.bytes * 3, 1)
         try await Task.detached(priority: .userInitiated) {
@@ -209,7 +213,6 @@ enum MadeiraRuntime {
                 progress("Installing \(package.title)…", 0.75 + 0.25 * min(Double(read) / Double(total), 1))
             }
         }.value
-        defer { try? fm.removeItem(at: staging) }
 
         // Every file against the package's own manifest, then the libraries Wine and
         // DXMT need, before anything replaces the installed runtime.
@@ -225,14 +228,10 @@ enum MadeiraRuntime {
             throw InstallError.message("\(package.title) failed verification: \(problems.prefix(3).joined(separator: "; ")).")
         }
 
-        // Swap each top-level folder in; the marker is written last.
-        try? fm.removeItem(at: marker(id))
-        for name in try fm.contentsOfDirectory(atPath: staging.path) where downloadedFolders.contains(name) {
-            let target = root.appendingPathComponent(name, isDirectory: true)
-            try? fm.removeItem(at: target)
-            try fm.moveItem(at: staging.appendingPathComponent(name), to: target)
-        }
-        try package.sha256.write(to: marker(id), atomically: true, encoding: .utf8)
+        try Task.checkCancellation()
+        let folders = try fm.contentsOfDirectory(atPath: staging.path).filter { downloadedFolders.contains($0) }
+        try RuntimePackageTransaction.commit(root: root, staging: staging, id: id,
+                                             digest: package.sha256, folders: folders)
         AppLog.record("[runtime] \(package.id) installed")
         progress("\(package.title) installed.", 1)
     }
@@ -269,7 +268,7 @@ enum MadeiraRuntime {
                     try await Task.sleep(nanoseconds: UInt64(min(attempt, 4)) * 2_000_000_000)
                     continue
                 }
-                guard status == 200 else {
+                guard status == 200 || (status == 206 && resume != nil) else {
                     try? FileManager.default.removeItem(at: file)
                     throw InstallError.message("The runtime download failed (HTTP \(status)). Try again.")
                 }
@@ -282,5 +281,82 @@ enum MadeiraRuntime {
                 try await Task.sleep(nanoseconds: UInt64(min(attempt, 4)) * 2_000_000_000)
             }
         }
+    }
+}
+
+/// A durable journal keeps an interrupted package replacement recoverable.
+/// All moves are on the same volume; the installed marker is the commit point.
+enum RuntimePackageTransaction {
+    private struct Journal: Codable {
+        let digest: String
+        let folders: [String]
+        let previousFolders: [String]
+        let previousMarker: String?
+    }
+
+    static func directory(root: URL, id: String) -> URL {
+        root.appendingPathComponent(".transaction-\(id)", isDirectory: true)
+    }
+
+    static func recover(root: URL, id: String, fm: FileManager = .default) throws {
+        let transaction = directory(root: root, id: id)
+        guard fm.fileExists(atPath: transaction.path) else { return }
+        let journalURL = transaction.appendingPathComponent("journal.json")
+        guard fm.fileExists(atPath: journalURL.path) else {
+            // No mutation is allowed until the journal has been written.
+            try fm.removeItem(at: transaction)
+            return
+        }
+        let journal = try JSONDecoder().decode(Journal.self, from: Data(contentsOf: journalURL))
+        let marker = root.appendingPathComponent(".installed-\(id)")
+        let current = try? String(contentsOf: marker, encoding: .utf8)
+        if current != journal.digest {
+            for name in journal.folders {
+                let target = root.appendingPathComponent(name)
+                let backup = transaction.appendingPathComponent("previous").appendingPathComponent(name)
+                if fm.fileExists(atPath: backup.path) {
+                    if fm.fileExists(atPath: target.path) { try fm.removeItem(at: target) }
+                    try fm.moveItem(at: backup, to: target)
+                } else if !journal.previousFolders.contains(name), fm.fileExists(atPath: target.path) {
+                    try fm.removeItem(at: target)
+                }
+            }
+            if let previous = journal.previousMarker {
+                try previous.write(to: marker, atomically: true, encoding: .utf8)
+            } else if fm.fileExists(atPath: marker.path) {
+                try fm.removeItem(at: marker)
+            }
+        }
+        try fm.removeItem(at: transaction)
+    }
+
+    static func commit(root: URL, staging: URL, id: String, digest: String, folders: [String],
+                       fm: FileManager = .default,
+                       move: (URL, URL) throws -> Void = { try FileManager.default.moveItem(at: $0, to: $1) }) throws {
+        try recover(root: root, id: id, fm: fm)
+        let transaction = directory(root: root, id: id)
+        let previous = transaction.appendingPathComponent("previous", isDirectory: true)
+        let marker = root.appendingPathComponent(".installed-\(id)")
+        let journal = Journal(digest: digest, folders: folders,
+                              previousFolders: folders.filter { fm.fileExists(atPath: root.appendingPathComponent($0).path) },
+                              previousMarker: try? String(contentsOf: marker, encoding: .utf8))
+        try fm.createDirectory(at: previous, withIntermediateDirectories: true)
+        try JSONEncoder().encode(journal).write(to: transaction.appendingPathComponent("journal.json"), options: .atomic)
+        do {
+            if fm.fileExists(atPath: marker.path) { try fm.removeItem(at: marker) }
+            for name in journal.previousFolders {
+                try move(root.appendingPathComponent(name), previous.appendingPathComponent(name))
+            }
+            for name in folders {
+                try move(staging.appendingPathComponent(name), root.appendingPathComponent(name))
+            }
+            try digest.write(to: marker, atomically: true, encoding: .utf8)
+        } catch {
+            // If recovery itself fails, keep the journal for the next launch.
+            try recover(root: root, id: id, fm: fm)
+            throw error
+        }
+        // A committed package remains valid even if backup cleanup fails.
+        try? fm.removeItem(at: transaction)
     }
 }
