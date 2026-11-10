@@ -468,6 +468,7 @@ class SystemCoordinator: ObservableObject {
     /// Runs the pending launch once the debugger is attached, or reports why not.
     private func finishJITRequest(_ result: Result<Void, Error>) {
         refreshJITStatus()
+        jitRequestStartedAt = nil
         let launch = pendingJITLaunch
         pendingJITLaunch = nil
         switch result {
@@ -564,7 +565,26 @@ class SystemCoordinator: ObservableObject {
         }
     }
 
+    /// When the JIT request in flight was started (nil: none). A second request
+    /// within 20 s joins it instead of opening StikDebug again.
+    private var jitRequestStartedAt: Date?
+
+    /// For launches that first need a network round trip (Epic's and EA's launch
+    /// tokens): starts JIT activation at once, in parallel with it, so StikDebug
+    /// opens on the tap instead of after the store answers. The launch itself still
+    /// goes through ensureJITForGameLaunch and waits for the validated preparation.
+    func prewarmJITForLaunch() {
+        guard MadeiraBundleIdentity.isNative, AddressSpaceCheck.hasGuestWindow,
+              StikJITHelper.scriptData != nil, !isClosingWindowsSession else { return }
+        refreshJITStatus()
+        guard !Self.jitPreparationValidated() else { return }
+        setWindowsStatus("JIT is not enabled for this iDeck process. Opening StikDebug...")
+        requestStikDebugJIT()
+    }
+
     func requestStikDebugJIT() {
+        if let started = jitRequestStartedAt, Date().timeIntervalSince(started) < 20 { return }
+        jitRequestStartedAt = Date()
         if jitMethod == "builtIn", FileManager.default.fileExists(atPath: pairingFileURL.path), MainActor.assumeIsolated({ IDeckBuiltInJIT.isAvailable }) {
             requestBuiltInJIT()
             StikJITHelper.waitForDebugger { [weak self] result in

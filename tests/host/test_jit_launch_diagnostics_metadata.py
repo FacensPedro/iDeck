@@ -5,7 +5,6 @@ from support import ROOT, repo_text
 MAIN = repo_text("iDeck/MainView.swift")
 COORD = repo_text("iDeck/SystemCoordinator.swift")
 BUGS = repo_text("iDeck/BugReportView.swift")
-SERVICE = repo_text("iDeck/IRelayDeviceService.swift")
 NOTES = repo_text("RELEASE_NOTES.md")
 
 class LauncherJITAndDiagnosticsTests(unittest.TestCase):
@@ -29,15 +28,11 @@ class LauncherJITAndDiagnosticsTests(unittest.TestCase):
             self.assertIn('"' + launcher + '"', COORD)
         for item in ("iPhone15,4", "iPad16,1", "activeProcessorCount", "sysctlbyname"):
             self.assertIn(item, BUGS)
-        self.assertIn("BugReportModel.hardwareSummary", SERVICE)
-        self.assertIn("BugReportModel.gameContext", SERVICE)
 
     def test_clear_logs_is_blocked_during_downloads(self):
         self.assertIn("downloadsOrTransfersActive", BUGS)
         self.assertIn("downloadProgress.keys.contains", BUGS)
         self.assertIn("showClearConfirmation", BUGS)
-        self.assertIn("BugReportModel.downloadsOrTransfersActive", SERVICE)
-        self.assertIn("return .error(409,", SERVICE)
 
     def test_clean_release_and_centered_jit_status(self):
         top = MAIN.split("private var topBar: some View")[1].split("private enum MixedLibraryEntry")[0]

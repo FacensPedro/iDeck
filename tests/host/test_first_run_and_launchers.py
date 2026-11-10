@@ -42,11 +42,6 @@ class FirstRunLaunchersContract(unittest.TestCase):
         self.assertNotIn("EAappInstaller.exe", settings + models)
         self.assertIn("EASignInView()", settings)
 
-    def test_launcher_paths_are_narrowly_scoped(self):
-        swift = repo_text("iDeck/IRelayDeviceService.swift")
-        self.assertIn('"protocol": 4', swift)
-        self.assertNotIn('WindowsDownloads/Launchers', swift)
-
     def test_memory_plus_is_entitlement_not_runtime_switch(self):
         entitlements = repo_text("iDeck/iDeck.entitlements")
         settings = repo_text("iDeck/SettingsView.swift")

@@ -27,10 +27,6 @@ class RuntimeEfficiencyTests(unittest.TestCase):
         self.assertIn("if !ideck_wineprocess_running() { coordinator.refreshJITStatus() }",
                       repo_text("iDeck/MainView.swift"))
 
-    def test_transfers_run_below_the_game(self):
-        self.assertIn('DispatchQueue(label: "ideck.irelay.service", qos: .utility)',
-                      repo_text("iDeck/IRelayDeviceService.swift"))
-
     def test_platform_layer_keeps_only_used_entry_points(self):
         platform = repo_text("iDeck/NativeRuntime/MadeiraPlatform.mm")
         for kept in ("ideck_metal_available", "ideck_dxmt_available", "ideck_d3d12_available", "ideck_session_stop"):

@@ -134,13 +134,37 @@ def data_dir(root: Path) -> int:
     return 0
 
 
+GL_OLD = '[bundle stringByAppendingPathComponent:@"gl/'
+GL_NEW = '[[[NSBundle mainBundle] bundlePath] stringByAppendingPathComponent:@"gl/'
+
+
+def host_libraries(root: Path) -> int:
+    """iOS dylibs (gl/libMoltenVK.dylib, KosmicKrisp) stay in the signed app bundle.
+    madeira_vulkan_library builds their paths from its `bundle` argument, which is
+    the downloaded runtime after the conversion above, where no dylib exists, so
+    winevulkan failed with "Failed to load MADEIRA_VULKAN_LIBRARY"."""
+    bridge = root / "app/Madeira/WineProcessBridge.m"
+    text = bridge.read_text()
+    if GL_OLD not in text:
+        if GL_NEW in text:
+            print("WineProcessBridge.m: Vulkan host libraries already read from the app bundle")
+            return 0
+        print("ERROR: WineProcessBridge.m: no gl/ library path to convert", file=sys.stderr)
+        return 2
+    count = text.count(GL_OLD)
+    bridge.write_text(text.replace(GL_OLD, GL_NEW))
+    print(f"WineProcessBridge.m: {count} Vulkan host library paths read the app bundle")
+    return 0
+
+
 def main(root: str) -> int:
     base = Path(root) / "app/Madeira"
     for name, minimum in (("WineProcessBridge.m", 3), ("WineServerBridge.m", 1)):
         status = convert(base / name, minimum)
         if status:
             return status
-    return data_dir(Path(root))
+    status = data_dir(Path(root))
+    return status or host_libraries(Path(root))
 
 
 if __name__ == "__main__":

@@ -293,6 +293,8 @@ enum GOGContentSystem {
             plan.setupNotes = setup.notes
             AppLog.record("[gog-setup] ids=\(plan.dependencies.joined(separator: ",")) run=\(setup.run.map(\.id).joined(separator: ",")) skipped=\(setup.notes.map(\.id).joined(separator: ","))")
         } catch {
+            // A cancelled or paused install is not a redistributable failure.
+            if error is CancellationError || Task.isCancelled { return }
             AppLog.record("[gog-setup] redistributables not downloaded: \(error.localizedDescription)")
             plan.setupNotes = [GOGSetupNote(id: "", name: "Redistributables",
                                             note: "Not downloaded: \(error.localizedDescription)")]
@@ -564,24 +566,8 @@ final class GOGContentInstaller: @unchecked Sendable {
                 return SignedCDN(format: format, parameters: parameters)
             }
             guard !providers.isEmpty else { throw GOGContentError.invalidManifest }
-            // Only the CDN origins are ranked on iRelay. Signed URL templates,
-            // product tokens and query parameters never leave this device.
-            let candidateURLs = providers.compactMap {
-                GOGContentSystem.signedChunkURL(format: $0.format, parameters: $0.parameters, hash: hash)
-            }
-            let ordered = await IRelayClient.rankedCDNURLs(store: "gog", urls: candidateURLs)
-            var rank: [String: Int] = [:]
-            for (index, url) in ordered.enumerated() {
-                if let host = url.host?.lowercased(), rank[host] == nil { rank[host] = index }
-            }
-            let candidates = providers.enumerated().sorted { left, right in
-                let leftHost = GOGContentSystem.signedChunkURL(
-                    format: left.element.format, parameters: left.element.parameters, hash: hash)?.host?.lowercased() ?? ""
-                let rightHost = GOGContentSystem.signedChunkURL(
-                    format: right.element.format, parameters: right.element.parameters, hash: hash)?.host?.lowercased() ?? ""
-                let a = rank[leftHost] ?? Int.max, b = rank[rightHost] ?? Int.max
-                return a == b ? left.offset < right.offset : a < b
-            }.map(\.element)
+            // GOG's own order: its preferred CDN first.
+            let candidates = providers
             let entry = SecureLinkCache.Entry(providers: candidates, fetched: Date())
             await linkCache.store(entry, for: productID)
             saved = entry

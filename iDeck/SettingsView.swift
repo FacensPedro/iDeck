@@ -39,10 +39,6 @@ struct SettingsView: View {
                         SettingsRow(icon: "square.grid.2x2.fill", color: .blue,
                                     title: tr("Stores & launchers"))
                     }
-                    NavigationLink { irelayPage } label: {
-                        SettingsRow(icon: "wifi", color: .blue, title: "iRelay",
-                                    value: IRelayPairing.display)
-                    }
                 }
 
                 Section(tr("Windows")) {
@@ -68,10 +64,20 @@ struct SettingsView: View {
                 }
 
                 Section(tr("General")) {
-                    Button(tr("Run first-time setup again")) {
+                    Button {
                         UserDefaults.standard.set(false, forKey: "firstRunSetup.complete.v1")
                         dismiss()
+                    } label: {
+                        HStack(spacing: 0) {
+                            SettingsRow(icon: "wand.and.stars", color: .indigo, title: tr("Setup assistant"))
+                            Image(systemName: "chevron.right")
+                                .font(.footnote.weight(.semibold))
+                                .foregroundStyle(.tertiary)
+                        }
+                        .contentShape(Rectangle())
                     }
+                    .buttonStyle(.plain)
+                    .accessibilityHint(tr("Opens the initial setup again"))
 
                     languagePicker
                     NavigationLink { updatesPage } label: {
@@ -142,13 +148,6 @@ struct SettingsView: View {
     }
 
     // MARK: Accounts
-
-    private var irelayPage: some View {
-        Form {
-            IRelaySettingsSection()
-        }
-        .navigationTitle("iRelay")
-    }
 
     private var steamPage: some View {
         Form {

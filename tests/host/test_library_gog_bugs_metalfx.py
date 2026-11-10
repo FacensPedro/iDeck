@@ -62,8 +62,10 @@ class LibraryPresentationTests(unittest.TestCase):
     def test_installing_cards_keep_installed_size(self):
         view = read("iDeck/MainView.swift")
         self.assertNotIn("private func downloadControls(", view)
-        self.assertIn("private let cardActionHeight: CGFloat = 40", view)
-        self.assertIn("steamProgressAction(for: game)", view)
+        # Cards have no action row; every title reserves two lines instead.
+        self.assertNotIn("cardActionHeight", view)
+        self.assertNotIn("steamProgressAction(", view)
+        self.assertIn(".lineLimit(2, reservesSpace: true)", view)
 
 
 class SettingsAndDiagnosticsTests(unittest.TestCase):

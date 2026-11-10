@@ -100,14 +100,12 @@
 		F3A000000000000000000018 /* StikJITHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000018 /* StikJITHelper.swift */; };
 		F3A000000000000000000017 /* MadeiraRuntimeSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000017 /* MadeiraRuntimeSettings.swift */; };
 		F3A000000000000000000016 /* MadeiraConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000016 /* MadeiraConfig.swift */; };
-		F3A0000000000000000000A2 /* IRelayDeviceService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A0000000000000000000A2 /* IRelayDeviceService.swift */; };
 		F3A0000000000000000000B0 /* MadeiraDock.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A0000000000000000000B0 /* MadeiraDock.swift */; };
 		F3A0000000000000000000B1 /* DockInstallers.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A0000000000000000000B1 /* DockInstallers.swift */; };
 		F3A0000000000000000000B2 /* DockReset.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A0000000000000000000B2 /* DockReset.swift */; };
 		F3A0000000000000000000B3 /* DockStartProgram.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A0000000000000000000B3 /* DockStartProgram.swift */; };
 		F3A0000000000000000000B4 /* SteamRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A0000000000000000000B4 /* SteamRuntime.swift */; };
 		F3A0000000000000000000B5 /* IDeckDockGlue.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A0000000000000000000B5 /* IDeckDockGlue.swift */; };
-		F3A0000000000000000000A1 /* IRelayClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A0000000000000000000A1 /* IRelayClient.swift */; };
 		F3A000000000000000000015 /* ResourceGovernor.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000015 /* ResourceGovernor.swift */; };
 		F3A000000000000000000014 /* GOGContentSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000014 /* GOGContentSystem.swift */; };
 		F3A000000000000000000001 /* BugReportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000001 /* BugReportView.swift */; };
@@ -244,14 +242,12 @@
 		F4A000000000000000000018 /* StikJITHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MadeiraJIT/StikJITHelper.swift"; sourceTree = "<group>"; };
 		F4A000000000000000000017 /* MadeiraRuntimeSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MadeiraRuntimeSettings.swift; sourceTree = "<group>"; };
 		F4A000000000000000000016 /* MadeiraConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MadeiraConfig.swift; sourceTree = "<group>"; };
-		F4A0000000000000000000A2 /* IRelayDeviceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IRelayDeviceService.swift; sourceTree = "<group>"; };
 		F4A0000000000000000000B0 /* MadeiraDock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Vendor/Madeira/MadeiraDock.swift"; sourceTree = "<group>"; };
 		F4A0000000000000000000B1 /* DockInstallers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Vendor/Madeira/DockInstallers.swift"; sourceTree = "<group>"; };
 		F4A0000000000000000000B2 /* DockReset.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Vendor/Madeira/DockReset.swift"; sourceTree = "<group>"; };
 		F4A0000000000000000000B3 /* DockStartProgram.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Vendor/Madeira/DockStartProgram.swift"; sourceTree = "<group>"; };
 		F4A0000000000000000000B4 /* SteamRuntime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Vendor/Madeira/SteamRuntime.swift"; sourceTree = "<group>"; };
 		F4A0000000000000000000B5 /* IDeckDockGlue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MadeiraDock/IDeckDockGlue.swift"; sourceTree = "<group>"; };
-		F4A0000000000000000000A1 /* IRelayClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IRelayClient.swift; sourceTree = "<group>"; };
 		F4A000000000000000000015 /* ResourceGovernor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResourceGovernor.swift; sourceTree = "<group>"; };
 		F4A000000000000000000014 /* GOGContentSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GOGContentSystem.swift; sourceTree = "<group>"; };
 		F4A000000000000000000001 /* BugReportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BugReportView.swift; sourceTree = "<group>"; };
@@ -425,14 +421,12 @@
 				F3A000000000000000000018 /* StikJITHelper.swift in Sources */,
 				F3A000000000000000000017 /* MadeiraRuntimeSettings.swift in Sources */,
 				F3A000000000000000000016 /* MadeiraConfig.swift in Sources */,
-				F3A0000000000000000000A2 /* IRelayDeviceService.swift in Sources */,
 				F3A0000000000000000000B0 /* MadeiraDock.swift in Sources */,
 				F3A0000000000000000000B1 /* DockInstallers.swift in Sources */,
 				F3A0000000000000000000B2 /* DockReset.swift in Sources */,
 				F3A0000000000000000000B3 /* DockStartProgram.swift in Sources */,
 				F3A0000000000000000000B4 /* SteamRuntime.swift in Sources */,
 				F3A0000000000000000000B5 /* IDeckDockGlue.swift in Sources */,
-				F3A0000000000000000000A1 /* IRelayClient.swift in Sources */,
 				F3A000000000000000000015 /* ResourceGovernor.swift in Sources */,
 				F3A000000000000000000014 /* GOGContentSystem.swift in Sources */,
 				F3A000000000000000000001 /* BugReportView.swift in Sources */,
@@ -594,14 +588,12 @@
 				F4A000000000000000000018 /* StikJITHelper.swift */,
 				F4A000000000000000000017 /* MadeiraRuntimeSettings.swift */,
 				F4A000000000000000000016 /* MadeiraConfig.swift */,
-				F4A0000000000000000000A2 /* IRelayDeviceService.swift */,
 				F4A0000000000000000000B0 /* MadeiraDock.swift */,
 				F4A0000000000000000000B1 /* DockInstallers.swift */,
 				F4A0000000000000000000B2 /* DockReset.swift */,
 				F4A0000000000000000000B3 /* DockStartProgram.swift */,
 				F4A0000000000000000000B4 /* SteamRuntime.swift */,
 				F4A0000000000000000000B5 /* IDeckDockGlue.swift */,
-				F4A0000000000000000000A1 /* IRelayClient.swift */,
 				F4A000000000000000000015 /* ResourceGovernor.swift */,
 				F4A000000000000000000014 /* GOGContentSystem.swift */,
 				F4A000000000000000000001 /* BugReportView.swift */,
@@ -813,7 +805,7 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = VPNExtension/VPNExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 51;
+				CURRENT_PROJECT_VERSION = 52;
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = VPNExtension/Info.plist;
@@ -822,7 +814,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.6.10;
+				MARKETING_VERSION = 1.7.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ideck.ideck.VPNExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -838,7 +830,7 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = VPNExtension/VPNExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 51;
+				CURRENT_PROJECT_VERSION = 52;
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = VPNExtension/Info.plist;
@@ -847,7 +839,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.6.10;
+				MARKETING_VERSION = 1.7.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ideck.ideck.VPNExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -941,7 +933,7 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = iDeckJITHelper/iDeckJITHelper.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 51;
+				CURRENT_PROJECT_VERSION = 52;
 				DEVELOPMENT_TEAM = "";
 				"FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*]" = "$(SRCROOT)/Frameworks/StikJIT.xcframework/ios-arm64";
 				GENERATE_INFOPLIST_FILE = NO;
@@ -950,7 +942,7 @@
 					"$(inherited)",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.6.10;
+				MARKETING_VERSION = 1.7.0;
 				"OTHER_LDFLAGS[sdk=iphoneos*]" = (
 					"$(inherited)",
 					"-framework",
@@ -971,7 +963,7 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = iDeckJITHelper/iDeckJITHelper.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 51;
+				CURRENT_PROJECT_VERSION = 52;
 				DEVELOPMENT_TEAM = "";
 				"FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*]" = "$(SRCROOT)/Frameworks/StikJIT.xcframework/ios-arm64";
 				GENERATE_INFOPLIST_FILE = NO;
@@ -980,7 +972,7 @@
 					"$(inherited)",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.6.10;
+				MARKETING_VERSION = 1.7.0;
 				"OTHER_LDFLAGS[sdk=iphoneos*]" = (
 					"$(inherited)",
 					"-framework",
@@ -1062,7 +1054,7 @@
 				OTHER_LDFLAGS = "$(inherited) -lz -llzma $(IDECK_NATIVE_LINK_FLAGS)";
 				OTHER_CFLAGS = "$(inherited) $(IDECK_NATIVE_CFLAGS)";
 				OTHER_CPLUSPLUSFLAGS = "$(inherited) $(IDECK_NATIVE_CFLAGS)";
-				CURRENT_PROJECT_VERSION = 51;
+				CURRENT_PROJECT_VERSION = 52;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -1075,7 +1067,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.6.10;
+				MARKETING_VERSION = 1.7.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ideck.ideck;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -1099,7 +1091,7 @@
 				OTHER_LDFLAGS = "$(inherited) -lz -llzma $(IDECK_NATIVE_LINK_FLAGS)";
 				OTHER_CFLAGS = "$(inherited) $(IDECK_NATIVE_CFLAGS)";
 				OTHER_CPLUSPLUSFLAGS = "$(inherited) $(IDECK_NATIVE_CFLAGS)";
-				CURRENT_PROJECT_VERSION = 51;
+				CURRENT_PROJECT_VERSION = 52;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -1112,7 +1104,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.6.10;
+				MARKETING_VERSION = 1.7.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ideck.ideck;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;

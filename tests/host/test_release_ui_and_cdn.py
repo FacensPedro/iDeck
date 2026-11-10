@@ -5,7 +5,6 @@ from support import ROOT, repo_text
 VIEW = repo_text("iDeck/MainView.swift")
 PROJECT = repo_text("iDeck.xcodeproj/project.pbxproj")
 SAVE = repo_text("iDeck/SessionControlsSheet.swift")
-RELAY = repo_text("iDeck/IRelayClient.swift")
 EPIC = repo_text("iDeck/EpicLibrary.swift")
 GOG = repo_text("iDeck/GOGContentSystem.swift")
 WORKFLOW = repo_text(".github/workflows/ios.yml")
@@ -37,10 +36,11 @@ class ReleaseInterfaceCDNTests(unittest.TestCase):
 
     def test_long_game_titles_are_truncated_and_header_is_ideck(self):
         start = VIEW.index("    private func cardTitle(_ title: String)")
-        end = VIEW.index("    private func cardActionLabel(", start)
+        end = VIEW.index("    private func downloadCoverButton(", start)
         card = VIEW[start:end]
-        self.assertIn(".lineLimit(1)", card)
-        self.assertIn(".truncationMode(.tail)", card)
+        # Long names wrap to a second line; every title reserves two lines.
+        self.assertIn(".lineLimit(2, reservesSpace: true)", card)
+        self.assertNotIn(".truncationMode(.tail)", card)
         self.assertIn(".accessibilityLabel(title)", card)
         top = VIEW.split("private var topBar: some View", 1)[1].split("private enum MixedLibraryEntry", 1)[0]
         self.assertIn('Text("iDeck")', top)
@@ -49,13 +49,9 @@ class ReleaseInterfaceCDNTests(unittest.TestCase):
 
     def test_legacy_steam_sizes_and_store_library_response(self):
         metadata = repo_text("iDeck/SwiftSteam/Library/SteamAppInfo.swift")
-        device = repo_text("iDeck/IRelayDeviceService.swift")
         self.assertIn("func displaySizeForWindows(installedBytes: UInt64 = 0)", metadata)
         self.assertIn("case 22330: return 4.6", metadata)
         self.assertIn("case 489830: return 12.0", metadata)
-        self.assertIn("size.isRequirement", device)
-        self.assertIn('"requiredSpaceGB":', device)
-        self.assertIn('"size": gog.installedSizes[game.id].flatMap', device)
         self.assertIn("steamLibrary.installedSizes[game.appID]", VIEW)
         self.assertIn('tr("Minimum required space: %@", text)', VIEW)
 
@@ -68,14 +64,7 @@ class ReleaseInterfaceCDNTests(unittest.TestCase):
         self.assertNotIn("unlimitedDownloadSpeed", SETTINGS)
         self.assertNotIn("isUnlimited", DOWNLOAD_SPEED)
         self.assertIn("static let steamChunks = 8", DOWNLOAD_SPEED)
-        self.assertIn("static let epicWindow = 8", DOWNLOAD_SPEED)
-
-    def test_irelay_reorders_only_official_cdn_origins(self):
-        self.assertIn('relay.request("servers/rank"', RELAY)
-        self.assertIn('return "https://', RELAY)
-        self.assertIn('rankedCDNURLs(store: "epic"', EPIC)
-        self.assertIn('rankedCDNURLs(store: "gog"', GOG)
-        self.assertNotIn('store: "epic", urls: location.secrets', EPIC)
+        self.assertIn("static let epicWindow = 24", DOWNLOAD_SPEED)
 
     def test_release_notes_contain_no_authors_or_pull_links(self):
         self.assertIn("--notes-file RELEASE_NOTES.md", WORKFLOW)

@@ -13,8 +13,8 @@ class EAFastestCDNTests(unittest.TestCase):
         self.assertIn("guard let best = timings.min(by: { $0.1 < $1.1 }) else { return url }", DOWNLOADER)
         self.assertIn("archive = await downloader.fastestMirror(archive)", repo_text("iDeck/EALibrary.swift"))
 
-    def test_six_files_at_once(self):
-        self.assertIn("private let parallel = 6", DOWNLOADER)
+    def test_files_at_once(self):
+        self.assertIn("private let parallel = DownloadSpeed.eaFiles", DOWNLOADER)
 
 
 class EAMemoryTests(unittest.TestCase):
@@ -28,10 +28,10 @@ class EAMemoryTests(unittest.TestCase):
 class EASegmentedTests(unittest.TestCase):
     def test_large_files_download_in_parallel_ranges_like_steam(self):
         self.assertIn("static let segmentedThreshold: Int64 = 16 << 20", DOWNLOADER)
-        self.assertIn("static let segmentsAtOnce = DownloadSpeed.steamChunks", DOWNLOADER)
+        self.assertIn("static let segmentsAtOnce = DownloadSpeed.eaSegments", DOWNLOADER)
         self.assertIn("if entry.compressedSize >= segmentedThreshold {", DOWNLOADER)
         self.assertIn("inflater.crc.checksum == entry.crc32", DOWNLOADER.split("private static func fetchSegmented", 1)[1])
-        self.assertIn("config.httpMaximumConnectionsPerHost = 16", DOWNLOADER)
+        self.assertIn("config.httpMaximumConnectionsPerHost = DownloadSpeed.eaConnections", DOWNLOADER)
 
 
 class EANativeInflateTests(unittest.TestCase):

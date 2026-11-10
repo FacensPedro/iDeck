@@ -43,7 +43,7 @@ class ExtendedWineLogDiagnosticsTests(unittest.TestCase):
     def test_cpu_instruction(self):
         self.assertEqual(self.classify("guest process aborted 0xC000001D"), 11)
 
-    def test_irelay(self):
+    def test_transport(self):
         self.assertEqual(self.classify("FATAL Error: usbmux timeout"), 12)
 
     def test_download_integrity(self):

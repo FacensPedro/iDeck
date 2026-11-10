@@ -278,7 +278,10 @@ struct EAInstalledGame: Codable, Sendable {
         guard signedIn || installed[id] != nil else { error = "Sign in to EA to download games."; return }
         guard signedIn else { error = EAAPIError.signedOut.localizedDescription; return }
         if let current = downloads[id], current.state == .active || current.state == .queued { return }
-        downloads[id] = Download(kind: kind, state: .queued)
+        // A resumed download keeps what it showed when it was paused.
+        var download = Download(kind: kind, state: .queued)
+        if let previous = downloads[id], previous.kind == kind, previous.state == .paused { download.progress = previous.progress }
+        downloads[id] = download
         if !queue.contains(id) { queue.append(id) }
         startTimer()
         pump()

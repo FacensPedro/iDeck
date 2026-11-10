@@ -45,10 +45,8 @@ class SteamMemoryDiagnosticsTests(unittest.TestCase):
         verified = DOWN.index('try await checkExisting(plans: plans,', start)
         pending = DOWN.index('var pendingUncompressed: UInt64 = 0', verified)
         free = DOWN.index('if pendingUncompressed > 0, let free = installURL.freeSpace', pending)
-        relay = DOWN.index(r'if !work.allSatisfy(\.isEmpty), let pc = IRelayClient.configured()', free)
         self.assertLess(verified, pending)
         self.assertLess(pending, free)
-        self.assertLess(free, relay)
         self.assertIn('insufficientDiskSpace(needed: pendingUncompressed', DOWN)
 
     def test_diagnostics_identify_game_before_start(self):
