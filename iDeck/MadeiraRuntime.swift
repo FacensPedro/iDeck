@@ -1,5 +1,4 @@
 import Foundation
-import CryptoKit
 
 // Wine's Windows files are not in the IPA. The build moves the PE farms (x64:
 // aarch64-windows, arm64ec-windows, nls, compat, vulkan; x86: i386-windows) into
@@ -108,7 +107,7 @@ enum MadeiraRuntime {
             for (relative, sha) in manifest.sorted(by: { $0.key < $1.key }) {
                 let url = folder.appendingPathComponent(relative)
                 guard fm.fileExists(atPath: url.path) else { problems.append("missing \(relative)"); continue }
-                if (try? WineMonoInstaller.sha256(of: url)) != sha { problems.append("damaged \(relative)") }
+                if (try? FileChecksum.sha256(of: url)) != sha { problems.append("damaged \(relative)") }
                 if problems.count > 20 { break }
             }
         }
@@ -200,7 +199,7 @@ enum MadeiraRuntime {
         defer { try? fm.removeItem(at: archive) }
 
         progress("Checking \(package.title)…", 0.7)
-        let digest = try await Task.detached(priority: .userInitiated) { try WineMonoInstaller.sha256(of: archive) }.value
+        let digest = try await Task.detached(priority: .userInitiated) { try FileChecksum.sha256(of: archive) }.value
         guard digest == package.sha256 else {
             AppLog.record("[runtime] \(package.id) SHA-256 mismatch")
             throw InstallError.message("\(package.title) did not match its checksum. Try again.")

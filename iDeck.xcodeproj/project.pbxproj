@@ -124,6 +124,7 @@
 		111111111111111111111127 /* WindowsRendererView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222239 /* WindowsRendererView.swift */; };
 		111111111111111111111128 /* WineInputBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 222222222222222222222240 /* WineInputBridge.swift */; };
 		BEEF00000000000000000001 /* WindowsLaunchArguments.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEEF00000000000000000002 /* WindowsLaunchArguments.swift */; };
+		DAD020261110000000000001 /* RuntimeFileUtilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAD020261110000000000002 /* RuntimeFileUtilities.swift */; };
 		AC100000000000000000010 /* VCArchiveExtractor.c in Sources */ = {isa = PBXBuildFile; fileRef = AC200000000000000000010 /* VCArchiveExtractor.c */; };
 		AC100000000000000000011 /* cabd.c in Sources */ = {isa = PBXBuildFile; fileRef = AC200000000000000000011 /* cabd.c */; };
 		AC100000000000000000012 /* cabc.c in Sources */ = {isa = PBXBuildFile; fileRef = AC200000000000000000012 /* cabc.c */; };
@@ -270,6 +271,7 @@
 		222222222222222222222240 /* WineInputBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WineInputBridge.swift"; sourceTree = "<group>"; };
 		222222222222222222222244 /* iDeck-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "iDeck-Bridging-Header.h"; sourceTree = "<group>"; };
 		BEEF00000000000000000002 /* WindowsLaunchArguments.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowsLaunchArguments.swift; sourceTree = "<group>"; };
+		DAD020261110000000000002 /* RuntimeFileUtilities.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeFileUtilities.swift; sourceTree = "<group>"; };
 		AC200000000000000000010 /* VCArchiveExtractor.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = NativeRuntime/VCArchiveExtractor.c; sourceTree = "<group>"; };
 		AC200000000000000000011 /* cabd.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = ThirdParty/libmspack/cabd.c; sourceTree = "<group>"; };
 		AC200000000000000000012 /* cabc.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = ThirdParty/libmspack/cabc.c; sourceTree = "<group>"; };
@@ -441,6 +443,7 @@
 				111111111111111111111125 /* GameSessionView.swift in Sources */,
 				111111111111111111111127 /* WindowsRendererView.swift in Sources */,
 				111111111111111111111128 /* WineInputBridge.swift in Sources */,
+				DAD020261110000000000001 /* RuntimeFileUtilities.swift in Sources */,
 				BEEF00000000000000000001 /* WindowsLaunchArguments.swift in Sources */,
 				DEAD00000000000000000071 /* VisualCRuntimeBootstrap.swift in Sources */,
 				A70100000000000000000001 /* WineExitDiagnostics.swift in Sources */,
@@ -610,6 +613,7 @@
 				222222222222222222222239 /* WindowsRendererView.swift */,
 				222222222222222222222240 /* WineInputBridge.swift */,
 				222222222222222222222244 /* iDeck-Bridging-Header.h */,
+				DAD020261110000000000002 /* RuntimeFileUtilities.swift */,
 				BEEF00000000000000000002 /* WindowsLaunchArguments.swift */,
 				DEAD00000000000000000072 /* VisualCRuntimeBootstrap.swift */,
 				A70200000000000000000001 /* WineExitDiagnostics.swift */,

@@ -1,6 +1,5 @@
 import Foundation
 import Compression
-import CryptoKit
 
 class PrefixInstaller: ObservableObject {
     @Published var isInstalling: Bool = false
@@ -86,7 +85,7 @@ class PrefixInstaller: ObservableObject {
             }
 
             do {
-                guard try PrefixInstaller.sha256(of: localURL) == PrefixInstaller.templateSHA256 else {
+                guard try FileChecksum.sha256(of: localURL) == PrefixInstaller.templateSHA256 else {
                     print("PrefixInstaller: checksum mismatch, refusing to install")
                     self.finish(false, completion)
                     return
@@ -138,16 +137,6 @@ class PrefixInstaller: ObservableObject {
             try fm.removeItem(at: link)
         }
         try fm.createSymbolicLink(atPath: link.path, withDestinationPath: "../drive_c")
-    }
-
-    private static func sha256(of url: URL) throws -> String {
-        let handle = try FileHandle(forReadingFrom: url)
-        defer { try? handle.close() }
-        var hasher = SHA256()
-        while let chunk = try handle.read(upToCount: 1 << 20), !chunk.isEmpty {
-            hasher.update(data: chunk)
-        }
-        return hasher.finalize().map { String(format: "%02x", $0) }.joined()
     }
 }
 

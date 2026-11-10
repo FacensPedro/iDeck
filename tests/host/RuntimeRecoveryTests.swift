@@ -3,8 +3,10 @@ import FoundationNetworking
 #endif
 
 enum AppLog { static func record(_ text: String) {} }
-enum WineMonoInstaller {
+enum FileChecksum {
     static func sha256(of url: URL) throws -> String { "unused" }
+}
+enum WineMonoInstaller {
     static func unpack(tarXZ: URL, into: URL, map: (String) -> String?, progress: (Int64) -> Void) throws {}
 }
 enum ObservedDownload {
