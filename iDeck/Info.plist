@@ -14,7 +14,7 @@
 	<key>NSMicrophoneUsageDescription</key>
 	<string>iDeck never records sound. iOS asks for this only because game sound is moved from a controller's speaker to the device's own speaker.</string>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Local network access is required for JIT activation and for downloads through iRelay on your PC.</string>
+	<string>Local network access is required for JIT activation and for Steam downloads from a PC on your network.</string>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_ideck._tcp</string>

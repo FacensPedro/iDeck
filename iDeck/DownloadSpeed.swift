@@ -1,13 +1,19 @@
 import Foundation
 
-/// iDeck uses a bounded, predictable download queue. Download acceleration
-/// and server prioritization are managed by the separately installed iRelay.
+/// iDeck uses bounded, predictable download queues, sized per store.
 enum DownloadSpeed {
     /// Parallel Steam chunk requests on the device.
     static let steamChunks = 8
 
-    /// Epic chunks fetched ahead of the writer.
-    static let epicWindow = 8
+    /// Epic chunks (about 1 MB each) fetched ahead of the writer. 8 left most of a
+    /// fast connection idle; 24 keeps at most ~24 MB of chunks in flight.
+    static let epicWindow = 24
+
+    /// EA: files fetched at once, ranges of one large file fetched at once, and the
+    /// connections to EA's CDN they share.
+    static let eaFiles = 8
+    static let eaSegments = 12
+    static let eaConnections = 32
 }
 
     

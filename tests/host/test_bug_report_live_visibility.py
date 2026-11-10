@@ -3,12 +3,11 @@ from pathlib import Path
 
 from support import ROOT, repo_text
 BUGS = repo_text("iDeck/BugReportView.swift")
-SERVICE = repo_text("iDeck/IRelayDeviceService.swift")
 
 class BugReportLiveVisibilityTests(unittest.TestCase):
-    def test_all_detected_bugs_are_expanded_by_default(self):
-        self.assertIn("@State private var bugsOpen = true", BUGS)
-        self.assertIn("@State private var jitOpen = true", BUGS)
+    def test_bug_groups_start_collapsed(self):
+        self.assertIn("@State private var bugsOpen = false", BUGS)
+        self.assertIn("@State private var jitOpen = false", BUGS)
         self.assertIn("ForEach(gameIssues) { issue in issueRow(issue) }", BUGS)
         self.assertIn("if jitOpen { ForEach(jitIssues) { issue in issueRow(issue) } }", BUGS)
 
@@ -47,7 +46,6 @@ class BugReportLiveVisibilityTests(unittest.TestCase):
         self.assertIn("LogIssueScanner.scan(text, source: .wine", BUGS)
         self.assertIn("Self.gameContext", BUGS)
         self.assertIn("Self.hardwareSummary", BUGS)
-        self.assertIn("LogIssueScanner.scan(wine, source: .wine", SERVICE)
 
 if __name__ == "__main__":
     unittest.main()

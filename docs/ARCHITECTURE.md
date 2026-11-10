@@ -6,7 +6,7 @@ linked statically into the app (`MadeiraStaticABI.h`).
 
 | Layer | Language | Location | Owns |
 | --- | --- | --- | --- |
-| 1. iDeck UI | SwiftUI | `iDeck/*.swift` | Library, stores (Steam, GOG, Epic, EA app), settings, downloads, iRelay service, game session screen |
+| 1. iDeck UI | SwiftUI | `iDeck/*.swift` | Library, stores (Steam, GOG, Epic, EA app), settings, downloads, game session screen |
 | 2. Runtime Manager | Swift + Objective-C++ | `SystemCoordinator.swift`, `WindowsEnvironment.swift`, `ResourceGovernor.swift`, `NativeSymbol.swift`, `MadeiraDock/`, `MadeiraJIT/`, `NativeRuntime/MadeiraRuntimeBridge.mm`, `NativeRuntime/WineBridge.mm` | Prefix, Wine and wineserver start/stop, JIT (StikDebug, 896 MB pool by default), session state and errors, memory pressure |
 | 3. Madeira Core | C/C++ (+ the linked Madeira archives) | `NativeRuntime/` | FEX/JIT guards, graphics availability (DXMT, D3D12, Metal), controllers, Visual C++ extraction, Wine log triage |
 
@@ -19,8 +19,6 @@ linked statically into the app (`MadeiraStaticABI.h`).
   FPS, CPU and Metal memory are measured only while the performance overlay is on.
 - The 5-second JIT status probe (`MainView`) pauses while a Wine game runs:
   JIT cannot change under a running game.
-- iRelay transfers (`IRelayDeviceService`) run on a `.utility` queue so SHA-1
-  checks and file writes stay below the game's threads.
 
 ## Layer 2 — Runtime Manager
 

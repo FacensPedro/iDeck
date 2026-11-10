@@ -33,12 +33,6 @@ class EAStoreTests(unittest.TestCase):
         self.assertIn('"Software\\\\Wow6432Node\\\\" + key.dropFirst("Software\\\\".count)', glue)
         self.assertIn('return name + String(format: "=dword:%08x", number)', glue)
 
-    def test_irelay_endpoints_know_ea_and_no_ubisoft(self):
-        service = repo_text("iDeck/IRelayDeviceService.swift")
-        for text in ('case "ea":', '"ea": ["signedIn"'):
-            self.assertIn(text, service)
-        self.assertNotIn("ubisoft", service.lower())
-
     def test_ubisoft_support_is_removed(self):
         self.assertFalse((ROOT / "iDeck/UbisoftLibrary.swift").exists())
         self.assertFalse((ROOT / "iDeck/Assets.xcassets/StoreBadgeUbisoft.imageset").exists())

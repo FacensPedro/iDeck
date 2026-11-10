@@ -22,10 +22,8 @@ struct iDeckApp: App {
             AppLog.record("[startup] warning: previous Steam installation did not finish normally: \(inFlight); cause undetermined")
             diagnostics.removeObject(forKey: "diagnostics.installInFlight")
         }
-        // iRelay on the local network: listen from launch so the PC finds iDeck at once.
         // The prefix is Documents/wine (Madeira's); earlier builds' moves first.
         MadeiraDock.linkPrefix()
-        IRelayRuntime.start()
         JITPoolList.ensureFile()
         // iOS crash reports (MetricKit) for wineserver and loader crashes in-process.
         IOSCrashDiagnostics.shared.start()

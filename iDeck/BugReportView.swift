@@ -263,7 +263,7 @@ final class BugReportModel: ObservableObject {
         case 9: return "WineServer reported a startup, connection, or unexpected-exit failure. Inspect its native log for the actual cause."
         case 10: return "The graphics pipeline reported a DXMT, Direct3D 12, Metal presentation, or shader compilation failure. This does not establish which component caused it."
         case 11: return "The guest log reported an illegal or unsupported CPU instruction (0xC000001D). Check the game executable and FEX translation logs."
-        case 12: return "iRelay or USB transport reported a connection failure. Verify the companion service and device connectivity."
+        case 12: return "A network or USB transport reported a connection failure. Check the device's connectivity."
         case 13: return "Download or installation integrity verification failed. Check hashes and retry only the affected data."
         default: return nil
         }
@@ -373,8 +373,9 @@ final class BugReportModel: ObservableObject {
 struct BugReportView: View {
     @StateObject private var model = BugReportModel()
     @State private var expanded: Set<String> = []
-    @State private var bugsOpen = true
-    @State private var jitOpen = true
+    // Both groups start collapsed: the report opens as a short summary.
+    @State private var bugsOpen = false
+    @State private var jitOpen = false
     @State private var showClearConfirmation = false
     @AppStorage("diagnostics.detailed") private var detailedDiagnostics = false
     @AppStorage(BenchmarkSession.enabledKey) private var recordBenchmarks = false

@@ -87,11 +87,17 @@ final class BackgroundDownloads {
 
     func started(name: String) {
         currentName = name
-        requestNotificationPermission()
-        if #available(iOS 26.0, *) {
-            if Self.continuedEnabled { submitContinued() }
-            (continued as? BGContinuedProcessingTask)?.updateTitle(
-                String(format: tr("Downloading %@"), name), subtitle: source)
+        // The system's "Downloading ..." activity for a continued download is shown
+        // only once the user allowed notifications: someone who tapped Don't Allow
+        // gets no iDeck notification of any kind (the download then has only the
+        // short background grace period).
+        whenNotificationsAllowed { [weak self] in
+            guard let self, self.isActive() else { return }
+            if #available(iOS 26.0, *) {
+                if Self.continuedEnabled { self.submitContinued() }
+                (self.continued as? BGContinuedProcessingTask)?.updateTitle(
+                    String(format: tr("Downloading %@"), self.currentName), subtitle: self.source)
+            }
         }
         if isBackground { beginGrace() }
     }
@@ -197,16 +203,39 @@ final class BackgroundDownloads {
 
     // MARK: Notifications
 
-    private static var askedNotifications = false
+    /// The user's answer to the notification prompt, once known this run.
+    private static var notificationsAllowed: Bool?
 
-    private func requestNotificationPermission() {
-        guard !Self.askedNotifications, Self.notificationsEnabled else { return }
-        Self.askedNotifications = true
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+    /// Runs `action` on the main queue if notifications are allowed, asking the first
+    /// time. Never runs it after Don't Allow, or with notifications off in Settings.
+    private func whenNotificationsAllowed(_ action: @escaping @MainActor () -> Void) {
+        guard Self.notificationsEnabled else { return }
+        let center = UNUserNotificationCenter.current()
+        center.getNotificationSettings { settings in
+            let status = settings.authorizationStatus
+            if status == .notDetermined {
+                center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
+                    DispatchQueue.main.async {
+                        MainActor.assumeIsolated {
+                            Self.notificationsAllowed = granted
+                            if granted { action() }
+                        }
+                    }
+                }
+            } else {
+                let allowed = status != .denied
+                DispatchQueue.main.async {
+                    MainActor.assumeIsolated {
+                        Self.notificationsAllowed = allowed
+                        if allowed { action() }
+                    }
+                }
+            }
+        }
     }
 
     private func notify(_ title: String, body: String) {
-        guard Self.notificationsEnabled else { return }
+        guard Self.notificationsEnabled, Self.notificationsAllowed == true else { return }
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body

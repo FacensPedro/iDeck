@@ -282,31 +282,8 @@ final class DepotDownloader {
             peer = await lanPeerSource(appID: app.appID, currentBuild: installedBuild == app.buildID ? 0 : installedBuild,
                                        depots: Set(plans.map(\.depotID)))
         }
-        // iDeck: iRelay, the PC on the local network, does this download: it fetches,
-        // decrypts, decompresses and checks every chunk at the PC's speed and
-        // writes it into the game's files here (IRelayDeviceService, PUT /write,
-        // which checks each chunk's SHA-1 again). Chunks it could not deliver
-        // stay in `work` and come from Steam's content servers below.
-        if !work.allSatisfy(\.isEmpty), let pc = IRelayClient.configured() {
-            do {
-                _ = try await pc.ping()
-                work = try await processOnPC(pc, app: app, plans: plans, prepared: prepared, work: work,
-                                             steamApps: steamApps, state: &state, report: report)
-            } catch is CancellationError {
-                throw CancellationError()
-            } catch {
-                SteamLog.event("[irelay] not used: \(error.localizedDescription)")
-            }
-        }
-        let startedRelay: IRelayClient? = nil
-        let relay = startedRelay
-        defer {
-            if let relay {
-                SteamLog.event("[irelay] done app=\(app.appID) chunks=\(relay.chunks) bytes=\(relay.bytes) failures=\(relay.failures)")
-            }
-        }
         let peerStarted = Date()
-        state.pcName = peer?.name ?? relay?.name
+        state.pcName = peer?.name
         defer {
             if let peer {
                 peer.close()
@@ -323,7 +300,7 @@ final class DepotDownloader {
             let work = work[index]
             let paths = prepared.paths[index]
             // A PC answers many requests on one connection at once.
-            let maximum = peer?.usable == true || relay != nil ? 16 : maxConcurrentChunks, attempts = attemptsPerChunk
+            let maximum = peer?.usable == true ? 16 : maxConcurrentChunks, attempts = attemptsPerChunk
             try await withThrowingTaskGroup(of: (UInt64, UInt64, Bool).self) { group in
                 var next = 0
                 func enqueue() {
@@ -332,7 +309,7 @@ final class DepotDownloader {
                     let chunk = plan.manifest.files[item.file].chunks[item.chunk]
                     let path = paths[item.file]
                     group.addTask {
-                        try await Self.fetchChunk(chunk, plan: plan, peer: peer, relay: relay, path: path, attempts: attempts, seed: item.file &+ item.chunk)
+                        try await Self.fetchChunk(chunk, plan: plan, peer: peer, path: path, attempts: attempts, seed: item.file &+ item.chunk)
                         return (item.key, UInt64(chunk.compressedSize) | (UInt64(chunk.uncompressedSize) << 32), false)
                     }
                 }
@@ -667,117 +644,8 @@ final class DepotDownloader {
 
     // MARK: - Chunks
 
-    /// iDeck: hands the pending chunks to iRelay and follows its progress.
-    /// Returns what is still to fetch: the chunks iRelay could not deliver.
-    private func processOnPC(_ pc: IRelayClient, app: SteamAppInfo, plans: [DepotPlan], prepared: Prepared,
-                             work: [[WorkItem]], steamApps: URL, state: inout SteamDownloadProgress,
-                             report: @escaping (SteamDownloadProgress) -> Void) async throws -> [[WorkItem]] {
-        // drive_c: steamApps is <drive>/Program Files (x86)/Steam/steamapps.
-        let drive = steamApps.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-            .standardizedFileURL.path + "/"
-        var depots: [IRelayClient.ProcessDepot] = []
-        for (index, plan) in plans.enumerated() where !work[index].isEmpty {
-            let root = plan.installURL.standardizedFileURL.path
-            guard root.hasPrefix(drive) else { continue }
-            var files: [Int: IRelayClient.ProcessFile] = [:]
-            for item in work[index] {
-                let path = prepared.paths[index][item.file]
-                guard !path.isEmpty, path.hasPrefix(root + "/") else { continue }
-                let entry = plan.manifest.files[item.file]
-                let chunk = entry.chunks[item.chunk]
-                var file = files[item.file] ?? IRelayClient.ProcessFile(path: String(path.dropFirst(root.count + 1)),
-                                                                        size: entry.size, chunks: [])
-                file.chunks.append(IRelayClient.ProcessChunk(sha: chunk.shaHex, offset: chunk.offset,
-                                                             size: chunk.uncompressedSize, compressed: chunk.compressedSize,
-                                                             crc: chunk.crc))
-                files[item.file] = file
-            }
-            depots.append(IRelayClient.ProcessDepot(depotId: plan.depotID, key: plan.key.map { String(format: "%02x", $0) }.joined(),
-                                                    hosts: plan.hosts, auth: plan.auth,
-                                                    root: String(root.dropFirst(drive.count)),
-                                                    files: files.keys.sorted().compactMap { files[$0] }))
-        }
-        guard !depots.isEmpty else { return work }
-        let job = try await pc.startProcess(appID: app.appID, title: app.name, depots: depots)
-        SteamLog.event("[irelay] processing on the PC app=\(app.appID) job=\(job) chunks=\(depots.reduce(0) { $0 + $1.files.reduce(0) { $0 + $1.chunks.count } })")
-        state.pcName = pc.name
-        let baseDone = state.doneBytes, baseInstalled = state.installedBytes
-        let started = Date()
-        var status = IRelayClient.ProcessStatus()
-        var reconnectDeadline: Date?
-        var pollFailures = 0
-        do {
-            while true {
-                try Task.checkCancellation()
-                try await Task.sleep(nanoseconds: 1_000_000_000)
-                do {
-                    status = try await pc.processStatus(job)
-                    if pollFailures > 0 {
-                        SteamLog.event("[irelay] status recovered app=\(app.appID) after \(pollFailures) failed polls")
-                    }
-                    reconnectDeadline = nil
-                    pollFailures = 0
-                } catch {
-                    // iRelay can briefly stop answering when iOS is under
-                    // memory pressure or network reconnects. Preserve all the
-                    // PC-side work while the cable is recovering instead of
-                    // cancelling the job after its first missed status poll.
-                    try Task.checkCancellation()
-                    pollFailures += 1
-                    if pollFailures == 1 || pollFailures % 5 == 0 {
-                        SteamLog.event("[irelay] poll unavailable app=\(app.appID) count=\(pollFailures): \(error.localizedDescription)")
-                    }
-                    if reconnectDeadline == nil {
-                        reconnectDeadline = Date().addingTimeInterval(65)
-                    }
-                    guard Date() < reconnectDeadline! else { throw error }
-                    try await Task.sleep(nanoseconds: 1_500_000_000)
-                    continue
-                }
-                state.doneBytes = baseDone + status.compressedDone
-                state.installedBytes = baseInstalled + status.bytesDone
-                state.bytesPerSecond = Double(status.compressedDone) / max(Date().timeIntervalSince(started), 0.001)
-                report(state)
-                if status.finished { break }
-            }
-        } catch {
-            // The install task is cancelled here, and a cancelled task's
-            // URLSession request fails at once: send the stop from a task of
-            // its own so iRelay actually receives it.
-            await Task.detached { await pc.cancelProcess(job) }.value
-            SteamLog.event("[irelay] asked the PC to stop app=\(app.appID) job=\(job)")
-            throw error
-        }
-        let failed = Set(status.failed)
-        SteamLog.event("[irelay] PC done app=\(app.appID) chunks=\(status.chunksDone) failed=\(failed.count)")
-        state.pcName = nil
-        return work.enumerated().map { index, items in
-            items.filter { failed.contains(plans[index].manifest.files[$0.file].chunks[$0.chunk].shaHex) }
-        }
-    }
-
     private nonisolated static func fetchChunk(_ chunk: DepotManifest.ChunkEntry, plan: DepotPlan, peer: SteamPeerChunkSource? = nil,
-                                               relay: IRelayClient? = nil,
                                                path: String, attempts: Int, seed: Int) async throws {
-        // iDeck: iRelay sends the content server's own bytes, checked and
-        // decrypted here exactly like a content server's answer.
-        if let relay, relay.usable {
-            do {
-                let encrypted = try await relay.chunk(depotID: plan.depotID, shaHex: chunk.shaHex)
-                let data = try ContentDecryptor.processChunk(encryptedData: encrypted, depotKey: plan.key,
-                                                             expectedCRC: chunk.crc,
-                                                             expectedSize: Int(chunk.uncompressedSize))
-                guard data.count == Int(chunk.uncompressedSize) else { throw SteamError.checksumMismatch }
-                try write(data, to: path, offset: chunk.offset)
-                relay.recordSuccess(bytes: encrypted.count)
-                return
-            } catch is CancellationError {
-                throw CancellationError()
-            } catch {
-                if Task.isCancelled { throw CancellationError() }
-                if relay.recordFailure() { SteamLog.event("[irelay] off after repeated failures: \(error.localizedDescription)") }
-            }
-        }
         if let peer, peer.serves(plan.depotID) {
             do {
                 try await fetchChunkFromPeer(chunk, plan: plan, peer: peer, path: path)

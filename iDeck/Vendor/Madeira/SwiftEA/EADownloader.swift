@@ -62,7 +62,7 @@ final class EARangeClient: @unchecked Sendable {
         config.urlCache = nil
         config.timeoutIntervalForRequest = 60
         config.timeoutIntervalForResource = 24 * 3600
-        config.httpMaximumConnectionsPerHost = 16
+        config.httpMaximumConnectionsPerHost = DownloadSpeed.eaConnections
         config.httpAdditionalHeaders = ["User-Agent": EAAPI.userAgent]
         http = URLSession(configuration: config)
     }
@@ -452,7 +452,7 @@ final class EAJournal {
 final class EADownloader: @unchecked Sendable {
     private let client = EARangeClient()
     /// Files fetched at once. Each is one range request, streamed.
-    private let parallel = 6
+    private let parallel = DownloadSpeed.eaFiles
 
     func archive(_ url: URL) async throws -> EABuildArchive { try await client.archive(url) }
 
@@ -712,7 +712,7 @@ final class EADownloader: @unchecked Sendable {
     // was limited to a single connection's speed for files of several GB.
     static let segmentedThreshold: Int64 = 16 << 20
     static let segmentBytes: Int64 = 4 << 20
-    static let segmentsAtOnce = DownloadSpeed.steamChunks
+    static let segmentsAtOnce = DownloadSpeed.eaSegments
 
     /// One large file: its compressed bytes in `segmentBytes` ranges, `segmentsAtOnce`
     /// at a time, written in place into a side file, then inflated from disk with the
@@ -722,7 +722,14 @@ final class EADownloader: @unchecked Sendable {
         let folder = destination.deletingLastPathComponent()
         let compressed = folder.appendingPathComponent("." + destination.lastPathComponent + ".madeira-gz")
         let temporary = folder.appendingPathComponent("." + destination.lastPathComponent + ".madeira-part")
-        defer { try? FileManager.default.removeItem(at: compressed) }
+        // iDeck: the ranges already written into the side file, so a paused download
+        // of a large file continues instead of starting the file again. Both files
+        // are removed when the file is finished or its data does not check out.
+        let marks = folder.appendingPathComponent("." + destination.lastPathComponent + ".madeira-seg")
+        func discardPartial() {
+            try? FileManager.default.removeItem(at: compressed)
+            try? FileManager.default.removeItem(at: marks)
+        }
 
         // The local header's own length (its name and extra field can differ from the
         // central directory's), so the data starts where it really does.
@@ -734,20 +741,43 @@ final class EADownloader: @unchecked Sendable {
         let total = entry.compressedSize
         guard dataStart + total <= archive.fileSize else { throw EADownloadError.file("data bounds") }
 
-        try? FileManager.default.removeItem(at: compressed)
-        guard FileManager.default.createFile(atPath: compressed.path, contents: nil) else { throw EADownloadError.file("create") }
+        let ranges = stride(from: Int64(0), to: total, by: Int(segmentBytes)).map { $0..<min($0 + segmentBytes, total) }
+        // "<compressed size> <segment size> <crc32>" then one finished range index per line.
+        let signature = "\(total) \(segmentBytes) \(entry.crc32)"
+        var finished = Set<Int>()
+        let existingSize = (try? FileManager.default.attributesOfItem(atPath: compressed.path)[.size] as? NSNumber)?.int64Value
+        if existingSize == total, let text = try? String(contentsOf: marks, encoding: .utf8) {
+            let lines = text.split(separator: "\n").map(String.init)
+            if lines.first == signature {
+                finished = Set(lines.dropFirst().compactMap { Int($0) }.filter { ranges.indices.contains($0) })
+            }
+        }
+        if finished.isEmpty {
+            discardPartial()
+            guard FileManager.default.createFile(atPath: compressed.path, contents: nil) else { throw EADownloadError.file("create") }
+            try (signature + "\n").write(to: marks, atomically: true, encoding: .utf8)
+        } else {
+            EALog.event("[ea-download] resuming name=\(destination.lastPathComponent) ranges=\(finished.count)/\(ranges.count)")
+        }
         let output = try FileHandle(forWritingTo: compressed)
-        try output.truncate(atOffset: UInt64(total))
+        if existingSize != total || finished.isEmpty { try output.truncate(atOffset: UInt64(total)) }
+        let marker = try FileHandle(forWritingTo: marks)
+        try marker.seekToEnd()
         let writeLock = NSLock()
         final class Added: @unchecked Sendable { var bytes: UInt64 = 0 }
         let added = Added()
+        // Ranges kept from before the pause count as downloaded.
+        let keptBytes = finished.reduce(UInt64(0)) { $0 + UInt64(ranges[$1].count) }
+        added.bytes = keptBytes
+        meter.add(keptBytes)
+        let pending = ranges.indices.filter { !finished.contains($0) }
         do {
-            let ranges = stride(from: Int64(0), to: total, by: Int(segmentBytes)).map { $0..<min($0 + segmentBytes, total) }
             try await withThrowingTaskGroup(of: Void.self) { group in
                 var next = 0
                 func add() {
-                    guard next < ranges.count else { return }
-                    let range = ranges[next]; next += 1
+                    guard next < pending.count else { return }
+                    let index = pending[next]; next += 1
+                    let range = ranges[index]
                     group.addTask {
                         var attempt = 0
                         while true {
@@ -759,6 +789,7 @@ final class EADownloader: @unchecked Sendable {
                                 try writeLock.withLock {
                                     try output.seek(toOffset: UInt64(range.lowerBound))
                                     try autoreleasepool { try output.write(contentsOf: data) }
+                                    try marker.write(contentsOf: Data("\(index)\n".utf8))
                                 }
                                 writeLock.withLock { added.bytes += UInt64(data.count) }
                                 meter.add(UInt64(data.count))
@@ -777,9 +808,12 @@ final class EADownloader: @unchecked Sendable {
                 while try await group.next() != nil { add() }
             }
             try output.close()
+            try? marker.close()
         } catch {
             try? output.close()
+            try? marker.close()
             // A failed file takes back what it counted, as the streamed path does.
+            // Its side file and finished ranges stay for the next attempt.
             meter.remove(writeLock.withLock { added.bytes })
             throw error
         }
@@ -816,10 +850,12 @@ final class EADownloader: @unchecked Sendable {
         }
         guard inflatedOK else {
             try? FileManager.default.removeItem(at: temporary)
+            discardPartial()
             throw EADownloadError.file("checksum " + destination.lastPathComponent)
         }
         try? FileManager.default.removeItem(at: destination)
         try FileManager.default.moveItem(at: temporary, to: destination)
+        discardPartial()
         return UInt64(total)
     }
 

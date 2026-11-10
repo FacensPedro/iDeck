@@ -12,7 +12,6 @@
 - **Game controls:** Game controller and touch-input support.
 - **Runtime setup:** Wine prefixes, Madeira Dock, Wine Mono, Wine Gecko and Visual C++ dependency preparation.
 - **JIT:** Integration with StikDebug for devices and configurations that support it.
-- **iRelay:** Companion-device transfer integration, including local game installation workflows.
 - **Diagnostics:** Wine logs, runtime status and troubleshooting information.
 
 Feature availability depends on the build configuration, installed runtime components and device compatibility.

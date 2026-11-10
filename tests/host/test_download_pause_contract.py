@@ -5,7 +5,6 @@ from support import ROOT, repo_text
 STEAM = repo_text("iDeck/SteamManager.swift")
 GOG = repo_text("iDeck/GOGLibrary.swift")
 EPIC = repo_text("iDeck/EpicLibrary.swift")
-RELAY = repo_text("iDeck/IRelayDeviceService.swift")
 VIEW = repo_text("iDeck/MainView.swift")
 TRANSLATIONS = repo_text("iDeck/Localization.swift")
 
@@ -29,41 +28,17 @@ class DownloadPauseContractTests(unittest.TestCase):
         self.assertIn("func cancelInstallAndWait(appID: UInt32) async", STEAM)
         self.assertIn("await previous?.value", STEAM)
         self.assertIn("await cleanup?.value", STEAM)
-        self.assertIn("await steam.cancelInstallAndWait(appID: id)", RELAY)
-        self.assertIn("await gog.cancelDownloadAndWait(game)", RELAY)
-        self.assertIn("await EpicLibrary.shared.cancelAndWait(app)", RELAY)
         self.assertIn("func cancelDownloadAndWait(_ game: GOGGame) async", GOG)
         self.assertIn("func cancelAndWait(_ app: String) async", EPIC)
 
-    def test_pc_status_poll_recovers_temporary_network_errors(self):
-        downloader = repo_text("iDeck/SwiftSteam/Content/DepotDownloader.swift")
-        self.assertIn("var reconnectDeadline: Date?", downloader)
-        self.assertIn("addingTimeInterval(65)", downloader)
-        self.assertIn("[irelay] status recovered", downloader)
-        self.assertIn("[irelay] poll unavailable", downloader)
-        self.assertIn("await pc.cancelProcess(job)", downloader)
-
-    def test_http_receiver_uses_bounded_one_megabyte_slabs(self):
-        self.assertIn("maximumLength: 1 << 20", RELAY)
-        self.assertIn("if take == buffer.count { buffer = Data() }", RELAY)
-        self.assertIn('case ("PUT", "/write"):', RELAY)
-        self.assertIn('SHA-1 mismatch', RELAY)
-
-    def test_device_service_exposes_store_agnostic_transfer_controls(self):
-        self.assertIn('case ("POST", "/downloads/control"):', RELAY)
-        self.assertIn('"protocol": 4', RELAY)
-        self.assertNotIn('"WindowsDownloads/Launchers/"', RELAY)
-        for store in ('"steam"', '"gog"', '"epic"'):
-            self.assertIn(f'case {store}:', RELAY)
-        for action in ("pause", "resume", "stop"):
-            self.assertIn(f'"{action}"', RELAY)
-
     def test_interface_distinguishes_pause_stop_and_resume(self):
         self.assertIn('tr("Pause download")', VIEW)
-        self.assertIn("steamLibrary.resumeInstall(appID: game.appID)", VIEW)
-        self.assertIn("gogLibrary.resumeDownload(game)", VIEW)
-        self.assertIn("epicLibrary.pause(game.appName)", VIEW)
-        self.assertIn("epicLibrary.cancel(game.appName)", VIEW)
+        # The controls are on each game's page, not under its library card.
+        self.assertIn("steamLibrary.pauseInstall(appID: game.appID)", VIEW)
+        self.assertIn("gog.resumeDownload(game)", VIEW)
+        self.assertIn("epic.pause(appName)", VIEW)
+        self.assertIn("epic.cancel(appName)", VIEW)
+        self.assertNotIn("cardActionLabel(", VIEW)
         self.assertIn('"Download paused": ["pt": "Download pausado"', TRANSLATIONS)
 
 

@@ -308,6 +308,8 @@ final class GOGLibraryModel: ObservableObject {
     @Published private(set) var downloadProgress: [Int: Double] = [:]
     @Published private(set) var downloadErrors: [Int: String] = [:]
     @Published private(set) var downloadETASeconds: [Int: Int] = [:]
+    /// Bytes downloaded and to download for each game being installed (the details page).
+    @Published private(set) var downloadedBytes: [Int: (done: UInt64, total: UInt64)] = [:]
     private var transferRateSamples: [Int: (at: Date, bytes: UInt64, rate: Double)] = [:]
 
     private func updateDownloadETA(gameID: Int, done: UInt64, total: UInt64) {
@@ -331,6 +333,7 @@ final class GOGLibraryModel: ObservableObject {
     }
 
     private func resetDownloadETA(gameID: Int) {
+        downloadedBytes.removeValue(forKey: gameID)
         transferRateSamples.removeValue(forKey: gameID)
         downloadETASeconds.removeValue(forKey: gameID)
     }
@@ -405,6 +408,7 @@ final class GOGLibraryModel: ObservableObject {
                     let done = counter.add(bytes)
                     Task { @MainActor in
                         self.downloadProgress[game.id] = min(Double(done) / Double(total), 1)
+                        self.downloadedBytes[game.id] = (UInt64(max(done, 0)), UInt64(total))
                         self.updateDownloadETA(gameID: game.id, done: UInt64(max(done, 0)), total: UInt64(total))
                         BackgroundDownloads.gog.progress(done: UInt64(done), total: UInt64(total))
                     }

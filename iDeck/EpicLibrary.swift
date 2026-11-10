@@ -201,7 +201,7 @@ struct EpicInstalledGame: Codable, Sendable {
             .write(to: Self.cacheURL, options: .atomic)
     }
 
-    /// Reads the install records again (games added from outside, by iRelay say).
+    /// Reads the install records again (games added from outside).
     func reloadInstalled() { loadInstalled() }
 
     private func loadInstalled() {
@@ -209,12 +209,6 @@ struct EpicInstalledGame: Codable, Sendable {
               let records = try? JSONDecoder().decode([String: EpicInstalledGame].self, from: data) else { return }
         // A record whose program is gone (the folder was deleted in Files) is dropped.
         installed = records.filter { FileManager.default.fileExists(atPath: Self.drive.appendingPathComponent($0.value.programPath).path) }
-    }
-
-    /// A game iRelay copied from the PC's Epic Games Launcher, files already in place.
-    func registerTransferred(_ game: EpicInstalledGame) {
-        installed[game.appName] = game
-        writeInstalled()
     }
 
     private func writeInstalled() {
@@ -449,11 +443,7 @@ struct EpicInstalledGame: Codable, Sendable {
             }) else { throw EpicAPIError.invalid("unknown-game") }
             let asset = EpicAsset(appName: game.appName, labelName: "Live", buildVersion: game.buildVersion,
                                   catalogItemId: game.catalogItemID, namespace: game.namespace)
-            var location = try await api.manifestLocation(asset)
-            // iRelay benchmarks the official CDN hosts over HTTPS on the PC.
-            // When unplugged, keep the provider's original routing order.
-            location.manifestURLs = await IRelayClient.rankedCDNURLs(store: "epic", urls: location.manifestURLs)
-            location.baseURLs = await IRelayClient.rankedCDNURLs(store: "epic", urls: location.baseURLs)
+            let location = try await api.manifestLocation(asset)
             downloader.window = DownloadSpeed.epicWindow
             let data = try await api.manifest(location)
             let manifest = try await Task.detached(priority: .userInitiated) { try EpicManifest.parse(data, secrets: location.secrets) }.value
