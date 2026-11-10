@@ -254,6 +254,14 @@ extern "C" int32_t ideck_runtime_launch(const char *executable_path,
         unsetenv("MADEIRA_STEAM_APPID");
         unsetenv("MADEIRA_STEAM_APPPATH");
         unsetenv("MADEIRA_WORKDIR");
+        // Not a Steam game (Epic, GOG, EA, a .exe): publish no Steam identity
+        // (scripts/apply_madeira_steam_identity.py), instead of Madeira's fixed
+        // Dock identity, SteamAppId 356400.
+        if (![request[@"isSteam"] boolValue] && steamID == nil) {
+            if (setenv("MADEIRA_NO_STEAM_IDENTITY", "1", 1)) return errno;
+        } else {
+            unsetenv("MADEIRA_NO_STEAM_IDENTITY");
+        }
         if (steamID != nil) {
             if (![steamID isKindOfClass:[NSNumber class]] ||
                 ![steamFolder isKindOfClass:[NSString class]]) return ideck_invalid_launch("invalid Steam app identity types");
@@ -303,7 +311,7 @@ extern "C" int32_t ideck_runtime_launch(const char *executable_path,
         }
         int32_t prepared = ideck_runtime_prepare(wine_prefix);
         if (prepared != 0) return prepared;
-        if (setenv("MADEIRA_ENV_LOCKED", "MADEIRA_EXE,MADEIRA_ARGS,MADEIRA_STEAM_APPID,MADEIRA_STEAM_APPPATH,MADEIRA_WORKDIR", 1))
+        if (setenv("MADEIRA_ENV_LOCKED", "MADEIRA_EXE,MADEIRA_ARGS,MADEIRA_STEAM_APPID,MADEIRA_STEAM_APPPATH,MADEIRA_WORKDIR,MADEIRA_NO_STEAM_IDENTITY", 1))
             return errno;
         // FEX's Windows build derives its user config directory from
         // WINEHOMEDIR (\??\unix\var\...), drops the \??\ and is left with a
@@ -335,7 +343,7 @@ extern "C" bool ideck_runtime_complete_session(void) {
     ideck_wine_session_started = false;
     for (const char *key : {"MADEIRA_EXE", "MADEIRA_ARGS", "MADEIRA_WORKDIR",
                              "MADEIRA_STEAM_APPID", "MADEIRA_STEAM_APPPATH",
-                             "MADEIRA_DOCK_SESSION", "MADEIRA_ENV_LOCKED", "WINESERVERSOCKET",
+                             "MADEIRA_DOCK_SESSION", "MADEIRA_NO_STEAM_IDENTITY", "MADEIRA_ENV_LOCKED", "WINESERVERSOCKET",
                              "MADEIRA_WAIT_CHILDREN"}) unsetenv(key);
     ideck_gamepad_end_session();
     ideck_session_stop();

@@ -277,6 +277,9 @@ python3 "$ROOT/scripts/apply_madeira_relink_cache.py" "$DEST"
 # Wine's Windows files come from the runtime the initial setup downloads.
 python3 "$ROOT/scripts/apply_madeira_runtime_root.py" "$DEST"
 
+# Epic, GOG and .exe programs get no Steam identity (SteamAppId/SteamGameId/SteamAppPath).
+python3 "$ROOT/scripts/apply_madeira_steam_identity.py" "$DEST"
+
 # mscoree remembers that fusion.dll is absent instead of retrying per assembly.
 FUSION_PATCH="$ROOT/patches/madeira-mscoree-fusion-negative-cache.patch"
 if ! git -C "$DEST" apply --reverse --check "$FUSION_PATCH" >/dev/null 2>&1; then
