@@ -705,7 +705,17 @@ jobs:
             echo "::add-mask::$MSC_PKG_REPO"
             DL="$RUNNER_TEMP/msc-download"
             mkdir -p "$DL"
-            GH_TOKEN="$MSC_PKG_TOKEN" gh release download --repo "$MSC_PKG_REPO" --pattern '*.pkg' --dir "$DL"
+            if ! GH_TOKEN="$MSC_PKG_TOKEN" gh release download --repo "$MSC_PKG_REPO" --pattern '*.pkg' --dir "$DL" 2>"$DL.err"; then
+              cat "$DL.err" >&2
+              if grep -qE "HTTP 401|Bad credentials" "$DL.err"; then
+                echo "::error::IDECK_MSC_PKG_TOKEN was rejected (HTTP 401: invalid, expired or revoked). Create a new token with read access to the .pkg repository's contents and update the IDECK_MSC_PKG_TOKEN secret."
+              elif grep -qE "HTTP 404|Not Found" "$DL.err"; then
+                echo "::error::The .pkg repository or its latest release was not found with IDECK_MSC_PKG_TOKEN. Check the repository name and that the token can read it."
+              else
+                echo "::error::Downloading the Metal Shader Converter .pkg failed."
+              fi
+              exit 2
+            fi
             FOUND=("$DL"/*.pkg)
             [[ ${#FOUND[@]} -eq 1 && -s "${FOUND[0]}" ]] || { echo "::error::Expected exactly one .pkg in the latest release."; exit 2; }
             mv "${FOUND[0]}" "$PKG"
