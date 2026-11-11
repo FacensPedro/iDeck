@@ -5,3 +5,6 @@
 
 ### Windows runtime
 - A game that stops on an illegal instruction (0xC000001D) raised by the Windows runtime's own code is no longer reported as needing AVX/AVX2 translation, and AVX is not turned on for it. The message now says the runtime stopped on an internal error.
+
+### Release
+- Updated the application version to 1.7.1 (build 53).
