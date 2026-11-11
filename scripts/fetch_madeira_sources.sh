@@ -40,6 +40,11 @@ if ! git -C "$DEST" apply --reverse --check "$FAULT_DIAGNOSTICS_PATCH" >/dev/nul
   git -C "$DEST" apply "$FAULT_DIAGNOSTICS_PATCH"
 fi
 
+DXIL_PATCH="$ROOT/patches/madeira-dxil-concurrent-cache.patch"
+if ! git -C "$DEST" apply --reverse --check "$DXIL_PATCH" >/dev/null 2>&1; then
+  git -C "$DEST" apply "$DXIL_PATCH"
+fi
+
 WINE_PERF_PATCH="$ROOT/patches/madeira-wine-idle-logging.patch"
 if ! git -C "$DEST" apply --reverse --check "$WINE_PERF_PATCH" >/dev/null 2>&1; then
   git -C "$DEST" apply --check "$WINE_PERF_PATCH"
