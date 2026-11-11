@@ -251,20 +251,6 @@ jobs:
           python3 -m unittest discover -s tests/host -p 'test_madeira_payload_staging.py' -v
 
 
-      - name: Test native regional Steam depot selection
-        run: |
-          xcrun clang -std=c11 -D_DARWIN_C_SOURCE -O2 -Wall -Wextra -Werror \
-            tests/host/SteamDepotRegionPolicyTests.c iDeck/SteamDepotRegionPolicy.c \
-            -o /tmp/ideck-steam-region-tests
-          /tmp/ideck-steam-region-tests
-
-      - name: Test native Steam disk writer
-        run: |
-          xcrun clang -std=c11 -D_DARWIN_C_SOURCE -O2 -Wall -Wextra -Werror \
-            tests/host/SteamDiskIOTests.c iDeck/SteamDiskIO.c iDeck/PipelineCounters.c \
-            -o /tmp/ideck-steam-disk-tests
-          /tmp/ideck-steam-disk-tests
-
       - name: Test native dispatch WoW64, D3D11 kit cache and D3D12 license gates
         run: python3 -m unittest discover -s tests/host -p 'test_actions_native_dispatch_matrix.py' -v
 
@@ -638,6 +624,13 @@ jobs:
         if: ${{ env.IDECK_NATIVE_BUILD == '1' && steps.madeira_kit.outputs.available != 'true' }}
         run: bash scripts/fetch_madeira_sources.sh
 
+      # Keys for the slow stages below, from the sources each one really compiles:
+      # a patch to the iOS bridge no longer rebuilds the i386 farm or the libraries.
+      - name: Fingerprint native build inputs
+        id: native_fp
+        if: ${{ env.IDECK_NATIVE_BUILD == '1' && steps.madeira_kit.outputs.available != 'true' }}
+        run: bash scripts/native_cache_fingerprints.sh vendor/Madeira | tee -a "$GITHUB_OUTPUT"
+
       - name: Restore precompiled ARM64EC and iOS LLVM toolchains
         id: native_toolchains
         if: ${{ env.IDECK_NATIVE_BUILD == '1' && steps.madeira_kit.outputs.available != 'true' }}
@@ -659,7 +652,7 @@ jobs:
             vendor/Madeira/toolchains/ffmpeg-ios
             vendor/Madeira/research/freetype
             vendor/Madeira/build/freetype-ios/build
-          key: madeira-deps-v2-xcode27-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/prepare_madeira_dependencies.sh', 'scripts/fetch_madeira_sources.sh') }}
+          key: madeira-deps-v3-xcode27-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/prepare_madeira_dependencies.sh') }}-${{ steps.native_fp.outputs.deps }}
 
       - name: Prepare ARM64EC and iOS LLVM toolchains
         if: ${{ env.IDECK_NATIVE_BUILD == '1' && steps.madeira_kit.outputs.available != 'true' }}
@@ -684,7 +677,7 @@ jobs:
         uses: actions/cache/restore@v5
         with:
           path: build/gl-runtime-cache
-          key: madeira-gl-vulkan-v1-xcode27-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/build_madeira_gl_vulkan.sh', 'scripts/fetch_madeira_sources.sh') }}
+          key: madeira-gl-vulkan-v2-xcode27-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/build_madeira_gl_vulkan.sh') }}-${{ steps.native_fp.outputs.gl }}
 
       # Swift package checkouts and the Clang/Swift module cache: rebuilt from
       # scratch on every run otherwise.
@@ -704,7 +697,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: build/i386-farm-cache
-          key: madeira-i386-farm-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/fetch_madeira_sources.sh', 'patches/**') }}
+          key: madeira-i386-farm-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/prepare_madeira_toolchains.sh', 'scripts/build_madeira_components.sh') }}-${{ steps.native_fp.outputs.i386 }}
 
       - name: Download owner-supplied Apple Metal Shader Converter package
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.use_msc_pkg }}

@@ -16,6 +16,7 @@ names the tag and files for the publishing step.  Run after the bundle verifiers
 and the profile stamp, before packaging.
 """
 import argparse
+import concurrent.futures
 import hashlib
 import io
 import json
@@ -151,7 +152,7 @@ def main() -> int:
             removed += 1
     print(f"Test programs left out of the runtime: {removed}")
 
-    built = []
+    jobs = []
     for ident, title, folders in PACKAGES:
         present = [f for f in folders if (app / f).is_dir()]
         if not present:
@@ -160,8 +161,17 @@ def main() -> int:
         if wrong:
             print(f"ERROR: {ident} holds images of another architecture: " + ", ".join(wrong[:20]), file=sys.stderr)
             return 2
-        staging = out / f"{ident}.tar.xz"
-        count = archive(app, present, staging, ident)
+        jobs.append((ident, title, present, out / f"{ident}.tar.xz"))
+
+    # xz is single-threaded and the archives are independent: one process each, so
+    # the x86 farm compresses while the x64 one does. The bytes are the same as
+    # compressing them one after the other.
+    with concurrent.futures.ProcessPoolExecutor(max_workers=len(jobs) or 1) as pool:
+        counts = list(pool.map(archive, [app] * len(jobs), [j[2] for j in jobs],
+                               [j[3] for j in jobs], [j[0] for j in jobs]))
+
+    built = []
+    for (ident, title, present, staging), count in zip(jobs, counts):
         digest = sha256(staging)
         name = f"{ident}-{digest[:16]}.tar.xz"
         staging.rename(out / name)

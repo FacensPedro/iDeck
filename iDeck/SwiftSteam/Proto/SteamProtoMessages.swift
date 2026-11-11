@@ -788,42 +788,6 @@ struct CMsgClientGetDepotDecryptionKeyResponse {
     }
 }
 
-// MARK: - Service Method Wrapper
-
-/// Wraps a service method call for sending via EMsg.serviceMethodCallFromClient
-struct CMsgClientServiceMethod {
-    var methodName: String = ""
-    var serializedMethod: Data = Data()
-    var isNotification: Bool = false
-
-    func serialize() -> Data {
-        var encoder = ProtobufEncoder()
-        encoder.writeString(fieldNumber: 1, value: methodName)
-        encoder.writeBytes(fieldNumber: 2, value: serializedMethod)
-        encoder.writeBool(fieldNumber: 3, value: isNotification)
-        return encoder.data
-    }
-}
-
-struct CMsgClientServiceMethodResponse {
-    var methodName: String = ""
-    var serializedMethodResponse: Data = Data()
-
-    static func deserialize(from data: Data) throws -> Self {
-        var decoder = ProtobufDecoder(data)
-        var msg = Self()
-
-        while let tag = try decoder.readTag() {
-            switch tag.fieldNumber {
-            case 1: msg.methodName = try decoder.readString()
-            case 2: msg.serializedMethodResponse = try decoder.readBytes()
-            default: try decoder.skip(wireType: tag.wireType)
-            }
-        }
-        return msg
-    }
-}
-
 // MARK: - Multi Message (for bundled responses)
 
 struct CMsgMulti {

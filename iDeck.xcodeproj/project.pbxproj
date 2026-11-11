@@ -14,8 +14,6 @@
 		F5A000000000000000000007 /* iDeckJITHelper.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = iDeckJITHelper.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		F5A000000000000000000008 /* StikJIT.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; path = Frameworks/StikJIT.xcframework; sourceTree = SOURCE_ROOT; };
 
-		E10000000000000000000010 /* SteamDepotRegionPolicy.c in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000010 /* SteamDepotRegionPolicy.c */; };
-		E10000000000000000000012 /* SteamDiskIO.c in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000012 /* SteamDiskIO.c */; };
 		F7A000000000000000000001 /* ZipNative.c in Sources */ = {isa = PBXBuildFile; fileRef = F8A000000000000000000001 /* ZipNative.c */; };
 		F7C000000000000000000006 /* GraphicsAPIScan.c in Sources */ = {isa = PBXBuildFile; fileRef = F8C00000000000000000000C /* GraphicsAPIScan.c */; };
 		F7C000000000000000000005 /* BenchmarkBridge.mm in Sources */ = {isa = PBXBuildFile; fileRef = F8C00000000000000000000A /* BenchmarkBridge.mm */; };
@@ -304,10 +302,6 @@
 		BEEF20261107000000000002 /* NativeSymbol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeSymbol.swift; sourceTree = "<group>"; };
 		BEEF20261106000000000102 /* WineMono.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WineMono.swift; sourceTree = "<group>"; };
 		A20000000000000000000005 /* SteamInstall.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamInstall.swift; sourceTree = "<group>"; };
-		E20000000000000000000010 /* SteamDepotRegionPolicy.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = SteamDepotRegionPolicy.c; sourceTree = "<group>"; };
-		E20000000000000000000011 /* SteamDepotRegionPolicy.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SteamDepotRegionPolicy.h; sourceTree = "<group>"; };
-		E20000000000000000000012 /* SteamDiskIO.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = SteamDiskIO.c; sourceTree = "<group>"; };
-		E20000000000000000000013 /* SteamDiskIO.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SteamDiskIO.h; sourceTree = "<group>"; };
 		F8A000000000000000000001 /* ZipNative.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = ZipNative.c; sourceTree = "<group>"; };
 		F8B000000000000000000001 /* ZipNative.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ZipNative.h; sourceTree = "<group>"; };
 		F8C00000000000000000000C /* GraphicsAPIScan.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = GraphicsAPIScan.c; sourceTree = "<group>"; };
@@ -474,8 +468,6 @@
 				AC100000000000000000016 /* qtmd.c in Sources */,
 				AC100000000000000000017 /* crc32.c in Sources */,
 				A10000000000000000000005 /* SteamInstall.swift in Sources */,
-				E10000000000000000000010 /* SteamDepotRegionPolicy.c in Sources */,
-				E10000000000000000000012 /* SteamDiskIO.c in Sources */,
 				F7A000000000000000000001 /* ZipNative.c in Sources */,
 				F7C000000000000000000006 /* GraphicsAPIScan.c in Sources */,
 				F7C000000000000000000005 /* BenchmarkBridge.mm in Sources */,
@@ -643,14 +635,10 @@
 				AC200000000000000000016 /* qtmd.c */,
 				AC200000000000000000017 /* crc32.c */,
 				A20000000000000000000005 /* SteamInstall.swift */,
-				E20000000000000000000010 /* SteamDepotRegionPolicy.c */,
-				E20000000000000000000011 /* SteamDepotRegionPolicy.h */,
-				E20000000000000000000012 /* SteamDiskIO.c */,
 				E20000000000000000000014 /* SteamNativeCore.c */,
 				E20000000000000000000015 /* SteamNativeCore.h */,
 				F40000000000000000000007 /* WineLogTriage.c */,
 				F40000000000000000000008 /* WineLogTriage.h */,
-				E20000000000000000000013 /* SteamDiskIO.h */,
 				F8A000000000000000000001 /* ZipNative.c */,
 				F8B000000000000000000001 /* ZipNative.h */,
 				F8C00000000000000000000C /* GraphicsAPIScan.c */,
