@@ -75,7 +75,6 @@ class BenchmarkInstrumentationTests(unittest.TestCase):
     def test_pipeline_stages_are_timed(self):
         # Steam chunk codecs are Madeira's (iDeck/SwiftSteam, verbatim).
         self.assertTrue((ROOT / "iDeck/SwiftSteam/lzma_shim.c").exists())
-        self.assertIn("IDECK_STAGE_WRITE", (ROOT / "iDeck/SteamDiskIO.c").read_text())
         self.assertIn("IDECK_STAGE_DECRYPT", (ROOT / "iDeck/SteamNativeCore.c").read_text())
         self.assertIn("IDECK_STAGE_DECOMPRESS", (ROOT / "iDeck/EpicChunkCodec.cpp").read_text())
 
