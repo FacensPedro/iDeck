@@ -85,6 +85,21 @@ enum GOGSetup {
         return ["msvc2015", "msvc2017", "msvc2019", "msvc2022"].contains { lower.hasPrefix($0) }
     }
 
+    /// Visual C++ 2005 to 2013: iDeck extracts these runtimes from Microsoft's
+    /// redistributables itself (VisualCRuntimeLegacy) and links them into the prefix.
+    /// GOG's copies are installers that drive Windows Installer, which stops in this
+    /// runtime before it installs anything, so running them only delays the game.
+    static func visualCppLegacy(_ id: String) -> Bool {
+        let lower = id.lowercased()
+        return ["msvc2005", "msvc2008", "msvc2010", "msvc2012", "msvc2013"].contains { lower.hasPrefix($0) }
+    }
+
+    /// A redistributable iDeck provides itself: its installer is never run.
+    static func providedByiDeck(_ id: String) -> Bool {
+        id.caseInsensitiveCompare(directX) == .orderedSame || visualCpp2015Plus(id) || visualCppLegacy(id)
+            || dotNetFramework.contains { $0.caseInsensitiveCompare(id) == .orderedSame }
+    }
+
     struct Plan: Equatable {
         /// Downloaded into the game's folder (their files, installer or not).
         var download: [GOGDependency] = []
@@ -107,6 +122,8 @@ enum GOGSetup {
                 plan.notes.append(GOGSetupNote(id: d.id, name: d.name, note: "Not needed: iDeck has its own DirectX"))
             } else if visualCpp2015Plus(d.id) {
                 plan.notes.append(GOGSetupNote(id: d.id, name: d.name, note: "Not needed: iDeck installs Visual C++ 2015-2022 on demand"))
+            } else if visualCppLegacy(d.id) {
+                plan.notes.append(GOGSetupNote(id: d.id, name: d.name, note: "Not needed: iDeck installs Visual C++ 2005-2013 on demand"))
             } else if dotNetFramework.contains(d.id) {
                 plan.notes.append(GOGSetupNote(id: d.id, name: d.name, note: "Not needed: iDeck installs .NET support (Wine Mono) on demand"))
             } else if d.executable.isEmpty {
@@ -171,7 +188,10 @@ enum GOGSetup {
         func text(_ s: String) -> String {
             s.replacingOccurrences(of: "\r", with: " ").replacingOccurrences(of: "\n", with: " ").replacingOccurrences(of: "%", with: "%%")
         }
-        let pending = programs.filter { state($0.id, drive: drive) == .pending && !$0.executable.contains("\"") }
+        // A game installed before iDeck provided a runtime itself may still list its installer.
+        let pending = programs.filter {
+            state($0.id, drive: drive) == .pending && !$0.executable.contains("\"") && !providedByiDeck($0.id)
+        }
         guard !pending.isEmpty else { return [] }
         var lines = ["if not exist \"\(resultFolder)\" mkdir \"\(resultFolder)\""]
         for (index, program) in pending.enumerated() {

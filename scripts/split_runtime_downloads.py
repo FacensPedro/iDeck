@@ -31,6 +31,59 @@ PACKAGES = (
     ("wine-x86", "x86 (WoW64) environment", ("i386-windows",)),
 )
 DROPPED = ("wine-mono", "vcruntime-bundle", "x86_64-vcruntime")
+# Madeira's own bring-up and test programs. Every farm file is linked into each
+# prefix's system32, and no game, installer or iDeck code starts these.
+TEST_PROGRAMS = (
+    "arm64ec-windows/calltest-x64.exe", "arm64ec-windows/child-test-x64.exe",
+    "arm64ec-windows/clocktest-x64.exe", "arm64ec-windows/cube-x64.exe",
+    "arm64ec-windows/d3d12-cube-x64.exe", "arm64ec-windows/d3d12-m2-x64.exe",
+    "arm64ec-windows/d3d12-vfetch-x64.exe", "arm64ec-windows/dxchkmsaa-x64.exe",
+    "arm64ec-windows/fib-x64.exe", "arm64ec-windows/fib2-x64.exe", "arm64ec-windows/fib3-x64.exe",
+    "arm64ec-windows/fileio-x64.exe", "arm64ec-windows/fpconf-x64.exe",
+    "arm64ec-windows/heap-x64.exe", "arm64ec-windows/hello-x64.exe",
+    "arm64ec-windows/proc-test-x64.exe",
+    "aarch64-windows/child-test.exe", "aarch64-windows/cube.exe", "aarch64-windows/proc-test.exe",
+    "aarch64-windows/texquad.exe", "aarch64-windows/triangle.exe", "aarch64-windows/winhttp-test.exe",
+)
+
+
+# The Windows machine each farm holds. arm64ec-windows is ARM64EC, which a PE header
+# declares as x64 (0x8664); a DLL of another architecture in a farm fails to load
+# with STATUS_INVALID_IMAGE_FORMAT at the first program that imports it.
+MACHINES = {
+    "aarch64-windows": (0xAA64,),
+    "arm64ec-windows": (0x8664, 0xA641),
+    "i386-windows": (0x014C,),
+    "vulkan": (0x8664, 0xA641),
+    "compat": (0x8664,),
+}
+
+
+def pe_machine(path: Path):
+    """The COFF machine of a PE image, or None for any other file."""
+    with path.open("rb") as handle:
+        head = handle.read(0x40)
+        if len(head) < 0x40 or head[:2] != b"MZ":
+            return None
+        handle.seek(int.from_bytes(head[0x3C:0x40], "little"))
+        signature = handle.read(6)
+    if len(signature) < 6 or signature[:4] != b"PE\0\0":
+        return None
+    return int.from_bytes(signature[4:6], "little")
+
+
+def wrong_architecture(app: Path, folders) -> list:
+    wrong = []
+    for folder in folders:
+        allowed = MACHINES.get(folder)
+        if not allowed:
+            continue
+        for path in sorted((app / folder).rglob("*")):
+            if path.is_file():
+                machine = pe_machine(path)
+                if machine is not None and machine not in allowed:
+                    wrong.append(f"{path.relative_to(app)} (machine 0x{machine:04x})")
+    return wrong
 
 
 def sha256(path: Path) -> str:
@@ -90,11 +143,23 @@ def main() -> int:
         shutil.rmtree(out)
     out.mkdir(parents=True)
 
+    removed = 0
+    for name in TEST_PROGRAMS:
+        program = app / name
+        if program.is_file():
+            program.unlink()
+            removed += 1
+    print(f"Test programs left out of the runtime: {removed}")
+
     built = []
     for ident, title, folders in PACKAGES:
         present = [f for f in folders if (app / f).is_dir()]
         if not present:
             continue
+        wrong = wrong_architecture(app, present)
+        if wrong:
+            print(f"ERROR: {ident} holds images of another architecture: " + ", ".join(wrong[:20]), file=sys.stderr)
+            return 2
         staging = out / f"{ident}.tar.xz"
         count = archive(app, present, staging, ident)
         digest = sha256(staging)

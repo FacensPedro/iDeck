@@ -64,6 +64,8 @@ class MadeiraPayloadStagingTests(unittest.TestCase):
             (self.source / "licenses" / name).write_text(name, encoding="utf-8")
         (self.source / "nls").mkdir()
         (self.source / "nls" / "locale.nls").write_bytes(b"nls-data")
+        for table in ("c_850", "c_932", "c_1251", "c_10000"):
+            (self.source / "nls" / f"{table}.nls").write_bytes(b"table")
         (self.source / "prefix-template.tar.gz").write_bytes(
             b"\x1f\x8b" + bytes(64)
         )
