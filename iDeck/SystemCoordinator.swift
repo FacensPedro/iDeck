@@ -1665,12 +1665,21 @@ class SystemCoordinator: ObservableObject {
             }
         }
         let outcome = wineExitResult()
+        let hostTrap = outcome.ntstatus == 0xC000001D
+            && IllegalInstructionOrigin.isHost(logURL: Self.wineLogURL, since: wineLogStartOffset)
         wineLogStartOffset = nil
         let ntstatus = outcome.ntstatus
         var reason = outcome.reason
         // An illegal instruction (0xC000001D) is what a game built for AVX
         // processors hits without AVX translation: it is turned on for that game.
-        if ntstatus == 0xC000001D, let endedGame, AVXAuto.enable(endedGame) {
+        // One raised by the Windows runtime's own code is not the game's: AVX
+        // translation would change nothing, so it stays as the user set it.
+        if hostTrap {
+            reason = "Execution Error: Windows program crashed (NTSTATUS 0xC000001D). "
+                + "The Windows runtime stopped on an internal error while starting this game; "
+                + "AVX/AVX2 translation is unrelated and was left unchanged."
+            SteamLog.event("[avx] 0xC000001D came from the runtime, not from guest code: AVX left unchanged")
+        } else if ntstatus == 0xC000001D, let endedGame, AVXAuto.enable(endedGame) {
             reason += " AVX/AVX2 translation is now on for this game: restart iDeck and start it again."
         }
         SteamLog.event("[wine-exit] \(reason)")

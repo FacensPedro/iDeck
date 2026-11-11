@@ -933,6 +933,35 @@ private class BoxTranslator {
 }
 
 
+/// Where the last unhandled illegal instruction (0xC000001D) of a session was
+/// raised, read from Wine's log. Guest code (the game, x86 or x64) runs at the
+/// Windows addresses the runtime maps from 0x70_0000_0000 up; an address below
+/// that is the runtime's own native code, which AVX translation cannot affect.
+enum IllegalInstructionOrigin {
+    static let guestBase: UInt64 = 0x70_0000_0000
+    private static let marker = "Unhandled exception code c000001d"
+
+    /// The address on the last "Unhandled exception code c000001d ... addr 0x..." line.
+    static func lastAddress(in log: String) -> UInt64? {
+        guard let line = log.components(separatedBy: "\n").last(where: { $0.contains(marker) }),
+              let range = line.range(of: " addr 0x") else { return nil }
+        let digits = line[range.upperBound...].prefix { $0.isHexDigit }
+        return UInt64(digits, radix: 16)
+    }
+
+    static func isHost(address: UInt64) -> Bool { address < guestBase }
+
+    /// True only when the log names an address and it is the runtime's own.
+    static func isHost(logURL: URL?, since offset: Int64?) -> Bool {
+        guard let logURL, let handle = try? FileHandle(forReadingFrom: logURL) else { return false }
+        defer { try? handle.close() }
+        if let offset, offset > 0 { try? handle.seek(toOffset: UInt64(offset)) }
+        guard let data = try? handle.readToEnd(),
+              let address = lastAddress(in: String(decoding: data, as: UTF8.self)) else { return false }
+        return isHost(address: address)
+    }
+}
+
 /// Games that need AVX/AVX2 translation, found when one stops on an illegal
 /// instruction (0xC000001D); kept per game, by its profile ID.
 enum AVXAuto {
