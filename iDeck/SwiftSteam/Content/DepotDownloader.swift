@@ -70,7 +70,7 @@ final class DepotDownloader {
     /// downloader lives for the app run: a token is reused only until Steam's
     /// expiry, and a failed request only briefly, so Try again asks afresh.
     private var cdnAuthTokens: [String: (fragment: String, until: Date)] = [:]
-    private let maxConcurrentChunks = 8
+    private let maxConcurrentChunks = DownloadSpeed.steamChunks
     private let attemptsPerChunk = 5
     private let hostPoolSize = 6
 
@@ -80,7 +80,7 @@ final class DepotDownloader {
         config.requestCachePolicy = .reloadIgnoringLocalCacheData
         config.timeoutIntervalForRequest = 30
         config.timeoutIntervalForResource = 300
-        config.httpMaximumConnectionsPerHost = 8
+        config.httpMaximumConnectionsPerHost = DownloadSpeed.steamChunks
         return URLSession(configuration: config)
     }()
 
@@ -300,7 +300,7 @@ final class DepotDownloader {
             let work = work[index]
             let paths = prepared.paths[index]
             // A PC answers many requests on one connection at once.
-            let maximum = peer?.usable == true ? 16 : maxConcurrentChunks, attempts = attemptsPerChunk
+            let maximum = peer?.usable == true ? max(16, maxConcurrentChunks) : maxConcurrentChunks, attempts = attemptsPerChunk
             try await withThrowingTaskGroup(of: (UInt64, UInt64, Bool).self) { group in
                 var next = 0
                 func enqueue() {

@@ -129,7 +129,7 @@ enum GOGAPI {
     static let session: URLSession = {
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 20
-        config.httpMaximumConnectionsPerHost = 6
+        config.httpMaximumConnectionsPerHost = DownloadSpeed.gogConnections
         return URLSession(configuration: config)
     }()
 

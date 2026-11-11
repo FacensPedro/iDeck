@@ -97,7 +97,7 @@ enum LogIssueScanner {
 
     /// `steamSession` false leaves Steam-only lines out: they belong to an
     /// earlier Steam run, not to the game (GOG, Epic, any .exe) that failed.
-    static func scan(_ text: String, source: LogIssue.Source, steamSession: Bool = true, limit: Int = 300) -> [LogIssue] {
+    static func scan(_ text: String, source: LogIssue.Source, steamSession: Bool = true, limit: Int = 600) -> [LogIssue] {
         var found: [String: LogIssue] = [:]
         var order: [String] = []
         for raw in text.split(whereSeparator: \.isNewline) {
@@ -352,6 +352,33 @@ final class BugReportModel: ObservableObject {
         return "Game: \(game) | Launcher: \(launcher)"
     }
 
+    /// What the problems happened in: build, memory, Memory+, JIT, runtime and storage.
+    static var environmentLines: [String] {
+        func name(_ state: MemoryPlus.State) -> String {
+            switch state {
+            case .granted: return "active"
+            case .missing: return "not granted"
+            case .unknown: return "unknown"
+            }
+        }
+        let runtime = MadeiraBundleIdentity.profile
+        let defaults = UserDefaults.standard
+        let physical = ProcessInfo.processInfo.physicalMemory / 1_048_576
+        let pool = defaults.object(forKey: "wineJITPoolMiB") as? Int ?? 560
+        let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
+        let free = (try? documents?.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey]))?
+            .volumeAvailableCapacityForImportantUsage
+        return [
+            "Build: commit \(runtime["sourceCommit"] as? String ?? "unknown"), graphics \(MadeiraBundleIdentity.graphicsProfile)",
+            "Memory: \(physical) MB physical, \(ResourceGovernor.availableMiB()) MB still allowed by iOS",
+            "Memory+: increased limit \(name(MemoryPlus.increasedLimit)), extended addressing \(name(MemoryPlus.extendedAddressing))",
+            "JIT: method \(defaults.string(forKey: SystemCoordinator.jitMethodKey) ?? "stikdebug"), pool \(pool) MB",
+            "Windows runtime: x64 \(MadeiraRuntime.installed("wine-x64") ? "installed" : "missing"), x86 \(MadeiraRuntime.installed("wine-x86") ? "installed" : "missing")",
+            "Device language: \(Locale.preferredLanguages.first ?? "unknown")"
+                + (free.map { ", storage free: \($0 / 1_073_741_824) GB" } ?? ""),
+        ]
+    }
+
     /// A paste-ready report: device, app build and the selected problems.
     private func report(for selected: [LogIssue]) -> String {
         let info = Bundle.main.infoDictionary
@@ -363,6 +390,7 @@ final class BugReportModel: ObservableObject {
             Self.gameContext,
             "Runtime: \(MadeiraBundleIdentity.isNative ? "native" : "interface-only")",
         ]
+        lines += Self.environmentLines
         if let wineFinding { lines.append("Diagnosis: " + wineFinding) }
         lines.append("")
         lines += selected.map(\.copyText)
@@ -377,7 +405,6 @@ struct BugReportView: View {
     @State private var bugsOpen = false
     @State private var jitOpen = false
     @State private var showClearConfirmation = false
-    @AppStorage("diagnostics.detailed") private var detailedDiagnostics = false
     @AppStorage(BenchmarkSession.enabledKey) private var recordBenchmarks = false
     @State private var benchmarkReports: [URL] = []
 
@@ -433,11 +460,6 @@ struct BugReportView: View {
                     .buttonStyle(.plain)
                 }
                 Section {
-                    Toggle(tr("Detailed diagnostics"), isOn: $detailedDiagnostics)
-                } footer: {
-                    Text(tr("Turns on Madeira's profilers and full logs for the next game. They slow games down: use only to report a bug."))
-                }
-                Section {
                     Toggle(tr("Record benchmarks"), isOn: $recordBenchmarks)
                     ForEach(benchmarkReports.prefix(20), id: \.self) { url in
                         ShareLink(item: url) {
@@ -448,7 +470,7 @@ struct BugReportView: View {
                 } header: {
                     Text(tr("Benchmarks"))
                 } footer: {
-                    Text(tr("Records each game session and each Steam or Epic install: FPS, frame times, CPU, memory, thermal state and install speed. Reports are saved in Files › iDeck › iDeck › Benchmarks. Detailed diagnostics change the results, so keep them off while measuring."))
+                    Text(tr("Records each game session and each Steam or Epic install: FPS, frame times, CPU, memory, thermal state and install speed. Reports are saved in Files › iDeck › iDeck › Benchmarks."))
                 }
                 .onAppear { benchmarkReports = BenchmarkSession.reports() }
                 Section(tr("Logs")) {
