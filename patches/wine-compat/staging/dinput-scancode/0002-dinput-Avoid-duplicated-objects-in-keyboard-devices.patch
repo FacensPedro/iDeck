@@ -1,0 +1,34 @@
+From b9f850d5ba2d36ae39a2e88b31a687e2d9745c6e Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?R=C3=A9mi=20Bernon?= <rbernon@codeweavers.com>
+Date: Fri, 23 Aug 2024 08:51:44 +0200
+Subject: [PATCH] dinput: Avoid duplicated objects in keyboard devices.
+
+Wine-Bug: https://bugs.winehq.org/show_bug.cgi?id=55205
+---
+ dlls/dinput/keyboard.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/dlls/dinput/keyboard.c b/dlls/dinput/keyboard.c
+index d1fa242574e..d9c73cd7367 100644
+--- a/dlls/dinput/keyboard.c
++++ b/dlls/dinput/keyboard.c
+@@ -216,13 +216,15 @@ static HRESULT enum_objects( struct keyboard *impl, const DIPROPHEADER *filter,
+         .dwOfs = DIK_ESCAPE,
+         .dwType = DIDFT_PSHBUTTON | DIDFT_MAKEINSTANCE( DIK_ESCAPE ),
+     };
++    BOOL ret, mapped[0x100] = {0};
+     DWORD index, i, dik;
+-    BOOL ret;
+ 
+     for (i = 0, index = 0; i < 512; ++i)
+     {
+         if (!GetKeyNameTextW( i << 16, instance.tszName, ARRAY_SIZE(instance.tszName) )) continue;
+         if (!(dik = map_dik_code( i, 0, subtype, impl->base.dinput->dwVersion ))) continue;
++        if (mapped[dik]) continue;
++        mapped[dik] = TRUE;
+         instance.dwOfs = dik;
+         instance.dwType = DIDFT_PSHBUTTON | DIDFT_MAKEINSTANCE( dik );
+         ret = enum_object( impl, filter, flags, callback, index++, &instance, data );
+-- 
+2.43.0
+

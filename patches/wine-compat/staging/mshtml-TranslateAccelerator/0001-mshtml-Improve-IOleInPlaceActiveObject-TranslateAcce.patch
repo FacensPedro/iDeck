@@ -1,0 +1,48 @@
+From 6059fc95c799ed70419bb170c99ddb11507e66f9 Mon Sep 17 00:00:00 2001
+From: Alistair Leslie-Hughes <leslie_alistair@hotmail.com>
+Date: Tue, 11 Jun 2019 15:27:50 +1000
+Subject: [PATCH] mshtml: Improve IOleInPlaceActiveObject TranslateAccelerator
+
+Wine-Bug: https://bugs.winehq.org/show_bug.cgi?id=37058
+---
+ dlls/mshtml/oleobj.c | 24 ++++++++++++++++++++++--
+ 1 file changed, 22 insertions(+), 2 deletions(-)
+
+diff --git a/dlls/mshtml/oleobj.c b/dlls/mshtml/oleobj.c
+index a9bd8a3d558..444551778e1 100644
+--- a/dlls/mshtml/oleobj.c
++++ b/dlls/mshtml/oleobj.c
+@@ -1413,8 +1413,28 @@ static HRESULT WINAPI DocObjOleInPlaceActiveObject_ContextSensitiveHelp(IOleInPl
+ static HRESULT WINAPI DocObjOleInPlaceActiveObject_TranslateAccelerator(IOleInPlaceActiveObject *iface, LPMSG lpmsg)
+ {
+     HTMLDocumentObj *This = HTMLDocumentObj_from_IOleInPlaceActiveObject(iface);
+-    FIXME("(%p)->(%p)\n", This, lpmsg);
+-    return E_NOTIMPL;
++    HRESULT hres = S_FALSE;
++
++    TRACE("(%p)->(%p)\n", This, lpmsg);
++
++    switch(lpmsg->message)
++    {
++        case WM_KEYDOWN:
++            break;
++        case WM_KEYUP:
++        {
++            TRACE("Processing key %Ix\n", lpmsg->wParam);
++            if (lpmsg->wParam == VK_F5)
++                hres = IOleCommandTarget_Exec(&This->IOleCommandTarget_iface, NULL, OLECMDID_REFRESH, 0, NULL, NULL);
++
++            break;
++        }
++        default:
++            FIXME("Unsupported message %04x\n", lpmsg->message);
++    }
++
++    TRACE("result 0x%08lx\n", hres);
++    return hres;
+ }
+ 
+ static HRESULT WINAPI DocObjOleInPlaceActiveObject_OnFrameWindowActivate(IOleInPlaceActiveObject *iface,
+-- 
+2.37.2
+
