@@ -55,6 +55,22 @@ func trStatus(_ status: String) -> String {
 
 enum Translations {
     static let table: [String: [String: String]] = [
+        "Active": ["pt": "Ativo", "es": "Activo"],
+        "Unknown": ["pt": "Desconhecido", "es": "Desconocido"],
+        "Increased Memory Limit": ["pt": "Limite de memória aumentado", "es": "Límite de memoria aumentado"],
+        "Extended Virtual Addressing": ["pt": "Endereçamento virtual estendido", "es": "Direccionamiento virtual extendido"],
+        "Memory iOS still allows": ["pt": "Memória que o iOS ainda permite", "es": "Memoria que iOS aún permite"],
+        "Not granted": ["pt": "Não concedido", "es": "No concedido"],
+        "Copy App ID": ["pt": "Copiar App ID", "es": "Copiar App ID"],
+        "Open GetMoreRam": ["pt": "Abrir GetMoreRam", "es": "Abrir GetMoreRam"],
+        "iOS decides Memory+ when iDeck is signed: the IPA asks for both capabilities, and the signature keeps only those the App ID allows. iDeck cannot turn them on while it runs.": ["pt": "O iOS decide o Memory+ quando o iDeck é assinado: o IPA pede as duas capacidades, e a assinatura mantém só as que o App ID permite. O iDeck não consegue ativá-las em execução.", "es": "iOS decide Memory+ cuando se firma iDeck: el IPA pide las dos capacidades y la firma conserva solo las que el App ID permite. iDeck no puede activarlas mientras se ejecuta."],
+        "GetMoreRam adds Increased Memory Limit to an App ID from this device, without a Mac:": ["pt": "O GetMoreRam adiciona o Limite de memória aumentado a um App ID neste aparelho, sem Mac:", "es": "GetMoreRam añade el Límite de memoria aumentado a un App ID desde este dispositivo, sin Mac:"],
+        "Install GetMoreRam the way iDeck was installed (SideStore or AltStore).": ["pt": "Instale o GetMoreRam do mesmo jeito que o iDeck (SideStore ou AltStore).", "es": "Instala GetMoreRam igual que iDeck (SideStore o AltStore)."],
+        "In GetMoreRam's settings, sign in with the Apple Account that signed iDeck.": ["pt": "Nos ajustes do GetMoreRam, entre com a Conta Apple que assinou o iDeck.", "es": "En los ajustes de GetMoreRam, inicia sesión con la Cuenta de Apple que firmó iDeck."],
+        "Open App IDs, tap Refresh and choose iDeck's App ID.": ["pt": "Abra App IDs, toque em Refresh e escolha o App ID do iDeck.", "es": "Abre App IDs, toca Refresh y elige el App ID de iDeck."],
+        "Tap Add Increased Memory Limit.": ["pt": "Toque em Add Increased Memory Limit.", "es": "Toca Add Increased Memory Limit."],
+        "Install iDeck again from SideStore or AltStore, then open it and check this page.": ["pt": "Instale o iDeck de novo pelo SideStore ou AltStore, abra-o e confira esta página.", "es": "Instala iDeck otra vez desde SideStore o AltStore, ábrelo y revisa esta página."],
+        "Extended Virtual Addressing is missing: Windows games cannot start without it. GetMoreRam's instructions name only Increased Memory Limit, so this one may need the App ID changed in Apple's developer portal or Xcode.": ["pt": "Falta o Endereçamento virtual estendido: sem ele os jogos de Windows não iniciam. As instruções do GetMoreRam citam só o Limite de memória aumentado, então este pode exigir alterar o App ID no portal de desenvolvedor da Apple ou no Xcode.", "es": "Falta el Direccionamiento virtual extendido: sin él los juegos de Windows no inician. Las instrucciones de GetMoreRam solo nombran el Límite de memoria aumentado, así que este puede requerir cambiar el App ID en el portal de desarrolladores de Apple o en Xcode."],
         "Connect EA": ["pt": "Conectar EA", "es": "Conectar EA"],
         "Loading EA app library...": ["pt": "Carregando a biblioteca do EA app...", "es": "Cargando la biblioteca de EA app..."],
         "Sign in on EA's own page to see your EA games and install them without the EA app. iDeck keeps only the sign-in token, in this device's Keychain.": ["pt": "Entre pela página da EA para ver seus jogos da EA e instalá-los sem o EA app. O iDeck guarda só o token de acesso, no Keychain deste aparelho.", "es": "Inicia sesión en la página de EA para ver tus juegos de EA e instalarlos sin EA app. iDeck solo guarda el token de acceso, en el Llavero de este dispositivo."],
