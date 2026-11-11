@@ -435,6 +435,18 @@ struct EAInstalledGame: Codable, Sendable {
                       registryKey: path.key, registryValue: path.valueName)
     }
 
+    nonisolated static let licenceFactsKey = "diagnostics.eaLicence"
+
+    /// The activation library the game ships and what the licence is built for.
+    nonisolated static func activationFacts(_ activation: EALicense.Activation, gameFolder: URL) -> String {
+        guard activation.required else { return "no Core folder: the game checks no licence" }
+        let core = EALicense.child(of: gameFolder, named: "Core")
+        let names = (core.flatMap { try? FileManager.default.contentsOfDirectory(atPath: $0.path) } ?? []).sorted()
+        let version = activation.libraryVersion.map { "\($0.major).\($0.minor).\($0.patch)" } ?? "unreadable"
+        return "library \(version), hash version \(activation.hashVersion), signature as \(activation.decodeSignature ? "bytes" : "base64 text"), "
+            + "Core: \(names.prefix(16).joined(separator: " "))"
+    }
+
     /// The registry keys an EA game expects: the EA app's install marker and, when the
     /// game's manifest named one, its own install folder. Only while no session runs.
     nonisolated static func writeRegistry(_ record: EAInstalledGame) {
@@ -484,15 +496,26 @@ struct EAInstalledGame: Codable, Sendable {
                                          gpuDevice: nvidia ? 0x2544 : 0x0001, avx: avx)
         let folder = Self.drive.appendingPathComponent(record.folder, isDirectory: true)
         let activation = EALicense.activation(gameFolder: folder)
+        // What the licence was prepared for, kept for the bug report: a game that does
+        // not accept it starts EA's activation window, and only these facts say why.
+        let facts = Self.activationFacts(activation, gameFolder: folder)
+        UserDefaults.standard.set(facts + ", licence not prepared", forKey: Self.licenceFactsKey)
         if activation.required {
             guard !record.contentID.isEmpty else { throw EAAPIError.license("the game's content id is unknown") }
             let (hash, _) = profile.machineHash(version: activation.hashVersion)
             let current = EALicense.current(contentID: record.contentID, drive: Self.drive)
             if EALicense.needsRenewal(current, machineHash: hash, userID: session.userID) {
-                _ = try await EALicense.renew(api: api, contentID: record.contentID, profile: profile, activation: activation, drive: Self.drive)
+                UserDefaults.standard.set(facts + ", licence request failed", forKey: Self.licenceFactsKey)
+                let renewed = try await EALicense.renew(api: api, contentID: record.contentID, profile: profile, activation: activation, drive: Self.drive)
+                UserDefaults.standard.set(facts + ", licence renewed, game token \(renewed.gameToken == nil ? "absent" : "present")",
+                                          forKey: Self.licenceFactsKey)
             } else {
+                UserDefaults.standard.set(facts + ", licence kept, game token \(current?.gameToken == nil ? "absent" : "present")",
+                                          forKey: Self.licenceFactsKey)
                 EALog.event("[ea-license] kept content=\(record.contentID) hash-version=\(activation.hashVersion)")
             }
+        } else {
+            UserDefaults.standard.set(facts, forKey: Self.licenceFactsKey)
         }
         Self.writeRegistry(record)
         // The short-lived token the EA app hands a game (EALaunchUserAuthToken); a game
