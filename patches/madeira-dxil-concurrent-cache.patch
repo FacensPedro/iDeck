@@ -1,0 +1,69 @@
+--- a/madeira-d3d12/src/unix/madeira_ir_unix.mm
++++ b/madeira-d3d12/src/unix/madeira_ir_unix.mm
+@@ -1543,6 +1543,50 @@
+ /* Pipelines are created from several threads at once, so a single slot would
+  * be stolen between one caller's too-small call and its retry. Eight is far
+  * more than the number of threads that are ever between those two calls. */
++/* Only overlapping requests for the same complete DXIL cache key wait.
++ * Each owner lives on its calling thread's stack until publication or error. */
++class DXILConversion {
++    static pthread_mutex_t mutex;
++    static pthread_cond_t changed;
++    static DXILConversion *active;
++    DXILConversion *next = nullptr;
++    uint64_t key = 0, check = 0;
++    bool registered = false;
++
++    bool alreadyActive() const {
++        for (auto *p = active; p; p = p->next)
++            if (p->key == key && p->check == check) return true;
++        return false;
++    }
++
++public:
++    DXILConversion() = default;
++    DXILConversion(const DXILConversion &) = delete;
++    void acquire(uint64_t k, uint64_t c) {
++        key = k;
++        check = c;
++        pthread_mutex_lock(&mutex);
++        while (alreadyActive()) pthread_cond_wait(&changed, &mutex);
++        next = active;
++        active = this;
++        registered = true;
++        pthread_mutex_unlock(&mutex);
++    }
++    ~DXILConversion() {
++        if (!registered) return;
++        pthread_mutex_lock(&mutex);
++        auto **link = &active;
++        while (*link != this) link = &(*link)->next;
++        *link = next;
++        pthread_cond_broadcast(&changed);
++        pthread_mutex_unlock(&mutex);
++    }
++};
++
++pthread_mutex_t DXILConversion::mutex = PTHREAD_MUTEX_INITIALIZER;
++pthread_cond_t DXILConversion::changed = PTHREAD_COND_INITIALIZER;
++DXILConversion *DXILConversion::active = nullptr;
++
+ #define MAD_DXC_SLOTS 8
+ static struct { uint64_t key, check, seq; void *blob; size_t len; } g_dxc_slots[MAD_DXC_SLOTS];
+ static uint64_t g_dxc_slot_seq;
+@@ -1740,6 +1784,7 @@
+     char dxc_note[128] = "";
+     void *dxc_blob = NULL;
+     uint64_t dxc_key = 0, dxc_check = 0;
++    DXILConversion conversion;
+     int dxc_disk = 0, dxc_slot = 0;
+ 
+     /* ml1990: a conversion already done -- by this caller's too-small first
+@@ -1756,6 +1801,7 @@
+         env.ags_rewrite = (uint32_t)mad_ags_enabled();
+         env.compat_flags = mad_ir_compat_flags();
+         mad_dxc_key(a, &env, &dxc_key, &dxc_check);
++        if (dxc_disk) conversion.acquire(dxc_key, dxc_check);
+         if (dxc_slot) hit = mad_dxc_slot_take(dxc_key, dxc_check, &hit_len);
+         if (!hit && dxc_disk) {
+             char path[1200];
