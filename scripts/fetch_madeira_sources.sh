@@ -40,6 +40,12 @@ if ! git -C "$DEST" apply --reverse --check "$FAULT_DIAGNOSTICS_PATCH" >/dev/nul
   git -C "$DEST" apply "$FAULT_DIAGNOSTICS_PATCH"
 fi
 
+WINE_PERF_PATCH="$ROOT/patches/madeira-wine-idle-logging.patch"
+if ! git -C "$DEST" apply --reverse --check "$WINE_PERF_PATCH" >/dev/null 2>&1; then
+  git -C "$DEST" apply --check "$WINE_PERF_PATCH"
+  git -C "$DEST" apply "$WINE_PERF_PATCH"
+fi
+
 # The pinned Madeira script says it builds the ARM64EC PE ntdll, but
 # `make -C dlls/ntdll` also links the host ntdll.so. That Unix target
 # references Madeira's iOS-only ios_avail_phys hook and fails on macOS.

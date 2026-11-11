@@ -262,7 +262,8 @@ class WindowsEnvironment {
     func configureWine(prefix: String) {
         self.winePrefixPath = prefix
         setenv("WINEPREFIX", prefix, 1)
-        if ProcessInfo.processInfo.environment["IDECK_WINE_DIAGNOSTICS"] == "1" {
+        if ProcessInfo.processInfo.environment["IDECK_WINE_DIAGNOSTICS"] == "1" ||
+           UserDefaults.standard.bool(forKey: "diagnostics.detailed") {
             // Madeira's Wine process thread configures WINEDEBUG itself.
             // Use its supported flag to request detailed native traces.
             setenv("MADEIRA_DEBUG_VERBOSE", "1", 1)
@@ -272,6 +273,7 @@ class WindowsEnvironment {
             // bug report diagnoses crashes from. err+all wrote thousands of
             // lines per launch (thread, module, sync...), costing CPU and disk
             // while the game started.
+            unsetenv("MADEIRA_DEBUG_VERBOSE")
             setenv("WINEDEBUG", "-all,err+seh,err+process", 1)
         }
         setenv("WINEARCH", "win64", 1)

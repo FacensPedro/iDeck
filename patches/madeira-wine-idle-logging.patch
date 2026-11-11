@@ -1,0 +1,32 @@
+--- a/build/wineserver/fd_ios.c
++++ b/build/wineserver/fd_ios.c
+@@ -168,7 +168,13 @@
+ static unsigned long long ios_srv_idle_ns(void)
+ {
+     int us = __atomic_load_n( &g_madeira_srv_idle_us, __ATOMIC_RELAXED );
+-    if (us <= 0) return 1000000ull;
++    if (us <= 0)
++    {
++        const char *nosem = getenv("MADEIRA_SRV_NOSEM");
++        /* Requests interrupt this wait; sockets still get a bounded 2ms scan. */
++        return ios_srv_wake_sem && !(nosem && atoi(nosem))
++            ? 2000000ull : 1000000ull;
++    }
+     if (us < 100) us = 100;
+     if (us > 50000) us = 50000;
+     return (unsigned long long)us * 1000ull;
+--- a/app/Madeira/WineProcessBridge.m
++++ b/app/Madeira/WineProcessBridge.m
+@@ -1362,8 +1362,10 @@
+                  * skip_u32_unknown line per unknown RDEF dword. Metro 2033
+                  * Redux reflects every shader at load: ~90,000 of a
+                  * 105,000-line log in six seconds, all of it parsed by LogStore. */
+-                setenv("WINEDEBUG", "err+all,err-virtual,fixme-d3dcompiler", 1);
+-                LOG("WINEDEBUG = err+all,err-virtual,fixme-d3dcompiler (perf default — set MADEIRA_DEBUG_VERBOSE=1 for full trace)");
++                const char *configured_debug = getenv("WINEDEBUG");
++                if (!configured_debug || !*configured_debug)
++                    setenv("WINEDEBUG", "err+all,err-virtual,fixme-d3dcompiler", 1);
++                LOG("WINEDEBUG = %s", getenv("WINEDEBUG"));
+             }
+         }
+ 
