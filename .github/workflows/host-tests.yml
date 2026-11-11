@@ -21,6 +21,11 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: "3.13"
+      - name: Validate runtime patch syntax
+        run: |
+          for patch in patches/*.patch; do
+            git apply --numstat "$patch" > /dev/null || exit 1
+          done
       - name: Run host tests
         run: python3 -m unittest discover -s tests/host -v
       - name: Check language layers
