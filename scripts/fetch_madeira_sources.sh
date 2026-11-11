@@ -299,6 +299,9 @@ python3 "$ROOT/scripts/apply_madeira_steam_identity.py" "$DEST"
 # Every Wine code page, so a device in any language finds its ANSI and OEM tables.
 python3 "$ROOT/scripts/apply_madeira_full_nls.py" "$DEST"
 
+# A child's WINEDEBUG is copied into the environment, not aliased to freed memory.
+python3 "$ROOT/scripts/apply_madeira_spawn_env.py" "$DEST"
+
 # mscoree remembers that fusion.dll is absent instead of retrying per assembly.
 FUSION_PATCH="$ROOT/patches/madeira-mscoree-fusion-negative-cache.patch"
 if ! git -C "$DEST" apply --reverse --check "$FUSION_PATCH" >/dev/null 2>&1; then

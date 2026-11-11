@@ -444,10 +444,6 @@ struct SettingsView: View {
                                value: tr(MadeiraBundleIdentity.d3d12Available ? "Bundled" : "Not bundled"))
                 LabeledContent("WoW64", value: tr((runtime["wow64Enabled"] as? Bool ?? false) ? "Bundled" : "Not bundled"))
                 LabeledContent("Wine Mono", value: tr((runtime["wineMonoBundled"] as? Bool ?? false) ? "Bundled" : "Not bundled"))
-                LabeledContent("Memory+", value: tr("Requested in IPA"))
-                Text(tr("Memory+ requires the signed app to retain the Increased Memory Limit entitlement. The iDeck settings cannot enable it after signing."))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
                 LabeledContent("Metal Shader Converter",
                                value: tr((runtime["metalShaderConverterBundled"] as? Bool ?? false) ? "Bundled" : "Not bundled"))
                 LabeledContent(tr("Madeira Dock"), value: tr(MadeiraDock.bundled ? "Bundled" : "Not bundled"))
@@ -462,8 +458,48 @@ struct SettingsView: View {
                         .foregroundStyle(.orange)
                 }
             }
+            memoryPlusSection
         }
         .navigationTitle(tr("Windows runtime"))
+    }
+
+    // MARK: Memory+
+
+    private func memoryPlusValue(_ state: MemoryPlus.State) -> Text {
+        switch state {
+        case .granted: return Text(tr("Active")).foregroundColor(.green)
+        case .missing: return Text(tr("Not granted")).foregroundColor(.orange)
+        case .unknown: return Text(tr("Unknown")).foregroundColor(.secondary)
+        }
+    }
+
+    /// Memory+ as this installed copy has it, and GetMoreRam's steps when it is missing.
+    private var memoryPlusSection: some View {
+        settingsSection(title: "Memory+") {
+            LabeledContent(tr("Increased Memory Limit")) { memoryPlusValue(MemoryPlus.increasedLimit) }
+            LabeledContent(tr("Extended Virtual Addressing")) { memoryPlusValue(MemoryPlus.extendedAddressing) }
+            LabeledContent(tr("Memory iOS still allows"), value: "\(ResourceGovernor.availableMiB()) MB")
+            LabeledContent("App ID") {
+                Text(MemoryPlus.appID).font(.caption.monospaced()).textSelection(.enabled)
+            }
+            Text(tr("iOS decides Memory+ when iDeck is signed: the IPA asks for both capabilities, and the signature keeps only those the App ID allows. iDeck cannot turn them on while it runs."))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            if !MemoryPlus.ready {
+                Text(tr("GetMoreRam adds Increased Memory Limit to an App ID from this device, without a Mac:"))
+                    .font(.caption)
+                ForEach(Array(MemoryPlus.getMoreRamSteps.enumerated()), id: \.offset) { index, step in
+                    Text("\(index + 1). " + tr(step)).font(.caption)
+                }
+            }
+            Button(tr("Copy App ID")) { UIPasteboard.general.string = MemoryPlus.appID }
+            Link(tr("Open GetMoreRam"), destination: MemoryPlus.getMoreRamURL)
+            if MemoryPlus.extendedAddressing == .missing {
+                Text(tr("Extended Virtual Addressing is missing: Windows games cannot start without it. GetMoreRam's instructions name only Increased Memory Limit, so this one may need the App ID changed in Apple's developer portal or Xcode."))
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            }
+        }
     }
 
     // MARK: General

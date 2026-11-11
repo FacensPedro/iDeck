@@ -10,8 +10,8 @@ class FirstRunLaunchersContract(unittest.TestCase):
             "IDeckFirstRunSetupView",
             "installMadeiraDock()",
             "Wine Mono",
-            "requestStikDebugJIT()",
-            "requestBuiltInJIT()",
+            'Text("StikDebug").tag("stikdebug")',
+            'Text("Built-in").tag("builtIn")',
         ):
             self.assertIn(phrase, swift)
         environment = (ROOT / "iDeck/WindowsInstallerEnvironment.swift").read_text()

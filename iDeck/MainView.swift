@@ -2687,26 +2687,25 @@ private struct IDeckFirstRunSetupView: View {
 
     private var jitStep: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Label("Set up JIT", systemImage: "bolt.fill")
+            Label("JIT method", systemImage: "bolt.fill")
                 .font(.title2.bold())
             Picker("JIT method", selection: $jitMethod) {
                 Text("StikDebug").tag("stikdebug")
                 Text("Built-in").tag("builtIn")
             }
             .pickerStyle(.segmented)
-            LabeledContent("JIT permission", value: coordinator.isJITEnabled ? "Active" : "Inactive")
-            LabeledContent("Debugger", value: coordinator.isStikDebugAttached ? "Attached" : "Detached")
             if jitMethod == "builtIn" {
+                LabeledContent("Pairing file", value: coordinator.hasPairingFile ? "Imported" : "Missing")
                 Button(coordinator.hasPairingFile ? "Replace pairing file" : "Import pairing file") {
                     pairingImporterPresented = true
                 }
+                Text("Built-in turns JIT on from inside iDeck, with the pairing file of this device.")
+                    .font(.caption).foregroundStyle(.secondary)
+            } else {
+                Text("StikDebug is opened by iDeck when a game starts and turns JIT on for it.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
-            Button(coordinator.isJITEnabled ? "Reconnect debugger" : "Enable JIT") {
-                if jitMethod == "builtIn" { coordinator.requestBuiltInJIT() }
-                else { coordinator.requestStikDebugJIT() }
-            }
-            .buttonStyle(.borderedProminent)
-            Text("Wine/FEX requires a working debugger and executable-memory setup. JIT permission alone is insufficient.")
+            Text("Nothing is turned on here: iDeck activates JIT with the chosen method each time a game starts.")
                 .font(.caption).foregroundStyle(.secondary)
         }
     }
@@ -2719,7 +2718,8 @@ private struct IDeckFirstRunSetupView: View {
                 .font(.title2.bold())
             statusRow("Windows runtime", windowsReady)
             statusRow("Madeira Dock", MadeiraDock.clientInstalled)
-            statusRow("JIT", coordinator.isJITEnabled && (coordinator.isStikDebugAttached || coordinator.isWineJITPrepared))
+            LabeledContent("JIT method", value: jitMethod == "builtIn" ? "Built-in" : "StikDebug")
+            if jitMethod == "builtIn" { statusRow("Pairing file", coordinator.hasPairingFile) }
             Text("Unfinished steps can be revisited from Settings.")
                 .font(.caption).foregroundStyle(.secondary)
         }

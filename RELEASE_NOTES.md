@@ -1,11 +1,13 @@
 ## What's Changed
-### Windows runtime
-- The runtime now carries all of Wine's code page tables (76 NLS files instead of 12). Windows takes its language from the device, so an iPad or iPhone set to Portuguese, Spanish, French, German, Japanese, Russian or any language other than English asked for tables that were missing; `cmd.exe`, console programs, installers and games that convert text failed on them.
-- The build stops if a DLL of the wrong architecture is in a runtime folder (x86 in the x64/ARM64EC folder, x64 in the x86 folder, and so on).
-- Madeira's own test programs (22 files) are no longer part of the downloaded runtime or linked into each prefix.
+### Memory+
+- Settings › Windows runtime shows what this installed copy of iDeck really has: Increased Memory Limit (read from the profile the app was signed with), Extended Virtual Addressing (measured), the memory iOS still allows and the App ID.
+- When a capability is missing, the page lists GetMoreRam's steps to add Increased Memory Limit to the App ID from the device, with a button to copy the App ID and a link to GetMoreRam.
 
-### GOG
-- Visual C++ 2005 to 2013 redistributable installers that come with a GOG game are no longer run before the game starts. iDeck installs those runtimes itself, and the installers stopped inside Windows Installer without installing anything. Games installed earlier skip them too.
+### Initial setup
+- The JIT step only chooses the method, StikDebug or Built-in (with its pairing file). The Enable JIT button is gone: iDeck turns JIT on with the chosen method when a game starts.
+
+### Windows runtime
+- Starting a Windows child process no longer leaves the app's environment pointing at freed memory. Wine frees a child's WINEDEBUG string after handing it to the environment, which is safe after a fork but not on iOS, where the child is a thread of iDeck.
 
 ### Release
-- Updated the application version to 1.7.2 (build 54).
+- Updated the application version to 1.7.3 (build 55).
