@@ -86,6 +86,11 @@ for source in madeira-d3d12/src/pe/madeira_d3d12.c \
   }
 done
 
+CONTEXT_PATCH="$ROOT/patches/wine-arm64ec-null-thread-context.patch"
+if ! git -C "$DEST/wine" apply --reverse --check "$CONTEXT_PATCH" >/dev/null 2>&1; then
+  git -C "$DEST/wine" apply "$CONTEXT_PATCH"
+fi
+
 # Pinned willfaust/dxmt invokes a private four-argument Metal atomic intrinsic.
 # Metal Toolchain 27B47 requires five arguments, and the old call fails to compile.
 # Apply the equivalent public Metal atomic operation used by upstream DXMT.
@@ -293,4 +298,3 @@ fi
 echo "Madeira sources checked out at $REV"
 echo "Source checkout complete. Run bash scripts/build_native_runtime.sh on macOS to compile, link and package."
 echo "Read $DEST/docs/BUILDING.md for the platform toolchains and licensed prerequisites."
-

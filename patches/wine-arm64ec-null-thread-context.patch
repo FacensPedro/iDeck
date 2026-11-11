@@ -1,0 +1,10 @@
+--- a/dlls/ntdll/signal_arm64ec.c
++++ b/dlls/ntdll/signal_arm64ec.c
+@@ -1806,6 +1806,8 @@
+ 
+ NTSTATUS SYSCALL_API NtGetContextThread( HANDLE handle, CONTEXT *context )
+ {
++    if (!context) return STATUS_ACCESS_VIOLATION;
++
+     ARM64_NT_CONTEXT arm_ctx = { .ContextFlags = ctx_flags_x64_to_arm( context->ContextFlags ) };
+     NTSTATUS status = syscall_NtGetContextThread( handle, &arm_ctx );
