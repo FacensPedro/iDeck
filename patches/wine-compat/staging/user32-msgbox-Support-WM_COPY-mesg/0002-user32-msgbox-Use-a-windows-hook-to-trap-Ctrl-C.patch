@@ -1,0 +1,57 @@
+From 213514e0cfc73abd3be2f9707f53688fbf28669e Mon Sep 17 00:00:00 2001
+From: Alistair Leslie-Hughes <leslie_alistair@hotmail.com>
+Date: Wed, 6 Mar 2024 20:21:36 +1100
+Subject: [PATCH] user32/msgbox: Use a windows hook to trap Ctrl+C
+
+---
+ dlls/user32/msgbox.c | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
+
+diff --git a/dlls/user32/msgbox.c b/dlls/user32/msgbox.c
+index e7fd704ea28..8d9adce8bd6 100644
+--- a/dlls/user32/msgbox.c
++++ b/dlls/user32/msgbox.c
+@@ -391,6 +391,22 @@ static void MSGBOX_CopyToClipbaord( HWND hwnd )
+     }
+ }
+ 
++HHOOK msghook_handle;
++
++LRESULT CALLBACK msg_hook_proc(int nCode, WPARAM wParam, LPARAM lParam)
++{
++    MSG *msg = (MSG *)lParam;
++    if (nCode == MSGF_DIALOGBOX && msg->message == WM_KEYUP)
++    {
++        if ( (msg->wParam == 'C' || msg->wParam == 'c') && (NtUserGetKeyState(VK_CONTROL) & 0x8000))
++        {
++            MSGBOX_CopyToClipbaord(GetParent(msg->hwnd));
++        }
++    }
++
++    return NtUserCallNextHookEx(msghook_handle, nCode, wParam, lParam);
++}
++
+ /**************************************************************************
+  *           MSGBOX_DlgProc
+  *
+@@ -406,6 +422,7 @@ static INT_PTR CALLBACK MSGBOX_DlgProc( HWND hwnd, UINT message,
+        NtUserSetWindowContextHelpId(hwnd, mbp->dwContextHelpId);
+        MSGBOX_OnInit(hwnd, mbp);
+        SetPropA(hwnd, "WINE_MSGBOX_HELPCALLBACK", mbp->lpfnMsgBoxCallback);
++       msghook_handle = SetWindowsHookExA(WH_MSGFILTER, msg_hook_proc, NULL, GetCurrentThreadId());
+        break;
+    }
+    case WM_COPY:
+@@ -413,6 +430,9 @@ static INT_PTR CALLBACK MSGBOX_DlgProc( HWND hwnd, UINT message,
+         MSGBOX_CopyToClipbaord(hwnd);
+         break;
+    }
++   case WM_DESTROY:
++       NtUserUnhookWindowsHookEx(msghook_handle);
++       break;
+ 
+    case WM_COMMAND:
+     switch (LOWORD(wParam))
+-- 
+2.47.2
+

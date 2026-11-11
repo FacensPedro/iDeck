@@ -57,7 +57,7 @@ class ARM64ECMachSlowpathTests(unittest.TestCase):
         self.assertIn("ARM64EC Mach context patch mismatch", KIT)
         self.assertIn("madeira_native_kit.py inspect --archive", WORKFLOW)
         self.assertIn("madeira_native_kit.py inspect --archive", BUILD)
-        self.assertIn("'patches/*'", WORKFLOW)
+        self.assertIn("'patches/**'", WORKFLOW)
 
     def test_wine_dispatcher_caller_and_return_logic_are_both_changed(self):
         self.assertIn("syscall_dispatcher_return_slowpath(void)", PATCH)

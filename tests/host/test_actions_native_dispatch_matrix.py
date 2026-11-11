@@ -62,7 +62,7 @@ class ActionsNativeDispatchMatrix(unittest.TestCase):
         self.assertIn("if: ${{ env.IDECK_NATIVE_BUILD == '1' }}", block)
         for key in ("env.IDECK_MADEIRA_GRAPHICS", "env.IDECK_BUILD_WOW64",
                     "env.IDECK_BUNDLE_WINE_MONO", "scripts/madeira_native_kit.py",
-                    "'patches/*'"):
+                    "'patches/**'"):
             self.assertIn(key, block)
         self.assertIn('OPTIONS=(--graphics "$IDECK_MADEIRA_GRAPHICS")', block)
         self.assertIn("python3 scripts/madeira_native_kit.py inspect", block)

@@ -302,6 +302,12 @@ python3 "$ROOT/scripts/apply_madeira_full_nls.py" "$DEST"
 # A child's WINEDEBUG is copied into the environment, not aliased to freed memory.
 python3 "$ROOT/scripts/apply_madeira_spawn_env.py" "$DEST"
 
+# A refused ARM64EC context return (the 0xC000001D of 32-bit Direct3D 9 games) logs its reason.
+python3 "$ROOT/scripts/apply_madeira_slowpath_diag.py" "$DEST"
+
+# Wine Staging patch sets and GE-Proton fixes for Windows-side DLLs (patches/wine-compat).
+python3 "$ROOT/scripts/apply_madeira_wine_compat.py" "$DEST"
+
 # mscoree remembers that fusion.dll is absent instead of retrying per assembly.
 FUSION_PATCH="$ROOT/patches/madeira-mscoree-fusion-negative-cache.patch"
 if ! git -C "$DEST" apply --reverse --check "$FUSION_PATCH" >/dev/null 2>&1; then
