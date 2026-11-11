@@ -262,20 +262,11 @@ class WindowsEnvironment {
     func configureWine(prefix: String) {
         self.winePrefixPath = prefix
         setenv("WINEPREFIX", prefix, 1)
-        if ProcessInfo.processInfo.environment["IDECK_WINE_DIAGNOSTICS"] == "1" ||
-           UserDefaults.standard.bool(forKey: "diagnostics.detailed") {
-            // Madeira's Wine process thread configures WINEDEBUG itself.
-            // Use its supported flag to request detailed native traces.
-            setenv("MADEIRA_DEBUG_VERBOSE", "1", 1)
-            setenv("WINEDEBUG", "err+all", 1)
-        } else {
-            // Lean default: only exceptions (seh) and process errors, which the
-            // bug report diagnoses crashes from. err+all wrote thousands of
-            // lines per launch (thread, module, sync...), costing CPU and disk
-            // while the game started.
-            unsetenv("MADEIRA_DEBUG_VERBOSE")
-            setenv("WINEDEBUG", "-all,err+seh,err+process", 1)
-        }
+        // Full logs for every session: Bugs & logs needs the lines Wine and Madeira
+        // print before a failure, and a game that failed cannot be asked to fail again
+        // with logging on. Madeira's Wine thread configures WINEDEBUG from this flag.
+        setenv("MADEIRA_DEBUG_VERBOSE", "1", 1)
+        setenv("WINEDEBUG", "err+all", 1)
         setenv("WINEARCH", "win64", 1)
         setenv("STEAM_COMPAT_CLIENT_INSTALL_PATH", prefix + "/drive_c/Program Files (x86)/Steam", 1)
         
@@ -701,19 +692,14 @@ class WindowsEnvironment {
         }
         sessionUseRecommended = profile.useRecommended
         sessionCodeChecks = profile.codeChecks
-        // Release-style runtime by default, as upstream Madeira's bridge does:
-        // no PC sampler suspending the game thread ~500 times a second, no
-        // thread-suspending profilers, no per-present log lines, no 256 MB
-        // JIT dump on a crash, and Mono logs at warning level. Settings ›
-        // Bugs & logs › Detailed diagnostics turns them back on.
-        if UserDefaults.standard.bool(forKey: "diagnostics.detailed") {
-            for key in ["MADEIRA_QUIET", "MADEIRA_LEAN_DIAG"] { unsetenv(key) }
-            setenv("MADEIRA_JIT_DUMP", "1", 1)
-        } else {
-            setenv("MADEIRA_QUIET", "1", 1)
-            setenv("MADEIRA_LEAN_DIAG", "1", 1)
-            setenv("MADEIRA_JIT_DUMP", "0", 1)
-        }
+        // Detailed logs without the tools that slow a game. MADEIRA_QUIET keeps the
+        // PC sampler (it suspends the game thread ~500 times a second) and the
+        // per-present lines off; Wine's ERR lines and boot logging are not affected by
+        // it. MADEIRA_LEAN_DIAG is left unset so diagnostic lines are not rate-limited,
+        // and the 256 MB JIT dump on a crash stays off.
+        setenv("MADEIRA_QUIET", "1", 1)
+        unsetenv("MADEIRA_LEAN_DIAG")
+        setenv("MADEIRA_JIT_DUMP", "0", 1)
         setenv("MONO_LOG_LEVEL", "warning", 0)
         sessionVulkanMode = profile.vulkanMode
         sessionD3D12Renderer = profile.d3d12Renderer

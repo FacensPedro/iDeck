@@ -63,8 +63,8 @@ class ReleaseInterfaceCDNTests(unittest.TestCase):
         self.assertNotIn("Unlimited download speed", SETTINGS)
         self.assertNotIn("unlimitedDownloadSpeed", SETTINGS)
         self.assertNotIn("isUnlimited", DOWNLOAD_SPEED)
-        self.assertIn("static let steamChunks = 8", DOWNLOAD_SPEED)
-        self.assertIn("static let epicWindow = 24", DOWNLOAD_SPEED)
+        self.assertIn("static let steamChunks = 16", DOWNLOAD_SPEED)
+        self.assertIn("static let epicWindow = 32", DOWNLOAD_SPEED)
 
     def test_release_notes_contain_no_authors_or_pull_links(self):
         self.assertIn("--notes-file RELEASE_NOTES.md", WORKFLOW)

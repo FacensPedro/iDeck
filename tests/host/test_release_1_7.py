@@ -14,8 +14,9 @@ class Release17Tests(unittest.TestCase):
 
     def test_download_speed_and_resumable_ea_pause(self):
         speed = repo_text("iDeck/DownloadSpeed.swift")
-        for line in ("static let epicWindow = 24", "static let eaFiles = 8", "static let eaSegments = 12",
-                     "static let eaConnections = 32"):
+        for line in ("static let steamChunks = 16", "static let epicWindow = 32", "static let eaFiles = 8",
+                     "static let eaSegments = 16", "static let eaConnections = 40", "static let gogFiles = 4",
+                     "static let gogChunksPerFile = 3", "static let gogConnections = 12"):
             self.assertIn(line, speed)
         ea = repo_text("iDeck/Vendor/Madeira/SwiftEA/EADownloader.swift")
         self.assertIn('".madeira-seg"', ea)
@@ -42,7 +43,7 @@ class Release17Tests(unittest.TestCase):
         self.assertIn("func prewarmJITForLaunch()", coordinator)
         self.assertEqual(repo_text("iDeck/MainView.swift").count("coordinator.prewarmJITForLaunch()"), 2)
         project = repo_text("iDeck.xcodeproj/project.pbxproj")
-        self.assertEqual(project.count("MARKETING_VERSION = 1.7.3;"), 6)
+        self.assertEqual(project.count("MARKETING_VERSION = 1.7.4;"), 6)
 
 
 class VulkanHostLibraryTests(unittest.TestCase):

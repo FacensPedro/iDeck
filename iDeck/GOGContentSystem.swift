@@ -373,7 +373,7 @@ final class GOGContentInstaller: @unchecked Sendable {
             }
         }
 
-        // Every other file, four at a time. Redistributables come last and never fail
+        // Every other file, DownloadSpeed.gogFiles at a time. Redistributables come last and never fail
         // the game's install (as Madeira): a missing one is logged and left out.
         let files = plan.files.filter { plan.containerOf[$0.path] == nil && $0.productID != Self.redistProduct }
         try await downloadAll(files, into: folder)
@@ -398,7 +398,7 @@ final class GOGContentInstaller: @unchecked Sendable {
                 next += 1
                 group.addTask { try await self.download(file, into: folder) }
             }
-            for _ in 0..<4 { add() }
+            for _ in 0..<DownloadSpeed.gogFiles { add() }
             while try await group.next() != nil {
                 try Task.checkCancellation()
                 add()
@@ -430,11 +430,33 @@ final class GOGContentInstaller: @unchecked Sendable {
         manager.createFile(atPath: partial.path, contents: nil)
         let writer = try FileHandle(forWritingTo: partial)
         do {
-            for chunk in chunks {
-                try Task.checkCancellation()
-                let data = try await fetchChunk(chunk, productID: productID, label: label)
-                try writer.write(contentsOf: data)
-                progress(chunk.compressedSize)
+            // A window of chunks is fetched at once and written in order: at most
+            // DownloadSpeed.gogChunksPerFile are in flight or waiting for their turn.
+            try await withThrowingTaskGroup(of: (Int, Data).self) { group in
+                var next = 0
+                var written = 0
+                var ready: [Int: Data] = [:]
+                func add() {
+                    guard next < chunks.count else { return }
+                    let index = next
+                    let chunk = chunks[index]
+                    next += 1
+                    group.addTask {
+                        let data = try await self.fetchChunk(chunk, productID: productID, label: label)
+                        return (index, data)
+                    }
+                }
+                for _ in 0..<DownloadSpeed.gogChunksPerFile { add() }
+                while let (index, data) = try await group.next() {
+                    try Task.checkCancellation()
+                    ready[index] = data
+                    while let data = ready.removeValue(forKey: written) {
+                        try writer.write(contentsOf: data)
+                        progress(chunks[written].compressedSize)
+                        written += 1
+                        add()
+                    }
+                }
             }
             try writer.close()
         } catch {

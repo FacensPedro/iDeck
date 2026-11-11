@@ -87,7 +87,7 @@ enum BenchmarkSession {
             "runtimeKind": runtime["runtimeKind"] as? String ?? "unknown",
             "graphicsBackend": runtime["graphicsBackend"] as? String ?? "unknown",
             "wineJITPoolMiB": jit.wine_pool_mib,
-            "detailedDiagnostics": UserDefaults.standard.bool(forKey: "diagnostics.detailed"),
+            "detailedDiagnostics": true,
         ]
     }
 

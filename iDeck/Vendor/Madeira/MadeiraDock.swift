@@ -372,10 +372,21 @@ enum MadeiraDock {
     }
 
     @MainActor private static var lastReport = Report()
+    /// The report file's modification time and size when it was last parsed: the host
+    /// rewrites it only when a field changes, and it is polled every second.
+    @MainActor private static var lastReportStamp: (Date, Int64)?
 
     /// Reads C:\madeira-dock.txt and logs fields that changed ([dock-report]).
     @MainActor static func pollReport() -> Report {
         let url = drive.appendingPathComponent("madeira-dock.txt")
+        let attributes = try? FileManager.default.attributesOfItem(atPath: url.path)
+        let stamp: (Date, Int64)? = {
+            guard let date = attributes?[.modificationDate] as? Date,
+                  let size = (attributes?[.size] as? NSNumber)?.int64Value else { return nil }
+            return (date, size)
+        }()
+        // iDeck: an unchanged file is not read and parsed again.
+        if let stamp, let last = lastReportStamp, last.0 == stamp.0, last.1 == stamp.1 { return lastReport }
         guard let file = try? FileHandle(forReadingFrom: url) else { return lastReport }
         defer { try? file.close() }
         guard let data = try? file.read(upToCount: 32769), data.count <= 32768 else { return lastReport }
@@ -392,6 +403,7 @@ enum MadeiraDock {
             for line in lines.prefix(400) { SteamLog.event("[dock-report-file] " + line.trimmingCharacters(in: .whitespacesAndNewlines)) }
         }
         lastReport = report
+        lastReportStamp = stamp
         return report
     }
 
@@ -416,6 +428,7 @@ enum MadeiraDock {
     @MainActor static func writeHandoff(account: String, token: String, appID: Int) throws {
         cleanup()
         lastReport = Report()
+        lastReportStamp = nil
         let report = drive.appendingPathComponent("madeira-dock.txt")
         if FileManager.default.fileExists(atPath: report.path) { try FileManager.default.removeItem(at: report) }
         guard let url = transferURL else { throw DockError.message("Dock's private transfer folder is unavailable.") }
