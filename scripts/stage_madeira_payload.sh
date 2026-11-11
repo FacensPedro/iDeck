@@ -116,6 +116,13 @@ fi
 [[ -s "$APP/nls/locale.nls" ]] || {
   echo "ERROR: Wine locale.nls is missing" >&2; exit 2;
 }
+# The device's language picks the Windows code pages: all of Wine's tables are staged
+# (scripts/apply_madeira_full_nls.py), not only the en-US ones.
+for table in c_850.nls c_932.nls c_1251.nls c_10000.nls; do
+  [[ -s "$APP/nls/$table" ]] || {
+    echo "ERROR: Wine NLS table missing (non-English devices need it): $table" >&2; exit 2;
+  }
+done
 
 if [[ "${IDECK_BUILD_WOW64:-0}" == "1" && -s "$SOURCE/i386-windows/ntdll.dll" ]]; then
   for name in ntdll.dll kernel32.dll user32.dll d3d11.dll dxgi.dll; do

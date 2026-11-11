@@ -105,6 +105,9 @@ FRAMEWORKS = (
     "VideoToolbox", "CoreMedia", "CoreVideo", "CoreFoundation", "IOKit",
     "ImageIO", "GameController", "CoreHaptics", "OpenGLES", "IOSurface",
 )
+# Code pages beyond en-US (scripts/apply_madeira_full_nls.py). A kit built before
+# they were added is rejected: a device in another language needs them.
+FULL_NLS_FILES = ("nls/c_850.nls", "nls/c_932.nls", "nls/c_1251.nls", "nls/c_10000.nls")
 BASIC_FOLDERS = ("aarch64-windows", "arm64ec-windows", "nls", "legal", "licenses", "compat", "vulkan", "gl")
 # OpenGL (winios WGL driver on Mesa OSMesa + Zink, GLES fallback) and Vulkan
 # (winevulkan on MoltenVK). Kits built before these existed are rejected.
@@ -171,7 +174,7 @@ def check_assets(app: Path, wow64: bool, mono: bool, graphics: str = "d3d12") ->
     pe = REQUIRED_PE + (D3D12_PE if graphics == "d3d12" else ())
     for name in BASIC_FILES + pe + (
         "nls/locale.nls", "compat/love/lua51.dll", "licenses/LuaJIT-MIT.txt",
-    ) + GL_VULKAN_FILES + (D3D12_FILES if graphics == "d3d12" else ()) + (WOW64_FILES if wow64 else ()) + (
+    ) + FULL_NLS_FILES + GL_VULKAN_FILES + (D3D12_FILES if graphics == "d3d12" else ()) + (WOW64_FILES if wow64 else ()) + (
         ("wine-mono/bin/libmono-2.0-x86.dll",) if mono else ()
     ):
         file = app / name
