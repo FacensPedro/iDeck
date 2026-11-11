@@ -37,8 +37,10 @@ enum StikJITHelper {
     /// Check whether StikDebug is installed. `stikdebug` is its canonical scheme;
     /// the older `stikjit` alias remains declared for compatibility.
     static var isAvailable: Bool {
-        guard let url = URL(string: "stikdebug://enable-jit") else { return false }
-        return UIApplication.shared.canOpenURL(url)
+        ["stikdebug", "stikjit"].contains { scheme in
+            guard let url = URL(string: "\(scheme)://enable-jit") else { return false }
+            return UIApplication.shared.canOpenURL(url)
+        }
     }
 
     /// Open StikDebug with our JIT script embedded in the URL.
@@ -68,8 +70,20 @@ enum StikJITHelper {
 
         UIApplication.shared.open(url, options: [:]) { success in
             if !success {
-                LogStore.shared.log("Failed to open StikDebug. Is it installed?", level: .error)
-                completion(.failure(RequestError.unavailable))
+                var legacy = components
+                legacy.scheme = "stikjit"
+                guard let legacyURL = legacy.url else {
+                    completion(.failure(RequestError.invalidRequest))
+                    return
+                }
+                UIApplication.shared.open(legacyURL, options: [:]) { opened in
+                    guard opened else {
+                        LogStore.shared.log("Neither StikDebug URL scheme could be opened. Install or reinstall StikDebug.", level: .error)
+                        completion(.failure(RequestError.unavailable))
+                        return
+                    }
+                    waitForDebugger(completion: completion)
+                }
                 return
             }
             waitForDebugger(completion: completion)
