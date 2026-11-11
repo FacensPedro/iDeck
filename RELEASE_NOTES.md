@@ -4,5 +4,8 @@
 - These patches reach the x86 (32-bit) DLLs, which iDeck compiles from this Wine tree. The x64 DLLs are Madeira's prebuilt ones and are not changed by this release.
 - Patches that touch wineserver, ntdll, kernelbase, win32u, wined3d, the loader or a Unix driver are not included: Madeira replaces those parts with its iOS ports. No patch from Proton itself could be taken for that reason. The full list and sources are in `patches/wine-compat/SOURCES.md`.
 
+### 32-bit Direct3D 9 games
+- BioShock and Assassin's Creed IV stop with 0xC000001D at one place: the runtime's context return after the game's first debug message is refused in 32-bit processes. That is not fixed in this release. The refusal now writes its reason and the values it tested to the log, so the next bug report shows which check fails.
+
 ### Release
 - Updated the application version to 1.7.5 (build 57).
