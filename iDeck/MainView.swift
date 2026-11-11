@@ -351,9 +351,9 @@ struct WindowsWorkspaceView: View {
             // Long names wrap to a second line; the height is always two lines, so
             // every card is the same size whatever its title's length.
             .lineLimit(2, reservesSpace: true)
-            .multilineTextAlignment(.leading)
+            .multilineTextAlignment(.center)
             .fixedSize(horizontal: false, vertical: true)
-            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .frame(maxWidth: .infinity, alignment: .top)
             .accessibilityLabel(title)
     }
 
@@ -2183,7 +2183,9 @@ extension WindowsWorkspaceView {
                     }
                 }
                 .padding(.vertical, 10)
-                .padding(.horizontal, 2)
+                // Room for the selected tile's 1.08 scale, border and glow, which the
+                // scroll view's edge would otherwise cut on the first tile.
+                .padding(.horizontal, 14)
             }
             .onChange(of: shelf) { _, item in
                 withAnimation(.easeInOut(duration: 0.2)) { proxy.scrollTo(item, anchor: .center) }
