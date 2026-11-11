@@ -391,6 +391,13 @@ final class BugReportModel: ObservableObject {
             "Runtime: \(MadeiraBundleIdentity.isNative ? "native" : "interface-only")",
         ]
         lines += Self.environmentLines
+        if (UserDefaults.standard.string(forKey: "diagnostics.lastLauncher") ?? "").hasPrefix("EA"),
+           let facts = UserDefaults.standard.string(forKey: EALibrary.licenceFactsKey) {
+            lines.append("EA licence: " + facts)
+            if selected.contains(where: { $0.line.contains("ActivationUI.exe") }) {
+                lines.append("EA: the game started ActivationUI.exe, EA's activation window: it did not accept the licence on disk.")
+            }
+        }
         if let wineFinding { lines.append("Diagnosis: " + wineFinding) }
         lines.append("")
         lines += selected.map(\.copyText)
