@@ -1,6 +1,6 @@
 --- a/dlls/ntdll/signal_arm64ec.c
 +++ b/dlls/ntdll/signal_arm64ec.c
-@@ -1806,6 +1806,8 @@
+@@ -1806,5 +1806,7 @@
  
  NTSTATUS SYSCALL_API NtGetContextThread( HANDLE handle, CONTEXT *context )
  {
