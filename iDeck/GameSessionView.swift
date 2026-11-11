@@ -221,11 +221,13 @@ struct GameSessionView: View {
             // Edge to edge: on iPhones the safe area (Dynamic Island, notch,
             // home indicator) would otherwise shrink the game image; the
             // surface mode letterboxes it within the whole screen.
-            GeometryReader { geometry in
-                WindowsRendererView()
-                    .frame(width: geometry.size.width, height: geometry.size.height)
+            if !coordinator.windowsStatus.hasPrefix("Execution Error") {
+                GeometryReader { geometry in
+                    WindowsRendererView()
+                        .frame(width: geometry.size.width, height: geometry.size.height)
+                }
+                .ignoresSafeArea()
             }
-            .ignoresSafeArea()
 
             if touchMouseEnabled {
                 TouchMouseView().ignoresSafeArea()
