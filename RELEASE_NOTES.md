@@ -1,9 +1,8 @@
 ## What's Changed
 ### Windows runtime
-- 64-bit games whose executable cannot be moved in memory and is larger than 128 MB start again (Assassin's Creed Unity's ACU.exe is 131 MB). iDeck never measured the game's executable before reserving the JIT pool, so the pool was placed where the executable must load and Windows reported "failed to create main module" (0xC0000018). The executable is now measured first, as Madeira does, for Steam, GOG, Epic Games, EA app and .exe launches, and the pool is placed above it.
-
-### Bugs & logs
-- When iDeck itself crashes, the bug report now lists the crashing thread's call stack with function names, resolved on the device for iDeck and for iOS libraries of the same iOS version. Until now it showed only the faulting address.
+- The 32-bit (WoW64) runtime now has NTMARTA.dll and CLBCATQ.dll, which Wine does not ship. 32-bit programs that load them by name no longer fail with STATUS_DLL_NOT_FOUND (0xC0000135).
+  - NTMARTA.dll forwards GetNamedSecurityInfoW, SetNamedSecurityInfoW, GetSecurityInfo, SetSecurityInfo, SetEntriesInAclW, GetExplicitEntriesFromAclW, TreeResetNamedSecurityInfoW and TreeSetNamedSecurityInfoW to Wine's advapi32.
+  - CLBCATQ.dll provides the standard COM entry points of an empty COM+ catalog.
 
 ### Release
-- Updated the application version to 1.8.0 (build 62).
+- Updated the application version to 1.8.1 (build 63).
