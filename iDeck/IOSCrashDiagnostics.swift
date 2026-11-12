@@ -1,4 +1,5 @@
 import Foundation
+import MachO
 import MetricKit
 
 // Crash diagnostics the iPadOS way. Wine's own advice when its server dies,
@@ -50,7 +51,71 @@ final class IOSCrashDiagnostics: NSObject, MXMetricManagerSubscriber {
         let wine = Self.mentionsWine(crash.callStackTree.jsonRepresentation())
         AppLog.record("[ios-crash] iDeck crashed (\(parts.joined(separator: ", ")))"
                       + (wine ? "; the crashing stacks are in Wine/wineserver code" : ""))
+        // Function names for the frames: MetricKit gives a binary UUID and an offset;
+        // a binary loaded in this process with the same UUID (iDeck itself, or a
+        // system library while iOS is the same version) turns that into a symbol.
+        for line in Self.symbolicated(crash.callStackTree.jsonRepresentation()) {
+            AppLog.record("[ios-crash] " + line)
+        }
         save(crash.jsonRepresentation(), kind: kind, payload: payload)
+    }
+
+    /// Images loaded in this process by UUID: their Mach header, where __TEXT starts.
+    static func loadedImages() -> [String: UnsafePointer<mach_header>] {
+        var images: [String: UnsafePointer<mach_header>] = [:]
+        for index in 0..<_dyld_image_count() {
+            guard let header = _dyld_get_image_header(index) else { continue }
+            var command = UnsafeRawPointer(header).advanced(by: MemoryLayout<mach_header_64>.size)
+            for _ in 0..<header.pointee.ncmds {
+                let load = command.assumingMemoryBound(to: load_command.self).pointee
+                if load.cmd == UInt32(LC_UUID) {
+                    let uuid = command.assumingMemoryBound(to: uuid_command.self).pointee.uuid
+                    images[UUID(uuid: uuid).uuidString] = header
+                    break
+                }
+                command = command.advanced(by: Int(load.cmdsize))
+            }
+        }
+        return images
+    }
+
+    /// The crashing thread's frames in full and the first frames of the others, as
+    /// "binary+offset symbol+delta", when the binary is loaded with the same UUID.
+    static func symbolicated(_ json: Data, otherFrames: Int = 6) -> [String] {
+        guard let tree = try? JSONSerialization.jsonObject(with: json) as? [String: Any],
+              let stacks = tree["callStacks"] as? [[String: Any]] else { return [] }
+        let images = loadedImages()
+        func frames(_ root: [String: Any]) -> [[String: Any]] {
+            var out: [[String: Any]] = [root]
+            var node = root
+            while let next = (node["subFrames"] as? [[String: Any]])?.first { out.append(next); node = next }
+            return out
+        }
+        func name(_ frame: [String: Any]) -> String {
+            let binary = frame["binaryName"] as? String ?? "?"
+            let offset = (frame["offsetIntoBinaryTextSegment"] as? NSNumber)?.uintValue ?? 0
+            var text = "\(binary)+\(offset)"
+            if let uuid = frame["binaryUUID"] as? String, let header = images[uuid.uppercased()] {
+                var info = Dl_info()
+                let address = UnsafeRawPointer(header).advanced(by: Int(offset))
+                if dladdr(address, &info) != 0, let symbol = info.dli_sname, let start = info.dli_saddr {
+                    text += " " + String(cString: symbol) + "+\(address - UnsafeRawPointer(start))"
+                }
+            }
+            return text
+        }
+        var lines: [String] = []
+        for (index, stack) in stacks.enumerated() {
+            let attributed = stack["threadAttributed"] as? Bool ?? false
+            for root in stack["callStackRootFrames"] as? [[String: Any]] ?? [] {
+                let list = frames(root)
+                let shown = attributed ? list : Array(list.prefix(otherFrames))
+                lines.append("thread \(index)\(attributed ? " (crashed)" : ""): "
+                             + shown.map(name).joined(separator: " <- "))
+            }
+        }
+        // The crashing thread first.
+        return lines.sorted { $0.contains("(crashed)") && !$1.contains("(crashed)") }
     }
 
     /// Whether a call-stack tree names Wine's server or loader frames.
