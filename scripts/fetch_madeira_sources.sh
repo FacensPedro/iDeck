@@ -119,6 +119,8 @@ fi
 # - opengl32's wow64 thunks resolve the 32-bit TEB inside the iOS WoW64 window.
 # - The [iat-life] probe skips a WoW64 process's i386 image.
 # - An unloaded image retires its anon JIT aliases; the watchdog leaves exited threads.
+# - A loaded image's bound import address table is copied into its JIT-pool copy before
+#   any DllMain runs (an IAT in a writable section was never synced there).
 python3 "$ROOT/scripts/apply_madeira_patches.py" "$DEST" native
 [[ -s "$DEST/app/Madeira/iDeckARMHostFeatures.h" ]] || {
   echo "ERROR: native ARM host feature probe header is missing." >&2
