@@ -1,0 +1,25 @@
+# Wine targets built from the ARM64EC tree into the x64 farm (build_madeira_components.sh).
+# The x86 farm has all of these; the prebuilt x64 farm had none.
+# DirectShow, its renderers and codecs
+dlls/quartz/arm64ec-windows/quartz.dll
+dlls/devenum/arm64ec-windows/devenum.dll
+dlls/amstream/arm64ec-windows/amstream.dll
+dlls/qedit/arm64ec-windows/qedit.dll
+dlls/qcap/arm64ec-windows/qcap.dll
+dlls/l3codecx.ax/arm64ec-windows/l3codecx.ax
+dlls/mciqtz32/arm64ec-windows/mciqtz32.dll
+dlls/iccvid/arm64ec-windows/iccvid.dll
+dlls/msvidc32/arm64ec-windows/msvidc32.dll
+dlls/msrle32/arm64ec-windows/msrle32.dll
+# Media Foundation: the Enhanced Video Renderer (mf.dll delay-loads it) and the playback APIs
+dlls/evr/arm64ec-windows/evr.dll
+dlls/mfmediaengine/arm64ec-windows/mfmediaengine.dll
+dlls/mfplay/arm64ec-windows/mfplay.dll
+# Installers: INF installs (urlmon delay-loads advpack) and the programs they start
+dlls/advpack/arm64ec-windows/advpack.dll
+programs/msiexec/arm64ec-windows/msiexec.exe
+programs/rundll32/arm64ec-windows/rundll32.exe
+programs/regsvr32/arm64ec-windows/regsvr32.exe
+# Imported by modules already in the farm (bthprops.cpl, mshtml)
+dlls/bluetoothapis/arm64ec-windows/bluetoothapis.dll
+dlls/inetcomm/arm64ec-windows/inetcomm.dll

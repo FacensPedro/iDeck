@@ -518,7 +518,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: build/native-cache
-          key: madeira-kit-v3-${{ runner.os }}-${{ runner.arch }}-${{ env.IDECK_MADEIRA_GRAPHICS }}-${{ env.IDECK_BUILD_WOW64 == '1' && 'wow64' || 'no-wow64' }}-${{ env.IDECK_BUNDLE_WINE_MONO == '1' && 'mono' || 'no-mono' }}-${{ hashFiles('scripts/madeira_native_kit.py', 'scripts/build_madeira_components.sh', 'scripts/build_madeira_dcomp.sh', 'scripts/build_madeira_luajit.sh', 'scripts/link_madeira_native.sh', 'scripts/fetch_madeira_sources.sh', 'scripts/apply_madeira_*.py', 'build/dcomp/*', 'build/compat-dlls/*', 'scripts/build_compat_dlls.sh', 'build/wineserver/*', 'build/host/*', 'scripts/build_madeira_gl_vulkan.sh', 'scripts/stage_madeira_payload.sh', 'patches/**') }}
+          key: madeira-kit-v3-${{ runner.os }}-${{ runner.arch }}-${{ env.IDECK_MADEIRA_GRAPHICS }}-${{ env.IDECK_BUILD_WOW64 == '1' && 'wow64' || 'no-wow64' }}-${{ env.IDECK_BUNDLE_WINE_MONO == '1' && 'mono' || 'no-mono' }}-${{ hashFiles('scripts/madeira_native_kit.py', 'scripts/build_madeira_components.sh', 'scripts/build_madeira_dcomp.sh', 'scripts/build_madeira_luajit.sh', 'scripts/link_madeira_native.sh', 'scripts/fetch_madeira_sources.sh', 'scripts/apply_madeira_*.py', 'build/dcomp/*', 'build/compat-dlls/*', 'scripts/arm64ec_extra_modules.txt', 'scripts/build_compat_dlls.sh', 'build/wineserver/*', 'build/host/*', 'scripts/build_madeira_gl_vulkan.sh', 'scripts/stage_madeira_payload.sh', 'patches/**') }}
 
       - name: Locate repository or cached Madeira runtime
         if: ${{ env.IDECK_NATIVE_BUILD == '1' }}
