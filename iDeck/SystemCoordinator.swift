@@ -40,11 +40,29 @@ class SystemCoordinator: ObservableObject {
             .appendingPathComponent("madeira-log.txt", isDirectory: false)
     }
 
+    /// madeira-log.txt grows by every session (Madeira opens it for appending) and was
+    /// never cut. Between sessions, while no Wine runs, a log past this size becomes
+    /// madeira-log.previous.txt (one kept), so it stays fast to scan and copy.
+    static let wineLogRotateBytes: Int64 = 24 << 20
+
+    static func rotateWineLogIfLarge(_ url: URL) {
+        guard !ideck_wineprocess_running(), !ideck_wineserver_running(),
+              let size = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? NSNumber)?.int64Value,
+              size > wineLogRotateBytes else { return }
+        let previous = url.deletingLastPathComponent().appendingPathComponent("madeira-log.previous.txt")
+        try? FileManager.default.removeItem(at: previous)
+        if (try? FileManager.default.moveItem(at: url, to: previous)) != nil {
+            AppLog.record("[wine-log] madeira-log.txt reached \(size >> 20) MB: kept as madeira-log.previous.txt")
+        }
+    }
+
     private func captureWineLogStart() {
-        guard let path = Self.wineLogURL?.path else {
+        guard let url = Self.wineLogURL else {
             wineLogStartOffset = nil
             return
         }
+        Self.rotateWineLogIfLarge(url)
+        let path = url.path
         let attributes = try? FileManager.default.attributesOfItem(atPath: path)
         wineLogStartOffset = (attributes?[.size] as? NSNumber)?.int64Value ?? 0
     }
@@ -1505,7 +1523,7 @@ class SystemCoordinator: ObservableObject {
             (ideck_wineserver_running() || !ideck_wineprocess_thread_finished()) &&
             !waitForSessionCleanup()
         if stillBusy {
-            setWindowsStatus("Cannot start another Windows game: the previous Wine session or wineserver is still shutting down. Retry after it finishes.")
+            setWindowsStatus(Self.cleanupStuckMessage)
             SteamLog.event("[wine-session] blocked second launch: worker/server still active")
             return true
         }
@@ -1516,9 +1534,15 @@ class SystemCoordinator: ObservableObject {
             // The last guest thread and wineserver can take a moment to go
             // quiescent after the game window closes: wait for them (the run
             // loop keeps the UI responsive) instead of refusing the launch.
-            guard waitForSessionCleanup() else {
-                setWindowsStatus("Cannot start another Windows game: native Wine session cleanup is still in progress.")
-                SteamLog.event("[wine-session] cleanup did not finish within the wait; launch refused")
+            if !ideck_runtime_complete_session() {
+                setWindowsStatus("Waiting for the previous Windows session to finish…")
+            }
+            // Up to 20 s: a game's last threads and the wineserver can take that long to
+            // stop after its window closes. Wine runs inside iDeck, so when they do not
+            // stop, only reopening iDeck gives the next game a clean runtime.
+            guard waitForSessionCleanup(timeout: 20) else {
+                setWindowsStatus(Self.cleanupStuckMessage)
+                SteamLog.event("[wine-session] cleanup did not finish within 20 s; launch refused, restart needed")
                 return true
             }
         }
@@ -1698,6 +1722,7 @@ class SystemCoordinator: ObservableObject {
         setWindowsStatus(reason)
     }
 
+    static let cleanupStuckMessage = "Execution Error: the previous Windows session did not finish closing. Wine runs inside iDeck, so restart iDeck to start another game: swipe iDeck away in the app switcher, then open it again."
     static let restartMessage = "Execution Error: restart iDeck to start another game: swipe iDeck away in the app switcher, then open it again."
 
     private func nativeLaunchFailure(_ status: Int) -> String {
@@ -1707,7 +1732,7 @@ class SystemCoordinator: ObservableObject {
         if status == Int(EALREADY) {
             return ideck_wineprocess_running()
                 ? "A Windows session is already running. Close it before starting another game."
-                : "Cannot start another Windows game: native Wine session cleanup is still in progress."
+                : Self.cleanupStuckMessage
         }
         if status == Int(ENOTSUP) {
             return "Execution Error: 32-bit Windows support (WoW64) is missing from this IPA."
