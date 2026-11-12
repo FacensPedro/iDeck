@@ -505,13 +505,24 @@ struct EAInstalledGame: Codable, Sendable {
             guard !record.contentID.isEmpty else { throw EAAPIError.license("the game's content id is unknown") }
             let (hash, _) = profile.machineHash(version: activation.hashVersion)
             let current = EALicense.current(contentID: record.contentID, drive: Self.drive)
-            if EALicense.needsRenewal(current, machineHash: hash, userID: session.userID) {
-                UserDefaults.standard.set(facts + ", licence request failed", forKey: Self.licenceFactsKey)
-                let renewed = try await EALicense.renew(api: api, contentID: record.contentID, profile: profile, activation: activation, drive: Self.drive)
+            // Every launch asks EA for a fresh licence. A licence kept from an earlier
+            // launch (same machine hash, still recent) was refused by Dragon Age:
+            // Inquisition, which then started ActivationUI.exe; the same game accepted a
+            // renewed one. A kept licence is used only when the renewal fails.
+            let stale = EALicense.needsRenewal(current, machineHash: hash, userID: session.userID)
+            var renewal: EALicenseInfo?
+            UserDefaults.standard.set(facts + ", licence request failed", forKey: Self.licenceFactsKey)
+            do {
+                renewal = try await EALicense.renew(api: api, contentID: record.contentID, profile: profile, activation: activation, drive: Self.drive)
+            } catch {
+                EALog.event("[ea-license] renewal failed content=\(record.contentID) stale=\(stale ? 1 : 0): \(error.localizedDescription)")
+                if stale { throw error }
+            }
+            if let renewed = renewal {
                 UserDefaults.standard.set(facts + ", licence renewed, game token \(renewed.gameToken == nil ? "absent" : "present")",
                                           forKey: Self.licenceFactsKey)
             } else {
-                UserDefaults.standard.set(facts + ", licence kept, game token \(current?.gameToken == nil ? "absent" : "present")",
+                UserDefaults.standard.set(facts + ", licence kept (renewal failed), game token \(current?.gameToken == nil ? "absent" : "present")",
                                           forKey: Self.licenceFactsKey)
                 EALog.event("[ea-license] kept content=\(record.contentID) hash-version=\(activation.hashVersion)")
             }

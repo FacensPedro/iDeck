@@ -67,10 +67,11 @@ class SetupDownloadsRuntimeTests(unittest.TestCase):
         project = repo_text("iDeck.xcodeproj/project.pbxproj")
         self.assertEqual(project.count("/* ObservedDownload.swift in Sources */"), 2)
 
-    def test_workflow_publishes_runtime(self):
+    def test_workflow_keeps_runtime_in_the_ipa(self):
         workflow = repo_text(".github/workflows/ios.yml")
-        self.assertIn("Publish Windows runtime downloads", workflow)
-        self.assertIn("--prerelease --latest=false", workflow)
+        self.assertNotIn("Publish Windows runtime downloads", workflow)
+        self.assertNotIn("iDeck Windows runtime $TAG", workflow)
+        self.assertIn("IDECK_SPLIT_RUNTIME: '0'", workflow)
 
 
 if __name__ == "__main__":

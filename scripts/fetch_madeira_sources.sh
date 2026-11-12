@@ -69,7 +69,8 @@ for source in madeira-d3d12/src/pe/madeira_d3d12.c \
   }
 done
 
-# The Wine submodule (group "wine"): a null ARM64EC thread context query fails cleanly.
+# The Wine submodule (group "wine"): a null ARM64EC thread context query fails cleanly, and
+# wow64win passes atoms (values below 64 KB) through its guest pointer conversions.
 python3 "$ROOT/scripts/apply_madeira_patches.py" "$DEST" wine
 
 # Pinned willfaust/dxmt invokes a private four-argument Metal atomic intrinsic.
@@ -172,6 +173,9 @@ python3 "$ROOT/scripts/apply_madeira_spawn_env.py" "$DEST"
 
 # A refused ARM64EC context return (the 0xC000001D of 32-bit Direct3D 9 games) logs its reason.
 python3 "$ROOT/scripts/apply_madeira_slowpath_diag.py" "$DEST"
+
+# A native SIGBUS/SIGSEGV names the image and symbol of its pc and lr ([bus-sym]).
+python3 "$ROOT/scripts/apply_madeira_bus_symbols.py" "$DEST"
 
 # Wine Staging patch sets and GE-Proton fixes for Windows-side DLLs (patches/wine-compat).
 python3 "$ROOT/scripts/apply_madeira_wine_compat.py" "$DEST"

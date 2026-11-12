@@ -347,6 +347,18 @@ if [[ "$REBUILD" == "1" ]]; then
         "dlls/dbghelp/$arch-windows/libdbghelp.a" tools/winebuild/winebuild
   done
 
+  # The ARM64 wow64win.dll (32-bit programs' win32u thunks) is rebuilt from the
+  # patched tree instead of Madeira's prebuilt copy: patches/wine-wow64win-atoms.patch
+  # keeps MAKEINTATOM values (below 64 KB) untranslated in every guest pointer
+  # conversion, not only in the few entry points that used get_str_or_atom.
+  PATH="$MD/toolchains/llvm-mingw-20260421-ucrt-macos-universal/bin:$PATH" \
+    make -C "$MD/wine/build-macos" -j"$(sysctl -n hw.ncpu)" dlls/wow64win/aarch64-windows/wow64win.dll
+  WOW64WIN="$MD/wine/build-macos/dlls/wow64win/aarch64-windows/wow64win.dll"
+  [[ -s "$WOW64WIN" ]] || { echo "ERROR: ARM64 wow64win.dll was not built." >&2; exit 2; }
+  "$MD/toolchains/llvm-mingw-20260421-ucrt-macos-universal/bin/aarch64-w64-mingw32-strip" --strip-debug \
+    -o "$MD/app/Madeira/aarch64-windows/wow64win.dll" "$WOW64WIN"
+  echo "== installed ARM64 wow64win.dll from the patched tree =="
+
   # DXMT has both native iOS renderer code and Windows PE frontend modules.
   if [[ ! -e "$MD/dxmt/toolchains" ]]; then
     ln -s ../toolchains "$MD/dxmt/toolchains"

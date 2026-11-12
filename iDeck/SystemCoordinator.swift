@@ -390,9 +390,23 @@ class SystemCoordinator: ObservableObject {
             } else if detected && !wineReady &&
                       !self.wineJITPreparationInFlight &&
                       !self.wineJITAttemptedDuringAttachment {
-                // As Madeira: the pool is allocated at launch (MadeiraWinePool),
-                // not when the debugger attaches.
+                // iDeck opened by StikDebug: prepare Wine's pool now, while the
+                // debugger is attached. StikDebug may detach before the user taps
+                // Play; with the pool ready, the launch no longer reopens StikDebug.
                 self.wineJITAttemptedDuringAttachment = true
+                if MadeiraBundleIdentity.isNative, AddressSpaceCheck.hasGuestWindow,
+                   StikJITHelper.scriptData != nil, !ideck_wineprocess_running() {
+                    self.wineJITPreparationInFlight = true
+                    AppLog.record("[jit] debugger attached at startup: preparing the Wine JIT pool now")
+                    DispatchQueue.global(qos: .userInitiated).async {
+                        let failure = MadeiraWinePool.prepare()
+                        DispatchQueue.main.async {
+                            self.wineJITPreparationInFlight = false
+                            if let failure { AppLog.record("[jit] early pool preparation failed: \(failure)") }
+                            self.refreshJITStatus()
+                        }
+                    }
+                }
             }
             if !detected && (self.currentStatus == "JIT confirmed via StikDebug" || self.currentStatus == "Ready") {
                 self.currentStatus = "JIT not detected. Enable it in StikDebug and return to iDeck."
@@ -1546,6 +1560,11 @@ class SystemCoordinator: ObservableObject {
                 return true
             }
         }
+        if let why = Self.restartNeeded() {
+            setWindowsStatus("Execution Error: \(why). Restart iDeck before starting another game: swipe iDeck away in the app switcher, then open it again through StikDebug.")
+            SteamLog.event("[wine-session] launch refused, restart needed: \(why)")
+            return true
+        }
         return false
     }
 
@@ -1719,7 +1738,23 @@ class SystemCoordinator: ObservableObject {
             reason += " AVX/AVX2 translation is now on for this game: restart iDeck and start it again."
         }
         SteamLog.event("[wine-exit] \(reason)")
+        if let ntstatus, ntstatus != 0 { Self.restartReason = "the last game crashed (NTSTATUS 0x\(String(ntstatus, radix: 16, uppercase: true)))" }
         setWindowsStatus(reason)
+    }
+
+    /// Why the next game needs a fresh iDeck process, or nil. Wine runs inside iDeck:
+    /// after a crashed session, on a shrunken JIT pool or with little memory left, a
+    /// second game started in the same process failed (BioShock after Dragon Age:
+    /// 6108 MB in use, a 336 MB pool, a crash inside the runtime).
+    static var restartReason: String?
+    static let restartMinimumFreeMiB = 1500
+
+    static func restartNeeded() -> String? {
+        if let restartReason { return restartReason }
+        if StikJITHelper.smallPoolMB > 0 { return "the JIT pool shrank to \(StikJITHelper.smallPoolMB) MB" }
+        let free = Int(os_proc_available_memory() >> 20)
+        if free > 0 && free < restartMinimumFreeMiB { return "only \(free) MB of memory is left" }
+        return nil
     }
 
     static let cleanupStuckMessage = "Execution Error: the previous Windows session did not finish closing. Wine runs inside iDeck, so restart iDeck to start another game: swipe iDeck away in the app switcher, then open it again."

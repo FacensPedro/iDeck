@@ -446,6 +446,8 @@ jobs:
     # Metal Shader Converter and third-party redistribution in Actions vars.
     env:
       IDECK_REQUIRE_IPHONE_DUO_SDK: '1'
+      # Wine's Windows files stay inside the IPA: no runtime-* GitHub releases.
+      IDECK_SPLIT_RUNTIME: '0'
       IDECK_NATIVE_BUILD: ${{ ((github.event_name == 'workflow_dispatch' && inputs.require_madeira) || (github.event_name == 'push' && vars.IDECK_NATIVE_DISTRIBUTION_APPROVED == 'true')) && '1' || '0' }}
       IDECK_BUILD_WOW64: ${{ ((github.event_name == 'workflow_dispatch' && inputs.require_madeira && inputs.build_wow64) || (github.event_name == 'push' && vars.IDECK_NATIVE_DISTRIBUTION_APPROVED == 'true')) && '1' || '0' }}
       IDECK_BUNDLE_WINE_MONO: ${{ ((github.event_name == 'workflow_dispatch' && inputs.require_madeira && inputs.bundle_wine_mono) || (github.event_name == 'push' && vars.IDECK_NATIVE_DISTRIBUTION_APPROVED == 'true')) && '1' || '0' }}
@@ -911,30 +913,6 @@ jobs:
           print("Confirmed IPA includes Madeira native manifest and Windows runtime payload")
           PY
           fi
-
-      - name: Publish Windows runtime downloads
-        # The initial setup downloads Wine's x64/x86 Windows files from a release
-        # tagged by their content hash; an existing tag already holds the same files.
-        if: ${{ env.IDECK_NATIVE_BUILD == '1' && hashFiles('build/runtime-downloads/runtime-release.json') != '' }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          TAG="$(python3 -c 'import json;print(json.load(open("build/runtime-downloads/runtime-release.json"))["tag"])')"
-          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --prerelease --latest=false \
-              --target "$GITHUB_SHA" --title "iDeck Windows runtime $TAG" \
-              --notes "Wine x64 and x86 (WoW64) Windows files downloaded by iDeck's initial setup. Not an app release."
-          fi
-          EXISTING="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')"
-          for file in build/runtime-downloads/*.tar.xz; do
-            name="$(basename "$file")"
-            if grep -Fxq "$name" <<<"$EXISTING"; then
-              echo "$name already published"
-            else
-              gh release upload "$TAG" "$file" --repo "$GITHUB_REPOSITORY"
-            fi
-          done
 
       - name: Prepare authorized compiled runtime export
         if: ${{ env.IDECK_NATIVE_BUILD == '1' && env.IDECK_MADEIRA_GRAPHICS == 'd3d12' && inputs.export_runtime_kit && env.IDECK_ACCEPT_METAL_CONVERTER_LICENSE == '1' }}

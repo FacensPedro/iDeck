@@ -130,6 +130,10 @@ enum GOGAPI {
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 20
         config.httpMaximumConnectionsPerHost = DownloadSpeed.gogConnections
+        // Game chunks are written to disk by the installer: nothing is kept in
+        // URLCache (memory, or its Cache.db on disk) for them.
+        config.urlCache = nil
+        config.requestCachePolicy = .reloadIgnoringLocalCacheData
         return URLSession(configuration: config)
     }()
 

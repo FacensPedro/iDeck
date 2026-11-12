@@ -332,6 +332,8 @@ class WindowsEnvironment {
     /// madeira.cfg env.MADEIRA_ONE_SESSION_PER_RUN = 0 lets the launch go ahead.
     static var sessionsThisRun = 0
     /// Why Madeira's StikJITHelper could not allocate the pool (its poolFailure).
+    /// DXMT_MAX_FRAME_LATENCY was set by iDeck's low-memory rule (not a game config).
+    static var lowMemoryFrameLatency = false
     static var lastPoolFailure: String?
     static let sessionAlreadyRan = Int32(EALREADY)
     static var oneSessionPerRun: Bool { MadeiraConfig.flag("MADEIRA_ONE_SESSION_PER_RUN") }
@@ -690,6 +692,17 @@ class WindowsEnvironment {
         // it and stopped right after loading its shaders.
         setenv("DXMT_WSI_MONITOR_IDENTITY", "1", 1)
         setenv("DXMT_WSI_MODE_TABLE", "1", 1)
+        // RAM: DXMT keeps a frame's staging buffers alive per frame in flight. With
+        // less than 3 GB left for the game, one frame in flight instead of two
+        // (a game's own DXMT_MAX_FRAME_LATENCY, from its config, still wins). The
+        // shader cache on disk is capped at 128 MB (its SQLite file is mapped).
+        if getenv("DXMT_MAX_FRAME_LATENCY") == nil || Self.lowMemoryFrameLatency {
+            let low = Int(os_proc_available_memory() >> 20) < 3072
+            Self.lowMemoryFrameLatency = low
+            if low { setenv("DXMT_MAX_FRAME_LATENCY", "1", 1) } else { unsetenv("DXMT_MAX_FRAME_LATENCY") }
+            AppLog.record("[memory] DXMT frames in flight: \(low ? 1 : 2) (\(Int(os_proc_available_memory() >> 20)) MiB left)")
+        }
+        setenv("DXMT_SHADER_CACHE_MAX_MB", "128", 0)
         // Fastsync's per-game switches, only when Settings chose Fastsync.
         if MadeiraSyncEngine.current == .fastsync {
             let mode = MadeiraConfig.get("env.MADEIRA_FASTSYNC") ?? "auto"

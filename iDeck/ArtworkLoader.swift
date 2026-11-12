@@ -12,14 +12,23 @@ final class ArtworkLoader: @unchecked Sendable {
     private let session: URLSession
 
     private init() {
-        memory.totalCostLimit = 96 << 20
+        // Cost is the DECODED size (width x height x 4): the compressed byte count
+        // used before let 96 MB of JPEGs hold several hundred MB of bitmaps.
+        memory.totalCostLimit = 48 << 20
         let config = URLSessionConfiguration.default
-        config.urlCache = URLCache(memoryCapacity: 16 << 20, diskCapacity: 256 << 20, directory: nil)
+        // The disk cache keeps covers across launches; nothing of it in RAM (the
+        // decoded NSCache above is the in-memory copy).
+        config.urlCache = URLCache(memoryCapacity: 0, diskCapacity: 256 << 20, directory: nil)
         config.requestCachePolicy = .returnCacheDataElseLoad
         config.networkServiceType = .responsiveData
         config.httpMaximumConnectionsPerHost = 6
         config.timeoutIntervalForRequest = 20
         session = URLSession(configuration: config)
+        // Memory pressure and the end of a game session drop the decoded covers;
+        // they come back from the disk cache.
+        // (ResourceGovernor.releaseCachesNotification, spelled out: that type is main-actor isolated.)
+        NotificationCenter.default.addObserver(forName: Notification.Name("iDeckReleaseCaches"),
+                                               object: nil, queue: nil) { [weak self] _ in self?.memory.removeAllObjects() }
     }
 
     func cached(_ url: URL) -> UIImage? { memory.object(forKey: url as NSURL) }
@@ -31,9 +40,19 @@ final class ArtworkLoader: @unchecked Sendable {
         let (data, response) = try await session.data(for: request, delegate: HighPriority.shared)
         guard (response as? HTTPURLResponse).map({ (200..<300).contains($0.statusCode) }) ?? true,
               let image = UIImage(data: data) else { throw URLError(.cannotDecodeContentData) }
-        // Decoded once here, not on the main thread while scrolling.
-        let ready = image.preparingForDisplay() ?? image
-        memory.setObject(ready, forKey: url as NSURL, cost: data.count)
+        // Decoded once here, not on the main thread while scrolling, and no larger
+        // than the biggest place a cover is shown (1280 px on the long side).
+        let longSide = max(image.size.width, image.size.height) * image.scale
+        let ready: UIImage
+        if longSide > 1280 {
+            let factor = 1280 / longSide
+            ready = image.preparingThumbnail(of: CGSize(width: image.size.width * image.scale * factor,
+                                                        height: image.size.height * image.scale * factor)) ?? image
+        } else {
+            ready = image.preparingForDisplay() ?? image
+        }
+        let pixels = Int(ready.size.width * ready.scale) * Int(ready.size.height * ready.scale)
+        memory.setObject(ready, forKey: url as NSURL, cost: max(pixels * 4, data.count))
         return ready
     }
 

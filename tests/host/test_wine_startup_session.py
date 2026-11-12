@@ -17,7 +17,7 @@ class WineStartupSessionTests(unittest.TestCase):
         self.assertIn("private var gameLoading:", VIEW)
         self.assertIn("ProgressView(value: loading.progress, total: 1)", VIEW)
         self.assertIn('0.90, "Waiting for the first game frame"', VIEW)
-        self.assertIn('1.0, "First Metal frame displayed"', VIEW)
+        self.assertIn('if metrics.receivedNewFrames { return nil }', VIEW)
         self.assertIn("metrics.receivedNewFrames", VIEW)
         self.assertIn("Startup milestone, not the game's internal loading percentage.", VIEW)
 
