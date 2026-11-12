@@ -383,9 +383,11 @@ if [[ "$REBUILD" == "1" ]]; then
         cp -R "$MD/app/Madeira/i386-windows/." "$I386_CACHE/"
       fi
     fi
-    # DLLs Wine does not ship that 32-bit programs load by name (NTMARTA, CLBCATQ).
+    # DLLs Wine does not ship that 32-bit programs load by name (NTMARTA, CLBCATQ), and a
+    # vulkan-1.dll that reports no Vulkan driver (the x86 tree has no Vulkan).
     PATH="$MD/toolchains/llvm-mingw-20260421-ucrt-macos-universal/bin:$PATH" \
-      bash "$ROOT/scripts/build_compat_dlls.sh" "$MD/app/Madeira/i386-windows"
+      bash "$ROOT/scripts/build_compat_dlls.sh" "$MD/app/Madeira/i386-windows" i686-w64-mingw32-clang \
+        "$MD/wine/dlls/vulkan-1/vulkan-1.spec"
   fi
 
   if [[ "$GRAPHICS" == "d3d12" ]]; then
