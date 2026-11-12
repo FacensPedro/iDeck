@@ -16,6 +16,13 @@
 - iDeck asks to be reopened before the next game when the last game crashed, when the JIT pool had to shrink, or when less than 1.5 GB of memory is left. A second game started in the same iDeck process after a crash began with 6 GB in use and a 336 MB JIT pool, and crashed too.
 
 ### Memory
+- Store covers are kept in memory by their decoded size (48 MB at most), are scaled down to 1280 px on the long side, and are dropped on memory pressure and when a game session ends; the disk cache brings them back. The memory limit used to count their compressed size, so far more decoded images stayed in RAM.
+- SQLite's page caches (DXMT's shader cache and the system frameworks share them) are limited to 32 MB.
+- With less than 3 GB left when a game starts, DXMT keeps one frame in flight instead of two, which holds fewer staging buffers; a game's own setting still wins. The shader cache on disk is capped at 128 MB.
+
+### Game screen
+- The loading bar goes away as soon as the first game frame arrives; "First Metal frame displayed" used to stay on screen.
+- The performance overlay shows the frame time instead of "GPU utilization: unavailable on iOS" (iOS gives apps no GPU utilization counter).
 - Network responses are no longer kept in a URL cache: iDeck's shared cache (in RAM and in CFNetwork's Cache.db) is turned off at launch, and GOG game downloads bypass it too. Game files were always written straight to disk; artwork keeps its own small cache.
 
 ### Bugs & logs

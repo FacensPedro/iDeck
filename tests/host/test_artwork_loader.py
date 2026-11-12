@@ -8,7 +8,7 @@ class ArtworkLoaderTests(unittest.TestCase):
         loader = repo_text("iDeck/ArtworkLoader.swift")
         self.assertIn("task.priority = URLSessionTask.highPriority", loader)
         self.assertIn("config.networkServiceType = .responsiveData", loader)
-        self.assertIn("URLCache(memoryCapacity: 16 << 20, diskCapacity: 256 << 20", loader)
+        self.assertIn("URLCache(memoryCapacity: 0, diskCapacity: 256 << 20", loader)
         project = repo_text("iDeck.xcodeproj/project.pbxproj")
         self.assertIn("/* ArtworkLoader.swift in Sources */", project)
         view = repo_text("iDeck/MainView.swift")

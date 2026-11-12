@@ -137,10 +137,9 @@ struct GameSessionView: View {
             if coordinator.currentSteamLaunchUsesDock && !coordinator.dockLaunchAccepted {
                 return (0.70, coordinator.steamDockLaunchStage ?? "Starting Madeira Dock")
             }
-            if metrics.receivedNewFrames {
-                let recentlyReady = metrics.secondsSinceLaunch - (metrics.firstFrameAt ?? 0) < 2.5
-                return recentlyReady ? (1.0, "First Metal frame displayed") : nil
-            }
+            // The bar goes away with the first frame: secondsSinceLaunch stops being
+            // published once frames arrive, so a 2.5 s "displayed" stage never ended.
+            if metrics.receivedNewFrames { return nil }
             if coordinator.currentSteamLaunchUsesDock {
                 return (0.90, "Waiting for a Metal frame after Steam's LaunchApp")
             }
@@ -326,8 +325,9 @@ struct GameSessionView: View {
                                 .minimumScaleFactor(0.8)
                             if horizontalSizeClass != .compact {
                                 Text("GPU memory (Metal): \(metrics.gpuMemory)")
-                                Text("GPU utilization: unavailable on iOS")
-                                    .font(.system(size: 9))
+                                // iOS gives apps no GPU utilization counter; the frame
+                                // time is the honest per-frame load figure.
+                                Text("Frame time: \(Int(metrics.fps).map { $0 > 0 ? String(format: "%.1f ms", 1000.0 / Double($0)) : "N/D" } ?? "N/D")")
                             }
                         }
                         .font(.system(size: 12, design: .monospaced))

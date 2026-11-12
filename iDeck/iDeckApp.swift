@@ -1,4 +1,5 @@
 import SwiftUI
+import SQLite3
 
 @main
 struct iDeckApp: App {
@@ -9,6 +10,10 @@ struct iDeckApp: App {
         // default configurations was kept in RAM and in CFNetwork's Cache.db
         // (sqlite). Downloads write to disk themselves, and artwork has its own cache.
         URLCache.shared = URLCache(memoryCapacity: 0, diskCapacity: 0, directory: nil)
+        // SQLite's page caches are process-wide: DXMT's shader cache and the system
+        // frameworks share them. A 32 MB soft limit makes SQLite reuse pages
+        // instead of growing with every database it opens.
+        sqlite3_soft_heap_limit64(32 << 20)
         // As MadeiraApp.init: host pads as Windows.Gaming.Input gamepads, and no
         // Metal HUD insights; madeira.cfg values exported later win.
         setenv("MTL_HUD_INSIGHTS_ENABLED", "0", 0)
