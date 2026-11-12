@@ -6,6 +6,7 @@
 - In Settings, Stores & launchers lists each store in its own group, with space between Steam, GOG, Epic Games and the EA app.
 
 ### Build
+- The Windows compilers (llvm-mingw's `*-w64-mingw32-clang`) now go through ccache: their wrapper calls ccache when `CCACHE` is set, and the build sets it. Wine modules, DXMT and the compat DLLs whose sources did not change are taken from the cache instead of recompiled. A probe checks that it works and the statistics are shown after the build.
 - The compiled i386 Wine farm (about 9 minutes of the IPA build) is no longer rebuilt when `scripts/build_madeira_components.sh` changes: its cache key now follows only the toolchains and the farm's own patched sources.
 - The patch applier records each applied patch (name, SHA-256 and the repository's HEAD) in the repository's git directory, so preparing the same checkout twice works even when a later patch changed the lines of an earlier one.
 - iDeck's patches to Madeira are applied from one list (patches/series.txt) by one tested script, instead of twenty copies of the same shell block. A patch that no longer fits the pinned sources stops the build with its name.

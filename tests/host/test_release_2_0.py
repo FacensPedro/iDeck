@@ -36,6 +36,15 @@ class Release20Tests(unittest.TestCase):
         self.assertNotIn("build_madeira_components.sh", line)
         self.assertIn("native_fp.outputs.i386", line)
 
+    def test_ccache_wraps_the_windows_compilers(self):
+        workflow = (ROOT / ".github/workflows/ios.yml").read_text()
+        self.assertIn('echo "CCACHE=1" >> "$GITHUB_ENV"', workflow)
+        self.assertIn("ccache --set-config=hash_dir=false", workflow)
+        self.assertIn("ideck-ccache-v2-", workflow)
+        self.assertLess(workflow.index("Save compiled ARM64EC and iOS LLVM toolchains"),
+                        workflow.index("scripts/check_mingw_ccache.sh"))
+        self.assertTrue((ROOT / "scripts/check_mingw_ccache.sh").is_file())
+
     def test_no_multiversus(self):
         self.assertNotIn("multiversus", read("WindowsLibraryModels.swift").lower())
         self.assertNotIn("multiversus", (ROOT / "RELEASE_NOTES.md").read_text().lower())
