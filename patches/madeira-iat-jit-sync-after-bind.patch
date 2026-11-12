@@ -1,0 +1,65 @@
+diff --git a/build/ntdll-unix/virtual_ios.c b/build/ntdll-unix/virtual_ios.c
+index 7e23bd2..948b1a1 100644
+--- a/build/ntdll-unix/virtual_ios.c
++++ b/build/ntdll-unix/virtual_ios.c
+@@ -6934,10 +6934,17 @@ NTSTATUS unixcall_ios_sync_pe_write(void *args)
+     struct ios_sync_pe_write_params *p = args;
+     void *copy;
+ 
+-    if (!p || !p->address || p->size != sizeof(ULONG)) return STATUS_INVALID_PARAMETER;
++    /* iDeck: besides the four-byte TLS index, the loader syncs an image's bound
++     * import address table (IAT) in chunks of up to 64 KB, 8-byte entries. */
++    if (!p || !p->address) return STATUS_INVALID_PARAMETER;
++    if (p->size != sizeof(ULONG) && (!p->size || (p->size & 7) || p->size > 0x10000))
++        return STATUS_INVALID_PARAMETER;
+     p->synced = 0;
+     copy = ios_jit_translate_addr(p->address);
+     if (copy == p->address) return STATUS_SUCCESS; /* image not copied yet */
++    /* The whole range must lie in the same copied image. */
++    if ((char *)ios_jit_translate_addr((char *)p->address + p->size - 1) != (char *)copy + p->size - 1)
++        return STATUS_INVALID_PARAMETER;
+     ios_jit_sync_write(p->address, p->size);
+     if (memcmp(copy, p->address, p->size)) return STATUS_UNSUCCESSFUL;
+     p->synced = 1;
+diff --git a/wine/dlls/ntdll/loader.c b/wine/dlls/ntdll/loader.c
+index 50a2118..c62614a 100644
+--- a/wine/dlls/ntdll/loader.c
++++ b/wine/dlls/ntdll/loader.c
+@@ -1935,6 +1935,37 @@ static NTSTATUS fixup_imports( WINE_MODREF *wm, LPCWSTR load_path )
+         else if (imp && imp->ldr.DdagNode != node_ntdll && imp->ldr.DdagNode != node_kernel32)
+             add_module_dependency_after( wm->ldr.DdagNode, imp->ldr.DdagNode, dep_after );
+     }
++#ifdef __arm64ec__
++    if (status == STATUS_SUCCESS)
++    {
++        /* iDeck: the image runs from a JIT-pool copy taken at map time, before its
++         * imports were bound. Code reaches the IAT PC-relatively, so it reads the
++         * copy's slots: an import bound without an NtProtectVirtualMemory call on
++         * the IAT (one in a writable section) stayed unbound (zero) there, and the
++         * first use of an imported data pointer faulted at address 0 inside the
++         * DLL's process_attach. Copy the bound IAT into the pool copy before any
++         * DllMain runs. */
++        DWORD iat_size, done = 0, synced = 0;
++        char *iat = RtlImageDirectoryEntryToData( wm->ldr.DllBase, TRUE,
++                                                  IMAGE_DIRECTORY_ENTRY_IAT, &iat_size );
++        iat_size &= ~7u;
++        while (iat && done < iat_size)
++        {
++            struct ios_sync_pe_write_params params = { iat + done, min( iat_size - done, 0x10000 ), 0 };
++            NTSTATUS sync = WINE_UNIX_CALL( unix_ios_sync_pe_write, &params );
++            if (sync)
++            {
++                ERR( "[iat-jit-sync] module=%s iat=%p+0x%lx status=%lx\n",
++                     debugstr_w(wm->ldr.BaseDllName.Buffer), iat + done, (unsigned long)params.size, sync );
++                break;
++            }
++            synced += params.synced;
++            done += params.size;
++        }
++        if (synced) TRACE( "[iat-jit-sync] module=%s iat=%p size=0x%lx\n",
++                           debugstr_w(wm->ldr.BaseDllName.Buffer), iat, (unsigned long)iat_size );
++    }
++#endif
+     if (wm->ldr.ActivationContext) RtlDeactivateActivationContext( 0, cookie );
+     return status;
+ }
