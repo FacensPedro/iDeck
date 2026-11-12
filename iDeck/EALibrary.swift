@@ -511,10 +511,10 @@ struct EAInstalledGame: Codable, Sendable {
             // renewed one. A kept licence is used only when the renewal fails.
             let stale = EALicense.needsRenewal(current, machineHash: hash, userID: session.userID)
             var renewal: EALicenseInfo?
+            UserDefaults.standard.set(facts + ", licence request failed", forKey: Self.licenceFactsKey)
             do {
                 renewal = try await EALicense.renew(api: api, contentID: record.contentID, profile: profile, activation: activation, drive: Self.drive)
             } catch {
-                UserDefaults.standard.set(facts + ", licence request failed", forKey: Self.licenceFactsKey)
                 EALog.event("[ea-license] renewal failed content=\(record.contentID) stale=\(stale ? 1 : 0): \(error.localizedDescription)")
                 if stale { throw error }
             }
