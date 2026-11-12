@@ -7,6 +7,9 @@
 ### EA app
 - EA games that check their licence with EA's activation library get a fresh licence from EA at every launch. Dragon Age: Inquisition refused a licence kept from an earlier launch and opened EA's activation window (ActivationUI.exe), which then crashed; with a renewed licence it went on to start. A kept licence is used only if the renewal fails, and the bug report then says "licence kept (renewal failed)".
 
+### JIT
+- When StikDebug opens iDeck and attaches, iDeck prepares Wine's JIT pool right away. Starting a game then no longer sends you back to StikDebug when JIT is already on, even if StikDebug has detached in the meantime.
+
 ### Starting another game
 - iDeck asks to be reopened before the next game when the last game crashed, when the JIT pool had to shrink, or when less than 1.5 GB of memory is left. A second game started in the same iDeck process after a crash began with 6 GB in use and a 336 MB JIT pool, and crashed too.
 

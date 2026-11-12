@@ -390,9 +390,23 @@ class SystemCoordinator: ObservableObject {
             } else if detected && !wineReady &&
                       !self.wineJITPreparationInFlight &&
                       !self.wineJITAttemptedDuringAttachment {
-                // As Madeira: the pool is allocated at launch (MadeiraWinePool),
-                // not when the debugger attaches.
+                // iDeck opened by StikDebug: prepare Wine's pool now, while the
+                // debugger is attached. StikDebug may detach before the user taps
+                // Play; with the pool ready, the launch no longer reopens StikDebug.
                 self.wineJITAttemptedDuringAttachment = true
+                if MadeiraBundleIdentity.isNative, AddressSpaceCheck.hasGuestWindow,
+                   StikJITHelper.scriptData != nil, !ideck_wineprocess_running() {
+                    self.wineJITPreparationInFlight = true
+                    AppLog.record("[jit] debugger attached at startup: preparing the Wine JIT pool now")
+                    DispatchQueue.global(qos: .userInitiated).async {
+                        let failure = MadeiraWinePool.prepare()
+                        DispatchQueue.main.async {
+                            self.wineJITPreparationInFlight = false
+                            if let failure { AppLog.record("[jit] early pool preparation failed: \(failure)") }
+                            self.refreshJITStatus()
+                        }
+                    }
+                }
             }
             if !detected && (self.currentStatus == "JIT confirmed via StikDebug" || self.currentStatus == "Ready") {
                 self.currentStatus = "JIT not detected. Enable it in StikDebug and return to iDeck."
