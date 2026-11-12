@@ -1738,7 +1738,7 @@ class SystemCoordinator: ObservableObject {
             reason += " AVX/AVX2 translation is now on for this game: restart iDeck and start it again."
         }
         SteamLog.event("[wine-exit] \(reason)")
-        if ntstatus != 0 { Self.restartReason = "the last game crashed (NTSTATUS 0x\(String(ntstatus, radix: 16, uppercase: true)))" }
+        if let ntstatus, ntstatus != 0 { Self.restartReason = "the last game crashed (NTSTATUS 0x\(String(ntstatus, radix: 16, uppercase: true)))" }
         setWindowsStatus(reason)
     }
 
@@ -1752,7 +1752,7 @@ class SystemCoordinator: ObservableObject {
     static func restartNeeded() -> String? {
         if let restartReason { return restartReason }
         if StikJITHelper.smallPoolMB > 0 { return "the JIT pool shrank to \(StikJITHelper.smallPoolMB) MB" }
-        let free = ResourceGovernor.availableMiB()
+        let free = Int(os_proc_available_memory() >> 20)
         if free > 0 && free < restartMinimumFreeMiB { return "only \(free) MB of memory is left" }
         return nil
     }

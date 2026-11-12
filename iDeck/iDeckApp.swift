@@ -5,6 +5,10 @@ struct iDeckApp: App {
     @StateObject private var coordinator = SystemCoordinator()
 
     init() {
+        // No shared URL cache: every response through URLSession.shared and the
+        // default configurations was kept in RAM and in CFNetwork's Cache.db
+        // (sqlite). Downloads write to disk themselves, and artwork has its own cache.
+        URLCache.shared = URLCache(memoryCapacity: 0, diskCapacity: 0, directory: nil)
         // As MadeiraApp.init: host pads as Windows.Gaming.Input gamepads, and no
         // Metal HUD insights; madeira.cfg values exported later win.
         setenv("MTL_HUD_INSIGHTS_ENABLED", "0", 0)
