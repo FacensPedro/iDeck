@@ -24,6 +24,7 @@ class SteamDLLSetupTests(unittest.TestCase):
         fetch = GLUE[GLUE.index("static func fetch(progress:"):]
         fetch = fetch[:fetch.index('await progress("Steam DLLs are ready.")')]
         self.assertIn("ObservedDownload.run(request, expected: Int64(package.bytes))", fetch)
+        self.assertIn("static func fetch(progress: @escaping @Sendable (String) async -> Void)", GLUE)
         self.assertNotIn("session.download(from: url)", fetch)
         self.assertIn('progress("\\(label) \\(percent)%…")', fetch)
         # The checks on the result are kept.

@@ -188,7 +188,7 @@ enum SteamVideoLibraries {
     /// Downloads Valve's pinned x64 video-client packages and places the
     /// FFmpeg DLLs and SDL3.dll in Documents/SteamDLLs, where
     /// SteamDLLRepair validates and installs them. Nothing is executed.
-    static func fetch(progress: @Sendable (String) async -> Void) async throws {
+    static func fetch(progress: @escaping @Sendable (String) async -> Void) async throws {
         guard let folder = SteamDLLRepair.sourceFolder else { return }
         let fm = FileManager.default
         let names = SteamDLLRepair.mediaLibraries + [SteamDLLRepair.sdlLibrary]
