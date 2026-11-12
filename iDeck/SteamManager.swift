@@ -405,6 +405,10 @@ final class SteamOwnedGamesModel: ObservableObject {
 
     func install(appID: UInt32, prefixPath: URL) async {
         guard !installingApps.contains(appID) else { return }
+        if AntiCheatPolicy.isBlocked(title: games.first(where: { $0.appID == appID })?.name ?? "", steamAppID: appID) {
+            downloadErrors[appID] = AntiCheatPolicy.message
+            return
+        }
         guard SteamSignIn.isSignedIn else {
             downloadErrors[appID] = "Sign in to install Steam games."
             return

@@ -276,6 +276,7 @@ struct EAInstalledGame: Codable, Sendable {
 
     private func enqueue(_ id: String, kind: Download.Kind) {
         guard signedIn || installed[id] != nil else { error = "Sign in to EA to download games."; return }
+        if kind == .install, AntiCheatPolicy.isBlocked(title: game(id)?.title ?? "") { error = AntiCheatPolicy.message; return }
         guard signedIn else { error = EAAPIError.signedOut.localizedDescription; return }
         if let current = downloads[id], current.state == .active || current.state == .queued { return }
         // A resumed download keeps what it showed when it was paused.
@@ -532,7 +533,7 @@ struct EAInstalledGame: Codable, Sendable {
         let launchID = UUID().uuidString.lowercased()
         let environment: [String: String] = [
             "EAAuthCode": "unavailable", "EAEgsProxyIpcPort": "0", "EAEntitlementSource": "EA", "EAExternalSource": "EA", "EAFreeTrialGame": "false",
-            "EAGameLocale": "en_US", "EAGenericAuthToken": session.accessToken, "EALaunchCode": "unavailable", "EALaunchOwner": "EA",
+            "EAGameLocale": AppLanguage.gameLocale(separator: "_"), "EAGenericAuthToken": session.accessToken, "EALaunchCode": "unavailable", "EALaunchOwner": "EA",
             "EALaunchEAID": session.displayName, "EALaunchEnv": "production", "EALaunchOfflineMode": "false", "EALsxPort": String(EAService.port),
             "EARtPLaunchCode": String(EALSXCrypto.launchCode()), "EASecureLaunchTokenTemp": session.userID, "EASteamProxyIpcPort": "0",
             "OriginSessionKey": launchID, "ContentId": record.contentID, "EAOnErrorExitRetCode": "1", "EAConnectionId": id, "EALicenseToken": id,

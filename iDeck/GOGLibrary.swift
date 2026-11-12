@@ -369,6 +369,11 @@ final class GOGLibraryModel: ObservableObject {
     /// Galaxy builds are installed; no offline installer is used.
     func install(_ game: GOGGame, prefixPath: URL, completion: @escaping (InstallOutcome) -> Void) {
         guard downloadTasks[game.id] == nil else { return }
+        if AntiCheatPolicy.isBlocked(title: game.title) {
+            downloadErrors[game.id] = AntiCheatPolicy.message
+            completion(.failed)
+            return
+        }
         pausedDownloads.remove(game.id)
         resumeDownloads[game.id] = { [weak self] in self?.install(game, prefixPath: prefixPath, completion: completion) }
         downloadErrors[game.id] = nil

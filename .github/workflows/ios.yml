@@ -580,9 +580,9 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ~/.cache/ccache
-          key: ideck-ccache-v1-xcode27-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+          key: ideck-ccache-v2-xcode27-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
           restore-keys: |
-            ideck-ccache-v1-xcode27-${{ runner.os }}-${{ runner.arch }}-
+            ideck-ccache-v2-xcode27-${{ runner.os }}-${{ runner.arch }}-
 
       - name: Configure native compiler cache
         if: ${{ env.IDECK_NATIVE_BUILD == '1' && steps.madeira_kit.outputs.available != 'true' }}
@@ -592,8 +592,15 @@ jobs:
           fi
           echo "CCACHE_DIR=$HOME/.cache/ccache" >> "$GITHUB_ENV"
           echo "CCACHE_BASEDIR=$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
-          ccache --set-config=max_size=2G
+          # llvm-mingw's clang-target-wrapper.sh (every *-w64-mingw32-clang/clang++) runs
+          # `$CCACHE clang ...` when CCACHE is set, so the Wine PE farms (x64 and i386),
+          # DXMT and the compat DLLs go through ccache without replacing any compiler.
+          echo "CCACHE=1" >> "$GITHUB_ENV"
+          ccache --set-config=max_size=4G
           ccache --set-config=compiler_check=content
+          # Same object for the same source wherever the runner checked it out.
+          ccache --set-config=hash_dir=false
+          ccache --zero-stats
 
       - name: Install Madeira native build dependencies
         if: ${{ env.IDECK_NATIVE_BUILD == '1' && steps.madeira_kit.outputs.available != 'true' }}
@@ -669,6 +676,10 @@ jobs:
             vendor/Madeira/toolchains/llvm-ios-build
           key: ${{ steps.native_toolchains.outputs.cache-primary-key }}
 
+      - name: Verify ccache wraps the Windows compilers
+        if: ${{ env.IDECK_NATIVE_BUILD == '1' && steps.madeira_kit.outputs.available != 'true' }}
+        run: bash scripts/check_mingw_ccache.sh vendor/Madeira/toolchains/llvm-mingw-20260421-ucrt-macos-universal
+
       # MoltenVK (Vulkan) and Mesa OSMesa + Zink (desktop OpenGL) take a long
       # time to compile; scripts/build_madeira_gl_vulkan.sh reuses this cache.
       - name: Restore compiled OpenGL and Vulkan runtimes
@@ -697,7 +708,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: build/i386-farm-cache
-          key: madeira-i386-farm-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/prepare_madeira_toolchains.sh', 'scripts/build_madeira_components.sh') }}-${{ steps.native_fp.outputs.i386 }}
+          key: madeira-i386-farm-v3-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/prepare_madeira_toolchains.sh') }}-${{ steps.native_fp.outputs.i386 }}
 
       - name: Download owner-supplied Apple Metal Shader Converter package
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.use_msc_pkg }}
@@ -784,6 +795,10 @@ jobs:
             echo "::error title=Last build log lines::$(tail -n 40 build.log | cut -c1-200 | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')"
           fi
           exit ${status:-0}
+
+      - name: Show native compiler cache statistics
+        if: ${{ always() && env.IDECK_NATIVE_BUILD == '1' && steps.madeira_kit.outputs.available != 'true' }}
+        run: ccache --show-stats || true
 
       - name: Save compiled OpenGL and Vulkan runtimes
         if: ${{ always() && env.IDECK_NATIVE_BUILD == '1' && steps.madeira_kit.outputs.available != 'true' && steps.gl_runtime.outputs.cache-hit != 'true' && hashFiles('build/gl-runtime-cache/gl/libOSMesa.dylib') != '' }}

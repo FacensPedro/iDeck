@@ -1,0 +1,39 @@
+# The patches scripts/apply_madeira_patches.py applies to the pinned Madeira checkout,
+# by group, in this order. scripts/fetch_madeira_sources.sh runs each group at its
+# place among the source checks and content-detected patches.
+# Columns: group, repository (relative to the Madeira checkout), patch file in patches/.
+# A patch that is already applied is skipped; one that neither applies nor is applied
+# stops the build.
+
+# Before the submodule checks
+early     .      madeira-jit-early-hole.patch
+early     .      madeira-arm64-cpu-area.patch
+early     .      madeira-fault-diagnostics.patch
+early     .      madeira-dxil-concurrent-cache.patch
+early     .      madeira-wine-idle-logging.patch
+
+# The Wine submodule
+wine      wine   wine-arm64ec-null-thread-context.patch
+
+# DXMT's iOS cache/sync work, then the upstream backports (before the VC++ overlay,
+# which edits the same bridge file)
+backports dxmt   dxmt-ios-cache-sync-reuse.patch
+backports .      madeira-game-compat-backports.patch
+
+# FEX host features, the ARM64EC context return and the loader/JIT fixes
+native    .      madeira-arm-host-feature-probe.patch
+native    .      madeira-arm64ec-mach-context-return.patch
+native    .      madeira-unaligned-live-neighbour.patch
+native    .      madeira-arm64-importer-native-bind.patch
+native    .      madeira-arm64-importer-syscall-bind.patch
+native    .      madeira-opengl32-wow-teb.patch
+native    .      madeira-arm64-importer-ret-bind.patch
+native    .      madeira-arm64-getprocaddress-native.patch
+native    .      madeira-iat-life-pe32-skip.patch
+native    .      madeira-jit-alias-lifecycle.patch
+
+# Repeated Wine sessions in one app run
+session   .      madeira-repeat-wine-sessions.patch
+
+# After the source scripts
+late      .      madeira-mscoree-fusion-negative-cache.patch

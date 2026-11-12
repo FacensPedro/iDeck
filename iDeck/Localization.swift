@@ -20,6 +20,22 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         }
     }
 
+    /// The language picked in iDeck's settings, nil when it follows the device.
+    static var chosenCode: String? {
+        let stored = UserDefaults.standard.string(forKey: storageKey) ?? AppLanguage.system.rawValue
+        guard let language = AppLanguage(rawValue: stored), language != .system else { return nil }
+        return language.rawValue
+    }
+
+    /// The locale handed to Epic and EA games (games without it start in English).
+    static func gameLocale(separator: String) -> String {
+        switch currentCode {
+        case "pt": return "pt\(separator)BR"
+        case "es": return "es\(separator)ES"
+        default: return "en\(separator)US"
+        }
+    }
+
     /// The language strings are currently shown in: "en", "pt" or "es".
     static var currentCode: String {
         let stored = UserDefaults.standard.string(forKey: storageKey) ?? AppLanguage.system.rawValue
@@ -55,6 +71,13 @@ func trStatus(_ status: String) -> String {
 
 enum Translations {
     static let table: [String: [String: String]] = [
+        "This game needs Easy Anti-Cheat, which does not run on iDeck. It cannot be installed.": ["pt": "Este jogo precisa do Easy Anti-Cheat, que não funciona no iDeck. Ele não pode ser instalado.", "es": "Este juego necesita Easy Anti-Cheat, que no funciona en iDeck. No se puede instalar."],
+        "Achievements": ["pt": "Conquistas", "es": "Logros"],
+        "%d achievements in this game. The highlighted ones are shown.": ["pt": "%d conquistas neste jogo. As destacadas aparecem aqui.", "es": "%d logros en este juego. Se muestran los destacados."],
+        "%d achievements": ["pt": "%d conquistas", "es": "%d logros"],
+        "The JIT pool is only %d MB this time, so heavy games may freeze for about a second now and then. Close iDeck and open it again for a full pool.": ["pt": "O pool de JIT ficou com só %d MB desta vez, então jogos pesados podem travar por cerca de um segundo de vez em quando. Feche o iDeck e abra de novo para ter o pool completo.", "es": "El pool de JIT quedó con solo %d MB esta vez, así que los juegos pesados pueden congelarse un segundo de vez en cuando. Cierra iDeck y ábrelo de nuevo para tener el pool completo."],
+        "Waiting for the previous Windows session to finish…": ["pt": "Aguardando a sessão anterior do Windows terminar…", "es": "Esperando a que termine la sesión anterior de Windows…"],
+        "Execution Error: the previous Windows session did not finish closing. Wine runs inside iDeck, so restart iDeck to start another game: swipe iDeck away in the app switcher, then open it again.": ["pt": "Erro de execução: a sessão anterior do Windows não terminou de fechar. O Wine roda dentro do iDeck, então reinicie o iDeck para abrir outro jogo: deslize o iDeck para fora no seletor de apps e abra de novo.", "es": "Error de ejecución: la sesión anterior de Windows no terminó de cerrarse. Wine se ejecuta dentro de iDeck, así que reinicia iDeck para abrir otro juego: desliza iDeck fuera del selector de apps y ábrelo de nuevo."],
         "Active": ["pt": "Ativo", "es": "Activo"],
         "Unknown": ["pt": "Desconhecido", "es": "Desconocido"],
         "Increased Memory Limit": ["pt": "Limite de memória aumentado", "es": "Límite de memoria aumentado"],

@@ -299,6 +299,11 @@ enum StikJITHelper {
     /// limit and heavy games can be killed without a log.
     static var poolCountsAgainstFootprint = false
 
+    /// iDeck: the pool size of this launch when it had to shrink below 500MB (0 when
+    /// not), where FEX's code cache starts to roll over and heavy games freeze for
+    /// about a second each time. Shown on the loading screen, not only in the log.
+    static var smallPoolMB = 0
+
     static func reportNoFootprint(_ applied: Bool, poolBytes: Int) {
         poolCountsAgainstFootprint = !applied
         LogStore.shared.log("[no-footprint] pool applied=\(applied)", level: applied ? .success : .error)
@@ -318,6 +323,7 @@ enum StikJITHelper {
         }
         var poolSize = requestedPoolSize      // ml1036: may shrink to fit, see the hole census below
         poolFailure = nil
+        smallPoolMB = 0
         LogStore.shared.log("Allocating \(poolSize / 1024 / 1024)MB JIT pool via debugger...")
         // madeira-bcd Social Club layout 2: take the [0x7000000000, +4 GB) hold
         // FIRST. Taken at alias time it lost the race on build 348 (GTA log
@@ -686,6 +692,7 @@ enum StikJITHelper {
                                                           : "above the window, with a run below it the split could not reach"),
                             level: .success)
                         if best < 500 << 20 {
+                            smallPoolMB = Int(best >> 20)
                             LogStore.shared.log("⚠️ SMALL JIT POOL (\(best >> 20)MB) on this launch: expect ~1 s freezes in heavy games. "
                                 + "Quit and relaunch the app for a smooth session.", level: .error)
                         }
@@ -715,6 +722,7 @@ enum StikJITHelper {
                     // code cache is starved and rolls over every few seconds in game
                     // (ph-rdr90: 432MB pool, 52 rollovers, a ~1 s freeze each).
                     if fit < 500 << 20 {
+                        smallPoolMB = fit >> 20
                         LogStore.shared.log("⚠️ SMALL JIT POOL (\(fit >> 20)MB) on this launch: expect ~1 s freezes in heavy games. "
                             + "Quit and relaunch the app for a smooth session.", level: .error)
                     }

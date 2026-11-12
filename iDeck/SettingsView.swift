@@ -226,11 +226,15 @@ struct SettingsView: View {
                                 value: coordinator.isSteamConnected ? (SteamSignIn.accountName ?? tr("Connected")) : tr("Not connected"),
                                 asset: "StoreBadgeSteam", assetKeepsColors: true)
                 }
+            }
+            Section {
                 NavigationLink { gogPage } label: {
                     SettingsRow(icon: "shippingbox.fill", color: .purple, title: "GOG",
                                 value: gogLibrary.isSignedIn ? (gogLibrary.username ?? tr("Connected")) : tr("Not connected"),
                                 asset: "StoreBadgeGOG", assetPlain: true)
                 }
+            }
+            Section {
                 NavigationLink { epicPage } label: {
                     SettingsRow(icon: "e.square.fill", color: .gray, title: "Epic Games",
                                 value: epicLibrary.signedIn ? (epicLibrary.accountName ?? tr("Connected")) : tr("Not connected"),

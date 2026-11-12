@@ -1,7 +1,7 @@
 import sys
 import unittest
 
-from support import ROOT, repo_text
+from support import ROOT, repo_text, patch_group
 
 
 class MadeiraCoreStartupTests(unittest.TestCase):
@@ -35,7 +35,7 @@ class MadeiraCoreStartupTests(unittest.TestCase):
         fetch = repo_text("scripts/fetch_madeira_sources.sh")
         kit = repo_text("scripts/madeira_native_kit.py")
         self.assertIn('python3 "$ROOT/scripts/apply_madeira_relink_cache.py" "$DEST"', fetch)
-        self.assertIn('FUSION_PATCH="$ROOT/patches/madeira-mscoree-fusion-negative-cache.patch"', fetch)
+        self.assertEqual(patch_group("madeira-mscoree-fusion-negative-cache.patch"), "late")
         self.assertIn('"scripts/apply_madeira_relink_cache.py"', kit)
         self.assertIn('"patches/madeira-mscoree-fusion-negative-cache.patch"', kit)
 

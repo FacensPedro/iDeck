@@ -1,6 +1,6 @@
 import unittest
 
-from support import ROOT, repo_text
+from support import ROOT, repo_text, patch_group
 
 
 class MadeiraOpengl32WowTebTests(unittest.TestCase):
@@ -11,8 +11,7 @@ class MadeiraOpengl32WowTebTests(unittest.TestCase):
         self.assertIn("& ~(ULONG_PTR)0xffffffff) | teb32", patch)
 
     def test_patch_is_applied_and_invalidates_cached_kits(self):
-        self.assertIn('OPENGL_WOW_TEB_PATCH="$ROOT/patches/madeira-opengl32-wow-teb.patch"',
-                      repo_text("scripts/fetch_madeira_sources.sh"))
+        self.assertEqual(patch_group("madeira-opengl32-wow-teb.patch"), "native")
         self.assertIn('"patches/madeira-opengl32-wow-teb.patch"', repo_text("scripts/madeira_native_kit.py"))
 
 

@@ -24,7 +24,7 @@ class MadeiraSecondLaunchCloseContractTests(unittest.TestCase):
                 self.assertIn("previousWineSessionStillFinishing()", body)
         self.assertIn("!ideck_wineprocess_running()", COORDINATOR)
         self.assertIn("ideck_wineserver_running() || !ideck_wineprocess_thread_finished()", COORDINATOR)
-        self.assertIn("guard waitForSessionCleanup() else", COORDINATOR)
+        self.assertIn("guard waitForSessionCleanup(timeout: 20) else", COORDINATOR)
         self.assertIn("if ideck_runtime_complete_session() { return true }", COORDINATOR)
 
     def test_native_release_only_after_both_threads_quiescent(self):

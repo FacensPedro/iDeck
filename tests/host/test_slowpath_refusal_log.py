@@ -52,7 +52,7 @@ class SlowpathRefusalTests(unittest.TestCase):
     def test_an_unknown_source_stops_the_build_and_the_fetch_runs_it(self):
         self.assertEqual(run("int main(void) { return 0; }\n")[0], 2)
         fetch = (ROOT / "scripts/fetch_madeira_sources.sh").read_text()
-        self.assertLess(fetch.index("madeira-arm64ec-mach-context-return.patch"),
+        self.assertLess(fetch.index('apply_madeira_patches.py" "$DEST" native'),
                         fetch.index('python3 "$ROOT/scripts/apply_madeira_slowpath_diag.py" "$DEST"'))
 
 

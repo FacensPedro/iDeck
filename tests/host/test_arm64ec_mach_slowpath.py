@@ -2,6 +2,8 @@ import pathlib
 import re
 import unittest
 
+from support import patch_group
+
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 PATCH = (ROOT / "patches/madeira-arm64ec-mach-context-return.patch").read_text(encoding="utf-8")
 FETCH = (ROOT / "scripts/fetch_madeira_sources.sh").read_text(encoding="utf-8")
@@ -15,8 +17,7 @@ class ARM64ECMachSlowpathTests(unittest.TestCase):
         self.assertIn("build/ntdll-unix/signal_arm64_ios.c", PATCH)
         self.assertEqual(PATCH.count("diff --git"), 1)
         self.assertEqual(PATCH.count("\n@@ -"), 4)
-        self.assertIn("git -C \"$DEST\" apply --check \"$ARM64EC_PATCH\"", FETCH)
-        self.assertIn("git -C \"$DEST\" apply \"$ARM64EC_PATCH\"", FETCH)
+        self.assertEqual(patch_group("madeira-arm64ec-mach-context-return.patch"), "native")
         self.assertIn("brk #0x5a5a", FETCH)
         self.assertIn('bash "$MD/build/ntdll-unix/build.sh"',
                       (ROOT / "scripts/build_madeira_components.sh").read_text())

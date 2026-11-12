@@ -1,6 +1,6 @@
 import unittest
 
-from support import ROOT, repo_text
+from support import ROOT, repo_text, patch_group
 
 
 class MadeiraArm64CpuAreaTests(unittest.TestCase):
@@ -15,7 +15,7 @@ class MadeiraArm64CpuAreaTests(unittest.TestCase):
         self.assertIn('ios_its_step = "WoW64 emulator area";', patch)
 
     def test_patch_is_applied_and_invalidates_cached_kits(self):
-        self.assertIn('ARM64_CPU_AREA_PATCH="$ROOT/patches/madeira-arm64-cpu-area.patch"', repo_text("scripts/fetch_madeira_sources.sh"))
+        self.assertEqual(patch_group("madeira-arm64-cpu-area.patch"), "early")
         self.assertIn('"patches/madeira-arm64-cpu-area.patch"', repo_text("scripts/madeira_native_kit.py"))
 
 
