@@ -157,6 +157,20 @@ enum SteamDLLRepair {
     }
 }
 
+/// The last percentage shown for a download: a new one every 5 points.
+final class SteamDownloadPercent: @unchecked Sendable {
+    private let lock = NSLock()
+    private var last = -5
+
+    func next(_ percent: Int) -> Int? {
+        lock.lock(); defer { lock.unlock() }
+        let value = Swift.min(100, Swift.max(0, percent))
+        guard value >= last + 5 || (value == 100 && last != 100) else { return nil }
+        last = value
+        return value
+    }
+}
+
 /// Valve's official x64 video-client DLLs (FFmpeg family and SDL3.dll),
 /// downloaded from Steam's update server and pinned by size and SHA-256.
 enum SteamVideoLibraries {
@@ -190,9 +204,24 @@ enum SteamVideoLibraries {
             try Task.checkCancellation()
             await progress("Downloading Steam DLLs (\(index + 1) of \(packages.count))…")
             let url = URL(string: SteamRuntimeFiles.origin + package.file)!
-            let (temporary, response) = try await session.download(from: url)
+            // iDeck: with real progress. The plain async download reported nothing until
+            // a 64 MB package had finished, so the step looked stuck on a slow connection.
+            let label = "Downloading Steam DLLs (\(index + 1) of \(packages.count))"
+            let shown = SteamDownloadPercent()
+            var request = URLRequest(url: url)
+            request.timeoutInterval = 60
+            let temporary: URL
+            let http: HTTPURLResponse
+            do {
+                (temporary, http) = try await ObservedDownload.run(request, expected: Int64(package.bytes)) { written, total in
+                    guard total > 0, let percent = shown.next(Int(written * 100 / total)) else { return }
+                    Task { await progress("\(label) \(percent)%…") }
+                }
+            } catch let failure as ObservedDownload.Failure {
+                throw failure.error
+            }
             defer { try? fm.removeItem(at: temporary) }
-            guard let http = response as? HTTPURLResponse, http.statusCode == 200,
+            guard http.statusCode == 200,
                   http.url?.host == url.host, http.url?.scheme == "https",
                   (try temporary.resourceValues(forKeys: [.fileSizeKey])).fileSize == package.bytes else {
                 throw SteamRuntimeFiles.Failure.invalidPackage
