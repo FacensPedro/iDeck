@@ -1,6 +1,6 @@
 import unittest
 
-from support import ROOT, repo_text
+from support import ROOT, repo_text, patch_group
 
 
 class MadeiraUnalignedLiveNeighbourTests(unittest.TestCase):
@@ -12,8 +12,7 @@ class MadeiraUnalignedLiveNeighbourTests(unittest.TestCase):
         self.assertIn("(int32_t)(insn << 11)) >> 23", patch)
 
     def test_patch_is_applied_and_invalidates_cached_kits(self):
-        self.assertIn('UNALIGNED_PATCH="$ROOT/patches/madeira-unaligned-live-neighbour.patch"',
-                      repo_text("scripts/fetch_madeira_sources.sh"))
+        self.assertEqual(patch_group("madeira-unaligned-live-neighbour.patch"), "native")
         self.assertIn('"patches/madeira-unaligned-live-neighbour.patch"', repo_text("scripts/madeira_native_kit.py"))
 
 

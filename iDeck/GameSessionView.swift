@@ -290,6 +290,12 @@ struct GameSessionView: View {
                             .foregroundColor(.yellow)
                             .font(.caption2.weight(.semibold))
                             .lineLimit(3)
+                    } else if !metrics.receivedNewFrames && StikJITHelper.smallPoolMB > 0 {
+                        Text(tr("The JIT pool is only %d MB this time, so heavy games may freeze for about a second now and then. Close iDeck and open it again for a full pool.",
+                                StikJITHelper.smallPoolMB))
+                            .foregroundColor(.yellow)
+                            .font(.caption2.weight(.semibold))
+                            .lineLimit(3)
                     } else if !metrics.receivedNewFrames &&
                               (coordinator.windowsStatus == "Wine started; waiting for game..." ||
                                coordinator.windowsStatus == "Running") {

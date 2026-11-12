@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 
 
-from support import ROOT, repo_text
+from support import ROOT, repo_text, patch_group
 PATCH = ROOT / "patches/madeira-game-compat-backports.patch"
 FETCH = ROOT / "scripts/fetch_madeira_sources.sh"
 TARGETS = (
@@ -87,8 +87,8 @@ class MadeiraCompatibilityBackportsTests(unittest.TestCase):
         for name in TARGETS:
             self.assertIn("diff --git a/" + name + " b/" + name, patch)
         fetch = FETCH.read_text(encoding="utf-8")
-        self.assertIn('git -C "$DEST" apply --reverse --check "$COMPAT_PATCH"', fetch)
-        self.assertIn('git -C "$DEST" apply --check "$COMPAT_PATCH"', fetch)
+        self.assertEqual(patch_group("madeira-game-compat-backports.patch"), "backports")
+        self.assertIn('apply_madeira_patches.py" "$DEST" backports', fetch)
 
     def test_automatic_vc_setup_preserves_madeira_documents_overlay(self):
         settings = repo_text("iDeck/SettingsView.swift")

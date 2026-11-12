@@ -18,38 +18,10 @@ git -C "$DEST" submodule sync --recursive
 git -C "$DEST" submodule update --init --recursive --jobs 8 --filter=blob:none
 python3 "$ROOT/scripts/verify_madeira_sources.py" --root "$DEST" --revision "$REV"
 
-# Reserve the largest safe early JIT hole even if a small mapping blocks
-# the address immediately above the executable window.
-EARLY_JIT_PATCH="$ROOT/patches/madeira-jit-early-hole.patch"
-if ! git -C "$DEST" apply --reverse --check "$EARLY_JIT_PATCH" >/dev/null 2>&1; then
-  git -C "$DEST" apply --check "$EARLY_JIT_PATCH"
-  git -C "$DEST" apply "$EARLY_JIT_PATCH"
-fi
-
-# ARM64 processes in an ARM64EC session (services.exe for Steam's installers)
-# get the emulator CPU area the session's ARM64EC ntdll reads.
-ARM64_CPU_AREA_PATCH="$ROOT/patches/madeira-arm64-cpu-area.patch"
-if ! git -C "$DEST" apply --reverse --check "$ARM64_CPU_AREA_PATCH" >/dev/null 2>&1; then
-  git -C "$DEST" apply --check "$ARM64_CPU_AREA_PATCH"
-  git -C "$DEST" apply "$ARM64_CPU_AREA_PATCH"
-fi
-
-FAULT_DIAGNOSTICS_PATCH="$ROOT/patches/madeira-fault-diagnostics.patch"
-if ! git -C "$DEST" apply --reverse --check "$FAULT_DIAGNOSTICS_PATCH" >/dev/null 2>&1; then
-  git -C "$DEST" apply --check "$FAULT_DIAGNOSTICS_PATCH"
-  git -C "$DEST" apply "$FAULT_DIAGNOSTICS_PATCH"
-fi
-
-DXIL_PATCH="$ROOT/patches/madeira-dxil-concurrent-cache.patch"
-if ! git -C "$DEST" apply --reverse --check "$DXIL_PATCH" >/dev/null 2>&1; then
-  git -C "$DEST" apply "$DXIL_PATCH"
-fi
-
-WINE_PERF_PATCH="$ROOT/patches/madeira-wine-idle-logging.patch"
-if ! git -C "$DEST" apply --reverse --check "$WINE_PERF_PATCH" >/dev/null 2>&1; then
-  git -C "$DEST" apply --check "$WINE_PERF_PATCH"
-  git -C "$DEST" apply "$WINE_PERF_PATCH"
-fi
+# Early overlays (patches/series.txt, group "early"): the early JIT hole, the ARM64
+# CPU area for ARM64 processes in an ARM64EC session, fault diagnostics, concurrent
+# DXIL conversion and Wine's idle logging.
+python3 "$ROOT/scripts/apply_madeira_patches.py" "$DEST" early
 
 # The pinned Madeira script says it builds the ARM64EC PE ntdll, but
 # `make -C dlls/ntdll` also links the host ntdll.so. That Unix target
@@ -97,10 +69,8 @@ for source in madeira-d3d12/src/pe/madeira_d3d12.c \
   }
 done
 
-CONTEXT_PATCH="$ROOT/patches/wine-arm64ec-null-thread-context.patch"
-if ! git -C "$DEST/wine" apply --reverse --check "$CONTEXT_PATCH" >/dev/null 2>&1; then
-  git -C "$DEST/wine" apply "$CONTEXT_PATCH"
-fi
+# The Wine submodule (group "wine"): a null ARM64EC thread context query fails cleanly.
+python3 "$ROOT/scripts/apply_madeira_patches.py" "$DEST" wine
 
 # Pinned willfaust/dxmt invokes a private four-argument Metal atomic intrinsic.
 # Metal Toolchain 27B47 requires five arguments, and the old call fails to compile.
@@ -116,30 +86,15 @@ if ! grep -Fq 'reinterpret_cast<threadgroup atomic_int *>(out_count), 1, memory_
   git -C "$DEST/dxmt" apply "$DXMT_PATCH"
 fi
 
-# iOS shader cache, CPU/GPU sync and resource reuse: reader reopened after the
-# first write, kernel wait instead of yield loops, memory-pressure trims,
-# 2 frames in flight by default, bounded shader DB, opt-in pipeline archive.
-DXMT_IOS_PATCH="$ROOT/patches/dxmt-ios-cache-sync-reuse.patch"
-if ! git -C "$DEST/dxmt" apply --reverse --check "$DXMT_IOS_PATCH" >/dev/null 2>&1; then
-  git -C "$DEST/dxmt" apply --check "$DXMT_IOS_PATCH"
-  git -C "$DEST/dxmt" apply "$DXMT_IOS_PATCH"
-fi
-
-# Backport only the upstream fixes verified against the pinned Madeira base:
-# - ARM64 shared-object alignment in wineserver (#377)
-# - iPad Documents/vcruntime directory precedence for VC++ DLLs
-# - RemoteIO slice / shared-mode Wine engine period for game audio (#349)
-# The Wine/FEX/DXMT ABI revision stays pinned; do not switch submodules to main.
-COMPAT_PATCH="$ROOT/patches/madeira-game-compat-backports.patch"
-if git -C "$DEST" apply --reverse --check "$COMPAT_PATCH" >/dev/null 2>&1; then
-  echo "Madeira game compatibility patch already applied."
-else
-  git -C "$DEST" apply --check "$COMPAT_PATCH" || {
-    echo "ERROR: pinned Madeira sources do not match the game compatibility backport." >&2
-    exit 2
-  }
-  git -C "$DEST" apply "$COMPAT_PATCH"
-fi
+# Group "backports":
+# - DXMT's iOS shader cache, CPU/GPU sync and resource reuse: reader reopened after
+#   the first write, kernel wait instead of yield loops, memory-pressure trims,
+#   2 frames in flight by default, bounded shader DB, opt-in pipeline archive.
+# - Upstream fixes verified against the pinned Madeira base: ARM64 shared-object
+#   alignment in wineserver (#377), iPad Documents/vcruntime directory precedence
+#   for VC++ DLLs, RemoteIO slice / shared-mode Wine engine period for game audio
+#   (#349). The Wine/FEX/DXMT ABI revision stays pinned.
+python3 "$ROOT/scripts/apply_madeira_patches.py" "$DEST" backports
 
 # iDeck's Visual C++ 2005-2022 runtimes for 32-bit code (syswow64) and the
 # VC80/VC90 side-by-side assemblies, from Documents/vcruntime.
@@ -149,19 +104,22 @@ if ! grep -Fq 'ideck_link_vcruntime_wow64(fm, prefix);' "$DEST/app/Madeira/WineP
   git -C "$DEST" apply "$VCRT_PATCH"
 fi
 
-# The pinned Madeira FEX bridge assumes every iOS device is an Apple A15.
-# Patch its FEXCore HostFeatures construction to use actual iOS sysctl
-# capabilities. A missing feature query must never enable a JIT instruction.
-ARM_HOST_PATCH="$ROOT/patches/madeira-arm-host-feature-probe.patch"
-if git -C "$DEST" apply --reverse --check "$ARM_HOST_PATCH" >/dev/null 2>&1; then
-  echo "ARM host feature probe patch already applied."
-else
-  git -C "$DEST" apply --check "$ARM_HOST_PATCH" || {
-    echo "ERROR: pinned Madeira FEXBridge source does not match the ARM feature detection patch." >&2
-    exit 2
-  }
-  git -C "$DEST" apply "$ARM_HOST_PATCH"
-fi
+# Group "native":
+# - FEX's HostFeatures from the device's real sysctl capabilities (the pinned bridge
+#   assumed an Apple A15); a missing feature query never enables a JIT instruction.
+# - An ARM64EC CONTEXT_INTEGER return needing its original x16/x17 goes through
+#   Wine's syscall_dispatcher_return_slowpath; on iOS 27 raise(SIGUSR2) there was
+#   caught as a Mach host breakpoint and surfaced as guest C000001D. The patch
+#   routes it through Wine's registered Mach exception server.
+# - Unaligned LDAR/STLR rewrites emulate the access instead of overwriting a live
+#   neighbouring JIT instruction.
+# - Pure ARM64 importers (wow64.dll, xtajit.dll) bind to ARM64EC native targets,
+#   Nt* syscall exports included, lone-`ret` exports resolve to a native `ret`, and
+#   LdrGetProcedureAddress and delay-load importers get native targets too.
+# - opengl32's wow64 thunks resolve the 32-bit TEB inside the iOS WoW64 window.
+# - The [iat-life] probe skips a WoW64 process's i386 image.
+# - An unloaded image retires its anon JIT aliases; the watchdog leaves exited threads.
+python3 "$ROOT/scripts/apply_madeira_patches.py" "$DEST" native
 [[ -s "$DEST/app/Madeira/iDeckARMHostFeatures.h" ]] || {
   echo "ERROR: native ARM host feature probe header is missing." >&2
   exit 2
@@ -170,93 +128,10 @@ if grep -Fq 'Features.CPUMIDRs.resize(8, 0x611F0250)' "$DEST/app/Madeira/FEXBrid
   echo "ERROR: Madeira FEX still spoofs the Apple A15 CPU model." >&2
   exit 2
 fi
-
-# An ARM64EC CONTEXT_INTEGER return needing its original x16/x17 goes
-# through Wine's syscall_dispatcher_return_slowpath. On iOS 27 the pinned
-# raise(SIGUSR2) path was caught as a Mach host breakpoint, then incorrectly
-# surfaced as guest NTSTATUS C000001D. The narrowly scoped patch routes the
-# slow return through Wine's already registered Mach exception server and
-# restores the complete frame without a sigreturn x17-clobbering trampoline.
-# This is native source, not a modification of the public Wine submodule ABI.
-ARM64EC_PATCH="$ROOT/patches/madeira-arm64ec-mach-context-return.patch"
-ARM64EC_SOURCE="$DEST/build/ntdll-unix/signal_arm64_ios.c"
-if git -C "$DEST" apply --reverse --check "$ARM64EC_PATCH" >/dev/null 2>&1; then
-  echo "ARM64EC Mach slowpath patch already applied."
-else
-  git -C "$DEST" apply --check "$ARM64EC_PATCH" || {
-    echo "ERROR: pinned Madeira ARM64EC source no longer matches the safe Mach resume patch." >&2
-    exit 2
-  }
-  git -C "$DEST" apply "$ARM64EC_PATCH"
-fi
-grep -Fq 'brk #0x5a5a' "$ARM64EC_SOURCE" || {
+grep -Fq 'brk #0x5a5a' "$DEST/build/ntdll-unix/signal_arm64_ios.c" || {
   echo "ERROR: scoped ARM64EC Mach resume is absent from compiled Madeira sources." >&2
   exit 2
 }
-
-# Unaligned LDAR/STLR rewrites must not overwrite a live neighbouring JIT
-# instruction with their half-barrier; emulate the access instead.
-UNALIGNED_PATCH="$ROOT/patches/madeira-unaligned-live-neighbour.patch"
-if ! git -C "$DEST" apply --reverse --check "$UNALIGNED_PATCH" >/dev/null 2>&1; then
-  git -C "$DEST" apply --check "$UNALIGNED_PATCH"
-  git -C "$DEST" apply "$UNALIGNED_PATCH"
-fi
-
-# Pure ARM64 importers (wow64.dll, xtajit.dll in WoW64 children) must bind
-# to ARM64EC native targets, never to x86_64 export thunks.
-ARM64_IMPORTER_PATCH="$ROOT/patches/madeira-arm64-importer-native-bind.patch"
-if ! git -C "$DEST" apply --reverse --check "$ARM64_IMPORTER_PATCH" >/dev/null 2>&1; then
-  git -C "$DEST" apply --check "$ARM64_IMPORTER_PATCH"
-  git -C "$DEST" apply "$ARM64_IMPORTER_PATCH"
-fi
-
-# ...including Nt* syscall exports, whose x86_64 stubs have no redirection
-# entry: decode them to arm64ec_syscalls[id] like arm64x_check_call does.
-ARM64_SYSCALL_PATCH="$ROOT/patches/madeira-arm64-importer-syscall-bind.patch"
-if ! git -C "$DEST" apply --reverse --check "$ARM64_SYSCALL_PATCH" >/dev/null 2>&1; then
-  git -C "$DEST" apply --check "$ARM64_SYSCALL_PATCH"
-  git -C "$DEST" apply "$ARM64_SYSCALL_PATCH"
-fi
-
-# opengl32's wow64 thunks receive the 32-bit TEB as a guest address; resolve
-# it inside the iOS WoW64 window instead of dereferencing it as host memory.
-OPENGL_WOW_TEB_PATCH="$ROOT/patches/madeira-opengl32-wow-teb.patch"
-if ! git -C "$DEST" apply --reverse --check "$OPENGL_WOW_TEB_PATCH" >/dev/null 2>&1; then
-  git -C "$DEST" apply --check "$OPENGL_WOW_TEB_PATCH"
-  git -C "$DEST" apply "$OPENGL_WOW_TEB_PATCH"
-fi
-
-# x86_64 exports that are a lone `ret` (ARM64EC ntdll's __chkstk) resolve to a
-# native `ret` for pure ARM64 importers (mingw's xtajit.dll imports __chkstk).
-RET_BIND_PATCH="$ROOT/patches/madeira-arm64-importer-ret-bind.patch"
-if ! git -C "$DEST" apply --reverse --check "$RET_BIND_PATCH" >/dev/null 2>&1; then
-  git -C "$DEST" apply --check "$RET_BIND_PATCH"
-  git -C "$DEST" apply "$RET_BIND_PATCH"
-fi
-
-# Pure ARM64 callers of LdrGetProcedureAddress and delay-load importers get
-# ARM64EC native targets too, not x86_64 export thunks.
-GETPROC_PATCH="$ROOT/patches/madeira-arm64-getprocaddress-native.patch"
-if ! git -C "$DEST" apply --reverse --check "$GETPROC_PATCH" >/dev/null 2>&1; then
-  git -C "$DEST" apply --check "$GETPROC_PATCH"
-  git -C "$DEST" apply "$GETPROC_PATCH"
-fi
-
-# The [iat-life] loader probe must not walk a WoW64 process's i386 image with
-# 64-bit thunks: the wild name pointer killed ActivationUI.exe at startup.
-IAT_PE32_PATCH="$ROOT/patches/madeira-iat-life-pe32-skip.patch"
-if ! git -C "$DEST" apply --reverse --check "$IAT_PE32_PATCH" >/dev/null 2>&1; then
-  git -C "$DEST" apply --check "$IAT_PE32_PATCH"
-  git -C "$DEST" apply "$IAT_PE32_PATCH"
-fi
-
-# An unloaded image retires the anon JIT aliases over its pages; the session
-# watchdog never touches a thread that already exited.
-ALIAS_LIFECYCLE_PATCH="$ROOT/patches/madeira-jit-alias-lifecycle.patch"
-if ! git -C "$DEST" apply --reverse --check "$ALIAS_LIFECYCLE_PATCH" >/dev/null 2>&1; then
-  git -C "$DEST" apply --check "$ALIAS_LIFECYCLE_PATCH"
-  git -C "$DEST" apply "$ALIAS_LIFECYCLE_PATCH"
-fi
 
 # opengl32's wow64 thunks: every 32-bit guest pointer gets the iOS window base.
 python3 "$ROOT/scripts/apply_madeira_opengl32_wow_ptrs.py" "$DEST"
@@ -264,16 +139,7 @@ python3 "$ROOT/scripts/apply_madeira_opengl32_wow_ptrs.py" "$DEST"
 # The stock Wine worker reports g_wine_running=0 before joining wineserver,
 # and wineserver_start never clears the prior session's stop flag.
 # Both make game B fail after game A ends in the same iDeck process.
-SESSION_PATCH="$ROOT/patches/madeira-repeat-wine-sessions.patch"
-if git -C "$DEST" apply --reverse --check "$SESSION_PATCH" >/dev/null 2>&1; then
-  echo "Madeira repeat-session lifecycle patch already applied."
-else
-  git -C "$DEST" apply --check "$SESSION_PATCH" || {
-    echo "ERROR: pinned Madeira source does not match the repeat-session lifecycle patch." >&2
-    exit 2
-  }
-  git -C "$DEST" apply "$SESSION_PATCH"
-fi
+python3 "$ROOT/scripts/apply_madeira_patches.py" "$DEST" session
 grep -Fq 'int wine_process_thread_finished(void)' "$DEST/app/Madeira/WineProcessBridge.m" || exit 2
 grep -Fq '__atomic_store_n(&g_wineserver_should_stop, 0' "$DEST/app/Madeira/WineServerBridge.m" || exit 2
 
@@ -308,12 +174,8 @@ python3 "$ROOT/scripts/apply_madeira_slowpath_diag.py" "$DEST"
 # Wine Staging patch sets and GE-Proton fixes for Windows-side DLLs (patches/wine-compat).
 python3 "$ROOT/scripts/apply_madeira_wine_compat.py" "$DEST"
 
-# mscoree remembers that fusion.dll is absent instead of retrying per assembly.
-FUSION_PATCH="$ROOT/patches/madeira-mscoree-fusion-negative-cache.patch"
-if ! git -C "$DEST" apply --reverse --check "$FUSION_PATCH" >/dev/null 2>&1; then
-  git -C "$DEST" apply --check "$FUSION_PATCH"
-  git -C "$DEST" apply "$FUSION_PATCH"
-fi
+# mscoree remembers that fusion.dll is absent instead of retrying per assembly (group "late").
+python3 "$ROOT/scripts/apply_madeira_patches.py" "$DEST" late
 
 echo "Madeira sources checked out at $REV"
 echo "Source checkout complete. Run bash scripts/build_native_runtime.sh on macOS to compile, link and package."

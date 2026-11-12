@@ -5,6 +5,8 @@ import subprocess
 import tempfile
 import unittest
 
+from support import patch_group
+
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 PATCH = ROOT / "patches/madeira-arm-host-feature-probe.patch"
 FETCH = ROOT / "scripts/fetch_madeira_sources.sh"
@@ -149,9 +151,7 @@ class MadeiraARMHostFeatureTests(unittest.TestCase):
 
     def test_native_checkout_patches_pinned_source(self):
         fetch = FETCH.read_text(encoding="utf-8")
-        self.assertIn('apply --reverse --check "$ARM_HOST_PATCH"', fetch)
-        self.assertIn('apply --check "$ARM_HOST_PATCH"', fetch)
-        self.assertIn('apply "$ARM_HOST_PATCH"', fetch)
+        self.assertEqual(patch_group("madeira-arm-host-feature-probe.patch"), "native")
         self.assertIn('iDeckARMHostFeatures.h', fetch)
         self.assertIn('grep -Fq', fetch)
 

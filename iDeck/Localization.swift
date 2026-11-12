@@ -55,6 +55,7 @@ func trStatus(_ status: String) -> String {
 
 enum Translations {
     static let table: [String: [String: String]] = [
+        "The JIT pool is only %d MB this time, so heavy games may freeze for about a second now and then. Close iDeck and open it again for a full pool.": ["pt": "O pool de JIT ficou com só %d MB desta vez, então jogos pesados podem travar por cerca de um segundo de vez em quando. Feche o iDeck e abra de novo para ter o pool completo.", "es": "El pool de JIT quedó con solo %d MB esta vez, así que los juegos pesados pueden congelarse un segundo de vez en cuando. Cierra iDeck y ábrelo de nuevo para tener el pool completo."],
         "Waiting for the previous Windows session to finish…": ["pt": "Aguardando a sessão anterior do Windows terminar…", "es": "Esperando a que termine la sesión anterior de Windows…"],
         "Execution Error: the previous Windows session did not finish closing. Wine runs inside iDeck, so restart iDeck to start another game: swipe iDeck away in the app switcher, then open it again.": ["pt": "Erro de execução: a sessão anterior do Windows não terminou de fechar. O Wine roda dentro do iDeck, então reinicie o iDeck para abrir outro jogo: deslize o iDeck para fora no seletor de apps e abra de novo.", "es": "Error de ejecución: la sesión anterior de Windows no terminó de cerrarse. Wine se ejecuta dentro de iDeck, así que reinicia iDeck para abrir otro juego: desliza iDeck fuera del selector de apps y ábrelo de nuevo."],
         "Active": ["pt": "Ativo", "es": "Activo"],

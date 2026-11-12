@@ -2,6 +2,8 @@ import pathlib
 import re
 import unittest
 
+from support import patch_group
+
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 PAD = (ROOT / "iDeck/NativeRuntime/DirectInputBridge.mm").read_text()
 NATIVE = (ROOT / "iDeck/NativeRuntime/MadeiraRuntimeBridge.mm").read_text()
@@ -74,7 +76,7 @@ class MadeiraXInputHIDRestartTests(unittest.TestCase):
         self.assertIn('int wine_process_thread_finished(void)', PATCH)
         self.assertIn('__atomic_store_n(&g_wine_thread_finished, 1, __ATOMIC_RELEASE)', PATCH)
         self.assertIn('__atomic_store_n(&g_wineserver_should_stop, 0, __ATOMIC_RELEASE)', PATCH)
-        self.assertIn('git -C "$DEST" apply --check "$SESSION_PATCH"', FETCH)
+        self.assertEqual(patch_group("madeira-repeat-wine-sessions.patch"), "session")
         self.assertIn('"wine_process_thread_finished"', BRIDGE)
         self.assertIn("!ideck_wineprocess_thread_finished()", NATIVE)
         self.assertIn("ideck_wineprocess_thread_finished()", COORDINATOR)

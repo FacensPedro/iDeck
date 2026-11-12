@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from support import ROOT, repo_text
+from support import ROOT, repo_text, patch_group
 
 
 class StabilityJITLifecycleTests(unittest.TestCase):
@@ -24,7 +24,7 @@ class StabilityJITLifecycleTests(unittest.TestCase):
         fetch = repo_text("scripts/fetch_madeira_sources.sh")
         kit = repo_text("scripts/madeira_native_kit.py")
         for name in ("madeira-arm64-getprocaddress-native.patch", "madeira-jit-alias-lifecycle.patch"):
-            self.assertIn(f'"$ROOT/patches/{name}"', fetch)
+            self.assertEqual(patch_group(name), "native")
             self.assertIn(f'"patches/{name}"', kit)
         self.assertIn('python3 "$ROOT/scripts/apply_madeira_opengl32_wow_ptrs.py" "$DEST"', fetch)
         self.assertIn('"scripts/apply_madeira_opengl32_wow_ptrs.py"', kit)

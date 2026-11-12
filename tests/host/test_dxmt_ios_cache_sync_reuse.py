@@ -1,6 +1,6 @@
 import unittest
 
-from support import ROOT, repo_text
+from support import ROOT, repo_text, patch_group
 
 
 class DXMTiOSCacheSyncReuseTests(unittest.TestCase):
@@ -38,8 +38,7 @@ class DXMTiOSCacheSyncReuseTests(unittest.TestCase):
         self.assertIn("wmt_resolve_cache_file(path)", self.patch)
 
     def test_patch_applied_and_hashed(self):
-        self.assertIn('DXMT_IOS_PATCH="$ROOT/patches/dxmt-ios-cache-sync-reuse.patch"',
-                      repo_text("scripts/fetch_madeira_sources.sh"))
+        self.assertEqual(patch_group("dxmt-ios-cache-sync-reuse.patch"), "backports")
         self.assertIn('"patches/dxmt-ios-cache-sync-reuse.patch"', repo_text("scripts/madeira_native_kit.py"))
 
 

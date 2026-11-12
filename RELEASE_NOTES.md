@@ -10,5 +10,11 @@
 - When a game has just closed, iDeck now waits up to 20 seconds for it to finish shutting down, showing "Waiting for the previous Windows session to finish…", instead of 5.
 - If it still does not finish, the message now says that iDeck has to be reopened, and how. Retrying did not help: Wine runs inside iDeck, so only a new launch of the app resets it.
 
+### JIT memory
+- When the JIT pool has to shrink below 500 MB (the address space is fragmented by an earlier session), the loading screen now says so and suggests reopening iDeck. Until now this warning was only in the log.
+
+### Build
+- iDeck's patches to Madeira are applied from one list (patches/series.txt) by one tested script, instead of twenty copies of the same shell block. A patch that no longer fits the pinned sources stops the build with its name.
+
 ### Release
-- Updated the application version to 1.8.4 (build 66).
+- Updated the application version to 1.8.5 (build 67).
