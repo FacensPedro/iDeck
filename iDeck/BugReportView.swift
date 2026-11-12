@@ -157,6 +157,8 @@ enum LogIssueScanner {
 final class BugReportModel: ObservableObject {
     @Published private(set) var issues: [LogIssue] = []
     @Published private(set) var wineFinding: String?
+    /// The "Missing DLLs:" line of the report, from the last Wine log.
+    @Published private(set) var missingModules: String?
     @Published private(set) var isScanning = false
     @Published private(set) var hasWineLog = false
     @Published private(set) var hasAppLog = false
@@ -179,23 +181,26 @@ final class BugReportModel: ObservableObject {
         hasAppLog = !appURLs.isEmpty
         let steamSession = UserDefaults.standard.bool(forKey: "session.lastWasSteam")
         let generation = scanGeneration
-        let result = await Task.detached(priority: .userInitiated) { () -> ([LogIssue], Int32) in
+        let result = await Task.detached(priority: .userInitiated) { () -> ([LogIssue], Int32, String) in
             var issues: [LogIssue] = []
             let appText = appURLs.compactMap { try? WineLogClipboard.read(from: $0).text }.joined(separator: "\n")
             issues += LogIssueScanner.scan(appText, source: .app, steamSession: steamSession)
             var diagnosis: Int32 = 0
+            var missing = MissingModuleScanner.summary(nil)
             if let wineURL {
                 if let text = try? WineLogClipboard.read(from: wineURL).text {
                     issues += LogIssueScanner.scan(text, source: .wine, steamSession: steamSession)
+                    missing = MissingModuleScanner.summary(text)
                 }
                 diagnosis = wineURL.path.withCString { ideck_wine_log_diagnose($0) }
             }
-            return (issues.sorted { $0.severity > $1.severity }, diagnosis)
+            return (issues.sorted { $0.severity > $1.severity }, diagnosis, missing)
         }.value
         // Clearing logs while a read is in flight must not restore stale bugs.
         guard generation == scanGeneration, !Task.isCancelled else { return }
         issues = Self.liveJITIssues() + result.0
         wineFinding = Self.finding(for: result.1)
+        missingModules = result.2
     }
 
     /// The JIT state of this process right now, as bugs: a missing debugger,
@@ -319,6 +324,7 @@ final class BugReportModel: ObservableObject {
         hasAppLog = false
         hasWineLog = false
         wineFinding = nil
+        missingModules = nil
         issues = Self.liveJITIssues()
         notice = tr("Logs cleared.")
     }
@@ -398,6 +404,7 @@ final class BugReportModel: ObservableObject {
                 lines.append("EA: the game started ActivationUI.exe, EA's activation window: it did not accept the licence on disk.")
             }
         }
+        if let missingModules { lines.append("Missing DLLs: " + missingModules) }
         if let wineFinding { lines.append("Diagnosis: " + wineFinding) }
         lines.append("")
         lines += selected.map(\.copyText)
@@ -561,5 +568,52 @@ struct BugReportView: View {
         .onTapGesture {
             if isOpen { expanded.remove(issue.id) } else { expanded.insert(issue.id) }
         }
+    }
+}
+
+/// DLLs and functions the last Windows session could not find, from Wine's own messages:
+/// a missing import library, a library that failed to load, an import with no
+/// implementation, an unimplemented function that was called, and a DLL looked up in
+/// system32/syswow64 (the last place Windows searches) that is not there.
+enum MissingModuleScanner {
+    private static let rules: [(pattern: String, format: ([Substring]) -> String)] = [
+        (#"Library ([^ ]+) \(which is needed by L?"?([^)"]+)"?\) not found"#, { "\($0[0]) (needed by \(name($0[1])))" }),
+        (#"Loading library ([^ ]+) \(which is needed by L?"?([^)"]+)"?\) failed"#, { "\($0[0]) (failed to load, needed by \(name($0[1])))" }),
+        (#"[Cc]ould not load L?"?([^ ",]+)"?, status"#, { "\(name($0[0])) (could not load)" }),
+        (#"No implementation for ([^ .]+(?:\.dll)?)\.([^ ]+) imported from L?"?([^ ,"]+)"#, { "\($0[0]).\($0[1]) (function, imported by \(name($0[2])))" }),
+        (#"[Uu]nimplemented function ([^ .]+(?:\.dll)?)\.([^ ]+) called"#, { "\($0[0]).\($0[1]) (unimplemented function called)" }),
+        (#"\\+windows\\+(?:system32|syswow64)\\+([^\\" ]+\.dll)"? not found"#, { "\($0[0]) (not in system32)" }),
+    ]
+
+    private static func name(_ path: Substring) -> String {
+        String(path.split(whereSeparator: { $0 == "\\" || $0 == "/" }).last ?? path)
+    }
+
+    /// Every distinct finding in the log, in the order first seen.
+    static func findings(in text: String) -> [String] {
+        var seen = Set<String>(), result: [String] = []
+        let compiled = rules.compactMap { rule in
+            (try? NSRegularExpression(pattern: rule.pattern, options: [.caseInsensitive])).map { ($0, rule.format) }
+        }
+        for line in text.split(separator: "\n", omittingEmptySubsequences: true) {
+            let string = String(line)
+            let range = NSRange(string.startIndex..., in: string)
+            for (regex, format) in compiled {
+                guard let match = regex.firstMatch(in: string, range: range) else { continue }
+                let groups = (1..<match.numberOfRanges).compactMap { Range(match.range(at: $0), in: string).map { string[$0] } }
+                let finding = format(groups)
+                if seen.insert(finding.lowercased()).inserted { result.append(finding) }
+                break
+            }
+            if result.count >= 40 { break }
+        }
+        return result
+    }
+
+    /// The report line: the findings, or that the log has none (or no log exists).
+    static func summary(_ text: String?) -> String {
+        guard let text else { return "no Wine log to check" }
+        let found = findings(in: text)
+        return found.isEmpty ? "none reported in the Wine log" : found.joined(separator: "; ")
     }
 }
