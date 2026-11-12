@@ -144,9 +144,13 @@ if [[ "$REBUILD" == "1" ]]; then
   # one, as Madeira's own build/windows-runtime/build.sh does: every Wine module
   # in the farm (targets.py leaves out what DXMT, madeira-d3d12, FEX and Madeira
   # own), so the Wine Staging and GE-Proton patches and iDeck's own Wine changes
-  # reach 64-bit games too, not only the x86 farm. IDECK_REBUILD_WINE_PE_MODULES=0
-  # keeps Madeira's prebuilt farm instead.
-  if [[ "${IDECK_REBUILD_WINE_PE_MODULES:-1}" == "1" ]]; then
+  # reach 64-bit games too, not only the x86 farm.
+  # Off by default since 2.0.2: with the rebuilt farm, 64-bit games stopped in the
+  # ARM64EC CRT's own initialization (ucrtbase.dll, loaded right after xtajit64,
+  # read a NULL global at RVA 0x63670; msacm32.dll failed to initialize), before
+  # any game code ran. Madeira's prebuilt farm is the one tested on iOS.
+  # IDECK_REBUILD_WINE_PE_MODULES=1 rebuilds it from the patched tree.
+  if [[ "${IDECK_REBUILD_WINE_PE_MODULES:-0}" == "1" ]]; then
     X64_MODULES=()
     while read -r module; do
       # d3d9-wined3d is Wine's d3d9 under the name the farm gives it (build-modules.sh knows it).

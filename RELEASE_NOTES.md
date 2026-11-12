@@ -1,6 +1,11 @@
 ## What's Changed
 ### Windows runtime
-- Fixed 64-bit games closing at start with an access violation (0xC0000005) while the x86-64 translator (xtajit64.dll) and its DLLs initialize, seen with Dragon Age: Inquisition. A DLL runs from a copy in the JIT pool that was made before its imports were bound; an import table in a writable section was never copied there again, so the DLL read an empty import and crashed. The bound import table of every loaded DLL is now copied into its JIT copy before the DLL's initialization runs.
+- 64-bit games use Madeira's prebuilt x64 Windows runtime again instead of the one rebuilt from iDeck's patched Wine (since 2.0.0). With the rebuilt runtime, games such as Dragon Age: Inquisition closed with an access violation (0xC0000005) before any game code ran: the ARM64EC C runtime (ucrtbase.dll), loaded right after the x86-64 translator, crashed during its own initialization, and msacm32.dll failed to initialize. The rebuild can still be turned on in the build with `IDECK_REBUILD_WINE_PE_MODULES=1`.
+- The 32-bit (x86) runtime still comes from iDeck's patched Wine.
+- The x64 runtime changes, so a new runtime download is published with this build.
+
+### Bugs & logs
+- The bug report has a "Missing DLLs:" line listing what the last Windows session could not find, from Wine's own messages: a DLL a program imports that is missing or failed to load, a function with no implementation, an unimplemented function that was called, and a DLL looked up in system32 or syswow64 that is not there. When there are none, the line says so.
 
 ### Release
 - Updated the application version to 2.0.1 (build 69).

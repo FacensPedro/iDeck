@@ -1,4 +1,4 @@
-"""The x64 (ARM64EC) Wine farm is rebuilt from the patched Wine tree."""
+"""The x64 (ARM64EC) Wine farm: Madeira's prebuilt one by default, rebuilt on request."""
 import unittest
 from pathlib import Path
 
@@ -7,8 +7,9 @@ COMPONENTS = (ROOT / "scripts/build_madeira_components.sh").read_text()
 
 
 class X64FarmRebuildTests(unittest.TestCase):
-    def test_every_farm_module_is_rebuilt_by_default(self):
-        self.assertIn('if [[ "${IDECK_REBUILD_WINE_PE_MODULES:-1}" == "1" ]]; then', COMPONENTS)
+    def test_rebuild_is_opt_in(self):
+        self.assertIn('if [[ "${IDECK_REBUILD_WINE_PE_MODULES:-0}" == "1" ]]; then', COMPONENTS)
+        self.assertNotIn('IDECK_REBUILD_WINE_PE_MODULES:-1', COMPONENTS)
         self.assertIn('done < <(python3 "$MD/build/windows-runtime/targets.py" arm64ec list)', COMPONENTS)
         self.assertIn('bash "$MD/build/wine-pe/build-modules.sh" "${X64_MODULES[@]}"', COMPONENTS)
         self.assertIn('[[ "$module" == d3d9-wined3d ]]', COMPONENTS)
