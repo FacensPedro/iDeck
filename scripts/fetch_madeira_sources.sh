@@ -69,7 +69,8 @@ for source in madeira-d3d12/src/pe/madeira_d3d12.c \
   }
 done
 
-# The Wine submodule (group "wine"): a null ARM64EC thread context query fails cleanly.
+# The Wine submodule (group "wine"): a null ARM64EC thread context query fails cleanly, and
+# wow64win passes atoms (values below 64 KB) through its guest pointer conversions.
 python3 "$ROOT/scripts/apply_madeira_patches.py" "$DEST" wine
 
 # Pinned willfaust/dxmt invokes a private four-argument Metal atomic intrinsic.

@@ -4,6 +4,8 @@
 - The 32-bit (x86) runtime still comes from iDeck's patched Wine.
 - The Windows runtime (Wine's x64 and x86 files) is inside the IPA again instead of a separate download, so no runtime releases are published.
 
+- Fixed 32-bit programs crashing iDeck with an access violation while they create windows (BioShock, Tor Browser's installer). Windows passes some names as small numbers (atoms) instead of text; iDeck's 32-bit layer turned them into addresses inside the program's memory and Wine read text there that did not exist. Numbers below 64 KB now stay numbers in every conversion, and the 32-bit layer (wow64win.dll) is built from the patched source.
+
 ### EA app
 - EA games that check their licence with EA's activation library get a fresh licence from EA at every launch. Dragon Age: Inquisition refused a licence kept from an earlier launch and opened EA's activation window (ActivationUI.exe), which then crashed; with a renewed licence it went on to start. A kept licence is used only if the renewal fails, and the bug report then says "licence kept (renewal failed)".
 

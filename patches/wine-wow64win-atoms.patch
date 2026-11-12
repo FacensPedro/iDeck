@@ -1,0 +1,31 @@
+diff --git a/dlls/wow64win/wow64win_private.h b/dlls/wow64win/wow64win_private.h
+index 6bf1074..e04b436 100644
+--- a/dlls/wow64win/wow64win_private.h
++++ b/dlls/wow64win/wow64win_private.h
+@@ -74,16 +74,23 @@ static inline ULONG_PTR wow64win_guest_base(void)
+     return cached;
+ }
+ 
+-/* guest 32-bit address -> host pointer.  NULL stays NULL. */
++/* guest 32-bit address -> host pointer.  NULL stays NULL.
++ * iDeck: a value below 64 KB is a MAKEINTATOM/MAKEINTRESOURCE, never an address
++ * (see get_str_or_atom below), so it is passed through untranslated in EVERY
++ * conversion. Class names in UNICODE_STRINGs, FindWindow/RemoveProp atoms and
++ * resource ids reached win32u as B + atom and were read as strings (BioShock,
++ * Tor Browser's installer: ldrh at B + 0x8002). */
+ static inline void *guest_ptr32( ULONG addr )
+ {
+-    return addr ? (void *)(wow64win_guest_base() + addr) : NULL;
++    if (!(addr >> 16)) return (void *)(ULONG_PTR)addr;
++    return (void *)(wow64win_guest_base() + addr);
+ }
+ 
+ /* host pointer -> guest 32-bit address.  NULL stays 0. */
+ static inline ULONG host_ptr32( const void *addr )
+ {
+-    return addr ? (ULONG)((ULONG_PTR)addr - wow64win_guest_base()) : 0;
++    if (!((ULONG_PTR)addr >> 16)) return (ULONG)(ULONG_PTR)addr;   /* atom or NULL, as above */
++    return (ULONG)((ULONG_PTR)addr - wow64win_guest_base());
+ }
+ 
+ static inline ULONG get_ulong( UINT **args ) { return *(*args)++; }
