@@ -140,8 +140,24 @@ if [[ "$REBUILD" == "1" ]]; then
   [[ -s "$MD/app/Madeira/arm64ec-windows/ntdll.dll" ]] || {
     echo "ERROR: Wine ARM64EC ntdll.dll was not generated." >&2; exit 2;
   }
-  if [[ "${IDECK_REBUILD_WINE_PE_MODULES:-0}" == "1" ]]; then
-    bash "$MD/build/wine-pe/build-modules.sh"
+  # The x64 (ARM64EC) farm is rebuilt from the same patched Wine tree as the x86
+  # one, as Madeira's own build/windows-runtime/build.sh does: every Wine module
+  # in the farm (targets.py leaves out what DXMT, madeira-d3d12, FEX and Madeira
+  # own), so the Wine Staging and GE-Proton patches and iDeck's own Wine changes
+  # reach 64-bit games too, not only the x86 farm. IDECK_REBUILD_WINE_PE_MODULES=0
+  # keeps Madeira's prebuilt farm instead.
+  if [[ "${IDECK_REBUILD_WINE_PE_MODULES:-1}" == "1" ]]; then
+    X64_MODULES=()
+    while read -r module; do
+      # d3d9-wined3d is Wine's d3d9 under the name the farm gives it (build-modules.sh knows it).
+      [[ "$module" == d3d9-wined3d ]] && { X64_MODULES+=("$module"); continue; }
+      [[ -n "$module" && "$module" != ntdll && -f "$MD/wine/dlls/$module/Makefile.in" ]] && X64_MODULES+=("$module")
+    done < <(python3 "$MD/build/windows-runtime/targets.py" arm64ec list)
+    (( ${#X64_MODULES[@]} > 100 )) || {
+      echo "ERROR: only ${#X64_MODULES[@]} ARM64EC Wine modules selected from the farm" >&2; exit 2;
+    }
+    echo "== rebuilding ${#X64_MODULES[@]} ARM64EC Wine modules from the patched tree =="
+    JOBS="$(sysctl -n hw.ncpu)" bash "$MD/build/wine-pe/build-modules.sh" "${X64_MODULES[@]}"
   fi
   [[ -f "$MD/wine/build-arm64ec/config.status" ]] || {
     echo "ERROR: Wine ARM64EC configure did not complete." >&2; exit 2;
@@ -206,7 +222,14 @@ if [[ "$REBUILD" == "1" ]]; then
   while read -r target; do
     [[ -z "$target" || "$target" == \#* ]] && continue
     name="${target##*/}"
-    if PATH="$MD/toolchains/llvm-mingw-20260421-ucrt-macos-universal/bin:$PATH" \
+    if [[ "$target" == dlls/* ]]; then
+      # Through Madeira's build-modules.sh, which links delay imports as plain ones
+      # (UNDELAY): lld's ARM64EC delay-load stub is x64 code that faults once the
+      # module runs from the JIT pool. It installs and strips the DLL itself.
+      directory="${target#dlls/}"; directory="${directory%%/*}"
+      JOBS="$(sysctl -n hw.ncpu)" bash "$MD/build/wine-pe/build-modules.sh" "$directory" >/dev/null 2>&1 &&
+        [[ -s "$MD/app/Madeira/arm64ec-windows/$name" ]] || EXTRA_FAILED+=("$name")
+    elif PATH="$MD/toolchains/llvm-mingw-20260421-ucrt-macos-universal/bin:$PATH" \
          make -C "$MD/wine/build-arm64ec" -j"$(sysctl -n hw.ncpu)" "$target" >/dev/null 2>&1 &&
        [[ -s "$MD/wine/build-arm64ec/$target" && "$(head -c 2 "$MD/wine/build-arm64ec/$target")" == "MZ" ]]; then
       install -m 644 "$MD/wine/build-arm64ec/$target" "$MD/app/Madeira/arm64ec-windows/$name"
