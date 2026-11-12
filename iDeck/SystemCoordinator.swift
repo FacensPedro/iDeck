@@ -1546,6 +1546,11 @@ class SystemCoordinator: ObservableObject {
                 return true
             }
         }
+        if let why = Self.restartNeeded() {
+            setWindowsStatus("Execution Error: \(why). Restart iDeck before starting another game: swipe iDeck away in the app switcher, then open it again through StikDebug.")
+            SteamLog.event("[wine-session] launch refused, restart needed: \(why)")
+            return true
+        }
         return false
     }
 
@@ -1719,7 +1724,23 @@ class SystemCoordinator: ObservableObject {
             reason += " AVX/AVX2 translation is now on for this game: restart iDeck and start it again."
         }
         SteamLog.event("[wine-exit] \(reason)")
+        if ntstatus != 0 { Self.restartReason = "the last game crashed (NTSTATUS 0x\(String(ntstatus, radix: 16, uppercase: true)))" }
         setWindowsStatus(reason)
+    }
+
+    /// Why the next game needs a fresh iDeck process, or nil. Wine runs inside iDeck:
+    /// after a crashed session, on a shrunken JIT pool or with little memory left, a
+    /// second game started in the same process failed (BioShock after Dragon Age:
+    /// 6108 MB in use, a 336 MB pool, a crash inside the runtime).
+    static var restartReason: String?
+    static let restartMinimumFreeMiB = 1500
+
+    static func restartNeeded() -> String? {
+        if let restartReason { return restartReason }
+        if StikJITHelper.smallPoolMB > 0 { return "the JIT pool shrank to \(StikJITHelper.smallPoolMB) MB" }
+        let free = ResourceGovernor.availableMiB()
+        if free > 0 && free < restartMinimumFreeMiB { return "only \(free) MB of memory is left" }
+        return nil
     }
 
     static let cleanupStuckMessage = "Execution Error: the previous Windows session did not finish closing. Wine runs inside iDeck, so restart iDeck to start another game: swipe iDeck away in the app switcher, then open it again."
