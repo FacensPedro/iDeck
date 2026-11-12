@@ -196,6 +196,31 @@ if [[ "$REBUILD" == "1" ]]; then
     exit 2
   }
   install -m 644 "$cmd_output" "$MD/app/Madeira/arm64ec-windows/cmd.exe"
+  # Wine modules the x64 (ARM64EC) farm lacked although the x86 farm has them
+  # (scripts/arm64ec_extra_modules.txt): DirectShow and its codecs (video in many
+  # games and their cutscenes), the Enhanced Video Renderer Media Foundation
+  # delay-loads, advpack (INF installs, urlmon's delay import), and the programs
+  # installers start (msiexec, rundll32, regsvr32). Built from the same pinned
+  # ARM64EC tree; one that does not build is reported and left out.
+  EXTRA_FAILED=()
+  while read -r target; do
+    [[ -z "$target" || "$target" == \#* ]] && continue
+    name="${target##*/}"
+    if PATH="$MD/toolchains/llvm-mingw-20260421-ucrt-macos-universal/bin:$PATH" \
+         make -C "$MD/wine/build-arm64ec" -j"$(sysctl -n hw.ncpu)" "$target" >/dev/null 2>&1 &&
+       [[ -s "$MD/wine/build-arm64ec/$target" && "$(head -c 2 "$MD/wine/build-arm64ec/$target")" == "MZ" ]]; then
+      install -m 644 "$MD/wine/build-arm64ec/$target" "$MD/app/Madeira/arm64ec-windows/$name"
+      STRIP="$MD/toolchains/llvm-mingw-20260421-ucrt-macos-universal/bin/llvm-strip"
+      [[ -x "$STRIP" ]] && "$STRIP" --strip-debug "$MD/app/Madeira/arm64ec-windows/$name"
+    else
+      EXTRA_FAILED+=("$name")
+    fi
+  done < "$ROOT/scripts/arm64ec_extra_modules.txt"
+  if (( ${#EXTRA_FAILED[@]} )); then
+    echo "WARNING: ARM64EC modules not built (left out of the x64 farm): ${EXTRA_FAILED[*]}" >&2
+  else
+    echo "ARM64EC extra modules built: $(grep -cv '^#\|^$' "$ROOT/scripts/arm64ec_extra_modules.txt")"
+  fi
   NTDLL_LOG="$MD/build/ntdll-unix/build-ideck.log"
   if ! bash "$MD/build/ntdll-unix/build.sh" 2>&1 | tee "$NTDLL_LOG"; then
     FAILED_UNIXLIBS="$(sed -n 's/^Failed://p' "$NTDLL_LOG")"
