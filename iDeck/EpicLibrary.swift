@@ -348,6 +348,7 @@ struct EpicInstalledGame: Codable, Sendable {
     private func enqueue(_ app: String, kind: Download.Kind) {
         guard Self.enabled else { return }
         guard signedIn else { error = "Sign in to Epic Games to download games."; return }
+        if kind == .install, AntiCheatPolicy.isBlocked(title: game(app)?.title ?? app) { error = AntiCheatPolicy.message; return }
         guard !EpicCloud.shared.isBusy else { error = "Wait for Epic save sync to finish, then try again."; return }
         if active?.app == app || queue.contains(app) { return }
         if inSession { resumeAfterSession.insert(app); downloads[app] = Download(kind: kind, state: .paused); return }
@@ -592,7 +593,7 @@ struct EpicInstalledGame: Codable, Sendable {
         if let extra = record.additionalCommandLine, !extra.isEmpty { args.append(extra) }
         args += ["-AUTH_LOGIN=unused", "-AUTH_PASSWORD=\(code)", "-AUTH_TYPE=exchangecode", "-epicapp=\(app)", "-epicenv=Prod"]
         if let ownershipFile { args.append(quoted("-epicovt=\(ownershipFile)")) }
-        args += ["-EpicPortal", quoted("-epicusername=\(name)"), "-epicuserid=\(account?.id ?? "")", "-epiclocale=en",
+        args += ["-EpicPortal", quoted("-epicusername=\(name)"), "-epicuserid=\(account?.id ?? "")", "-epiclocale=\(AppLanguage.gameLocale(separator: "-"))",
                  "-epicsandboxid=\(record.namespace)"]
         EpicLog.event("[epic-launch] app=\(app) online=\(code.isEmpty ? 0 : 1) ovt=\(ownershipFile == nil ? 0 : 1)")
         return args.joined(separator: " ")

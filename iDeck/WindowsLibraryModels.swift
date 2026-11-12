@@ -587,3 +587,38 @@ enum WindowsShortcutScanner {
         return directory.hasSuffix("\\") ? directory + name : directory + "\\" + name
     }
 }
+
+/// Games that need Easy Anti-Cheat online. Its kernel/user-mode client does not run in
+/// Wine on iOS and these games refuse to start or ban without it, so iDeck does not
+/// download them. Matched by Steam App ID or by title, whatever the store.
+enum AntiCheatPolicy {
+    static let steamAppIDs: Set<UInt32> = [
+        252950,   // Rocket League
+        1097150,  // Fall Guys
+        1222730,  // STAR WARS: Squadrons
+        1172470,  // Apex Legends
+        381210,   // Dead by Daylight
+        2073850,  // THE FINALS
+        386360,   // SMITE
+        444090,   // Paladins
+        594650,   // Hunt: Showdown
+    ]
+    /// Normalized titles (lowercase letters and digits only).
+    static let titles: Set<String> = [
+        "fortnite", "rocketleague", "fallguys", "starwarssquadrons", "apexlegends",
+        "deadbydaylight", "thefinals", "smite", "smite2", "paladins", "huntshowdown",
+        "huntshowdown1896", "multiversus",
+    ]
+
+    static func normalized(_ title: String) -> String {
+        String(title.lowercased().unicodeScalars.filter { CharacterSet.alphanumerics.contains($0) && $0.isASCII }.map(Character.init))
+    }
+
+    static func isBlocked(title: String, steamAppID: UInt32? = nil) -> Bool {
+        if let steamAppID, steamAppIDs.contains(steamAppID) { return true }
+        let name = normalized(title)
+        return !name.isEmpty && titles.contains(name)
+    }
+
+    static let message = "This game needs Easy Anti-Cheat, which does not run on iDeck. It cannot be installed."
+}

@@ -718,6 +718,13 @@ enum SteamLanguage {
     /// The device's preferred language as a Steam API name, English when Steam
     /// has none for it.
     static var device: String {
+        // The language chosen in iDeck comes first; a game without it falls back to English.
+        switch AppLanguage.chosenCode {
+        case "pt": return "brazilian"
+        case "es": return "latam"
+        case "en": return "english"
+        default: break
+        }
         for identifier in Locale.preferredLanguages {
             if let code = steamName(Locale(identifier: identifier)) { return code }
         }

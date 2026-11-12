@@ -1,4 +1,10 @@
 ## What's Changed
+### Games and stores
+- Steam game pages show the game's achievements: the total count and the highlighted achievements with their icons, in the app's language.
+- Games that need Easy Anti-Cheat (Fortnite, Fall Guys, Rocket League, STAR WARS: Squadrons, Apex Legends, Dead by Daylight, THE FINALS, SMITE, Paladins, Hunt: Showdown, MultiVersus) can no longer be installed from Steam, Epic Games, GOG or the EA app. The anti-cheat does not run on iDeck, so the install is refused with a message.
+- Games start in the language chosen in iDeck: Portuguese or Spanish when the game supports it, English otherwise. Steam games get it through their install record, Epic games through `-epiclocale` and EA games through `EAGameLocale`.
+- In Settings, Stores & launchers lists each store in its own group, with space between Steam, GOG, Epic Games and the EA app.
+
 ### Windows runtime
 - The x64 Windows runtime is now compiled from the same patched Wine as the x86 one: all 386 of its Wine modules, instead of Madeira's prebuilt copies. The Wine Staging and GE-Proton patches and iDeck's own Wine fixes now reach 64-bit games too. Direct3D (DXMT and Madeira's D3D12), FEX and Madeira's own modules are unchanged.
 - The DirectShow, Media Foundation and installer modules added in 1.8.2 are now built the way Madeira builds its modules, with their delayed imports linked directly: an x64 delay-load stub can fault when the module runs from the JIT pool.
@@ -17,4 +23,4 @@
 - iDeck's patches to Madeira are applied from one list (patches/series.txt) by one tested script, instead of twenty copies of the same shell block. A patch that no longer fits the pinned sources stops the build with its name.
 
 ### Release
-- Updated the application version to 1.8.5 (build 67).
+- Updated the application version to 2.0.0 (build 68).

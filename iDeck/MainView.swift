@@ -1400,6 +1400,7 @@ private struct SteamProgramDetailsView: View {
                                    ?? tr("Automatically sync Steam Cloud saves before playing when available. Conflicting saves are never overwritten.")) {
                         steamCloudControls
                     }
+                    SteamAchievementsCard(appID: game.appID)
                     if installed {
                         DetailCard(title: tr("DLCs")) {
                             dlcList
