@@ -1,8 +1,6 @@
 ## What's Changed
-### Madeira Dock
-- The Steam DLLs step no longer keeps saying it is installing. The downloaded DLLs stay in Files › iDeck › SteamDLLs after they are installed, and their presence alone started the setup again on every Steam sign-in and every Repair tap. It now runs only while the Steam client still lacks one of them.
-- The Steam DLLs download shows its percentage. It reported nothing until each package (up to 64 MB) had finished, so it looked stuck on a slow connection.
-- Tapping Install or Repair again while the setup runs keeps its progress line instead of replacing it with a message about Wine.
+### Windows runtime
+- 64-bit games whose executable cannot be moved in memory and is larger than 128 MB start again (Assassin's Creed Unity's ACU.exe is 131 MB). iDeck never measured the game's executable before reserving the JIT pool, so the pool was placed where the executable must load and Windows reported "failed to create main module" (0xC0000018). The executable is now measured first, as Madeira does, for Steam, GOG, Epic Games, EA app and .exe launches, and the pool is placed above it.
 
 ### Release
-- Updated the application version to 1.7.8 (build 60).
+- Updated the application version to 1.7.9 (build 61).
