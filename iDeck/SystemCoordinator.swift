@@ -225,7 +225,10 @@ class SystemCoordinator: ObservableObject {
         // Runs when the Madeira workspace first opens (its Wine prefix
         // ready), with or without a Steam account: the components come from
         // Valve's public update server.
-        guard steamComponentsTask == nil, MadeiraDock.bundled,
+        // A setup already under way keeps its own progress line: a second tap must not
+        // replace it with a message about Wine.
+        guard steamComponentsTask == nil else { return }
+        guard MadeiraDock.bundled,
               PrefixInstaller.isPrefixInstalled(at: MadeiraDock.prefix),
               !ideck_wineprocess_running(), !ideck_wineserver_running() else {
             if force { steamComponentsProgress = "Dock setup is unavailable while Wine is running or its prefix is not ready." }
@@ -233,9 +236,10 @@ class SystemCoordinator: ObservableObject {
         }
         // The pinned Valve installer does not guarantee the optional video
         // codecs. Repair an already installed client as well, without
-        // restarting Wine or copying large DLLs on the UI thread.
-        guard !MadeiraDock.clientInstalled || SteamDLLRepair.hasImportFiles
-                || SteamDLLRepair.needsRepair(prefix: MadeiraDock.prefix) else {
+        // restarting Wine or copying large DLLs on the UI thread. The downloaded
+        // DLLs stay in Documents/SteamDLLs after they are installed, so their
+        // presence alone is not work to do: only a client that still lacks one is.
+        guard !MadeiraDock.clientInstalled || SteamDLLRepair.needsRepair(prefix: MadeiraDock.prefix) else {
             if force { steamComponentsProgress = "Madeira Dock is already installed." }
             return
         }
