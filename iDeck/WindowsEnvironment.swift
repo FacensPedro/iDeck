@@ -403,6 +403,12 @@ class WindowsEnvironment {
         // As Madeira's launch: the JIT pool from StikJITHelper, exported, and the
         // debugger detached, before the wineserver and Wine start.
         DispatchQueue.global(qos: .userInitiated).async {
+          // As Madeira's Dock launch (ContentView): measure the game's own fixed-base
+          // exe first, so the pool is placed above it. iDeck never did, so a 64-bit
+          // exe without relocations that is larger than the 128MB executable window
+          // (Assassin's Creed Unity's ACU.exe, 131MB) found the pool on top of it and
+          // failed with "failed to create main module ... c0000018".
+          Self.measureExecutableWindow(binary: binary, steamInstallDirectory: steamInstallDirectory)
           if let failure = MadeiraWinePool.prepare() {
             Self.lastPoolFailure = failure
             SteamLog.event("[wine-launch] JIT pool: " + failure)
@@ -523,6 +529,21 @@ class WindowsEnvironment {
 
     /// The recommendation for the program being launched; `.standard` for an
     /// unrecognised game.
+    /// The executable window the game needs (StikJITHelper.exeWindowAutoMB, read once
+    /// by the next pool allocation). Steam games are measured in their install folder,
+    /// since the program started is Madeira Dock's host; others in the program's folder.
+    static func measureExecutableWindow(binary: URL, steamInstallDirectory: URL?) {
+        let name = binary.lastPathComponent.lowercased()
+        let folder = steamInstallDirectory ?? (name == "dockhost.exe" || name == "cmd.exe" ? nil : binary.deletingLastPathComponent())
+        guard let folder, let need = StikJITHelper.fixedBaseWindowMB(in: folder) else {
+            StikJITHelper.exeWindowAutoMB = 0
+            return
+        }
+        StikJITHelper.exeWindowAutoMB = need.mb
+        LogStore.shared.log("[exe-window] \(need.exe) is a fixed-base image ending \(need.mb)MB above 0x140000000: "
+            + "the executable window is widened to \(need.mb)MB for this session (exe-window-mb in the game's file overrides)")
+    }
+
     static func recommendation(binary: URL, steamAppID: UInt32?, steamInstallDirectory: URL?) -> GameRecommendation {
         let exists: (String) -> Bool = { windows in
             guard let root = binary.standardizedFileURL.pathComponents.lastIndex(of: "drive_c") else { return false }

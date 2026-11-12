@@ -1393,7 +1393,15 @@ class SystemCoordinator: ObservableObject {
                 return
             }
             self.captureWineLogStart()
-            self.windowsEnvironment.execute(binary: program, arguments: arguments, jitEnabler: self.jitEnabler) { [weak self] status in
+            // The game's folder, so its fixed-base exe is measured before the JIT pool is
+            // placed: the program started here is Madeira Dock's host, not the game.
+            let steamApps = SteamInstallPaths.steamApps(drive: MadeiraDock.drive)
+            let folderName = SteamInstallFiles.installDirectoryName(appID: Int(game.appID), steamApps: steamApps)
+                ?? SteamInstallFiles.safeFolderName(game.installDir.isEmpty ? "app_\(game.appID)" : game.installDir)
+            let gameFolder = SteamInstallPaths.common(drive: MadeiraDock.drive).appendingPathComponent(folderName, isDirectory: true)
+            self.windowsEnvironment.execute(binary: program, arguments: arguments,
+                                            steamInstallDirectory: installsOnly ? nil : gameFolder,
+                                            jitEnabler: self.jitEnabler) { [weak self] status in
                 DispatchQueue.main.async {
                     guard let self else { return }
                     self.pendingSteamGameID = nil
