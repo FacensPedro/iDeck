@@ -15,6 +15,10 @@ enum DownloadSpeed {
     static let eaFiles = 8
     static let eaSegments = 16
     static let eaConnections = 40
+    /// Whole-range requests in flight across all files (EARangeGate). Fewer than the
+    /// connections, so none waits inside URLSession, where its timeout would run; the
+    /// rest of the connections serve the small files' streams.
+    static let eaRangeRequests = 24
 
     /// GOG: files fetched at once, and chunks of one file fetched ahead of its writer
     /// (they are written in order). A game that is one large archive used to download

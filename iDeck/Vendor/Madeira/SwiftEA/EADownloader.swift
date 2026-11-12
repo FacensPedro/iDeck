@@ -52,6 +52,24 @@ struct EABuildArchive: Sendable {
     var installBytes: Int64 { files.reduce(0) { $0 + $1.uncompressedSize } }
 }
 
+/// iDeck: a counting gate for range requests. Waiters are served in order.
+actor EARangeGate {
+    private var free: Int
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    init(_ limit: Int) { free = Swift.max(1, limit) }
+
+    func acquire() async {
+        if free > 0 { free -= 1; return }
+        await withCheckedContinuation { waiters.append($0) }
+    }
+
+    /// Hands the slot to the next waiter, or frees it.
+    func release() {
+        if waiters.isEmpty { free += 1 } else { waiters.removeFirst().resume() }
+    }
+}
+
 /// Reading from EA's CDN by byte range.
 final class EARangeClient: @unchecked Sendable {
     private let http: URLSession
@@ -81,15 +99,34 @@ final class EARangeClient: @unchecked Sendable {
         return length
     }
 
+    /// iDeck: how many whole-range requests are in flight. Eight files of sixteen
+    /// ranges each used to hand URLSession up to 128 requests for its 40 connections;
+    /// the ones it queued kept their 60 s timeout running while they waited for a
+    /// connection, timed out and were fetched again, so a download stopped for a
+    /// while and then went on. A request now waits here, with no clock running, and
+    /// reaches URLSession only when a connection is free for it.
+    private let gate = EARangeGate(DownloadSpeed.eaRangeRequests)
+
     /// Bytes `range` of the archive, whole.
     func bytes(_ url: URL, range: Range<Int64>) async throws -> Data {
         var request = URLRequest(url: url)
         request.setValue("bytes=\(range.lowerBound)-\(range.upperBound - 1)", forHTTPHeaderField: "Range")
-        let (data, response) = try await http.data(for: request, delegate: LowPriority.shared)
-        guard let http = response as? HTTPURLResponse, http.statusCode == 206 || http.statusCode == 200 else {
-            throw EADownloadError.file("HTTP \((response as? HTTPURLResponse)?.statusCode ?? 0)")
+        // A connection that stops sending is given up after 30 s instead of 60.
+        request.timeoutInterval = 30
+        await gate.acquire()
+        let result: (Data, URLResponse)
+        do {
+            try Task.checkCancellation()
+            result = try await http.data(for: request, delegate: LowPriority.shared)
+        } catch {
+            await gate.release()
+            throw error
         }
-        return data
+        await gate.release()
+        guard let http = result.1 as? HTTPURLResponse, http.statusCode == 206 || http.statusCode == 200 else {
+            throw EADownloadError.file("HTTP \((result.1 as? HTTPURLResponse)?.statusCode ?? 0)")
+        }
+        return result.0
     }
 
     /// Bytes `range` of the archive as they arrive, with back-pressure: the
@@ -239,8 +276,10 @@ struct EARangeStream: AsyncSequence {
                 task?.suspend()
             }
             // True back-pressure: hold URLSession's delegate thread until the consumer
-            // has taken most of it (or the stream ended), at most 30 s.
-            let deadline = Date().addingTimeInterval(30)
+            // has taken most of it (or the stream ended). iDeck: at most 5 s, not 30:
+            // that thread delivers every other transfer of the session too, so a long
+            // hold here stopped the whole download.
+            let deadline = Date().addingTimeInterval(5)
             while waiting > EARangeStream.hardLimit && !finished {
                 if !condition.wait(until: deadline) { break }
             }
