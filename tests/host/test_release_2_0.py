@@ -10,7 +10,7 @@ def read(name):
 
 class Release20Tests(unittest.TestCase):
     def test_achievements_card(self):
-        self.assertIn("filters=achievements", read("GameDetailComponents.swift"))
+        self.assertIn("\"achievements\"", read("GameDetailComponents.swift"))
         self.assertIn("SteamAchievementsCard(appID: game.appID)", read("MainView.swift"))
 
     def test_easy_anti_cheat_blocked_in_every_store(self):
