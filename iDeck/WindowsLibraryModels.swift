@@ -607,7 +607,7 @@ enum AntiCheatPolicy {
     static let titles: Set<String> = [
         "fortnite", "rocketleague", "fallguys", "starwarssquadrons", "apexlegends",
         "deadbydaylight", "thefinals", "smite", "smite2", "paladins", "huntshowdown",
-        "huntshowdown1896", "multiversus",
+        "huntshowdown1896",
     ]
 
     static func normalized(_ title: String) -> String {

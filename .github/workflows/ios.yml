@@ -697,7 +697,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: build/i386-farm-cache
-          key: madeira-i386-farm-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/prepare_madeira_toolchains.sh', 'scripts/build_madeira_components.sh') }}-${{ steps.native_fp.outputs.i386 }}
+          key: madeira-i386-farm-v3-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/prepare_madeira_toolchains.sh') }}-${{ steps.native_fp.outputs.i386 }}
 
       - name: Download owner-supplied Apple Metal Shader Converter package
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.use_msc_pkg }}

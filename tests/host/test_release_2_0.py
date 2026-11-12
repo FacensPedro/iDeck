@@ -30,6 +30,16 @@ class Release20Tests(unittest.TestCase):
         page = read("SettingsView.swift").split("private var accountsPage")[1].split("private var eaPage")[0]
         self.assertEqual(page.count("Section"), 4)
 
+    def test_i386_farm_key_ignores_the_components_script(self):
+        workflow = (ROOT / ".github/workflows/ios.yml").read_text()
+        line = next(l for l in workflow.splitlines() if "madeira-i386-farm-" in l)
+        self.assertNotIn("build_madeira_components.sh", line)
+        self.assertIn("native_fp.outputs.i386", line)
+
+    def test_no_multiversus(self):
+        self.assertNotIn("multiversus", read("WindowsLibraryModels.swift").lower())
+        self.assertNotIn("multiversus", (ROOT / "RELEASE_NOTES.md").read_text().lower())
+
 
 if __name__ == "__main__":
     unittest.main()

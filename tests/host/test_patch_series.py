@@ -74,6 +74,15 @@ class ApplyTests(unittest.TestCase):
         self.assertEqual(self.run_group("group"), 0)  # already applied: skipped, not doubled
         self.assertEqual((self.repo / "src/a.c").read_text(), "one\nTWO\n")
 
+    def test_overlapping_patches_run_twice(self):
+        # third.patch rewrites the line first.patch made, so first.patch no longer
+        # reverses; the stamp keeps the second run from stopping.
+        (self.patches / "third.patch").write_text("--- a/src/a.c\n+++ b/src/a.c\n@@ -1,2 +1,2 @@\n one\n-TWO\n+2\n")
+        self.series.write_text("group . first.patch\ngroup . third.patch\n")
+        self.assertEqual(self.run_group("group"), 0)
+        self.assertEqual(self.run_group("group"), 0)
+        self.assertEqual((self.repo / "src/a.c").read_text(), "one\n2\n")
+
     def test_drifted_sources_and_unknown_groups_stop(self):
         (self.repo / "src/a.c").write_text("changed\n")
         self.assertEqual(self.run_group("group"), 2)
