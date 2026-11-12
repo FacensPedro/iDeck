@@ -98,7 +98,8 @@ class AutomaticIPAReleaseTests(unittest.TestCase):
     def test_one_time_current_release_request_requires_native_main_and_does_not_clobber(self):
         release = WORKFLOW.split("\n  release:\n", 1)[1]
         requested = (ROOT / ".github/release-request.txt").read_text(encoding="utf-8").strip()
-        self.assertEqual(requested, PROJECT_VERSION)
+        # Empty while no release is wanted; otherwise exactly the project version.
+        self.assertIn(requested, ("", PROJECT_VERSION))
         self.assertIn("needs.build.outputs.ipa_kind == 'native'", release)
         self.assertIn("github.ref == 'refs/heads/main'", release)
         self.assertIn('test -s .github/release-request.txt', release)
