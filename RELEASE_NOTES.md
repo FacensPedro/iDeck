@@ -8,6 +8,7 @@
 ### Build
 - The compiled i386 Wine farm (about 9 minutes of the IPA build) is no longer rebuilt when `scripts/build_madeira_components.sh` changes: its cache key now follows only the toolchains and the farm's own patched sources.
 - The patch applier records each applied patch (name, SHA-256 and the repository's HEAD) in the repository's git directory, so preparing the same checkout twice works even when a later patch changed the lines of an earlier one.
+- iDeck's patches to Madeira are applied from one list (patches/series.txt) by one tested script, instead of twenty copies of the same shell block. A patch that no longer fits the pinned sources stops the build with its name.
 
 ### Windows runtime
 - The x64 Windows runtime is now compiled from the same patched Wine as the x86 one: all 386 of its Wine modules, instead of Madeira's prebuilt copies. The Wine Staging and GE-Proton patches and iDeck's own Wine fixes now reach 64-bit games too. Direct3D (DXMT and Madeira's D3D12), FEX and Madeira's own modules are unchanged.
@@ -22,9 +23,6 @@
 
 ### JIT memory
 - When the JIT pool has to shrink below 500 MB (the address space is fragmented by an earlier session), the loading screen now says so and suggests reopening iDeck. Until now this warning was only in the log.
-
-### Build
-- iDeck's patches to Madeira are applied from one list (patches/series.txt) by one tested script, instead of twenty copies of the same shell block. A patch that no longer fits the pinned sources stops the build with its name.
 
 ### Release
 - Updated the application version to 2.0.0 (build 68).
