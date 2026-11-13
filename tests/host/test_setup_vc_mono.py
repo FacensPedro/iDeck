@@ -19,6 +19,11 @@ class SetupTests(unittest.TestCase):
         self.assertIn("wineMono.install()", VIEW)
         self.assertIn("(current == .wineMono && !wineMono.installed)", VIEW)
 
+    def test_design(self):
+        self.assertIn("private func stepper(_ current: Step) -> some View", VIEW)
+        self.assertIn("private func stepHeader(_ item: Step, _ subtitle: String) -> some View", VIEW)
+        self.assertNotIn('Picker("Setup step", selection: $step)', VIEW)
+
 
 if __name__ == "__main__":
     unittest.main()

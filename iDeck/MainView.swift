@@ -2475,11 +2475,34 @@ private struct IDeckFirstRunSetupView: View {
             case .visualCpp: return "Visual C++"
             case .wineMono: return "Wine Mono"
             case .dock: return "Madeira Dock"
-            case .jit: return "JIT configuration"
-            case .summary: return "Setup summary"
+            case .jit: return "JIT"
+            case .summary: return "Summary"
+            }
+        }
+        var icon: String {
+            switch self {
+            case .visualCpp: return "shippingbox.fill"
+            case .wineMono: return "gearshape.2.fill"
+            case .dock: return "dock.rectangle"
+            case .jit: return "bolt.fill"
+            case .summary: return "checkmark.seal.fill"
+            }
+        }
+        var tint: Color {
+            switch self {
+            case .visualCpp: return .blue
+            case .wineMono: return .purple
+            case .dock: return .teal
+            case .jit: return .orange
+            case .summary: return .green
             }
         }
     }
+
+    // Palette: one neutral background, one card surface, one hairline.
+    private let background = Color(red: 0.043, green: 0.047, blue: 0.063)
+    private let surface = Color(red: 0.094, green: 0.102, blue: 0.129)
+    private let hairline = Color.white.opacity(0.08)
 
     private var documents: URL {
         FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
@@ -2501,38 +2524,26 @@ private struct IDeckFirstRunSetupView: View {
         }
     }
 
+    private func done(_ item: Step) -> Bool {
+        switch item {
+        case .visualCpp: return prefixReady && vcReady
+        case .wineMono: return wineMono.installed
+        case .dock: return MadeiraDock.clientInstalled
+        case .jit: return jitMethod != "builtIn" || coordinator.hasPairingFile
+        case .summary: return false
+        }
+    }
+
     var body: some View {
         let current = Step(rawValue: step) ?? .summary
         NavigationStack {
             ZStack {
-                Color(red: 0.055, green: 0.063, blue: 0.085).ignoresSafeArea()
+                background.ignoresSafeArea()
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 22) {
-                        HStack(spacing: 12) {
-                            Image(systemName: "square.stack.3d.up.fill")
-                                .font(.title2)
-                                .foregroundStyle(.white)
-                                .frame(width: 52, height: 52)
-                                .background(Color.blue.opacity(0.24), in: RoundedRectangle(cornerRadius: 14))
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("iDeck")
-                                    .font(.system(size: 30, weight: .bold, design: .rounded))
-                                    .foregroundStyle(.white)
-                                Text("Initial setup")
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-
-                        Picker("Setup step", selection: $step) {
-                            ForEach(Step.allCases, id: \.rawValue) { item in
-                                Text(item.title).tag(item.rawValue)
-                            }
-                        }
-                        .pickerStyle(.segmented)
-                        .disabled(installing)
-
-                        VStack(alignment: .leading, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 28) {
+                        header(current)
+                        stepper(current)
+                        VStack(alignment: .leading, spacing: 20) {
                             switch current {
                             case .visualCpp: visualCppStep
                             case .wineMono: wineMonoStep
@@ -2542,33 +2553,15 @@ private struct IDeckFirstRunSetupView: View {
                             }
                         }
                         .id(refresh)
-                        .padding(22)
+                        .padding(24)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Color(red: 0.11, green: 0.12, blue: 0.15), in: RoundedRectangle(cornerRadius: 18))
-                        .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.white.opacity(0.1), lineWidth: 1))
-
-                        HStack(spacing: 12) {
-                            if step > 0 {
-                                Button("Back") { withAnimation(.easeInOut(duration: 0.2)) { step -= 1 } }
-                                    .buttonStyle(.bordered)
-                            }
-                            Spacer()
-                            if current != .summary {
-                                Button("Continue") { withAnimation(.easeInOut(duration: 0.2)) { step += 1 } }
-                                    .buttonStyle(.borderedProminent)
-                                    .disabled(installing || wineMono.busy
-                                              || (current == .visualCpp && !(prefixReady && vcReady))
-                                              || (current == .wineMono && !wineMono.installed))
-                            } else {
-                                Button("Finish setup") { step = 0; onFinish() }
-                                    .buttonStyle(.borderedProminent)
-                            }
-                        }
-                        .controlSize(.large)
-                        .disabled(installing)
+                        .background(surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(hairline, lineWidth: 1))
+                        footer(current)
                     }
-                    .padding(24)
-                    .frame(maxWidth: 660)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 32)
+                    .frame(maxWidth: 640)
                     .frame(maxWidth: .infinity)
                 }
             }
@@ -2586,59 +2579,206 @@ private struct IDeckFirstRunSetupView: View {
         .preferredColorScheme(.dark)
     }
 
+    // MARK: - Layout
+
+    private func header(_ current: Step) -> some View {
+        HStack(alignment: .center, spacing: 14) {
+            Image(systemName: "square.stack.3d.up.fill")
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 48, height: 48)
+                .background(LinearGradient(colors: [Color.blue, Color.indigo], startPoint: .topLeading, endPoint: .bottomTrailing),
+                            in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Welcome to iDeck")
+                    .font(.system(size: 26, weight: .bold))
+                    .foregroundStyle(.white)
+                Text("Step \(current.rawValue + 1) of \(Step.allCases.count) · \(current.title)")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+        }
+    }
+
+    /// Numbered steps joined by a line; finished ones show a check. Tappable when idle.
+    private func stepper(_ current: Step) -> some View {
+        HStack(spacing: 0) {
+            ForEach(Step.allCases, id: \.rawValue) { item in
+                let isCurrent = item == current
+                let finished = done(item) && !isCurrent
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) { step = item.rawValue }
+                } label: {
+                    VStack(spacing: 6) {
+                        ZStack {
+                            Circle()
+                                .fill(isCurrent ? item.tint : (finished ? Color.green.opacity(0.18) : surface))
+                                .overlay(Circle().stroke(isCurrent ? Color.clear : hairline, lineWidth: 1))
+                                .frame(width: 32, height: 32)
+                            if finished {
+                                Image(systemName: "checkmark").font(.system(size: 13, weight: .bold)).foregroundStyle(.green)
+                            } else {
+                                Text("\(item.rawValue + 1)")
+                                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                                    .foregroundStyle(isCurrent ? .white : .secondary)
+                            }
+                        }
+                        Text(item.title)
+                            .font(.caption2.weight(isCurrent ? .semibold : .regular))
+                            .foregroundStyle(isCurrent ? .white : .secondary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.plain)
+                .disabled(installing || wineMono.busy)
+                if item != Step.allCases.last {
+                    Rectangle()
+                        .fill(done(item) ? Color.green.opacity(0.5) : hairline)
+                        .frame(height: 1)
+                        .frame(maxWidth: 28)
+                        .offset(y: -10)
+                }
+            }
+        }
+    }
+
+    private func footer(_ current: Step) -> some View {
+        HStack(spacing: 12) {
+            if step > 0 {
+                Button { withAnimation(.easeInOut(duration: 0.2)) { step -= 1 } } label: {
+                    Label("Back", systemImage: "chevron.left").frame(minWidth: 90)
+                }
+                .buttonStyle(.bordered)
+                .tint(.white)
+            }
+            Spacer()
+            if current != .summary {
+                Button { withAnimation(.easeInOut(duration: 0.2)) { step += 1 } } label: {
+                    HStack(spacing: 6) { Text("Continue"); Image(systemName: "chevron.right") }.frame(minWidth: 120)
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(installing || wineMono.busy
+                          || (current == .visualCpp && !(prefixReady && vcReady))
+                          || (current == .wineMono && !wineMono.installed))
+            } else {
+                Button { step = 0; onFinish() } label: { Text("Start using iDeck").frame(minWidth: 160) }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.green)
+            }
+        }
+        .controlSize(.large)
+        .disabled(installing)
+    }
+
+    /// The top of a step: tinted icon tile, title and one line of explanation.
+    private func stepHeader(_ item: Step, _ subtitle: String) -> some View {
+        HStack(alignment: .top, spacing: 14) {
+            Image(systemName: item.icon)
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(item.tint)
+                .frame(width: 40, height: 40)
+                .background(item.tint.opacity(0.15), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            VStack(alignment: .leading, spacing: 4) {
+                Text(item.title).font(.title3.weight(.semibold)).foregroundStyle(.white)
+                Text(subtitle).font(.subheadline).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    /// Component rows inside a step, drawn as a grouped list.
+    private func componentList<Content: View>(@ViewBuilder _ rows: () -> Content) -> some View {
+        VStack(spacing: 0) { rows() }
+            .background(Color.white.opacity(0.03), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(hairline, lineWidth: 1))
+    }
+
+    private func statusRow(_ title: String, _ ready: Bool, detail: String? = nil) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: ready ? "checkmark.circle.fill" : "circle.dashed")
+                .font(.system(size: 17))
+                .foregroundStyle(ready ? Color.green : Color.secondary)
+            Text(title).font(.body).foregroundStyle(.white)
+            Spacer(minLength: 8)
+            Text(detail ?? (ready ? "Installed" : "Not installed"))
+                .font(.caption.weight(.medium))
+                .foregroundStyle(ready ? Color.green : Color.secondary)
+                .padding(.horizontal, 8).padding(.vertical, 3)
+                .background((ready ? Color.green : Color.white).opacity(0.1), in: Capsule())
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+    }
+
+    private func primaryButton(_ title: String, systemImage: String, disabled: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: systemImage).frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.borderedProminent)
+        .controlSize(.large)
+        .disabled(disabled)
+    }
+
+    private func note(_ text: String, warning: Bool = false) -> some View {
+        Label(text, systemImage: warning ? "exclamationmark.triangle.fill" : "info.circle")
+            .font(.caption)
+            .foregroundStyle(warning ? Color.orange : Color.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private var progressNote: some View {
+        HStack(spacing: 10) {
+            ProgressView().controlSize(.small)
+            Text(installerStatus.isEmpty ? coordinator.windowsStatus : installerStatus)
+                .font(.caption).foregroundStyle(.secondary)
+        }
+    }
+
     // MARK: - Visual C++
 
     private var visualCppStep: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Label("Visual C++", systemImage: "shippingbox.fill")
-                .font(.title2.bold())
-            Text("Prepares the Windows environment and installs Microsoft Visual C++ 2005-2022 (x64 and x86), which most games and programs need. It is downloaded from Microsoft.")
-            statusRow("Windows environment (x64 + x86)", prefixReady)
-            statusRow("Microsoft Visual C++ 2005-2022", vcReady)
-            Button(prefixReady && vcReady ? "Installed" : (installing ? "Installing…" : "Install")) {
+        VStack(alignment: .leading, spacing: 18) {
+            stepHeader(.visualCpp, "Prepares the Windows environment and installs Microsoft Visual C++ 2005–2022, which most games and programs need.")
+            componentList {
+                statusRow("Windows environment (x64 + x86)", prefixReady)
+                Divider().overlay(hairline).padding(.leading, 43)
+                statusRow("Microsoft Visual C++ 2005–2022", vcReady)
+            }
+            primaryButton(prefixReady && vcReady ? "Installed" : (installing ? "Installing…" : "Install"),
+                          systemImage: prefixReady && vcReady ? "checkmark" : "arrow.down.circle",
+                          disabled: installing || (prefixReady && vcReady) || !MadeiraRuntime.available) {
                 installVisualCpp()
             }
-            .buttonStyle(.borderedProminent)
-            .disabled(installing || (prefixReady && vcReady) || !MadeiraRuntime.available)
-            if installing { ProgressView(installerStatus.isEmpty ? coordinator.windowsStatus : installerStatus).font(.caption) }
-            else if !installerStatus.isEmpty {
-                Text(installerStatus).font(.caption).foregroundStyle(.secondary)
-            }
+            if installing { progressNote }
+            else if !installerStatus.isEmpty { note(installerStatus) }
             if !MadeiraRuntime.available {
-                Text("This IPA does not include the Windows runtime. Install a native iDeck IPA.")
-                    .font(.caption).foregroundStyle(.orange)
+                note("This IPA does not include the Windows runtime. Install a native iDeck IPA.", warning: true)
             }
+            note("Downloaded from Microsoft.")
         }
     }
 
     // MARK: - Wine Mono
 
     private var wineMonoStep: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Label("Wine Mono", systemImage: "gearshape.2.fill")
-                .font(.title2.bold())
-            Text("Installs Wine Mono, the .NET Framework that programs and launchers built with .NET need. It is downloaded from WineHQ (about \(Int((Double(WineMonoPin.tarBytes) / 1_000_000).rounded())) MB).")
-            statusRow("Wine Mono \(WineMonoPin.version)", wineMono.installed, detail: wineMono.busy ? wineMono.status : nil)
-            Button(wineMono.installed ? "Installed" : (wineMono.busy ? "Installing…" : "Install")) {
+        VStack(alignment: .leading, spacing: 18) {
+            stepHeader(.wineMono, "Installs Wine Mono, the .NET Framework that programs and launchers built with .NET need.")
+            componentList {
+                statusRow("Wine Mono \(WineMonoPin.version)", wineMono.installed, detail: wineMono.busy ? wineMono.status : nil)
+            }
+            primaryButton(wineMono.installed ? "Installed" : (wineMono.busy ? "Installing…" : "Install"),
+                          systemImage: wineMono.installed ? "checkmark" : "arrow.down.circle",
+                          disabled: wineMono.installed || wineMono.busy) {
                 wineMono.install()
             }
-            .buttonStyle(.borderedProminent)
-            .disabled(wineMono.installed || wineMono.busy)
-            if wineMono.busy { ProgressView(wineMono.status).font(.caption) }
-            if let error = wineMono.error {
-                Text(error).font(.caption).foregroundStyle(.orange)
+            if wineMono.busy {
+                HStack(spacing: 10) { ProgressView().controlSize(.small); Text(wineMono.status).font(.caption).foregroundStyle(.secondary) }
             }
-        }
-    }
-
-    private func statusRow(_ title: String, _ ready: Bool, detail: String? = nil) -> some View {
-        HStack {
-            Image(systemName: ready ? "checkmark.circle.fill" : "circle")
-                .foregroundStyle(ready ? Color.green : Color.secondary)
-            Text(title)
-            Spacer()
-            Text(detail ?? (ready ? "Installed" : "Not installed"))
-                .font(.caption).foregroundStyle(.secondary)
+            if let error = wineMono.error { note(error, warning: true) }
+            note("Downloaded from WineHQ, about \(Int((Double(WineMonoPin.tarBytes) / 1_000_000).rounded())) MB.")
         }
     }
 
@@ -2706,68 +2846,67 @@ private struct IDeckFirstRunSetupView: View {
     // MARK: - Madeira Dock
 
     private var dockStep: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Label("Madeira Dock", systemImage: "dock.rectangle")
-                .font(.title2.bold())
-            Text("Madeira Dock runs Valve's official Steam client so Steam games start with their licence and DRM intact.")
-            statusRow("Steam client", MadeiraDock.clientInstalled)
-            statusRow("Steam DLLs", steamDLLsReady)
-            Button(MadeiraDock.clientInstalled ? "Repair Madeira Dock" : "Install Madeira Dock") {
+        VStack(alignment: .leading, spacing: 18) {
+            stepHeader(.dock, "Runs Valve's official Steam client, so Steam games start with their licence and DRM intact.")
+            componentList {
+                statusRow("Steam client", MadeiraDock.clientInstalled)
+                Divider().overlay(hairline).padding(.leading, 43)
+                statusRow("Steam DLLs", steamDLLsReady)
+            }
+            primaryButton(MadeiraDock.clientInstalled ? "Repair Madeira Dock" : "Install Madeira Dock",
+                          systemImage: MadeiraDock.clientInstalled ? "wrench.and.screwdriver" : "arrow.down.circle",
+                          disabled: !MadeiraDock.bundled || !prefixReady) {
                 coordinator.installMadeiraDock()
             }
-            .buttonStyle(.borderedProminent)
-            .disabled(!MadeiraDock.bundled || !prefixReady)
             if let progress = coordinator.steamComponentsProgress {
-                Text(progress)
-                    .font(.caption)
-                    .foregroundStyle(progress.contains("failed") || progress.contains("missing") ? Color.orange : Color.secondary)
+                note(progress, warning: progress.contains("failed") || progress.contains("missing"))
             }
             if !prefixReady {
-                Text("Install Visual C++ first: it prepares the Windows environment.").font(.caption).foregroundStyle(.orange)
+                note("Install Visual C++ first: it prepares the Windows environment.", warning: true)
             }
+            note("Optional: only needed for Steam games.")
         }
     }
 
     // MARK: - JIT
 
     private var jitStep: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Label("JIT method", systemImage: "bolt.fill")
-                .font(.title2.bold())
+        VStack(alignment: .leading, spacing: 18) {
+            stepHeader(.jit, "Choose how iDeck turns JIT on each time a game starts.")
             Picker("JIT method", selection: $jitMethod) {
                 Text("StikDebug").tag("stikdebug")
                 Text("Built-in").tag("builtIn")
             }
             .pickerStyle(.segmented)
             if jitMethod == "builtIn" {
-                LabeledContent("Pairing file", value: coordinator.hasPairingFile ? "Imported" : "Missing")
+                componentList {
+                    statusRow("Pairing file", coordinator.hasPairingFile, detail: coordinator.hasPairingFile ? "Imported" : "Missing")
+                }
                 Button(coordinator.hasPairingFile ? "Replace pairing file" : "Import pairing file") {
                     pairingImporterPresented = true
                 }
-                Text("Built-in turns JIT on from inside iDeck, with the pairing file of this device.")
-                    .font(.caption).foregroundStyle(.secondary)
+                .buttonStyle(.bordered)
+                note("Built-in turns JIT on from inside iDeck with this device's pairing file.")
             } else {
-                Text("StikDebug is opened by iDeck when a game starts and turns JIT on for it.")
-                    .font(.caption).foregroundStyle(.secondary)
+                note("iDeck opens StikDebug when a game starts, and StikDebug turns JIT on for it.")
             }
-            Text("Nothing is turned on here: iDeck activates JIT with the chosen method each time a game starts.")
-                .font(.caption).foregroundStyle(.secondary)
         }
     }
 
     // MARK: - Summary
 
     private var completeStep: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Label("Setup summary", systemImage: "checkmark.circle")
-                .font(.title2.bold())
-            statusRow("Visual C++", prefixReady && vcReady)
-            statusRow("Wine Mono", wineMono.installed)
-            statusRow("Madeira Dock", MadeiraDock.clientInstalled)
-            LabeledContent("JIT method", value: jitMethod == "builtIn" ? "Built-in" : "StikDebug")
-            if jitMethod == "builtIn" { statusRow("Pairing file", coordinator.hasPairingFile) }
-            Text("Unfinished steps can be revisited from Settings.")
-                .font(.caption).foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 18) {
+            stepHeader(.summary, "Everything iDeck needs. Unfinished items can be completed later from Settings.")
+            componentList {
+                statusRow("Visual C++", prefixReady && vcReady)
+                Divider().overlay(hairline).padding(.leading, 43)
+                statusRow("Wine Mono", wineMono.installed)
+                Divider().overlay(hairline).padding(.leading, 43)
+                statusRow("Madeira Dock", MadeiraDock.clientInstalled)
+                Divider().overlay(hairline).padding(.leading, 43)
+                statusRow("JIT method", true, detail: jitMethod == "builtIn" ? "Built-in" : "StikDebug")
+            }
         }
     }
 }

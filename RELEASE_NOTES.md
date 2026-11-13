@@ -12,6 +12,8 @@
 ### Initial setup
 - The Windows runtime step is replaced by two steps. Visual C++ prepares the Windows environment and installs Microsoft Visual C++ 2005-2022 (x64 and x86). Wine Mono installs the .NET Framework runtime. Both are downloaded during setup, so programs no longer wait for them on first use.
 
+- The initial setup has a new design: a numbered step bar with checks for finished steps, a card per step with its icon, grouped component rows with status badges, and full-width install buttons.
+
 ### App size
 - The IPA is built like Madeira's: the Windows runtime is inside, while Wine Mono (.NET programs) and Microsoft's Visual C++ runtimes are downloaded on the device the first time they are needed instead of being bundled.
 
