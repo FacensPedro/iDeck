@@ -950,7 +950,13 @@ struct EAHardwareProfile: Codable, Equatable {
     /// GetVolumeInformation's serial for C:, 8 hex digits; without mountmgr it is 0.
     var volumeSerial = "00000000"
     /// Win32_VideoController.PNPDeviceID; the hash takes it up to its last backslash.
-    var gpuPNPDeviceID = "PCI\\VEN_106B&DEV_0001&SUBSYS_00000000&REV_00\\00000000"
+    /// Wine's wbemprox answers with the display device's HardwareID, which win32u
+    /// writes WITHOUT the instance suffix (sysparams: the device path with its last
+    /// component cut off). The game therefore hashes only "PCI". With the "\\00000000"
+    /// suffix assumed before, the licence hash had "PCI\\VEN_…&REV_00" instead, the
+    /// game computed another hash, refused the licence and opened ActivationUI.exe
+    /// (Dragon Age: Inquisition).
+    var gpuPNPDeviceID = "PCI\\VEN_106B&DEV_0001&SUBSYS_00000000&REV_00"
     var cpuManufacturer = "GenuineIntel"
     var cpuBrand = "Unknown ARM CPU"
     var cpuEAX: UInt32 = 0x000A_0661

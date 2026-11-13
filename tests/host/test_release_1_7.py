@@ -43,7 +43,7 @@ class Release17Tests(unittest.TestCase):
         self.assertIn("func prewarmJITForLaunch()", coordinator)
         self.assertEqual(repo_text("iDeck/MainView.swift").count("coordinator.prewarmJITForLaunch()"), 2)
         project = repo_text("iDeck.xcodeproj/project.pbxproj")
-        self.assertEqual(project.count("MARKETING_VERSION = 2.3.1;"), 6)
+        self.assertEqual(project.count("MARKETING_VERSION = 2.3.2;"), 6)
 
 
 class VulkanHostLibraryTests(unittest.TestCase):

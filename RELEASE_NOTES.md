@@ -1,6 +1,6 @@
 ## What's Changed
 ### EA app
-- The bug report has an "EA hash check" line for EA games. It compares the machine values iDeck signs the licence with (board and BIOS maker, Windows product id, C: volume serial, graphics card, processor) with what the game reads from the Windows environment (the prefix registry and volume serial), and names the fields that differ. A licence the game refuses, which makes it open EA's activation window, can then be traced to the field that does not match.
+- Fixed EA games refusing their licence and opening EA's activation window (ActivationUI.exe), seen with Dragon Age: Inquisition. The licence is bound to a hash of the machine that includes the graphics card's PNP id, which the game reads from Wine. Wine gives the id without the instance suffix iDeck assumed, so the game computed a different hash than the one the licence was issued for. iDeck now uses the id exactly as Wine reports it; the licence is renewed with the matching hash at the next launch.
 
 ### Release
-- Updated the application version to 2.3.1 (build 73).
+- Updated the application version to 2.3.2 (build 74).
