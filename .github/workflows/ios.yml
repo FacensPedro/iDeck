@@ -450,7 +450,11 @@ jobs:
       IDECK_SPLIT_RUNTIME: '0'
       IDECK_NATIVE_BUILD: ${{ ((github.event_name == 'workflow_dispatch' && inputs.require_madeira) || (github.event_name == 'push' && vars.IDECK_NATIVE_DISTRIBUTION_APPROVED == 'true')) && '1' || '0' }}
       IDECK_BUILD_WOW64: ${{ ((github.event_name == 'workflow_dispatch' && inputs.require_madeira && inputs.build_wow64) || (github.event_name == 'push' && vars.IDECK_NATIVE_DISTRIBUTION_APPROVED == 'true')) && '1' || '0' }}
-      IDECK_BUNDLE_WINE_MONO: ${{ ((github.event_name == 'workflow_dispatch' && inputs.require_madeira && inputs.bundle_wine_mono) || (github.event_name == 'push' && vars.IDECK_NATIVE_DISTRIBUTION_APPROVED == 'true')) && '1' || '0' }}
+      # As Madeira's IPA: Wine Mono (about 42 MB) and the Visual C++ runtimes are
+      # downloaded on the device the first time they are needed, not bundled. A manual
+      # run can still bundle Mono (bundle_wine_mono).
+      IDECK_BUNDLE_WINE_MONO: ${{ (github.event_name == 'workflow_dispatch' && inputs.require_madeira && inputs.bundle_wine_mono) && '1' || '0' }}
+      IDECK_BUNDLE_VCRUNTIME: '0'
       # The profile (always unified): DXMT + Madeira D3D12 ("d3d12" payload).
       IDECK_GRAPHICS_PROFILE: unified
       IDECK_MADEIRA_GRAPHICS: d3d12

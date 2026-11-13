@@ -9,6 +9,9 @@
 ### JIT
 - The JIT pool prepared when StikDebug attaches keeps a 256 MB executable window free instead of 128 MB, so games with a large fixed-base exe (Assassin's Creed Unity's ACU.exe, 131 MB) can still load with it. A game that needs more is named in the log.
 
+### App size
+- The IPA is built like Madeira's: the Windows runtime is inside, while Wine Mono (.NET programs) and Microsoft's Visual C++ runtimes are downloaded on the device the first time they are needed instead of being bundled.
+
 ### Memory
 - Epic downloads keep at most 64 MB of reused chunks in memory (256 MB before); the rest waits on disk.
 - EA downloads fetch 2 MB ranges instead of 4 MB, halving what the concurrent requests hold in memory.
