@@ -140,7 +140,11 @@ enum VisualCRuntimeBootstrap {
     }
 
     static func download(in prefix: URL, completion: @escaping (Result<URL, Error>) -> Void) {
-        let downloads = prefix.appendingPathComponent("drive_c/WindowsDownloads", isDirectory: true)
+        // The installer is only read (its CABs are extracted), never run: it is kept
+        // out of WindowsDownloads, where it showed up in the library as a program and
+        // opened Microsoft's setup window. An old copy left there is removed.
+        try? FileManager.default.removeItem(at: prefix.appendingPathComponent("drive_c/WindowsDownloads/vc_redist.x64.exe"))
+        let downloads = FileManager.default.temporaryDirectory.appendingPathComponent("vcredist", isDirectory: true)
         let destination = downloads.appendingPathComponent("vc_redist.x64.exe")
         do {
             try FileManager.default.createDirectory(at: downloads, withIntermediateDirectories: true)

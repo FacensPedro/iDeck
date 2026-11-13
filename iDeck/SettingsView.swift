@@ -358,9 +358,6 @@ struct SettingsView: View {
             } label: {
                 Label(tr(coordinator.isJITEnabled ? "Reconnect JIT debugger" : "Enable JIT"), systemImage: "bolt.fill")
             }
-            Text(tr("StikDebug requires pairing, LocalDevVPN, and a debug-signable iDeck."))
-                .font(.caption)
-                .foregroundStyle(.secondary)
         }
     }
 

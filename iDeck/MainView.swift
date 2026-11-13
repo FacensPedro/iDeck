@@ -924,7 +924,7 @@ struct WindowsWorkspaceView: View {
         return VStack(alignment: .leading, spacing: 6) {
             VStack(alignment: .leading, spacing: 6) {
                 ZStack {
-                    GOGArtworkView(urls: [game.cover].compactMap { $0 }, fallbackColor: secondaryColor)
+                    GOGArtworkView(urls: [game.cover].compactMap { $0 }, fallbackColor: secondaryColor, fill: true)
                         .libraryCoverFrame()
                         .contentShape(Rectangle())
                         .onTapGesture { selectedEAGame = game }
@@ -1098,13 +1098,21 @@ struct WindowsWorkspaceView: View {
 private struct GOGArtworkView: View {
     let urls: [URL]
     let fallbackColor: Color
+    /// Fill the frame and crop (EA's 9:16 pack art in a 2:3 card); fit otherwise.
+    var fill = false
     @State private var index = 0
 
     var body: some View {
         Group {
             if index < urls.count {
                 ArtworkImage(url: urls[index], failed: { index += 1 }) { image in
-                    image.resizable().scaledToFit()
+                    if fill {
+                        image.resizable().scaledToFill()
+                            .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+                            .clipped()
+                    } else {
+                        image.resizable().scaledToFit()
+                    }
                 } placeholder: {
                     fallbackColor.overlay(ProgressView().tint(.gray))
                 }
@@ -2245,7 +2253,7 @@ extension WindowsWorkspaceView {
         case .epic(let app), .epicInstalling(let app):
             GOGArtworkView(urls: [epicLibrary.game(app)?.cover].compactMap { $0 }, fallbackColor: panelColor)
         case .ea(let id):
-            GOGArtworkView(urls: [eaLibrary.game(id)?.cover].compactMap { $0 }, fallbackColor: panelColor)
+            GOGArtworkView(urls: [eaLibrary.game(id)?.cover].compactMap { $0 }, fallbackColor: panelColor, fill: true)
         case .exe(let path):
             WindowsExecutableArtworkView(executableURL: URL(fileURLWithPath: path), library: windowsLibrary, fallbackColor: panelColor)
         }

@@ -1,4 +1,12 @@
 ## What's Changed
+### Fixes
+- Built-in JIT: when it cannot run (no pairing file, unsupported iOS, a sideloaded build without its helper) it says why instead of silently opening StikDebug. A helper failure ends the 90-second wait at once, so the next tap tries again.
+- Settings no longer says that StikDebug requires pairing and LocalDevVPN.
+- Visual C++ x64 is installed by reading Microsoft's installer, never by running it. The installer is now downloaded to a temporary folder instead of the Windows downloads folder, where it appeared in the library and opened Microsoft's setup window (whose buttons did not take taps). An old copy left there is removed.
+- Closing a game that never exits: besides Retry and Keep Waiting, the dialog offers Close iDeck. This is the only way to end a Windows game that ignores Alt+F4, since Wine runs inside iDeck; Madeira offers the same.
+- EA covers fill their card in the library and in the store column, whether the game is installed, installing or not installed. EA's 9:16 pack art was fitted into the 2:3 card and looked small.
+- Epic game sizes show the base game: files that carry install tags (language packs, high-resolution textures, optional modes) are no longer counted. Fortnite showed 160.62 GB.
+
 ### Settings
 - The bug report no longer lists steamservice.dll (Steam's Windows service, which does not run under Wine) as missing, and shows "pool automatic" instead of "pool 0 MB".
 - JIT & Debugging no longer says that JIT does not guarantee FEX is ready, and the pairing file appears only with the Built-in method, the only one that uses it.

@@ -122,7 +122,13 @@ struct EpicInstalledGame: Codable, Sendable {
         guard signedIn, accountGeneration == generation, accountID == account,
               installed[app] == nil, game == self.game(app) else { return }
         manifestSizeBuilds[app] = game.buildVersion
-        manifestSizes[app] = manifest.files.reduce(0) { $0 + $1.size }
+        // The base game: files without install tags. Tagged files are optional content
+        // (language packs, high-resolution textures); counting them gave Fortnite
+        // 160 GB. A manifest whose files are all tagged keeps its whole total.
+        let total = manifest.files.reduce(0) { $0 + $1.size }
+        let base = manifest.files.filter { $0.installTags.isEmpty }.reduce(0) { $0 + $1.size }
+        manifestSizes[app] = base > 0 ? base : total
+        EpicLog.event("[epic-library] size app=\(app) base=\(base >> 20)MB all=\(total >> 20)MB")
     }
 
     // MARK: Files

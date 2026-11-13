@@ -71,9 +71,10 @@ func trStatus(_ status: String) -> String {
 
 enum Translations {
     static let table: [String: [String: String]] = [
+        "Close iDeck": ["pt": "Fechar o iDeck", "es": "Cerrar iDeck"],
+        "The Windows game has not exited. Close it from its own menu, retry, or close iDeck: unsaved progress is lost, and iDeck has to be opened again through StikDebug.": ["pt": "O jogo do Windows não fechou. Feche pelo menu do próprio jogo, tente de novo ou feche o iDeck: o progresso não salvo é perdido e o iDeck precisa ser aberto de novo pelo StikDebug.", "es": "El juego de Windows no se cerró. Ciérralo desde su propio menú, vuelve a intentarlo o cierra iDeck: se pierde el progreso no guardado y hay que abrir iDeck de nuevo desde StikDebug."],
         "JIT pool": ["pt": "Pool JIT", "es": "Pool JIT"],
         "Notifications are turned off for iDeck in iOS Settings.": ["pt": "As notificações do iDeck estão desativadas nos Ajustes do iOS.", "es": "Las notificaciones de iDeck están desactivadas en los Ajustes de iOS."],
-        "StikDebug requires pairing, LocalDevVPN, and a debug-signable iDeck.": ["pt": "O StikDebug exige pareamento, LocalDevVPN e um iDeck assinado para depuração.", "es": "StikDebug requiere emparejamiento, LocalDevVPN y un iDeck firmado para depuración."],
         "This game needs Easy Anti-Cheat, which does not run on iDeck. It cannot be installed.": ["pt": "Este jogo precisa do Easy Anti-Cheat, que não funciona no iDeck. Ele não pode ser instalado.", "es": "Este juego necesita Easy Anti-Cheat, que no funciona en iDeck. No se puede instalar."],
         "Achievements": ["pt": "Conquistas", "es": "Logros"],
         "%d achievements in this game. The highlighted ones are shown.": ["pt": "%d conquistas neste jogo. As destacadas aparecem aqui.", "es": "%d logros en este juego. Se muestran los destacados."],
@@ -112,7 +113,6 @@ enum Translations {
         "Retry Close": ["pt": "Tentar encerrar novamente", "es": "Reintentar el cierre"],
         "Keep Waiting": ["pt": "Continuar aguardando", "es": "Seguir esperando"],
         "Return to Game": ["pt": "Voltar ao jogo", "es": "Volver al juego"],
-        "The Windows game has not exited. iDeck cannot safely force-kill an in-process Wine thread without risking an app crash. Try closing the game from its menu or retry Alt+F4.": ["pt": "O jogo Windows não foi encerrado. O iDeck não pode interromper à força uma thread do Wine sem risco de travar o aplicativo. Tente sair pelo menu do jogo ou repetir Alt+F4.", "es": "El juego de Windows no se ha cerrado. iDeck no puede detener por la fuerza un hilo de Wine sin riesgo de bloquear la aplicación. Intenta salir desde el menú del juego o repetir Alt+F4."],
         "Keep helper processes running": ["pt": "Manter processos auxiliares em execução", "es": "Mantener procesos auxiliares en ejecución"],
 
         "Share Wine log": ["pt": "Compartilhar log do Wine", "es": "Compartir registro de Wine"],

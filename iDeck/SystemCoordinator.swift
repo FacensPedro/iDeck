@@ -589,12 +589,12 @@ class SystemCoordinator: ObservableObject {
     /// pairing file and runs the bundled universal.js script.
     func requestBuiltInJIT() {
         guard let pairing = try? Data(contentsOf: pairingFileURL), !pairing.isEmpty else {
-            setWindowsStatus("Import a pairing file in Settings › JIT before using the built-in JIT.")
+            builtInFailed("Import a pairing file in Settings › JIT before using the built-in JIT.")
             return
         }
         guard let scriptURL = Bundle.main.url(forResource: "universal", withExtension: "jitscript"),
               let script = try? Data(contentsOf: scriptURL), !script.isEmpty else {
-            setWindowsStatus("Cannot request JIT: the bundled universal.js debugger script is missing.")
+            builtInFailed("Cannot request JIT: the bundled universal.js debugger script is missing.")
             return
         }
         setWindowsStatus("Starting the built-in JIT helper...")
@@ -612,12 +612,26 @@ class SystemCoordinator: ObservableObject {
                 switch result {
                 case .success(let response):
                     AppLog.record("[jit-builtin] finished: \(response.message)")
-                    if !response.success { self.setWindowsStatus("Built-in JIT: " + response.message) }
+                    if !response.success { self.builtInFailed("Built-in JIT: " + response.message) }
                 case .failure(let error):
-                    self.setWindowsStatus("Built-in JIT: " + error.localizedDescription)
+                    self.builtInFailed("Built-in JIT: " + error.localizedDescription)
                 }
             }
         }
+    }
+
+    /// The wait for the debugger that a built-in request started.
+    private var builtInWait: Timer?
+
+    /// The helper failed: stop waiting 90 s for a debugger that will not come, and
+    /// let the next tap try again at once.
+    private func builtInFailed(_ message: String) {
+        builtInWait?.invalidate()
+        builtInWait = nil
+        jitRequestStartedAt = nil
+        pendingJITLaunch = nil
+        setWindowsStatus(message)
+        AppLog.record("[jit-builtin] " + message)
     }
 
     /// When the JIT request in flight was started (nil: none). A second request
@@ -640,11 +654,26 @@ class SystemCoordinator: ObservableObject {
     func requestStikDebugJIT() {
         if let started = jitRequestStartedAt, Date().timeIntervalSince(started) < 20 { return }
         jitRequestStartedAt = Date()
-        if jitMethod == "builtIn", FileManager.default.fileExists(atPath: pairingFileURL.path), MainActor.assumeIsolated({ IDeckBuiltInJIT.isAvailable }) {
-            requestBuiltInJIT()
-            StikJITHelper.waitForDebugger { [weak self] result in
-                DispatchQueue.main.async { self?.finishJITRequest(result) }
+        if jitMethod == "builtIn" {
+            // Built-in never falls back to StikDebug silently: the reason it cannot
+            // run is shown instead, and the request ends.
+            let unavailable = MainActor.assumeIsolated { IDeckBuiltInJIT.unavailableReason }
+            if let unavailable {
+                jitRequestStartedAt = nil
+                setWindowsStatus("Built-in JIT: " + unavailable)
+                AppLog.record("[jit-builtin] unavailable: \(unavailable)")
+                return
             }
+            guard FileManager.default.fileExists(atPath: pairingFileURL.path) else {
+                jitRequestStartedAt = nil
+                setWindowsStatus("Built-in JIT needs this device's pairing file: import it in Settings › JIT.")
+                return
+            }
+            builtInWait?.invalidate()
+            builtInWait = StikJITHelper.waitForDebugger { [weak self] result in
+                DispatchQueue.main.async { self?.builtInWait = nil; self?.finishJITRequest(result) }
+            }
+            requestBuiltInJIT()
             return
         }
         // Madeira's StikJITHelper.enableJIT, verbatim: stikdebug://enable-jit with
@@ -1630,6 +1659,15 @@ class SystemCoordinator: ObservableObject {
         pollWindowsSessionClose()
     }
 
+    /// The game did not exit: iDeck closes itself, the only way to end an in-process
+    /// Wine thread that ignores Alt+F4 (Madeira offers the same). Open it again from
+    /// StikDebug to start another game.
+    func forceCloseIDeck() {
+        SteamLog.event("[wine-close] game did not exit; iDeck closed by the user")
+        AppLog.record("[wine-close] force close: iDeck exits so the stuck Windows session ends")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { exit(0) }
+    }
+
     func acknowledgeWindowsCloseWarning() {
         windowsCloseWarning = nil
     }
@@ -1678,7 +1716,7 @@ class SystemCoordinator: ObservableObject {
         }
         if seconds >= 15, !windowsCloseWarningWasShown {
             windowsCloseWarningWasShown = true
-            windowsCloseWarning = "The Windows game has not exited. iDeck cannot safely force-kill an in-process Wine thread without risking an app crash. Try closing the game from its menu or retry Alt+F4."
+            windowsCloseWarning = "The Windows game has not exited. Close it from its own menu, retry, or close iDeck: unsaved progress is lost, and iDeck has to be opened again through StikDebug."
             SteamLog.event("[wine-close] guest or wineserver did not exit after 15 seconds")
         }
     }
