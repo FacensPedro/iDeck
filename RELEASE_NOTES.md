@@ -3,6 +3,9 @@
 - Epic games install only the base game: files that carry install tags (language packs, high-resolution textures, optional modes) are left out, so a game takes the space its page shows. A build whose files are all tagged is installed whole.
 - Epic DLC can be installed and uninstalled like Steam DLC. An installed game's page lists the downloadable DLC the account owns, with Install, progress, Cancel and Uninstall. A DLC is installed into its game's folder and updated with the same downloader. Uninstalling removes only the DLC's own files, and uninstalling the game removes its DLC too.
 
+### Storage
+- Settings › Storage & Downloads shows how much space is free on this device and on each external drive (free of total), or "Not connected" for a drive that is not plugged in.
+
 ### Fixes
 - A JIT pool that had to shrink no longer blocks the next game with "restart iDeck": it happened on a fresh launch too, so reopening could not help and no game could start. The pool prepared when StikDebug attaches keeps a 192 MB executable window free instead of 256 MB, which leaves the pool more room.
 - Built-in JIT: when it cannot run (no pairing file, unsupported iOS, a sideloaded build without its helper) it says why instead of silently opening StikDebug. A helper failure ends the 90-second wait at once, so the next tap tries again.

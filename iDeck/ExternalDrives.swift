@@ -202,6 +202,27 @@ final class ExternalDrives: ObservableObject {
 
     /// Opens every saved folder and refreshes the prefix links. Run before
     /// Wine starts so Windows lists the drives.
+    /// Free and total bytes of a volume, or nil when it does not say.
+    static func capacity(of url: URL) -> (free: Int64, total: Int64)? {
+        guard let values = try? url.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey,
+                                                             .volumeAvailableCapacityKey, .volumeTotalCapacityKey]),
+              let total = values.volumeTotalCapacity, total > 0 else { return nil }
+        let free = max(values.volumeAvailableCapacityForImportantUsage ?? 0, Int64(values.volumeAvailableCapacity ?? 0))
+        return (free, Int64(total))
+    }
+
+    /// The external folder's drive, when it is connected (Settings › Storage).
+    func capacity(_ folder: ExternalFolder) -> (free: Int64, total: Int64)? {
+        if let url = mounted[folder.id] { return Self.capacity(of: url) }
+        var stale = false
+        guard let url = try? URL(resolvingBookmarkData: folder.bookmark, options: [], relativeTo: nil,
+                                 bookmarkDataIsStale: &stale) else { return nil }
+        let scoped = url.startAccessingSecurityScopedResource()
+        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+        guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+        return Self.capacity(of: url)
+    }
+
     func mountAll(prefix: URL) {
         guard !loadFailed else { return }
         let fm = FileManager.default
