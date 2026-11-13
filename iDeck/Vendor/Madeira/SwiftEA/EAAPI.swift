@@ -135,7 +135,8 @@ enum EAHardware {
         if let created = (try? drive.resourceValues(forKeys: [.creationDateKey]))?.creationDate {
             profile.osInstallDate = EAHardwareProfile.wmiDate(created)
         }
-        profile.gpuPNPDeviceID = String(format: "PCI\\VEN_%04X&DEV_%04X&SUBSYS_00000000&REV_00\\00000000", gpuVendor, gpuDevice)
+        // As Wine reports it: the HardwareID, with no instance suffix (EAHardwareProfile).
+        profile.gpuPNPDeviceID = String(format: "PCI\\VEN_%04X&DEV_%04X&SUBSYS_00000000&REV_00", gpuVendor, gpuDevice)
         profile.cpuECX = EAHardwareProfile.cpuECX(avx: avx)
         if let url = overridesURL, let data = try? Data(contentsOf: url),
            let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
