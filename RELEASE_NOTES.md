@@ -9,6 +9,20 @@
 ### JIT
 - The JIT pool prepared when StikDebug attaches keeps a 256 MB executable window free instead of 128 MB, so games with a large fixed-base exe (Assassin's Creed Unity's ACU.exe, 131 MB) can still load with it. A game that needs more is named in the log.
 
+### Initial setup
+- The Windows runtime step is replaced by two steps. Visual C++ prepares the Windows environment and installs Microsoft Visual C++ 2005-2022 (x64 and x86). Wine Mono installs the .NET Framework runtime. Both are downloaded during setup, so programs no longer wait for them on first use.
+
+- The initial setup has a new design: a numbered step bar with checks for finished steps, a card per step with its icon, grouped component rows with status badges, and full-width install buttons.
+
+### Installer caches
+- When an installer (.exe/.msi) ends, the files it unpacked into the Windows Temp folders and the WinINet download cache are deleted, freeing the space setup payloads used to keep. This runs only when no Windows program is running, and the log says how much was freed.
+
+### Per-game JIT pool
+- A game's page has a JIT pool setting under Performance (Automatic, 336–768 MB). A light game can use less memory, and a heavy one can ask for more. A pool already prepared when StikDebug attached keeps its size until iDeck is reopened.
+
+### App size
+- The IPA is built like Madeira's: the Windows runtime is inside, while Wine Mono (.NET programs) and Microsoft's Visual C++ runtimes are downloaded on the device the first time they are needed instead of being bundled.
+
 ### Memory
 - Epic downloads keep at most 64 MB of reused chunks in memory (256 MB before); the rest waits on disk.
 - EA downloads fetch 2 MB ranges instead of 4 MB, halving what the concurrent requests hold in memory.
@@ -51,4 +65,4 @@
 - The bug report has a "Missing DLLs:" line listing what the last Windows session could not find, from Wine's own messages: a DLL a program imports that is missing or failed to load, a function with no implementation, an unimplemented function that was called, and a DLL looked up in system32 or syswow64 that is not there. When there are none, the line says so.
 
 ### Release
-- Updated the application version to 2.1.0 (build 70).
+- Updated the application version to 2.2.0 (build 71).

@@ -71,6 +71,7 @@ func trStatus(_ status: String) -> String {
 
 enum Translations {
     static let table: [String: [String: String]] = [
+        "JIT pool": ["pt": "Pool JIT", "es": "Pool JIT"],
         "Notifications are turned off for iDeck in iOS Settings.": ["pt": "As notificações do iDeck estão desativadas nos Ajustes do iOS.", "es": "Las notificaciones de iDeck están desactivadas en los Ajustes de iOS."],
         "StikDebug requires pairing, LocalDevVPN, and a debug-signable iDeck.": ["pt": "O StikDebug exige pareamento, LocalDevVPN e um iDeck assinado para depuração.", "es": "StikDebug requiere emparejamiento, LocalDevVPN y un iDeck firmado para depuración."],
         "This game needs Easy Anti-Cheat, which does not run on iDeck. It cannot be installed.": ["pt": "Este jogo precisa do Easy Anti-Cheat, que não funciona no iDeck. Ele não pode ser instalado.", "es": "Este juego necesita Easy Anti-Cheat, que no funciona en iDeck. No se puede instalar."],

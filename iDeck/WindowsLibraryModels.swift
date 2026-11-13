@@ -31,6 +31,9 @@ struct WindowsGameProfile: Codable, Equatable, Identifiable {
     var reducedX87: Bool = false
     /// CPU cores the game sees (MADEIRA_CPU_COUNT); 0 = all.
     var cpuCount: Int = 0
+    /// This game's Wine JIT pool in MB; 0 follows Settings.
+    var jitPoolMiB: Int = 0
+    static let jitPoolChoices = [0, 336, 448, 560, 624, 768]
     static let cpuCounts = [0, 2, 4, 6, 8]
     /// Direct3D 9 anisotropic filtering limit (DXMT_D9_ANISO_LIMIT); 0 = the game's.
     var anisotropyLimit: Int = 0
@@ -61,7 +64,7 @@ struct WindowsGameProfile: Codable, Equatable, Identifiable {
     var updatedAt: Date = Date()
 
     private enum CodingKeys: String, CodingKey {
-        case id, title, arguments, resolution, surfaceScaling, graphicsAPI, controllerAPI, metalFXEnabled, fpsLimit, avxEnabled, keepChildProcessesRunning, artworkFilename, updatedAt, vulkanMode, openGLBackend, useRecommended, launchThroughSteam, codeChecks, d3d12Renderer, reducedX87, cpuCount, anisotropyLimit, frameGeneration, reportNVIDIA, fastSync, resolutionDefaults
+        case id, title, arguments, resolution, surfaceScaling, graphicsAPI, controllerAPI, metalFXEnabled, fpsLimit, avxEnabled, keepChildProcessesRunning, artworkFilename, updatedAt, vulkanMode, openGLBackend, useRecommended, launchThroughSteam, codeChecks, d3d12Renderer, reducedX87, cpuCount, jitPoolMiB, anisotropyLimit, frameGeneration, reportNVIDIA, fastSync, resolutionDefaults
     }
 
     static let vulkanModes = ["Automatic", "On", "Off"]
@@ -119,6 +122,8 @@ struct WindowsGameProfile: Codable, Equatable, Identifiable {
         reducedX87 = (try? values.decodeIfPresent(Bool.self, forKey: .reducedX87)) ?? false
         let savedCPU = (try? values.decodeIfPresent(Int.self, forKey: .cpuCount)) ?? 0
         cpuCount = Self.cpuCounts.contains(savedCPU) ? savedCPU : 0
+        let savedPool = (try? values.decodeIfPresent(Int.self, forKey: .jitPoolMiB)) ?? 0
+        jitPoolMiB = Self.jitPoolChoices.contains(savedPool) ? savedPool : 0
         let savedAniso = (try? values.decodeIfPresent(Int.self, forKey: .anisotropyLimit)) ?? 0
         anisotropyLimit = Self.anisotropyLimits.contains(savedAniso) ? savedAniso : 0
         frameGeneration = (try? values.decodeIfPresent(Bool.self, forKey: .frameGeneration)) ?? false
@@ -215,8 +220,39 @@ final class WindowsLibraryStore: ObservableObject {
               folder.deletingLastPathComponent().lastPathComponent.lowercased() == "drive_c" else { return }
         let drive = folder.deletingLastPathComponent()
         let before = WindowsShortcutScanner.programs(in: drive).map { $0.standardizedFileURL.path.lowercased() }
-        UserDefaults.standard.set(["file": url.lastPathComponent.lowercased(), "before": before.joined(separator: "\n")],
+        UserDefaults.standard.set(["file": url.lastPathComponent.lowercased(), "before": before.joined(separator: "\n"),
+                                   "drive": drive.path],
                                   forKey: pendingInstallerKey)
+    }
+
+    /// What installers leave behind once they end: the files they unpack into the
+    /// Windows Temp folders (setup payloads, often hundreds of MB) and the WinINet
+    /// download cache. Only runs with no Wine process alive.
+    nonisolated static func cleanInstallerCaches(drive: URL) {
+        guard !ideck_wineprocess_running() else { return }
+        let fm = FileManager.default
+        var folders = [drive.appendingPathComponent("windows/temp", isDirectory: true)]
+        if let users = try? fm.contentsOfDirectory(atPath: drive.appendingPathComponent("users").path) {
+            for user in users {
+                let local = drive.appendingPathComponent("users/\(user)/AppData/Local", isDirectory: true)
+                folders.append(local.appendingPathComponent("Temp", isDirectory: true))
+                folders.append(local.appendingPathComponent("Microsoft/Windows/INetCache", isDirectory: true))
+            }
+        }
+        var freed: Int64 = 0
+        for folder in folders {
+            guard let items = try? fm.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil) else { continue }
+            for item in items {
+                if let walker = fm.enumerator(at: item, includingPropertiesForKeys: [.fileAllocatedSizeKey]) {
+                    for case let file as URL in walker {
+                        freed += Int64((try? file.resourceValues(forKeys: [.fileAllocatedSizeKey]).fileAllocatedSize) ?? 0)
+                    }
+                }
+                freed += Int64((try? item.resourceValues(forKeys: [.fileAllocatedSizeKey]).fileAllocatedSize) ?? 0)
+                try? fm.removeItem(at: item)
+            }
+        }
+        if freed > 0 { AppLog.record("[windows-library] installer caches removed: \(freed >> 20) MB") }
     }
 
     /// After the session: programs that appeared since the installer started were
@@ -228,6 +264,7 @@ final class WindowsLibraryStore: ObservableObject {
         let before = Set((pending["before"] ?? "").split(separator: "\n").map(String.init))
         let added = installedNow.subtracting(before)
         UserDefaults.standard.removeObject(forKey: pendingInstallerKey)
+        if let drive = pending["drive"] { cleanInstallerCaches(drive: URL(fileURLWithPath: drive)) }
         guard !added.isEmpty else { return }
         var hidden = hiddenInstallers
         hidden[file] = Array(added)

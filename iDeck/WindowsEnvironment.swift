@@ -78,6 +78,7 @@ class WindowsEnvironment {
     private var sessionD3D12Renderer = "Madeira D3D12"
     private var sessionUseRecommended = true
     private var sessionCodeChecks = "Automatic"
+    private var sessionJITPoolMiB = 0
     private var sessionOpenGLBackend = "Automatic"
     /// MetalFX spatial upscale factor for this launch (nil = off).
     private var sessionMetalFXFactor: Double?
@@ -621,6 +622,15 @@ class WindowsEnvironment {
         } else {
             unsetenv("MADEIRA_REAL_SUSPEND")
         }
+        // The game's own JIT pool size (its page, Performance): MadeiraWinePool.sizeMB
+        // reads `pool` from this per-game config before Settings. A pool prepared
+        // at startup keeps its size for this run.
+        if sessionJITPoolMiB > 0 {
+            lines.append("pool = \(sessionJITPoolMiB)")
+            if ideck_wine_jit_pool_ready() {
+                AppLog.record("[jit] this game asks for a \(sessionJITPoolMiB) MB pool; the pool prepared at startup is kept until iDeck is reopened")
+            }
+        }
         switch sessionCodeChecks {
         case "Compatible":
             lines.append("env.FEX_SMCCHECKS = full")
@@ -732,6 +742,7 @@ class WindowsEnvironment {
         }
         sessionUseRecommended = profile.useRecommended
         sessionCodeChecks = profile.codeChecks
+        sessionJITPoolMiB = profile.jitPoolMiB
         // Detailed logs without the tools that slow a game. MADEIRA_QUIET keeps the
         // PC sampler (it suspends the game thread ~500 times a second) and the
         // per-present lines off; Wine's ERR lines and boot logging are not affected by
