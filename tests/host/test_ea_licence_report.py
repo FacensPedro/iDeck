@@ -17,7 +17,8 @@ class EALicenceReportTests(unittest.TestCase):
         self.assertLess(LIBRARY.index("licence request failed"), LIBRARY.index("try await EALicense.renew("))
 
     def test_only_ea_sessions_show_it(self):
-        self.assertIn('.hasPrefix("EA"),', REPORT)
+        self.assertIn('.hasPrefix("EA")', REPORT)
+        self.assertIn("if Self.lastLauncherIsEA, let facts =", REPORT)
         self.assertIn('lines.append("EA licence: " + facts)', REPORT)
         self.assertIn('$0.line.contains("ActivationUI.exe")', REPORT)
 

@@ -69,8 +69,9 @@ for source in madeira-d3d12/src/pe/madeira_d3d12.c \
   }
 done
 
-# The Wine submodule (group "wine"): a null ARM64EC thread context query fails cleanly, and
-# wow64win passes atoms (values below 64 KB) through its guest pointer conversions.
+# The Wine submodule (group "wine"): a null ARM64EC thread context query fails cleanly,
+# wow64win passes atoms (values below 64 KB) through its guest pointer conversions, and
+# 64-bit programs get C:'s volume serial too (an EA licence is bound to it).
 python3 "$ROOT/scripts/apply_madeira_patches.py" "$DEST" wine
 
 # Pinned willfaust/dxmt invokes a private four-argument Metal atomic intrinsic.
@@ -176,6 +177,9 @@ python3 "$ROOT/scripts/apply_madeira_slowpath_diag.py" "$DEST"
 
 # A native SIGBUS/SIGSEGV names the image and symbol of its pc and lr ([bus-sym]).
 python3 "$ROOT/scripts/apply_madeira_bus_symbols.py" "$DEST"
+
+# The session log names the WMI queries a program makes (an EA game's licence hash).
+python3 "$ROOT/scripts/apply_madeira_wmi_trace.py" "$DEST"
 
 # The app can tear down an exited 32-bit program's 4 GB window right after the session.
 python3 "$ROOT/scripts/apply_madeira_wow_reclaim.py" "$DEST"
