@@ -47,6 +47,8 @@ bool ideck_wineserver_ready(void);
 bool ideck_wineserver_running(void);
 // Stops an orphan wineserver asynchronously only if no Wine guest thread exists.
 bool ideck_wineserver_stop_if_idle(void);
+/// Tears down exited 32-bit programs' 4 GB windows once the session has ended (-1: not now / unavailable).
+int ideck_wow_reclaim_after_session(void);
 void ideck_gamepad_begin_session(void);
 void ideck_gamepad_end_session(void);
 bool ideck_wineprocess_available(void);

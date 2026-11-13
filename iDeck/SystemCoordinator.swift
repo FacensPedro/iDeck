@@ -1738,8 +1738,28 @@ class SystemCoordinator: ObservableObject {
             reason += " AVX/AVX2 translation is now on for this game: restart iDeck and start it again."
         }
         SteamLog.event("[wine-exit] \(reason)")
+        Self.reclaimAfterSession()
         if let ntstatus, ntstatus != 0 { Self.restartReason = "the last game crashed (NTSTATUS 0x\(String(ntstatus, radix: 16, uppercase: true)))" }
         setWindowsStatus(reason)
+    }
+
+    /// Returns an exited 32-bit program's 4 GB window to iOS as soon as the session
+    /// has really ended, instead of when the next 32-bit program starts. Waits (on a
+    /// background thread, never a Wine one) up to 30 s for the worker to finish and the
+    /// wineserver to stop; the native side still refuses while any of the program's
+    /// threads exists. The JIT pool stays.
+    static func reclaimAfterSession() {
+        DispatchQueue.global(qos: .utility).async {
+            for _ in 0..<60 {
+                if !ideck_wineprocess_running() && ideck_wineprocess_thread_finished() && !ideck_wineserver_running() { break }
+                usleep(500_000)
+            }
+            let before = Int(os_proc_available_memory() >> 20)
+            let waiting = ideck_wow_reclaim_after_session()
+            let after = Int(os_proc_available_memory() >> 20)
+            AppLog.record("[memory] after-session reclaim: \(waiting < 0 ? "not run (session still active or unavailable)" : "\(waiting) window(s) still waiting"), "
+                          + "\(before) -> \(after) MiB available")
+        }
     }
 
     /// Why the next game needs a fresh iDeck process, or nil. Wine runs inside iDeck:

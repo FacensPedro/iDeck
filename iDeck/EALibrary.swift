@@ -240,18 +240,32 @@ struct EAInstalledGame: Codable, Sendable {
     }
 
     /// A game's sizes from its live build's archive (the download sheet); once per app run.
+    /// The request runs in its own task: the view that asks (a card's .task) is often
+    /// redrawn or scrolled away, and its cancellation used to end the request with
+    /// CancellationError / URLError -999, which was then stored as "unavailable" for
+    /// the rest of the run. A cancelled request now stores nothing, so it is asked again.
     func loadSize(_ id: String) async {
         guard signedIn, sizes[id] == nil else { return }
-        do {
-            let build = try await api.liveBuild(offerID: id)
-            let url = try await api.downloadURL(offerID: id, buildID: build.buildID)
-            let archive = try await downloader.archive(url)
-            sizes[id] = .known(download: archive.compressedBytes, install: archive.installBytes)
-        } catch {
-            sizes[id] = .unavailable((error as? EAAPIError)?.errorDescription ?? "EA did not say how large this game is.")
-            handle(error, context: "size id=\(id)", report: false)
+        if let running = sizeRequests[id] { await running.value; return }
+        let request = Task { () -> Void in
+            do {
+                let build = try await self.api.liveBuild(offerID: id)
+                let url = try await self.api.downloadURL(offerID: id, buildID: build.buildID)
+                let archive = try await self.downloader.archive(url)
+                self.sizes[id] = .known(download: archive.compressedBytes, install: archive.installBytes)
+            } catch {
+                let cancelled = error is CancellationError || (error as? URLError)?.code == .cancelled
+                if !cancelled {
+                    self.sizes[id] = .unavailable((error as? EAAPIError)?.errorDescription ?? "EA did not say how large this game is.")
+                }
+                self.handle(error, context: "size id=\(id)\(cancelled ? " (cancelled, will retry)" : "")", report: false)
+            }
         }
+        sizeRequests[id] = request
+        await request.value
+        sizeRequests[id] = nil
     }
+    private var sizeRequests: [String: Task<Void, Never>] = [:]
 
     /// Notes the newest build (the Game details page shows Update when it differs).
     func checkForUpdate(_ id: String) async {

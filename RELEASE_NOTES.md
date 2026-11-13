@@ -7,6 +7,7 @@
 - Fixed 32-bit programs crashing iDeck with an access violation while they create windows (BioShock, Tor Browser's installer). Windows passes some names as small numbers (atoms) instead of text; iDeck's 32-bit layer turned them into addresses inside the program's memory and Wine read text there that did not exist. Numbers below 64 KB now stay numbers in every conversion, and the 32-bit layer (wow64win.dll) is built from the patched source.
 
 ### EA app
+- EA game sizes show again: the size request was cancelled whenever its card was redrawn or scrolled away, and the cancellation was saved as "unavailable" until iDeck restarted. The request now finishes on its own, and a cancelled one is asked again.
 - EA games that check their licence with EA's activation library get a fresh licence from EA at every launch. Dragon Age: Inquisition refused a licence kept from an earlier launch and opened EA's activation window (ActivationUI.exe), which then crashed; with a renewed licence it went on to start. A kept licence is used only if the renewal fails, and the bug report then says "licence kept (renewal failed)".
 
 ### JIT
@@ -16,6 +17,7 @@
 - iDeck asks to be reopened before the next game when the last game crashed, when the JIT pool had to shrink, or when less than 1.5 GB of memory is left. A second game started in the same iDeck process after a crash began with 6 GB in use and a 336 MB JIT pool, and crashed too.
 
 ### Memory
+- When a 32-bit program ends, its 4 GB memory area is returned to iOS as soon as the session has fully stopped, instead of when the next 32-bit program starts. iDeck waits for the game and the wineserver to stop, and the area is kept while any of the program's threads still runs. The JIT pool stays prepared. The log says how much memory came back.
 - Store covers are kept in memory by their decoded size (48 MB at most), are scaled down to 1280 px on the long side, and are dropped on memory pressure and when a game session ends; the disk cache brings them back. The memory limit used to count their compressed size, so far more decoded images stayed in RAM.
 - SQLite's page caches (DXMT's shader cache and the system frameworks share them) are limited to 32 MB.
 - With less than 3 GB left when a game starts, DXMT keeps one frame in flight instead of two, which holds fewer staging buffers; a game's own setting still wins. The shader cache on disk is capped at 128 MB.
