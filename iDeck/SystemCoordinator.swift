@@ -106,6 +106,10 @@ class SystemCoordinator: ObservableObject {
         UserDefaults.standard.set(safeTitle, forKey: "diagnostics.lastGame")
         UserDefaults.standard.set(launcher, forKey: "diagnostics.lastLauncher")
         AppLog.record("[game-session] launcher=\(launcher) game=\(safeTitle)")
+        // The game gets the memory: covers and other caches iDeck rebuilds on demand
+        // are dropped before it starts.
+        URLCache.shared.removeAllCachedResponses()
+        NotificationCenter.default.post(name: Notification.Name("iDeckReleaseCaches"), object: nil)
     }
 
     @Published private(set) var activeWindowsProfile: WindowsGameProfile?

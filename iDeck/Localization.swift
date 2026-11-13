@@ -71,6 +71,8 @@ func trStatus(_ status: String) -> String {
 
 enum Translations {
     static let table: [String: [String: String]] = [
+        "Notifications are turned off for iDeck in iOS Settings.": ["pt": "As notificações do iDeck estão desativadas nos Ajustes do iOS.", "es": "Las notificaciones de iDeck están desactivadas en los Ajustes de iOS."],
+        "StikDebug requires pairing, LocalDevVPN, and a debug-signable iDeck.": ["pt": "O StikDebug exige pareamento, LocalDevVPN e um iDeck assinado para depuração.", "es": "StikDebug requiere emparejamiento, LocalDevVPN y un iDeck firmado para depuración."],
         "This game needs Easy Anti-Cheat, which does not run on iDeck. It cannot be installed.": ["pt": "Este jogo precisa do Easy Anti-Cheat, que não funciona no iDeck. Ele não pode ser instalado.", "es": "Este juego necesita Easy Anti-Cheat, que no funciona en iDeck. No se puede instalar."],
         "Achievements": ["pt": "Conquistas", "es": "Logros"],
         "%d achievements in this game. The highlighted ones are shown.": ["pt": "%d conquistas neste jogo. As destacadas aparecem aqui.", "es": "%d logros en este juego. Se muestran los destacados."],
@@ -204,8 +206,6 @@ enum Translations {
         "Madeira display backend is missing. This build cannot present Windows graphics.": ["pt": "O módulo de vídeo Madeira está ausente. Esta compilação não consegue exibir gráficos do Windows.", "es": "Falta el módulo de vídeo Madeira. Esta compilación no puede mostrar gráficos de Windows."],
         "Wine started, but the Metal presentation counter is unavailable. Graphics are not verified.": ["pt": "O Wine iniciou, mas o contador de quadros do Metal está indisponível. Não foi possível confirmar os gráficos.", "es": "Wine se inició, pero el contador de fotogramas de Metal no está disponible. No se pudo verificar la salida gráfica."],
         "Enable JIT": ["pt": "Ativar JIT", "es": "Activar JIT"],
-        "JIT permission does not guarantee that FEX is ready.": ["pt": "A permissão de JIT não garante que o FEX esteja pronto.", "es": "El permiso JIT no garantiza que FEX esté listo."],
-        "StikDebug requires pairing, LocalDevVPN, and a debug-signable iDeck. Opening StikDebug does not prove FEX JIT is ready.": ["pt": "O StikDebug requer pareamento, LocalDevVPN e uma assinatura do iDeck que permita depuração. Abrir o StikDebug não confirma que o JIT do FEX esteja pronto.", "es": "StikDebug requiere emparejamiento, LocalDevVPN y una firma de iDeck que permita depuración. Abrir StikDebug no confirma que el JIT de FEX esté listo."],
         "JIT confirmed via StikDebug": ["pt": "JIT confirmado pelo StikDebug", "es": "JIT confirmado mediante StikDebug"],
         "Graphics & Performance": ["pt": "Gráficos e desempenho", "es": "Gráficos y rendimiento"],
         "MetalFX Upscaling": ["pt": "Upscaling MetalFX", "es": "Escalado MetalFX"],
