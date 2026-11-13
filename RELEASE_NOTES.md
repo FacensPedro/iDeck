@@ -28,6 +28,7 @@
 - Network responses are no longer kept in a URL cache: iDeck's shared cache (in RAM and in CFNetwork's Cache.db) is turned off at launch, and GOG game downloads bypass it too. Game files were always written straight to disk; artwork keeps its own small cache.
 
 ### Bugs & logs
+- The first taps of a session are logged with where they were sent in the Windows screen and how they were mapped, and the bug report includes them, to find why taps on some installers' buttons do nothing.
 - A crash in Wine's native code now names the image and function of the faulting address and its caller (`[bus-sym]`), instead of raw addresses only.
 - The bug report has a "Missing DLLs:" line listing what the last Windows session could not find, from Wine's own messages: a DLL a program imports that is missing or failed to load, a function with no implementation, an unimplemented function that was called, and a DLL looked up in system32 or syswow64 that is not there. When there are none, the line says so.
 

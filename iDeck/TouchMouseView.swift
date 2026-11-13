@@ -34,8 +34,25 @@ final class TouchMouseSurface: UIView {
         return (Int32(g.x.rounded()), Int32(g.y.rounded()))
     }
 
+    /// The first taps of each run are logged with where they were mapped, so a bug
+    /// report shows whether a tap that "did nothing" landed on the button.
+    private static var loggedTaps = 0
+
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
-        guard tracked == nil, let touch = touches.first, let p = guest(touch) else { return }
+        guard tracked == nil, let touch = touches.first else { return }
+        let windowPoint = window.map { touch.location(in: $0) } ?? .zero
+        guard let p = guest(touch) else {
+            if Self.loggedTaps < 12 {
+                Self.loggedTaps += 1
+                AppLog.record("[touch] tap at \(Int(windowPoint.x)),\(Int(windowPoint.y)) dropped: no game surface to map it onto")
+            }
+            return
+        }
+        if Self.loggedTaps < 12 {
+            Self.loggedTaps += 1
+            AppLog.record("[touch] tap at \(Int(windowPoint.x)),\(Int(windowPoint.y)) -> guest \(p.0),\(p.1) "
+                          + "(\(WindowsRendererView.touchMappingSummary)); down=\(Self.down != nil)")
+        }
         tracked = touch
         Self.down?(p.0, p.1)
     }
