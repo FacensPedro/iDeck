@@ -11,7 +11,7 @@ class GOGLikeMadeiraTests(unittest.TestCase):
         self.assertFalse((ROOT / "iDeck/GOGGalaxyApp.swift").exists())
         view = repo_text("iDeck/MainView.swift")
         self.assertNotIn("GOGGalaxyApp", view)
-        self.assertIn("case windows, dock, jit, summary", view)
+        self.assertIn("case visualCpp, wineMono, dock, jit, summary", view)
         self.assertNotIn("GOGGalaxyApp.swift", repo_text("iDeck.xcodeproj/project.pbxproj"))
 
     def test_install_script_is_kept_and_applied(self):

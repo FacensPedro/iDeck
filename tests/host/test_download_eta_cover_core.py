@@ -28,17 +28,16 @@ class DownloadETACoreContract(unittest.TestCase):
 
     def test_first_architecture_bootstrap_is_win64_wow64(self):
         view = source("iDeck/MainView.swift")
-        self.assertIn('private func installWindowsRuntime()', view)
-        self.assertIn('hasWoW64Runtime()', view)
+        # The setup prepares the x64 + x86 prefix in the Visual C++ step, installs
+        # Visual C++ and Wine Mono, and the Steam client only in the Madeira Dock step.
+        self.assertIn('private func installVisualCpp()', view)
         self.assertIn('coordinator.installMadeiraDock()', view)
-        self.assertIn('case windows, dock, jit, summary', view)
+        self.assertIn('case visualCpp, wineMono, dock, jit, summary', view)
         self.assertIn('coordinator.openMadeiraWorkspace()', view)
-        # Steam's client and DLLs are installed only by the Madeira Dock step.
         self.assertNotIn('SteamVideoLibraries.fetch', view)
         self.assertNotIn('statusRow("Steam client", steamClientReady)', view)
-        # Visual C++ and Wine Mono are installed on demand, not by the setup.
         for component in ('VisualCRuntimeLegacy.installAll', 'wineMono.install()'):
-            self.assertNotIn(component, view)
+            self.assertIn(component, view)
         windows = source("iDeck/WindowsEnvironment.swift")
         self.assertIn('setenv("WINEARCH", "win64", 1)', windows)
 
