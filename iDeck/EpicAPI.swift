@@ -75,6 +75,8 @@ struct EpicCatalogItem: Sendable {
     var attributes: [String: String]
     var isDLC: Bool
     var categories: [String]
+    /// A DLC's base game (catalog item id), from `mainGameItem`.
+    var mainGameID: String? = nil
 }
 
 /// Where a build's manifest and chunks are.
@@ -328,7 +330,8 @@ actor EpicAPI {
         }
         let categories = (item["categories"] as? [[String: Any]] ?? []).compactMap { $0["path"] as? String }
         return EpicCatalogItem(title: item["title"] as? String ?? "", images: images, attributes: attributes,
-                               isDLC: item["mainGameItem"] != nil, categories: categories)
+                               isDLC: item["mainGameItem"] != nil, categories: categories,
+                               mainGameID: (item["mainGameItem"] as? [String: Any])?["id"] as? String)
     }
 
     // MARK: Builds
