@@ -13,5 +13,11 @@ class StorageFreeSpaceTests(unittest.TestCase):
         self.assertIn("static func capacity(of url: URL) -> (free: Int64, total: Int64)?", drives)
 
 
+    def test_session_memory_sampling(self):
+        coord = (ROOT / "iDeck/SystemCoordinator.swift").read_text()
+        self.assertIn("private func startMemorySampling(launcher: String)", coord)
+        self.assertIn('lower.contains("[memory] session")', (ROOT / "iDeck/BugReportView.swift").read_text())
+
+
 if __name__ == "__main__":
     unittest.main()

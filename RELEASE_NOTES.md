@@ -6,6 +6,9 @@
 ### Storage
 - Settings › Storage & Downloads shows how much space is free on this device and on each external drive (free of total), or "Not connected" for a drive that is not plugged in.
 
+### Memory diagnostics
+- During a game, iDeck logs its memory every 30 seconds for 10 minutes: footprint, memory still allowed by iOS, the launcher and whether Madeira Dock runs. The bug report includes these lines, to show where memory grows (Steam's client in Madeira Dock, the game, or over time).
+
 ### Fixes
 - A JIT pool that had to shrink no longer blocks the next game with "restart iDeck": it happened on a fresh launch too, so reopening could not help and no game could start. The pool prepared when StikDebug attaches keeps a 192 MB executable window free instead of 256 MB, which leaves the pool more room.
 - Built-in JIT: when it cannot run (no pairing file, unsupported iOS, a sideloaded build without its helper) it says why instead of silently opening StikDebug. A helper failure ends the 90-second wait at once, so the next tap tries again.

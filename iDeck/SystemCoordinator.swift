@@ -110,6 +110,36 @@ class SystemCoordinator: ObservableObject {
         // are dropped before it starts.
         URLCache.shared.removeAllCachedResponses()
         NotificationCenter.default.post(name: Notification.Name("iDeckReleaseCaches"), object: nil)
+        startMemorySampling(launcher: launcher)
+    }
+
+    /// Where the memory goes during a session: iDeck's footprint (which includes Wine,
+    /// FEX, Madeira Dock's Steam client and the game, all in this one process) every
+    /// 30 s for 10 minutes, so a bug report shows when it grows (at Dock's sign-in, at
+    /// the first frame, over time) instead of one number.
+    private var memorySampler: Timer?
+    private func startMemorySampling(launcher: String) {
+        memorySampler?.invalidate()
+        let started = Date()
+        var samples = 0
+        let log = { [weak self] (stage: String) in
+            let footprint = MainActor.assumeIsolated { ResourceGovernor.footprintMiB() }
+            AppLog.record("[memory] session \(stage) t=\(Int(Date().timeIntervalSince(started)))s footprint=\(footprint) MiB "
+                          + "available=\(Int(os_proc_available_memory() >> 20)) MiB launcher=\(launcher) "
+                          + "dock=\(self?.currentSteamLaunchUsesDock == true ? 1 : 0)")
+        }
+        log("start")
+        let timer = Timer(timeInterval: 30, repeats: true) { [weak self] timer in
+            samples += 1
+            guard samples <= 20, ideck_wineprocess_running() else {
+                timer.invalidate()
+                if self?.memorySampler === timer { self?.memorySampler = nil }
+                return
+            }
+            log("sample")
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        memorySampler = timer
     }
 
     @Published private(set) var activeWindowsProfile: WindowsGameProfile?
