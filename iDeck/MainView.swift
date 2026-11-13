@@ -1676,6 +1676,11 @@ private struct WindowsGameProfileForm: View {
                                     set: { profile.cpuCount = Int($0) ?? 0 }),
                                 choices: WindowsGameProfile.cpuCounts.map { $0 == 0 ? tr("All") : String($0) },
                                 icon: "cpu", iconColor: .blue)
+                DetailPickerRow(title: tr("JIT pool"), selection: Binding(
+                                    get: { profile.jitPoolMiB == 0 ? tr("Automatic") : "\(profile.jitPoolMiB) MB" },
+                                    set: { value in profile.jitPoolMiB = Int(value.split(separator: " ").first ?? "") ?? 0 }),
+                                choices: WindowsGameProfile.jitPoolChoices.map { $0 == 0 ? tr("Automatic") : "\($0) MB" },
+                                icon: "memorychip", iconColor: .orange)
                 DetailToggleRow(title: tr("Fast synchronization"), isOn: $profile.fastSync,
                                 icon: "bolt.fill", iconColor: .yellow)
                 DetailToggleRow(title: tr("Frame generation"), isOn: $profile.frameGeneration, showsDivider: false,

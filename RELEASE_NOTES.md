@@ -14,6 +14,9 @@
 
 - The initial setup has a new design: a numbered step bar with checks for finished steps, a card per step with its icon, grouped component rows with status badges, and full-width install buttons.
 
+### Per-game JIT pool
+- A game's page has a JIT pool setting under Performance (Automatic, 336–768 MB). A light game can use less memory, and a heavy one can ask for more. A pool already prepared when StikDebug attached keeps its size until iDeck is reopened.
+
 ### App size
 - The IPA is built like Madeira's: the Windows runtime is inside, while Wine Mono (.NET programs) and Microsoft's Visual C++ runtimes are downloaded on the device the first time they are needed instead of being bundled.
 
