@@ -451,6 +451,7 @@ struct EAInstalledGame: Codable, Sendable {
     }
 
     nonisolated static let licenceFactsKey = "diagnostics.eaLicence"
+    nonisolated static let hashCheckKey = "diagnostics.eaHashCheck"
 
     /// The activation library the game ships and what the licence is built for.
     nonisolated static func activationFacts(_ activation: EALicense.Activation, gameFolder: URL) -> String {
@@ -518,6 +519,8 @@ struct EAInstalledGame: Codable, Sendable {
         if activation.required {
             guard !record.contentID.isEmpty else { throw EAAPIError.license("the game's content id is unknown") }
             let (hash, _) = profile.machineHash(version: activation.hashVersion)
+            UserDefaults.standard.set(EAHashCheck.report(profile: profile, hashVersion: activation.hashVersion, drive: Self.drive),
+                                      forKey: Self.hashCheckKey)
             let current = EALicense.current(contentID: record.contentID, drive: Self.drive)
             // Every launch asks EA for a fresh licence. A licence kept from an earlier
             // launch (same machine hash, still recent) was refused by Dragon Age:
@@ -646,5 +649,88 @@ struct EAInstalledGame: Codable, Sendable {
         let ids = resumeAfterBackground.sorted()
         resumeAfterBackground.removeAll()
         for id in ids { enqueue(id, kind: downloads[id]?.kind ?? .install) }
+    }
+}
+
+
+/// Compares the machine-hash fields iDeck signs the licence with (EAHardwareProfile)
+/// with what the game will read from the Windows environment: the values Wine keeps in
+/// the prefix registry (system.reg) and C:'s volume serial (.windows-serial). A licence
+/// whose hash input differs from the game's is refused, and the game opens EA's
+/// activation window; this names the fields that differ.
+enum EAHashCheck {
+    /// The fields each hash version uses (EAHardwareProfile.machineHash).
+    static func usedFields(version: Int) -> Set<String> {
+        switch version {
+        case 0, 1: return ["board", "bios", "osSerial", "osInstallDate", "hostname"]
+        case 2: return ["board", "bios", "osSerial", "osInstallDate", "volume", "gpu", "cpuVendor", "cpuBrand"]
+        default: return ["board", "bios", "volume", "gpu", "cpuVendor", "cpuBrand"]
+        }
+    }
+
+    static func report(profile: EAHardwareProfile, hashVersion: Int, drive: URL) -> String {
+        let prefix = drive.deletingLastPathComponent()
+        let registry = (try? String(contentsOf: prefix.appendingPathComponent("system.reg"), encoding: .utf8)) ?? ""
+        guard !registry.isEmpty else { return "no system.reg in the prefix to compare with" }
+        func value(_ key: String, _ name: String) -> String? { registryValue(registry, key: key, name: name) }
+        let gpuPrefix = String(profile.gpuPNPDeviceID[..<(profile.gpuPNPDeviceID.lastIndex(of: "\\") ?? profile.gpuPNPDeviceID.endIndex)])
+        // field, iDeck's value, Wine's value (nil: not readable here)
+        var rows: [(String, String, String?)] = [
+            ("board", profile.boardManufacturer, value("Hardware\\Description\\System\\BIOS", "BaseBoardManufacturer")),
+            ("bios", profile.biosManufacturer, value("Hardware\\Description\\System\\BIOS", "BIOSVendor")),
+            ("osSerial", profile.osSerial, value("Software\\Microsoft\\Windows NT\\CurrentVersion", "ProductId")),
+            ("cpuVendor", profile.cpuManufacturer,
+             value("Hardware\\Description\\System\\CentralProcessor\\0", "VendorIdentifier")),
+            ("cpuBrand", profile.cpuBrand,
+             value("Hardware\\Description\\System\\CentralProcessor\\0", "ProcessorNameString")),
+        ]
+        let serialFile = drive.appendingPathComponent(".windows-serial")
+        let serial = (try? String(contentsOf: serialFile, encoding: .utf8))?
+            .trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        rows.append(("volume", profile.volumeSerial.uppercased(), serial ?? "00000000"))
+        if let device = matchingDevice(registry) {
+            rows.append(("gpu", gpuPrefix.uppercased(), device.uppercased()))
+        } else {
+            rows.append(("gpu", gpuPrefix.uppercased(), nil))
+        }
+        let used = usedFields(version: hashVersion)
+        var differ: [String] = [], unread: [String] = []
+        for (field, mine, wine) in rows where used.contains(field) {
+            guard let wine else { unread.append(field); continue }
+            let a = mine.trimmingCharacters(in: .whitespaces), b = wine.trimmingCharacters(in: .whitespaces)
+            let same = field == "gpu" ? b.hasPrefix(a) || a.hasPrefix(b) : a == b
+            if !same { differ.append("\(field) iDeck=\"\(a)\" wine=\"\(b)\"") }
+        }
+        var text = differ.isEmpty ? "the fields readable in the prefix match" : "differs: " + differ.joined(separator: "; ")
+        if !unread.isEmpty { text += " | not readable here: " + unread.sorted().joined(separator: ", ") }
+        return text
+    }
+
+    /// A string value from a Wine .reg file: the key's section, then `"name"="value"`.
+    static func registryValue(_ text: String, key: String, name: String) -> String? {
+        // Section headers double their backslashes: [Hardware\\Description\\System\\BIOS] 1700000000
+        let header = "[" + key.lowercased().replacingOccurrences(of: "\\", with: "\\\\") + "]"
+        var inside = false
+        for raw in text.split(separator: "\n", omittingEmptySubsequences: false) {
+            let line = raw.trimmingCharacters(in: .whitespaces)
+            if line.hasPrefix("[") {
+                inside = line.lowercased().hasPrefix(header)
+                continue
+            }
+            guard inside, line.hasPrefix("\"\(name)\"=\"") else { continue }
+            var value = String(line.dropFirst(name.count + 4))
+            if value.hasSuffix("\"") { value.removeLast() }
+            return value.replacingOccurrences(of: "\\\\", with: "\\")
+        }
+        return nil
+    }
+
+    /// The graphics card's PCI id as Wine registered it (MatchingDeviceId of the
+    /// first display adapter), e.g. pci\\ven_106b&dev_0001.
+    static func matchingDevice(_ text: String) -> String? {
+        guard let range = text.range(of: "\"MatchingDeviceId\"=\"", options: .caseInsensitive) else { return nil }
+        let rest = text[range.upperBound...]
+        guard let end = rest.firstIndex(of: "\"") else { return nil }
+        return String(rest[..<end]).replacingOccurrences(of: "\\\\", with: "\\")
     }
 }

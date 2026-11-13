@@ -403,6 +403,9 @@ final class BugReportModel: ObservableObject {
         if (UserDefaults.standard.string(forKey: "diagnostics.lastLauncher") ?? "").hasPrefix("EA"),
            let facts = UserDefaults.standard.string(forKey: EALibrary.licenceFactsKey) {
             lines.append("EA licence: " + facts)
+            if let check = UserDefaults.standard.string(forKey: EALibrary.hashCheckKey) {
+                lines.append("EA hash check: " + check)
+            }
             if selected.contains(where: { $0.line.contains("ActivationUI.exe") }) {
                 lines.append("EA: the game started ActivationUI.exe, EA's activation window: it did not accept the licence on disk.")
             }
