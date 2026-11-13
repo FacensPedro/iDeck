@@ -542,6 +542,12 @@ class WindowsEnvironment {
             return
         }
         StikJITHelper.exeWindowAutoMB = need.mb
+        if ideck_wine_jit_pool_ready(), SystemCoordinator.earlyPoolExeWindowMB > 0,
+           need.mb > SystemCoordinator.earlyPoolExeWindowMB {
+            AppLog.record("[exe-window] \(need.exe) needs \(need.mb) MB but the JIT pool prepared at startup "
+                + "kept \(SystemCoordinator.earlyPoolExeWindowMB) MB free: the game may fail to load "
+                + "(c0000018). Set exe-window-mb in its config, then reopen iDeck through StikDebug.")
+        }
         LogStore.shared.log("[exe-window] \(need.exe) is a fixed-base image ending \(need.mb)MB above 0x140000000: "
             + "the executable window is widened to \(need.mb)MB for this session (exe-window-mb in the game's file overrides)")
     }

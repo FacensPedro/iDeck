@@ -1,9 +1,13 @@
 ## What's Changed
 ### Settings
+- The bug report no longer lists steamservice.dll (Steam's Windows service, which does not run under Wine) as missing, and shows "pool automatic" instead of "pool 0 MB".
 - JIT & Debugging no longer says that JIT does not guarantee FEX is ready, and the pairing file appears only with the Built-in method, the only one that uses it.
 - Download notifications is switched off and greyed out when iDeck's notifications are refused in iOS Settings.
 - Hold Display at Maximum Rate appears only on screens faster than 60 Hz.
 - Graphics & Performance › Advanced shows short notes, and only for choices that change something.
+
+### JIT
+- The JIT pool prepared when StikDebug attaches keeps a 256 MB executable window free instead of 128 MB, so games with a large fixed-base exe (Assassin's Creed Unity's ACU.exe, 131 MB) can still load with it. A game that needs more is named in the log.
 
 ### Memory
 - Epic downloads keep at most 64 MB of reused chunks in memory (256 MB before); the rest waits on disk.

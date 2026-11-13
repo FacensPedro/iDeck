@@ -401,7 +401,16 @@ class SystemCoordinator: ObservableObject {
                 if MadeiraBundleIdentity.isNative, AddressSpaceCheck.hasGuestWindow,
                    StikJITHelper.scriptData != nil, !ideck_wineprocess_running() {
                     self.wineJITPreparationInFlight = true
-                    AppLog.record("[jit] debugger attached at startup: preparing the Wine JIT pool now")
+                    // No game is chosen yet, so its fixed-base exe cannot be measured
+                    // (measureExecutableWindow): a 256 MB executable window is kept free
+                    // instead of 128 MB, which fits images such as Assassin's Creed
+                    // Unity's ACU.exe (131 MB) and MapleStory.exe (183 MB).
+                    if StikJITHelper.exeWindowAutoMB < Self.earlyExeWindowMB {
+                        StikJITHelper.exeWindowAutoMB = Self.earlyExeWindowMB
+                    }
+                    Self.earlyPoolExeWindowMB = Self.earlyExeWindowMB
+                    AppLog.record("[jit] debugger attached at startup: preparing the Wine JIT pool now "
+                                  + "(executable window \(Self.earlyExeWindowMB) MB)")
                     DispatchQueue.global(qos: .userInitiated).async {
                         let failure = MadeiraWinePool.prepare()
                         DispatchQueue.main.async {
@@ -488,6 +497,12 @@ class SystemCoordinator: ObservableObject {
 
     /// JIT is ready for a launch: CS_DEBUGGED is set and the pool is prepared or a
     /// debugger is attached to prepare it.
+    /// The executable window kept free by the pool prepared at startup.
+    static let earlyExeWindowMB = 256
+    /// Set once that early pool exists: a game whose fixed-base exe needs more cannot
+    /// load in this run (the pool cannot move without the debugger).
+    static var earlyPoolExeWindowMB = 0
+
     static func jitPreparationValidated() -> Bool {
         guard ideck_process_has_jit_permission() else { return false }
         return ideck_wine_jit_pool_ready() || StikJITHelper.ready
