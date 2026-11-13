@@ -182,3 +182,23 @@ bool ideck_wineserver_stop_if_idle(void) {
     });
     return true;
 }
+
+// After a session has fully ended (worker finished, wineserver stopped): tear down
+// exited 32-bit programs' 4 GB windows now instead of when the next 32-bit program
+// starts (scripts/apply_madeira_wow_reclaim.py). Runs on the caller's thread, which
+// must not be a Wine thread. Returns the windows still waiting, or -1 if this build
+// has no reclaim.
+#if defined(IDECK_NATIVE_MADEIRA_ENABLED) && IDECK_NATIVE_MADEIRA_ENABLED
+extern "C" int ideck_wow_reclaim_dead_windows(void);
+#endif
+int ideck_wow_reclaim_after_session(void) {
+    if (ideck_wineprocess_running() || !ideck_wineprocess_thread_finished() || ideck_wineserver_running())
+        return -1;
+#if defined(IDECK_NATIVE_MADEIRA_ENABLED) && IDECK_NATIVE_MADEIRA_ENABLED
+    return ideck_wow_reclaim_dead_windows();
+#else
+    typedef int (*ReclaimFn)(void);
+    ReclaimFn reclaim = (ReclaimFn)dlsym(RTLD_DEFAULT, "ideck_wow_reclaim_dead_windows");
+    return reclaim ? reclaim() : -1;
+#endif
+}

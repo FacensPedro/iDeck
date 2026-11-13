@@ -123,6 +123,15 @@ struct WindowsRendererView: UIViewRepresentable {
     // not be the whole monitor (a game whose window is not the monitor's size,
     // or that sits at an offset). Mapping onto the monitor instead put taps
     // off target whenever the two differed.
+    /// What touches are mapped through, for the [touch] log line.
+    static var touchMappingSummary: String {
+        guard let surface = currentSurface else { return "no surface" }
+        let client = gameClientRect.map { "client \(Int($0.minX)),\(Int($0.minY)) \(Int($0.width))x\(Int($0.height))" } ?? "monitor"
+        return "guest \(Int(surface.guest.width))x\(Int(surface.guest.height)), surface "
+            + "\(Int(surface.bounds.minX)),\(Int(surface.bounds.minY)) \(Int(surface.bounds.width))x\(Int(surface.bounds.height)), "
+            + "\(surface.mode), \(client)"
+    }
+
     static func guestPoint(fromWindow point: CGPoint) -> CGPoint? {
         guard let surface = currentSurface else { return nil }
         guard let client = gameClientRect else {

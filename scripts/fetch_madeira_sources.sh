@@ -177,6 +177,9 @@ python3 "$ROOT/scripts/apply_madeira_slowpath_diag.py" "$DEST"
 # A native SIGBUS/SIGSEGV names the image and symbol of its pc and lr ([bus-sym]).
 python3 "$ROOT/scripts/apply_madeira_bus_symbols.py" "$DEST"
 
+# The app can tear down an exited 32-bit program's 4 GB window right after the session.
+python3 "$ROOT/scripts/apply_madeira_wow_reclaim.py" "$DEST"
+
 # Wine Staging patch sets and GE-Proton fixes for Windows-side DLLs (patches/wine-compat).
 python3 "$ROOT/scripts/apply_madeira_wine_compat.py" "$DEST"
 
