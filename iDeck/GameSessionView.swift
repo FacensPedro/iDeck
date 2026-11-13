@@ -496,6 +496,9 @@ struct GameSessionView: View {
         )) {
             Button(tr("Retry Close")) { coordinator.retryCloseWindowsSession() }
             Button(tr("Keep Waiting")) { coordinator.acknowledgeWindowsCloseWarning() }
+            // As Madeira's "Close Madeira": a game that never handles Alt+F4 holds the
+            // in-process Wine thread, which cannot be killed alone; closing iDeck ends it.
+            Button(tr("Close iDeck"), role: .destructive) { coordinator.forceCloseIDeck() }
             Button(tr("Return to Game"), role: .cancel) { coordinator.cancelWindowsSessionClose() }
         } message: {
             Text(tr(coordinator.windowsCloseWarning ?? ""))

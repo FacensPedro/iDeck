@@ -1,4 +1,23 @@
 ## What's Changed
+### Epic Games
+- Epic games install only the base game: files that carry install tags (language packs, high-resolution textures, optional modes) are left out, so a game takes the space its page shows. A build whose files are all tagged is installed whole.
+- Epic DLC can be installed and uninstalled like Steam DLC. An installed game's page lists the downloadable DLC the account owns, with Install, progress, Cancel and Uninstall. A DLC is installed into its game's folder and updated with the same downloader. Uninstalling removes only the DLC's own files, and uninstalling the game removes its DLC too.
+
+### Storage
+- Settings › Storage & Downloads shows how much space is free on this device and on each external drive (free of total), or "Not connected" for a drive that is not plugged in.
+
+### Memory diagnostics
+- During a game, iDeck logs its memory every 30 seconds for 10 minutes: footprint, memory still allowed by iOS, the launcher and whether Madeira Dock runs. The bug report includes these lines, to show where memory grows (Steam's client in Madeira Dock, the game, or over time).
+
+### Fixes
+- A JIT pool that had to shrink no longer blocks the next game with "restart iDeck": it happened on a fresh launch too, so reopening could not help and no game could start. The pool prepared when StikDebug attaches keeps a 192 MB executable window free instead of 256 MB, which leaves the pool more room.
+- Built-in JIT: when it cannot run (no pairing file, unsupported iOS, a sideloaded build without its helper) it says why instead of silently opening StikDebug. A helper failure ends the 90-second wait at once, so the next tap tries again.
+- Settings no longer says that StikDebug requires pairing and LocalDevVPN.
+- Visual C++ x64 is installed by reading Microsoft's installer, never by running it. The installer is now downloaded to a temporary folder instead of the Windows downloads folder, where it appeared in the library and opened Microsoft's setup window (whose buttons did not take taps). An old copy left there is removed.
+- Closing a game that never exits: besides Retry and Keep Waiting, the dialog offers Close iDeck. This is the only way to end a Windows game that ignores Alt+F4, since Wine runs inside iDeck; Madeira offers the same.
+- EA covers fill their card in the library and in the store column, whether the game is installed, installing or not installed. EA's 9:16 pack art was fitted into the 2:3 card and looked small.
+- Epic game sizes show the base game: files that carry install tags (language packs, high-resolution textures, optional modes) are no longer counted. Fortnite showed 160.62 GB.
+
 ### Settings
 - The bug report no longer lists steamservice.dll (Steam's Windows service, which does not run under Wine) as missing, and shows "pool automatic" instead of "pool 0 MB".
 - JIT & Debugging no longer says that JIT does not guarantee FEX is ready, and the pairing file appears only with the Built-in method, the only one that uses it.
@@ -65,4 +84,4 @@
 - The bug report has a "Missing DLLs:" line listing what the last Windows session could not find, from Wine's own messages: a DLL a program imports that is missing or failed to load, a function with no implementation, an unimplemented function that was called, and a DLL looked up in system32 or syswow64 that is not there. When there are none, the line says so.
 
 ### Release
-- Updated the application version to 2.2.0 (build 71).
+- Updated the application version to 2.3.0 (build 72).

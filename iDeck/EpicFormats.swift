@@ -212,6 +212,9 @@ struct EpicFileEntry: Sendable {
     var sha1: Data
     var flags: UInt8
     var parts: [EpicChunkPart]
+    /// Install tags: empty for the base game; optional content (language packs,
+    /// high-resolution textures, extra modes) carries one or more.
+    var installTags: [String] = []
     var size: Int64 { parts.reduce(0) { $0 + Int64($1.size) } }
 }
 
@@ -325,7 +328,12 @@ struct EpicManifest: Sendable {
         for i in 0..<fileCount { files[i].symlinkTarget = try r.fstring() }
         for i in 0..<fileCount { files[i].sha1 = try r.data(20) }
         for i in 0..<fileCount { files[i].flags = try r.u8() }
-        for _ in 0..<fileCount { for _ in 0..<(try r.count(elementSize: 4)) { _ = try r.fstring() } }   // install tags
+        for i in 0..<fileCount {                                                                       // install tags
+            for _ in 0..<(try r.count(elementSize: 4)) {
+                let tag = try r.fstring()
+                if !tag.isEmpty { files[i].installTags.append(tag) }
+            }
+        }
         for i in 0..<fileCount {
             let partCount = try r.count(elementSize: 28)
             files[i].parts.reserveCapacity(partCount)
@@ -466,6 +474,7 @@ struct EpicManifest: Sendable {
             let flags = (item["bIsReadOnly"] as? Bool == true ? 1 : 0) | (item["bIsCompressed"] as? Bool == true ? 2 : 0)
                 | (item["bIsUnixExecutable"] as? Bool == true ? 4 : 0)
             var file = EpicFileEntry(name: name, symlinkTarget: "", sha1: sha, flags: UInt8(flags), parts: [])
+            file.installTags = (item["InstallTags"] as? [String] ?? []).filter { !$0.isEmpty }
             for part in parts {
                 guard let key = part["Guid"] as? String else { throw EpicFormatError.badMagic("manifest") }
                 file.parts.append(EpicChunkPart(guid: try guid(json: key), offset: UInt32(try size(part["Offset"])),

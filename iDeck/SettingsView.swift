@@ -358,9 +358,6 @@ struct SettingsView: View {
             } label: {
                 Label(tr(coordinator.isJITEnabled ? "Reconnect JIT debugger" : "Enable JIT"), systemImage: "bolt.fill")
             }
-            Text(tr("StikDebug requires pairing, LocalDevVPN, and a debug-signable iDeck."))
-                .font(.caption)
-                .foregroundStyle(.secondary)
         }
     }
 
@@ -418,8 +415,22 @@ struct SettingsView: View {
 
     // MARK: Storage
 
+    private func capacityText(_ capacity: (free: Int64, total: Int64)?) -> String {
+        guard let capacity else { return tr("Not connected") }
+        return tr("%@ free of %@", ByteCountFormatter.string(fromByteCount: capacity.free, countStyle: .file),
+                  ByteCountFormatter.string(fromByteCount: capacity.total, countStyle: .file))
+    }
+
     private var storagePage: some View {
         Form {
+            // Free space: this device, then every connected external drive.
+            Section(tr("Free space")) {
+                let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+                LabeledContent(UIDevice.current.model, value: capacityText(ExternalDrives.capacity(of: documents)))
+                ForEach(externalDrives.folders) { folder in
+                    LabeledContent("\(folder.name) (\(folder.letter):)", value: capacityText(externalDrives.capacity(folder)))
+                }
+            }
             Section {
                 NavigationLink { ExternalDrivesSettingsView() } label: {
                     SettingsRow(icon: "externaldrive.fill", color: .teal, title: tr("External drives"),

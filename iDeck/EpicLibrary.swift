@@ -60,6 +60,25 @@ struct EpicInstalledGame: Codable, Sendable {
     var programPath: String { folder + "/" + launchExe }
 }
 
+/// A DLC the account owns that has files to download (Epic lists it as an asset).
+struct EpicOwnedDLC: Codable, Identifiable, Hashable, Sendable {
+    var appName: String
+    var title: String
+    var namespace: String
+    var catalogItemID: String
+    var buildVersion: String
+    var image: URL?
+    var id: String { appName }
+}
+
+/// A DLC installed into its base game's folder.
+struct EpicInstalledDLC: Codable, Sendable {
+    var appName: String
+    var baseApp: String
+    var buildVersion: String
+    var secrets: [String: String]?
+}
+
 @MainActor final class EpicLibrary: ObservableObject {
     static let shared = EpicLibrary()
 
@@ -70,6 +89,10 @@ struct EpicInstalledGame: Codable, Sendable {
     @Published private(set) var accountName: String?
     @Published private(set) var owned: [EpicOwnedGame] = []
     @Published private(set) var installed: [String: EpicInstalledGame] = [:]
+    /// Base game app name -> its downloadable DLC the account owns.
+    @Published private(set) var dlcs: [String: [EpicOwnedDLC]] = [:]
+    /// DLC app name -> where it is installed.
+    @Published private(set) var installedDLC: [String: EpicInstalledDLC] = [:]
     @Published private(set) var refreshing = false
     @Published private(set) var libraryUpdated: Date?
     @Published var error: String?
@@ -122,7 +145,13 @@ struct EpicInstalledGame: Codable, Sendable {
         guard signedIn, accountGeneration == generation, accountID == account,
               installed[app] == nil, game == self.game(app) else { return }
         manifestSizeBuilds[app] = game.buildVersion
-        manifestSizes[app] = manifest.files.reduce(0) { $0 + $1.size }
+        // The base game: files without install tags. Tagged files are optional content
+        // (language packs, high-resolution textures); counting them gave Fortnite
+        // 160 GB. A manifest whose files are all tagged keeps its whole total.
+        let total = manifest.files.reduce(0) { $0 + $1.size }
+        let base = manifest.files.filter { $0.installTags.isEmpty }.reduce(0) { $0 + $1.size }
+        manifestSizes[app] = base > 0 ? base : total
+        EpicLog.event("[epic-library] size app=\(app) base=\(base >> 20)MB all=\(total >> 20)MB")
     }
 
     // MARK: Files
@@ -146,6 +175,7 @@ struct EpicInstalledGame: Codable, Sendable {
     }
     private static var cacheURL: URL { support.appendingPathComponent("epic-library.json") }
     private static var installedURL: URL { support.appendingPathComponent("epic-installed.json") }
+    private static var installedDLCURL: URL { support.appendingPathComponent("epic-installed-dlc.json") }
     private static func manifestURL(_ app: String) -> URL {
         support.appendingPathComponent("epic-manifests", isDirectory: true).appendingPathComponent(safeName(app) + ".manifest")
     }
@@ -209,6 +239,16 @@ struct EpicInstalledGame: Codable, Sendable {
               let records = try? JSONDecoder().decode([String: EpicInstalledGame].self, from: data) else { return }
         // A record whose program is gone (the folder was deleted in Files) is dropped.
         installed = records.filter { FileManager.default.fileExists(atPath: Self.drive.appendingPathComponent($0.value.programPath).path) }
+        if let dlcData = try? Data(contentsOf: Self.installedDLCURL),
+           let dlcRecords = try? JSONDecoder().decode([String: EpicInstalledDLC].self, from: dlcData) {
+            installedDLC = dlcRecords.filter { installed[$0.value.baseApp] != nil }
+        }
+    }
+
+    private func writeInstalledDLC() {
+        try? FileManager.default.createDirectory(at: Self.support, withIntermediateDirectories: true)
+        let encoder = JSONEncoder(); encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        try? encoder.encode(installedDLC).write(to: Self.installedDLCURL, options: .atomic)
     }
 
     private func writeInstalled() {
@@ -286,8 +326,16 @@ struct EpicInstalledGame: Codable, Sendable {
                 }
             }
             var games: [EpicOwnedGame] = []
+            var ownedDLC: [(main: String, dlc: EpicOwnedDLC)] = []
             for asset in assets {
                 if let item = details[asset.appName] {
+                    if item.isDLC, let main = item.mainGameID, item.attributes["ThirdPartyManagedApp"] == nil {
+                        ownedDLC.append((main, EpicOwnedDLC(
+                            appName: asset.appName, title: item.title.isEmpty ? asset.appName : item.title,
+                            namespace: asset.namespace, catalogItemID: asset.catalogItemId, buildVersion: asset.buildVersion,
+                            image: item.images["DieselGameBox"] ?? item.images["OfferImageWide"] ?? item.images["Thumbnail"]
+                                ?? item.images["DieselGameBoxTall"])))
+                    }
                     if item.isDLC || item.attributes["ThirdPartyManagedApp"] != nil || !Self.isGame(categories: item.categories) {
                         known[asset.appName] = nil; continue
                     }
@@ -310,9 +358,16 @@ struct EpicInstalledGame: Codable, Sendable {
             manifestSizes = manifestSizes.filter { builds[$0.key] == manifestSizeBuilds[$0.key] }
             manifestSizeBuilds = manifestSizeBuilds.filter { builds[$0.key] == $0.value }
             owned = games.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
+            let byCatalog = Dictionary(games.map { ($0.catalogItemID, $0.appName) }, uniquingKeysWith: { first, _ in first })
+            var grouped: [String: [EpicOwnedDLC]] = [:]
+            for entry in ownedDLC {
+                guard let base = byCatalog[entry.main] else { continue }
+                grouped[base, default: []].append(entry.dlc)
+            }
+            dlcs = grouped.mapValues { $0.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending } }
             libraryUpdated = Date()
             if let account = await api.account() { writeCache(account: account.id); accountName = account.name }
-            EpicLog.event("[epic-library] owned assets=\(assets.count) games=\(owned.count)")
+            EpicLog.event("[epic-library] owned assets=\(assets.count) games=\(owned.count) dlc=\(ownedDLC.count)")
         } catch {
             handle(error, context: "library", report: interactive)
         }
@@ -406,6 +461,11 @@ struct EpicInstalledGame: Codable, Sendable {
         pause(app); downloads[app] = nil
         installed[app] = nil
         writeInstalled()
+        for (dlc, entry) in installedDLC where entry.baseApp == app {
+            installedDLC[dlc] = nil
+            try? FileManager.default.removeItem(at: Self.manifestURL(dlc))
+        }
+        writeInstalledDLC()
         let folder = Self.drive.appendingPathComponent(record.folder, isDirectory: true)
         let manifest = Self.manifestURL(app), journal = Self.journalURL(app)
         Task.detached(priority: .utility) {
@@ -416,6 +476,82 @@ struct EpicInstalledGame: Codable, Sendable {
             try? FileManager.default.removeItem(at: journal)
         }
         EpicLog.event("[epic-download] uninstalled app=\(app)")
+    }
+
+    // MARK: DLC
+
+    /// The DLC entry for an app name, with its base game, when it is a DLC.
+    private func dlcEntry(_ app: String) -> (base: String, dlc: EpicOwnedDLC)? {
+        for (base, list) in dlcs { if let dlc = list.first(where: { $0.appName == app }) { return (base, dlc) } }
+        if let record = installedDLC[app] {
+            return (record.baseApp, EpicOwnedDLC(appName: app, title: app, namespace: installed[record.baseApp]?.namespace ?? "",
+                                                 catalogItemID: "", buildVersion: record.buildVersion, image: nil))
+        }
+        return nil
+    }
+
+    func dlcTitle(_ app: String) -> String { dlcEntry(app)?.dlc.title ?? app }
+
+    /// Installs or updates a DLC into its base game's folder, as the Epic launcher does.
+    func installDLC(_ dlcApp: String) {
+        guard let entry = dlcEntry(dlcApp), installed[entry.base] != nil else {
+            error = "Install the game before its DLC."; return
+        }
+        enqueue(dlcApp, kind: installedDLC[dlcApp] == nil ? .install : .update)
+    }
+
+    /// Deletes the DLC's files (those its manifest lists and the base game does not).
+    func uninstallDLC(_ dlcApp: String) {
+        guard let record = installedDLC[dlcApp], let base = installed[record.baseApp], !inSession else { return }
+        pause(dlcApp); downloads[dlcApp] = nil
+        installedDLC[dlcApp] = nil
+        writeInstalledDLC()
+        let folder = Self.drive.appendingPathComponent(base.folder, isDirectory: true)
+        let dlcData = try? Data(contentsOf: Self.manifestURL(dlcApp))
+        let baseData = try? Data(contentsOf: Self.manifestURL(record.baseApp))
+        let dlcSecrets = record.secrets ?? [:], baseSecrets = base.secrets ?? [:]
+        let manifestFile = Self.manifestURL(dlcApp)
+        Task.detached(priority: .utility) {
+            guard let dlcData, let manifest = try? EpicManifest.parse(dlcData, secrets: dlcSecrets) else { return }
+            let baseNames = Set((baseData.flatMap { try? EpicManifest.parse($0, secrets: baseSecrets) }?.files ?? []).map { $0.name.lowercased() })
+            let paths = EpicPathResolver(root: folder)
+            for file in manifest.files where !baseNames.contains(file.name.lowercased()) {
+                if let parts = EpicManifest.components(file.name), let url = paths.existing(parts) {
+                    try? FileManager.default.removeItem(at: url)
+                }
+            }
+            try? FileManager.default.removeItem(at: manifestFile)
+        }
+        EpicLog.event("[epic-download] uninstalled dlc=\(dlcApp) base=\(record.baseApp)")
+    }
+
+    private func installDLCFiles(_ app: String, dlc: EpicOwnedDLC, baseApp: String) async throws {
+        guard let base = installed[baseApp] else { throw EpicAPIError.invalid("dlc-without-game") }
+        let asset = EpicAsset(appName: app, labelName: "Live", buildVersion: dlc.buildVersion,
+                              catalogItemId: dlc.catalogItemID, namespace: dlc.namespace)
+        let location = try await api.manifestLocation(asset)
+        let data = try await api.manifest(location)
+        let manifest = try await Task.detached(priority: .userInitiated) { try EpicManifest.parse(data, secrets: location.secrets) }.value
+        let previousData = try? Data(contentsOf: Self.manifestURL(app))
+        let previousSecrets = installedDLC[app]?.secrets ?? [:]
+        let previous = await Task.detached(priority: .utility) { previousData.flatMap { try? EpicManifest.parse($0, secrets: previousSecrets) } }.value
+        EpicLog.event("[epic-download] start dlc=\(app) base=\(baseApp) files=\(manifest.files.count)")
+        let result = try await downloader.install(
+            manifest: manifest, baseURLs: location.baseURLs, secrets: location.secrets,
+            folder: Self.drive.appendingPathComponent(base.folder, isDirectory: true),
+            previous: previous, verifyAll: false, journal: Self.journalURL(app)) { progress in
+                Task { @MainActor in
+                    EpicLibrary.shared.downloads[app]?.progress = progress
+                    BackgroundDownloads.epic.progress(done: progress.doneBytes, total: progress.totalBytes)
+                }
+            }
+        try? FileManager.default.createDirectory(at: Self.manifestURL(app).deletingLastPathComponent(), withIntermediateDirectories: true)
+        try? data.write(to: Self.manifestURL(app), options: .atomic)
+        installedDLC[app] = EpicInstalledDLC(appName: app, baseApp: baseApp,
+                                             buildVersion: manifest.buildVersion.isEmpty ? location.buildVersion : manifest.buildVersion,
+                                             secrets: location.secrets.isEmpty ? nil : location.secrets)
+        writeInstalledDLC()
+        EpicLog.event("[epic-download] done dlc=\(app) written=\(result.filesWritten) kept=\(result.filesKept)")
     }
 
     private func pump() {
@@ -436,6 +572,11 @@ struct EpicInstalledGame: Codable, Sendable {
         BenchmarkSession.begin(kind: "install", scenario: "Epic: " + (game(app)?.title ?? installed[app]?.title ?? app),
                                settings: ["store": "epic", "operation": kind.rawValue])
         do {
+          if let entry = dlcEntry(app) {
+            try await installDLCFiles(app, dlc: entry.dlc, baseApp: entry.base)
+            downloads[app] = nil
+            outcome = .completed
+          } else {
             guard let game = game(app) ?? installed[app].map({ record in
                 EpicOwnedGame(appName: record.appName, title: record.title, namespace: record.namespace, catalogItemID: record.catalogItemID,
                               buildVersion: record.buildVersion, folderName: URL(fileURLWithPath: record.folder).lastPathComponent,
@@ -485,6 +626,7 @@ struct EpicInstalledGame: Codable, Sendable {
             downloads[app] = nil
             outcome = .completed
             EpicLog.event("[epic-download] done app=\(app) written=\(result.filesWritten) kept=\(result.filesKept) fetched=\(result.bytesFetched)")
+          }
         } catch {
             if Task.isCancelled || error is CancellationError || (error as? URLError)?.code == .cancelled {
                 if downloads[app] != nil { downloads[app]?.state = .paused }

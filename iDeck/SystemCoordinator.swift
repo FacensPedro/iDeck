@@ -110,6 +110,36 @@ class SystemCoordinator: ObservableObject {
         // are dropped before it starts.
         URLCache.shared.removeAllCachedResponses()
         NotificationCenter.default.post(name: Notification.Name("iDeckReleaseCaches"), object: nil)
+        startMemorySampling(launcher: launcher)
+    }
+
+    /// Where the memory goes during a session: iDeck's footprint (which includes Wine,
+    /// FEX, Madeira Dock's Steam client and the game, all in this one process) every
+    /// 30 s for 10 minutes, so a bug report shows when it grows (at Dock's sign-in, at
+    /// the first frame, over time) instead of one number.
+    private var memorySampler: Timer?
+    private func startMemorySampling(launcher: String) {
+        memorySampler?.invalidate()
+        let started = Date()
+        var samples = 0
+        let log = { [weak self] (stage: String) in
+            let footprint = MainActor.assumeIsolated { ResourceGovernor.footprintMiB() }
+            AppLog.record("[memory] session \(stage) t=\(Int(Date().timeIntervalSince(started)))s footprint=\(footprint) MiB "
+                          + "available=\(Int(os_proc_available_memory() >> 20)) MiB launcher=\(launcher) "
+                          + "dock=\(self?.currentSteamLaunchUsesDock == true ? 1 : 0)")
+        }
+        log("start")
+        let timer = Timer(timeInterval: 30, repeats: true) { [weak self] timer in
+            samples += 1
+            guard samples <= 20, ideck_wineprocess_running() else {
+                timer.invalidate()
+                if self?.memorySampler === timer { self?.memorySampler = nil }
+                return
+            }
+            log("sample")
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        memorySampler = timer
     }
 
     @Published private(set) var activeWindowsProfile: WindowsGameProfile?
@@ -403,8 +433,8 @@ class SystemCoordinator: ObservableObject {
                     self.wineJITPreparationInFlight = true
                     // No game is chosen yet, so its fixed-base exe cannot be measured
                     // (measureExecutableWindow): a 256 MB executable window is kept free
-                    // instead of 128 MB, which fits images such as Assassin's Creed
-                    // Unity's ACU.exe (131 MB) and MapleStory.exe (183 MB).
+                    // instead of 128 MB (192 MB: 256 cost the pool 112 MB), which fits images
+                    // such as Assassin's Creed Unity's ACU.exe (131 MB) and MapleStory.exe (183 MB).
                     if StikJITHelper.exeWindowAutoMB < Self.earlyExeWindowMB {
                         StikJITHelper.exeWindowAutoMB = Self.earlyExeWindowMB
                     }
@@ -498,7 +528,7 @@ class SystemCoordinator: ObservableObject {
     /// JIT is ready for a launch: CS_DEBUGGED is set and the pool is prepared or a
     /// debugger is attached to prepare it.
     /// The executable window kept free by the pool prepared at startup.
-    static let earlyExeWindowMB = 256
+    static let earlyExeWindowMB = 192
     /// Set once that early pool exists: a game whose fixed-base exe needs more cannot
     /// load in this run (the pool cannot move without the debugger).
     static var earlyPoolExeWindowMB = 0
@@ -589,12 +619,12 @@ class SystemCoordinator: ObservableObject {
     /// pairing file and runs the bundled universal.js script.
     func requestBuiltInJIT() {
         guard let pairing = try? Data(contentsOf: pairingFileURL), !pairing.isEmpty else {
-            setWindowsStatus("Import a pairing file in Settings › JIT before using the built-in JIT.")
+            builtInFailed("Import a pairing file in Settings › JIT before using the built-in JIT.")
             return
         }
         guard let scriptURL = Bundle.main.url(forResource: "universal", withExtension: "jitscript"),
               let script = try? Data(contentsOf: scriptURL), !script.isEmpty else {
-            setWindowsStatus("Cannot request JIT: the bundled universal.js debugger script is missing.")
+            builtInFailed("Cannot request JIT: the bundled universal.js debugger script is missing.")
             return
         }
         setWindowsStatus("Starting the built-in JIT helper...")
@@ -612,12 +642,26 @@ class SystemCoordinator: ObservableObject {
                 switch result {
                 case .success(let response):
                     AppLog.record("[jit-builtin] finished: \(response.message)")
-                    if !response.success { self.setWindowsStatus("Built-in JIT: " + response.message) }
+                    if !response.success { self.builtInFailed("Built-in JIT: " + response.message) }
                 case .failure(let error):
-                    self.setWindowsStatus("Built-in JIT: " + error.localizedDescription)
+                    self.builtInFailed("Built-in JIT: " + error.localizedDescription)
                 }
             }
         }
+    }
+
+    /// The wait for the debugger that a built-in request started.
+    private var builtInWait: Timer?
+
+    /// The helper failed: stop waiting 90 s for a debugger that will not come, and
+    /// let the next tap try again at once.
+    private func builtInFailed(_ message: String) {
+        builtInWait?.invalidate()
+        builtInWait = nil
+        jitRequestStartedAt = nil
+        pendingJITLaunch = nil
+        setWindowsStatus(message)
+        AppLog.record("[jit-builtin] " + message)
     }
 
     /// When the JIT request in flight was started (nil: none). A second request
@@ -640,11 +684,26 @@ class SystemCoordinator: ObservableObject {
     func requestStikDebugJIT() {
         if let started = jitRequestStartedAt, Date().timeIntervalSince(started) < 20 { return }
         jitRequestStartedAt = Date()
-        if jitMethod == "builtIn", FileManager.default.fileExists(atPath: pairingFileURL.path), MainActor.assumeIsolated({ IDeckBuiltInJIT.isAvailable }) {
-            requestBuiltInJIT()
-            StikJITHelper.waitForDebugger { [weak self] result in
-                DispatchQueue.main.async { self?.finishJITRequest(result) }
+        if jitMethod == "builtIn" {
+            // Built-in never falls back to StikDebug silently: the reason it cannot
+            // run is shown instead, and the request ends.
+            let unavailable = MainActor.assumeIsolated { IDeckBuiltInJIT.unavailableReason }
+            if let unavailable {
+                jitRequestStartedAt = nil
+                setWindowsStatus("Built-in JIT: " + unavailable)
+                AppLog.record("[jit-builtin] unavailable: \(unavailable)")
+                return
             }
+            guard FileManager.default.fileExists(atPath: pairingFileURL.path) else {
+                jitRequestStartedAt = nil
+                setWindowsStatus("Built-in JIT needs this device's pairing file: import it in Settings › JIT.")
+                return
+            }
+            builtInWait?.invalidate()
+            builtInWait = StikJITHelper.waitForDebugger { [weak self] result in
+                DispatchQueue.main.async { self?.builtInWait = nil; self?.finishJITRequest(result) }
+            }
+            requestBuiltInJIT()
             return
         }
         // Madeira's StikJITHelper.enableJIT, verbatim: stikdebug://enable-jit with
@@ -1630,6 +1689,15 @@ class SystemCoordinator: ObservableObject {
         pollWindowsSessionClose()
     }
 
+    /// The game did not exit: iDeck closes itself, the only way to end an in-process
+    /// Wine thread that ignores Alt+F4 (Madeira offers the same). Open it again from
+    /// StikDebug to start another game.
+    func forceCloseIDeck() {
+        SteamLog.event("[wine-close] game did not exit; iDeck closed by the user")
+        AppLog.record("[wine-close] force close: iDeck exits so the stuck Windows session ends")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { exit(0) }
+    }
+
     func acknowledgeWindowsCloseWarning() {
         windowsCloseWarning = nil
     }
@@ -1678,7 +1746,7 @@ class SystemCoordinator: ObservableObject {
         }
         if seconds >= 15, !windowsCloseWarningWasShown {
             windowsCloseWarningWasShown = true
-            windowsCloseWarning = "The Windows game has not exited. iDeck cannot safely force-kill an in-process Wine thread without risking an app crash. Try closing the game from its menu or retry Alt+F4."
+            windowsCloseWarning = "The Windows game has not exited. Close it from its own menu, retry, or close iDeck: unsaved progress is lost, and iDeck has to be opened again through StikDebug."
             SteamLog.event("[wine-close] guest or wineserver did not exit after 15 seconds")
         }
     }
@@ -1791,7 +1859,8 @@ class SystemCoordinator: ObservableObject {
 
     static func restartNeeded() -> String? {
         if let restartReason { return restartReason }
-        if StikJITHelper.smallPoolMB > 0 { return "the JIT pool shrank to \(StikJITHelper.smallPoolMB) MB" }
+        // A pool that had to shrink is not a reason: it happens on a fresh launch too
+        // (the startup pool keeps a 256 MB exe window free), so reopening changes nothing.
         let free = Int(os_proc_available_memory() >> 20)
         if free > 0 && free < restartMinimumFreeMiB { return "only \(free) MB of memory is left" }
         return nil

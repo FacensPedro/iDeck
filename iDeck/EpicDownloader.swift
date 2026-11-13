@@ -79,6 +79,7 @@ final class EpicDownloader: @unchecked Sendable {
     /// the files of `manifest` in `folder`. Throws CancellationError when cancelled.
     func install(manifest: EpicManifest, baseURLs: [URL], secrets: [String: String], folder: URL,
                  previous: EpicManifest?, verifyAll: Bool, journal journalURL: URL,
+                 includeTags: Set<String> = [],
                  progress report: @escaping @Sendable (EpicDownloadProgress) -> Void) async throws -> Result {
         guard !baseURLs.isEmpty else { throw EpicDownloadError.noServers }
         let fm = FileManager.default
@@ -90,7 +91,12 @@ final class EpicDownloader: @unchecked Sendable {
         // Which files to write.
         struct Planned { var file: EpicFileEntry; var parts: [String] }
         var all: [Planned] = []
+        // The base game: files without install tags, plus files whose tags were chosen.
+        // Optional content (language packs, high-resolution textures) is left out. A
+        // manifest whose files all carry tags is installed whole.
+        let hasBase = manifest.files.contains { $0.installTags.isEmpty }
         for file in manifest.files where file.symlinkTarget.isEmpty {
+            if hasBase, !file.installTags.isEmpty, includeTags.isDisjoint(with: file.installTags) { continue }
             guard let parts = EpicManifest.components(file.name) else { throw EpicFormatError.unsafePath }
             all.append(Planned(file: file, parts: parts))
         }

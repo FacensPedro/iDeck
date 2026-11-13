@@ -125,7 +125,7 @@ enum LogIssueScanner {
             // [touch] lines are diagnostics, not failures: kept so a report shows
             // where a tap that did nothing was sent.
             let severity = errors.contains(where: actionable.contains) ? 2
-                : (failures.contains(where: actionable.contains) || lower.contains("[touch] tap")) ? 1 : 0
+                : (failures.contains(where: actionable.contains) || lower.contains("[touch] tap") || lower.contains("[memory] session")) ? 1 : 0
             guard severity > 0 else { continue }
             // JIT problems get their own group, whichever log they came from.
             let lineSource: LogIssue.Source = lower.contains("jit") ? .jit : source

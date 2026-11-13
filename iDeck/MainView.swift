@@ -924,7 +924,7 @@ struct WindowsWorkspaceView: View {
         return VStack(alignment: .leading, spacing: 6) {
             VStack(alignment: .leading, spacing: 6) {
                 ZStack {
-                    GOGArtworkView(urls: [game.cover].compactMap { $0 }, fallbackColor: secondaryColor)
+                    GOGArtworkView(urls: [game.cover].compactMap { $0 }, fallbackColor: secondaryColor, fill: true)
                         .libraryCoverFrame()
                         .contentShape(Rectangle())
                         .onTapGesture { selectedEAGame = game }
@@ -1098,13 +1098,21 @@ struct WindowsWorkspaceView: View {
 private struct GOGArtworkView: View {
     let urls: [URL]
     let fallbackColor: Color
+    /// Fill the frame and crop (EA's 9:16 pack art in a 2:3 card); fit otherwise.
+    var fill = false
     @State private var index = 0
 
     var body: some View {
         Group {
             if index < urls.count {
                 ArtworkImage(url: urls[index], failed: { index += 1 }) { image in
-                    image.resizable().scaledToFit()
+                    if fill {
+                        image.resizable().scaledToFill()
+                            .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+                            .clipped()
+                    } else {
+                        image.resizable().scaledToFit()
+                    }
                 } placeholder: {
                     fallbackColor.overlay(ProgressView().tint(.gray))
                 }
@@ -2092,6 +2100,9 @@ private struct EpicGameDetailsSheet: View {
                         epic.repair(appName)
                     }
                 }
+                if let list = epic.dlcs[appName], !list.isEmpty {
+                    DetailCard(title: tr("DLCs")) { epicDLCList(list) }
+                }
                 VStack(alignment: .leading, spacing: 10) {
                     EpicCloudSection(appName: appName)
                 }
@@ -2102,6 +2113,62 @@ private struct EpicGameDetailsSheet: View {
             }
         }
         .task(id: appName) { await epic.loadSize(appName) }
+    }
+
+    /// The game's DLC, as the Steam page lists them: install, progress, uninstall.
+    private func epicDLCList(_ list: [EpicOwnedDLC]) -> some View {
+        VStack(spacing: 0) {
+            ForEach(list) { dlc in
+                let download = epic.downloads[dlc.appName]
+                let failed: String? = { if case .failed(let message) = download?.state { return message }; return nil }()
+                HStack(spacing: 12) {
+                    AsyncImage(url: dlc.image) { image in
+                        image.resizable().scaledToFill()
+                    } placeholder: { Color(white: 0.2) }
+                    .frame(width: 92, height: 52)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(dlc.title)
+                            .font(.subheadline)
+                            .foregroundColor(.white)
+                            .lineLimit(2)
+                        if let download, failed == nil {
+                            ProgressView(value: download.progress.fraction).tint(.blue)
+                            Text(tr("Installing %d%%", Int((download.progress.fraction * 100).rounded())))
+                                .font(.caption2)
+                                .foregroundColor(.white)
+                        } else if let failed {
+                            Text(failed).font(.caption2).foregroundColor(.red).lineLimit(2)
+                        }
+                    }
+                    Spacer(minLength: 6)
+                    if download != nil && failed == nil {
+                        Button(role: .destructive) { epic.cancel(dlc.appName) } label: {
+                            Label(tr("Cancel"), systemImage: "xmark.circle.fill").font(.caption.weight(.semibold))
+                        }
+                        .buttonStyle(.bordered)
+                    } else if epic.installedDLC[dlc.appName] != nil {
+                        Button(role: .destructive) { epic.uninstallDLC(dlc.appName) } label: {
+                            Label(tr("Uninstall"), systemImage: "trash").font(.caption.weight(.semibold))
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(epic.sessionRunning)
+                    } else {
+                        Button { epic.installDLC(dlc.appName) } label: {
+                            Text(tr("Install")).font(.caption.weight(.semibold))
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(epic.downloads[appName] != nil)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                if dlc.id != list.last?.id {
+                    Divider().background(Color.white.opacity(0.08)).padding(.leading, 120)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -2245,7 +2312,7 @@ extension WindowsWorkspaceView {
         case .epic(let app), .epicInstalling(let app):
             GOGArtworkView(urls: [epicLibrary.game(app)?.cover].compactMap { $0 }, fallbackColor: panelColor)
         case .ea(let id):
-            GOGArtworkView(urls: [eaLibrary.game(id)?.cover].compactMap { $0 }, fallbackColor: panelColor)
+            GOGArtworkView(urls: [eaLibrary.game(id)?.cover].compactMap { $0 }, fallbackColor: panelColor, fill: true)
         case .exe(let path):
             WindowsExecutableArtworkView(executableURL: URL(fileURLWithPath: path), library: windowsLibrary, fallbackColor: panelColor)
         }
