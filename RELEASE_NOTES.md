@@ -14,6 +14,9 @@
 
 - The initial setup has a new design: a numbered step bar with checks for finished steps, a card per step with its icon, grouped component rows with status badges, and full-width install buttons.
 
+### Installer caches
+- When an installer (.exe/.msi) ends, the files it unpacked into the Windows Temp folders and the WinINet download cache are deleted, freeing the space setup payloads used to keep. This runs only when no Windows program is running, and the log says how much was freed.
+
 ### Per-game JIT pool
 - A game's page has a JIT pool setting under Performance (Automatic, 336–768 MB). A light game can use less memory, and a heavy one can ask for more. A pool already prepared when StikDebug attached keeps its size until iDeck is reopened.
 

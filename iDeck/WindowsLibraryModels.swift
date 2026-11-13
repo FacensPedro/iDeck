@@ -220,8 +220,39 @@ final class WindowsLibraryStore: ObservableObject {
               folder.deletingLastPathComponent().lastPathComponent.lowercased() == "drive_c" else { return }
         let drive = folder.deletingLastPathComponent()
         let before = WindowsShortcutScanner.programs(in: drive).map { $0.standardizedFileURL.path.lowercased() }
-        UserDefaults.standard.set(["file": url.lastPathComponent.lowercased(), "before": before.joined(separator: "\n")],
+        UserDefaults.standard.set(["file": url.lastPathComponent.lowercased(), "before": before.joined(separator: "\n"),
+                                   "drive": drive.path],
                                   forKey: pendingInstallerKey)
+    }
+
+    /// What installers leave behind once they end: the files they unpack into the
+    /// Windows Temp folders (setup payloads, often hundreds of MB) and the WinINet
+    /// download cache. Only runs with no Wine process alive.
+    nonisolated static func cleanInstallerCaches(drive: URL) {
+        guard !ideck_wineprocess_running() else { return }
+        let fm = FileManager.default
+        var folders = [drive.appendingPathComponent("windows/temp", isDirectory: true)]
+        if let users = try? fm.contentsOfDirectory(atPath: drive.appendingPathComponent("users").path) {
+            for user in users {
+                let local = drive.appendingPathComponent("users/\(user)/AppData/Local", isDirectory: true)
+                folders.append(local.appendingPathComponent("Temp", isDirectory: true))
+                folders.append(local.appendingPathComponent("Microsoft/Windows/INetCache", isDirectory: true))
+            }
+        }
+        var freed: Int64 = 0
+        for folder in folders {
+            guard let items = try? fm.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil) else { continue }
+            for item in items {
+                if let walker = fm.enumerator(at: item, includingPropertiesForKeys: [.fileAllocatedSizeKey]) {
+                    for case let file as URL in walker {
+                        freed += Int64((try? file.resourceValues(forKeys: [.fileAllocatedSizeKey]).fileAllocatedSize) ?? 0)
+                    }
+                }
+                freed += Int64((try? item.resourceValues(forKeys: [.fileAllocatedSizeKey]).fileAllocatedSize) ?? 0)
+                try? fm.removeItem(at: item)
+            }
+        }
+        if freed > 0 { AppLog.record("[windows-library] installer caches removed: \(freed >> 20) MB") }
     }
 
     /// After the session: programs that appeared since the installer started were
@@ -233,6 +264,7 @@ final class WindowsLibraryStore: ObservableObject {
         let before = Set((pending["before"] ?? "").split(separator: "\n").map(String.init))
         let added = installedNow.subtracting(before)
         UserDefaults.standard.removeObject(forKey: pendingInstallerKey)
+        if let drive = pending["drive"] { cleanInstallerCaches(drive: URL(fileURLWithPath: drive)) }
         guard !added.isEmpty else { return }
         var hidden = hiddenInstallers
         hidden[file] = Array(added)
