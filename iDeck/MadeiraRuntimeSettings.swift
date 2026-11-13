@@ -185,72 +185,72 @@ struct MadeiraGraphicsSettings: View {
         Text(text).font(.caption).foregroundStyle(warning ? Color.orange : Color.secondary)
     }
 
-    private var d3d9Note: String {
+    // Short notes, only for choices that change something; the defaults need none.
+    private var d3d9Note: String? {
         switch d3d9 {
-        case "": return "DXMT draws Direct3D 9 on Metal; 32-bit games run its frontend through the x86 translator."
-        case "native": return "32-bit games run DXMT's Direct3D 9 frontend as native ARM64 code; 64-bit games are unchanged."
-        case "wined3d": return "Experimental: 32- and 64-bit games use Wine's own Direct3D 9 on OpenGL, which needs the Zink OpenGL backend."
-        default: return "A value Madeira does not know; Direct3D 9 games use DXMT."
+        case "": return nil
+        case "native": return "Native ARM64 frontend for 32-bit games."
+        case "wined3d": return "Experimental. Needs Zink OpenGL."
+        default: return "Unknown value; DXMT is used."
         }
     }
-    private var d3d11Note: String {
+    private var d3d11Note: String? {
         switch d3d11 {
-        case "": return "DXMT draws Direct3D 10 and 11 on Metal."
-        case "dxvk": return "Experimental, 64-bit games only: Direct3D 10/11 and DXGI run through DXVK on Vulkan (MoltenVK unless a Vulkan driver is chosen below). Direct3D 12 then uses vkd3d-proton."
-        default: return "A value Madeira does not know; Direct3D 10/11 games use DXMT."
+        case "": return nil
+        case "dxvk": return "Experimental, 64-bit only. Direct3D 12 uses vkd3d-proton."
+        default: return "Unknown value; DXMT is used."
         }
     }
-    private var d3d12Note: String {
+    private var d3d12Note: String? {
         switch d3d12 {
-        case "" where d3d11 == "dxvk": return "With DXVK chosen above, Direct3D 12 games use vkd3d-proton on Vulkan: DXVK's DXGI shows only Vulkan devices."
-        case "": return "Direct3D 12 games run on madeira-d3d12, Madeira's own Direct3D 12 on Metal."
-        case "vkd3d": return "Experimental, 64-bit games only: Direct3D 12 runs through vkd3d-proton on Vulkan (MoltenVK unless a Vulkan driver is chosen below)."
-        default: return "A developer value; Direct3D 12 games run on madeira-d3d12."
+        case "" where d3d11 == "dxvk": return "vkd3d-proton, because DXVK is chosen."
+        case "": return nil
+        case "vkd3d": return "Experimental, 64-bit only."
+        default: return "Unknown value; madeira-d3d12 is used."
         }
     }
-    private var vulkanNote: String {
+    private var vulkanNote: String? {
         switch vulkan {
-        case "": return "Off, so games find no Vulkan, unless DXVK or vkd3d-proton is chosen above, which turns on MoltenVK."
-        case "moltenvk": return "64-bit games get Vulkan through MoltenVK, the driver the Zink OpenGL backend also uses."
-        case "kosmickrisp": return "Experimental: 64-bit games get Vulkan through Mesa's KosmicKrisp driver. Needs iOS 26 and an A14 chip or newer."
-        case "off", "0": return "Off: games find no Vulkan, and DXVK and vkd3d-proton are not used even when chosen above."
-        default: return "A Vulkan library named by path in madeira.cfg."
+        case "", "moltenvk": return nil
+        case "kosmickrisp": return "Experimental. iOS 26 and A14 or newer."
+        case "off", "0": return "No Vulkan for games."
+        default: return "Library path from madeira.cfg."
         }
     }
 
     var body: some View {
         Section {
             choicePicker("Direct3D 9", key: "d3d9", value: $d3d9, choices: Self.d3d9Choices)
-            note(d3d9Note)
+            if let text = d3d9Note { note(text) }
             if d3d9 == "wined3d" {
                 let backend = (MadeiraConfig.get(Self.glBackendKey) ?? "").lowercased()
                 if !Self.hasZink || (!backend.isEmpty && backend != "zink") {
-                    note(Self.hasZink ? "madeira.cfg sets gl-backend = \(backend); wined3d needs gl-backend = zink."
-                                      : "This build has no Zink OpenGL backend (gl/ folder), so wined3d cannot start.", warning: true)
+                    note(Self.hasZink ? "Set gl-backend = zink for wined3d."
+                                      : "No Zink OpenGL in this build.", warning: true)
                 }
             }
 
             choicePicker("Direct3D 10/11", key: "d3d11", value: $d3d11,
                          choices: Self.hasDxvk || d3d11 == "dxvk" ? Self.d3d11Choices : Array(Self.d3d11Choices.prefix(1)))
-            note(d3d11Note)
-            if !Self.hasDxvk { note("DXVK is not in this build.", warning: d3d11 == "dxvk") }
+            if let text = d3d11Note { note(text) }
+            if !Self.hasDxvk && d3d11 == "dxvk" { note("DXVK is not in this build.", warning: true) }
             if d3d11 == "dxvk" && !d3d12.isEmpty && d3d12 != "vkd3d" {
-                note("Direct3D 12 is set to \(d3d12); with DXVK only vkd3d-proton can show Direct3D 12 games.", warning: true)
+                note("With DXVK, Direct3D 12 needs vkd3d-proton.", warning: true)
             }
 
             choicePicker("Direct3D 12", key: "d3d12", value: $d3d12,
                          choices: Self.hasVkd3d || d3d12 == "vkd3d" ? Self.d3d12Choices : Array(Self.d3d12Choices.prefix(1)))
-            note(d3d12Note)
-            if !Self.hasVkd3d { note("vkd3d-proton is not in this build.", warning: d3d12 == "vkd3d") }
+            if let text = d3d12Note { note(text) }
+            if !Self.hasVkd3d && d3d12 == "vkd3d" { note("vkd3d-proton is not in this build.", warning: true) }
 
             choicePicker("Vulkan driver", key: "vulkan", value: $vulkan,
                          choices: Self.hasKosmicKrisp || vulkan == "kosmickrisp" ? Self.vulkanChoices : Array(Self.vulkanChoices.prefix(2)),
                          other: { $0 == "off" || $0 == "0" ? "Off" : "Custom library" })
-            note(vulkanNote)
-            if !Self.hasKosmicKrisp {
-                note("KosmicKrisp is not in this build (no gl/libvulkan_kosmickrisp.dylib).", warning: vulkan == "kosmickrisp")
-            } else if !Self.metal4 {
-                note("This device has no Metal 4 GPU, so KosmicKrisp cannot start on it.", warning: vulkan == "kosmickrisp")
+            if let text = vulkanNote { note(text) }
+            if vulkan == "kosmickrisp" && !Self.hasKosmicKrisp {
+                note("KosmicKrisp is not in this build.", warning: true)
+            } else if vulkan == "kosmickrisp" && !Self.metal4 {
+                note("This device cannot run KosmicKrisp.", warning: true)
             }
 
             Button("Reset to defaults") {

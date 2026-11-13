@@ -1,4 +1,5 @@
 import SwiftUI
+import UserNotifications
 import UniformTypeIdentifiers
 
 /// Settings: a grouped list of categories, each opening its own page.
@@ -27,6 +28,8 @@ struct SettingsView: View {
     @State private var isGOGSignInPresented = false
     @State private var isEpicSignInPresented = false
     @State private var isPairingImporterPresented = false
+    /// iDeck's notifications were refused in iOS Settings.
+    @State private var notificationsDenied = false
     @AppStorage(AppLanguage.storageKey) private var appLanguage = AppLanguage.system.rawValue
 
     var body: some View {
@@ -111,13 +114,17 @@ struct SettingsView: View {
             inputManager.refreshControllers()
             coordinator.refreshJITStatus()
             coordinator.refreshPairingFileState()
+            await refreshNotificationPermission()
             await updater.check()
         }
         .onChange(of: wineJITPoolMiB) { _, selected in
             winePoolChangeRequiresRestart = !coordinator.updateWineJITPoolPreference(selected)
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active { coordinator.refreshJITStatus() }
+            if phase == .active {
+                coordinator.refreshJITStatus()
+                Task { await refreshNotificationPermission() }
+            }
         }
         .preferredColorScheme(.dark)
     }
@@ -293,9 +300,12 @@ struct SettingsView: View {
                     Text("StikDebug").tag("stikdebug")
                     Text(tr("Built-in")).tag("builtIn")
                 }
-                LabeledContent(tr("Pairing file"), value: coordinator.hasPairingFile ? tr("Imported") : tr("Missing"))
-                Button(coordinator.hasPairingFile ? tr("Replace pairing file") : tr("Import pairing file")) {
-                    isPairingImporterPresented = true
+                // The pairing file is used only by the built-in method.
+                if jitMethod == "builtIn" {
+                    LabeledContent(tr("Pairing file"), value: coordinator.hasPairingFile ? tr("Imported") : tr("Missing"))
+                    Button(coordinator.hasPairingFile ? tr("Replace pairing file") : tr("Import pairing file")) {
+                        isPairingImporterPresented = true
+                    }
                 }
             } header: {
                 Text(tr("Activation"))
@@ -328,9 +338,6 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(coordinator.isJITEnabled ? tr("JIT detected") : tr("JIT not detected"))
                     .font(.headline)
-                Text(tr("JIT permission does not guarantee that FEX is ready."))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
         }
         .padding(.vertical, 4)
@@ -351,7 +358,7 @@ struct SettingsView: View {
             } label: {
                 Label(tr(coordinator.isJITEnabled ? "Reconnect JIT debugger" : "Enable JIT"), systemImage: "bolt.fill")
             }
-            Text(tr("StikDebug requires pairing, LocalDevVPN, and a debug-signable iDeck. Opening StikDebug does not prove FEX JIT is ready."))
+            Text(tr("StikDebug requires pairing, LocalDevVPN, and a debug-signable iDeck."))
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -390,7 +397,10 @@ struct SettingsView: View {
         Form {
             // The everyday choices only; renderers, memory and sync are under Advanced.
             settingsSection(title: tr("Graphics & Performance")) {
-                toggleRow(title: tr("Hold Display at Maximum Rate"), isOn: $coordinator.isMaxRefreshRateEnabled)
+                // Only a display faster than 60 Hz (ProMotion) has a higher rate to hold.
+                if UIScreen.main.maximumFramesPerSecond > 60 {
+                    toggleRow(title: tr("Hold Display at Maximum Rate"), isOn: $coordinator.isMaxRefreshRateEnabled)
+                }
                 toggleRow(title: tr("Pause games in the background"), isOn: $pauseGamesInBackground)
             }
             Section {
@@ -424,6 +434,12 @@ struct SettingsView: View {
             Section {
                 toggleRow(title: tr("Continue downloads in the background"), isOn: $continueDownloadsInBackground)
                 toggleRow(title: tr("Download notifications"), isOn: $downloadNotifications)
+                    .disabled(notificationsDenied)
+                if notificationsDenied {
+                    Text(tr("Notifications are turned off for iDeck in iOS Settings."))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             } header: {
                 Text(tr("Downloads"))
             }
@@ -574,6 +590,14 @@ struct SettingsView: View {
             LabeledContent(title, value: String(format: "%.2fx", value.wrappedValue))
             Slider(value: value, in: 0.25...2.0, step: 0.05)
         }
+    }
+
+    /// Reads iDeck's notification permission; when refused, Download notifications
+    /// is switched off and greyed out.
+    private func refreshNotificationPermission() async {
+        let status = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
+        notificationsDenied = status == .denied
+        if notificationsDenied { downloadNotifications = false }
     }
 
     private func toggleRow(title: String, isOn: Binding<Bool>) -> some View {

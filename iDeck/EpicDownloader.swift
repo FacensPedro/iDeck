@@ -47,7 +47,8 @@ enum EpicDownloadError: LocalizedError {
 ///   case, as Windows does.
 final class EpicDownloader: @unchecked Sendable {
     var window = DownloadSpeed.epicWindow
-    var memoryBudget = 256 << 20
+    // RAM: reused chunks beyond 64 MB go to the spill folder on disk (was 256 MB).
+    var memoryBudget = 64 << 20
     var attempts = 6
     /// Pause between retries of one chunk, doubled per attempt (tests set 0).
     var retryDelay: Double = 0.25

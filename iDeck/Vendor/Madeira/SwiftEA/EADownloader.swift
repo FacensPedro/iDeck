@@ -750,7 +750,9 @@ final class EADownloader: @unchecked Sendable {
     // as many small ranges at once instead of one long stream, which on EA's CDN
     // was limited to a single connection's speed for files of several GB.
     static let segmentedThreshold: Int64 = 16 << 20
-    static let segmentBytes: Int64 = 4 << 20
+    // RAM: each range is held in memory until written; 2 MB ranges halve what the
+    // concurrent requests keep (was 4 MB).
+    static let segmentBytes: Int64 = 2 << 20
     static let segmentsAtOnce = DownloadSpeed.eaSegments
 
     /// One large file: its compressed bytes in `segmentBytes` ranges, `segmentsAtOnce`

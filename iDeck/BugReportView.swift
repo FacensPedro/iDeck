@@ -372,7 +372,8 @@ final class BugReportModel: ObservableObject {
         let runtime = MadeiraBundleIdentity.profile
         let defaults = UserDefaults.standard
         let physical = ProcessInfo.processInfo.physicalMemory / 1_048_576
-        let pool = defaults.object(forKey: "wineJITPoolMiB") as? Int ?? 560
+        let poolSetting = defaults.object(forKey: "wineJITPoolMiB") as? Int ?? 0
+        let pool = poolSetting > 0 ? "\(poolSetting) MB" : "automatic"
         let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
         let free = (try? documents?.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey]))?
             .volumeAvailableCapacityForImportantUsage
@@ -380,7 +381,7 @@ final class BugReportModel: ObservableObject {
             "Build: commit \(runtime["sourceCommit"] as? String ?? "unknown"), graphics \(MadeiraBundleIdentity.graphicsProfile)",
             "Memory: \(physical) MB physical, \(ResourceGovernor.availableMiB()) MB still allowed by iOS",
             "Memory+: increased limit \(name(MemoryPlus.increasedLimit)), extended addressing \(name(MemoryPlus.extendedAddressing))",
-            "JIT: method \(defaults.string(forKey: SystemCoordinator.jitMethodKey) ?? "stikdebug"), pool \(pool) MB",
+            "JIT: method \(defaults.string(forKey: SystemCoordinator.jitMethodKey) ?? "stikdebug"), pool \(pool)",
             "Windows runtime: x64 \(MadeiraRuntime.installed("wine-x64") ? "installed" : "missing"), x86 \(MadeiraRuntime.installed("wine-x86") ? "installed" : "missing")",
             "Device language: \(Locale.preferredLanguages.first ?? "unknown")"
                 + (free.map { ", storage free: \($0 / 1_073_741_824) GB" } ?? ""),
@@ -587,6 +588,8 @@ enum MissingModuleScanner {
         (#"\\+windows\\+(?:system32|syswow64)\\+([^\\" ]+\.dll)"? not found"#, { "\($0[0]) (not in system32)" }),
     ]
 
+    private static let optionalModules: Set<String> = ["steamservice.dll", "wow64cpu.dll"]
+
     private static func name(_ path: Substring) -> String {
         String(path.split(whereSeparator: { $0 == "\\" || $0 == "/" }).last ?? path)
     }
@@ -603,6 +606,9 @@ enum MissingModuleScanner {
             for (regex, format) in compiled {
                 guard let match = regex.firstMatch(in: string, range: range) else { continue }
                 let groups = (1..<match.numberOfRanges).compactMap { Range(match.range(at: $0), in: string).map { string[$0] } }
+                // DLLs Windows programs look for that are optional by design: Steam's
+                // Windows service (steamservice.dll) does not run under Wine.
+                if groups.first.map({ optionalModules.contains($0.lowercased()) }) == true { break }
                 let finding = format(groups)
                 if seen.insert(finding.lowercased()).inserted { result.append(finding) }
                 break
