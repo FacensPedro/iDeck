@@ -1,4 +1,7 @@
 ## What's Changed
+### Windows programs
+- When an installer (.exe or .msi from the Windows downloads folder) installs something, it leaves the library and only the installed programs are shown. iDeck compares the programs with Start Menu or Desktop shortcuts before and after the installer runs. The installer file stays on disk and comes back to the list if everything it installed is removed.
+
 ### Windows runtime
 - 64-bit games use Madeira's prebuilt x64 Windows runtime again instead of the one rebuilt from iDeck's patched Wine (since 2.0.0). With the rebuilt runtime, games such as Dragon Age: Inquisition closed with an access violation (0xC0000005) before any game code ran: the ARM64EC C runtime (ucrtbase.dll), loaded right after the x86-64 translator, crashed during its own initialization, and msacm32.dll failed to initialize. The rebuild can still be turned on in the build with `IDECK_REBUILD_WINE_PE_MODULES=1`.
 - The 32-bit (x86) runtime still comes from iDeck's patched Wine.
@@ -33,4 +36,4 @@
 - The bug report has a "Missing DLLs:" line listing what the last Windows session could not find, from Wine's own messages: a DLL a program imports that is missing or failed to load, a function with no implementation, an unimplemented function that was called, and a DLL looked up in system32 or syswow64 that is not there. When there are none, the line says so.
 
 ### Release
-- Updated the application version to 2.0.1 (build 69).
+- Updated the application version to 2.1.0 (build 70).

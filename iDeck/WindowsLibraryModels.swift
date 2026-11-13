@@ -183,7 +183,56 @@ final class WindowsLibraryStore: ObservableObject {
         let known = Set(executableURLs.map { $0.standardizedFileURL.path.lowercased() })
         let installed = WindowsShortcutScanner.programs(in: drive)
             .filter { !known.contains($0.standardizedFileURL.path.lowercased()) }
+        // An installer that installed something leaves the list: only what it
+        // installed is shown. It comes back if all of that is gone again.
+        let installedPaths = Set(installed.map { $0.standardizedFileURL.path.lowercased() })
+        Self.settleInstaller(installedNow: installedPaths)
+        var hidden = Self.hiddenInstallers
+        for (file, programs) in hidden where !programs.contains(where: installedPaths.contains) {
+            hidden[file] = nil
+        }
+        if hidden != Self.hiddenInstallers { Self.hiddenInstallers = hidden }
+        executableURLs = executableURLs.filter { hidden[$0.lastPathComponent.lowercased()] == nil }
         executableURLs += installed
+    }
+
+    // MARK: Installers replaced by what they installed
+
+    nonisolated private static let pendingInstallerKey = "windows.pendingInstaller"
+    nonisolated private static let hiddenInstallersKey = "windows.hiddenInstallers"
+
+    /// Installer file name (lowercased) -> the programs it installed (paths, lowercased).
+    nonisolated static var hiddenInstallers: [String: [String]] {
+        get { UserDefaults.standard.dictionary(forKey: hiddenInstallersKey) as? [String: [String]] ?? [:] }
+        set { UserDefaults.standard.set(newValue, forKey: hiddenInstallersKey) }
+    }
+
+    /// Called when a program from WindowsDownloads starts: remembers which installed
+    /// programs existed before it, to tell afterwards what it installed.
+    nonisolated static func noteLaunch(of url: URL) {
+        let folder = url.standardizedFileURL.deletingLastPathComponent()
+        guard folder.lastPathComponent.lowercased() == "windowsdownloads",
+              folder.deletingLastPathComponent().lastPathComponent.lowercased() == "drive_c" else { return }
+        let drive = folder.deletingLastPathComponent()
+        let before = WindowsShortcutScanner.programs(in: drive).map { $0.standardizedFileURL.path.lowercased() }
+        UserDefaults.standard.set(["file": url.lastPathComponent.lowercased(), "before": before.joined(separator: "\n")],
+                                  forKey: pendingInstallerKey)
+    }
+
+    /// After the session: programs that appeared since the installer started were
+    /// installed by it, and the installer is hidden.
+    nonisolated private static func settleInstaller(installedNow: Set<String>) {
+        guard !ideck_wineprocess_running(),
+              let pending = UserDefaults.standard.dictionary(forKey: pendingInstallerKey) as? [String: String],
+              let file = pending["file"] else { return }
+        let before = Set((pending["before"] ?? "").split(separator: "\n").map(String.init))
+        let added = installedNow.subtracting(before)
+        UserDefaults.standard.removeObject(forKey: pendingInstallerKey)
+        guard !added.isEmpty else { return }
+        var hidden = hiddenInstallers
+        hidden[file] = Array(added)
+        hiddenInstallers = hidden
+        AppLog.record("[windows-library] \(file) installed \(added.count) program(s); the installer is hidden")
     }
 
     func profileID(for url: URL) -> String {

@@ -943,6 +943,7 @@ class SystemCoordinator: ObservableObject {
         let launcher = gameID.hasPrefix("epic:") ? "Epic Games" : gameID.hasPrefix("ea:") ? "EA app"
             : gameID.hasPrefix("gog:") || gameID.hasPrefix("gog-setup:") ? "GOG" : ".exe"
         recordGameContext(profile?.title ?? url.deletingPathExtension().lastPathComponent, launcher: launcher)
+        if launcher == ".exe" { WindowsLibraryStore.noteLaunch(of: url) }
         BenchmarkSession.begin(kind: "game", scenario: profile?.title ?? url.deletingPathExtension().lastPathComponent,
                                settings: BenchmarkSession.gameSettings(profile))
         guard !previousWineSessionStillFinishing() else { return }
