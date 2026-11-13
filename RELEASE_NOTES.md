@@ -1,5 +1,6 @@
 ## What's Changed
 ### Fixes
+- A JIT pool that had to shrink no longer blocks the next game with "restart iDeck": it happened on a fresh launch too, so reopening could not help and no game could start. The pool prepared when StikDebug attaches keeps a 192 MB executable window free instead of 256 MB, which leaves the pool more room.
 - Built-in JIT: when it cannot run (no pairing file, unsupported iOS, a sideloaded build without its helper) it says why instead of silently opening StikDebug. A helper failure ends the 90-second wait at once, so the next tap tries again.
 - Settings no longer says that StikDebug requires pairing and LocalDevVPN.
 - Visual C++ x64 is installed by reading Microsoft's installer, never by running it. The installer is now downloaded to a temporary folder instead of the Windows downloads folder, where it appeared in the library and opened Microsoft's setup window (whose buttons did not take taps). An old copy left there is removed.

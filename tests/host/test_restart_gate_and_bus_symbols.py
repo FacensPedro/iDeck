@@ -16,7 +16,7 @@ class RestartGateTests(unittest.TestCase):
 
     def test_reasons(self):
         self.assertIn("Self.restartReason = \"the last game crashed", COORD)
-        self.assertIn("StikJITHelper.smallPoolMB > 0", COORD)
+        self.assertNotIn('the JIT pool shrank to', COORD)
         self.assertIn("static let restartMinimumFreeMiB = 1500", COORD)
 
 

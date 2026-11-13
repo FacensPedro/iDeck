@@ -403,8 +403,8 @@ class SystemCoordinator: ObservableObject {
                     self.wineJITPreparationInFlight = true
                     // No game is chosen yet, so its fixed-base exe cannot be measured
                     // (measureExecutableWindow): a 256 MB executable window is kept free
-                    // instead of 128 MB, which fits images such as Assassin's Creed
-                    // Unity's ACU.exe (131 MB) and MapleStory.exe (183 MB).
+                    // instead of 128 MB (192 MB: 256 cost the pool 112 MB), which fits images
+                    // such as Assassin's Creed Unity's ACU.exe (131 MB) and MapleStory.exe (183 MB).
                     if StikJITHelper.exeWindowAutoMB < Self.earlyExeWindowMB {
                         StikJITHelper.exeWindowAutoMB = Self.earlyExeWindowMB
                     }
@@ -498,7 +498,7 @@ class SystemCoordinator: ObservableObject {
     /// JIT is ready for a launch: CS_DEBUGGED is set and the pool is prepared or a
     /// debugger is attached to prepare it.
     /// The executable window kept free by the pool prepared at startup.
-    static let earlyExeWindowMB = 256
+    static let earlyExeWindowMB = 192
     /// Set once that early pool exists: a game whose fixed-base exe needs more cannot
     /// load in this run (the pool cannot move without the debugger).
     static var earlyPoolExeWindowMB = 0
@@ -1829,7 +1829,8 @@ class SystemCoordinator: ObservableObject {
 
     static func restartNeeded() -> String? {
         if let restartReason { return restartReason }
-        if StikJITHelper.smallPoolMB > 0 { return "the JIT pool shrank to \(StikJITHelper.smallPoolMB) MB" }
+        // A pool that had to shrink is not a reason: it happens on a fresh launch too
+        // (the startup pool keeps a 256 MB exe window free), so reopening changes nothing.
         let free = Int(os_proc_available_memory() >> 20)
         if free > 0 && free < restartMinimumFreeMiB { return "only \(free) MB of memory is left" }
         return nil

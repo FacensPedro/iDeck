@@ -7,7 +7,7 @@ ROOT = Path(__file__).resolve().parents[2]
 class EarlyPoolWindowTests(unittest.TestCase):
     def test_early_pool_keeps_256mb(self):
         coord = (ROOT / "iDeck/SystemCoordinator.swift").read_text()
-        self.assertIn("static let earlyExeWindowMB = 256", coord)
+        self.assertIn("static let earlyExeWindowMB = 192", coord)
         block = coord[coord.index("iDeck opened by StikDebug: prepare Wine's pool now"):]
         self.assertLess(block.index("StikJITHelper.exeWindowAutoMB = Self.earlyExeWindowMB"),
                         block.index("MadeiraWinePool.prepare()"))
