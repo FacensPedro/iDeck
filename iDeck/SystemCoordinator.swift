@@ -1665,7 +1665,7 @@ class SystemCoordinator: ObservableObject {
     func forceCloseIDeck() {
         SteamLog.event("[wine-close] game did not exit; iDeck closed by the user")
         AppLog.record("[wine-close] force close: iDeck exits so the stuck Windows session ends")
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { exit(0) }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { exit(0) }
     }
 
     func acknowledgeWindowsCloseWarning() {
