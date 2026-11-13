@@ -9,6 +9,9 @@
 ### Memory diagnostics
 - During a game, iDeck logs its memory every 30 seconds for 10 minutes: footprint, memory still allowed by iOS, the launcher and whether Madeira Dock runs. The bug report includes these lines, to show where memory grows (Steam's client in Madeira Dock, the game, or over time).
 
+### EA app
+- The bug report has an "EA hash check" line for EA games. It compares the machine values iDeck signs the licence with (board and BIOS maker, Windows product id, C: volume serial, graphics card, processor) with what the game reads from the Windows environment (the prefix registry and volume serial), and names the fields that differ. A licence the game refuses, which makes it open EA's activation window, can then be traced to the field that does not match.
+
 ### Fixes
 - A JIT pool that had to shrink no longer blocks the next game with "restart iDeck": it happened on a fresh launch too, so reopening could not help and no game could start. The pool prepared when StikDebug attaches keeps a 192 MB executable window free instead of 256 MB, which leaves the pool more room.
 - Built-in JIT: when it cannot run (no pairing file, unsupported iOS, a sideloaded build without its helper) it says why instead of silently opening StikDebug. A helper failure ends the 90-second wait at once, so the next tap tries again.
