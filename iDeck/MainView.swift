@@ -2462,17 +2462,18 @@ private struct IDeckFirstRunSetupView: View {
 
     @AppStorage(SystemCoordinator.jitMethodKey) private var jitMethod = "stikdebug"
     @ObservedObject private var wineMono = WineMonoModel.shared
-    @AppStorage("firstRunSetup.step.v1") private var step = 0
+    @AppStorage("firstRunSetup.step.v2") private var step = 0
     @State private var installing = false
     @State private var installerStatus = ""
     @State private var refresh = 0
     @State private var pairingImporterPresented = false
 
     private enum Step: Int, CaseIterable {
-        case windows, dock, jit, summary
+        case visualCpp, wineMono, dock, jit, summary
         var title: String {
             switch self {
-            case .windows: return "Windows runtime"
+            case .visualCpp: return "Visual C++"
+            case .wineMono: return "Wine Mono"
             case .dock: return "Madeira Dock"
             case .jit: return "JIT configuration"
             case .summary: return "Setup summary"
@@ -2484,9 +2485,11 @@ private struct IDeckFirstRunSetupView: View {
         FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
     }
     private var prefixReady: Bool { PrefixInstaller.isPrefixInstalled(at: MadeiraDock.prefix) }
-    private var x64Ready: Bool { MadeiraBundleIdentity.isNative && MadeiraRuntime.installed("wine-x64") && prefixReady }
-    private var x86Ready: Bool {
-        MadeiraRuntime.installed("wine-x86") && coordinator.windowsEnvironment.hasWoW64Runtime() && prefixReady
+    /// The Windows runtime itself is part of the IPA; the Wine environment (prefix)
+    /// is prepared by the Visual C++ step before the runtimes go into it.
+    private var vcReady: Bool {
+        VisualCRuntimeBootstrap.installed(in: MadeiraDock.prefix, documents: documents)
+            && VisualCRuntimeLegacy.installed(documents: documents)
     }
     private var steamDLLsReady: Bool {
         guard let folder = SteamDLLRepair.sourceFolder else { return false }
@@ -2496,9 +2499,6 @@ private struct IDeckFirstRunSetupView: View {
             SteamDLLRepair.validX64DLL(folder.appendingPathComponent($0))
                 || SteamDLLRepair.validX64DLL(root.appendingPathComponent($0))
         }
-    }
-    private var windowsReady: Bool {
-        x64Ready && x86Ready
     }
 
     var body: some View {
@@ -2534,7 +2534,8 @@ private struct IDeckFirstRunSetupView: View {
 
                         VStack(alignment: .leading, spacing: 16) {
                             switch current {
-                            case .windows: windowsStep
+                            case .visualCpp: visualCppStep
+                            case .wineMono: wineMonoStep
                             case .dock: dockStep
                             case .jit: jitStep
                             case .summary: completeStep
@@ -2555,7 +2556,9 @@ private struct IDeckFirstRunSetupView: View {
                             if current != .summary {
                                 Button("Continue") { withAnimation(.easeInOut(duration: 0.2)) { step += 1 } }
                                     .buttonStyle(.borderedProminent)
-                                    .disabled(installing || (current == .windows && (!x64Ready || !x86Ready)))
+                                    .disabled(installing || wineMono.busy
+                                              || (current == .visualCpp && !(prefixReady && vcReady))
+                                              || (current == .wineMono && !wineMono.installed))
                             } else {
                                 Button("Finish setup") { step = 0; onFinish() }
                                     .buttonStyle(.borderedProminent)
@@ -2583,29 +2586,47 @@ private struct IDeckFirstRunSetupView: View {
         .preferredColorScheme(.dark)
     }
 
-    // MARK: - Windows runtime
+    // MARK: - Visual C++
 
-    private var windowsStep: some View {
+    private var visualCppStep: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Label("Windows runtime", systemImage: "square.stack.3d.up.fill")
+            Label("Visual C++", systemImage: "shippingbox.fill")
                 .font(.title2.bold())
-            Text("Downloads the x64 and x86 Wine environments with Wine's own DLLs. None of it is part of the app download. The Steam client and its DLLs are installed in the Madeira Dock step.")
-            statusRow("x64 Wine environment", x64Ready)
-            statusRow("x86 (WoW64) environment", x86Ready)
-            Button(windowsReady ? "Installed" : (installing ? "Installing…" : "Install all")) {
-                installWindowsRuntime()
+            Text("Prepares the Windows environment and installs Microsoft Visual C++ 2005-2022 (x64 and x86), which most games and programs need. It is downloaded from Microsoft.")
+            statusRow("Windows environment (x64 + x86)", prefixReady)
+            statusRow("Microsoft Visual C++ 2005-2022", vcReady)
+            Button(prefixReady && vcReady ? "Installed" : (installing ? "Installing…" : "Install")) {
+                installVisualCpp()
             }
             .buttonStyle(.borderedProminent)
-            .disabled(installing || windowsReady || !MadeiraRuntime.available)
+            .disabled(installing || (prefixReady && vcReady) || !MadeiraRuntime.available)
             if installing { ProgressView(installerStatus.isEmpty ? coordinator.windowsStatus : installerStatus).font(.caption) }
             else if !installerStatus.isEmpty {
                 Text(installerStatus).font(.caption).foregroundStyle(.secondary)
             }
-            Text("Microsoft Visual C++ and .NET (Wine Mono) are installed on demand: before a program or installer starts, iDeck reads which runtimes it uses and installs only those. MSI, Inno Setup, NSIS, InstallShield, WiX and 7-Zip installers are recognised automatically.")
-                .font(.caption).foregroundStyle(.secondary)
             if !MadeiraRuntime.available {
                 Text("This IPA does not include the Windows runtime. Install a native iDeck IPA.")
                     .font(.caption).foregroundStyle(.orange)
+            }
+        }
+    }
+
+    // MARK: - Wine Mono
+
+    private var wineMonoStep: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label("Wine Mono", systemImage: "gearshape.2.fill")
+                .font(.title2.bold())
+            Text("Installs Wine Mono, the .NET Framework that programs and launchers built with .NET need. It is downloaded from WineHQ (about \(Int((Double(WineMonoPin.tarBytes) / 1_000_000).rounded())) MB).")
+            statusRow("Wine Mono \(WineMonoPin.version)", wineMono.installed, detail: wineMono.busy ? wineMono.status : nil)
+            Button(wineMono.installed ? "Installed" : (wineMono.busy ? "Installing…" : "Install")) {
+                wineMono.install()
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(wineMono.installed || wineMono.busy)
+            if wineMono.busy { ProgressView(wineMono.status).font(.caption) }
+            if let error = wineMono.error {
+                Text(error).font(.caption).foregroundStyle(.orange)
             }
         }
     }
@@ -2621,41 +2642,64 @@ private struct IDeckFirstRunSetupView: View {
         }
     }
 
-    /// Runs every Windows component in order; each one is skipped when present.
-    private func installWindowsRuntime() {
+    /// Prepares the Wine environment, then installs every Visual C++ runtime; each
+    /// part is skipped when present.
+    private func installVisualCpp() {
         guard !installing else { return }
         installing = true
+        let docs = documents
         Task { @MainActor in
             defer { installing = false; refresh += 1 }
-            // 0. Wine's x64 and x86 Windows files (not in the IPA).
+            // An IPA built with a split runtime downloads Wine's Windows files first.
             for package in MadeiraRuntime.packages where !MadeiraRuntime.installed(package.id) {
                 do {
                     try await MadeiraRuntime.install(package.id) { message, fraction in
-                        Task { @MainActor in
-                            installerStatus = "\(message) \(Int(fraction * 100))%"
-                        }
+                        Task { @MainActor in installerStatus = "\(message) \(Int(fraction * 100))%" }
                     }
                 } catch {
                     installerStatus = error.localizedDescription
                     return
                 }
-                refresh += 1
             }
-            // 1. x64 prefix with x86 WoW64.
             if !prefixReady {
-                installerStatus = "Preparing x64 + x86 Wine environment…"
+                installerStatus = "Preparing the Windows environment…"
                 coordinator.openMadeiraWorkspace()
                 for _ in 0..<600 where !prefixReady {
                     try? await Task.sleep(nanoseconds: 1_000_000_000)
                 }
                 guard prefixReady else {
-                    installerStatus = "The Wine environment could not be prepared: \(coordinator.windowsStatus)"
+                    installerStatus = "The Windows environment could not be prepared: \(coordinator.windowsStatus)"
                     return
                 }
             }
             refresh += 1
-            // Visual C++ and Wine Mono are installed on demand (WindowsInstallerEnvironment).
-            installerStatus = windowsReady ? "Windows runtime installed." : "Some components are missing. Tap Install all to retry."
+            // 2015-2022 x64 (vcruntime140 & co.).
+            if !VisualCRuntimeBootstrap.installed(in: MadeiraDock.prefix, documents: docs) {
+                installerStatus = "Downloading Microsoft Visual C++ 2015-2022 (x64)…"
+                let downloaded: Result<URL, Error> = await withCheckedContinuation { done in
+                    VisualCRuntimeBootstrap.download(in: MadeiraDock.prefix) { done.resume(returning: $0) }
+                }
+                guard case .success(let installer) = downloaded else {
+                    if case .failure(let error) = downloaded { installerStatus = error.localizedDescription }
+                    return
+                }
+                installerStatus = "Installing Microsoft Visual C++ 2015-2022 (x64)…"
+                let installed: Result<Void, Error> = await withCheckedContinuation { done in
+                    VisualCRuntimeBootstrap.extractAndInstall(installer: installer, documents: docs) { done.resume(returning: $0) }
+                }
+                if case .failure(let error) = installed { installerStatus = error.localizedDescription; return }
+            }
+            // 2005-2013 (x86/x64) and 2015-2022 x86.
+            if !VisualCRuntimeLegacy.installed(documents: docs) {
+                let failures = await VisualCRuntimeLegacy.installAll(documents: docs) { name in
+                    Task { @MainActor in installerStatus = "Installing Microsoft Visual C++ \(name)…" }
+                }
+                if !failures.isEmpty {
+                    installerStatus = "Some runtimes failed: " + failures.joined(separator: "; ") + ". Tap Install to retry."
+                    return
+                }
+            }
+            installerStatus = vcReady ? "Visual C++ installed." : "Some components are missing. Tap Install to retry."
         }
     }
 
@@ -2679,7 +2723,7 @@ private struct IDeckFirstRunSetupView: View {
                     .foregroundStyle(progress.contains("failed") || progress.contains("missing") ? Color.orange : Color.secondary)
             }
             if !prefixReady {
-                Text("Install the Windows runtime first.").font(.caption).foregroundStyle(.orange)
+                Text("Install Visual C++ first: it prepares the Windows environment.").font(.caption).foregroundStyle(.orange)
             }
         }
     }
@@ -2717,7 +2761,8 @@ private struct IDeckFirstRunSetupView: View {
         VStack(alignment: .leading, spacing: 12) {
             Label("Setup summary", systemImage: "checkmark.circle")
                 .font(.title2.bold())
-            statusRow("Windows runtime", windowsReady)
+            statusRow("Visual C++", prefixReady && vcReady)
+            statusRow("Wine Mono", wineMono.installed)
             statusRow("Madeira Dock", MadeiraDock.clientInstalled)
             LabeledContent("JIT method", value: jitMethod == "builtIn" ? "Built-in" : "StikDebug")
             if jitMethod == "builtIn" { statusRow("Pairing file", coordinator.hasPairingFile) }

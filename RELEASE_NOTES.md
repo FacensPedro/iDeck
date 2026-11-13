@@ -9,6 +9,9 @@
 ### JIT
 - The JIT pool prepared when StikDebug attaches keeps a 256 MB executable window free instead of 128 MB, so games with a large fixed-base exe (Assassin's Creed Unity's ACU.exe, 131 MB) can still load with it. A game that needs more is named in the log.
 
+### Initial setup
+- The Windows runtime step is replaced by two steps. Visual C++ prepares the Windows environment and installs Microsoft Visual C++ 2005-2022 (x64 and x86). Wine Mono installs the .NET Framework runtime. Both are downloaded during setup, so programs no longer wait for them on first use.
+
 ### App size
 - The IPA is built like Madeira's: the Windows runtime is inside, while Wine Mono (.NET programs) and Microsoft's Visual C++ runtimes are downloaded on the device the first time they are needed instead of being bundled.
 
