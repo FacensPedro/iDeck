@@ -949,19 +949,19 @@ struct EAHardwareProfile: Codable, Equatable {
     var osSerial = "12345-oem-0000001-54321"
     /// GetVolumeInformation's serial for C:, 8 hex digits; without mountmgr it is 0.
     var volumeSerial = "00000000"
-    /// Win32_VideoController.PNPDeviceID; the hash takes it up to its last backslash.
-    /// Wine's wbemprox answers with the display device's HardwareID, which win32u
-    /// writes WITHOUT the instance suffix (sysparams: the device path with its last
-    /// component cut off). The game therefore hashes only "PCI". With the "\\00000000"
-    /// suffix assumed before, the licence hash had "PCI\\VEN_…&REV_00" instead, the
-    /// game computed another hash, refused the licence and opened ActivationUI.exe
-    /// (Dragon Age: Inquisition).
+    /// Win32_VideoController.PNPDeviceID as Wine 11's wbemprox answers it: the display
+    /// device's first HardwareID (SetupAPI), which win32u writes without an instance
+    /// suffix. Hash versions before 4 cut it at its last backslash ("PCI"); version 4
+    /// hashes all of it (machineHash).
     var gpuPNPDeviceID = "PCI\\VEN_106B&DEV_0001&SUBSYS_00000000&REV_00"
     var cpuManufacturer = "GenuineIntel"
     var cpuBrand = "Unknown ARM CPU"
     var cpuEAX: UInt32 = 0x000A_0661
     var cpuECX: UInt32 = 0x82D8_230F
-    var cpuEDX: UInt32 = 0x2F8B_FBF3
+    /// CPUID(1).EDX as FEX answers it (FEXCore CPUID.cpp, Function_01h): Self Snoop
+    /// (bit 27) and HTT (bit 28) are clear. The 0x2F8BFBF3 assumed before had bit 27
+    /// set, so the licence was bound to a hash the game never computes.
+    var cpuEDX: UInt32 = 0x278B_FBF3
     var hostname = "iPad"
     var diskSerial = "None"
     var macAddress: String?
@@ -970,7 +970,7 @@ struct EAHardwareProfile: Codable, Equatable {
     /// activation libraries; 2 and 3 add the volume, graphics card and processor; 4 is
     /// the current one. Returned with the text that was hashed, for the log.
     func machineHash(version: Int) -> (hash: String, input: String) {
-        let gpu = gpuPNPDeviceID.isEmpty ? "None" : String(gpuPNPDeviceID[..<(gpuPNPDeviceID.lastIndex(of: "\\") ?? gpuPNPDeviceID.endIndex)])
+        let gpu = Self.hashedGPU(gpuPNPDeviceID, version: version)
         let edx = String(format: "%08x", cpuEDX), ecx = String(format: "%08x", cpuECX)
         let edxEAX = String(format: "%08X%08X", cpuEDX, cpuEAX)
         var parts = [boardManufacturer, boardSerial]
@@ -996,6 +996,14 @@ struct EAHardwareProfile: Codable, Equatable {
         return (hash, input)
     }
 
+    /// The hashed text for a log line or bug report. A board serial number other than
+    /// Wine's "None" (a device serial IOKit might answer with) is not shown.
+    func shownHashInput(version: Int) -> String {
+        let input = machineHash(version: version).input
+        guard !boardSerial.isEmpty, boardSerial != "None" else { return input }
+        return input.replacingOccurrences(of: boardSerial, with: "<serial>")
+    }
+
     /// The machine identity in the sign-in's `pc_sign` (FNV-1a of the board, BIOS and OS fields).
     var machineID: String {
         var text = boardManufacturer + boardSerial + biosManufacturer + biosSerial + osInstallDate + osSerial
@@ -1019,6 +1027,14 @@ struct EAHardwareProfile: Codable, Equatable {
         let milliseconds = (c.nanosecond ?? 0) / 1_000_000
         return String(format: "%04d%02d%02d%02d%02d%02d.%06d+000", c.year ?? 1970, c.month ?? 1, c.day ?? 1,
                       c.hour ?? 0, c.minute ?? 0, c.second ?? 0, milliseconds * 1000)
+    }
+
+    /// The graphics card's part of the hash: before version 4 the PNPDeviceID up to its
+    /// last backslash, from version 4 all of it (Maxima's tested versions).
+    static func hashedGPU(_ pnpDeviceID: String, version: Int) -> String {
+        guard !pnpDeviceID.isEmpty else { return "None" }
+        guard version < 4 else { return pnpDeviceID }
+        return String(pnpDeviceID[..<(pnpDeviceID.lastIndex(of: "\\") ?? pnpDeviceID.endIndex)])
     }
 
     /// The processor's CPUID(1) ECX as FEX reports it on this host: AVX and what comes

@@ -9,7 +9,9 @@ class TouchDiagnosticsTests(unittest.TestCase):
         touch = (ROOT / "iDeck/TouchMouseView.swift").read_text()
         self.assertIn('AppLog.record("[touch] tap at', touch)
         self.assertIn("WindowsRendererView.touchMappingSummary", touch)
-        self.assertIn('lower.contains("[touch] tap")', (ROOT / "iDeck/BugReportView.swift").read_text())
+        report = (ROOT / "iDeck/BugReportView.swift").read_text()
+        self.assertIn('private static let diagnostics = ["[touch] tap"', report)
+        self.assertIn("diagnostics.contains(where: lower.contains)", report)
 
 
 if __name__ == "__main__":

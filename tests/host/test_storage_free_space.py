@@ -16,7 +16,9 @@ class StorageFreeSpaceTests(unittest.TestCase):
     def test_session_memory_sampling(self):
         coord = (ROOT / "iDeck/SystemCoordinator.swift").read_text()
         self.assertIn("private func startMemorySampling(launcher: String)", coord)
-        self.assertIn('lower.contains("[memory] session")', (ROOT / "iDeck/BugReportView.swift").read_text())
+        report = (ROOT / "iDeck/BugReportView.swift").read_text()
+        self.assertIn('"[memory] session"', report)
+        self.assertIn("diagnostics.contains(where: lower.contains)", report)
 
 
 if __name__ == "__main__":

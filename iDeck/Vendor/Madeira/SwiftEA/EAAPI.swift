@@ -135,9 +135,15 @@ enum EAHardware {
         if let created = (try? drive.resourceValues(forKeys: [.creationDateKey]))?.creationDate {
             profile.osInstallDate = EAHardwareProfile.wmiDate(created)
         }
-        // As Wine reports it: the HardwareID, with no instance suffix (EAHardwareProfile).
+        // As Wine 11's wbemprox reports it: the display device's HardwareID, with no
+        // instance suffix (EAHardwareProfile.gpuPNPDeviceID).
         profile.gpuPNPDeviceID = String(format: "PCI\\VEN_%04X&DEV_%04X&SUBSYS_00000000&REV_00", gpuVendor, gpuDevice)
         profile.cpuECX = EAHardwareProfile.cpuECX(avx: avx)
+        if let platform = EAPlatformIdentity.read() {
+            profile.boardManufacturer = platform.boardManufacturer
+            profile.biosManufacturer = platform.biosManufacturer
+            profile.boardSerial = platform.boardSerial
+        }
         if let url = overridesURL, let data = try? Data(contentsOf: url),
            let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
             var dictionary = (try? JSONSerialization.jsonObject(with: JSONEncoder().encode(profile))) as? [String: Any] ?? [:]
@@ -148,6 +154,81 @@ enum EAHardware {
             }
         }
         return profile
+    }
+}
+
+/// The board and BIOS values Wine's ntdll builds its SMBIOS table from on an Apple
+/// host (dlls/ntdll/unix/system.c, create_smbios_data), read with the same IOKit
+/// calls. Wine runs in this process under the same sandbox, so what IOKit answers
+/// here is what the game reads through WMI (wbemprox: Win32_BaseBoard, Win32_BIOS).
+enum EAPlatformIdentity {
+    struct Values: Equatable {
+        var boardManufacturer: String
+        var biosManufacturer: String
+        var boardSerial: String
+    }
+
+    /// wbemprox's own answers for fields the SMBIOS table does not have.
+    static let wbemDefaults = Values(boardManufacturer: "Intel Corporation", biosManufacturer: "The Wine Project", boardSerial: "None")
+
+    /// IOPlatformExpertDevice's manufacturer and serial number as Wine uses them: the
+    /// manufacturer names the BIOS and the board, the serial number the board, and an
+    /// empty string is left out of the table, so wbemprox answers its default instead.
+    static func values(manufacturer: String, serial: String) -> Values {
+        Values(boardManufacturer: manufacturer.isEmpty ? wbemDefaults.boardManufacturer : manufacturer,
+               biosManufacturer: manufacturer.isEmpty ? wbemDefaults.biosManufacturer : manufacturer,
+               boardSerial: serial.isEmpty ? wbemDefaults.boardSerial : serial)
+    }
+
+    /// A property as Wine's cf_to_string reads it: data up to its first zero byte, or
+    /// an ASCII string; anything else is empty. Both are capped at Wine's 128 bytes.
+    static func text(fromData bytes: [UInt8]) -> String {
+        String(decoding: bytes.prefix(128).prefix { $0 != 0 }, as: UTF8.self)
+    }
+
+    static func text(fromString string: String) -> String {
+        string.canBeConverted(to: .ascii) && string.utf8.count < 128 ? string : ""
+    }
+
+    /// nil when IOKit cannot be reached from here, or when the host has a real SMBIOS
+    /// table (the AppleSMBIOS service), which Wine would use instead: the profile then
+    /// keeps its defaults. Without IOPlatformExpertDevice Wine has no table at all.
+    static func read() -> Values? {
+        guard let kit = dlopen("/System/Library/Frameworks/IOKit.framework/IOKit", RTLD_NOW),
+              let matchingSymbol = dlsym(kit, "IOServiceMatching"),
+              let serviceSymbol = dlsym(kit, "IOServiceGetMatchingService"),
+              let propertySymbol = dlsym(kit, "IORegistryEntryCreateCFProperty"),
+              let releaseSymbol = dlsym(kit, "IOObjectRelease") else { return nil }
+        typealias Matching = @convention(c) (UnsafePointer<CChar>) -> UnsafeMutableRawPointer?
+        typealias Service = @convention(c) (UInt32, UnsafeMutableRawPointer?) -> UInt32
+        typealias Property = @convention(c) (UInt32, CFString, CFAllocator?, UInt32) -> UnsafeMutableRawPointer?
+        typealias Release = @convention(c) (UInt32) -> Int32
+        let matching = unsafeBitCast(matchingSymbol, to: Matching.self)
+        let getService = unsafeBitCast(serviceSymbol, to: Service.self)
+        let property = unsafeBitCast(propertySymbol, to: Property.self)
+        let release = unsafeBitCast(releaseSymbol, to: Release.self)
+        // IOServiceGetMatchingService consumes the dictionary IOServiceMatching returns.
+        func service(_ name: String) -> UInt32 { name.withCString { getService(0, matching($0)) } }
+        let smbios = service("AppleSMBIOS")
+        if smbios != 0 {
+            _ = release(smbios)
+            return nil
+        }
+        let expert = service("IOPlatformExpertDevice")
+        guard expert != 0 else { return wbemDefaults }
+        defer { _ = release(expert) }
+        func stringValue(_ key: String) -> String {
+            guard let raw = property(expert, key as CFString, kCFAllocatorDefault, 0) else { return "" }
+            let value = Unmanaged<CFTypeRef>.fromOpaque(raw).takeRetainedValue()
+            if CFGetTypeID(value) == CFDataGetTypeID() {
+                return EAPlatformIdentity.text(fromData: [UInt8](unsafeBitCast(value, to: CFData.self) as Data))
+            }
+            if CFGetTypeID(value) == CFStringGetTypeID() {
+                return EAPlatformIdentity.text(fromString: unsafeBitCast(value, to: CFString.self) as String)
+            }
+            return ""
+        }
+        return values(manufacturer: stringValue("manufacturer"), serial: stringValue("IOPlatformSerialNumber"))
     }
 }
 

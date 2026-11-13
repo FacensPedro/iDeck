@@ -82,8 +82,8 @@ enum EALicense {
 
     /// Asks EA for the game's licence for this machine and saves it. Returns what was granted.
     static func renew(api: EAAPI, contentID: String, profile: EAHardwareProfile, activation: Activation, drive: URL) async throws -> EALicenseInfo {
-        let (hash, input) = profile.machineHash(version: activation.hashVersion)
-        EALog.event("[ea-license] request hash-version=\(activation.hashVersion) input=\"\(input.replacingOccurrences(of: "\0", with: "\\0"))\" hash=\(hash)")
+        let (hash, _) = profile.machineHash(version: activation.hashVersion)
+        EALog.event("[ea-license] request hash-version=\(activation.hashVersion) input=\"\(profile.shownHashInput(version: activation.hashVersion))\" hash=\(hash)")
         let (xml, signature) = try await api.license(contentID: contentID, machineHash: hash)
         guard let info = EALicenseInfo(xml: xml) else { throw EAAPIError.license("unreadable licence") }
         try save(xml: xml, signature: signature, contentID: contentID, decodeSignature: activation.decodeSignature, drive: drive)

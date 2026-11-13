@@ -92,6 +92,8 @@ enum LogIssueScanner {
                                 "ml990:", "master_socket_timeout", "[ios env]"]
     /// Counters that report no problem at all ("launch-client-error=0").
     private static let zeroCount = try! NSRegularExpression(pattern: #"\b(error|errors|failed|failures|missing)\s*[=:]\s*0\b"#)
+    /// Informational lines a report keeps although they name no failure.
+    private static let diagnostics = ["[touch] tap", "[memory] session", "[ea-service]", "[ea-license]"]
     /// Lines from iDeck's Steam client, downloads and Madeira Dock.
     private static let steamTags = ["[steam", "[dock", "steam client", "steam's", "madeira dock", "steamworks", "steam_api"]
 
@@ -123,9 +125,11 @@ enum LogIssueScanner {
             let range = NSRange(lower.startIndex..., in: lower)
             let actionable = zeroCount.stringByReplacingMatches(in: lower, range: range, withTemplate: "")
             // [touch] lines are diagnostics, not failures: kept so a report shows
-            // where a tap that did nothing was sent.
+            // where a tap that did nothing was sent. The EA service's and licence's
+            // lines say whether a game talked to the local EA service and what its
+            // licence was asked for.
             let severity = errors.contains(where: actionable.contains) ? 2
-                : (failures.contains(where: actionable.contains) || lower.contains("[touch] tap") || lower.contains("[memory] session")) ? 1 : 0
+                : (failures.contains(where: actionable.contains) || diagnostics.contains(where: lower.contains)) ? 1 : 0
             guard severity > 0 else { continue }
             // JIT problems get their own group, whichever log they came from.
             let lineSource: LogIssue.Source = lower.contains("jit") ? .jit : source
