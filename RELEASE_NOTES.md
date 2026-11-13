@@ -74,4 +74,4 @@
 - The bug report has a "Missing DLLs:" line listing what the last Windows session could not find, from Wine's own messages: a DLL a program imports that is missing or failed to load, a function with no implementation, an unimplemented function that was called, and a DLL looked up in system32 or syswow64 that is not there. When there are none, the line says so.
 
 ### Release
-- Updated the application version to 2.2.0 (build 71).
+- Updated the application version to 2.2.1 (build 72).
