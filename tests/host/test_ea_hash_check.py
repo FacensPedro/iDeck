@@ -16,14 +16,20 @@ class EAHashCheckTests(unittest.TestCase):
         self.assertIn('key.lowercased().replacingOccurrences(of: "\\\\", with: "\\\\\\\\")', EA)
 
     def test_reads_the_values_the_prefix_records(self):
-        for name in ("ProductId", ".windows-serial"):
+        for name in ("ProductId", "EAVolumeSerial.fileName", "displayDevices(registry)"):
             self.assertIn(name, EA)
-        # Hardware\\Description is volatile in Wine: never compared with system.reg.
-        for name in ("BaseBoardManufacturer", "BIOSVendor", "ProcessorNameString", "MatchingDeviceId"):
+        # Hardware\\Description is volatile in Wine, and without a mount manager
+        # .windows-serial is never read: neither is compared.
+        for name in ("BaseBoardManufacturer", "BIOSVendor", "ProcessorNameString", ".windows-serial"):
             self.assertNotIn(name, EA)
 
     def test_report_shows_the_hashed_text(self):
-        self.assertIn('let hashed = "hashed \\"" + profile.shownHashInput(version: hashVersion) + "\\""', EA)
+        self.assertIn('var notes = ["hashed \\"" + profile.shownHashInput(version: hashVersion) + "\\""]', EA)
+
+    def test_display_adapters_come_from_the_enum_keys(self):
+        self.assertIn('let enumPrefix = "[system\\\\\\\\currentcontrolset\\\\\\\\enum\\\\\\\\"', EA)
+        self.assertIn('let displayClass = "{4d36e968-e325-11ce-bfc1-08002be10318}"', EA)
+        self.assertIn("static func firstString(_ quoted: Substring) -> String {", EA)
 
 
 if __name__ == "__main__":

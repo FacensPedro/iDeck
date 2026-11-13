@@ -132,8 +132,16 @@ enum EAHardware {
     /// and FEX will report them, then the overrides file.
     static func profile(drive: URL, gpuVendor: UInt16, gpuDevice: UInt16, avx: Bool) -> EAHardwareProfile {
         var profile = EAHardwareProfile()
-        if let created = (try? drive.resourceValues(forKeys: [.creationDateKey]))?.creationDate {
+        // C:\'s creation time as Wine reads it: the folder's birth time from stat().
+        var folder = stat()
+        if stat(drive.path, &folder) == 0 {
+            profile.osInstallDate = EAHardwareProfile.wmiDate(seconds: Int(folder.st_birthtimespec.tv_sec),
+                                                              nanoseconds: Int(folder.st_birthtimespec.tv_nsec))
+        } else if let created = (try? drive.resourceValues(forKeys: [.creationDateKey]))?.creationDate {
             profile.osInstallDate = EAHardwareProfile.wmiDate(created)
+        }
+        if let serial = volumeSerial(prefix: drive.deletingLastPathComponent(), drive: drive) {
+            profile.volumeSerial = String(format: "%08x", serial)
         }
         // As Wine 11's wbemprox reports it: the display device's HardwareID, with no
         // instance suffix (EAHardwareProfile.gpuPNPDeviceID).
@@ -154,6 +162,32 @@ enum EAHardware {
             }
         }
         return profile
+    }
+
+    /// C:'s volume serial in this prefix (EAVolumeSerial): the value stored there, written
+    /// here the way ntdll would when the prefix has none yet, mixed with C:'s letter.
+    static func volumeSerial(prefix: URL, drive: URL) -> UInt32? {
+        let file = prefix.appendingPathComponent(EAVolumeSerial.fileName)
+        var base = (try? Data(contentsOf: file)).map(EAVolumeSerial.stored) ?? 0
+        if base == 0 {
+            base = UInt32.random(in: 1..<UInt32.max)
+            guard (try? Data(String(format: "%08x\n", base).utf8).write(to: file, options: .atomic)) != nil else { return nil }
+        }
+        return EAVolumeSerial.serial(base: base, letter: driveLetter(prefix: prefix, drive: drive))
+    }
+
+    /// The letter ntdll's find_dos_device gives C:\: the first of dosdevices/a: to z:
+    /// that is the same directory as drive_c, 0 when none is.
+    static func driveLetter(prefix: URL, drive: URL) -> UInt8 {
+        var target = stat()
+        guard stat(drive.path, &target) == 0 else { return 0 }
+        for letter in UInt8(ascii: "a")...UInt8(ascii: "z") {
+            let path = prefix.path + "/dosdevices/" + String(UnicodeScalar(letter)) + ":"
+            var entry = stat()
+            if stat(path, &entry) == 0, (entry.st_mode & S_IFMT) == S_IFDIR,
+               entry.st_dev == target.st_dev, entry.st_ino == target.st_ino { return letter }
+        }
+        return 0
     }
 }
 

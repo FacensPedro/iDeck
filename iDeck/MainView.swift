@@ -118,6 +118,10 @@ struct SteamGameArtworkView: View {
         func append(_ url: URL?) {
             if let url, !urls.contains(url) { urls.append(url) }
         }
+        if game.appID == 407530 {
+            // ARK: Survival of the Fittest publishes its vertical artwork as portrait.png.
+            append(URL(string: "https://cdn.cloudflare.steamstatic.com/steam/apps/407530/portrait.png"))
+        }
         if let asset = game.libraryCapsule,
            asset.utf8.count <= 256,
            !asset.isEmpty,
@@ -756,7 +760,7 @@ struct WindowsWorkspaceView: View {
             VStack(alignment: .leading, spacing: 6) {
                 ZStack {
                     Button { selectedGOGGame = game } label: {
-                        GOGArtworkView(urls: game.artworkCandidates, fallbackColor: secondaryColor)
+                        GOGArtworkView(urls: game.artworkCandidates, fallbackColor: secondaryColor, fill: true)
                             .libraryCoverFrame()
                             .blur(radius: installed == nil && gogLibrary.downloadProgress[game.id] == nil &&
                                   !gogLibrary.pausedDownloads.contains(game.id) && game.worksOnWindows ? Self.uninstalledCoverBlur : 0)
@@ -861,7 +865,7 @@ struct WindowsWorkspaceView: View {
             VStack(alignment: .leading, spacing: 6) {
                 ZStack {
                     Button { selectedEpicGame = SelectedEpicGame(id: game.appName) } label: {
-                        GOGArtworkView(urls: [game.cover].compactMap { $0 }, fallbackColor: secondaryColor)
+                        GOGArtworkView(urls: [game.cover].compactMap { $0 }, fallbackColor: secondaryColor, fill: true)
                             .libraryCoverFrame()
                             .blur(radius: installed == nil && download == nil ? Self.uninstalledCoverBlur : 0)
                     }
@@ -969,7 +973,7 @@ struct WindowsWorkspaceView: View {
     }
 
     private func launchEpicGame(_ game: EpicInstalledGame) {
-        let executable = EpicLibrary.drive.appendingPathComponent(game.programPath)
+        let executable = game.launchURL(in: EpicLibrary.drive)
         let savedProfile = windowsLibrary.profile(for: "epic:\(game.appName)", title: game.title)
         // StikDebug opens on the tap, while Epic's launch token is being fetched
         // (that request took seconds and JIT activation only started after it).
@@ -2256,7 +2260,7 @@ extension WindowsWorkspaceView {
                     }
                 }
                 .padding(.vertical, 10)
-                // Room for the selected tile's 1.08 scale, border and glow, which the
+                // Room for the selected tile's 1.08 scale and border, which the
                 // scroll view's edge would otherwise cut on the first tile.
                 .padding(.horizontal, 14)
             }
@@ -2281,9 +2285,8 @@ extension WindowsWorkspaceView {
                 .frame(width: shelfTileWidth, height: shelfTileHeight)
                 .clipShape(RoundedRectangle(cornerRadius: 12))
                 .overlay(RoundedRectangle(cornerRadius: 12)
-                    .stroke(selected ? textColor : lineColor, lineWidth: selected ? 2 : 1))
+                    .strokeBorder(selected ? textColor : lineColor, lineWidth: selected ? 2 : 1))
                 .scaleEffect(selected ? 1.08 : 1)
-                .shadow(color: selected ? accentColor.opacity(0.45) : .clear, radius: 10)
         }
         .buttonStyle(.plain)
         .id(item)

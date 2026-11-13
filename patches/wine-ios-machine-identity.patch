@@ -1,0 +1,133 @@
+diff --git a/dlls/ntdll/unix/file.c b/dlls/ntdll/unix/file.c
+index 60f8b74..11e5b65 100644
+--- a/dlls/ntdll/unix/file.c
++++ b/dlls/ntdll/unix/file.c
+@@ -5591,8 +5591,12 @@ NTSTATUS WINAPI NtQueryAttributesFile( const OBJECT_ATTRIBUTES *attr, FILE_BASIC
+  * $WINEPREFIX/.madeira-volume-serial, so it is stable across relaunches and
+  * app updates and never derived from container paths.  The drive letter is
+  * mixed in so that two drive letters get different serials.  0 and ~0 are
+- * never returned.  64-bit callers never get here: they keep upstream's
+- * answers exactly.
++ * never returned.
++ *
++ * iDeck: 64-bit callers get the same serial.  An EA game's activation library
++ * hashes C:'s serial into the machine hash its licence is bound to, and with
++ * GetVolumeInformation failing for a 64-bit game that hash was undefined; the
++ * app computes the same value from the stored one for the licence it asks for.
+  */
+ static DWORD ios_wow_volume_serial( WCHAR letter )
+ {
+@@ -5892,7 +5896,7 @@ NTSTATUS WINAPI NtQueryInformationFile( HANDLE handle, IO_STATUS_BLOCK *io,
+             if (!get_mountmgr_fs_info( handle, fd, &drive, sizeof(drive) ))
+                 info->VolumeSerialNumber = drive.serial;
+ #ifdef WINE_IOS
+-            else if (NtCurrentTeb()->WowTebOffset)   /* WoW64 callers only, see ios_wow_volume_serial */
++            else   /* see ios_wow_volume_serial */
+                 info->VolumeSerialNumber = ios_wow_volume_serial( drive.letter );
+ #endif
+             memset( &info->FileId, 0, sizeof(info->FileId) );
+@@ -8809,10 +8813,20 @@ NTSTATUS WINAPI NtQueryVolumeInformationFile( HANDLE handle, IO_STATUS_BLOCK *io
+         if (get_mountmgr_fs_info( handle, fd, drive, sizeof(data) ))
+         {
+ #ifdef WINE_IOS
+-            /* WoW64 callers only (see ios_wow_volume_serial): a prefix-stored
+-             * serial and an empty label instead of STATUS_NOT_IMPLEMENTED. */
+-            if (NtCurrentTeb()->WowTebOffset && (info->VolumeSerialNumber = ios_wow_volume_serial( drive->letter )))
++            /* See ios_wow_volume_serial: a prefix-stored serial and an empty
++             * label instead of STATUS_NOT_IMPLEMENTED. */
++            if ((info->VolumeSerialNumber = ios_wow_volume_serial( drive->letter )))
+             {
++                /* One line every few seconds: what a licence check was told. */
++                static time_t reported_at;
++                time_t now = time( NULL );
++
++                if (!reported_at || now - reported_at >= 5)
++                {
++                    reported_at = now;
++                    ERR( "ios volume serial %08x for drive %c: (%s caller)\n", (unsigned int)info->VolumeSerialNumber,
++                         drive->letter ? (char)drive->letter : '?', NtCurrentTeb()->WowTebOffset ? "32-bit" : "64-bit" );
++                }
+                 info->VolumeCreationTime.QuadPart = 0;
+                 info->VolumeLabelLength = 0;
+                 info->SupportsObjects = TRUE;
+diff --git a/dlls/ntdll/unix/system.c b/dlls/ntdll/unix/system.c
+index 282ef39..94e2f0a 100644
+--- a/dlls/ntdll/unix/system.c
++++ b/dlls/ntdll/unix/system.c
+@@ -2266,6 +2266,23 @@ static struct smbios_prologue *create_smbios_data(void)
+ 
+ #elif defined(__APPLE__)
+ 
++#ifdef WINE_IOS
++/* iDeck: what the SMBIOS table was built from, said in the log once every few
++ * seconds while it is queried. An EA game's licence is bound to a hash of the
++ * board and BIOS strings WMI reads from this table. */
++static char ios_smbios_identity[320] = "not built";
++
++static void ios_report_smbios_identity(void)
++{
++    static time_t reported_at;
++    time_t now = time( NULL );
++
++    if (reported_at && now - reported_at < 5) return;
++    reported_at = now;
++    ERR( "ios smbios: %s (%s caller)\n", ios_smbios_identity, NtCurrentTeb()->WowTebOffset ? "32-bit" : "64-bit" );
++}
++#endif
++
+ static struct smbios_prologue *get_smbios_from_iokit(void)
+ {
+     io_service_t service;
+@@ -2357,7 +2374,12 @@ static struct smbios_prologue *create_smbios_data(void)
+         /* wineboot requires SMBIOS 2.5 or higher tables. */
+         if ((ret->major_version >= 3) ||
+             (ret->major_version == 2 && ret->minor_version >= 5))
++        {
++#ifdef WINE_IOS
++            snprintf( ios_smbios_identity, sizeof(ios_smbios_identity), "the AppleSMBIOS table" );
++#endif
+             return ret;
++        }
+         else
+             free(ret);
+     }
+@@ -2368,7 +2390,12 @@ static struct smbios_prologue *create_smbios_data(void)
+ 
+     platform_expert = IOServiceGetMatchingService(0, IOServiceMatching("IOPlatformExpertDevice"));
+     if (!platform_expert)
++    {
++#ifdef WINE_IOS
++        snprintf( ios_smbios_identity, sizeof(ios_smbios_identity), "no IOPlatformExpertDevice, no table" );
++#endif
+         return NULL;
++    }
+ 
+     cf_manufacturer = IORegistryEntryCreateCFProperty(platform_expert, CFSTR("manufacturer"), kCFAllocatorDefault, 0);
+     cf_model = IORegistryEntryCreateCFProperty(platform_expert, CFSTR("model"), kCFAllocatorDefault, 0);
+@@ -2378,6 +2405,10 @@ static struct smbios_prologue *create_smbios_data(void)
+     cf_to_string(cf_manufacturer, manufacturer, sizeof(manufacturer));
+     cf_to_string(cf_model, model, sizeof(model));
+     cf_to_string(cf_serial_number, serial_number, sizeof(serial_number));
++#ifdef WINE_IOS
++    snprintf( ios_smbios_identity, sizeof(ios_smbios_identity), "manufacturer \"%s\" model \"%s\" serial %s",
++              manufacturer, model, serial_number[0] ? "present" : "absent" );
++#endif
+ 
+     if (cf_uuid_string)
+     {
+@@ -2464,9 +2495,15 @@ static NTSTATUS get_firmware_info( SYSTEM_FIRMWARE_TABLE_INFORMATION *sfti, ULON
+         if (!smbios_data)
+         {
+             struct smbios_prologue *data = create_smbios_data();
++#ifdef WINE_IOS
++            ios_report_smbios_identity();
++#endif
+             if (!data) return STATUS_NO_MEMORY;
+             if (InterlockedCompareExchangePointer( (void **)&smbios_data, data, NULL )) free( data );
+         }
++#ifdef WINE_IOS
++        ios_report_smbios_identity();
++#endif
+         len = sizeof(*smbios_data) + smbios_data->length;
+         sfti->TableBufferLength = len;
+         *required_len = offsetof( SYSTEM_FIRMWARE_TABLE_INFORMATION, TableBuffer[len] );

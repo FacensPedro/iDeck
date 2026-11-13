@@ -170,6 +170,11 @@ final class BugReportModel: ObservableObject {
     @Published private(set) var hasAppLog = false
     @Published var notice: String?
     private var scanGeneration = 0
+    /// The last Wine log's lines about an EA game's activation (EAActivationTrace).
+    private var eaTrace: [String] = []
+    private static var lastLauncherIsEA: Bool {
+        (UserDefaults.standard.string(forKey: "diagnostics.lastLauncher") ?? "").hasPrefix("EA")
+    }
 
     static var wineLogURL: URL? {
         FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?
@@ -186,8 +191,9 @@ final class BugReportModel: ObservableObject {
         hasWineLog = wineURL != nil
         hasAppLog = !appURLs.isEmpty
         let steamSession = UserDefaults.standard.bool(forKey: "session.lastWasSteam")
+        let eaSession = Self.lastLauncherIsEA
         let generation = scanGeneration
-        let result = await Task.detached(priority: .userInitiated) { () -> ([LogIssue], Int32, String) in
+        let result = await Task.detached(priority: .userInitiated) { () -> ([LogIssue], Int32, String, [String]) in
             var issues: [LogIssue] = []
             let appText = appURLs.compactMap { try? WineLogClipboard.read(from: $0).text }.joined(separator: "\n")
             issues += LogIssueScanner.scan(appText, source: .app, steamSession: steamSession)
@@ -200,13 +206,15 @@ final class BugReportModel: ObservableObject {
                 }
                 diagnosis = wineURL.path.withCString { ideck_wine_log_diagnose($0) }
             }
-            return (issues.sorted { $0.severity > $1.severity }, diagnosis, missing)
+            let trace = eaSession ? (wineURL.map { EAActivationTrace.extract(from: $0) } ?? []) : []
+            return (issues.sorted { $0.severity > $1.severity }, diagnosis, missing, trace)
         }.value
         // Clearing logs while a read is in flight must not restore stale bugs.
         guard generation == scanGeneration, !Task.isCancelled else { return }
         issues = Self.liveJITIssues() + result.0
         wineFinding = Self.finding(for: result.1)
         missingModules = result.2
+        eaTrace = result.3
     }
 
     /// The JIT state of this process right now, as bugs: a missing debugger,
@@ -404,20 +412,29 @@ final class BugReportModel: ObservableObject {
             "Runtime: \(MadeiraBundleIdentity.isNative ? "native" : "interface-only")",
         ]
         lines += Self.environmentLines
-        if (UserDefaults.standard.string(forKey: "diagnostics.lastLauncher") ?? "").hasPrefix("EA"),
-           let facts = UserDefaults.standard.string(forKey: EALibrary.licenceFactsKey) {
+        var evidence: [String] = []
+        if Self.lastLauncherIsEA, let facts = UserDefaults.standard.string(forKey: EALibrary.licenceFactsKey) {
             lines.append("EA licence: " + facts)
             if let check = UserDefaults.standard.string(forKey: EALibrary.hashCheckKey) {
                 lines.append("EA hash check: " + check)
             }
+            lines.append("EA licence files: " + EAPrefixEvidence.licenceFiles(drive: EALibrary.drive))
             if selected.contains(where: { $0.line.contains("ActivationUI.exe") }) {
                 lines.append("EA: the game started ActivationUI.exe, EA's activation window: it did not accept the licence on disk.")
+            }
+            if !eaTrace.isEmpty {
+                evidence += ["", "EA activation trace (Wine log, oldest first):"] + eaTrace
+            }
+            let logs = EAPrefixEvidence.originLogs(drive: EALibrary.drive)
+            if !logs.isEmpty {
+                evidence += ["", "EA's own logs (C:\\ProgramData\\Origin\\Logs, newest first):"] + logs
             }
         }
         if let missingModules { lines.append("Missing DLLs: " + missingModules) }
         if let wineFinding { lines.append("Diagnosis: " + wineFinding) }
         lines.append("")
         lines += selected.map(\.copyText)
+        lines += evidence
         return lines.joined(separator: "\n")
     }
 }
@@ -578,6 +595,145 @@ struct BugReportView: View {
         .onTapGesture {
             if isOpen { expanded.remove(issue.id) } else { expanded.insert(issue.id) }
         }
+    }
+}
+
+/// What an EA game's activation library did in the last Wine log: the licence files it
+/// opened, the WMI queries its machine hash is built from, the volume serial and SMBIOS
+/// identity ntdll answered with, the display adapter registered, and how
+/// ActivationUI.exe was started. A game that refuses its licence says nothing itself;
+/// these lines are what it read before it decided.
+enum EAActivationTrace {
+    static let limit = 140
+
+    /// Whether a lower-cased log line belongs in the trace.
+    static func matches(_ lower: String) -> Bool {
+        for word in [".dlf", "wbemprox", "[vgpu]", "ios volume serial", "ios smbios", "\\wbem:"] where lower.contains(word) { return true }
+        return lower.contains("activation") && (lower.contains("trace:process") || lower.contains("loaddll"))
+    }
+
+    static func capped(_ line: String) -> String {
+        line.count <= 400 ? line : String(line.prefix(400)) + " …"
+    }
+
+    /// A line that may carry an account's token or address (a command line, EA's own
+    /// logs): long tokens and e-mail addresses removed, capped in length.
+    static func sanitized(_ line: String) -> String {
+        var text = line
+        for (pattern, replacement) in [(#"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}"#, "<email>"),
+                                       (#"[A-Za-z0-9+/=_-]{24,}"#, "<redacted>")] {
+            text = text.replacingOccurrences(of: pattern, with: replacement, options: .regularExpression)
+        }
+        return capped(text)
+    }
+
+    /// What makes two trace lines the same: pointers and handles removed, numbers kept
+    /// (a licence file is named by its content id, which is all digits).
+    static func key(_ lower: String) -> String {
+        var text = lower
+        for pattern in [#"0x[0-9a-f]+"#, #"\b[0-9a-f]{12,}\b"#, #"\b(?=[0-9a-f]*[a-f])[0-9a-f]{8}\b"#] {
+            text = text.replacingOccurrences(of: pattern, with: "#", options: .regularExpression)
+        }
+        return text
+    }
+
+    /// The distinct matching lines of a log, oldest first, read in pieces from its
+    /// newest `maximumBytes`.
+    static func extract(from url: URL, maximumBytes: UInt64 = 32 * 1024 * 1024) -> [String] {
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return [] }
+        defer { try? handle.close() }
+        guard let size = try? handle.seekToEnd() else { return [] }
+        guard (try? handle.seek(toOffset: size > maximumBytes ? size - maximumBytes : 0)) != nil else { return [] }
+        var pending = Data()
+        var seen = Set<String>()
+        var lines: [String] = []
+        while lines.count < limit, let chunk = try? handle.read(upToCount: 1024 * 1024), !chunk.isEmpty {
+            pending.append(chunk)
+            guard let cut = pending.lastIndex(of: UInt8(ascii: "\n")) else {
+                // No line break in 8 MiB: not a text log worth keeping in memory.
+                if pending.count > 8 * 1024 * 1024 { pending.removeAll() }
+                continue
+            }
+            let text = String(decoding: pending[pending.startIndex..<cut], as: UTF8.self)
+            pending = Data(pending[pending.index(after: cut)...])
+            for raw in text.split(separator: "\n") where lines.count < limit {
+                let lower = raw.lowercased()
+                guard matches(lower), seen.insert(key(lower)).inserted else { continue }
+                let line = raw.trimmingCharacters(in: .whitespaces)
+                // Only a command line can carry a token; WMI queries and file names are kept whole.
+                lines.append(lower.contains("trace:process") ? sanitized(line) : capped(line))
+            }
+        }
+        return lines
+    }
+}
+
+/// What the prefix itself holds about an EA game's activation: the licence files on
+/// disk and the newest lines of the logs EA's own programs (ActivationUI.exe) wrote in
+/// C:\ProgramData\Origin\Logs.
+enum EAPrefixEvidence {
+    static let logFolder = ["ProgramData", "Origin", "Logs"]
+
+    /// A folder below `drive` by its Windows names, whatever their case on disk.
+    static func folder(drive: URL, components: [String]) -> URL? {
+        var url = drive
+        for name in components {
+            guard let next = EALicense.child(of: url, named: name) else { return nil }
+            url = next
+        }
+        return url
+    }
+
+    /// The licence folder's files with their sizes.
+    static func licenceFiles(drive: URL) -> String {
+        let licences = EALicense.folder(drive: drive)
+        guard let names = try? FileManager.default.contentsOfDirectory(atPath: licences.path), !names.isEmpty else { return "none" }
+        return names.sorted().prefix(12).map { name -> String in
+            let attributes = try? FileManager.default.attributesOfItem(atPath: licences.appendingPathComponent(name).path)
+            guard let size = (attributes?[.size] as? NSNumber)?.intValue else { return name }
+            return "\(name) \(size) B"
+        }.joined(separator: ", ")
+    }
+
+    /// A log's text without markup: tags and the common entities removed.
+    static func plainText(_ data: Data) -> String {
+        // EA's logs are UTF-8 or UTF-16 (a zero in the second byte).
+        let utf16 = data.count >= 2 && data[data.startIndex + 1] == 0
+        var text = utf16 ? (String(data: data, encoding: .utf16LittleEndian) ?? "") : String(decoding: data, as: UTF8.self)
+        text = text.replacingOccurrences(of: #"<(br|/tr|/p|/div|/li)[^>]{0,80}>"#, with: "\n", options: [.regularExpression, .caseInsensitive])
+        text = text.replacingOccurrences(of: #"<[^>]{0,300}>"#, with: " ", options: .regularExpression)
+        for (entity, character) in [("&nbsp;", " "), ("&quot;", "\""), ("&lt;", "<"), ("&gt;", ">"), ("&amp;", "&")] {
+            text = text.replacingOccurrences(of: entity, with: character)
+        }
+        return text
+    }
+
+    /// The newest files of EA's log folder: name, size and time, then each one's last lines.
+    static func originLogs(drive: URL, files: Int = 4, linesPerFile: Int = 25) -> [String] {
+        guard let logs = folder(drive: drive, components: logFolder),
+              let names = try? FileManager.default.contentsOfDirectory(atPath: logs.path) else { return [] }
+        let entries = names.compactMap { name -> (name: String, size: Int, date: Date)? in
+            let attributes = try? FileManager.default.attributesOfItem(atPath: logs.appendingPathComponent(name).path)
+            guard attributes?[.type] as? FileAttributeType == .typeRegular else { return nil }
+            return (name, (attributes?[.size] as? NSNumber)?.intValue ?? 0, attributes?[.modificationDate] as? Date ?? .distantPast)
+        }.sorted { $0.date > $1.date }
+        let stamp = ISO8601DateFormatter()
+        stamp.timeZone = .current
+        var lines: [String] = []
+        for entry in entries.prefix(files) {
+            lines.append("\(entry.name), \(entry.size) B, \(stamp.string(from: entry.date))")
+            // The reader page EA copies next to its logs is not a log.
+            guard entry.size > 0, !entry.name.lowercased().hasSuffix("reader.html") else { continue }
+            guard let handle = try? FileHandle(forReadingFrom: logs.appendingPathComponent(entry.name)) else { continue }
+            defer { try? handle.close() }
+            let tail: UInt64 = 64 * 1024
+            _ = try? handle.seek(toOffset: UInt64(entry.size) > tail ? UInt64(entry.size) - tail : 0)
+            guard let data = try? handle.readToEnd() else { continue }
+            let text = plainText(data).split(whereSeparator: \.isNewline)
+                .map { $0.split(whereSeparator: \.isWhitespace).joined(separator: " ") }.filter { !$0.isEmpty }
+            lines += text.suffix(linesPerFile).map { "  " + EAActivationTrace.sanitized($0) }
+        }
+        return lines
     }
 }
 

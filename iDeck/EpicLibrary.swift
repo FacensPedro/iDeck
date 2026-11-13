@@ -58,6 +58,22 @@ struct EpicInstalledGame: Codable, Sendable {
     /// The build's content keys (encrypted builds only), to read the saved manifest again.
     var secrets: [String: String]?
     var programPath: String { folder + "/" + launchExe }
+
+    func launchURL(in drive: URL) -> URL {
+        let manifestURL = drive.appendingPathComponent(programPath)
+        let relativePath: String
+        switch (title.lowercased(), manifestURL.lastPathComponent.lowercased()) {
+        case ("maneater", "maneater.exe"):
+            relativePath = "Maneater/Binaries/Win64/Maneater-Win64-Shipping.exe"
+        case ("borderlands 2", "launcher.exe"):
+            relativePath = "Binaries/Win32/Borderlands2.exe"
+        default:
+            return manifestURL
+        }
+        let binary = drive.appendingPathComponent(folder).appendingPathComponent(relativePath)
+        return (try? binary.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true
+            ? binary : manifestURL
+    }
 }
 
 /// A DLC the account owns that has files to download (Epic lists it as an asset).

@@ -1,9 +1,8 @@
 ## What's Changed
 ### EA app
-- Fixed EA games refusing their licence and opening EA's activation window (ActivationUI.exe), seen with Dragon Age: Inquisition. The licence is bound to a hash of the machine that includes the processor's feature flags, and the flags iDeck hashed did not match what the x86 emulator (FEX) reports to the game: one bit (Self Snoop) differed, so the game computed a different hash than the one the licence was issued for. iDeck now uses FEX's exact values; the licence is renewed with the matching hash at the next launch.
-- The board and BIOS manufacturer and the board serial number in the hash are now read from the device the same way Wine reads them, instead of being assumed.
-- Games with the newest activation libraries hash the graphics card's full PNP id again; 2.3.2 had cut it short for them as well.
-- Bug reports for EA games now show the exact text the licence hash was built from (a device serial number is never shown) and the local EA service's activity.
+- EA games that refuse their licence and open EA's activation window (ActivationUI.exe), seen with Dragon Age: Inquisition: the licence is bound to a hash of the machine that includes the serial number of drive C:, and on iOS a 64-bit game could not read that serial at all. iDeck's Wine now answers 64-bit programs with the same serial 32-bit programs already got, and the licence is asked for with that serial. The licence is renewed at the next launch.
+- The Windows install date in the hash is now read exactly as Wine reads it (the birth time of drive C:'s folder), without rounding.
+- Bug reports for EA games now show what the game's activation library did: the licence files it opened, the hardware queries it made, the volume serial and board identity Wine answered with, how ActivationUI.exe was started, the licence files on disk and the last lines of EA's own activation logs. Account tokens and e-mail addresses are removed from those lines.
 
 ### Release
-- Updated the application version to 2.3.3 (build 75).
+- Updated the application version to 2.3.4 (build 76).

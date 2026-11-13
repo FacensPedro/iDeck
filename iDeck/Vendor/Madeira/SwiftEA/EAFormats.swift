@@ -947,7 +947,9 @@ struct EAHardwareProfile: Codable, Equatable {
     var osInstallDate = "20260101000000.000000+000"
     /// Win32_OperatingSystem.SerialNumber: the prefix's ProductId.
     var osSerial = "12345-oem-0000001-54321"
-    /// GetVolumeInformation's serial for C:, 8 hex digits; without mountmgr it is 0.
+    /// GetVolumeInformation's serial for C:, 8 hex digits. iOS has no mount manager, so
+    /// ntdll answers with a value kept in the prefix (EAVolumeSerial); the launch fills
+    /// it in, and this default only stands where the prefix has none.
     var volumeSerial = "00000000"
     /// Win32_VideoController.PNPDeviceID as Wine 11's wbemprox answers it: the display
     /// device's first HardwareID (SetupAPI), which win32u writes without an instance
@@ -1029,6 +1031,17 @@ struct EAHardwareProfile: Codable, Equatable {
                       c.hour ?? 0, c.minute ?? 0, c.second ?? 0, milliseconds * 1000)
     }
 
+    /// The same from a file's birth time as stat() gives it: whole seconds and
+    /// nanoseconds, with no rounding through a floating-point date on the way.
+    static func wmiDate(seconds: Int, nanoseconds: Int) -> String {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        let c = calendar.dateComponents([.year, .month, .day, .hour, .minute, .second],
+                                        from: Date(timeIntervalSince1970: TimeInterval(seconds)))
+        return String(format: "%04d%02d%02d%02d%02d%02d.%06d+000", c.year ?? 1970, c.month ?? 1, c.day ?? 1,
+                      c.hour ?? 0, c.minute ?? 0, c.second ?? 0, (nanoseconds / 1_000_000) * 1000)
+    }
+
     /// The graphics card's part of the hash: before version 4 the PNPDeviceID up to its
     /// last backslash, from version 4 all of it (Maxima's tested versions).
     static func hashedGPU(_ pnpDeviceID: String, version: Int) -> String {
@@ -1042,6 +1055,33 @@ struct EAHardwareProfile: Codable, Equatable {
     static func cpuECX(avx: Bool) -> UInt32 {
         let base: UInt32 = 0x82D8_230F
         return avx ? base | 1 << 12 | 1 << 26 | 1 << 27 | 1 << 28 | 1 << 29 : base
+    }
+}
+
+/// A drive's volume serial as Madeira's ntdll answers it on iOS, where no mount manager
+/// runs (wine: dlls/ntdll/unix/file.c, ios_wow_volume_serial): a random value kept in
+/// `<prefix>/.madeira-volume-serial`, mixed with the drive letter by FNV-1a. iDeck's
+/// Wine gives it to 64-bit programs as well (patches/wine-ios-machine-identity.patch).
+enum EAVolumeSerial {
+    static let fileName = ".madeira-volume-serial"
+
+    /// The stored value as ntdll reads it: strtoul, base 16, of the file's first 15 bytes.
+    static func stored(_ contents: Data) -> UInt32 {
+        let text = String(decoding: contents.prefix(15), as: UTF8.self)
+        return UInt32(truncatingIfNeeded: strtoul(text, nil, 16))
+    }
+
+    /// The serial for a drive letter ("c" for C:, 0 when ntdll finds none).
+    static func serial(base: UInt32, letter: UInt8) -> UInt32 {
+        guard base != 0 else { return 0 }
+        var hash: UInt32 = 2_166_136_261
+        for index in 0..<4 {
+            hash ^= (base >> UInt32(index * 8)) & 0xFF
+            hash = hash &* 16_777_619
+        }
+        hash ^= UInt32(letter)
+        hash = hash &* 16_777_619
+        return hash == 0 || hash == UInt32.max ? base : hash
     }
 }
 
