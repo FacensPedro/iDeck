@@ -105,6 +105,7 @@
 		F3A0000000000000000000B4 /* SteamRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A0000000000000000000B4 /* SteamRuntime.swift */; };
 		F3A0000000000000000000B5 /* IDeckDockGlue.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A0000000000000000000B5 /* IDeckDockGlue.swift */; };
 		F3A000000000000000000015 /* ResourceGovernor.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000015 /* ResourceGovernor.swift */; };
+		F3A0000000000000000000C1 /* SessionCompatibility.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A0000000000000000000C1 /* SessionCompatibility.swift */; };
 		F3A000000000000000000014 /* GOGContentSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000014 /* GOGContentSystem.swift */; };
 		F3A000000000000000000001 /* BugReportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000001 /* BugReportView.swift */; };
 		999999999999999999999915 /* Localization.swift in Sources */ = {isa = PBXBuildFile; fileRef = 999999999999999999999907 /* Localization.swift */; };
@@ -247,6 +248,7 @@
 		F4A0000000000000000000B4 /* SteamRuntime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Vendor/Madeira/SteamRuntime.swift"; sourceTree = "<group>"; };
 		F4A0000000000000000000B5 /* IDeckDockGlue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MadeiraDock/IDeckDockGlue.swift"; sourceTree = "<group>"; };
 		F4A000000000000000000015 /* ResourceGovernor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResourceGovernor.swift; sourceTree = "<group>"; };
+		F4A0000000000000000000C1 /* SessionCompatibility.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionCompatibility.swift; sourceTree = "<group>"; };
 		F4A000000000000000000014 /* GOGContentSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GOGContentSystem.swift; sourceTree = "<group>"; };
 		F4A000000000000000000001 /* BugReportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BugReportView.swift; sourceTree = "<group>"; };
 		999999999999999999999907 /* Localization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Localization.swift; sourceTree = "<group>"; };
@@ -422,6 +424,7 @@
 				F3A0000000000000000000B4 /* SteamRuntime.swift in Sources */,
 				F3A0000000000000000000B5 /* IDeckDockGlue.swift in Sources */,
 				F3A000000000000000000015 /* ResourceGovernor.swift in Sources */,
+				F3A0000000000000000000C1 /* SessionCompatibility.swift in Sources */,
 				F3A000000000000000000014 /* GOGContentSystem.swift in Sources */,
 				F3A000000000000000000001 /* BugReportView.swift in Sources */,
 				999999999999999999999915 /* Localization.swift in Sources */,
@@ -587,6 +590,7 @@
 				F4A0000000000000000000B4 /* SteamRuntime.swift */,
 				F4A0000000000000000000B5 /* IDeckDockGlue.swift */,
 				F4A000000000000000000015 /* ResourceGovernor.swift */,
+				F4A0000000000000000000C1 /* SessionCompatibility.swift */,
 				F4A000000000000000000014 /* GOGContentSystem.swift */,
 				F4A000000000000000000001 /* BugReportView.swift */,
 				999999999999999999999907 /* Localization.swift */,

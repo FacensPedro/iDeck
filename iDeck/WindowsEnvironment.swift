@@ -267,7 +267,11 @@ class WindowsEnvironment {
         // print before a failure, and a game that failed cannot be asked to fail again
         // with logging on. Madeira's Wine thread configures WINEDEBUG from this flag.
         setenv("MADEIRA_DEBUG_VERBOSE", "1", 1)
-        setenv("WINEDEBUG", "err+all", 1)
+        // Errors from every channel, without the fixme/warn lines Wine repeats for
+        // every call of an unimplemented function (thousands per minute in some games):
+        // they fill madeira-log.txt and make each scan of it slower. A game's own
+        // config (GameRecommendations, env.WINEDEBUG) still overrides this.
+        setenv("WINEDEBUG", "err+all,fixme-all,warn-all", 1)
         setenv("WINEARCH", "win64", 1)
         setenv("STEAM_COMPAT_CLIENT_INSTALL_PATH", prefix + "/drive_c/Program Files (x86)/Steam", 1)
         
