@@ -2044,8 +2044,10 @@ private struct EpicGameDetailsSheet: View {
     private var title: String { epic.game(appName)?.title ?? epic.installed[appName]?.title ?? "Epic Games" }
 
     private var sizeText: String? {
-        let bytes = epic.installed[appName]?.installBytes ?? epic.manifestSizes[appName] ?? 0
-        return bytes > 0 ? ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file) : nil
+        let installedBytes = epic.installed[appName]?.installBytes
+        guard let bytes = installedBytes ?? epic.manifestSizes[appName], bytes > 0 else { return nil }
+        let formatted = ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
+        return installedBytes == nil ? tr("Download: %@", formatted) : tr("Installed: %@", formatted)
     }
 
     var body: some View {
