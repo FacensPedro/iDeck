@@ -23,9 +23,9 @@ class DownloadLogTests(unittest.TestCase):
 
     def test_ea_range_memory_stays_bounded(self):
         speed = (ROOT / "iDeck/DownloadSpeed.swift").read_text()
-        self.assertIn("static let eaRangeRequests = 40", speed)
+        self.assertIn("static let eaRangeRequests = 20", speed)
         # 32 ranges of 4 MB: at most 128 MB held while downloading.
-        self.assertIn("static let segmentBytes: Int64 = 4 << 20",
+        self.assertIn("static let segmentBytes: Int64 = 8 << 20",
                       (ROOT / "iDeck/Vendor/Madeira/SwiftEA/EADownloader.swift").read_text())
 
 

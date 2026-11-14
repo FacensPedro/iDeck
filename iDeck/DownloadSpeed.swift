@@ -3,32 +3,33 @@ import Foundation
 /// iDeck uses bounded, predictable download queues, sized per store.
 enum DownloadSpeed {
     /// Parallel Steam chunk requests on the device (a chunk is about 1 MB, so 48 keep
-    /// about 64 MB in flight), and the connections one content server may hold.
-    static let steamChunks = 64
-    static let steamConnections = 96
+    /// about 48 MB in flight), and the connections one content server may hold. Valve fixes
+    /// the chunk size; only their number is iDeck's.
+    static let steamChunks = 48
+    static let steamConnections = 64
 
-    /// Epic chunks (about 1 MB each) fetched ahead of the writer: at most ~64 MB of
-    /// chunks in flight.
-    static let epicWindow = 64
+    /// Epic chunks (about 1 MB each) fetched ahead of the writer: at most ~48 MB of
+    /// chunks in flight. Epic fixes the chunk size.
+    static let epicWindow = 48
 
     /// EA: files fetched at once, ranges of one large file fetched at once, and the
     /// connections to EA's CDN they share.
-    static let eaFiles = 12
-    static let eaSegments = 32
-    static let eaConnections = 72
+    static let eaFiles = 10
+    static let eaSegments = 16
+    static let eaConnections = 56
     /// Whole-range requests in flight across all files (EARangeGate). Fewer than the
     /// connections, so none waits inside URLSession, where its timeout would run; the
     /// rest of the connections serve the small files' streams. Each holds one 4 MB range
-    /// until written: 40 keep at most 160 MB, only while downloading.
-    static let eaRangeRequests = 40
+    /// until written: with 8 MB ranges, 20 keep at most 160 MB, only while downloading.
+    static let eaRangeRequests = 20
 
     /// GOG: files fetched at once, and chunks of one file fetched ahead of its writer
     /// (they are written in order). A game that is one large archive used to download
     /// one chunk at a time. Connections cover both.
-    /// 8 files × 8 chunks: 64 chunks in flight.
+    /// 8 files × 6 chunks: 48 chunks in flight. GOG fixes the chunk size.
     static let gogFiles = 8
-    static let gogChunksPerFile = 8
-    static let gogConnections = 96
+    static let gogChunksPerFile = 6
+    static let gogConnections = 64
 }
 
     

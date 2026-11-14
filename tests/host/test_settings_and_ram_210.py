@@ -24,7 +24,7 @@ class SettingsAndRamTests(unittest.TestCase):
 
     def test_ram(self):
         self.assertIn("var memoryBudget = 64 << 20", read("iDeck/EpicDownloader.swift"))
-        self.assertIn("static let segmentBytes: Int64 = 4 << 20", read("iDeck/Vendor/Madeira/SwiftEA/EADownloader.swift"))
+        self.assertIn("static let segmentBytes: Int64 = 8 << 20", read("iDeck/Vendor/Madeira/SwiftEA/EADownloader.swift"))
         self.assertIn('NotificationCenter.default.post(name: Notification.Name("iDeckReleaseCaches"), object: nil)',
                       read("iDeck/SystemCoordinator.swift"))
 

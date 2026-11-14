@@ -14,9 +14,9 @@ class Release17Tests(unittest.TestCase):
 
     def test_download_speed_and_resumable_ea_pause(self):
         speed = repo_text("iDeck/DownloadSpeed.swift")
-        for line in ("static let steamChunks = 64", "static let epicWindow = 64", "static let eaFiles = 12",
-                     "static let eaSegments = 32", "static let eaConnections = 72", "static let gogFiles = 8",
-                     "static let gogChunksPerFile = 8", "static let gogConnections = 96"):
+        for line in ("static let steamChunks = 48", "static let epicWindow = 48", "static let eaFiles = 10",
+                     "static let eaSegments = 16", "static let eaConnections = 56", "static let gogFiles = 8",
+                     "static let gogChunksPerFile = 6", "static let gogConnections = 64"):
             self.assertIn(line, speed)
         ea = repo_text("iDeck/Vendor/Madeira/SwiftEA/EADownloader.swift")
         self.assertIn('".madeira-seg"', ea)
