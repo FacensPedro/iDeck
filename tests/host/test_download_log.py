@@ -23,9 +23,9 @@ class DownloadLogTests(unittest.TestCase):
 
     def test_ea_range_memory_stays_bounded(self):
         speed = (ROOT / "iDeck/DownloadSpeed.swift").read_text()
-        self.assertIn("static let eaRangeRequests = 32", speed)
+        self.assertIn("static let eaRangeRequests = 20", speed)
         # 32 ranges of 4 MB: at most 128 MB held while downloading.
-        self.assertIn("static let segmentBytes: Int64 = 4 << 20",
+        self.assertIn("static let segmentBytes: Int64 = 8 << 20",
                       (ROOT / "iDeck/Vendor/Madeira/SwiftEA/EADownloader.swift").read_text())
 
 
@@ -47,3 +47,12 @@ class StallAndSizeTests(unittest.TestCase):
         view = (ROOT / "iDeck/MainView.swift").read_text()
         self.assertIn("game.displaySizeForWindows(installedBytes: measured, ownedDLC: steamLibrary.ownedDepotIDs)", view)
         self.assertIn(".onAppear { steamLibrary.loadOwnedDepots() }", view)
+
+
+class SessionProgramsTests(unittest.TestCase):
+    def test_bug_report_lists_programs_a_session_started(self):
+        report = (ROOT / "iDeck/BugReportView.swift").read_text()
+        self.assertIn("enum SessionProgramsTrace {", report)
+        self.assertIn('lower.contains("trace:process") && lower.contains(" cmdline ")', report)
+        self.assertIn('"Programs the last session started (Wine log, oldest first):"', report)
+        self.assertIn('"[dock-installers]", "[steam-redist]"', report)

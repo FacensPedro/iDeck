@@ -1,12 +1,12 @@
 ## What's Changed
-### Steam
-- A game's size now counts the DLC your account owns, which the install downloads with the game. Assassin's Creed Origins showed 52.44 GB but asked for 76.5 GB free: the difference was the owned DLC. The shown size and the space the install asks for now agree.
+### EA app
+- EA downloads ask for large files in 8 MB pieces (were 4 MB), half as many requests, so less time goes to waiting for each one. 16 pieces of a file and 20 overall are fetched at once (were 24 and 32); at most 160 MB is held, only while downloading.
 
-### Epic Games
-- Optional content inside a game's own build (DLC Epic ships with the game, high-resolution textures, voice languages) is now listed under Optional content on the game's page, with its size, and installed or uninstalled one by one, like Steam's DLC. The first install stays the base game only. DLC Epic sells as its own item keeps its DLCs list.
+### Steam, GOG and Epic Games
+- Their piece sizes are fixed by each store's servers, so only how many are fetched at once can change; that stays as in 2.4.3 (48 at once).
 
 ### Bugs & logs
-- When a download receives no data for 20 seconds, iDeck's log says so, with the game and how far it got, and again when data flows again. Bug reports show when and for how long a download stood still.
+- Bug reports list the programs the last Windows session started, oldest first, from Wine's log: what a game installs or runs at its first start (Visual C++, DirectX, PhysX, .NET, its own launcher or installer), each marked as installer or program. Steam's own install scripts for a game are listed too.
 
 ### Release
-- Updated the application version to 2.4.3 (build 82).
+- Updated the application version to 2.4.4 (build 83).

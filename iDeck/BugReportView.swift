@@ -93,7 +93,7 @@ enum LogIssueScanner {
     /// Counters that report no problem at all ("launch-client-error=0").
     private static let zeroCount = try! NSRegularExpression(pattern: #"\b(error|errors|failed|failures|missing)\s*[=:]\s*0\b"#)
     /// Informational lines a report keeps although they name no failure.
-    private static let diagnostics = ["[touch] tap", "[memory] session", "[ea-service]", "[ea-license]", "[jit-handoff]", "[download]", "[ea-download]"]
+    private static let diagnostics = ["[dock-installers]", "[steam-redist]", "[touch] tap", "[memory] session", "[ea-service]", "[ea-license]", "[jit-handoff]", "[download]", "[ea-download]"]
     /// Lines from iDeck's Steam client, downloads and Madeira Dock.
     private static let steamTags = ["[steam", "[dock", "steam client", "steam's", "madeira dock", "steamworks", "steam_api"]
 
@@ -172,6 +172,8 @@ final class BugReportModel: ObservableObject {
     private var scanGeneration = 0
     /// The last Wine log's lines about an EA game's activation (EAActivationTrace).
     private var eaTrace: [String] = []
+    /// The programs the last session started (SessionProgramsTrace).
+    private var programsTrace: [String] = []
     private static var lastLauncherIsEA: Bool {
         (UserDefaults.standard.string(forKey: "diagnostics.lastLauncher") ?? "").hasPrefix("EA")
     }
@@ -193,7 +195,7 @@ final class BugReportModel: ObservableObject {
         let steamSession = UserDefaults.standard.bool(forKey: "session.lastWasSteam")
         let eaSession = Self.lastLauncherIsEA
         let generation = scanGeneration
-        let result = await Task.detached(priority: .userInitiated) { () -> ([LogIssue], Int32, String, [String]) in
+        let result = await Task.detached(priority: .userInitiated) { () -> ([LogIssue], Int32, String, [String], [String]) in
             var issues: [LogIssue] = []
             let appText = appURLs.compactMap { try? WineLogClipboard.read(from: $0).text }.joined(separator: "\n")
             issues += LogIssueScanner.scan(appText, source: .app, steamSession: steamSession)
@@ -207,7 +209,8 @@ final class BugReportModel: ObservableObject {
                 diagnosis = wineURL.path.withCString { ideck_wine_log_diagnose($0) }
             }
             let trace = eaSession ? (wineURL.map { EAActivationTrace.extract(from: $0) } ?? []) : []
-            return (issues.sorted { $0.severity > $1.severity }, diagnosis, missing, trace)
+            let programs = wineURL.map { SessionProgramsTrace.extract(from: $0) } ?? []
+            return (issues.sorted { $0.severity > $1.severity }, diagnosis, missing, trace, programs)
         }.value
         // Clearing logs while a read is in flight must not restore stale bugs.
         guard generation == scanGeneration, !Task.isCancelled else { return }
@@ -215,6 +218,7 @@ final class BugReportModel: ObservableObject {
         wineFinding = Self.finding(for: result.1)
         missingModules = result.2
         eaTrace = result.3
+        programsTrace = result.4
     }
 
     /// The JIT state of this process right now, as bugs: a missing debugger,
@@ -448,6 +452,9 @@ final class BugReportModel: ObservableObject {
         }
         if let missingModules { lines.append("Missing DLLs: " + missingModules) }
         if let wineFinding { lines.append("Diagnosis: " + wineFinding) }
+        if !programsTrace.isEmpty {
+            evidence += ["", "Programs the last session started (Wine log, oldest first):"] + programsTrace
+        }
         lines.append("")
         lines += selected.map(\.copyText)
         lines += evidence
@@ -656,6 +663,16 @@ enum EAActivationTrace {
     /// The distinct matching lines of a log, oldest first, read in pieces from its
     /// newest `maximumBytes`.
     static func extract(from url: URL, maximumBytes: UInt64 = 32 * 1024 * 1024) -> [String] {
+        lines(of: url, maximumBytes: maximumBytes, limit: limit, matches: matches) { lower, line in
+            // Only a command line can carry a token; WMI queries and file names are kept whole.
+            lower.contains("trace:process") ? sanitized(line) : capped(line)
+        }
+    }
+
+    /// The distinct lines of a log that `matches` accepts, oldest first, each passed
+    /// through `shown`, read in pieces from the log's newest `maximumBytes`.
+    static func lines(of url: URL, maximumBytes: UInt64 = 32 * 1024 * 1024, limit: Int,
+                      matches: (String) -> Bool, shown: (String, String) -> String) -> [String] {
         guard let handle = try? FileHandle(forReadingFrom: url) else { return [] }
         defer { try? handle.close() }
         guard let size = try? handle.seekToEnd() else { return [] }
@@ -675,12 +692,39 @@ enum EAActivationTrace {
             for raw in text.split(separator: "\n") where lines.count < limit {
                 let lower = raw.lowercased()
                 guard matches(lower), seen.insert(key(lower)).inserted else { continue }
-                let line = raw.trimmingCharacters(in: .whitespaces)
-                // Only a command line can carry a token; WMI queries and file names are kept whole.
-                lines.append(lower.contains("trace:process") ? sanitized(line) : capped(line))
+                lines.append(shown(lower, raw.trimmingCharacters(in: .whitespaces)))
             }
         }
         return lines
+    }
+}
+
+/// The programs the last Windows session started, from Wine's process trace
+/// (CreateProcess's "app ... cmdline ..." line): what a game runs at its first start
+/// (Visual C++, DirectX, PhysX, .NET, its own launcher or installer), marked
+/// "installer" when the name says so.
+enum SessionProgramsTrace {
+    static let limit = 60
+    static let installerWords = ["setup", "install", "redist", "vcredist", "vc_redist", "dxsetup", "directx", "physx",
+                                 "dotnet", "ndp", "netfx", "msiexec", ".msi", "oalinst", "xnafx", "ue4prereq", "prereq",
+                                 "easyanticheat", "uplay", "ubisoftconnect", "eadm", "touchup"]
+
+    static func matches(_ lower: String) -> Bool { lower.contains("trace:process") && lower.contains(" cmdline ") }
+
+    /// "installer: <command line>" or "program: <command line>", tokens removed.
+    static func shown(_ lower: String, _ line: String) -> String {
+        var command = line
+        if let range = line.range(of: " cmdline ") { command = String(line[range.upperBound...]) }
+        command = command.replacingOccurrences(of: #"^L""#, with: "", options: .regularExpression)
+            .replacingOccurrences(of: #""$"#, with: "", options: .regularExpression)
+            .replacingOccurrences(of: "\\\\", with: "\\")
+        let commandLower = command.lowercased()
+        let kind = installerWords.contains(where: commandLower.contains) ? "installer" : "program"
+        return kind + ": " + EAActivationTrace.sanitized(command)
+    }
+
+    static func extract(from url: URL) -> [String] {
+        EAActivationTrace.lines(of: url, limit: limit, matches: matches, shown: shown)
     }
 }
 
