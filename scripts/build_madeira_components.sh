@@ -248,6 +248,12 @@ if [[ "$REBUILD" == "1" ]]; then
   else
     echo "ARM64EC extra modules built: $(grep -cv '^#\|^$' "$ROOT/scripts/arm64ec_extra_modules.txt")"
   fi
+  # Direct3D companion DLLs Wine does not implement (d3d11on12, d3d9on12, d3dcsx_42/43),
+  # as stand-ins that answer "not available" so a program importing one can start.
+  # Plain x64 code, which the ARM64EC farm loads like a game's own DLLs.
+  PATH="$MD/toolchains/llvm-mingw-20260421-ucrt-macos-universal/bin:$PATH" \
+    bash "$ROOT/scripts/build_d3d_stub_dlls.sh" "$MD/app/Madeira/arm64ec-windows" x86_64 ||
+    echo "WARNING: Direct3D stand-in DLLs not built for the x64 farm" >&2
   NTDLL_LOG="$MD/build/ntdll-unix/build-ideck.log"
   if ! bash "$MD/build/ntdll-unix/build.sh" 2>&1 | tee "$NTDLL_LOG"; then
     FAILED_UNIXLIBS="$(sed -n 's/^Failed://p' "$NTDLL_LOG")"
@@ -427,6 +433,9 @@ if [[ "$REBUILD" == "1" ]]; then
     PATH="$MD/toolchains/llvm-mingw-20260421-ucrt-macos-universal/bin:$PATH" \
       bash "$ROOT/scripts/build_compat_dlls.sh" "$MD/app/Madeira/i386-windows" i686-w64-mingw32-clang \
         "$MD/wine/dlls/vulkan-1/vulkan-1.spec"
+    PATH="$MD/toolchains/llvm-mingw-20260421-ucrt-macos-universal/bin:$PATH" \
+      bash "$ROOT/scripts/build_d3d_stub_dlls.sh" "$MD/app/Madeira/i386-windows" i386 ||
+      echo "WARNING: Direct3D stand-in DLLs not built for the x86 farm" >&2
   fi
 
   if [[ "$GRAPHICS" == "d3d12" ]]; then

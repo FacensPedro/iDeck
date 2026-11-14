@@ -95,6 +95,18 @@ final class ResourceGovernor {
         AppLog.record("[memory] session ended: footprint \(before) MiB -> \(Self.footprintMiB()) MiB, \(Self.availableMiB()) MiB left")
     }
 
+    /// After the last download of a queue ended: the network cache goes, and the
+    /// allocator hands back the pages the download's buffers used. Freed memory
+    /// otherwise stays with the app as dirty pages and keeps counting toward the limit
+    /// a game needs.
+    func releaseAfterDownload() {
+        let before = Self.footprintMiB()
+        URLCache.shared.removeAllCachedResponses()
+        let returned = malloc_zone_pressure_relief(nil, 0)
+        AppLog.record("[memory] downloads ended: footprint \(before) MiB -> \(Self.footprintMiB()) MiB, "
+                      + "\(returned >> 20) MiB handed back by the allocator, \(Self.availableMiB()) MiB left")
+    }
+
     private func memoryPressure(_ event: DispatchSource.MemoryPressureEvent) {
         let level = event.contains(.critical) ? "critical" : "warning"
         let before = Self.footprintMiB()

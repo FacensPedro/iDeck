@@ -23,3 +23,5 @@ programs/regsvr32/arm64ec-windows/regsvr32.exe
 # Imported by modules already in the farm (bthprops.cpl, mshtml)
 dlls/bluetoothapis/arm64ec-windows/bluetoothapis.dll
 dlls/inetcomm/arm64ec-windows/inetcomm.dll
+# DirectX Transform's module (a program's old effects code loads it by name)
+dlls/dxtrans/arm64ec-windows/dxtrans.dll

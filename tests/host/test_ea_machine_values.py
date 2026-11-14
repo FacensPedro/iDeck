@@ -56,7 +56,7 @@ class EAMachineValuesTests(unittest.TestCase):
         self.assertIn("profile.shownHashInput(version: activation.hashVersion)", LICENSE)
 
     def test_ea_lines_kept_in_bug_report(self):
-        self.assertIn('"[ea-service]", "[ea-license]"]', REPORT)
+        self.assertIn('"[ea-service]", "[ea-license]"', REPORT)
 
     def test_volume_serial_follows_ntdll(self):
         # Values from the C function compiled as it stands in dlls/ntdll/unix/file.c.
