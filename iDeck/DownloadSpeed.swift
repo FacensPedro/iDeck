@@ -12,13 +12,14 @@ enum DownloadSpeed {
 
     /// EA: files fetched at once, ranges of one large file fetched at once, and the
     /// connections to EA's CDN they share.
-    static let eaFiles = 8
-    static let eaSegments = 16
-    static let eaConnections = 40
+    static let eaFiles = 10
+    static let eaSegments = 24
+    static let eaConnections = 56
     /// Whole-range requests in flight across all files (EARangeGate). Fewer than the
     /// connections, so none waits inside URLSession, where its timeout would run; the
-    /// rest of the connections serve the small files' streams.
-    static let eaRangeRequests = 24
+    /// rest of the connections serve the small files' streams. Each holds one 4 MB range
+    /// until written: 32 keep at most 128 MB, only while downloading.
+    static let eaRangeRequests = 32
 
     /// GOG: files fetched at once, and chunks of one file fetched ahead of its writer
     /// (they are written in order). A game that is one large archive used to download
@@ -45,5 +46,50 @@ enum DownloadETA {
         if seconds < 3_600 { return "\(seconds / 60)m" }
         if seconds < 86_400 { return "\(seconds / 3_600)h \(seconds % 3_600 / 60)m" }
         return "\(seconds / 86_400)d \(seconds % 86_400 / 3_600)h"
+    }
+}
+
+/// Download speed and problems in iDeck's log, which Bugs & logs reads: one line every
+/// 15 s per running download (bytes done, total and the speed over those seconds), one
+/// when it ends with its average speed, and the reason when it fails.
+enum DownloadLog {
+    private struct Sample { var name: String; var started: Date; var startBytes: UInt64; var time: Date; var bytes: UInt64 }
+    private static let lock = NSLock()
+    nonisolated(unsafe) private static var samples: [String: Sample] = [:]  // guarded by lock
+    static let interval: TimeInterval = 15
+
+    static func gigabytes(_ bytes: UInt64) -> String { String(format: "%.2f GB", Double(bytes) / 1_000_000_000) }
+
+    static func megabytesPerSecond(_ bytes: UInt64, _ seconds: TimeInterval) -> String {
+        String(format: "%.1f MB/s", seconds > 0 ? Double(bytes) / 1_000_000 / seconds : 0)
+    }
+
+    static func progress(store: String, name: String, done: UInt64, total: UInt64, now: Date = Date()) {
+        lock.lock()
+        guard var sample = samples[store], sample.name == name, done >= sample.bytes else {
+            samples[store] = Sample(name: name, started: now, startBytes: done, time: now, bytes: done)
+            lock.unlock()
+            return
+        }
+        let seconds = now.timeIntervalSince(sample.time)
+        guard seconds >= interval else { lock.unlock(); return }
+        let speed = megabytesPerSecond(done - sample.bytes, seconds)
+        sample.time = now
+        sample.bytes = done
+        samples[store] = sample
+        lock.unlock()
+        AppLog.record("[download] \(store) \"\(name)\" \(gigabytes(done)) of \(gigabytes(total)), \(speed)")
+    }
+
+    static func ended(store: String, name: String, outcome: String, now: Date = Date()) {
+        lock.lock()
+        let sample = samples.removeValue(forKey: store)
+        lock.unlock()
+        var line = "[download] \(store) \"\(name)\" \(outcome)"
+        if let sample, sample.name == name {
+            let seconds = now.timeIntervalSince(sample.started)
+            line += ", \(gigabytes(sample.bytes - sample.startBytes)) in \(Int(seconds)) s, average \(megabytesPerSecond(sample.bytes - sample.startBytes, seconds))"
+        }
+        AppLog.record(line)
     }
 }
