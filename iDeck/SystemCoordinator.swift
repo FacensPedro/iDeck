@@ -553,6 +553,14 @@ class SystemCoordinator: ObservableObject {
     /// Runs the pending launch once the debugger is attached, or reports why not.
     private func finishJITRequest(_ result: Result<Void, Error>) {
         refreshJITStatus()
+        if let started = jitRequestStartedAt {
+            let outcome: String
+            switch result {
+            case .success: outcome = "debugger attached"
+            case .failure(let error): outcome = "failed (" + error.localizedDescription + ")"
+            }
+            AppLog.record("[jit-handoff] \(outcome) \(String(format: "%.1f", Date().timeIntervalSince(started))) s after the request")
+        }
         jitRequestStartedAt = nil
         let launch = pendingJITLaunch
         pendingJITLaunch = nil
@@ -667,6 +675,8 @@ class SystemCoordinator: ObservableObject {
     /// When the JIT request in flight was started (nil: none). A second request
     /// within 20 s joins it instead of opening StikDebug again.
     private var jitRequestStartedAt: Date?
+    /// Watches for iDeck coming back in front after StikDebug was opened.
+    private var jitHandoffObserver: NSObjectProtocol?
 
     /// For launches that first need a network round trip (Epic's and EA's launch
     /// tokens): starts JIT activation at once, in parallel with it, so StikDebug
@@ -705,6 +715,18 @@ class SystemCoordinator: ObservableObject {
             }
             requestBuiltInJIT()
             return
+        }
+        // How long the trip to StikDebug and back takes, for bug reports: when iDeck
+        // is in front again, and whether the debugger was attached by then.
+        let started = Date()
+        AppLog.record("[jit-handoff] StikDebug opened")
+        if let previous = jitHandoffObserver { NotificationCenter.default.removeObserver(previous) }
+        jitHandoffObserver = NotificationCenter.default.addObserver(forName: UIApplication.didBecomeActiveNotification,
+                                                                    object: nil, queue: .main) { [weak self] _ in
+            AppLog.record("[jit-handoff] iDeck in front again after \(String(format: "%.1f", Date().timeIntervalSince(started))) s, "
+                          + "debugger attached=\(StikJITHelper.ready ? 1 : 0)")
+            if let observer = self?.jitHandoffObserver { NotificationCenter.default.removeObserver(observer) }
+            self?.jitHandoffObserver = nil
         }
         // Madeira's StikJITHelper.enableJIT, verbatim: stikdebug://enable-jit with
         // the bundle ID, this PID and the script, then a wait for the debugger.
@@ -1674,6 +1696,13 @@ class SystemCoordinator: ObservableObject {
             } else {
                 SteamLog.event("[wine-close] Alt+F4 requested; waiting for guest and wineserver")
             }
+            // The X closes iDeck together with the session: Wine runs inside this
+            // process, and a session that has ended leaves memory behind that keeps
+            // the next game from getting its JIT pool. The game gets Alt+F4 first and
+            // a moment to save; iDeck is opened again for the next game.
+            AppLog.record("[wine-close] X pressed with a session running: iDeck closes with it")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { exit(0) }
+            return
         }
         pollWindowsSessionClose()
     }
