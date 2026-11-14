@@ -45,7 +45,7 @@ class StabilityJITLifecycleTests(unittest.TestCase):
         coordinator = repo_text("iDeck/SystemCoordinator.swift")
         self.assertIn("private func waitForSessionCleanup(timeout: TimeInterval = 5) -> Bool", coordinator)
         self.assertIn('"wineJITPool560Migrated"', coordinator)
-        self.assertIn("return (256...1152).contains(chosen) ? chosen : 560", repo_text("iDeck/MadeiraJIT/MadeiraWinePool.swift"))
+        self.assertIn("return automaticSizeMB(default: 560)", repo_text("iDeck/MadeiraJIT/MadeiraWinePool.swift"))
         jit = repo_text("iDeck/MadeiraJIT/StikJITHelper.swift")
         self.assertIn("static var poolCountsAgainstFootprint = false", jit)
         self.assertNotIn('LogStore.shared.log("[no-footprint] pool applied=\\(exempt)"', jit)
