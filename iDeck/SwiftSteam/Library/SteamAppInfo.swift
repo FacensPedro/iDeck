@@ -321,8 +321,8 @@ struct SteamAppInfo {
     /// apps since Valve's 2023 PICS change) and falls back to the legacy
     /// `maxsize`. DLC depots and `sharedinstall` redistributables are not part
     /// of the base install and are left out. Treat the figure as "about".
-    func downloadSize(for os: String) -> UInt64 {
-        installDepots(os: os).reduce(0) { total, d in
+    func downloadSize(for os: String, ownedDLC: Set<UInt32> = []) -> UInt64 {
+        installDepots(os: os, ownedDLC: ownedDLC).reduce(0) { total, d in
             let bytes = d.publicDownloadBytes > 0 ? d.publicDownloadBytes : d.maxSize
             guard bytes > 0 else { return total }
             // Sizes are parsed from untrusted PICS VDF strings with no bound:
@@ -335,8 +335,8 @@ struct SteamAppInfo {
     /// Approximate installed size for a platform: `manifests.public.size` per
     /// selected depot, else its download figure. Same selection and caveats as
     /// downloadSize (shared depots whose owner's product info was not read count 0).
-    func installSize(for os: String) -> UInt64 {
-        installDepots(os: os).reduce(0) { total, d in
+    func installSize(for os: String, ownedDLC: Set<UInt32> = []) -> UInt64 {
+        installDepots(os: os, ownedDLC: ownedDLC).reduce(0) { total, d in
             let bytes = d.publicSizeBytes > 0 ? d.publicSizeBytes : (d.publicDownloadBytes > 0 ? d.publicDownloadBytes : d.maxSize)
             let (sum, overflow) = total.addingReportingOverflow(bytes)
             return overflow ? UInt64.max : sum
@@ -347,11 +347,13 @@ struct SteamAppInfo {
     /// Certain legacy editions do not expose usable depot sizes in Steam's
     /// product info; the last resort is the *published minimum disk space*,
     /// which is explicitly marked as a requirement, not an exact download size.
-    func displaySizeForWindows(installedBytes: UInt64 = 0) -> (bytes: UInt64, isRequirement: Bool) {
+    /// `ownedDLC`: the account's depot IDs; the DLC depots among them are installed with
+    /// the game (unless turned off), so they count, as in the space the install checks.
+    func displaySizeForWindows(installedBytes: UInt64 = 0, ownedDLC: Set<UInt32> = []) -> (bytes: UInt64, isRequirement: Bool) {
         if installedBytes > 0 { return (installedBytes, false) }
-        let installed = installSize(for: "windows")
+        let installed = installSize(for: "windows", ownedDLC: ownedDLC)
         if installed > 0 { return (installed, false) }
-        let download = downloadSize(for: "windows")
+        let download = downloadSize(for: "windows", ownedDLC: ownedDLC)
         if download > 0 { return (download, false) }
         if let gb = Self.publishedRequiredSpaceGB(for: appID) {
             return (UInt64(gb * 1_000_000_000), true)

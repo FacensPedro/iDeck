@@ -1324,6 +1324,7 @@ private struct SteamProgramDetailsView: View {
                             DetailChip(text: size, systemImage: "internaldrive", tint: .gray)
                         }
                     }
+                    .onAppear { steamLibrary.loadOwnedDepots() }
                     if steamLibrary.pausedInstalls.contains(game.appID) {
                         VStack(spacing: 10) {
                             Text(tr("Download paused")).foregroundColor(.white)
@@ -1453,7 +1454,7 @@ private struct SteamProgramDetailsView: View {
     /// edition takes once installed (or, failing that, its download size).
     private var installedSizeText: String? {
         let measured = installed ? (steamLibrary.installedSizes[game.appID] ?? 0) : 0
-        let reported = game.displaySizeForWindows(installedBytes: measured)
+        let reported = game.displaySizeForWindows(installedBytes: measured, ownedDLC: steamLibrary.ownedDepotIDs)
         guard reported.bytes > 0 else { return nil }
         let text = ByteCountFormatter.string(fromByteCount: Int64(clamping: reported.bytes), countStyle: .file)
         return reported.isRequirement ? tr("Minimum required space: %@", text) : text

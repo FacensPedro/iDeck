@@ -51,7 +51,7 @@ class ReleaseInterfaceCDNTests(unittest.TestCase):
 
     def test_legacy_steam_sizes_and_store_library_response(self):
         metadata = repo_text("iDeck/SwiftSteam/Library/SteamAppInfo.swift")
-        self.assertIn("func displaySizeForWindows(installedBytes: UInt64 = 0)", metadata)
+        self.assertIn("func displaySizeForWindows(installedBytes: UInt64 = 0, ownedDLC: Set<UInt32> = [])", metadata)
         self.assertIn("case 22330: return 4.6", metadata)
         self.assertIn("case 489830: return 12.0", metadata)
         self.assertIn("steamLibrary.installedSizes[game.appID]", VIEW)
