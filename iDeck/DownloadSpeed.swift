@@ -66,8 +66,49 @@ enum DownloadLog {
         String(format: "%.1f MB/s", seconds > 0 ? Double(bytes) / 1_000_000 / seconds : 0)
     }
 
+    /// When each download last received data, for the stall check.
+    nonisolated(unsafe) private static var lastData: [String: (name: String, bytes: UInt64, time: Date, reported: Bool)] = [:]  // guarded by lock
+    nonisolated(unsafe) private static var watchdog: DispatchSourceTimer?  // guarded by lock
+    static let stallSeconds: TimeInterval = 20
+
+    /// Every 10 s: a download with no new data for `stallSeconds` is written to the log
+    /// once, and again when data flows again, so "starts, stops, continues" shows when
+    /// and for how long.
+    private static func startWatchdogLocked() {
+        guard watchdog == nil else { return }
+        let timer = DispatchSource.makeTimerSource(queue: .global(qos: .utility))
+        timer.schedule(deadline: .now() + 10, repeating: 10)
+        timer.setEventHandler {
+            let now = Date()
+            var lines: [String] = []
+            lock.lock()
+            for (store, entry) in lastData where !entry.reported && now.timeIntervalSince(entry.time) >= stallSeconds {
+                lastData[store]?.reported = true
+                lines.append("[download] \(store) \"\(entry.name)\" no data for \(Int(now.timeIntervalSince(entry.time))) s at \(gigabytes(entry.bytes))")
+            }
+            if lastData.isEmpty { watchdog?.cancel(); watchdog = nil }
+            lock.unlock()
+            lines.forEach { AppLog.record($0) }
+        }
+        watchdog = timer
+        timer.resume()
+    }
+
     static func progress(store: String, name: String, done: UInt64, total: UInt64, now: Date = Date()) {
         lock.lock()
+        var resumed: TimeInterval?
+        if let last = lastData[store], last.name == name, done > last.bytes {
+            if last.reported { resumed = now.timeIntervalSince(last.time) }
+            lastData[store] = (name, done, now, false)
+        } else if lastData[store]?.name != name {
+            lastData[store] = (name, done, now, false)
+        }
+        startWatchdogLocked()
+        if let resumed {
+            lock.unlock()
+            AppLog.record("[download] \(store) \"\(name)\" data again after \(Int(resumed)) s without")
+            lock.lock()
+        }
         guard var sample = samples[store], sample.name == name, done >= sample.bytes else {
             samples[store] = Sample(name: name, started: now, startBytes: done, time: now, bytes: done)
             lock.unlock()
@@ -86,6 +127,7 @@ enum DownloadLog {
     static func ended(store: String, name: String, outcome: String, now: Date = Date()) {
         lock.lock()
         let sample = samples.removeValue(forKey: store)
+        lastData.removeValue(forKey: store)
         lock.unlock()
         var line = "[download] \(store) \"\(name)\" \(outcome)"
         if let sample, sample.name == name {

@@ -31,3 +31,19 @@ class DownloadLogTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class StallAndSizeTests(unittest.TestCase):
+    def test_stalls_are_logged(self):
+        speed = (ROOT / "iDeck/DownloadSpeed.swift").read_text()
+        self.assertIn("static let stallSeconds: TimeInterval = 20", speed)
+        self.assertIn('no data for \\(Int(now.timeIntervalSince(entry.time))) s at', speed)
+        self.assertIn('data again after \\(Int(resumed)) s without', speed)
+
+    def test_steam_size_counts_owned_dlc(self):
+        info = (ROOT / "iDeck/SwiftSteam/Library/SteamAppInfo.swift").read_text()
+        self.assertIn("func installSize(for os: String, ownedDLC: Set<UInt32> = []) -> UInt64 {", info)
+        self.assertIn('let installed = installSize(for: "windows", ownedDLC: ownedDLC)', info)
+        view = (ROOT / "iDeck/MainView.swift").read_text()
+        self.assertIn("game.displaySizeForWindows(installedBytes: measured, ownedDLC: steamLibrary.ownedDepotIDs)", view)
+        self.assertIn(".onAppear { steamLibrary.loadOwnedDepots() }", view)

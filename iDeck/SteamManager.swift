@@ -18,6 +18,19 @@ final class SteamOwnedGamesModel: ObservableObject {
     @Published private(set) var downloadErrors: [UInt32: String] = [:]
     @Published private(set) var installedApps: Set<UInt32> = []
     @Published private(set) var installedSizes: [UInt32: UInt64] = [:]
+    /// The account's depot IDs (licenses), read once: a game's size counts the DLC
+    /// depots among them, which the install downloads with the game.
+    @Published private(set) var ownedDepotIDs: Set<UInt32> = []
+    private var ownedDepotsRequested = false
+    func loadOwnedDepots() {
+        guard !ownedDepotsRequested, SteamSignIn.isSignedIn else { return }
+        ownedDepotsRequested = true
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            if let owned = try? await self.fetcher.ownedDepotIDs() { self.ownedDepotIDs = owned }
+            else { self.ownedDepotsRequested = false }
+        }
+    }
     private var installedSizeScanGeneration = 0
     @Published private(set) var availableDLC: [UInt32: [UInt32]] = [:]
     @Published private(set) var dlcMetadata: [UInt32: SteamAppInfo] = [:]
