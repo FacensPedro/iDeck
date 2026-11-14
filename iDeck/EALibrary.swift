@@ -415,6 +415,7 @@ struct EAInstalledGame: Codable, Sendable {
         }
         active = nil
         pump()
+        if !hasActiveDownload { ResourceGovernor.shared.releaseAfterDownload() }
     }
 
     // MARK: What starts the game

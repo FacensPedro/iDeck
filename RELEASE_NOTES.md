@@ -5,6 +5,9 @@
 ### Game session
 - The X button during a game now closes iDeck together with the game. The game gets its close request first and a moment to save; iDeck is opened again for the next game. A session that had ended left memory behind that kept the next game from getting its JIT memory.
 
+### Downloads
+- When the last download of a queue ends, iDeck clears its network cache and returns the memory the download used to iOS, so it no longer counts against a game started afterwards.
+
 ### JIT
 - Bug reports now show how long the trip to StikDebug and back took: when iDeck was in front again and when the debugger was attached.
 

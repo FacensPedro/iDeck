@@ -123,6 +123,8 @@ final class BackgroundDownloads {
         guard queueEmpty else { return }
         if case .completed = outcome { finishContinued(success: true) } else { finishContinued(success: false) }
         endGrace()
+        // The queue is empty: what the downloads held in memory goes back to iOS.
+        DispatchQueue.main.async { MainActor.assumeIsolated { ResourceGovernor.shared.releaseAfterDownload() } }
     }
 
     // MARK: iOS 26 continued processing
