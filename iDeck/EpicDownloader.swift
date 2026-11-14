@@ -63,7 +63,7 @@ final class EpicDownloader: @unchecked Sendable {
         config.requestCachePolicy = .reloadIgnoringLocalCacheData
         config.urlCache = nil
         config.timeoutIntervalForRequest = 60
-        config.httpMaximumConnectionsPerHost = 48
+        config.httpMaximumConnectionsPerHost = 64
         config.httpAdditionalHeaders = ["User-Agent": Self.userAgent]
         http = URLSession(configuration: config)
     }
