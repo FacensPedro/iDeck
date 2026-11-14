@@ -460,7 +460,16 @@ final class BugReportModel: ObservableObject {
             "Windows runtime: x64 \(MadeiraRuntime.installed("wine-x64") ? "installed" : "missing"), x86 \(MadeiraRuntime.installed("wine-x86") ? "installed" : "missing")",
             "Device language: \(Locale.preferredLanguages.first ?? "unknown")"
                 + (free.map { ", storage free: \($0 / 1_073_741_824) GB" } ?? ""),
-        ]
+        ] + sessionMemoryLines
+    }
+
+    /// The last sessions' memory records and the last game's learned profile.
+    static var sessionMemoryLines: [String] {
+        var lines = SessionMemory.entries().suffix(5).map { "Session: " + $0.line }
+        if let game = SessionMemory.entries().last?.game, let learned = GameCompatibility.report(game) {
+            lines.append("Compatibility: " + learned)
+        }
+        return lines
     }
 
     /// A paste-ready report: device, app build and the selected problems.

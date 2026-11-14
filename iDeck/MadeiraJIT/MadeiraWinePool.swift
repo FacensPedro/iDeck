@@ -1,3 +1,5 @@
+import Darwin
+import os
 import Foundation
 
 /// Madeira's launch steps for the Wine JIT pool (ContentView, "Step 1" and
@@ -28,7 +30,56 @@ enum MadeiraWinePool {
         // (896 was always shrunk, here to as little as 336 MB, after the start
         // had already planned for it).
         let chosen = UserDefaults.standard.integer(forKey: "wineJITPoolMiB")
-        return (256...1152).contains(chosen) ? chosen : 560
+        if (256...1152).contains(chosen) { return chosen }
+        return automaticSizeMB(default: 560)
+    }
+
+    /// Steps the automatic pool may take, largest first.
+    static let automaticSteps = [560, 512, 384, 256]
+
+    /// The automatic pool (no choice in a game config, jit-pool.txt or Settings),
+    /// fitted to this run: what the current game needed before (GameCompatibility),
+    /// the memory iOS still gives the process and the address space beside the
+    /// guest window. An explicit choice is never changed.
+    static func automaticSizeMB(default base: Int) -> Int {
+        var size = base
+        var why: [String] = []
+        let game = ProcessInfo.processInfo.environment["IDECK_COMPAT_GAME"]
+        if let game, let learned = GameCompatibility.profile(game) {
+            if learned.lastGoodPoolMiB >= 256, learned.lastGoodPoolMiB < size {
+                size = learned.lastGoodPoolMiB
+                why.append("last clean session ran with \(size) MB")
+            } else if learned.consecutiveCrashes > 0, learned.lastPoolMiB > 256,
+                      let smaller = automaticSteps.first(where: { $0 < learned.lastPoolMiB }) {
+                size = min(size, smaller)
+                why.append("\(learned.consecutiveCrashes) crash(es) in a row at \(learned.lastPoolMiB) MB")
+            }
+        }
+        // The RW mirror is touched as code is translated: with little memory left a
+        // large pool only moves the game closer to iOS's limit.
+        let available = Int(os_proc_available_memory() >> 20)
+        let memoryCap: Int
+        switch available {
+        case ..<1: memoryCap = size
+        case ..<2048: memoryCap = 256
+        case ..<3072: memoryCap = 384
+        case ..<4096: memoryCap = 512
+        default: memoryCap = size
+        }
+        if memoryCap < size {
+            size = memoryCap
+            why.append("\(available) MiB available")
+        }
+        // Without the extended guest window the pool shares the default 64 GB space.
+        if !AddressSpaceCheck.hasGuestWindow, size > 384 {
+            size = 384
+            why.append("no extended address space")
+        }
+        size = automaticSteps.first(where: { $0 <= size }) ?? 256
+        if !why.isEmpty {
+            LogStore.shared.log("[jit-pool] automatic size \(size) MB (\(why.joined(separator: ", ")))")
+        }
+        return size
     }
 
     /// Runs on a background queue (allocatePool suspends the process for the
@@ -39,6 +90,9 @@ enum MadeiraWinePool {
         if ideck_wine_jit_pool_ready() { return nil }
         for key in exports { unsetenv(key) }
         let poolSizeMB = sizeMB
+        if let game = ProcessInfo.processInfo.environment["IDECK_COMPAT_GAME"] {
+            GameCompatibility.notePool(game, poolMiB: poolSizeMB)
+        }
         LogStore.shared.log("Allocating \(poolSizeMB)MB JIT pool (BRK will suspend process)...")
         let t0 = CFAbsoluteTimeGetCurrent()
         let pool = StikJITHelper.allocatePool(poolSize: poolSizeMB * 1024 * 1024)
@@ -117,11 +171,23 @@ enum JITPoolList {
     }
 
     /// key (lowercased App ID or exe name) -> MB: the app's list, then the device's lines.
+    private static let cacheLock = NSLock()
+    nonisolated(unsafe) private static var cached: (stamp: String, list: [String: Int])?
+
+    /// The files are read and parsed once, again only when the device copy changes.
     static func entries() -> [String: Int] {
+        let urls = [bundled, userFile].compactMap { $0 }
+        let stamp = urls.map { url -> String in
+            let date = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
+            return "\(url.path)@\(date?.timeIntervalSince1970 ?? -1)"
+        }.joined(separator: "|")
+        cacheLock.lock(); defer { cacheLock.unlock() }
+        if let cached, cached.stamp == stamp { return cached.list }
         var list: [String: Int] = [:]
-        for url in [bundled, userFile].compactMap({ $0 }) {
+        for url in urls {
             if let text = try? String(contentsOf: url, encoding: .utf8) { list.merge(parse(text)) { $1 } }
         }
+        cached = (stamp, list)
         return list
     }
 

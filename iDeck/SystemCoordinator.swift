@@ -156,24 +156,27 @@ class SystemCoordinator: ObservableObject {
     }
 
     private var memorySampler: Timer?
-    private var finishMemorySample: (() -> Void)?
+    private var finishMemorySample: ((String, String?) -> Void)?
 
-    private func finishMemorySampling() {
+    /// Ends the session's memory record: current, peak and available memory and
+    /// why the session ended, logged and kept for Bugs & logs (SessionMemory).
+    private func finishMemorySampling(reason: String = "session ended", game: String? = nil) {
         memorySampler?.invalidate()
         memorySampler = nil
-        finishMemorySample?()
+        let game = game ?? activeWindowsProfile?.id ?? activeSteamGameID.map { "steam:\($0)" }
+        finishMemorySample?(reason, game)
         finishMemorySample = nil
     }
 
     private func startMemorySampling(launcher: String) {
-        finishMemorySampling()
+        finishMemorySampling(reason: "replaced by a new session")
         let started = Date()
         let tracksInterval = IDResetSessionFootprint()
         var peakMiB = -1
         let defaults = UserDefaults.standard
         defaults.removeObject(forKey: "diagnostics.sessionPeakMiB")
         defaults.set(false, forKey: "diagnostics.kernelPeak")
-        let log = { [weak self] (stage: String) in
+        let log = { [weak self] (stage: String, reason: String?, gameID: String?) in
             let footprint = MainActor.assumeIsolated { ResourceGovernor.footprintMiB() }
             let kernelPeak = tracksInterval ? Int(IDSessionPeakMiB()) : -1
             let highest = max(footprint, kernelPeak)
@@ -184,16 +187,33 @@ class SystemCoordinator: ObservableObject {
             if kernelPeak >= 0 { defaults.set(true, forKey: "diagnostics.kernelPeak") }
             AppLog.record("[memory] session \(stage) t=\(Int(Date().timeIntervalSince(started)))s footprint=\(footprint) MiB "
                           + "peak=\(peakMiB) MiB available=\(Int(os_proc_available_memory() >> 20)) MiB launcher=\(launcher) "
-                          + "dock=\(self?.currentSteamLaunchUsesDock == true ? 1 : 0)")
+                          + "dock=\(self?.currentSteamLaunchUsesDock == true ? 1 : 0)"
+                          + (reason.map { " reason=\($0)" } ?? ""))
+            if let reason {
+                let available = Int(os_proc_available_memory() >> 20)
+                SessionMemory.record(SessionMemory.Entry(
+                    game: gameID ?? launcher, launcher: launcher, started: started,
+                    durationSeconds: Int(Date().timeIntervalSince(started)),
+                    currentMiB: footprint, peakMiB: peakMiB, availableMiB: available,
+                    reason: String(reason.prefix(300))))
+                if let gameID { GameCompatibility.noteMemory(gameID, peakMiB: peakMiB, availableMiB: available) }
+            }
         }
-        log("start")
-        finishMemorySample = { log("end") }
-        let timer = Timer(timeInterval: 30, repeats: true) { _ in log("sample") }
+        log("start", nil, nil)
+        finishMemorySample = { reason, game in log("end", reason, game) }
+        let timer = Timer(timeInterval: 30, repeats: true) { _ in log("sample", nil, nil) }
         RunLoop.main.add(timer, forMode: .common)
         memorySampler = timer
     }
 
-    @Published private(set) var activeWindowsProfile: WindowsGameProfile?
+    @Published private(set) var activeWindowsProfile: WindowsGameProfile? {
+        // The game the JIT pool is prepared for (MadeiraWinePool reads it to size the
+        // pool from what GameCompatibility learned about this game).
+        didSet {
+            if let id = activeWindowsProfile?.id { setenv("IDECK_COMPAT_GAME", id, 1) }
+            else if oldValue != nil { unsetenv("IDECK_COMPAT_GAME") }
+        }
+    }
     private var activeSteamPrefix: String?
     private var pendingSteamGameID: UInt32?
     @Published private(set) var isClosingWindowsSession = false
@@ -418,7 +438,7 @@ class SystemCoordinator: ObservableObject {
         recordBenchmarkMilestone(status)
         let update = {
             if status == "Windows Ready" || status.hasPrefix("Execution Error") || status.hasPrefix("Cannot launch") {
-                self.finishMemorySampling()
+                self.finishMemorySampling(reason: status == "Windows Ready" ? "the game exited and Wine closed normally" : status)
                 MainActor.assumeIsolated { EALibrary.shared.launchEnded() }
             }
             self.windowsStatus = status
@@ -485,7 +505,8 @@ class SystemCoordinator: ObservableObject {
                 // Play; with the pool ready, the launch no longer reopens StikDebug.
                 self.wineJITAttemptedDuringAttachment = true
                 if Self.restartNeeded() == nil, MadeiraBundleIdentity.isNative, AddressSpaceCheck.hasGuestWindow,
-                   StikJITHelper.scriptData != nil, !ideck_wineprocess_running() {
+                   StikJITHelper.scriptData != nil, !ideck_wineprocess_running(),
+                   !self.isClosingWindowsSession, !ideck_wineserver_running() {
                     self.wineJITPreparationInFlight = true
                     // No game is chosen yet, so its fixed-base exe cannot be measured
                     // (measureExecutableWindow): a 256 MB executable window is kept free
@@ -503,8 +524,7 @@ class SystemCoordinator: ObservableObject {
                             self.wineJITPreparationInFlight = false
                             if let failure { AppLog.record("[jit] early pool preparation failed: \(failure)") }
                             self.refreshJITStatus()
-                            if let launch = self.pendingJITLaunch {
-                                self.pendingJITLaunch = nil
+                            if let launch = self.takePendingJITLaunch() {
                                 if let failure { self.setWindowsStatus("Execution Error: " + failure) }
                                 else { launch() }
                             }
@@ -541,9 +561,35 @@ class SystemCoordinator: ObservableObject {
     /// The launch that continues when StikDebug reports the debugger attached
     /// (StikJITHelper.waitForDebugger), as Madeira's jitReadyForLaunch(then:).
     private var pendingJITLaunch: (() -> Void)?
+    /// Raised by every close: a launch queued behind JIT preparation before it is
+    /// stale and never starts Wine into a session that is being torn down.
+    private var launchGeneration = 0
+    private var pendingJITLaunchGeneration = 0
 
     private func waitForDebuggerThenResume(_ resume: @escaping () -> Void) {
         pendingJITLaunch = resume
+        pendingJITLaunchGeneration = launchGeneration
+    }
+
+    /// The queued launch, or nil when none is queued or it may not run now: a close
+    /// came after it, a session is closing, or Wine is already running.
+    private func takePendingJITLaunch() -> (() -> Void)? {
+        let launch = pendingJITLaunch
+        pendingJITLaunch = nil
+        guard let launch else { return nil }
+        if pendingJITLaunchGeneration != launchGeneration || isClosingWindowsSession
+            || ideck_wineprocess_running() {
+            AppLog.record("[jit] queued launch dropped: the session was closed or Wine is running")
+            return nil
+        }
+        return launch
+    }
+
+    /// Forgets every launch waiting on JIT (called when a session is closed).
+    private func cancelQueuedLaunches() {
+        launchGeneration &+= 1
+        pendingJITLaunch = nil
+        jitResume = nil
     }
 
     /// Madeira's readiness: StikJITHelper.ready (CS_DEBUGGED and a live
@@ -559,6 +605,17 @@ class SystemCoordinator: ObservableObject {
         }
         let resume = jitResume
         jitResume = nil
+        // Closing and launching never overlap: the close owns the runtime until
+        // finishWindowsSessionCloseIfPossible, and a running Wine keeps its pool.
+        if isClosingWindowsSession {
+            AppLog.record("[jit] launch refused: the previous session is still closing")
+            setWindowsStatus("Waiting for the previous Windows session to finish…")
+            return false
+        }
+        if ideck_wineprocess_running() {
+            setWindowsStatus("A Windows session is already running. Close it before starting another game.")
+            return false
+        }
         refreshJITStatus()
         // The StikDebug-compatible script iDeck sends (universal.jitscript) must be
         // in the app: without it, neither StikDebug nor the built-in path can prepare
@@ -627,12 +684,13 @@ class SystemCoordinator: ObservableObject {
             AppLog.record("[jit-handoff] \(outcome) \(String(format: "%.1f", Date().timeIntervalSince(started))) s after the request")
         }
         jitRequestStartedAt = nil
-        let launch = pendingJITLaunch
-        pendingJITLaunch = nil
+        let generation = pendingJITLaunchGeneration
+        let launch = takePendingJITLaunch()
         switch result {
         case .success:
             if wineJITPreparationInFlight {
                 pendingJITLaunch = launch
+                pendingJITLaunchGeneration = generation
             } else {
                 launch?()
             }
@@ -979,6 +1037,14 @@ class SystemCoordinator: ObservableObject {
     /// Programs whose dependencies were already offered this run (a failed download
     /// does not block every launch).
     private var onDemandAttempted = Set<String>()
+    private var bundledRuntimeChecked = false
+    /// Program path -> size and modification date when its libraries were complete.
+    private var satisfiedExecutables: [String: String] = [:]
+
+    private static func fileStamp(_ url: URL) -> String? {
+        guard let values = try? url.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey]) else { return nil }
+        return "\(values.fileSize ?? -1)@\(values.contentModificationDate?.timeIntervalSince1970 ?? -1)"
+    }
     private var onDemandInstallTask: Task<Void, Never>?
 
     /// On demand, before Wine starts: the Visual C++ runtime (by version and
@@ -993,14 +1059,26 @@ class SystemCoordinator: ObservableObject {
         }
         if onDemandInstallTask != nil { return true }
         let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
-        // Visual C++ built into a development app: in place without installing anything.
-        if let documents { VisualCRuntimeBootstrap.installBundled(documents: documents) }
-        guard let executable, let pe = WindowsPEInfo.read(executable),
-              !onDemandAttempted.contains(executable.path) else { return false }
+        // Visual C++ built into a development app: in place without installing anything
+        // (checked once per run: the marker does not change while iDeck runs).
+        if !bundledRuntimeChecked, let documents {
+            bundledRuntimeChecked = VisualCRuntimeBootstrap.installBundled(documents: documents)
+                || !VisualCRuntimeBootstrap.bundled
+        }
+        guard let executable else { return false }
         lastPreparedExecutable = executable
+        // A program already found complete in this run, unchanged since, is not read
+        // and checked again (PE imports, Visual C++, Mono, D3DX lookups).
+        let stamp = Self.fileStamp(executable)
+        if let stamp, satisfiedExecutables[executable.path] == stamp { return false }
+        guard let pe = WindowsPEInfo.read(executable),
+              !onDemandAttempted.contains(executable.path) else { return false }
         let needed = MainActor.assumeIsolated { WindowsInstallerEnvironment.missing(WindowsRequirements.of(pe)) }
         let d3dx = NativeD3DX.wanted(executable) && !NativeD3DX.installed(for: executable)
-        guard !needed.isEmpty || d3dx else { return false }
+        guard !needed.isEmpty || d3dx else {
+            if let stamp { satisfiedExecutables[executable.path] = stamp }
+            return false
+        }
         onDemandAttempted.insert(executable.path)
         AppLog.record("[installer] \(executable.lastPathComponent) needs \(needed)\(d3dx ? " and Microsoft's D3DX 9" : "")")
         onDemandInstallTask = Task { @MainActor [weak self] in
@@ -1674,7 +1752,7 @@ class SystemCoordinator: ObservableObject {
         dockLaunchAccepted = report.fields["launch-client-error"] == "0"
         if let failure = report.failure {
             dockSessionActive = false
-            finishMemorySampling()
+            finishMemorySampling(reason: "Steam: " + failure)
             setWindowsStatus("Steam: " + failure)
             MainActor.assumeIsolated { MadeiraDock.cleanup() }
             return
@@ -1764,6 +1842,9 @@ class SystemCoordinator: ObservableObject {
             legacyVisualCRuntimeAttempted = false
         }
         isClosingWindowsSession = true
+        cancelQueuedLaunches()
+        onDemandInstallTask?.cancel()
+        onDemandInstallTask = nil
         MainActor.assumeIsolated { ResourceGovernor.closingSession = true }
         windowsCloseWarning = nil
         windowsCloseWarningWasShown = false
@@ -1784,6 +1865,7 @@ class SystemCoordinator: ObservableObject {
             // a moment to save; iDeck is opened again for the next game.
             AppLog.record("[wine-close] X pressed with a session running: iDeck closes with it")
             SessionOutcome.ended("closed with the X button (iDeck exited with the game)")
+            finishMemorySampling(reason: "closed with the X button (iDeck exited with the game)")
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { exit(0) }
             return
         }
@@ -1808,6 +1890,7 @@ class SystemCoordinator: ObservableObject {
         SteamLog.event("[wine-close] game did not exit; iDeck closed by the user")
         AppLog.record("[wine-close] force close: iDeck exits so the stuck Windows session ends")
         SessionOutcome.ended("the game did not exit; iDeck was closed from the close warning")
+        finishMemorySampling(reason: "the game did not exit; iDeck was force-closed")
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { exit(0) }
     }
 
@@ -1872,11 +1955,12 @@ class SystemCoordinator: ObservableObject {
         guard !ideck_wineprocess_running(), !ideck_wineserver_running(),
               ideck_wineprocess_thread_finished(),
               ideck_runtime_complete_session() else { return }
+        finishMemorySampling(reason: "closed from iDeck")
         activeSteamGameID = nil
         activeSteamPrefix = nil
         pendingSteamGameID = nil
         activeWindowsProfile = nil
-        DispatchQueue.main.async { MainActor.assumeIsolated { GOGGalaxy.shared.stop() } }
+        releaseSessionResources()
         isClosingWindowsSession = false
         windowsCloseRequestedAt = nil
         windowsCloseWarning = nil
@@ -1902,11 +1986,11 @@ class SystemCoordinator: ObservableObject {
         guard windowsStatus == "Running" || windowsStatus == "Steam Running" ||
               windowsStatus == "Wine started; waiting for game..." else { return }
         guard !ideck_wineprocess_running() else { return }
-        finishMemorySampling()
         let endedGame = activeWindowsProfile?.id ?? activeSteamGameID.map { "steam:\($0)" }
         activeSteamGameID = nil
         activeSteamPrefix = nil
         pendingSteamGameID = nil
+        defer { releaseSessionResources() }
         // Madeira Dock writes its result (sign-in, license, offline checks)
         // and exits at once, often between two one-second report polls. Read
         // the report a last time: its reason beats Wine's bare exit code
@@ -1917,6 +2001,8 @@ class SystemCoordinator: ObservableObject {
             MainActor.assumeIsolated { MadeiraDock.cleanup() }
             if let failure = report.failure {
                 SteamLog.event("[wine-exit] Steam: \(failure)")
+                finishMemorySampling(reason: "Steam: " + failure, game: endedGame)
+                if let endedGame { GameCompatibility.noteSessionEnd(endedGame, ntstatus: nil, reason: "Steam: " + failure) }
                 setWindowsStatus("Steam: " + failure)
                 return
             }
@@ -1942,12 +2028,32 @@ class SystemCoordinator: ObservableObject {
         }
         if shaderFailure, let executable = lastPreparedExecutable, !NativeD3DX.installed(for: executable) {
             NativeD3DX.noteShaderFailure(executable)
+            satisfiedExecutables[executable.path] = nil
             reason += " The game could not compile a shader with Wine's D3DX: Microsoft's D3DX 9 is installed for it at its next start."
         }
         SteamLog.event("[wine-exit] \(reason)")
+        finishMemorySampling(reason: reason, game: endedGame)
+        if let endedGame { GameCompatibility.noteSessionEnd(endedGame, ntstatus: ntstatus, reason: reason) }
         Self.reclaimAfterSession()
         if let ntstatus, ntstatus != 0 { Self.restartReason = "the last game crashed (NTSTATUS 0x\(String(ntstatus, radix: 16, uppercase: true)))" }
         setWindowsStatus(reason)
+    }
+
+    /// Frees what a finished session held and iDeck rebuilds on demand: the GOG
+    /// Galaxy service, Madeira Dock's leftovers, cached responses and artwork, and
+    /// the Metal caches the governor owns. Safe to call more than once.
+    private func releaseSessionResources() {
+        activeWindowsProfile = nil
+        URLCache.shared.removeAllCachedResponses()
+        DispatchQueue.main.async {
+            MainActor.assumeIsolated {
+                GOGGalaxy.shared.stop()
+                if !ideck_wineprocess_running() { MadeiraDock.cleanup() }
+                NotificationCenter.default.post(name: ResourceGovernor.releaseCachesNotification, object: nil)
+            }
+        }
+        AppLog.record("[session] resources released after the session "
+                      + "(available \(Int(os_proc_available_memory() >> 20)) MiB)")
     }
 
     /// Whether the session's part of the Wine log (its last 16 MB at most) names a
@@ -1958,8 +2064,21 @@ class SystemCoordinator: ObservableObject {
         let end = (try? handle.seekToEnd()) ?? 0
         let start = max(UInt64(max(offset ?? 0, 0)), end > 16 << 20 ? end - (16 << 20) : 0)
         try? handle.seek(toOffset: start)
-        guard let data = try? handle.readToEnd() else { return false }
-        return NativeD3DX.logShowsShaderFailure(String(decoding: data, as: UTF8.self))
+        // Searched as bytes, 1 MB at a time with a short overlap, ASCII-lowercased in
+        // place: no 16 MB String is built and no case-insensitive Unicode search runs.
+        let needles = [Data("\\shadererrors\\compileerror".utf8),
+                       Data("\\\\shadererrors\\\\compileerror".utf8)]
+        let overlap = needles.map(\.count).max() ?? 0
+        var carry = Data()
+        while let chunk = try? handle.read(upToCount: 1 << 20), !chunk.isEmpty {
+            var window = carry + chunk
+            window.withUnsafeMutableBytes { raw in
+                for i in raw.indices where raw[i] >= 0x41 && raw[i] <= 0x5A { raw[i] |= 0x20 }
+            }
+            if needles.contains(where: { window.range(of: $0) != nil }) { return true }
+            carry = window.suffix(overlap)
+        }
+        return false
     }
 
     /// Returns an exited 32-bit program's 4 GB window to iOS as soon as the session
