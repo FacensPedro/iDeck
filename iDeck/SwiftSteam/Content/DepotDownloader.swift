@@ -80,7 +80,7 @@ final class DepotDownloader {
         config.requestCachePolicy = .reloadIgnoringLocalCacheData
         config.timeoutIntervalForRequest = 30
         config.timeoutIntervalForResource = 300
-        config.httpMaximumConnectionsPerHost = DownloadSpeed.steamChunks
+        config.httpMaximumConnectionsPerHost = DownloadSpeed.steamConnections
         return URLSession(configuration: config)
     }()
 
