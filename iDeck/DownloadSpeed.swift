@@ -110,8 +110,19 @@ enum DownloadLog {
             AppLog.record("[download] \(store) \"\(name)\" data again after \(Int(resumed)) s without")
             lock.lock()
         }
-        guard var sample = samples[store], sample.name == name, done >= sample.bytes else {
+        guard var sample = samples[store], sample.name == name else {
             samples[store] = Sample(name: name, started: now, startBytes: done, time: now, bytes: done, total: total)
+            lock.unlock()
+            return
+        }
+        // Bytes taken back (a failed attempt is retried) keep the download's start:
+        // restarting the sample here made its end read "2 GB in 0 s".
+        guard done >= sample.bytes else {
+            sample.bytes = done
+            sample.time = now
+            sample.startBytes = min(sample.startBytes, done)
+            sample.total = total
+            samples[store] = sample
             lock.unlock()
             return
         }
@@ -140,5 +151,35 @@ enum DownloadLog {
             line += ", \(gigabytes(transferred)) in \(Int(seconds)) s, average \(megabytesPerSecond(transferred, seconds))"
         }
         AppLog.record(line)
+    }
+}
+
+/// How often a download's progress reaches the interface. Downloaders report after
+/// every chunk or file (hundreds of times a second on a fast link); each report
+/// changed a @Published dictionary the whole library observes, so every cover,
+/// card and sheet was rebuilt each time and the library stuttered while games
+/// installed. A report passes when its phase or caption changed, when it is the
+/// last one, or when `interval` has passed since the last one shown for that
+/// download; the rest are dropped (the next one carries newer numbers anyway).
+enum ProgressThrottle {
+    static let interval: TimeInterval = 0.5
+    private static let lock = NSLock()
+    nonisolated(unsafe) private static var last: [String: (time: TimeInterval, state: String)] = [:]  // guarded by lock
+
+    static func allow(_ key: String, state: String = "", done: UInt64 = 0, total: UInt64 = 0) -> Bool {
+        let now = ProcessInfo.processInfo.systemUptime
+        lock.lock(); defer { lock.unlock() }
+        let finished = total > 0 && done >= total
+        if let previous = last[key], previous.state == state, !finished, now - previous.time < interval {
+            return false
+        }
+        last[key] = (now, state)
+        return true
+    }
+
+    /// Forgets a download, so its next report (a restart or resume) shows at once.
+    static func reset(_ key: String) {
+        lock.lock(); defer { lock.unlock() }
+        last[key] = nil
     }
 }

@@ -508,6 +508,8 @@ final class SteamOwnedGamesModel: ObservableObject {
                 steamApps: steamApps,
                 ownedDepots: { [weak self] in try? await self?.fetcher.ownedDepotIDs() },
                 progress: { [weak self] progress in
+                    guard ProgressThrottle.allow("steam:\(appID)", state: "\(progress.phase)\(progress.step)",
+                                                 done: progress.doneBytes, total: progress.totalBytes) else { return }
                     self?.downloadProgress[appID] = progress
                     BackgroundDownloads.steam.progress(done: progress.doneBytes, total: progress.totalBytes)
                 }
@@ -598,6 +600,8 @@ final class SteamOwnedGamesModel: ObservableObject {
                 ownedDepots: { [weak self] in try? await self?.fetcher.ownedDepotIDs() },
                 onlyDLC: [dlcAppID],
                 progress: { [weak self] progress in
+                    guard ProgressThrottle.allow("steam:\(appID)", state: "\(progress.phase)\(progress.step)",
+                                                 done: progress.doneBytes, total: progress.totalBytes) else { return }
                     self?.downloadProgress[appID] = progress
                     BackgroundDownloads.steam.progress(done: progress.doneBytes, total: progress.totalBytes)
                 })

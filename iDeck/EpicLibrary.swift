@@ -449,7 +449,7 @@ struct EpicInstalledDLC: Codable, Sendable {
     private func enqueue(_ app: String, kind: Download.Kind) {
         guard Self.enabled else { return }
         guard signedIn else { error = "Sign in to Epic Games to download games."; return }
-        if kind == .install, AntiCheatPolicy.isBlocked(title: game(app)?.title ?? app) { error = AntiCheatPolicy.message; return }
+        if kind == .install, AntiCheatPolicy.isBlocked(title: game(app)?.title ?? app, epicAppName: app) { error = AntiCheatPolicy.message; return }
         guard !EpicCloud.shared.isBusy else { error = "Wait for Epic save sync to finish, then try again."; return }
         if active?.app == app || queue.contains(app) { return }
         if inSession { resumeAfterSession.insert(app); downloads[app] = Download(kind: kind, state: .paused); return }
@@ -634,6 +634,8 @@ struct EpicInstalledDLC: Codable, Sendable {
             manifest: manifest, baseURLs: location.baseURLs, secrets: location.secrets,
             folder: Self.drive.appendingPathComponent(base.folder, isDirectory: true),
             previous: previous, verifyAll: false, journal: Self.journalURL(app)) { progress in
+                guard ProgressThrottle.allow("epic:" + app, state: "\(progress.phase)",
+                                             done: progress.doneBytes, total: progress.totalBytes) else { return }
                 Task { @MainActor in
                     EpicLibrary.shared.downloads[app]?.progress = progress
                     BackgroundDownloads.epic.progress(done: progress.doneBytes, total: progress.totalBytes)
@@ -679,6 +681,14 @@ struct EpicInstalledDLC: Codable, Sendable {
             }) else { throw EpicAPIError.invalid("unknown-game") }
             let asset = EpicAsset(appName: game.appName, labelName: "Live", buildVersion: game.buildVersion,
                                   catalogItemId: game.catalogItemID, namespace: game.namespace)
+            // iDeck: the installed build's file list is read and parsed while the new
+            // manifest downloads, instead of after it (a large game's list took seconds).
+            let previousManifestURL = Self.manifestURL(app)
+            let previousSecrets = installed[app]?.secrets ?? [:]
+            let previousTask = Task.detached(priority: .userInitiated) { () -> EpicManifest? in
+                guard let data = try? Data(contentsOf: previousManifestURL) else { return nil }
+                return try? EpicManifest.parse(data, secrets: previousSecrets)
+            }
             let location = try await api.manifestLocation(asset)
             downloader.window = DownloadSpeed.epicWindow
             let data = try await api.manifest(location)
@@ -694,15 +704,15 @@ struct EpicInstalledDLC: Codable, Sendable {
                     local: Self.drive.appendingPathComponent(folder, isDirectory: true), store: "Epic")
             }
             // The installed build's file list, so an update keeps unchanged files without reading them.
-            let previousData = try? Data(contentsOf: Self.manifestURL(app))
-            let previousSecrets = record?.secrets ?? [:]
-            let previous = await Task.detached(priority: .utility) { previousData.flatMap { try? EpicManifest.parse($0, secrets: previousSecrets) } }.value
+            let previous = await previousTask.value
             EpicLog.event("[epic-download] start app=\(app) kind=\(kind.rawValue) files=\(manifest.files.count) chunks=\(manifest.chunks.count) level=\(manifest.featureLevel)")
             let result = try await downloader.install(
                 manifest: manifest, baseURLs: location.baseURLs, secrets: location.secrets,
                 folder: Self.drive.appendingPathComponent(folder, isDirectory: true),
                 previous: kind == .repair ? nil : previous, verifyAll: kind == .repair, journal: Self.journalURL(app),
                 includeTags: Set(record?.selectedTags ?? [])) { progress in
+                    guard ProgressThrottle.allow("epic:" + app, state: "\(progress.phase)",
+                                                 done: progress.doneBytes, total: progress.totalBytes) else { return }
                     Task { @MainActor in
                         EpicLibrary.shared.downloads[app]?.progress = progress
                         BackgroundDownloads.epic.progress(done: progress.doneBytes, total: progress.totalBytes)

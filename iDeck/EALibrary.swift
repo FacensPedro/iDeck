@@ -376,6 +376,8 @@ struct EAInstalledGame: Codable, Sendable {
             let url = try await api.downloadURL(offerID: id, buildID: build.buildID)
             step("Reading the build's file list")
             var archive = try await downloader.archive(url)
+            // The game page shows the size as soon as the file list is read.
+            sizes[id] = .known(download: archive.compressedBytes, install: archive.installBytes)
             step("Choosing the fastest server")
             archive = await downloader.fastestMirror(archive)
             let record = installed[id]
@@ -388,6 +390,8 @@ struct EAInstalledGame: Codable, Sendable {
             let result = try await downloader.install(
                 archive: archive, folder: Self.drive.appendingPathComponent(folder, isDirectory: true),
                 previous: kind == .repair ? nil : previous, verifyAll: kind == .repair, journal: Self.journalURL(id)) { progress in
+                    guard ProgressThrottle.allow("ea:" + id, state: "\(progress.phase)\(progress.step ?? "")",
+                                                 done: progress.doneBytes, total: progress.totalBytes) else { return }
                     Task { @MainActor in EALibrary.shared.downloads[id]?.progress = progress }
                     if progress.phase == .downloading {
                         DownloadLog.progress(store: "EA app", name: title, done: progress.doneBytes, total: progress.totalBytes)
