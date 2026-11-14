@@ -30,7 +30,8 @@ class Fixes222Tests(unittest.TestCase):
 
     def test_epic_base_size(self):
         self.assertIn("var installTags: [String] = []", read("iDeck/EpicFormats.swift"))
-        self.assertIn("$0.installTags.isEmpty", read("iDeck/EpicLibrary.swift"))
+        self.assertIn("$0.installTags.isEmpty", read("iDeck/EpicFormats.swift"))
+        self.assertIn("manifestSizes[app] = manifest.baseDownloadBytes", read("iDeck/EpicLibrary.swift"))
 
 
 if __name__ == "__main__":
