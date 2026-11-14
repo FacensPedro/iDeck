@@ -1935,8 +1935,8 @@ private struct StoreGameDetailsView<Extra: View>: View {
 }
 
 /// "1.2 GB / 4 GB": what a download has put on the device so far, of its total.
-private func installedBytesText(done: UInt64, total: UInt64) -> String? {
-    guard total > 0, done > 0 else { return nil }
+private func installedBytesText(done: UInt64, total: UInt64, showZero: Bool = false) -> String? {
+    guard total > 0, done > 0 || showZero else { return nil }
     let format = { (bytes: UInt64) in ByteCountFormatter.string(fromByteCount: Int64(clamping: bytes), countStyle: .file) }
     return format(min(done, total)) + " / " + format(total)
 }
@@ -1997,7 +1997,9 @@ private struct EAGameDetailsSheet: View {
         if case .known(_, let bytes)? = ea.sizes[game.id], bytes > 0 {
             return ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
         }
-        return tr("Size unavailable")
+        // Still asking EA: nothing yet, not "unavailable".
+        if case .unavailable? = ea.sizes[game.id] { return tr("Size unavailable") }
+        return nil
     }
 
     var body: some View {
@@ -2025,7 +2027,7 @@ private struct EAGameDetailsSheet: View {
             progress: (download != nil && failed == nil) ? download?.progress.fraction : nil,
             etaSeconds: eta,
             installedText: download.flatMap { $0.progress.phase == .downloading
-                ? installedBytesText(done: $0.progress.doneBytes, total: $0.progress.totalBytes) : nil },
+                ? installedBytesText(done: $0.progress.doneBytes, total: $0.progress.totalBytes, showZero: true) : nil },
             paused: paused, sizeText: sizeText, errorText: failed,
             canInstall: game.downloadable,
             onLaunch: { if let installed { launch(installed) } },

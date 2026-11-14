@@ -443,6 +443,9 @@ final class GOGContentInstaller: @unchecked Sendable {
                     next += 1
                     group.addTask {
                         let data = try await self.fetchChunk(chunk, productID: productID, label: label)
+                        // Counted when it arrives, not when its turn to be written comes:
+                        // one slow chunk no longer freezes the progress of the whole file.
+                        self.progress(chunk.compressedSize)
                         return (index, data)
                     }
                 }
@@ -452,7 +455,6 @@ final class GOGContentInstaller: @unchecked Sendable {
                     ready[index] = data
                     while let data = ready.removeValue(forKey: written) {
                         try writer.write(contentsOf: data)
-                        progress(chunks[written].compressedSize)
                         written += 1
                         add()
                     }

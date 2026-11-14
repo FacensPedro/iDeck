@@ -110,8 +110,19 @@ enum DownloadLog {
             AppLog.record("[download] \(store) \"\(name)\" data again after \(Int(resumed)) s without")
             lock.lock()
         }
-        guard var sample = samples[store], sample.name == name, done >= sample.bytes else {
+        guard var sample = samples[store], sample.name == name else {
             samples[store] = Sample(name: name, started: now, startBytes: done, time: now, bytes: done, total: total)
+            lock.unlock()
+            return
+        }
+        // Bytes taken back (a failed attempt is retried) keep the download's start:
+        // restarting the sample here made its end read "2 GB in 0 s".
+        guard done >= sample.bytes else {
+            sample.bytes = done
+            sample.time = now
+            sample.startBytes = min(sample.startBytes, done)
+            sample.total = total
+            samples[store] = sample
             lock.unlock()
             return
         }

@@ -376,6 +376,8 @@ struct EAInstalledGame: Codable, Sendable {
             let url = try await api.downloadURL(offerID: id, buildID: build.buildID)
             step("Reading the build's file list")
             var archive = try await downloader.archive(url)
+            // The game page shows the size as soon as the file list is read.
+            sizes[id] = .known(download: archive.compressedBytes, install: archive.installBytes)
             step("Choosing the fastest server")
             archive = await downloader.fastestMirror(archive)
             let record = installed[id]
