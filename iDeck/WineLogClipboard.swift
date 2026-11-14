@@ -19,18 +19,18 @@ enum WineLogClipboard {
 
     #if canImport(UIKit)
     @MainActor
-    static func copyFile(from source: URL) async throws {
+    static func copyFile(from source: URL, name: String = "Wine-log") async throws {
         let snapshot = try await Task.detached(priority: .utility) {
             let values = try source.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey])
             guard values.isRegularFile == true, values.isSymbolicLink != true else { throw ReadError.invalidFile }
             guard (values.fileSize ?? 0) > 0 else { throw ReadError.empty }
             let destination = FileManager.default.temporaryDirectory
-                .appendingPathComponent("Wine-log-" + UUID().uuidString + ".txt")
+                .appendingPathComponent(name + "-" + UUID().uuidString + ".txt")
             try FileManager.default.copyItem(at: source, to: destination)
             return destination
         }.value
         let provider = NSItemProvider()
-        provider.suggestedName = "Wine-log.txt"
+        provider.suggestedName = name + ".txt"
         provider.registerFileRepresentation(forTypeIdentifier: UTType.plainText.identifier,
                                             fileOptions: [], visibility: .all) { completion in
             completion(snapshot, false, nil)
