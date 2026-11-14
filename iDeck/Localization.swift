@@ -239,9 +239,7 @@ enum Translations {
         "The game showed no image with MetalFX, so MetalFX is now off for it. Close the game and open it again.": ["pt": "O jogo não mostrou imagem com o MetalFX, então o MetalFX foi desligado para ele. Feche o jogo e abra de novo.", "es": "El juego no mostró imagen con MetalFX, así que MetalFX se desactivó para él. Cierra el juego y ábrelo de nuevo."],
         "Show FPS": ["pt": "Mostrar FPS", "es": "Mostrar FPS"],
         "Copy Wine log": ["pt": "Copiar log do Wine", "es": "Copiar registro de Wine"],
-        "Wine log copied to the clipboard.": ["pt": "Log do Wine copiado para a área de transferência.", "es": "Registro de Wine copiado al portapapeles."],
         "Could not copy Wine log.": ["pt": "Não foi possível copiar o log do Wine.", "es": "No se pudo copiar el registro de Wine."],
-        "The newest 4 MiB of the Wine log were copied. Share the file for the complete log.": ["pt": "Os 4 MiB mais recentes do log do Wine foram copiados. Compartilhe o arquivo para obter o log completo.", "es": "Se copiaron los 4 MiB más recientes del registro de Wine. Comparte el archivo para obtener el registro completo."],
 
         // Status lines
         "Ready": ["pt": "Pronto", "es": "Listo"],
