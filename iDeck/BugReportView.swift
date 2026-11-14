@@ -28,9 +28,38 @@ enum AppLog {
         fileURL?.deletingPathExtension().appendingPathExtension("1.txt")
     }
 
+    /// Messages already written (numbers, addresses and times removed), and the
+    /// repeats of the last one left out in a row; touched only on `queue`.
+    nonisolated(unsafe) private static var written = Set<String>()
+    nonisolated(unsafe) private static var lastKey: String?
+    nonisolated(unsafe) private static var run = 0
+    private static let maximumKeys = 4000
+
+    /// Writes a message once: a repeat (same text apart from numbers, addresses
+    /// or ids) is left out, and a run of repeats in a row ends with one
+    /// "repeated N more times" line, so the log stays short.
     static func record(_ message: String) {
-        let line = stamp.string(from: Date()) + " " + message.replacingOccurrences(of: "\n", with: " ⏎ ") + "\n"
+        let text = message.replacingOccurrences(of: "\n", with: " ⏎ ")
+        let date = Date()
         queue.async {
+            let key = LogIssueScanner.normalized(text.lowercased())
+            if key == lastKey { run += 1; return }
+            var line = ""
+            if run > 0 {
+                line += stamp.string(from: date) + " ↑ repeated \(run) more time\(run == 1 ? "" : "s")\n"
+            }
+            run = 0
+            lastKey = key
+            if written.count >= maximumKeys { written.removeAll(keepingCapacity: true) }
+            if written.insert(key).inserted {
+                line += stamp.string(from: date) + " " + text + "\n"
+            }
+            if !line.isEmpty { append(line) }
+        }
+    }
+
+    /// Appends to the file, rotating it at `maximumBytes`; runs on `queue`.
+    private static func append(_ line: String) {
             guard let url = fileURL, let data = line.data(using: .utf8) else { return }
             let manager = FileManager.default
             if let size = (try? manager.attributesOfItem(atPath: url.path))?[.size] as? UInt64,
@@ -45,13 +74,15 @@ enum AppLog {
             } else {
                 try? data.write(to: url, options: .atomic)
             }
-        }
     }
 
     /// Deletes the log now (waits for pending writes first), so a scan right
     /// after it no longer finds the old lines.
     static func clear() {
         queue.sync {
+            written.removeAll()
+            lastKey = nil
+            run = 0
             for url in [fileURL, rotatedURL].compactMap({ $0 }) {
                 try? FileManager.default.removeItem(at: url)
             }
@@ -297,9 +328,17 @@ final class BugReportModel: ObservableObject {
         notice = tr("Bug copied to the clipboard.")
     }
 
+    /// The whole report as a .txt file on the clipboard.
     func copyAll() {
-        UIPasteboard.general.string = report(for: issues)
-        notice = tr("All bugs copied to the clipboard.")
+        let text = report(for: issues)
+        Task {
+            do {
+                try await WineLogClipboard.copyText(text, name: "iDeck-bugs")
+                notice = tr("All bugs copied as a .txt file.")
+            } catch {
+                notice = tr("Could not copy the bugs.")
+            }
+        }
     }
 
     func copyWineLog() {
@@ -558,11 +597,12 @@ struct BugReportView: View {
             }
             .scrollContentBackground(.hidden)
         }
-        .confirmationDialog("Clear diagnostic logs?", isPresented: $showClearConfirmation) {
+        // A centred alert over the whole Bugs & logs screen, not a popover on the button.
+        .alert(tr("Clear diagnostic logs?"), isPresented: $showClearConfirmation) {
             Button(tr("Clear logs"), role: .destructive) { model.clearLogs() }
             Button(tr("Cancel"), role: .cancel) { }
         } message: {
-            Text("This action cannot be undone. Games and settings will not be changed.")
+            Text(tr("This action cannot be undone. Games and settings will not be changed."))
         }
         .navigationTitle(tr("Bugs & logs"))
         .navigationBarTitleDisplayMode(.inline)
