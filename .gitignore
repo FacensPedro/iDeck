@@ -1,5 +1,12 @@
 __pycache__/
 *.pyc
 .DS_Store
-build/
+build/*
+# iDeck's own Windows-side sources under build/ are tracked.
+!build/compat-dlls/
+!build/d3d-stubs/
+!build/dcomp/
+!build/gog-galaxy-service/
+!build/host/
+!build/wineserver/
 vendor/

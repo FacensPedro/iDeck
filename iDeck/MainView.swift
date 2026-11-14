@@ -2798,10 +2798,8 @@ private struct IDeckFirstRunSetupView: View {
 
     private var visualCppStep: some View {
         VStack(alignment: .leading, spacing: 18) {
-            stepHeader(.visualCpp, "Prepares the Windows environment and installs Microsoft Visual C++ 2005–2022, which most games and programs need.")
+            stepHeader(.visualCpp, "Installs Microsoft Visual C++ 2005–2022, which most games and programs need.")
             componentList {
-                statusRow("Windows environment (x64 + x86)", prefixReady)
-                Divider().overlay(hairline).padding(.leading, 43)
                 statusRow("Microsoft Visual C++ 2005–2022", vcReady)
             }
             primaryButton(prefixReady && vcReady ? "Installed" : (installing ? "Installing…" : "Install"),
@@ -2814,7 +2812,6 @@ private struct IDeckFirstRunSetupView: View {
             if !MadeiraRuntime.available {
                 note("This IPA does not include the Windows runtime. Install a native iDeck IPA.", warning: true)
             }
-            note("Downloaded from Microsoft.")
         }
     }
 

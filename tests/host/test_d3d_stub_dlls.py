@@ -52,6 +52,17 @@ class WiringTests(unittest.TestCase):
         workflow = (ROOT / ".github/workflows/ios.yml").read_text()
         self.assertIn("'scripts/build_d3d_stub_dlls.sh', 'build/d3d-stubs/*'", workflow)
 
+    def test_sources_are_in_the_repository(self):
+        # build/ is ignored for build products; iDeck's own sources there must stay tracked,
+        # or CI builds without them (2.3.6 shipped no stand-ins for that reason).
+        tracked = subprocess.run(["git", "-C", str(ROOT), "ls-files", "build/d3d-stubs"],
+                                 capture_output=True, text=True).stdout.split()
+        if not tracked:
+            ignored = subprocess.run(["git", "-C", str(ROOT), "check-ignore", "-q", "build/d3d-stubs/d3d11on12.c"])
+            self.assertNotEqual(ignored.returncode, 0, "build/d3d-stubs is git-ignored")
+        else:
+            self.assertEqual(sorted(Path(name).name for name in tracked), ["d3d11on12.c", "d3d9on12.c", "d3dcsx.c"])
+
     def test_dxtrans_joins_the_x64_farm(self):
         self.assertIn("dlls/dxtrans/arm64ec-windows/dxtrans.dll", (ROOT / "scripts/arm64ec_extra_modules.txt").read_text())
 
