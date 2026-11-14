@@ -133,6 +133,7 @@ enum Translations {
         ],
         "Checking existing files %d%%": ["pt": "Verificando arquivos existentes %d%%", "es": "Verificando archivos existentes %d%%"],
         "Installed: %@": ["pt": "Instalado: %@", "es": "Instalado: %@"],
+        "Wine log copied as a .txt file.": ["pt": "Log do Wine copiado como arquivo .txt.", "es": "Registro de Wine copiado como archivo .txt."],
         "Download: %@": ["pt": "Download: %@", "es": "Descarga: %@"],
         "Minimum required space: %@": ["pt": "Espaço mínimo necessário: %@", "es": "Espacio mínimo necesario: %@"],
         "Reconnect JIT debugger": ["pt": "Reconectar depurador JIT", "es": "Reconectar depurador JIT"],

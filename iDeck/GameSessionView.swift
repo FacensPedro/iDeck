@@ -167,18 +167,13 @@ struct GameSessionView: View {
         isCopyingWineLog = true
         logCopyMessage = nil
         Task {
-            let content = await Task.detached(priority: .utility) {
-                try? WineLogClipboard.read(from: url)
-            }.value
-            isCopyingWineLog = false
-            guard let content else {
-                logCopyMessage = "Could not copy Wine log."
-                return
+            defer { isCopyingWineLog = false }
+            do {
+                try await WineLogClipboard.copyFile(from: url)
+                logCopyMessage = tr("Wine log copied as a .txt file.")
+            } catch {
+                logCopyMessage = tr("Could not copy Wine log.")
             }
-            UIPasteboard.general.string = content.text
-            logCopyMessage = content.truncated
-                ? "The newest 4 MiB of the Wine log were copied. Share the file for the complete log."
-                : "Wine log copied to the clipboard."
         }
     }
 
