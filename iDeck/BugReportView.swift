@@ -383,6 +383,8 @@ final class BugReportModel: ObservableObject {
         }
         let runtime = MadeiraBundleIdentity.profile
         let defaults = UserDefaults.standard
+        let currentMiB = ResourceGovernor.footprintMiB()
+        let peakMiB = defaults.object(forKey: "diagnostics.sessionPeakMiB") as? Int
         let physical = ProcessInfo.processInfo.physicalMemory / 1_048_576
         let poolSetting = defaults.object(forKey: "wineJITPoolMiB") as? Int ?? 0
         let pool = poolSetting > 0 ? "\(poolSetting) MB" : "automatic"
@@ -391,7 +393,9 @@ final class BugReportModel: ObservableObject {
             .volumeAvailableCapacityForImportantUsage
         return [
             "Build: commit \(runtime["sourceCommit"] as? String ?? "unknown"), graphics \(MadeiraBundleIdentity.graphicsProfile)",
-            "Memory: \(physical) MB physical, \(ResourceGovernor.availableMiB()) MB still allowed by iOS",
+            "Memory: \(physical) MiB physical, \(ResourceGovernor.availableMiB()) MiB still allowed by iOS",
+            "iDeck RAM now: " + (currentMiB >= 0 ? "\(currentMiB) MiB" : "unavailable"),
+            "Last game session, highest sampled iDeck RAM: " + (peakMiB.map { "\($0) MiB" } ?? "unavailable"),
             "Memory+: increased limit \(name(MemoryPlus.increasedLimit)), extended addressing \(name(MemoryPlus.extendedAddressing))",
             "JIT: method \(defaults.string(forKey: SystemCoordinator.jitMethodKey) ?? "stikdebug"), pool \(pool)",
             "Windows runtime: x64 \(MadeiraRuntime.installed("wine-x64") ? "installed" : "missing"), x86 \(MadeiraRuntime.installed("wine-x86") ? "installed" : "missing")",

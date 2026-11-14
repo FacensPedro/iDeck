@@ -122,8 +122,14 @@ class SystemCoordinator: ObservableObject {
         memorySampler?.invalidate()
         let started = Date()
         var samples = 0
+        var peakMiB = -1
+        UserDefaults.standard.removeObject(forKey: "diagnostics.sessionPeakMiB")
         let log = { [weak self] (stage: String) in
             let footprint = MainActor.assumeIsolated { ResourceGovernor.footprintMiB() }
+            if footprint > peakMiB {
+                peakMiB = footprint
+                UserDefaults.standard.set(peakMiB, forKey: "diagnostics.sessionPeakMiB")
+            }
             AppLog.record("[memory] session \(stage) t=\(Int(Date().timeIntervalSince(started)))s footprint=\(footprint) MiB "
                           + "available=\(Int(os_proc_available_memory() >> 20)) MiB launcher=\(launcher) "
                           + "dock=\(self?.currentSteamLaunchUsesDock == true ? 1 : 0)")
