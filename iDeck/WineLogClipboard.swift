@@ -1,6 +1,8 @@
 import Foundation
+#if canImport(UIKit)
 import UIKit
 import UniformTypeIdentifiers
+#endif
 
 enum WineLogClipboard {
     static let maximumCopiedBytes = 4 * 1024 * 1024
@@ -15,6 +17,7 @@ enum WineLogClipboard {
         case empty
     }
 
+    #if canImport(UIKit)
     @MainActor
     static func copyFile(from source: URL) async throws {
         let snapshot = try await Task.detached(priority: .utility) {
@@ -35,6 +38,8 @@ enum WineLogClipboard {
         }
         UIPasteboard.general.setItemProviders([provider], localOnly: true, expirationDate: nil)
     }
+
+    #endif
 
     static func read(from url: URL) throws -> Content {
         let attributes = try url.resourceValues(
