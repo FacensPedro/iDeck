@@ -47,3 +47,12 @@ class StallAndSizeTests(unittest.TestCase):
         view = (ROOT / "iDeck/MainView.swift").read_text()
         self.assertIn("game.displaySizeForWindows(installedBytes: measured, ownedDLC: steamLibrary.ownedDepotIDs)", view)
         self.assertIn(".onAppear { steamLibrary.loadOwnedDepots() }", view)
+
+
+class SessionProgramsTests(unittest.TestCase):
+    def test_bug_report_lists_programs_a_session_started(self):
+        report = (ROOT / "iDeck/BugReportView.swift").read_text()
+        self.assertIn("enum SessionProgramsTrace {", report)
+        self.assertIn('lower.contains("trace:process") && lower.contains(" cmdline ")', report)
+        self.assertIn('"Programs the last session started (Wine log, oldest first):"', report)
+        self.assertIn('"[dock-installers]", "[steam-redist]"', report)
