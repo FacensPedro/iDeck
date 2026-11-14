@@ -414,8 +414,11 @@ final class GOGLibraryModel: ObservableObject {
                 let counter = GOGByteCounter()
                 AppLog.record("[gog] installing game \(game.id): \(plan.files.count) files, \(plan.downloadBytes) bytes to download")
                 let installer = GOGContentInstaller(tokens: tokens) { bytes in
-                    let done = counter.add(bytes)
+                    // One main-thread update every 0.25 s at most, never going backwards:
+                    // a task per chunk flooded the main thread and arrived out of order.
+                    guard let done = counter.addAndPublish(bytes) else { return }
                     Task { @MainActor in
+                        guard UInt64(max(done, 0)) >= (self.downloadedBytes[game.id]?.done ?? 0) else { return }
                         self.downloadProgress[game.id] = min(Double(done) / Double(total), 1)
                         self.downloadedBytes[game.id] = (UInt64(max(done, 0)), UInt64(total))
                         self.updateDownloadETA(gameID: game.id, done: UInt64(max(done, 0)), total: UInt64(total))
@@ -629,9 +632,19 @@ final class GOGLibraryModel: ObservableObject {
 final class GOGByteCounter: @unchecked Sendable {
     private let lock = NSLock()
     private var total: Int64 = 0
+    private var lastPublish = Date.distantPast
     func add(_ bytes: Int64) -> Int64 {
         lock.lock(); defer { lock.unlock() }
         total += bytes
+        return total
+    }
+
+    /// Adds `bytes`; returns the new total when 0.25 s passed since the last one returned.
+    func addAndPublish(_ bytes: Int64, now: Date = Date()) -> Int64? {
+        lock.lock(); defer { lock.unlock() }
+        total += bytes
+        guard now.timeIntervalSince(lastPublish) >= 0.25 else { return nil }
+        lastPublish = now
         return total
     }
 }

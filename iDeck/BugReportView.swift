@@ -611,13 +611,15 @@ struct BugReportView: View {
                 }
             }
             .scrollContentBackground(.hidden)
-        }
-        // A centred alert over the whole Bugs & logs screen, not a popover on the button.
-        .alert(tr("Clear diagnostic logs?"), isPresented: $showClearConfirmation) {
-            Button(tr("Clear logs"), role: .destructive) { model.clearLogs() }
-            Button(tr("Cancel"), role: .cancel) { }
-        } message: {
-            Text(tr("This action cannot be undone. Games and settings will not be changed."))
+            // On the list, not next to the notice alert below: two .alert modifiers on
+            // one view show only one of them, which left Clear logs doing nothing.
+            // A centred alert over the whole Bugs & logs screen, not a popover on the button.
+            .alert(tr("Clear diagnostic logs?"), isPresented: $showClearConfirmation) {
+                Button(tr("Clear logs"), role: .destructive) { model.clearLogs() }
+                Button(tr("Cancel"), role: .cancel) { }
+            } message: {
+                Text(tr("This action cannot be undone. Games and settings will not be changed."))
+            }
         }
         .navigationTitle(tr("Bugs & logs"))
         .navigationBarTitleDisplayMode(.inline)

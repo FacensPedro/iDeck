@@ -556,7 +556,11 @@ final class EADownloader: @unchecked Sendable {
             }
         }
 
-        meter.set { $0.phase = .downloading; $0.totalBytes = UInt64(toFetch.reduce(Int64(0)) { $0 + $1.compressedSize }); $0.doneBytes = 0; $0.step = nil }
+        // Done/total cover the whole game: files already on disk (a resumed or updated
+        // install) count as done from the first moment, so the page shows them at once.
+        let allBytes = UInt64(files.reduce(Int64(0)) { $0 + $1.compressedSize })
+        let fetchBytes = UInt64(toFetch.reduce(Int64(0)) { $0 + $1.compressedSize })
+        meter.set { $0.phase = .downloading; $0.totalBytes = max(allBytes, fetchBytes); $0.doneBytes = max(allBytes, fetchBytes) - fetchBytes; $0.bytesPerSecond = 0; $0.step = nil }
         EALog.event("[ea-download] plan files=\(files.count) fetch=\(toFetch.count) kept=\(kept) bytes=\(needed)")
         var fetched: UInt64 = 0
         var written = 0
