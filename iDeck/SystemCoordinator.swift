@@ -376,6 +376,7 @@ class SystemCoordinator: ObservableObject {
         let update = {
             if status == "Windows Ready" || status.hasPrefix("Execution Error") || status.hasPrefix("Cannot launch") {
                 self.finishMemorySampling()
+                MainActor.assumeIsolated { EALibrary.shared.launchEnded() }
             }
             self.windowsStatus = status
             self.currentStatus = status
@@ -440,7 +441,7 @@ class SystemCoordinator: ObservableObject {
                 // debugger is attached. StikDebug may detach before the user taps
                 // Play; with the pool ready, the launch no longer reopens StikDebug.
                 self.wineJITAttemptedDuringAttachment = true
-                if MadeiraBundleIdentity.isNative, AddressSpaceCheck.hasGuestWindow,
+                if Self.restartNeeded() == nil, MadeiraBundleIdentity.isNative, AddressSpaceCheck.hasGuestWindow,
                    StikJITHelper.scriptData != nil, !ideck_wineprocess_running() {
                     self.wineJITPreparationInFlight = true
                     // No game is chosen yet, so its fixed-base exe cannot be measured
@@ -459,6 +460,11 @@ class SystemCoordinator: ObservableObject {
                             self.wineJITPreparationInFlight = false
                             if let failure { AppLog.record("[jit] early pool preparation failed: \(failure)") }
                             self.refreshJITStatus()
+                            if let launch = self.pendingJITLaunch {
+                                self.pendingJITLaunch = nil
+                                if let failure { self.setWindowsStatus("Execution Error: " + failure) }
+                                else { launch() }
+                            }
                         }
                     }
                 }
@@ -522,6 +528,10 @@ class SystemCoordinator: ObservableObject {
         // Validated preparation: CS_DEBUGGED on this process, and a live debugger to
         // answer the pool request or this run's pool already prepared. Anything less
         // never reaches Wine: iDeck starts the activation itself and the launch waits.
+        if wineJITPreparationInFlight {
+            if let resume { waitForDebuggerThenResume(resume) }
+            return false
+        }
         if Self.jitPreparationValidated() {
             Self.recordLaunchJITState()
             return true
@@ -578,8 +588,11 @@ class SystemCoordinator: ObservableObject {
         pendingJITLaunch = nil
         switch result {
         case .success:
-            AppLog.record("[jit] debugger attached; continuing the launch")
-            launch?()
+            if wineJITPreparationInFlight {
+                pendingJITLaunch = launch
+            } else {
+                launch?()
+            }
         case .failure(let error):
             if launch != nil { setWindowsStatus(error.localizedDescription) }
         }
@@ -695,7 +708,7 @@ class SystemCoordinator: ObservableObject {
     /// opens on the tap instead of after the store answers. The launch itself still
     /// goes through ensureJITForGameLaunch and waits for the validated preparation.
     func prewarmJITForLaunch() {
-        guard MadeiraBundleIdentity.isNative, AddressSpaceCheck.hasGuestWindow,
+        guard Self.restartNeeded() == nil, MadeiraBundleIdentity.isNative, AddressSpaceCheck.hasGuestWindow,
               StikJITHelper.scriptData != nil, !isClosingWindowsSession else { return }
         refreshJITStatus()
         guard !Self.jitPreparationValidated() else { return }
@@ -1046,6 +1059,7 @@ class SystemCoordinator: ObservableObject {
 
     func launchWindowsExecutable(at url: URL, profile: WindowsGameProfile? = nil) {
         guard !isClosingWindowsSession else { return }
+        guard !previousWineSessionStillFinishing() else { return }
         isSteamSession = false
         let gameID = profile?.id ?? ""
         // The EA app's environment (EALibrary.prepareLaunch) belongs to EA games only.
@@ -1058,7 +1072,6 @@ class SystemCoordinator: ObservableObject {
         if launcher == ".exe" { WindowsLibraryStore.noteLaunch(of: url) }
         BenchmarkSession.begin(kind: "game", scenario: profile?.title ?? url.deletingPathExtension().lastPathComponent,
                                settings: BenchmarkSession.gameSettings(profile))
-        guard !previousWineSessionStillFinishing() else { return }
         currentSteamLaunchUsesDock = false
         dockLaunchAccepted = false
         steamDockLaunchStage = nil
@@ -1902,6 +1915,9 @@ class SystemCoordinator: ObservableObject {
 
     static func restartNeeded() -> String? {
         if let restartReason { return restartReason }
+        if WindowsEnvironment.oneSessionPerRun && WindowsEnvironment.sessionsThisRun > 0 {
+            return "this runtime requires a fresh iDeck process for each Windows session"
+        }
         // A pool that had to shrink is not a reason: it happens on a fresh launch too
         // (the startup pool keeps a 256 MB exe window free), so reopening changes nothing.
         let free = Int(os_proc_available_memory() >> 20)

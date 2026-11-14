@@ -56,7 +56,7 @@ enum DownloadETA {
 /// 15 s per running download (bytes done, total and the speed over those seconds), one
 /// when it ends with its average speed, and the reason when it fails.
 enum DownloadLog {
-    private struct Sample { var name: String; var started: Date; var startBytes: UInt64; var time: Date; var bytes: UInt64 }
+    private struct Sample { var name: String; var started: Date; var startBytes: UInt64; var time: Date; var bytes: UInt64; var total: UInt64 }
     private static let lock = NSLock()
     nonisolated(unsafe) private static var samples: [String: Sample] = [:]  // guarded by lock
     static let interval: TimeInterval = 15
@@ -111,10 +111,12 @@ enum DownloadLog {
             lock.lock()
         }
         guard var sample = samples[store], sample.name == name, done >= sample.bytes else {
-            samples[store] = Sample(name: name, started: now, startBytes: done, time: now, bytes: done)
+            samples[store] = Sample(name: name, started: now, startBytes: done, time: now, bytes: done, total: total)
             lock.unlock()
             return
         }
+        samples[store]?.total = total
+        sample.total = total
         let seconds = now.timeIntervalSince(sample.time)
         guard seconds >= interval else { lock.unlock(); return }
         let speed = megabytesPerSecond(done - sample.bytes, seconds)
@@ -128,12 +130,14 @@ enum DownloadLog {
     static func ended(store: String, name: String, outcome: String, now: Date = Date()) {
         lock.lock()
         let sample = samples.removeValue(forKey: store)
-        lastData.removeValue(forKey: store)
+        let last = lastData.removeValue(forKey: store)
         lock.unlock()
         var line = "[download] \(store) \"\(name)\" \(outcome)"
         if let sample, sample.name == name {
             let seconds = now.timeIntervalSince(sample.started)
-            line += ", \(gigabytes(sample.bytes - sample.startBytes)) in \(Int(seconds)) s, average \(megabytesPerSecond(sample.bytes - sample.startBytes, seconds))"
+            let final = outcome == "finished" ? sample.total : (last?.bytes ?? sample.bytes)
+            let transferred = final - min(final, sample.startBytes)
+            line += ", \(gigabytes(transferred)) in \(Int(seconds)) s, average \(megabytesPerSecond(transferred, seconds))"
         }
         AppLog.record(line)
     }
