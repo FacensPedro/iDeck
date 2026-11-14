@@ -77,6 +77,7 @@ private final class GameRuntimeMetrics: ObservableObject {
             if baselineFrames == nil { baselineFrames = count }
             if let baselineFrames, count > baselineFrames, !receivedNewFrames {
                 if firstFrameAt == nil { firstFrameAt = elapsed }
+                AppLog.record("[graphics] first frame presented by the renderer")
                 receivedNewFrames = true
             }
             if collectPerformance, let oldTime = previousUptime, let oldFrames = previousFrames, uptime > oldTime {

@@ -507,7 +507,7 @@ class WindowsEnvironment {
         // it keeps its own choice when this IPA runs both, and is switched to
         // Direct3D 11 (DXMT) through its engine when this IPA has no D3D12.
         guard d3d11 && d3d12 else {
-            SteamLog.event("[graphics] automatic: \(d3d12 ? "Direct3D 12 (Madeira)" : d3d11 ? "Direct3D 11 (DXMT)" : "no Direct3D")")
+            SteamLog.event("[graphics] automatic: \(d3d12 ? "Direct3D 12 (Madeira)" : d3d11 ? "Direct3D 11 (DXMT)" : "no D3D11 or D3D12 import detected; runtime selection remains automatic")")
             return []
         }
         guard !d3d12Available else {

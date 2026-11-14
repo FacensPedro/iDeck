@@ -280,7 +280,9 @@ struct EAInstalledGame: Codable, Sendable {
 
     /// A first install was paused or failed: its journal is on disk.
     func hasPartialDownload(_ id: String) -> Bool {
-        FileManager.default.fileExists(atPath: Self.journalURL(id).path)
+        let journal = Self.journalURL(id)
+        return FileManager.default.fileExists(atPath: journal.path)
+            || FileManager.default.fileExists(atPath: journal.deletingPathExtension().appendingPathExtension("folder").path)
     }
 
     // MARK: Downloads
@@ -410,9 +412,10 @@ struct EAInstalledGame: Codable, Sendable {
             DownloadLog.ended(store: "EA app", name: title, outcome: "finished")
         } catch {
             if Task.isCancelled || error is CancellationError || (error as? URLError)?.code == .cancelled {
-                if downloads[id] != nil { downloads[id]?.state = .paused }
-                EALog.event("[ea-download] paused id=\(id)")
-                DownloadLog.ended(store: "EA app", name: game(id)?.title ?? installed[id]?.title ?? id, outcome: "paused or stopped")
+                let stopped = downloads[id] == nil
+                if downloads[id]?.state != .queued { downloads[id]?.state = .paused }
+                EALog.event("[ea-download] \(stopped ? "stopped" : "paused") id=\(id)")
+                DownloadLog.ended(store: "EA app", name: game(id)?.title ?? installed[id]?.title ?? id, outcome: stopped ? "stopped" : "paused")
             } else {
                 downloads[id]?.state = .failed(error.localizedDescription)
                 DownloadLog.ended(store: "EA app", name: game(id)?.title ?? installed[id]?.title ?? id, outcome: "failed: " + error.localizedDescription)
@@ -593,7 +596,7 @@ struct EAInstalledGame: Codable, Sendable {
     }
 
     /// The session ended: the service stops and the EA app's environment goes.
-    private func launchEnded() {
+    func launchEnded() {
         guard launched != nil else { return }
         launched = nil
         EAService.shared.stop()
@@ -604,8 +607,8 @@ struct EAInstalledGame: Codable, Sendable {
 
     /// A game session is starting or ended: downloads pause for it and continue afterwards. Idempotent.
     func sessionChanged(active running: Bool) {
-        if !running { launchEnded() }
         guard running != inSession else { return }
+        if !running { launchEnded() }
         inSession = running
         if running {
             if let current = active { resumeAfterSession.insert(current.id); current.task.cancel() }
