@@ -230,6 +230,28 @@ struct EpicManifest: Sendable {
     var chunks: [EpicGUID: EpicChunkInfo]
     var files: [EpicFileEntry]
 
+    func installFiles(includeTags: Set<String> = []) -> [EpicFileEntry] {
+        let hasBase = files.contains { $0.symlinkTarget.isEmpty && $0.installTags.isEmpty }
+        return files.filter { file in
+            file.symlinkTarget.isEmpty &&
+                (!hasBase || file.installTags.isEmpty || !includeTags.isDisjoint(with: file.installTags))
+        }
+    }
+
+    var baseDownloadBytes: Int64? {
+        var seen = Set<EpicGUID>()
+        var total: Int64 = 0
+        for file in installFiles() {
+            for part in file.parts where seen.insert(part.guid).inserted {
+                guard let size = chunks[part.guid]?.fileSize, size > 0 else { return nil }
+                let (sum, overflow) = total.addingReportingOverflow(size)
+                guard !overflow else { return nil }
+                total = sum
+            }
+        }
+        return total
+    }
+
     static let magic: UInt32 = 0x44BE_C00C
 
     static func chunkFolder(_ level: UInt32) -> String {

@@ -12,7 +12,11 @@ class EpicBaseAndDLCTests(unittest.TestCase):
     def test_downloader_installs_base_files_only(self):
         d = read("EpicDownloader.swift")
         self.assertIn("includeTags: Set<String> = []", d)
-        self.assertIn("if hasBase, !file.installTags.isEmpty, includeTags.isDisjoint(with: file.installTags) { continue }", d)
+        self.assertIn("manifest.installFiles(includeTags: includeTags)", d)
+        formats = read("EpicFormats.swift")
+        self.assertIn("!includeTags.isDisjoint(with: file.installTags)", formats)
+        self.assertIn("for file in installFiles()", formats)
+        self.assertIn("seen.insert(part.guid).inserted", formats)
 
     def test_dlc_listed_installed_and_removed(self):
         api = read("EpicAPI.swift")

@@ -91,12 +91,7 @@ final class EpicDownloader: @unchecked Sendable {
         // Which files to write.
         struct Planned { var file: EpicFileEntry; var parts: [String] }
         var all: [Planned] = []
-        // The base game: files without install tags, plus files whose tags were chosen.
-        // Optional content (language packs, high-resolution textures) is left out. A
-        // manifest whose files all carry tags is installed whole.
-        let hasBase = manifest.files.contains { $0.installTags.isEmpty }
-        for file in manifest.files where file.symlinkTarget.isEmpty {
-            if hasBase, !file.installTags.isEmpty, includeTags.isDisjoint(with: file.installTags) { continue }
+        for file in manifest.installFiles(includeTags: includeTags) {
             guard let parts = EpicManifest.components(file.name) else { throw EpicFormatError.unsafePath }
             all.append(Planned(file: file, parts: parts))
         }

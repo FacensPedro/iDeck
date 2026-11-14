@@ -298,6 +298,18 @@ final class BugReportModel: ObservableObject {
         notice = tr("All bugs copied to the clipboard.")
     }
 
+    func copyWineLog() {
+        guard let url = Self.wineLogURL else { return }
+        Task {
+            do {
+                try await WineLogClipboard.copyFile(from: url)
+                notice = tr("Wine log copied as a .txt file.")
+            } catch {
+                notice = tr("Could not copy Wine log.")
+            }
+        }
+    }
+
     func copyLog(_ url: URL?) {
         guard let url, let content = try? WineLogClipboard.read(from: url) else {
             notice = tr("That log is empty.")
@@ -523,7 +535,7 @@ struct BugReportView: View {
                         Label(tr("Copy all bugs"), systemImage: "doc.on.doc")
                     }
                     .disabled(model.issues.isEmpty)
-                    Button { model.copyLog(BugReportModel.wineLogURL) } label: {
+                    Button { model.copyWineLog() } label: {
                         Label(tr("Copy last Wine log"), systemImage: "terminal")
                     }
                     .disabled(!model.hasWineLog)
