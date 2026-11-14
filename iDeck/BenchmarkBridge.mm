@@ -1,6 +1,8 @@
 #import "BenchmarkBridge.h"
 #import <Metal/Metal.h>
 #include <dlfcn.h>
+#include <libproc.h>
+#include <unistd.h>
 #include "BenchmarkRecorder.hpp"
 
 using ideck::bench::Recorder;
@@ -33,6 +35,19 @@ NSDictionary *stage(const ideck::bench::StageResult &result) {
              @"megabytesPerSecond": result.seconds > 0 ? @(result.bytes / 1048576.0 / result.seconds) : [NSNull null]};
 }
 } // namespace
+
+BOOL IDResetSessionFootprint(void) {
+    using Reset = int (*)(pid_t);
+    static Reset reset = reinterpret_cast<Reset>(dlsym(RTLD_DEFAULT, "proc_reset_footprint_interval"));
+    return reset && reset(getpid()) == 0;
+}
+
+int64_t IDSessionPeakMiB(void) {
+    struct rusage_info_v4 info = {};
+    if (proc_pid_rusage(getpid(), RUSAGE_INFO_V4, reinterpret_cast<rusage_info_t *>(&info)) != 0 ||
+        info.ri_interval_max_phys_footprint == 0) return -1;
+    return info.ri_interval_max_phys_footprint >> 20;
+}
 
 @implementation IDBenchmarkRecorder
 

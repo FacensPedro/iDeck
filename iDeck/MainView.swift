@@ -111,16 +111,12 @@ struct MainView: View {
 
 struct SteamGameArtworkView: View {
     let game: SteamAppInfo
-    @State private var candidateIndex = 0
+    var shelf = false
 
     private var candidates: [URL] {
         var urls: [URL] = []
         func append(_ url: URL?) {
             if let url, !urls.contains(url) { urls.append(url) }
-        }
-        if game.appID == 407530 {
-            // ARK: Survival of the Fittest publishes its vertical artwork as portrait.png.
-            append(URL(string: "https://cdn.cloudflare.steamstatic.com/steam/apps/407530/portrait.png"))
         }
         if let asset = game.libraryCapsule,
            asset.utf8.count <= 256,
@@ -146,29 +142,17 @@ struct SteamGameArtworkView: View {
     }
 
     var body: some View {
-        AsyncImage(url: candidateIndex < candidates.count ? candidates[candidateIndex] : nil) { phase in
-            if let image = phase.image {
-                image.resizable().scaledToFit()
-            } else if phase.error != nil {
-                Image(systemName: "gamecontroller.fill")
-                    .resizable()
-                    .scaledToFit()
-                    .padding(14)
-                    .foregroundColor(.gray)
-                    .onAppear {
-                        if candidateIndex + 1 < candidates.count { candidateIndex += 1 }
-                    }
-            } else {
-                ZStack {
-                    Color.white.opacity(0.06)
-                    ProgressView().tint(.gray)
+        Group {
+            if game.appID == 407530 {
+                Color.clear.overlay {
+                    Image("ARKSurvivalOfTheFittest").resizable().scaledToFill()
                 }
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+            } else {
+                GOGArtworkView(urls: candidates, fallbackColor: Color.white.opacity(0.06), fill: shelf)
+                    .id(game.appID)
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.white.opacity(0.06))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-        .task(id: game.appID) { candidateIndex = 0 }
         .accessibilityLabel(game.name)
     }
 }
@@ -2304,12 +2288,12 @@ extension WindowsWorkspaceView {
             }
         case .steam(let id):
             if let game = steamLibrary.games.first(where: { $0.appID == id }) {
-                SteamGameArtworkView(game: game)
+                SteamGameArtworkView(game: game, shelf: true)
             } else { panelColor }
         case .gog(let id), .gogInstalling(let id):
             GOGArtworkView(urls: gogLibrary.games.first { $0.id == id }?.artworkCandidates ?? [], fallbackColor: panelColor)
         case .epic(let app), .epicInstalling(let app):
-            GOGArtworkView(urls: [epicLibrary.game(app)?.cover].compactMap { $0 }, fallbackColor: panelColor)
+            GOGArtworkView(urls: [epicLibrary.game(app)?.cover].compactMap { $0 }, fallbackColor: panelColor, fill: true)
         case .ea(let id):
             GOGArtworkView(urls: [eaLibrary.game(id)?.cover].compactMap { $0 }, fallbackColor: panelColor, fill: true)
         case .exe(let path):

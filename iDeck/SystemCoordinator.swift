@@ -113,31 +113,40 @@ class SystemCoordinator: ObservableObject {
         startMemorySampling(launcher: launcher)
     }
 
-    /// Where the memory goes during a session: iDeck's footprint (which includes Wine,
-    /// FEX, Madeira Dock's Steam client and the game, all in this one process) every
-    /// 30 s for 10 minutes, so a bug report shows when it grows (at Dock's sign-in, at
-    /// the first frame, over time) instead of one number.
     private var memorySampler: Timer?
-    private func startMemorySampling(launcher: String) {
+    private var finishMemorySample: (() -> Void)?
+
+    private func finishMemorySampling() {
         memorySampler?.invalidate()
+        memorySampler = nil
+        finishMemorySample?()
+        finishMemorySample = nil
+    }
+
+    private func startMemorySampling(launcher: String) {
+        finishMemorySampling()
         let started = Date()
-        var samples = 0
+        let tracksInterval = IDResetSessionFootprint()
+        var peakMiB = -1
+        let defaults = UserDefaults.standard
+        defaults.removeObject(forKey: "diagnostics.sessionPeakMiB")
+        defaults.set(false, forKey: "diagnostics.kernelPeak")
         let log = { [weak self] (stage: String) in
             let footprint = MainActor.assumeIsolated { ResourceGovernor.footprintMiB() }
+            let kernelPeak = tracksInterval ? Int(IDSessionPeakMiB()) : -1
+            let highest = max(footprint, kernelPeak)
+            if highest > peakMiB {
+                peakMiB = highest
+                defaults.set(highest, forKey: "diagnostics.sessionPeakMiB")
+            }
+            if kernelPeak >= 0 { defaults.set(true, forKey: "diagnostics.kernelPeak") }
             AppLog.record("[memory] session \(stage) t=\(Int(Date().timeIntervalSince(started)))s footprint=\(footprint) MiB "
-                          + "available=\(Int(os_proc_available_memory() >> 20)) MiB launcher=\(launcher) "
+                          + "peak=\(peakMiB) MiB available=\(Int(os_proc_available_memory() >> 20)) MiB launcher=\(launcher) "
                           + "dock=\(self?.currentSteamLaunchUsesDock == true ? 1 : 0)")
         }
         log("start")
-        let timer = Timer(timeInterval: 30, repeats: true) { [weak self] timer in
-            samples += 1
-            guard samples <= 20, ideck_wineprocess_running() else {
-                timer.invalidate()
-                if self?.memorySampler === timer { self?.memorySampler = nil }
-                return
-            }
-            log("sample")
-        }
+        finishMemorySample = { log("end") }
+        let timer = Timer(timeInterval: 30, repeats: true) { _ in log("sample") }
         RunLoop.main.add(timer, forMode: .common)
         memorySampler = timer
     }
@@ -365,6 +374,9 @@ class SystemCoordinator: ObservableObject {
         AppLog.record("[status] " + status)
         recordBenchmarkMilestone(status)
         let update = {
+            if status == "Windows Ready" || status.hasPrefix("Execution Error") || status.hasPrefix("Cannot launch") {
+                self.finishMemorySampling()
+            }
             self.windowsStatus = status
             self.currentStatus = status
             // A session starting or ending changes whether 120 Hz may be held.
@@ -1593,6 +1605,7 @@ class SystemCoordinator: ObservableObject {
         dockLaunchAccepted = report.fields["launch-client-error"] == "0"
         if let failure = report.failure {
             dockSessionActive = false
+            finishMemorySampling()
             setWindowsStatus("Steam: " + failure)
             MainActor.assumeIsolated { MadeiraDock.cleanup() }
             return
@@ -1818,6 +1831,7 @@ class SystemCoordinator: ObservableObject {
         guard windowsStatus == "Running" || windowsStatus == "Steam Running" ||
               windowsStatus == "Wine started; waiting for game..." else { return }
         guard !ideck_wineprocess_running() else { return }
+        finishMemorySampling()
         let endedGame = activeWindowsProfile?.id ?? activeSteamGameID.map { "steam:\($0)" }
         activeSteamGameID = nil
         activeSteamPrefix = nil
