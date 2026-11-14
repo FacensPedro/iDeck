@@ -1,7 +1,7 @@
 #import "BenchmarkBridge.h"
 #import <Metal/Metal.h>
 #include <dlfcn.h>
-#include <libproc.h>
+#include <sys/resource.h>
 #include <unistd.h>
 #include "BenchmarkRecorder.hpp"
 
@@ -43,10 +43,17 @@ BOOL IDResetSessionFootprint(void) {
 }
 
 int64_t IDSessionPeakMiB(void) {
+#ifdef RUSAGE_INFO_V4
+    using ReadUsage = int (*)(pid_t, int, rusage_info_t *);
+    static ReadUsage readUsage = reinterpret_cast<ReadUsage>(dlsym(RTLD_DEFAULT, "proc_pid_rusage"));
+    if (!readUsage) return -1;
     struct rusage_info_v4 info = {};
-    if (proc_pid_rusage(getpid(), RUSAGE_INFO_V4, reinterpret_cast<rusage_info_t *>(&info)) != 0 ||
+    if (readUsage(getpid(), RUSAGE_INFO_V4, reinterpret_cast<rusage_info_t *>(&info)) != 0 ||
         info.ri_interval_max_phys_footprint == 0) return -1;
     return info.ri_interval_max_phys_footprint >> 20;
+#else
+    return -1;
+#endif
 }
 
 @implementation IDBenchmarkRecorder
