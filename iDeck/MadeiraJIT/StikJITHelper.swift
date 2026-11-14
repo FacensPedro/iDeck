@@ -244,6 +244,34 @@ enum StikJITHelper {
     /// since (malloc, Metal, IOSurface).
     private static var earlyPoolReleased = false
 
+    /// The executable window taken by holdExecutableWindowAtLaunch() (0 when the
+    /// image-load constructor already held it, or the hold failed).
+    private static var appWindowBase: vm_address_t = 0
+
+    /// iDeck 2.5.1: hold [0x140000000,+128MB) at app start when Madeira's image-load
+    /// constructor did not (madeira_early_window_base == 0). The window was otherwise
+    /// first reserved by the first pool request, after the app had run for a while:
+    /// iPad mini A17 Pro, 2.5.0 (85), DOOM + DOOM II after ten minutes of downloads:
+    ///   ml1034: could NOT reserve the executable window (kr=3)
+    ///   ml1097: occupant of 0x140000000: region 0x140000000+4MB user_tag=2 (malloc)
+    /// and exe-window-mb was ignored, so a fixed-base exe loads displaced. Reserved
+    /// PROT_NONE: no footprint. MADEIRA_NO_EXE_WINDOW=1 skips it, as in allocatePool.
+    static func holdExecutableWindowAtLaunch() {
+        guard appWindowBase == 0, madeira_early_window_base == 0,
+              !(ProcessInfo.processInfo.environment["MADEIRA_NO_EXE_WINDOW"].map { $0 != "0" } ?? false)
+        else { return }
+        var addr: vm_address_t = 0x140000000
+        let kr = vm_allocate(mach_task_self_, &addr, vm_size_t(0x8000000), 0 /* VM_FLAGS_FIXED */)
+        if kr == KERN_SUCCESS && addr == 0x140000000 {
+            vm_protect(mach_task_self_, addr, vm_size_t(0x8000000), 0, VM_PROT_NONE)
+            appWindowBase = addr
+            LogStore.shared.log("[exe-window] held [0x140000000,+128MB) at app start (no image-load hold)", level: .success)
+        } else {
+            if kr == KERN_SUCCESS { vm_deallocate(mach_task_self_, addr, vm_size_t(0x8000000)) }
+            LogStore.shared.log("[exe-window] could not hold [0x140000000,+128MB) at app start (kr=\(kr))", level: .error)
+        }
+    }
+
     /// madeira-bcd exe-window-mb, automatic: the window a game's own fixed-base
     /// exe needs, measured from its PE header before the session starts
     /// (fixedBaseWindowMB). 0: nothing larger than the 128MB window was found.
@@ -485,6 +513,11 @@ enum StikJITHelper {
             windowHeld = true
             setenv("WINE_IOS_EXE_WINDOW", String(format: "%lx:%lx", Int(exeWinBase), Int(exeWinSize)), 1)
             LogStore.shared.log("ml1040: executable window [0x140000000,+128MB) held since image load", level: .success)
+        } else if !skipWindow && appWindowBase == exeWinBase {
+            // iDeck 2.5.1: held since app start (holdExecutableWindowAtLaunch).
+            windowHeld = true
+            setenv("WINE_IOS_EXE_WINDOW", String(format: "%lx:%lx", Int(exeWinBase), Int(exeWinSize)), 1)
+            LogStore.shared.log("[exe-window] executable window [0x140000000,+128MB) held since app start", level: .success)
         } else if !skipWindow {
             var winAddr: vm_address_t = exeWinBase
             let krWin = vm_allocate(mach_task_self_, &winAddr, vm_size_t(exeWinSize), 0 /* VM_FLAGS_FIXED */)
@@ -629,8 +662,10 @@ enum StikJITHelper {
                 }
             }
             let desc = holes.map { String(format: "0x%lx+%luMB", Int($0.base), Int($0.size >> 20)) }.joined(separator: " ")
+            // Error level when the pool must shrink, so the census reaches bug reports.
             LogStore.shared.log("ml1036: free holes >=64MB in [0x119000000,0x180000000), excluding the executable window: "
-                + (desc.isEmpty ? "NONE" : desc))
+                + (desc.isEmpty ? "NONE" : desc),
+                level: (holes.map { $0.size }.max() ?? 0) < vm_address_t(poolSize) ? .error : .info)
             let largest = holes.map { $0.size }.max() ?? 0
             // madeira-bcd pool-pair (pool-split only): two runs ABOVE the window, split
             // only by the main thread's stack, can beat the largest single run when that

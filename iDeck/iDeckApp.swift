@@ -14,6 +14,9 @@ struct iDeckApp: App {
         // frameworks share them. A 32 MB soft limit makes SQLite reuse pages
         // instead of growing with every database it opens.
         sqlite3_soft_heap_limit64(32 << 20)
+        // Take the executable window [0x140000000,+128MB) now if Madeira's image-load
+        // constructor did not: downloads before the first game let malloc grow into it.
+        StikJITHelper.holdExecutableWindowAtLaunch()
         // As MadeiraApp.init: host pads as Windows.Gaming.Input gamepads, and no
         // Metal HUD insights; madeira.cfg values exported later win.
         setenv("MTL_HUD_INSIGHTS_ENABLED", "0", 0)
