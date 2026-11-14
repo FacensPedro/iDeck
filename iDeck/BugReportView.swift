@@ -93,7 +93,7 @@ enum LogIssueScanner {
     /// Counters that report no problem at all ("launch-client-error=0").
     private static let zeroCount = try! NSRegularExpression(pattern: #"\b(error|errors|failed|failures|missing)\s*[=:]\s*0\b"#)
     /// Informational lines a report keeps although they name no failure.
-    private static let diagnostics = ["[touch] tap", "[memory] session", "[ea-service]", "[ea-license]", "[jit-handoff]"]
+    private static let diagnostics = ["[touch] tap", "[memory] session", "[ea-service]", "[ea-license]", "[jit-handoff]", "[download]", "[ea-download]"]
     /// Lines from iDeck's Steam client, downloads and Madeira Dock.
     private static let steamTags = ["[steam", "[dock", "steam client", "steam's", "madeira dock", "steamworks", "steam_api"]
 

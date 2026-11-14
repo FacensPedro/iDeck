@@ -387,6 +387,9 @@ struct EAInstalledGame: Codable, Sendable {
                 archive: archive, folder: Self.drive.appendingPathComponent(folder, isDirectory: true),
                 previous: kind == .repair ? nil : previous, verifyAll: kind == .repair, journal: Self.journalURL(id)) { progress in
                     Task { @MainActor in EALibrary.shared.downloads[id]?.progress = progress }
+                    if progress.phase == .downloading {
+                        DownloadLog.progress(store: "EA app", name: title, done: progress.doneBytes, total: progress.totalBytes)
+                    }
                 }
             try? FileManager.default.createDirectory(at: Self.filesURL(id).deletingLastPathComponent(), withIntermediateDirectories: true)
             try? JSONEncoder().encode(archive.entries).write(to: Self.filesURL(id), options: .atomic)
@@ -404,12 +407,15 @@ struct EAInstalledGame: Codable, Sendable {
             downloads[id] = nil
             Self.writeRegistry(finished)
             EALog.event("[ea-download] done id=\(id) written=\(result.filesWritten) kept=\(result.filesKept) fetched=\(result.bytesFetched)")
+            DownloadLog.ended(store: "EA app", name: title, outcome: "finished")
         } catch {
             if Task.isCancelled || error is CancellationError || (error as? URLError)?.code == .cancelled {
                 if downloads[id] != nil { downloads[id]?.state = .paused }
                 EALog.event("[ea-download] paused id=\(id)")
+                DownloadLog.ended(store: "EA app", name: game(id)?.title ?? installed[id]?.title ?? id, outcome: "paused or stopped")
             } else {
                 downloads[id]?.state = .failed(error.localizedDescription)
+                DownloadLog.ended(store: "EA app", name: game(id)?.title ?? installed[id]?.title ?? id, outcome: "failed: " + error.localizedDescription)
                 handle(error, context: "download id=\(id)", report: false)
             }
         }

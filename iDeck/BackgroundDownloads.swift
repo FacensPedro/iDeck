@@ -103,6 +103,7 @@ final class BackgroundDownloads {
     }
 
     func progress(done: UInt64, total: UInt64) {
+        DownloadLog.progress(store: source, name: currentName, done: done, total: total)
         guard #available(iOS 26.0, *), let task = continued as? BGContinuedProcessingTask else { return }
         let totalUnits = Int64(clamping: max(total, 1))
         if task.progress.totalUnitCount != totalUnits { task.progress.totalUnitCount = totalUnits }
@@ -110,6 +111,11 @@ final class BackgroundDownloads {
     }
 
     func ended(name: String, outcome: Outcome, queueEmpty: Bool) {
+        switch outcome {
+        case .completed: DownloadLog.ended(store: source, name: name, outcome: "finished")
+        case .failed(let reason): DownloadLog.ended(store: source, name: name, outcome: "failed: " + reason)
+        case .paused: DownloadLog.ended(store: source, name: name, outcome: "paused or stopped")
+        }
         if isBackground {
             switch outcome {
             case .completed:

@@ -29,7 +29,7 @@ class LeanDefaultsTests(unittest.TestCase):
     def test_steam_uses_the_shared_chunk_width(self):
         depot = repo_text("iDeck/SwiftSteam/Content/DepotDownloader.swift")
         self.assertIn("private let maxConcurrentChunks = DownloadSpeed.steamChunks", depot)
-        self.assertIn("config.httpMaximumConnectionsPerHost = DownloadSpeed.steamChunks", depot)
+        self.assertIn("config.httpMaximumConnectionsPerHost = DownloadSpeed.steamConnections", depot)
 
     def test_an_unchanged_dock_report_is_not_parsed_again(self):
         dock = repo_text("iDeck/Vendor/Madeira/MadeiraDock.swift")
