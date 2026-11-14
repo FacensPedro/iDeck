@@ -28,9 +28,38 @@ enum AppLog {
         fileURL?.deletingPathExtension().appendingPathExtension("1.txt")
     }
 
+    /// Messages already written (numbers, addresses and times removed), and the
+    /// repeats of the last one left out in a row; touched only on `queue`.
+    nonisolated(unsafe) private static var written = Set<String>()
+    nonisolated(unsafe) private static var lastKey: String?
+    nonisolated(unsafe) private static var run = 0
+    private static let maximumKeys = 4000
+
+    /// Writes a message once: a repeat (same text apart from numbers, addresses
+    /// or ids) is left out, and a run of repeats in a row ends with one
+    /// "repeated N more times" line, so the log stays short.
     static func record(_ message: String) {
-        let line = stamp.string(from: Date()) + " " + message.replacingOccurrences(of: "\n", with: " ⏎ ") + "\n"
+        let text = message.replacingOccurrences(of: "\n", with: " ⏎ ")
+        let date = Date()
         queue.async {
+            let key = LogIssueScanner.normalized(text.lowercased())
+            if key == lastKey { run += 1; return }
+            var line = ""
+            if run > 0 {
+                line += stamp.string(from: date) + " ↑ repeated \(run) more time\(run == 1 ? "" : "s")\n"
+            }
+            run = 0
+            lastKey = key
+            if written.count >= maximumKeys { written.removeAll(keepingCapacity: true) }
+            if written.insert(key).inserted {
+                line += stamp.string(from: date) + " " + text + "\n"
+            }
+            if !line.isEmpty { append(line) }
+        }
+    }
+
+    /// Appends to the file, rotating it at `maximumBytes`; runs on `queue`.
+    private static func append(_ line: String) {
             guard let url = fileURL, let data = line.data(using: .utf8) else { return }
             let manager = FileManager.default
             if let size = (try? manager.attributesOfItem(atPath: url.path))?[.size] as? UInt64,
@@ -45,13 +74,15 @@ enum AppLog {
             } else {
                 try? data.write(to: url, options: .atomic)
             }
-        }
     }
 
     /// Deletes the log now (waits for pending writes first), so a scan right
     /// after it no longer finds the old lines.
     static func clear() {
         queue.sync {
+            written.removeAll()
+            lastKey = nil
+            run = 0
             for url in [fileURL, rotatedURL].compactMap({ $0 }) {
                 try? FileManager.default.removeItem(at: url)
             }
@@ -174,6 +205,8 @@ final class BugReportModel: ObservableObject {
     private var eaTrace: [String] = []
     /// The programs the last session started (SessionProgramsTrace).
     private var programsTrace: [String] = []
+    /// Where the last Windows exception happened (CrashLocation).
+    private var crashLocation: String?
     private static var lastLauncherIsEA: Bool {
         (UserDefaults.standard.string(forKey: "diagnostics.lastLauncher") ?? "").hasPrefix("EA")
     }
@@ -195,7 +228,7 @@ final class BugReportModel: ObservableObject {
         let steamSession = UserDefaults.standard.bool(forKey: "session.lastWasSteam")
         let eaSession = Self.lastLauncherIsEA
         let generation = scanGeneration
-        let result = await Task.detached(priority: .userInitiated) { () -> ([LogIssue], Int32, String, [String], [String]) in
+        let result = await Task.detached(priority: .userInitiated) { () -> ([LogIssue], Int32, String, [String], [String], String?) in
             var issues: [LogIssue] = []
             let appText = appURLs.compactMap { try? WineLogClipboard.read(from: $0).text }.joined(separator: "\n")
             issues += LogIssueScanner.scan(appText, source: .app, steamSession: steamSession)
@@ -210,7 +243,8 @@ final class BugReportModel: ObservableObject {
             }
             let trace = eaSession ? (wineURL.map { EAActivationTrace.extract(from: $0) } ?? []) : []
             let programs = wineURL.map { SessionProgramsTrace.extract(from: $0) } ?? []
-            return (issues.sorted { $0.severity > $1.severity }, diagnosis, missing, trace, programs)
+            let location = wineURL.flatMap { CrashLocation.find(in: $0) }
+            return (issues.sorted { $0.severity > $1.severity }, diagnosis, missing, trace, programs, location)
         }.value
         // Clearing logs while a read is in flight must not restore stale bugs.
         guard generation == scanGeneration, !Task.isCancelled else { return }
@@ -219,6 +253,7 @@ final class BugReportModel: ObservableObject {
         missingModules = result.2
         eaTrace = result.3
         programsTrace = result.4
+        crashLocation = result.5
     }
 
     /// The JIT state of this process right now, as bugs: a missing debugger,
@@ -297,9 +332,17 @@ final class BugReportModel: ObservableObject {
         notice = tr("Bug copied to the clipboard.")
     }
 
-    func copyAll() {
-        UIPasteboard.general.string = report(for: issues)
-        notice = tr("All bugs copied to the clipboard.")
+    /// "Copy all bugs": the whole report as a .txt file (copyReportFile).
+    func copyAll() { copyReportFile() }
+
+    /// The whole report (header, every bug and the evidence sections) as a .txt file.
+    func copyReportFile() {
+        do {
+            try WineLogClipboard.copyText(report(for: issues), named: "iDeck-bug-report.txt")
+            notice = tr("Bug report copied as a .txt file.")
+        } catch {
+            notice = tr("Could not copy the bug report.")
+        }
     }
 
     func copyWineLog() {
@@ -450,6 +493,17 @@ final class BugReportModel: ObservableObject {
                 evidence += ["", "EA's own logs (C:\\ProgramData\\Origin\\Logs, newest first):"] + logs
             }
         }
+        let defaults = UserDefaults.standard
+        if let end = defaults.string(forKey: SystemCoordinator.SessionOutcome.endKey) {
+            let stage = defaults.string(forKey: SystemCoordinator.SessionOutcome.stageKey) ?? "unknown"
+            lines.append("Last session: " + (end == SystemCoordinator.SessionOutcome.running ? "still running" : "ended: " + end)
+                         + " | last stage reached: " + stage)
+        }
+        if (defaults.string(forKey: "diagnostics.lastLauncher") ?? "") == "Steam",
+           let prerequisites = defaults.string(forKey: DockInstallScripts.prerequisitesKey) {
+            lines.append("Steam prerequisites (last run): " + prerequisites)
+        }
+        if let crashLocation { lines.append("Crash location: " + crashLocation) }
         if let missingModules { lines.append("Missing DLLs: " + missingModules) }
         if let wineFinding { lines.append("Diagnosis: " + wineFinding) }
         if !programsTrace.isEmpty {
@@ -558,11 +612,12 @@ struct BugReportView: View {
             }
             .scrollContentBackground(.hidden)
         }
-        .confirmationDialog("Clear diagnostic logs?", isPresented: $showClearConfirmation) {
+        // A centred alert over the whole Bugs & logs screen, not a popover on the button.
+        .alert(tr("Clear diagnostic logs?"), isPresented: $showClearConfirmation) {
             Button(tr("Clear logs"), role: .destructive) { model.clearLogs() }
             Button(tr("Cancel"), role: .cancel) { }
         } message: {
-            Text("This action cannot be undone. Games and settings will not be changed.")
+            Text(tr("This action cannot be undone. Games and settings will not be changed."))
         }
         .navigationTitle(tr("Bugs & logs"))
         .navigationBarTitleDisplayMode(.inline)
@@ -725,6 +780,75 @@ enum SessionProgramsTrace {
 
     static func extract(from url: URL) -> [String] {
         EAActivationTrace.lines(of: url, limit: limit, matches: matches, shown: shown)
+    }
+}
+
+/// Where the last Windows exception in a Wine log happened: its code and address, and
+/// the module loaded nearest below that address (Wine's loaddll trace names each
+/// module with its base). Module sizes are not in the log, so the module is the
+/// nearest one, and an address far past it is reported as outside any module.
+enum CrashLocation {
+    struct Module { var base: UInt64; var name: String }
+
+    private static let loaded = try! NSRegularExpression(pattern: #"Loaded L"([^"]+)" at ([0-9A-Fa-f]{6,16})"#)
+    private static let peAddress = try! NSRegularExpression(pattern: #"PE ExceptionAddress 0x([0-9a-fA-F]+)"#)
+    private static let exception = try! NSRegularExpression(pattern: #"Exception: Code: ([0-9A-Fa-f]+) Address: ([0-9A-Fa-f]+)"#)
+    private static let raise = try! NSRegularExpression(pattern: #"raise tid=\w+ code=([0-9a-fA-F]+) .*?addr=0x([0-9a-fA-F]+)"#)
+
+    private static func groups(_ regex: NSRegularExpression, _ line: String) -> [String]? {
+        let range = NSRange(line.startIndex..., in: line)
+        guard let match = regex.firstMatch(in: line, range: range) else { return nil }
+        return (1..<match.numberOfRanges).compactMap { Range(match.range(at: $0), in: line).map { String(line[$0]) } }
+    }
+
+    /// The module holding `address`: the one with the highest base at or below it,
+    /// unless the address is more than 256 MB past that base.
+    static func module(for address: UInt64, in modules: [Module]) -> (Module, UInt64)? {
+        guard let best = modules.filter({ $0.base <= address }).max(by: { $0.base < $1.base }) else { return nil }
+        let offset = address - best.base
+        return offset < 256 << 20 ? (best, offset) : nil
+    }
+
+    /// One line for a report, or nil when the log names no exception.
+    static func describe(code: String?, address: UInt64, modules: [Module]) -> String {
+        let where_ = module(for: address, in: modules).map { "\($0.0.name)+0x\(String($0.1, radix: 16))" }
+            ?? "outside every module the log names (runtime or JIT code)"
+        return (code.map { "exception 0x\($0.lowercased()) " } ?? "") + "at 0x\(String(address, radix: 16)) in " + where_
+    }
+
+    static func find(in url: URL, maximumBytes: UInt64 = 32 * 1024 * 1024) -> String? {
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
+        defer { try? handle.close() }
+        guard let size = try? handle.seekToEnd(),
+              (try? handle.seek(toOffset: size > maximumBytes ? size - maximumBytes : 0)) != nil else { return nil }
+        var modules: [Module] = []
+        var lastCode: String?, lastAddress: UInt64?
+        var pending = Data()
+        while let chunk = try? handle.read(upToCount: 1024 * 1024), !chunk.isEmpty {
+            pending.append(chunk)
+            guard let cut = pending.lastIndex(of: UInt8(ascii: "\n")) else {
+                if pending.count > 8 * 1024 * 1024 { pending.removeAll() }
+                continue
+            }
+            let text = String(decoding: pending[pending.startIndex..<cut], as: UTF8.self)
+            pending = Data(pending[pending.index(after: cut)...])
+            for raw in text.split(separator: "\n") {
+                let line = String(raw)
+                if line.contains("Loaded L\""), let g = groups(loaded, line), g.count == 2, let base = UInt64(g[1], radix: 16) {
+                    let name = g[0].replacingOccurrences(of: "\\\\", with: "\\").split(separator: "\\").last.map(String.init) ?? g[0]
+                    modules.append(Module(base: base, name: name))
+                } else if line.contains("PE ExceptionAddress"), let g = groups(peAddress, line), let address = UInt64(g[0], radix: 16) {
+                    lastAddress = address
+                } else if line.contains("Exception: Code:"), let g = groups(exception, line), g.count == 2,
+                          let address = UInt64(g[1], radix: 16) {
+                    lastCode = g[0]; lastAddress = address
+                } else if line.contains("raise tid="), let g = groups(raise, line), g.count == 2, let address = UInt64(g[1], radix: 16) {
+                    lastCode = g[0]; lastAddress = address
+                }
+            }
+        }
+        guard let lastAddress else { return nil }
+        return describe(code: lastCode, address: lastAddress, modules: modules)
     }
 }
 

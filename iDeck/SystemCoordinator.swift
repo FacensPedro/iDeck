@@ -34,6 +34,9 @@ class SystemCoordinator: ObservableObject {
     // The Wine host can return 0 after a Steam-launched game child aborts.
     // Only inspect Wine fatal-crash lines written after the current launch.
     private var wineLogStartOffset: Int64?
+    /// The program the last launch prepared (prepareVisualCRuntimeIfNeeded), for what a
+    /// session's log says about it afterwards.
+    private var lastPreparedExecutable: URL?
 
     private static var wineLogURL: URL? {
         FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?
@@ -100,12 +103,51 @@ class SystemCoordinator: ObservableObject {
     }
     /// Persist only public game identity, never store authentication or tokens.
     /// Last completed or attempted launch is shown in Bugs & logs and iRelay.
+    /// How the last game session ended and the last stage it reached, kept for bug
+    /// reports (a report after a crash runs in a new process).
+    enum SessionOutcome {
+        static let endKey = "diagnostics.session.end"
+        static let stageKey = "diagnostics.session.stage"
+        static let running = "running"
+
+        static func began() {
+            UserDefaults.standard.set(running, forKey: endKey)
+            UserDefaults.standard.set("starting", forKey: stageKey)
+        }
+
+        static var isRunning: Bool { UserDefaults.standard.string(forKey: endKey) == running }
+
+        /// A status while the session runs: an ending one is the session's end, any other
+        /// is the stage it reached.
+        static func status(_ status: String) {
+            guard isRunning else { return }
+            if status.hasPrefix("Execution Error") || status.hasPrefix("Cannot launch") || status.hasPrefix("Steam: ") {
+                ended(status)
+            } else if status == "Windows Ready" {
+                ended("the game exited and Wine closed normally")
+            } else {
+                UserDefaults.standard.set(String(status.prefix(200)), forKey: stageKey)
+            }
+        }
+
+        static func ended(_ reason: String) {
+            guard isRunning else { return }
+            UserDefaults.standard.set(String(reason.prefix(300)), forKey: endKey)
+        }
+
+        /// At iDeck's start: a session still marked running ended with the app itself.
+        static func noteAppRestart() {
+            ended("iDeck itself stopped while the game ran (a crash, iOS's memory limit, or the app was closed)")
+        }
+    }
+
     private func recordGameContext(_ title: String, launcher: String) {
         let clean = title.replacingOccurrences(of: "[\\r\\n]", with: " ", options: .regularExpression)
         let safeTitle = String(clean.prefix(160))
         UserDefaults.standard.set(safeTitle, forKey: "diagnostics.lastGame")
         UserDefaults.standard.set(launcher, forKey: "diagnostics.lastLauncher")
         AppLog.record("[game-session] launcher=\(launcher) game=\(safeTitle)")
+        SessionOutcome.began()
         // The game gets the memory: covers and other caches iDeck rebuilds on demand
         // are dropped before it starts.
         URLCache.shared.removeAllCachedResponses()
@@ -372,10 +414,12 @@ class SystemCoordinator: ObservableObject {
     
     func setWindowsStatus(_ status: String) {
         AppLog.record("[status] " + status)
+        SessionOutcome.status(status)
         recordBenchmarkMilestone(status)
         let update = {
             if status == "Windows Ready" || status.hasPrefix("Execution Error") || status.hasPrefix("Cannot launch") {
                 self.finishMemorySampling()
+                MainActor.assumeIsolated { EALibrary.shared.launchEnded() }
             }
             self.windowsStatus = status
             self.currentStatus = status
@@ -440,7 +484,7 @@ class SystemCoordinator: ObservableObject {
                 // debugger is attached. StikDebug may detach before the user taps
                 // Play; with the pool ready, the launch no longer reopens StikDebug.
                 self.wineJITAttemptedDuringAttachment = true
-                if MadeiraBundleIdentity.isNative, AddressSpaceCheck.hasGuestWindow,
+                if Self.restartNeeded() == nil, MadeiraBundleIdentity.isNative, AddressSpaceCheck.hasGuestWindow,
                    StikJITHelper.scriptData != nil, !ideck_wineprocess_running() {
                     self.wineJITPreparationInFlight = true
                     // No game is chosen yet, so its fixed-base exe cannot be measured
@@ -459,6 +503,11 @@ class SystemCoordinator: ObservableObject {
                             self.wineJITPreparationInFlight = false
                             if let failure { AppLog.record("[jit] early pool preparation failed: \(failure)") }
                             self.refreshJITStatus()
+                            if let launch = self.pendingJITLaunch {
+                                self.pendingJITLaunch = nil
+                                if let failure { self.setWindowsStatus("Execution Error: " + failure) }
+                                else { launch() }
+                            }
                         }
                     }
                 }
@@ -522,6 +571,10 @@ class SystemCoordinator: ObservableObject {
         // Validated preparation: CS_DEBUGGED on this process, and a live debugger to
         // answer the pool request or this run's pool already prepared. Anything less
         // never reaches Wine: iDeck starts the activation itself and the launch waits.
+        if wineJITPreparationInFlight {
+            if let resume { waitForDebuggerThenResume(resume) }
+            return false
+        }
         if Self.jitPreparationValidated() {
             Self.recordLaunchJITState()
             return true
@@ -578,8 +631,11 @@ class SystemCoordinator: ObservableObject {
         pendingJITLaunch = nil
         switch result {
         case .success:
-            AppLog.record("[jit] debugger attached; continuing the launch")
-            launch?()
+            if wineJITPreparationInFlight {
+                pendingJITLaunch = launch
+            } else {
+                launch?()
+            }
         case .failure(let error):
             if launch != nil { setWindowsStatus(error.localizedDescription) }
         }
@@ -695,7 +751,7 @@ class SystemCoordinator: ObservableObject {
     /// opens on the tap instead of after the store answers. The launch itself still
     /// goes through ensureJITForGameLaunch and waits for the validated preparation.
     func prewarmJITForLaunch() {
-        guard MadeiraBundleIdentity.isNative, AddressSpaceCheck.hasGuestWindow,
+        guard Self.restartNeeded() == nil, MadeiraBundleIdentity.isNative, AddressSpaceCheck.hasGuestWindow,
               StikJITHelper.scriptData != nil, !isClosingWindowsSession else { return }
         refreshJITStatus()
         guard !Self.jitPreparationValidated() else { return }
@@ -941,13 +997,26 @@ class SystemCoordinator: ObservableObject {
         if let documents { VisualCRuntimeBootstrap.installBundled(documents: documents) }
         guard let executable, let pe = WindowsPEInfo.read(executable),
               !onDemandAttempted.contains(executable.path) else { return false }
+        lastPreparedExecutable = executable
         let needed = MainActor.assumeIsolated { WindowsInstallerEnvironment.missing(WindowsRequirements.of(pe)) }
-        guard !needed.isEmpty else { return false }
+        let d3dx = NativeD3DX.wanted(executable) && !NativeD3DX.installed(for: executable)
+        guard !needed.isEmpty || d3dx else { return false }
         onDemandAttempted.insert(executable.path)
-        AppLog.record("[installer] \(executable.lastPathComponent) needs \(needed)")
+        AppLog.record("[installer] \(executable.lastPathComponent) needs \(needed)\(d3dx ? " and Microsoft's D3DX 9" : "")")
         onDemandInstallTask = Task { @MainActor [weak self] in
-            let failures = await WindowsInstallerEnvironment.install(needed) { [weak self] message in
-                self?.setWindowsStatus(message)
+            var failures: [String] = []
+            if !needed.isEmpty {
+                failures = await WindowsInstallerEnvironment.install(needed) { [weak self] message in
+                    self?.setWindowsStatus(message)
+                }
+            }
+            if d3dx {
+                self?.setWindowsStatus("Installing Microsoft D3DX 9 and its shader compiler (about 95 MB, once)…")
+                do { try await NativeD3DX.provide(for: executable, machine: pe.machine, prefix: prefix) }
+                catch {
+                    AppLog.record("[d3dx] not provided: \(error.localizedDescription)")
+                    failures.append("Microsoft D3DX 9: \(error.localizedDescription)")
+                }
             }
             self?.onDemandInstallTask = nil
             if !failures.isEmpty { self?.setWindowsStatus(failures.joined(separator: "\n")) }
@@ -1046,6 +1115,7 @@ class SystemCoordinator: ObservableObject {
 
     func launchWindowsExecutable(at url: URL, profile: WindowsGameProfile? = nil) {
         guard !isClosingWindowsSession else { return }
+        guard !previousWineSessionStillFinishing() else { return }
         isSteamSession = false
         let gameID = profile?.id ?? ""
         // The EA app's environment (EALibrary.prepareLaunch) belongs to EA games only.
@@ -1058,7 +1128,6 @@ class SystemCoordinator: ObservableObject {
         if launcher == ".exe" { WindowsLibraryStore.noteLaunch(of: url) }
         BenchmarkSession.begin(kind: "game", scenario: profile?.title ?? url.deletingPathExtension().lastPathComponent,
                                settings: BenchmarkSession.gameSettings(profile))
-        guard !previousWineSessionStillFinishing() else { return }
         currentSteamLaunchUsesDock = false
         dockLaunchAccepted = false
         steamDockLaunchStage = nil
@@ -1714,6 +1783,7 @@ class SystemCoordinator: ObservableObject {
             // the next game from getting its JIT pool. The game gets Alt+F4 first and
             // a moment to save; iDeck is opened again for the next game.
             AppLog.record("[wine-close] X pressed with a session running: iDeck closes with it")
+            SessionOutcome.ended("closed with the X button (iDeck exited with the game)")
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { exit(0) }
             return
         }
@@ -1737,6 +1807,7 @@ class SystemCoordinator: ObservableObject {
     func forceCloseIDeck() {
         SteamLog.event("[wine-close] game did not exit; iDeck closed by the user")
         AppLog.record("[wine-close] force close: iDeck exits so the stuck Windows session ends")
+        SessionOutcome.ended("the game did not exit; iDeck was closed from the close warning")
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { exit(0) }
     }
 
@@ -1853,6 +1924,7 @@ class SystemCoordinator: ObservableObject {
         let outcome = wineExitResult()
         let hostTrap = outcome.ntstatus == 0xC000001D
             && IllegalInstructionOrigin.isHost(logURL: Self.wineLogURL, since: wineLogStartOffset)
+        let shaderFailure = Self.sessionLogShowsShaderFailure(logURL: Self.wineLogURL, since: wineLogStartOffset)
         wineLogStartOffset = nil
         let ntstatus = outcome.ntstatus
         var reason = outcome.reason
@@ -1868,10 +1940,26 @@ class SystemCoordinator: ObservableObject {
         } else if ntstatus == 0xC000001D, let endedGame, AVXAuto.enable(endedGame) {
             reason += " AVX/AVX2 translation is now on for this game: restart iDeck and start it again."
         }
+        if shaderFailure, let executable = lastPreparedExecutable, !NativeD3DX.installed(for: executable) {
+            NativeD3DX.noteShaderFailure(executable)
+            reason += " The game could not compile a shader with Wine's D3DX: Microsoft's D3DX 9 is installed for it at its next start."
+        }
         SteamLog.event("[wine-exit] \(reason)")
         Self.reclaimAfterSession()
         if let ntstatus, ntstatus != 0 { Self.restartReason = "the last game crashed (NTSTATUS 0x\(String(ntstatus, radix: 16, uppercase: true)))" }
         setWindowsStatus(reason)
+    }
+
+    /// Whether the session's part of the Wine log (its last 16 MB at most) names a
+    /// shader the game wrote to ShaderErrors after a failed compile.
+    static func sessionLogShowsShaderFailure(logURL: URL?, since offset: Int64?) -> Bool {
+        guard let logURL, let handle = try? FileHandle(forReadingFrom: logURL) else { return false }
+        defer { try? handle.close() }
+        let end = (try? handle.seekToEnd()) ?? 0
+        let start = max(UInt64(max(offset ?? 0, 0)), end > 16 << 20 ? end - (16 << 20) : 0)
+        try? handle.seek(toOffset: start)
+        guard let data = try? handle.readToEnd() else { return false }
+        return NativeD3DX.logShowsShaderFailure(String(decoding: data, as: UTF8.self))
     }
 
     /// Returns an exited 32-bit program's 4 GB window to iOS as soon as the session
@@ -1902,6 +1990,9 @@ class SystemCoordinator: ObservableObject {
 
     static func restartNeeded() -> String? {
         if let restartReason { return restartReason }
+        if WindowsEnvironment.oneSessionPerRun && WindowsEnvironment.sessionsThisRun > 0 {
+            return "this runtime requires a fresh iDeck process for each Windows session"
+        }
         // A pool that had to shrink is not a reason: it happens on a fresh launch too
         // (the startup pool keeps a 256 MB exe window free), so reopening changes nothing.
         let free = Int(os_proc_available_memory() >> 20)

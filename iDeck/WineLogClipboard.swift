@@ -19,21 +19,35 @@ enum WineLogClipboard {
 
     #if canImport(UIKit)
     @MainActor
-    static func copyFile(from source: URL) async throws {
+    static func copyFile(from source: URL, name: String = "Wine-log") async throws {
         let snapshot = try await Task.detached(priority: .utility) {
             let values = try source.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey])
             guard values.isRegularFile == true, values.isSymbolicLink != true else { throw ReadError.invalidFile }
             guard (values.fileSize ?? 0) > 0 else { throw ReadError.empty }
             let destination = FileManager.default.temporaryDirectory
-                .appendingPathComponent("Wine-log-" + UUID().uuidString + ".txt")
+                .appendingPathComponent(name + "-" + UUID().uuidString + ".txt")
             try FileManager.default.copyItem(at: source, to: destination)
             return destination
         }.value
         let provider = NSItemProvider()
-        provider.suggestedName = "Wine-log.txt"
+        provider.suggestedName = name + ".txt"
         provider.registerFileRepresentation(forTypeIdentifier: UTType.plainText.identifier,
                                             fileOptions: [], visibility: .all) { completion in
             completion(snapshot, false, nil)
+            return nil
+        }
+        UIPasteboard.general.setItemProviders([provider], localOnly: true, expirationDate: nil)
+    }
+
+    /// Puts `text` on the pasteboard as a .txt file named `name`.
+    static func copyText(_ text: String, named name: String) throws {
+        let destination = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + "-" + name)
+        try Data(text.utf8).write(to: destination, options: .atomic)
+        let provider = NSItemProvider()
+        provider.suggestedName = name
+        provider.registerFileRepresentation(forTypeIdentifier: UTType.plainText.identifier,
+                                            fileOptions: [], visibility: .all) { completion in
+            completion(destination, false, nil)
             return nil
         }
         UIPasteboard.general.setItemProviders([provider], localOnly: true, expirationDate: nil)

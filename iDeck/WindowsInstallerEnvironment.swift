@@ -326,3 +326,117 @@ enum WindowsInstallerEnvironment {
         }
     }
 }
+
+// MARK: - Microsoft D3DX 9 and HLSL compiler
+
+/// Microsoft's own D3DX 9 libraries and HLSL compilers (d3dx9_24-43, d3dcompiler_33-43),
+/// from Microsoft's DirectX End-User Runtime (June 2010), for a game whose shaders
+/// Wine's D3DX could not compile: such a game writes ShaderErrors\CompileError*.hlsl
+/// and then crashes on the shader it never got (BioShock). Only those games get them:
+/// the DLLs go next to the game's program, and a per-program DLL override in the
+/// prefix (AppDefaults) makes Wine load them instead of its own. Log tag: [d3dx].
+enum NativeD3DX {
+    static let redistURL = URL(string: "https://download.microsoft.com/download/8/4/A/84A35BF1-DAFE-4AE8-82AF-AD2AE20B6B14/directx_Jun2010_redist.exe")!
+    static let modules: [String] = (24...43).map { "d3dx9_\($0)" } + (33...43).map { "d3dcompiler_\($0)" }
+    static let executablesKey = "d3dx.native.executables"
+    static let marker = ".ideck-native-d3dx"
+
+    /// Programs a session found failing to compile its shaders; BioShock's always.
+    static func wanted(_ executable: URL) -> Bool {
+        let set = UserDefaults.standard.stringArray(forKey: executablesKey) ?? []
+        return set.contains(executable.path) || executable.path.lowercased().contains("bioshock")
+    }
+
+    static func noteShaderFailure(_ executable: URL) {
+        var set = UserDefaults.standard.stringArray(forKey: executablesKey) ?? []
+        guard !set.contains(executable.path) else { return }
+        set.append(executable.path)
+        UserDefaults.standard.set(set, forKey: executablesKey)
+        AppLog.record("[d3dx] \(executable.lastPathComponent) failed to compile a shader with Wine's D3DX: Microsoft's D3DX is used for it from its next start")
+    }
+
+    /// A session's log names a shader its game could not compile.
+    static func logShowsShaderFailure(_ log: String) -> Bool {
+        log.range(of: "\\ShaderErrors\\CompileError", options: .caseInsensitive) != nil
+            || log.range(of: "\\\\ShaderErrors\\\\CompileError", options: .caseInsensitive) != nil
+    }
+
+    static func cache(machine: UInt16) -> URL {
+        WindowsInstallerEnvironment.documents.appendingPathComponent("directx/" + (machine == 0x014c ? "x86" : "x64"), isDirectory: true)
+    }
+
+    static func installed(for executable: URL) -> Bool {
+        FileManager.default.fileExists(atPath: executable.deletingLastPathComponent().appendingPathComponent(marker).path)
+    }
+
+    /// Downloads the runtime once and keeps the DLLs of both architectures.
+    static func prepareCache() async throws {
+        let fm = FileManager.default
+        if fm.fileExists(atPath: cache(machine: 0x014c).appendingPathComponent(marker).path),
+           fm.fileExists(atPath: cache(machine: 0x8664).appendingPathComponent(marker).path) { return }
+        var request = URLRequest(url: redistURL)
+        request.timeoutInterval = 120
+        let (temporary, response) = try await URLSession.shared.download(for: request)
+        defer { try? fm.removeItem(at: temporary) }
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200,
+              let final = http.url, VisualCRuntimeBootstrap.isTrustedDownloadURL(final) else { throw CocoaError(.fileReadUnknown) }
+        let size = (try fm.attributesOfItem(atPath: temporary.path)[.size] as? NSNumber)?.int64Value ?? 0
+        guard (50_000_000...150_000_000).contains(size), VisualCRuntimeBootstrap.hasPE(temporary, machines: [0x014C]) else {
+            throw CocoaError(.fileReadCorruptFile)
+        }
+        // Reading about 150 CABs takes a while: off the main actor.
+        let installer = temporary
+        try await Task.detached(priority: .userInitiated) {
+            for machine: UInt16 in [0x014c, 0x8664] { try extract(installer, machine: machine) }
+        }.value
+    }
+
+    /// The runtime's DLLs of one architecture into its cache folder.
+    static func extract(_ installer: URL, machine: UInt16) throws {
+        let fm = FileManager.default
+        let folder = cache(machine: machine)
+        try? fm.removeItem(at: folder)
+        try fm.createDirectory(at: folder, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+        let names = modules.map { $0 + ".dll" }
+        var found = [Int32](repeating: 0, count: names.count)
+        var message = [CChar](repeating: 0, count: 512)
+        let capacity = message.count
+        let copies = names.map { strdup($0) }
+        defer { copies.forEach { free($0) } }
+        let pointers: [UnsafePointer<CChar>?] = copies.map { $0.map { UnsafePointer($0) } }
+        let count = installer.path.withCString { source in
+            folder.path.withCString { target in
+                pointers.withUnsafeBufferPointer { list in
+                    ideck_vcrt_extract_set(source, target, list.baseAddress, Int32(names.count), Int32(machine),
+                                           &found, &message, capacity)
+                }
+            }
+        }
+        let text = String(cString: message)
+        AppLog.record("[d3dx] \(machine == 0x014c ? "x86" : "x64"): \(count) of \(names.count) DLLs (\(text))")
+        guard count > 0 else { throw NSError(domain: "iDeck.d3dx", code: Int(count), userInfo: [NSLocalizedDescriptionKey: text]) }
+        fm.createFile(atPath: folder.appendingPathComponent(marker).path, contents: Data())
+    }
+
+    /// Puts the DLLs next to the program and tells Wine to prefer them for it.
+    static func provide(for executable: URL, machine: UInt16, prefix: URL) async throws {
+        try await prepareCache()
+        let fm = FileManager.default
+        let source = cache(machine: machine), folder = executable.deletingLastPathComponent()
+        var copied = 0
+        for module in modules {
+            let from = source.appendingPathComponent(module + ".dll"), to = folder.appendingPathComponent(module + ".dll")
+            guard fm.fileExists(atPath: from.path), !fm.fileExists(atPath: to.path) else { continue }
+            try fm.copyItem(at: from, to: to)
+            copied += 1
+        }
+        guard wine_process_is_running() == 0, wineserver_is_running() == 0 else {
+            throw NSError(domain: "iDeck.d3dx", code: 1, userInfo: [NSLocalizedDescriptionKey: "a Windows session is still running"])
+        }
+        let key = "Software\\Wine\\AppDefaults\\" + executable.lastPathComponent + "\\DllOverrides"
+        let values = modules.map { SteamInstallValue(hive: .user, key: key, name: $0, data: .string("native,builtin"), followsInstall: true) }
+        try EARegistry.write(values, prefix: prefix)
+        fm.createFile(atPath: folder.appendingPathComponent(marker).path, contents: Data())
+        AppLog.record("[d3dx] \(executable.lastPathComponent): \(copied) Microsoft DLLs placed, Wine prefers them for this program")
+    }
+}
