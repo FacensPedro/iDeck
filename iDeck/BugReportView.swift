@@ -395,7 +395,7 @@ final class BugReportModel: ObservableObject {
             "Build: commit \(runtime["sourceCommit"] as? String ?? "unknown"), graphics \(MadeiraBundleIdentity.graphicsProfile)",
             "Memory: \(physical) MiB physical, \(ResourceGovernor.availableMiB()) MiB still allowed by iOS",
             "iDeck RAM now: " + (currentMiB >= 0 ? "\(currentMiB) MiB" : "unavailable"),
-            "Last game session, highest sampled iDeck RAM: " + (peakMiB.map { "\($0) MiB" } ?? "unavailable"),
+            (defaults.bool(forKey: "diagnostics.kernelPeak") ? "Last game session, iOS peak iDeck RAM: " : "Last game session, highest sampled iDeck RAM: ") + (peakMiB.map { "\($0) MiB" } ?? "unavailable"),
             "Memory+: increased limit \(name(MemoryPlus.increasedLimit)), extended addressing \(name(MemoryPlus.extendedAddressing))",
             "JIT: method \(defaults.string(forKey: SystemCoordinator.jitMethodKey) ?? "stikdebug"), pool \(pool)",
             "Windows runtime: x64 \(MadeiraRuntime.installed("wine-x64") ? "installed" : "missing"), x86 \(MadeiraRuntime.installed("wine-x86") ? "installed" : "missing")",

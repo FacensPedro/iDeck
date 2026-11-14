@@ -4,6 +4,9 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
+FOUNDATION_EXPORT BOOL IDResetSessionFootprint(void);
+FOUNDATION_EXPORT int64_t IDSessionPeakMiB(void);
+
 @interface IDBenchmarkRecorder : NSObject
 /// Starts a session ("game" or "install"). NO when one is already running.
 + (BOOL)startWithKind:(NSString *)kind label:(NSString *)label;
