@@ -119,8 +119,15 @@ enum LogIssueScanner {
     /// informational lines that only look like failures: commit-zero's success
     /// counters ("stale=0/0"), ml990's address-space cap, the wineserver's infinite
     /// master-socket timeout and the iOS environment listing.
+    /// Madeira's own tracing also prints through "err:" without being a failure: thread
+    /// and process exits with status 0, RPC argument dumps, directory-cache counters,
+    /// detach probes, the NtProtect sync scan, std-handle checks at exit and window traces.
     private static let noise = ["fixme:", "err:ole:", "err:winediag:", "[commit-zero]", "guest ok",
-                                "ml990:", "master_socket_timeout", "[ios env]"]
+                                "ml990:", "master_socket_timeout", "[ios env]",
+                                "[thr-exit]", "[ndr-param]", "[ndr-shift]", "[dircache]", "[detach-probe]",
+                                "ntprotect-sync", "ntprotectvirtualmemory(orig=", "[std-handles]", "trace:win:",
+                                "exit_process: raw_status=0x0", "process_exiting=1, forcing exit_process(0)",
+                                "exit_code=0x0)", "msctfp.dll"]
     /// Counters that report no problem at all ("launch-client-error=0").
     private static let zeroCount = try! NSRegularExpression(pattern: #"\b(error|errors|failed|failures|missing)\s*[=:]\s*0\b"#)
     /// Informational lines a report keeps although they name no failure.
@@ -155,6 +162,8 @@ enum LogIssueScanner {
             // real failure elsewhere in the same line remains visible.
             let range = NSRange(lower.startIndex..., in: lower)
             let actionable = zeroCount.stringByReplacingMatches(in: lower, range: range, withTemplate: "")
+                // "invalidate" (a window or cache being redrawn) is not "invalid".
+                .replacingOccurrences(of: "invalidat", with: "")
             // [touch] lines are diagnostics, not failures: kept so a report shows
             // where a tap that did nothing was sent. The EA service's and licence's
             // lines say whether a game talked to the local EA service and what its
@@ -163,7 +172,7 @@ enum LogIssueScanner {
                 : (failures.contains(where: actionable.contains) || diagnostics.contains(where: lower.contains)) ? 1 : 0
             guard severity > 0 else { continue }
             // JIT problems get their own group, whichever log they came from.
-            let lineSource: LogIssue.Source = lower.contains("jit") ? .jit : source
+            let lineSource: LogIssue.Source = (lower.contains("jit ") || lower.contains("[jit") || lower.contains("jit:")) ? .jit : source
             let key = lineSource.rawValue + ":" + normalized(lower)
             if var issue = found[key] {
                 issue.count += 1
@@ -183,7 +192,9 @@ enum LogIssueScanner {
     /// Strips timestamps, hex values, numbers and thread prefixes so repeats fold together.
     static func normalized(_ line: String) -> String {
         var text = line
-        for pattern in [#"^\S*\d{4}-\d\d-\d\dT\S+\s*"#, #"0x[0-9a-f]+"#, #"\b[0-9a-f]{6,}\b"#, #"\d+"#] {
+        // A Wine thread id ("00bc:") is a prefix like the time: the same message from
+        // two threads is one problem.
+        for pattern in [#"^\S*\d{4}-\d\d-\d\dT\S+\s*"#, #"^[0-9a-f]{4}:"#, #"0x[0-9a-f]+"#, #"\b[0-9a-f]{6,}\b"#, #"\d+"#] {
             text = text.replacingOccurrences(of: pattern, with: "#", options: .regularExpression)
         }
         return text
@@ -937,7 +948,8 @@ enum MissingModuleScanner {
         (#"\\+windows\\+(?:system32|syswow64)\\+([^\\" ]+\.dll)"? not found"#, { "\($0[0]) (not in system32)" }),
     ]
 
-    private static let optionalModules: Set<String> = ["steamservice.dll", "wow64cpu.dll"]
+    /// msctfp.dll is a private Text Services module Wine does not ship; programs probe for it.
+    private static let optionalModules: Set<String> = ["steamservice.dll", "wow64cpu.dll", "msctfp.dll"]
 
     private static func name(_ path: Substring) -> String {
         String(path.split(whereSeparator: { $0 == "\\" || $0 == "/" }).last ?? path)
