@@ -34,6 +34,9 @@ class SystemCoordinator: ObservableObject {
     // The Wine host can return 0 after a Steam-launched game child aborts.
     // Only inspect Wine fatal-crash lines written after the current launch.
     private var wineLogStartOffset: Int64?
+    /// The program the last launch prepared (prepareVisualCRuntimeIfNeeded), for what a
+    /// session's log says about it afterwards.
+    private var lastPreparedExecutable: URL?
 
     private static var wineLogURL: URL? {
         FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?
@@ -981,13 +984,26 @@ class SystemCoordinator: ObservableObject {
         if let documents { VisualCRuntimeBootstrap.installBundled(documents: documents) }
         guard let executable, let pe = WindowsPEInfo.read(executable),
               !onDemandAttempted.contains(executable.path) else { return false }
+        lastPreparedExecutable = executable
         let needed = MainActor.assumeIsolated { WindowsInstallerEnvironment.missing(WindowsRequirements.of(pe)) }
-        guard !needed.isEmpty else { return false }
+        let d3dx = NativeD3DX.wanted(executable) && !NativeD3DX.installed(for: executable)
+        guard !needed.isEmpty || d3dx else { return false }
         onDemandAttempted.insert(executable.path)
-        AppLog.record("[installer] \(executable.lastPathComponent) needs \(needed)")
+        AppLog.record("[installer] \(executable.lastPathComponent) needs \(needed)\(d3dx ? " and Microsoft's D3DX 9" : "")")
         onDemandInstallTask = Task { @MainActor [weak self] in
-            let failures = await WindowsInstallerEnvironment.install(needed) { [weak self] message in
-                self?.setWindowsStatus(message)
+            var failures: [String] = []
+            if !needed.isEmpty {
+                failures = await WindowsInstallerEnvironment.install(needed) { [weak self] message in
+                    self?.setWindowsStatus(message)
+                }
+            }
+            if d3dx {
+                self?.setWindowsStatus("Installing Microsoft D3DX 9 and its shader compiler (about 95 MB, once)…")
+                do { try await NativeD3DX.provide(for: executable, machine: pe.machine, prefix: prefix) }
+                catch {
+                    AppLog.record("[d3dx] not provided: \(error.localizedDescription)")
+                    failures.append("Microsoft D3DX 9: \(error.localizedDescription)")
+                }
             }
             self?.onDemandInstallTask = nil
             if !failures.isEmpty { self?.setWindowsStatus(failures.joined(separator: "\n")) }
@@ -1895,6 +1911,7 @@ class SystemCoordinator: ObservableObject {
         let outcome = wineExitResult()
         let hostTrap = outcome.ntstatus == 0xC000001D
             && IllegalInstructionOrigin.isHost(logURL: Self.wineLogURL, since: wineLogStartOffset)
+        let shaderFailure = Self.sessionLogShowsShaderFailure(logURL: Self.wineLogURL, since: wineLogStartOffset)
         wineLogStartOffset = nil
         let ntstatus = outcome.ntstatus
         var reason = outcome.reason
@@ -1910,10 +1927,26 @@ class SystemCoordinator: ObservableObject {
         } else if ntstatus == 0xC000001D, let endedGame, AVXAuto.enable(endedGame) {
             reason += " AVX/AVX2 translation is now on for this game: restart iDeck and start it again."
         }
+        if shaderFailure, let executable = lastPreparedExecutable, !NativeD3DX.installed(for: executable) {
+            NativeD3DX.noteShaderFailure(executable)
+            reason += " The game could not compile a shader with Wine's D3DX: Microsoft's D3DX 9 is installed for it at its next start."
+        }
         SteamLog.event("[wine-exit] \(reason)")
         Self.reclaimAfterSession()
         if let ntstatus, ntstatus != 0 { Self.restartReason = "the last game crashed (NTSTATUS 0x\(String(ntstatus, radix: 16, uppercase: true)))" }
         setWindowsStatus(reason)
+    }
+
+    /// Whether the session's part of the Wine log (its last 16 MB at most) names a
+    /// shader the game wrote to ShaderErrors after a failed compile.
+    static func sessionLogShowsShaderFailure(logURL: URL?, since offset: Int64?) -> Bool {
+        guard let logURL, let handle = try? FileHandle(forReadingFrom: logURL) else { return false }
+        defer { try? handle.close() }
+        let end = (try? handle.seekToEnd()) ?? 0
+        let start = max(UInt64(max(offset ?? 0, 0)), end > 16 << 20 ? end - (16 << 20) : 0)
+        try? handle.seek(toOffset: start)
+        guard let data = try? handle.readToEnd() else { return false }
+        return NativeD3DX.logShowsShaderFailure(String(decoding: data, as: UTF8.self))
     }
 
     /// Returns an exited 32-bit program's 4 GB window to iOS as soon as the session

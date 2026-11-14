@@ -13,7 +13,8 @@
 #define DLL_COUNT 14
 #define MAX_DLL_SIZE (32u * 1024u * 1024u)
 #define MAX_FILES_PER_INSTALLER 20000u
-#define MAX_NESTED_CABS 48u
+/* 48 covered Visual C++; Microsoft's DirectX runtime holds about 150 CABs. */
+#define MAX_NESTED_CABS 200u
 #define MAX_NESTED_CAB_BYTES (64u * 1024u * 1024u)
 #define MAX_TOTAL_NESTED_BYTES (256u * 1024u * 1024u)
 
