@@ -360,6 +360,18 @@ struct WindowsWorkspaceView: View {
         .accessibilityLabel(tr("Install"))
     }
 
+    /// In place of the download button on a game that needs Easy Anti-Cheat: the
+    /// download symbol struck through, not tappable.
+    private var antiCheatCoverBadge: some View {
+        AntiCheatBlockedSymbol(size: 48)
+            .padding(8)
+            .background(Color(white: 0.85))
+            .clipShape(Circle())
+            .shadow(color: .black.opacity(0.5), radius: 12, y: 4)
+            .allowsHitTesting(false)
+            .accessibilityLabel(tr(AntiCheatPolicy.shortMessage))
+    }
+
     /// A collapsible "owned games" header (store, count, chevron).
     private func ownedHeader(_ title: String, collapsed: Binding<Bool>) -> some View {
         Button {
@@ -644,7 +656,9 @@ struct WindowsWorkspaceView: View {
                             .blur(radius: !installed && !steamLibrary.installingApps.contains(game.appID) && !steamLibrary.pausedInstalls.contains(game.appID) && game.installableOnWindows ? Self.uninstalledCoverBlur : 0)
                     }
                     .buttonStyle(.plain)
-                    if !installed && !steamLibrary.installingApps.contains(game.appID) &&
+                    if !installed && AntiCheatPolicy.isBlocked(title: game.name, steamAppID: game.appID) {
+                        antiCheatCoverBadge
+                    } else if !installed && !steamLibrary.installingApps.contains(game.appID) &&
                         !steamLibrary.pausedInstalls.contains(game.appID) && game.installableOnWindows {
                         downloadCoverButton { install(game) }
                     }
@@ -750,7 +764,9 @@ struct WindowsWorkspaceView: View {
                                   !gogLibrary.pausedDownloads.contains(game.id) && game.worksOnWindows ? Self.uninstalledCoverBlur : 0)
                     }
                     .buttonStyle(.plain)
-                    if installed == nil && gogLibrary.downloadProgress[game.id] == nil &&
+                    if installed == nil && AntiCheatPolicy.isBlocked(title: game.title) {
+                        antiCheatCoverBadge
+                    } else if installed == nil && gogLibrary.downloadProgress[game.id] == nil &&
                         !gogLibrary.pausedDownloads.contains(game.id) && game.worksOnWindows {
                         downloadCoverButton { downloadGOGInstaller(game) }
                             .disabled(prefixPath == nil)
@@ -854,7 +870,9 @@ struct WindowsWorkspaceView: View {
                             .blur(radius: installed == nil && download == nil ? Self.uninstalledCoverBlur : 0)
                     }
                     .buttonStyle(.plain)
-                    if installed == nil && download == nil {
+                    if installed == nil && AntiCheatPolicy.isBlocked(title: game.title, epicAppName: game.appName) {
+                        antiCheatCoverBadge
+                    } else if installed == nil && download == nil {
                         downloadCoverButton { epicLibrary.install(game.appName) }
                     }
                 }
@@ -917,7 +935,9 @@ struct WindowsWorkspaceView: View {
                         .contentShape(Rectangle())
                         .onTapGesture { selectedEAGame = game }
                         .blur(radius: installed == nil && download == nil ? Self.uninstalledCoverBlur : 0)
-                    if installed == nil && download == nil {
+                    if installed == nil && AntiCheatPolicy.isBlocked(title: game.title) {
+                        antiCheatCoverBadge
+                    } else if installed == nil && download == nil {
                         downloadCoverButton { eaLibrary.install(game.id) }
                     }
                 }
@@ -1370,6 +1390,8 @@ private struct SteamProgramDetailsView: View {
                                 .padding(.vertical, 12)
                         }
                         .buttonStyle(.bordered)
+                    } else if AntiCheatPolicy.isBlocked(title: game.name, steamAppID: game.appID) {
+                        AntiCheatBlockedButton()
                     } else {
                         Button {
                             guard let prefixPath else {
@@ -1894,6 +1916,8 @@ private struct StoreGameDetailsView<Extra: View>: View {
                 }
                 .buttonStyle(.bordered)
             }
+        } else if AntiCheatPolicy.isBlocked(profileID: profileID, title: title) {
+            AntiCheatBlockedButton()
         } else if canInstall {
             Button(action: onInstall) {
                 Label(tr(paused ? "Resume" : "Install"),
@@ -3012,5 +3036,49 @@ private extension View {
     /// A library cover as Madeira draws it: the card's full width at 2:3.
     func libraryCoverFrame() -> some View {
         frame(maxWidth: .infinity).aspectRatio(2.0 / 3.0, contentMode: .fit)
+    }
+}
+
+
+/// The download symbol struck through: a game that needs Easy Anti-Cheat.
+struct AntiCheatBlockedSymbol: View {
+    var size: CGFloat
+    var body: some View {
+        ZStack {
+            Image(systemName: "arrow.down.circle.fill")
+                .resizable()
+                .scaledToFit()
+                .foregroundColor(.gray)
+            Capsule()
+                .fill(Color.red)
+                .frame(width: size * 1.15, height: max(3, size / 10))
+                .rotationEffect(.degrees(-45))
+        }
+        .frame(width: size, height: size)
+    }
+}
+
+/// The game page's install button for a game that needs Easy Anti-Cheat: grey,
+/// disabled, saying why it cannot be installed.
+struct AntiCheatBlockedButton: View {
+    var body: some View {
+        VStack(spacing: 8) {
+            Button {} label: {
+                Label {
+                    Text(tr("Cannot install"))
+                } icon: {
+                    AntiCheatBlockedSymbol(size: 20)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.gray)
+            .disabled(true)
+            Text(tr(AntiCheatPolicy.message))
+                .font(.caption)
+                .foregroundColor(.gray)
+                .multilineTextAlignment(.center)
+        }
     }
 }

@@ -141,6 +141,19 @@ final class DepotDownloader {
         // The logged-on account, for the install record. Read while the session
         // is connected: it idles out during a long download.
         var accountID: UInt64 = 0
+        // iDeck: every depot's decryption key and content-server authorizations are
+        // requested together before the plans are built, instead of one depot after
+        // another (each a Steam round trip): both are cached, so the loop below finds
+        // them ready and only fetches manifests. A refused key is asked again, and
+        // handled, in the loop.
+        await withTaskGroup(of: Void.self) { group in
+            for depot in depots where depot.manifestID(app.branch) != nil {
+                let contentAppID = !app.freeToDownload ? (depot.fromApp ?? app.appID) : app.appID
+                group.addTask { @MainActor in _ = try? await self.depotKey(depotID: depot.depotID, appID: app.appID) }
+                group.addTask { @MainActor in _ = await self.cdnAuthFragments(depotID: depot.depotID, appID: contentAppID, hosts: pool) }
+            }
+        }
+        SteamLog.event("[steam-depot] keys and authorizations ready in \(String(format: "%.1f", Date().timeIntervalSince(prepStarted))) s")
         for depot in depots {
             try Task.checkCancellation()
             guard let gid = depot.manifestID(app.branch) else { continue }

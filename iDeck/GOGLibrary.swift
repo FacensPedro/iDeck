@@ -415,6 +415,7 @@ final class GOGLibraryModel: ObservableObject {
                 AppLog.record("[gog] installing game \(game.id): \(plan.files.count) files, \(plan.downloadBytes) bytes to download")
                 let installer = GOGContentInstaller(tokens: tokens) { bytes in
                     let done = counter.add(bytes)
+                    guard ProgressThrottle.allow("gog:\(game.id)", done: UInt64(max(done, 0)), total: UInt64(total)) else { return }
                     Task { @MainActor in
                         self.downloadProgress[game.id] = min(Double(done) / Double(total), 1)
                         self.downloadedBytes[game.id] = (UInt64(max(done, 0)), UInt64(total))

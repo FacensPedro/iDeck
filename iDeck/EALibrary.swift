@@ -388,6 +388,8 @@ struct EAInstalledGame: Codable, Sendable {
             let result = try await downloader.install(
                 archive: archive, folder: Self.drive.appendingPathComponent(folder, isDirectory: true),
                 previous: kind == .repair ? nil : previous, verifyAll: kind == .repair, journal: Self.journalURL(id)) { progress in
+                    guard ProgressThrottle.allow("ea:" + id, state: "\(progress.phase)\(progress.step ?? "")",
+                                                 done: progress.doneBytes, total: progress.totalBytes) else { return }
                     Task { @MainActor in EALibrary.shared.downloads[id]?.progress = progress }
                     if progress.phase == .downloading {
                         DownloadLog.progress(store: "EA app", name: title, done: progress.doneBytes, total: progress.totalBytes)

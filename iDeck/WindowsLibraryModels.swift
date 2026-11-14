@@ -700,11 +700,35 @@ enum AntiCheatPolicy {
         String(title.lowercased().unicodeScalars.filter { CharacterSet.alphanumerics.contains($0) && $0.isASCII }.map(Character.init))
     }
 
-    static func isBlocked(title: String, steamAppID: UInt32? = nil) -> Bool {
+    /// Epic Games Store app names (the catalog id iDeck keys Epic games on).
+    static let epicAppNames: Set<String> = [
+        "fortnite",                            // Fortnite
+        "sugar",                               // Rocket League
+        "0a2d9f6403244d12969e11da6713137b",    // Fall Guys
+    ]
+
+    /// A store title often carries an edition after the name ("Fall Guys: Ultimate
+    /// Knockout", "Dead by Daylight - Deluxe"): a title that starts with a listed
+    /// name is matched too.
+    static func isBlocked(title: String, steamAppID: UInt32? = nil, epicAppName: String? = nil) -> Bool {
         if let steamAppID, steamAppIDs.contains(steamAppID) { return true }
+        if let epicAppName, epicAppNames.contains(epicAppName.lowercased()) { return true }
         let name = normalized(title)
-        return !name.isEmpty && titles.contains(name)
+        guard !name.isEmpty else { return false }
+        if titles.contains(name) { return true }
+        // Short names (smite) only match exactly, so another game is not caught.
+        return titles.contains { $0.count >= 8 && name.hasPrefix($0) }
+    }
+
+    /// From a library profile id ("steam:<id>", "epic:<app>", "gog:<id>", "ea:<id>").
+    static func isBlocked(profileID: String, title: String) -> Bool {
+        if profileID.hasPrefix("steam:"), let id = UInt32(profileID.dropFirst(6)) {
+            return isBlocked(title: title, steamAppID: id)
+        }
+        if profileID.hasPrefix("epic:") { return isBlocked(title: title, epicAppName: String(profileID.dropFirst(5))) }
+        return isBlocked(title: title)
     }
 
     static let message = "This game needs Easy Anti-Cheat, which does not run on iDeck. It cannot be installed."
+    static let shortMessage = "Easy Anti-Cheat: cannot be installed"
 }
