@@ -434,6 +434,9 @@ enum DockInstallScripts {
         static func succeeded(_ status: Int) -> Bool { status == 0 || status == 3010 || status == 1641 }
     }
 
+    /// The last game's prerequisite results ("app N: label=status, ..."), for bug reports.
+    static let prerequisitesKey = "diagnostics.prerequisites"
+
     static func results(_ text: String) -> Results {
         var results = Results()
         // cmd.exe writes CRLF; "\r\n" is one Character, so split on any newline Character.
@@ -1035,6 +1038,8 @@ enum DockInstallers {
             do { written = try SteamInstallScripts.mark(succeeded, prefix: prefix) }
             catch { LogStore.shared.log("[dock-installers] app=\(app) results not recorded: \(error.localizedDescription)", level: .error) }
             let failed = ledger.session.count - succeeded.count
+            // Per game, for bug reports: each prerequisite with its result.
+            UserDefaults.standard.set("app \(app): " + statuses.joined(separator: ", "), forKey: DockInstallScripts.prerequisitesKey)
             LogStore.shared.log("[dock-installers] app=\(app) results reason=\(reason) succeeded=\(succeeded.count) failed=\(failed) " +
                                 "recorded-values=\(written) services=\(results.services ?? "-") ended=\(results.ended ? 1 : 0) " +
                                 "statuses=\(statuses.joined(separator: ","))", level: failed > 0 ? .error : .info)

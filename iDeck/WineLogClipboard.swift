@@ -39,6 +39,20 @@ enum WineLogClipboard {
         UIPasteboard.general.setItemProviders([provider], localOnly: true, expirationDate: nil)
     }
 
+    /// Puts `text` on the pasteboard as a .txt file named `name`.
+    static func copyText(_ text: String, named name: String) throws {
+        let destination = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + "-" + name)
+        try Data(text.utf8).write(to: destination, options: .atomic)
+        let provider = NSItemProvider()
+        provider.suggestedName = name
+        provider.registerFileRepresentation(forTypeIdentifier: UTType.plainText.identifier,
+                                            fileOptions: [], visibility: .all) { completion in
+            completion(destination, false, nil)
+            return nil
+        }
+        UIPasteboard.general.setItemProviders([provider], localOnly: true, expirationDate: nil)
+    }
+
     #endif
 
     static func read(from url: URL) throws -> Content {

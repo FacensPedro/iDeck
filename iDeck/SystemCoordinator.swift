@@ -100,12 +100,51 @@ class SystemCoordinator: ObservableObject {
     }
     /// Persist only public game identity, never store authentication or tokens.
     /// Last completed or attempted launch is shown in Bugs & logs and iRelay.
+    /// How the last game session ended and the last stage it reached, kept for bug
+    /// reports (a report after a crash runs in a new process).
+    enum SessionOutcome {
+        static let endKey = "diagnostics.session.end"
+        static let stageKey = "diagnostics.session.stage"
+        static let running = "running"
+
+        static func began() {
+            UserDefaults.standard.set(running, forKey: endKey)
+            UserDefaults.standard.set("starting", forKey: stageKey)
+        }
+
+        static var isRunning: Bool { UserDefaults.standard.string(forKey: endKey) == running }
+
+        /// A status while the session runs: an ending one is the session's end, any other
+        /// is the stage it reached.
+        static func status(_ status: String) {
+            guard isRunning else { return }
+            if status.hasPrefix("Execution Error") || status.hasPrefix("Cannot launch") || status.hasPrefix("Steam: ") {
+                ended(status)
+            } else if status == "Windows Ready" {
+                ended("the game exited and Wine closed normally")
+            } else {
+                UserDefaults.standard.set(String(status.prefix(200)), forKey: stageKey)
+            }
+        }
+
+        static func ended(_ reason: String) {
+            guard isRunning else { return }
+            UserDefaults.standard.set(String(reason.prefix(300)), forKey: endKey)
+        }
+
+        /// At iDeck's start: a session still marked running ended with the app itself.
+        static func noteAppRestart() {
+            ended("iDeck itself stopped while the game ran (a crash, iOS's memory limit, or the app was closed)")
+        }
+    }
+
     private func recordGameContext(_ title: String, launcher: String) {
         let clean = title.replacingOccurrences(of: "[\\r\\n]", with: " ", options: .regularExpression)
         let safeTitle = String(clean.prefix(160))
         UserDefaults.standard.set(safeTitle, forKey: "diagnostics.lastGame")
         UserDefaults.standard.set(launcher, forKey: "diagnostics.lastLauncher")
         AppLog.record("[game-session] launcher=\(launcher) game=\(safeTitle)")
+        SessionOutcome.began()
         // The game gets the memory: covers and other caches iDeck rebuilds on demand
         // are dropped before it starts.
         URLCache.shared.removeAllCachedResponses()
@@ -372,6 +411,7 @@ class SystemCoordinator: ObservableObject {
     
     func setWindowsStatus(_ status: String) {
         AppLog.record("[status] " + status)
+        SessionOutcome.status(status)
         recordBenchmarkMilestone(status)
         let update = {
             if status == "Windows Ready" || status.hasPrefix("Execution Error") || status.hasPrefix("Cannot launch") {
@@ -1714,6 +1754,7 @@ class SystemCoordinator: ObservableObject {
             // the next game from getting its JIT pool. The game gets Alt+F4 first and
             // a moment to save; iDeck is opened again for the next game.
             AppLog.record("[wine-close] X pressed with a session running: iDeck closes with it")
+            SessionOutcome.ended("closed with the X button (iDeck exited with the game)")
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { exit(0) }
             return
         }
@@ -1737,6 +1778,7 @@ class SystemCoordinator: ObservableObject {
     func forceCloseIDeck() {
         SteamLog.event("[wine-close] game did not exit; iDeck closed by the user")
         AppLog.record("[wine-close] force close: iDeck exits so the stuck Windows session ends")
+        SessionOutcome.ended("the game did not exit; iDeck was closed from the close warning")
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { exit(0) }
     }
 
