@@ -1,6 +1,6 @@
 ## What's Changed
+### Windows runtime
+- The Direct3D companion stand-ins announced in 2.3.6 (d3d11on12, d3d9on12, d3dcsx_42, d3dcsx_43) were not actually in the app: their sources were left out of the repository, and the build skipped them with a warning. They are now built into the 32-bit and 64-bit runtimes.
 
-- Copy the complete Wine log as a .txt attachment from the game screen or Bugs & Logs.
-- Epic game details show the compressed download size before installation and the measured file size after installation.
-- Bug reports include current RAM usage and the highest recorded game-session footprint.
-- Updated the application version to 2.4.0 (build 79).
+### Release
+- Updated the application version to 2.4.1 (build 80).
