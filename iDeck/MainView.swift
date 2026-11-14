@@ -2094,6 +2094,9 @@ private struct EpicGameDetailsSheet: View {
                 if let list = epic.dlcs[appName], !list.isEmpty {
                     DetailCard(title: tr("DLCs")) { epicDLCList(list) }
                 }
+                if let packs = epic.optionalPacks[appName], !packs.isEmpty {
+                    DetailCard(title: tr("Optional content")) { epicPackList(packs) }
+                }
                 VStack(alignment: .leading, spacing: 10) {
                     EpicCloudSection(appName: appName)
                 }
@@ -2103,7 +2106,46 @@ private struct EpicGameDetailsSheet: View {
                 .background(Color(white: 0.11), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             }
         }
-        .task(id: appName) { await epic.loadSize(appName) }
+        .task(id: appName) {
+            await epic.loadSize(appName)
+            await epic.loadOptionalPacks(appName)
+        }
+    }
+
+    /// Optional content inside the game's own build, installed and removed one by one
+    /// like a DLC: Epic ships some DLC, textures and voice languages this way.
+    private func epicPackList(_ packs: [EpicOptionalPack]) -> some View {
+        VStack(spacing: 0) {
+            ForEach(packs) { pack in
+                let installedPack = epic.packInstalled(appName, tag: pack.tag)
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(pack.tag).font(.subheadline).foregroundColor(.white).lineLimit(2)
+                        Text(ByteCountFormatter.string(fromByteCount: pack.bytes, countStyle: .file))
+                            .font(.caption2).foregroundColor(.gray)
+                    }
+                    Spacer(minLength: 6)
+                    if installedPack {
+                        Button(role: .destructive) { epic.uninstallPack(appName, tag: pack.tag) } label: {
+                            Label(tr("Uninstall"), systemImage: "trash").font(.caption.weight(.semibold))
+                        }
+                        .buttonStyle(.bordered)
+                    } else {
+                        Button { epic.installPack(appName, tag: pack.tag) } label: {
+                            Text(tr("Install")).font(.caption.weight(.semibold))
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
+                }
+                .disabled(epic.downloads[appName] != nil || epic.sessionRunning)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                if pack.id != packs.last?.id {
+                    Divider().background(Color.white.opacity(0.08)).padding(.leading, 16)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     /// The game's DLC, as the Steam page lists them: install, progress, uninstall.

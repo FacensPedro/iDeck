@@ -57,6 +57,9 @@ struct EpicInstalledGame: Codable, Sendable {
     var additionalCommandLine: String?
     /// The build's content keys (encrypted builds only), to read the saved manifest again.
     var secrets: [String: String]?
+    /// Optional content of the build's own manifest (its install tags) the player
+    /// installed; nil or empty: the base game only.
+    var selectedTags: [String]?
     var programPath: String { folder + "/" + launchExe }
 
     func launchURL(in drive: URL) -> URL {
@@ -87,6 +90,25 @@ struct EpicOwnedDLC: Codable, Identifiable, Hashable, Sendable {
     var id: String { appName }
 }
 
+/// Optional content inside a game's own build: the files Epic marks with one install
+/// tag (a DLC shipped with the game, high-resolution textures, a language's audio).
+struct EpicOptionalPack: Identifiable, Hashable, Sendable {
+    var tag: String
+    /// Bytes of the files only this optional content adds.
+    var bytes: Int64
+    var id: String { tag }
+
+    /// The packs of a manifest: each tag with the size of its files, largest first.
+    static func packs(in manifest: EpicManifest) -> [EpicOptionalPack] {
+        var sizes: [String: Int64] = [:]
+        for file in manifest.files where file.symlinkTarget.isEmpty {
+            for tag in Set(file.installTags) { sizes[tag, default: 0] += file.size }
+        }
+        return sizes.map { EpicOptionalPack(tag: $0.key, bytes: $0.value) }
+            .sorted { $0.bytes != $1.bytes ? $0.bytes > $1.bytes : $0.tag < $1.tag }
+    }
+}
+
 /// A DLC installed into its base game's folder.
 struct EpicInstalledDLC: Codable, Sendable {
     var appName: String
@@ -109,6 +131,8 @@ struct EpicInstalledDLC: Codable, Sendable {
     @Published private(set) var dlcs: [String: [EpicOwnedDLC]] = [:]
     /// DLC app name -> where it is installed.
     @Published private(set) var installedDLC: [String: EpicInstalledDLC] = [:]
+    /// Installed game -> the optional content its manifest offers (EpicOptionalPack).
+    @Published private(set) var optionalPacks: [String: [EpicOptionalPack]] = [:]
     @Published private(set) var refreshing = false
     @Published private(set) var libraryUpdated: Date?
     @Published var error: String?
@@ -523,6 +547,54 @@ struct EpicInstalledDLC: Codable, Sendable {
     }
 
     /// Deletes the DLC's files (those its manifest lists and the base game does not).
+    // MARK: Optional content
+
+    /// The optional content of an installed game, from its saved manifest.
+    func loadOptionalPacks(_ app: String) async {
+        guard let record = installed[app], optionalPacks[app] == nil else { return }
+        let url = Self.manifestURL(app), secrets = record.secrets ?? [:]
+        let packs = await Task.detached(priority: .utility) { () -> [EpicOptionalPack] in
+            guard let data = try? Data(contentsOf: url), let manifest = try? EpicManifest.parse(data, secrets: secrets) else { return [] }
+            return EpicOptionalPack.packs(in: manifest)
+        }.value
+        if installed[app]?.buildVersion == record.buildVersion { optionalPacks[app] = packs }
+    }
+
+    func packInstalled(_ app: String, tag: String) -> Bool { installed[app]?.selectedTags?.contains(tag) == true }
+
+    /// Adds an optional content to the game: its files download as an update of the
+    /// installed build, which keeps every file already there.
+    func installPack(_ app: String, tag: String) {
+        guard installed[app] != nil, downloads[app] == nil, !inSession else { return }
+        var tags = Set(installed[app]?.selectedTags ?? [])
+        tags.insert(tag)
+        installed[app]?.selectedTags = tags.sorted()
+        writeInstalled()
+        EpicLog.event("[epic-download] optional content add app=\(app) tag=\(tag)")
+        enqueue(app, kind: .update)
+    }
+
+    /// Removes an optional content's files: those carrying its tag that neither the base
+    /// game (untagged) nor another installed optional content also needs.
+    func uninstallPack(_ app: String, tag: String) {
+        guard let record = installed[app], downloads[app] == nil, !inSession else { return }
+        let remaining = Set(record.selectedTags ?? []).subtracting([tag])
+        installed[app]?.selectedTags = remaining.isEmpty ? nil : remaining.sorted()
+        writeInstalled()
+        let folder = Self.drive.appendingPathComponent(record.folder, isDirectory: true)
+        let url = Self.manifestURL(app), secrets = record.secrets ?? [:]
+        Task.detached(priority: .utility) {
+            guard let data = try? Data(contentsOf: url), let manifest = try? EpicManifest.parse(data, secrets: secrets) else { return }
+            let paths = EpicPathResolver(root: folder)
+            for file in manifest.files where file.installTags.contains(tag) && remaining.isDisjoint(with: file.installTags) {
+                if let parts = EpicManifest.components(file.name), let existing = paths.existing(parts) {
+                    try? FileManager.default.removeItem(at: existing)
+                }
+            }
+        }
+        EpicLog.event("[epic-download] optional content removed app=\(app) tag=\(tag)")
+    }
+
     func uninstallDLC(_ dlcApp: String) {
         guard let record = installedDLC[dlcApp], let base = installed[record.baseApp], !inSession else { return }
         pause(dlcApp); downloads[dlcApp] = nil
@@ -629,7 +701,8 @@ struct EpicInstalledDLC: Codable, Sendable {
             let result = try await downloader.install(
                 manifest: manifest, baseURLs: location.baseURLs, secrets: location.secrets,
                 folder: Self.drive.appendingPathComponent(folder, isDirectory: true),
-                previous: kind == .repair ? nil : previous, verifyAll: kind == .repair, journal: Self.journalURL(app)) { progress in
+                previous: kind == .repair ? nil : previous, verifyAll: kind == .repair, journal: Self.journalURL(app),
+                includeTags: Set(record?.selectedTags ?? [])) { progress in
                     Task { @MainActor in
                         EpicLibrary.shared.downloads[app]?.progress = progress
                         BackgroundDownloads.epic.progress(done: progress.doneBytes, total: progress.totalBytes)
@@ -642,8 +715,10 @@ struct EpicInstalledDLC: Codable, Sendable {
                 buildVersion: manifest.buildVersion.isEmpty ? location.buildVersion : manifest.buildVersion,
                 launchExe: launch, launchCommand: manifest.launchCommand, installBytes: result.installBytes,
                 canRunOffline: game.canRunOffline, requiresOwnershipToken: game.requiresOwnershipToken,
-                additionalCommandLine: game.additionalCommandLine, secrets: location.secrets.isEmpty ? nil : location.secrets)
+                additionalCommandLine: game.additionalCommandLine, secrets: location.secrets.isEmpty ? nil : location.secrets,
+                selectedTags: installed[app]?.selectedTags)
             installed[app] = finished
+            optionalPacks[app] = EpicOptionalPack.packs(in: manifest)
             writeInstalled()
             downloads[app] = nil
             outcome = .completed

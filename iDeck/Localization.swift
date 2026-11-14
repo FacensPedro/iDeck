@@ -349,6 +349,7 @@ enum Translations {
         "Could not remove this game's files.": ["pt": "Não foi possível remover os arquivos deste jogo.", "es": "No se pudieron eliminar los archivos de este juego."],
         "Installing Steam client components...": ["pt": "Instalando os componentes do cliente Steam...", "es": "Instalando los componentes del cliente de Steam..."],
         "Installing Steam client components": ["pt": "Instalando os componentes do cliente Steam", "es": "Instalando los componentes del cliente de Steam"],
+        "Optional content": ["pt": "Conteúdo opcional", "es": "Contenido opcional"],
         "Close Wine and return to the library": ["pt": "Fechar o Wine e voltar à biblioteca", "es": "Cerrar Wine y volver a la biblioteca"],
         "Wine started, but no game frame was detected. The selected executable may need a different working folder or missing runtime DLLs.": ["pt": "O Wine iniciou, mas nenhum quadro do jogo foi detectado. O executável escolhido pode precisar de outra pasta de trabalho ou de DLLs de runtime ausentes.", "es": "Wine se inició, pero no se detectó ningún fotograma del juego. El ejecutable elegido puede necesitar otra carpeta de trabajo o DLL de runtime que faltan."],
         "Record benchmarks": ["pt": "Gravar benchmarks", "es": "Grabar benchmarks"],
