@@ -67,4 +67,4 @@ Issues and pull requests are welcome. Bug reports should include the device mode
 
 ---
 
-*iDeck is an independent experimental project and is not affiliated with Valve, Microsoft or Apple.*
+*iDeck is an independent experimental project and is not affiliated with Valve, Epic Games, GOG, EA, Microsoft or Apple.*
