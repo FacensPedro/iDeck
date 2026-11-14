@@ -2252,8 +2252,10 @@ extension WindowsWorkspaceView {
                         shelfTile(.store(store))
                     }
                     if !shelfGames.isEmpty {
-                        Rectangle().fill(lineColor).frame(width: 1, height: shelfTileHeight * 0.7)
-                            .padding(.top, shelfTileHeight * 0.15)
+                        // Over the selected game's blurred artwork the dark line colour read
+                        // as a scratch: a soft light rule shows on any background.
+                        Capsule().fill(Color.white.opacity(0.28)).frame(width: 2, height: shelfTileHeight * 0.5)
+                            .padding(.top, shelfTileHeight * 0.25)
                     }
                     ForEach(shelfGames, id: \.self) { item in
                         shelfTile(item)
