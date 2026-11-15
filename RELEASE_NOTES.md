@@ -1,4 +1,22 @@
 ## What's Changed
+### EA app games
+- A game that read its licence and still opened EA's activation window (Dragon Age: Inquisition) asked for a licence bound to the display adapter, which Wine registers only after the game has checked its licence. iDeck now notices when a game opens the activation window and asks for the licence without the adapter at the next launch, so the licence follows the machine identity the game really computes.
+
+### JIT memory
+- The executable window at 0x140000000 is held from the moment iDeck opens when the runtime did not hold it already, together with the space above it, so downloads and other work before the first game can no longer take it. Games with a large fixed-base program get their wider window again, and the JIT pool is no longer split into pieces too small for it.
+- Dragon Age: Inquisition's recommended settings split the JIT pool across the two free areas above the window (as Dark Souls III does), instead of shrinking it to 496 MB.
+- When the JIT pool has to shrink, the bug report shows the free memory areas it had to choose from.
+
+### Downloads
+- GOG install progress never goes backwards: late updates from parallel files are ignored.
+
+### Cleanup
+- Removed functions nothing called (an old Visual C++ setup path and unused JIT, Epic and installer helpers).
+
+### Release
+- Updated the application version to 2.5.2 (build 87).
+
+## What's Changed
 ### Windows sessions
 - Closing a game cancels any launch still waiting for JIT, and a launch is refused while the previous session is closing or Wine is running, so JIT preparation, launch and shutdown no longer overlap.
 - Every session records iDeck's RAM at the end, its peak, the memory still available and why it ended; the last sessions appear in Bugs & logs.
