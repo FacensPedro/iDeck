@@ -1,4 +1,24 @@
 ## What's Changed
+### Memory+
+- Extended Virtual Addressing shows Active after iDeck is installed again with Memory+: iDeck now reads the address limit iOS gives it (and the signing profile) instead of only probing an address that the early JIT reservation may already hold.
+- The Memory+ settings no longer carry the long explanation and GetMoreRam steps; the status, App ID and GetMoreRam link stay.
+
+### Logs
+- Logs are smaller and less repetitive: copied Wine logs, the bug report and the iDeck log fold lines that repeat apart from numbers, addresses and times, and list the most repeated ones once with a count.
+- The Wine log is kept at 8 MB (was 24 MB); the previous one is stored compacted and compressed (madeira-log.previous.txt.lzfse). The iDeck log keeps 512 KB (was 1 MB).
+
+### Touch
+- Taps work in .exe and .msi installers: their dialogs are mapped onto the whole Windows desktop instead of a game window's area, and a tap before the game surface exists is no longer dropped.
+
+### Interface
+- Initial setup: Madeira Dock is required, and its "optional" note is gone. Settings calls it Initial setup.
+- Epic Games' logo in Settings › Stores and launchers sits on black.
+- iPhone in portrait: the shelf with the stores and installed or installing games is smaller, so five tiles fit on a 6.1" or smaller screen.
+
+### Release
+- Updated the application version to 2.6.0 (build 89).
+
+## What's Changed
 ### JIT memory
 - The automatic JIT pool grows to 640, 768 or 896 MB when iOS leaves 5, 6 or 8 GB free and the extended address space is there (and the game has no recent crash). The allocator still shrinks it to the largest free area.
 

@@ -19,7 +19,7 @@ class LibraryLayoutTests(unittest.TestCase):
     def test_shelf_row_leaves_room_for_the_selected_tile(self):
         start = VIEW.index("    var consoleShelf: some View")
         shelf = VIEW[start:VIEW.index("    private var shelfTileWidth", start)]
-        self.assertIn(".padding(.horizontal, 14)", shelf)
+        self.assertIn(".padding(.horizontal, isCompact ? 10 : 14)", shelf)
         self.assertNotIn(".padding(.horizontal, 2)", shelf)
 
 

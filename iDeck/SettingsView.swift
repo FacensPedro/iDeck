@@ -72,7 +72,7 @@ struct SettingsView: View {
                         dismiss()
                     } label: {
                         HStack(spacing: 0) {
-                            SettingsRow(icon: "wand.and.stars", color: .indigo, title: tr("Setup assistant"))
+                            SettingsRow(icon: "wand.and.stars", color: .indigo, title: tr("Initial setup"))
                             Image(systemName: "chevron.right")
                                 .font(.footnote.weight(.semibold))
                                 .foregroundStyle(.tertiary)
@@ -243,7 +243,7 @@ struct SettingsView: View {
             }
             Section {
                 NavigationLink { epicPage } label: {
-                    SettingsRow(icon: "e.square.fill", color: .gray, title: "Epic Games",
+                    SettingsRow(icon: "e.square.fill", color: .black, title: "Epic Games",
                                 value: epicLibrary.signedIn ? (epicLibrary.accountName ?? tr("Connected")) : tr("Not connected"),
                                 asset: "StoreBadgeEpic")
                 }
@@ -513,23 +513,8 @@ struct SettingsView: View {
             LabeledContent("App ID") {
                 Text(MemoryPlus.appID).font(.caption.monospaced()).textSelection(.enabled)
             }
-            Text(tr("iOS decides Memory+ when iDeck is signed: the IPA asks for both capabilities, and the signature keeps only those the App ID allows. iDeck cannot turn them on while it runs."))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            if !MemoryPlus.ready {
-                Text(tr("GetMoreRam adds Increased Memory Limit to an App ID from this device, without a Mac:"))
-                    .font(.caption)
-                ForEach(Array(MemoryPlus.getMoreRamSteps.enumerated()), id: \.offset) { index, step in
-                    Text("\(index + 1). " + tr(step)).font(.caption)
-                }
-            }
             Button(tr("Copy App ID")) { UIPasteboard.general.string = MemoryPlus.appID }
             Link(tr("Open GetMoreRam"), destination: MemoryPlus.getMoreRamURL)
-            if MemoryPlus.extendedAddressing == .missing {
-                Text(tr("Extended Virtual Addressing is missing: Windows games cannot start without it. GetMoreRam's instructions name only Increased Memory Limit, so this one may need the App ID changed in Apple's developer portal or Xcode."))
-                    .font(.caption)
-                    .foregroundStyle(.orange)
-            }
         }
     }
 

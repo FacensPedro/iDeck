@@ -23,7 +23,7 @@ class MemoryPlusTests(unittest.TestCase):
     def test_settings_show_the_state_and_getmoreram_steps(self):
         settings = text("iDeck/SettingsView.swift")
         self.assertIn("memoryPlusSection", settings)
-        self.assertIn("MemoryPlus.getMoreRamSteps", settings)
+        self.assertNotIn("iOS decides Memory+ when iDeck is signed", settings)
         self.assertIn('Link(tr("Open GetMoreRam"), destination: MemoryPlus.getMoreRamURL)', settings)
         self.assertIn("UIPasteboard.general.string = MemoryPlus.appID", settings)
         self.assertNotIn("Requested in IPA", settings)

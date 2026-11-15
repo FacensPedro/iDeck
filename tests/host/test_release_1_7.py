@@ -38,12 +38,12 @@ class Release17Tests(unittest.TestCase):
         background = repo_text("iDeck/BackgroundDownloads.swift")
         self.assertIn("whenNotificationsAllowed {", background)
         self.assertIn("guard Self.notificationsEnabled, Self.notificationsAllowed == true else { return }", background)
-        self.assertIn('title: tr("Setup assistant")', repo_text("iDeck/SettingsView.swift"))
+        self.assertIn('title: tr("Initial setup")', repo_text("iDeck/SettingsView.swift"))
         coordinator = repo_text("iDeck/SystemCoordinator.swift")
         self.assertIn("func prewarmJITForLaunch()", coordinator)
         self.assertEqual(repo_text("iDeck/MainView.swift").count("coordinator.prewarmJITForLaunch()"), 2)
         project = repo_text("iDeck.xcodeproj/project.pbxproj")
-        self.assertEqual(project.count("MARKETING_VERSION = 2.5.3;"), 6)
+        self.assertEqual(project.count("MARKETING_VERSION = 2.6.0;"), 6)
 
 
 class VulkanHostLibraryTests(unittest.TestCase):

@@ -44,18 +44,24 @@ class SystemCoordinator: ObservableObject {
     }
 
     /// madeira-log.txt grows by every session (Madeira opens it for appending) and was
-    /// never cut. Between sessions, while no Wine runs, a log past this size becomes
-    /// madeira-log.previous.txt (one kept), so it stays fast to scan and copy.
-    static let wineLogRotateBytes: Int64 = 24 << 20
+    /// never cut. Between sessions, while no Wine runs, a log past this size is kept
+    /// as madeira-log.previous.txt.lzfse (one kept: repeated lines folded, then
+    /// compressed), so the current log stays small and fast to scan and copy.
+    static let wineLogRotateBytes: Int64 = 8 << 20
 
     static func rotateWineLogIfLarge(_ url: URL) {
         guard !ideck_wineprocess_running(), !ideck_wineserver_running(),
               let size = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? NSNumber)?.int64Value,
               size > wineLogRotateBytes else { return }
-        let previous = url.deletingLastPathComponent().appendingPathComponent("madeira-log.previous.txt")
+        let folder = url.deletingLastPathComponent()
+        let previous = folder.appendingPathComponent("madeira-log.previous.txt.lzfse")
+        try? FileManager.default.removeItem(at: folder.appendingPathComponent("madeira-log.previous.txt"))
+        guard let data = try? Data(contentsOf: url) else { return }
         try? FileManager.default.removeItem(at: previous)
-        if (try? FileManager.default.moveItem(at: url, to: previous)) != nil {
-            AppLog.record("[wine-log] madeira-log.txt reached \(size >> 20) MB: kept as madeira-log.previous.txt")
+        if (try? LogCompactor.writeCompressed(String(decoding: data, as: UTF8.self), to: previous)) != nil {
+            try? FileManager.default.removeItem(at: url)
+            let kept = ((try? FileManager.default.attributesOfItem(atPath: previous.path)[.size] as? NSNumber)?.int64Value ?? 0)
+            AppLog.record("[wine-log] madeira-log.txt reached \(size >> 20) MB: kept compacted as madeira-log.previous.txt.lzfse (\(kept >> 10) KB)")
         }
     }
 
@@ -1131,11 +1137,21 @@ class SystemCoordinator: ObservableObject {
             if plan.kind != nil {
                 launch.arguments = [plan.arguments, launch.arguments].filter { !$0.isEmpty }.joined(separator: " ")
             }
+            // Installers draw GDI dialogs on the Windows desktop: touches map onto the
+            // whole desktop picture, not a game window's client area.
+            self.nextLaunchIsInstaller = plan.kind != nil
             self.launchWindowsExecutable(at: plan.executable, profile: launch)
         }
     }
 
+    /// Set by launchWindowsProgram right before an installer starts; read once.
+    private var nextLaunchIsInstaller = false
+
     func launchWindowsExecutable(at url: URL, profile: WindowsGameProfile? = nil) {
+        WindowsRendererView.installerTouchMapping = nextLaunchIsInstaller
+            || url.pathExtension.lowercased() == "msi"
+            || WindowsRendererView.looksLikeInstaller(url.lastPathComponent)
+        nextLaunchIsInstaller = false
         guard !isClosingWindowsSession else { return }
         guard !previousWineSessionStillFinishing() else { return }
         isSteamSession = false

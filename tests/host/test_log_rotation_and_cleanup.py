@@ -17,7 +17,7 @@ class WineLogRotationTests(unittest.TestCase):
         body = body[:body.index("\n    }\n")]
         self.assertIn("guard !ideck_wineprocess_running(), !ideck_wineserver_running()", body)
         self.assertIn('"madeira-log.previous.txt"', body)
-        self.assertIn("static let wineLogRotateBytes: Int64 = 24 << 20", COORDINATOR)
+        self.assertIn("static let wineLogRotateBytes: Int64 = 8 << 20", COORDINATOR)
 
 
 class SessionCleanupTests(unittest.TestCase):
