@@ -116,7 +116,7 @@ final class SteamCloudSyncEngine {
     }
 
     private func backups(appID: UInt32, side: String) -> URL {
-        let stamp = ISO8601DateFormatter().string(from: Date())
+        let stamp = ISOStamp.string(Date())
             .replacingOccurrences(of: ":", with: "-")
         return FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("Steam Cloud Backups/\(appID)/\(stamp)/\(side)", isDirectory: true)

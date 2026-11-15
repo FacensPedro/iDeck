@@ -40,6 +40,24 @@ enum AddressSpaceCheck {
         return vm_address_t(info.max_address)
     }()
 
+    /// What each check found, for the log and the bug report.
+    static var diagnostics: String {
+        let top = maxAddress.map { String(format: "0x%llx", UInt64($0)) } ?? "unknown"
+        let profile: String
+        switch MemoryPlus.state(MemoryPlus.extendedAddressingKey, in: MemoryPlus.profileEntitlements) {
+        case .granted: profile = "granted"
+        case .missing: profile = "not in the signing profile"
+        case .unknown: profile = "no profile"
+        }
+        let memory: String
+        switch MemoryPlus.increasedLimit {
+        case .granted: memory = "granted"
+        case .missing: memory = "missing"
+        case .unknown: memory = "unknown"
+        }
+        return "max address \(top), extended addressing \(profile), increased memory limit \(memory)"
+    }
+
     static let message = "Execution Error: iOS did not give iDeck the extended memory address space Windows games need. Sign iDeck again with the extended virtual addressing entitlement (com.apple.developer.kernel.extended-virtual-addressing) and reopen it."
 }
 

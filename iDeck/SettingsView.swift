@@ -11,7 +11,7 @@ struct SettingsView: View {
     @AppStorage("controllerLeftSensitivity") private var controllerLeftSensitivity = 1.0
     @AppStorage("controllerRightSensitivity") private var controllerRightSensitivity = 1.0
     @AppStorage("controllerDeadzone") private var controllerDeadzone = 0.10
-    @AppStorage("wineControllerAPI") private var wineControllerAPI = "XInput"
+    @AppStorage("wineControllerAPI") private var wineControllerAPI = "By controller"
     @AppStorage("wineJITPoolMiB") private var wineJITPoolMiB = 560
     @AppStorage(BackgroundDownloads.continuedKey) private var continueDownloadsInBackground = true
     @AppStorage(BackgroundDownloads.notificationsKey) private var downloadNotifications = true
@@ -367,7 +367,7 @@ struct SettingsView: View {
         Form {
             settingsSection(title: tr("Controller")) {
                 Picker(tr("Windows controller API"), selection: $wineControllerAPI) {
-                    ForEach(["XInput", "XInput + DirectInput", "HID", "DualSense HID", "Generic HID"], id: \.self) { api in
+                    ForEach(["By controller", "XInput", "XInput + DirectInput", "HID", "DualSense HID", "Generic HID"], id: \.self) { api in
                         Text(tr(api)).tag(api)
                     }
                 }
@@ -478,11 +478,6 @@ struct SettingsView: View {
                 LabeledContent("Metal Shader Converter",
                                value: tr((runtime["metalShaderConverterBundled"] as? Bool ?? false) ? "Bundled" : "Not bundled"))
                 LabeledContent(tr("Madeira Dock"), value: tr(MadeiraDock.bundled ? "Bundled" : "Not bundled"))
-                if runtime["wineMonoBundled"] as? Bool != true {
-                    Text(tr("Wine Mono is not included. Run iOS Build with Require Madeira runtime and Wine Mono enabled to create a different signed IPA."))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
                 if !MadeiraBundleIdentity.isNative {
                     Text(tr(MadeiraBundleIdentity.missingRuntimeMessage))
                         .font(.caption)

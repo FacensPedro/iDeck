@@ -24,14 +24,14 @@ class WineJITPoolSettingsTests(unittest.TestCase):
         settings = (ROOT / "iDeck/SettingsView.swift").read_text()
         env = (ROOT / "iDeck/WindowsEnvironment.swift").read_text()
         self.assertIn('runtime["wineMonoBundled"] as? Bool', settings)
-        self.assertIn('Wine Mono is not included. Run iOS Build', settings)
+        self.assertNotIn('Wine Mono is not included.', settings)
         self.assertNotIn("downloadWineMono()", settings)
         self.assertIn('"wineMonoBundled"', env)
         self.assertIn("coordinator.requestStikDebugJIT()", settings)
 
     def test_localization_and_no_jit_faking(self):
         locale = (ROOT / "iDeck/Localization.swift").read_text()
-        self.assertIn('"Wine Mono is not included.', locale)
+        self.assertNotIn('"Wine Mono is not included.', locale)
         self.assertIn('"pt":', locale)
         self.assertIn('"es":', locale)
         bridge = (ROOT / "iDeck/SystemCoordinator.swift").read_text()

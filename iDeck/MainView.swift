@@ -2659,7 +2659,7 @@ private struct IDeckFirstRunSetupView: View {
         switch item {
         case .visualCpp: return prefixReady && vcReady
         case .wineMono: return wineMono.installed
-        case .dock: return MadeiraDock.clientInstalled
+        case .dock: return MadeiraDock.clientInstalled && steamDLLsReady && !coordinator.steamComponentsInstalling
         case .jit: return jitMethodChosen && (jitMethod != "builtIn" || coordinator.hasPairingFile)
         case .summary: return false
         }
@@ -2794,7 +2794,8 @@ private struct IDeckFirstRunSetupView: View {
                 .disabled(installing || wineMono.busy
                           || (current == .visualCpp && !(prefixReady && vcReady))
                           || (current == .wineMono && !wineMono.installed)
-                          || (current == .dock && !MadeiraDock.clientInstalled))
+                          || (current == .dock && (!MadeiraDock.clientInstalled || !steamDLLsReady
+                                                   || coordinator.steamComponentsInstalling)))
             } else {
                 Button { step = 0; onFinish() } label: { Text("Start using iDeck").frame(minWidth: 160) }
                     .buttonStyle(.borderedProminent)

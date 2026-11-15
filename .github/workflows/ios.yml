@@ -3,11 +3,6 @@ name: iOS Build
 on:
   workflow_dispatch:
     inputs:
-      require_madeira:
-        description: "Require real FEX/Wine/DXMT/D3D12 binaries and linked bridge (no UI-only IPA)"
-        type: boolean
-        required: false
-        default: true
       accept_converter_license:
         description: "I have reviewed the Metal Shader Converter terms and have permission to package the converter in this IPA"
         type: boolean
@@ -15,11 +10,6 @@ on:
         default: false
       build_wow64:
         description: "Bundle WoW64 (i386 FEX and Wine) in the native IPA (enabled by default; disable only for 64-bit-only builds)"
-        type: boolean
-        required: false
-        default: true
-      bundle_wine_mono:
-        description: "Include Wine Mono for compatible .NET Framework applications"
         type: boolean
         required: false
         default: true
@@ -441,12 +431,11 @@ jobs:
       IDECK_REQUIRE_IPHONE_DUO_SDK: '1'
       # Wine's Windows files stay inside the IPA: no runtime-* GitHub releases.
       IDECK_SPLIT_RUNTIME: '0'
-      IDECK_NATIVE_BUILD: ${{ ((github.event_name == 'workflow_dispatch' && inputs.require_madeira) || (github.event_name == 'push' && vars.IDECK_NATIVE_DISTRIBUTION_APPROVED == 'true')) && '1' || '0' }}
-      IDECK_BUILD_WOW64: ${{ ((github.event_name == 'workflow_dispatch' && inputs.require_madeira && inputs.build_wow64) || (github.event_name == 'push' && vars.IDECK_NATIVE_DISTRIBUTION_APPROVED == 'true')) && '1' || '0' }}
-      # As Madeira's IPA: Wine Mono (about 42 MB) and the Visual C++ runtimes are
-      # downloaded on the device the first time they are needed, not bundled. A manual
-      # run can still bundle Mono (bundle_wine_mono).
-      IDECK_BUNDLE_WINE_MONO: ${{ (github.event_name == 'workflow_dispatch' && inputs.require_madeira && inputs.bundle_wine_mono) && '1' || '0' }}
+      IDECK_NATIVE_BUILD: ${{ ((github.event_name == 'workflow_dispatch') || (github.event_name == 'push' && vars.IDECK_NATIVE_DISTRIBUTION_APPROVED == 'true')) && '1' || '0' }}
+      IDECK_BUILD_WOW64: ${{ ((github.event_name == 'workflow_dispatch' && inputs.build_wow64) || (github.event_name == 'push' && vars.IDECK_NATIVE_DISTRIBUTION_APPROVED == 'true')) && '1' || '0' }}
+      # The Madeira runtime and Wine Mono (about 42 MB) are always in a native IPA.
+      # The Visual C++ runtimes are downloaded on the device when first needed.
+      IDECK_BUNDLE_WINE_MONO: ${{ ((github.event_name == 'workflow_dispatch') || (github.event_name == 'push' && vars.IDECK_NATIVE_DISTRIBUTION_APPROVED == 'true')) && '1' || '0' }}
       IDECK_BUNDLE_VCRUNTIME: '0'
       # The profile (always unified): DXMT + Madeira D3D12 ("d3d12" payload).
       IDECK_GRAPHICS_PROFILE: unified

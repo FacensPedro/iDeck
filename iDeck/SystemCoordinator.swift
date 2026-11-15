@@ -605,7 +605,7 @@ class SystemCoordinator: ObservableObject {
     private func ensureJITForGameLaunch() -> Bool {
         guard AddressSpaceCheck.hasGuestWindow else {
             jitResume = nil
-            AppLog.record("[address-space] no mapping at 0x7000000000: extended virtual addressing is not active")
+            AppLog.record("[address-space] no mapping at 0x7000000000: extended virtual addressing is not active (\(AddressSpaceCheck.diagnostics))")
             setWindowsStatus(AddressSpaceCheck.message)
             return false
         }
@@ -673,7 +673,7 @@ class SystemCoordinator: ObservableObject {
     static func recordLaunchJITState() {
         let snapshot = ideck_jit_snapshot()
         let text = "debugged=\(ideck_process_has_jit_permission() ? 1 : 0) debugger=\(snapshot.debugger_attached ? 1 : 0) "
-            + "pool=\(ideck_wine_jit_pool_ready() ? 1 : 0) at \(ISO8601DateFormatter().string(from: Date()))"
+            + "pool=\(ideck_wine_jit_pool_ready() ? 1 : 0) at \(ISOStamp.string(Date()))"
         UserDefaults.standard.set(text, forKey: lastLaunchJITKey)
         AppLog.record("[jit] preparation validated for launch: \(text)")
     }
@@ -1144,6 +1144,33 @@ class SystemCoordinator: ObservableObject {
         }
     }
 
+    /// When the current Windows session started (EA games closing by themselves).
+    private var sessionStartedAt: Date?
+
+    /// Why an EA app game closed by itself, from its part of the Wine log, or nil
+    /// for a session that ran long enough to be a normal quit with nothing in the log.
+    static func eaFailureReason(logURL: URL?, since offset: Int64?, seconds: TimeInterval) -> String? {
+        func has(_ needles: [String]) -> Bool { sessionLogContains(needles, logURL: logURL, since: offset) }
+        let prefix = "Execution Error: EA app game closed. "
+        if has(["activationui.exe"]) {
+            return prefix + "EA's licence was refused (the game opened EA's activation window). iDeck asks for the licence another way at the next launch: start the game again."
+        }
+        if has(["eaanticheat", "easyanticheat", "eac_launcher", "anticheat.x64"]) {
+            return prefix + "The game requires EA's anti-cheat, which cannot run under Wine on iOS."
+        }
+        if has(["license not found", "licence not found", "no license", "invalid license", "license expired", "ownership check failed"]) {
+            return prefix + "EA's licence for this game could not be read. Sign in to the EA app again in Settings › Stores and launchers, then start the game again."
+        }
+        if has(["eadesktop.exe", "eabackgroundservice", "origin.exe", "ealauncher", "link2ea"]) {
+            return prefix + "The game asked for the EA app client, which iDeck does not run. Start it from iDeck's EA app library, not from its own launcher."
+        }
+        if has(["c0000135", "could not load", "library not found", "not found in the dll"]) {
+            return prefix + "A Windows DLL the game needs is missing. Copy the bug report from Bugs & logs to see which one."
+        }
+        guard seconds < 120 else { return nil }
+        return prefix + "It stopped \(Int(seconds)) s after starting without an error from Windows. Copy the bug report from Bugs & logs for the details."
+    }
+
     /// Set by launchWindowsProgram right before an installer starts; read once.
     private var nextLaunchIsInstaller = false
 
@@ -1152,6 +1179,7 @@ class SystemCoordinator: ObservableObject {
             || url.pathExtension.lowercased() == "msi"
             || WindowsRendererView.looksLikeInstaller(url.lastPathComponent)
         nextLaunchIsInstaller = false
+        sessionStartedAt = Date()
         guard !isClosingWindowsSession else { return }
         guard !previousWineSessionStillFinishing() else { return }
         isSteamSession = false
@@ -1961,7 +1989,17 @@ class SystemCoordinator: ObservableObject {
                 return
             }
         }
-        let outcome = wineExitResult()
+        var outcome = wineExitResult()
+        // EA app games that close by themselves (licence, anti-cheat, missing EA app)
+        // used to return to the library with no word: say what went wrong and keep
+        // the session screen open on it.
+        if let endedGame, endedGame.hasPrefix("ea:"), !outcome.reason.hasPrefix("Execution Error") {
+            let seconds = sessionStartedAt.map { Date().timeIntervalSince($0) } ?? 0
+            if let ea = Self.eaFailureReason(logURL: Self.wineLogURL, since: wineLogStartOffset, seconds: seconds) {
+                outcome.reason = ea
+            }
+        }
+        sessionStartedAt = nil
         let hostTrap = outcome.ntstatus == 0xC000001D
             && IllegalInstructionOrigin.isHost(logURL: Self.wineLogURL, since: wineLogStartOffset)
         let shaderFailure = Self.sessionLogShowsShaderFailure(logURL: Self.wineLogURL, since: wineLogStartOffset)

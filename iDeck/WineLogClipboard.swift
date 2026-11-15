@@ -102,7 +102,7 @@ enum WineLogClipboard {
 enum LogCompactor {
     /// A line seen more than this many times (anywhere in the log) is left out after
     /// that, and counted in the summary at the end.
-    static let maximumRepeats = 3
+    static let maximumRepeats = 2
 
     /// The text without long runs and endless repeats:
     /// - a run of lines that differ only in numbers/addresses becomes the first one

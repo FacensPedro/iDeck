@@ -88,7 +88,7 @@ import SwiftUI
     private static func backup(for record: EpicInstalledGame) -> URL {
         let safe = String(record.title.map { "/\\:*?\"<>|".contains($0) ? "-" : $0 }.prefix(80))
             .trimmingCharacters(in: .whitespacesAndNewlines.union(CharacterSet(charactersIn: ".")))
-        let stamp = ISO8601DateFormatter().string(from: Date()).replacingOccurrences(of: ":", with: "-")
+        let stamp = ISOStamp.string(Date()).replacingOccurrences(of: ":", with: "-")
         return backupsFolder.appendingPathComponent(safe.isEmpty ? record.appName : "\(safe) (\(record.appName))", isDirectory: true)
             .appendingPathComponent(stamp, isDirectory: true)
     }
