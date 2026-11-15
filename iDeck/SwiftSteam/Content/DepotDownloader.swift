@@ -72,7 +72,7 @@ final class DepotDownloader {
     private var cdnAuthTokens: [String: (fragment: String, until: Date)] = [:]
     private let maxConcurrentChunks = DownloadSpeed.steamChunks
     private let attemptsPerChunk = 5
-    private let hostPoolSize = 6
+    private let hostPoolSize = 8
 
     private nonisolated static let http: URLSession = {
         let config = URLSessionConfiguration.ephemeral
