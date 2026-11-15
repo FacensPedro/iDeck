@@ -28,11 +28,6 @@ on:
         type: boolean
         required: false
         default: false
-      use_msc_pkg:
-        description: "Bundle the Apple Metal Shader Converter 4.0 beta 3 from your own macOS .pkg (private release via IDECK_MSC_PKG_REPO + IDECK_MSC_PKG_TOKEN, or the IDECK_MSC_PKG_URL secret; forces a full native rebuild)"
-        type: boolean
-        required: false
-        default: false
       release_tag:
         description: "Use auto for the verified IPA version (currently 1.0.10), a matching version tag, or leave blank to build without publishing"
         required: false
@@ -229,8 +224,6 @@ jobs:
           python3 -m unittest discover -s tests/host -p 'test_madeira_payload_staging.py' -v
           python3 -m unittest discover -s tests/host -p 'test_steam_dll_repair.py' -v
           python3 -m unittest discover -s tests/host -p 'test_madeira_v020_gecko_and_audit.py' -v
-          python3 -m unittest discover -s tests/host -p 'test_apple_msc_beta3.py' -v
-          python3 -m unittest discover -s tests/host -p 'test_apple_msc_beta3_bundle.py' -v
           python3 -m unittest discover -s tests/host -p 'test_madeira_device_acceptance.py' -v
           python3 -m unittest discover -s tests/host -p 'test_madeira_legal_notices.py' -v
           python3 -m unittest discover -s tests/host -p 'test_madeira_toolchain_gate.py' -v
@@ -529,19 +522,8 @@ jobs:
       - name: Locate repository or cached Madeira runtime
         if: ${{ env.IDECK_NATIVE_BUILD == '1' }}
         id: madeira_kit
-        env:
-          USE_MSC_PKG: ${{ github.event_name == 'workflow_dispatch' && inputs.use_msc_pkg && '1' || '0' }}
         run: |
           set -euo pipefail
-          # The owner-supplied Apple converter package makes build_ipa.sh compile the
-          # runtime from source (IDECK_PREBUILT_MODE=off, to link the audited beta 3
-          # headers), so a cached kit cannot be used and the toolchain and dependency
-          # steps (meson, LLVM, Wine prerequisites) must run.
-          if [[ "$USE_MSC_PKG" == "1" ]]; then
-            echo "available=false" >> "$GITHUB_OUTPUT"
-            echo "Apple Metal Shader Converter package supplied: compiling the native runtime from source."
-            exit 0
-          fi
           OPTIONS=(--graphics "$IDECK_MADEIRA_GRAPHICS")
           if [[ "$IDECK_BUILD_WOW64" == "1" ]]; then OPTIONS+=(--wow64); fi
           if [[ "$IDECK_BUNDLE_WINE_MONO" == "1" ]]; then OPTIONS+=(--mono); fi
@@ -715,71 +697,6 @@ jobs:
         with:
           path: build/i386-farm-cache
           key: madeira-i386-farm-v3-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/prepare_madeira_toolchains.sh') }}-${{ steps.native_fp.outputs.i386 }}
-
-      - name: Download owner-supplied Apple Metal Shader Converter package
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.use_msc_pkg }}
-        env:
-          MSC_PKG_URL_SECRET: ${{ secrets.IDECK_MSC_PKG_URL }}
-          MSC_PKG_REPO: ${{ secrets.IDECK_MSC_PKG_REPO }}
-          MSC_PKG_TOKEN: ${{ secrets.IDECK_MSC_PKG_TOKEN }}
-        run: |
-          set -euo pipefail
-          if [[ "$IDECK_NATIVE_BUILD" != "1" || "$IDECK_ACCEPT_METAL_CONVERTER_LICENSE" != "1" ]]; then
-            echo "::error::use_msc_pkg needs require_madeira and accept_converter_license enabled."
-            exit 2
-          fi
-          PKG="$RUNNER_TEMP/MetalShaderConverter.pkg"
-          URL="$MSC_PKG_URL_SECRET"
-          REPO="$MSC_PKG_REPO"
-          # IDECK_MSC_PKG_URL may hold an owner/repo instead of a URL: use it as the
-          # release repository rather than handing curl a bare name as a host.
-          # A repository page (https://github.com/owner/repo) counts as owner/repo too.
-          if [[ "$URL" =~ ^https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/?$ ]]; then
-            URL="${URL#https://github.com/}"
-          fi
-          if [[ -n "$URL" && ! "$URL" =~ ^https?:// ]]; then
-            URL="${URL%/}"
-            if [[ "$URL" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
-              [[ -n "$REPO" ]] || REPO="$URL"
-              URL=""
-            else
-              echo "::error::IDECK_MSC_PKG_URL must be an https:// URL to the .pkg, or owner/repo of a release that holds it."
-              exit 2
-            fi
-          fi
-          MSC_PKG_REPO="$REPO"
-          # A token pasted with a trailing newline or spaces is rejected as
-          # "Bad credentials": strip whitespace before using it.
-          MSC_PKG_TOKEN="$(printf '%s' "$MSC_PKG_TOKEN" | tr -d '[:space:]')"
-          if [[ -n "$URL" ]]; then
-            echo "::add-mask::$URL"
-            curl -fL --retry 4 --retry-delay 2 -o "$PKG" "$URL"
-          elif [[ -n "$MSC_PKG_REPO" && -n "$MSC_PKG_TOKEN" ]]; then
-            # Latest release of a private owner repository holding the .pkg as an asset.
-            echo "::add-mask::$MSC_PKG_REPO"
-            DL="$RUNNER_TEMP/msc-download"
-            mkdir -p "$DL"
-            if ! GH_TOKEN="$MSC_PKG_TOKEN" gh release download --repo "$MSC_PKG_REPO" --pattern '*.pkg' --dir "$DL" 2>"$DL.err"; then
-              cat "$DL.err" >&2
-              if grep -qE "HTTP 401|Bad credentials" "$DL.err"; then
-                echo "::error::IDECK_MSC_PKG_TOKEN was rejected (HTTP 401: invalid, expired or revoked). Create a new token with read access to the .pkg repository's contents and update the IDECK_MSC_PKG_TOKEN secret."
-              elif grep -qE "HTTP 404|Not Found" "$DL.err"; then
-                echo "::error::The .pkg repository or its latest release was not found with IDECK_MSC_PKG_TOKEN. Check the repository name and that the token can read it."
-              else
-                echo "::error::Downloading the Metal Shader Converter .pkg failed."
-              fi
-              exit 2
-            fi
-            FOUND=("$DL"/*.pkg)
-            [[ ${#FOUND[@]} -eq 1 && -s "${FOUND[0]}" ]] || { echo "::error::Expected exactly one .pkg in the latest release."; exit 2; }
-            mv "${FOUND[0]}" "$PKG"
-          else
-            echo "::error::Set the IDECK_MSC_PKG_REPO + IDECK_MSC_PKG_TOKEN secrets (or IDECK_MSC_PKG_URL)."
-            exit 2
-          fi
-          echo "Downloaded $(stat -f%z "$PKG") bytes; SHA-256 $(shasum -a 256 "$PKG" | cut -d' ' -f1)"
-          # prepare_apple_msc_beta3.py rejects any package other than the audited 4.0 beta 3.
-          echo "IDECK_MSC_PKG=$PKG" >> "$GITHUB_ENV"
 
       - name: Build and package iDeck.ipa
         env:
