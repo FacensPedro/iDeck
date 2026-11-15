@@ -14,14 +14,14 @@ enum DownloadSpeed {
 
     /// EA: files fetched at once, ranges of one large file fetched at once, and the
     /// connections to EA's CDN they share.
-    static let eaFiles = 12
-    static let eaSegments = 16
-    static let eaConnections = 80
+    static let eaFiles = 16
+    static let eaSegments = 24
+    static let eaConnections = 128
     /// Whole-range requests in flight across all files (EARangeGate). Fewer than the
     /// connections, so none waits inside URLSession, where its timeout would run; the
     /// rest of the connections serve the small files' streams. Each holds one 4 MB range
-    /// until written: with 8 MB ranges, 28 keep at most 224 MB, only while downloading.
-    static let eaRangeRequests = 28
+    /// until written: with 8 MB ranges, 32 keep at most 256 MB, only while downloading.
+    static let eaRangeRequests = 32
 
     /// GOG: files fetched at once, and chunks of one file fetched ahead of its writer
     /// (they are written in order). A game that is one large archive used to download

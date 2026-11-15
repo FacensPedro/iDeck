@@ -1,4 +1,29 @@
 ## What's Changed
+### Controllers
+- New default controller API, "By controller": a DualSense or DualShock 4 reaches the game as a DualSense over HID; an Xbox One/Series, Xbox 360-style or other pad as an Xbox controller (XInput).
+- DualSense and DualShock 4 over HID now send touchpad finger positions and motion (gyro and accelerometer), not only the touchpad click.
+- Settings shows the connected controller's family (DualSense, DualShock 4, Xbox One / Series, Xbox 360).
+
+### EA app
+- A game that closes by itself keeps the session screen open with the reason: licence refused, anti-cheat, EA app client required, missing DLL, or how many seconds after starting it stopped.
+- Faster downloads: 16 files at once (was 12), 24 ranges per large file (was 16), 128 connections (was 80), 32 ranges in flight (was 28).
+
+### Initial setup
+- Continue on the Madeira Dock step waits until the Steam DLLs are installed, not only the Steam client.
+
+### Memory+
+- When Extended Virtual Addressing is missing, the log names the address limit iOS gave iDeck and whether the signing profile carries the entitlement.
+
+### Logs
+- Wine no longer writes the err:ole and err:winediag lines it repeats on every COM call; copied logs keep a line at most twice.
+
+### Builds
+- Every IPA built by iOS Build includes the Madeira runtime and Wine Mono: the Require Madeira runtime and Wine Mono options are gone, and so is Settings' note about Wine Mono not being included.
+
+### Release
+- Updated the application version to 2.7.0 (build 90).
+
+## What's Changed
 ### Memory+
 - Extended Virtual Addressing shows Active after iDeck is installed again with Memory+: iDeck now reads the address limit iOS gives it (and the signing profile) instead of only probing an address that the early JIT reservation may already hold.
 - The Memory+ settings no longer carry the long explanation and GetMoreRam steps; the status, App ID and GetMoreRam link stay.

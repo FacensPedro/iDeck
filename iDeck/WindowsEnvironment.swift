@@ -271,7 +271,9 @@ class WindowsEnvironment {
         // every call of an unimplemented function (thousands per minute in some games):
         // they fill madeira-log.txt and make each scan of it slower. A game's own
         // config (GameRecommendations, env.WINEDEBUG) still overrides this.
-        setenv("WINEDEBUG", "err+all,fixme-all,warn-all", 1)
+        // err:ole and err:winediag repeat harmless probing on every COM call and
+        // Bugs & logs already ignores them: they are not written at all.
+        setenv("WINEDEBUG", "err+all,err-ole,err-winediag,fixme-all,warn-all", 1)
         setenv("WINEARCH", "win64", 1)
         setenv("STEAM_COMPAT_CLIENT_INSTALL_PATH", prefix + "/drive_c/Program Files (x86)/Steam", 1)
         
@@ -760,9 +762,15 @@ class WindowsEnvironment {
         sessionD3D12Renderer = profile.d3d12Renderer
         sessionOpenGLBackend = profile.openGLBackend
         setenv("IDECK_DISPLAY_SCALING", RuntimeConfiguration.SurfaceMode(saved: profile.surfaceScaling).rawValue, 1)
-        let controllerMode = profile.controllerAPI == "Automatic"
-            ? (UserDefaults.standard.string(forKey: "wineControllerAPI") ?? "XInput")
+        var controllerMode = profile.controllerAPI == "Automatic"
+            ? (UserDefaults.standard.string(forKey: "wineControllerAPI") ?? "By controller")
             : profile.controllerAPI
+        // By controller: a PlayStation pad (DualSense, DualShock 4) is given to the game
+        // as a DualSense over HID (touchpad, motion, light, adaptive triggers); an Xbox
+        // One/Series, Xbox 360-style or any other pad as an Xbox controller (XInput).
+        if controllerMode == "By controller" {
+            controllerMode = InputManager.shared.connectedKind.isPlayStation ? "HID" : "XInput"
+        }
         switch controllerMode {
         case "HID": setenv("MADEIRA_PAD_MODE", "hid", 1)
         case "DualSense HID": setenv("MADEIRA_PAD_MODE", "dualsense", 1)

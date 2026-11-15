@@ -6,7 +6,7 @@ from support import repo_text
 class LeanDefaultsTests(unittest.TestCase):
     def test_logs_are_detailed_without_the_slow_profilers(self):
         environment = repo_text("iDeck/WindowsEnvironment.swift")
-        self.assertIn('setenv("WINEDEBUG", "err+all,fixme-all,warn-all", 1)', environment)
+        self.assertIn('setenv("WINEDEBUG", "err+all,err-ole,err-winediag,fixme-all,warn-all", 1)', environment)
         self.assertIn('setenv("MADEIRA_DEBUG_VERBOSE", "1", 1)', environment)
         # The PC sampler and the JIT dump stay off: they are what slowed games down.
         self.assertIn('setenv("MADEIRA_QUIET", "1", 1)', environment)

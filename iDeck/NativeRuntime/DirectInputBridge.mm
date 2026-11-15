@@ -198,11 +198,55 @@ static void sample_gamepads(void) {
             if (state.left_trigger > 25) hid.buttons |= IDECK_HID_L2;
             if (state.right_trigger > 25) hid.buttons |= IDECK_HID_R2;
             GCControllerButtonInput *touch = nil;
-            if ([pad isKindOfClass:[GCDualSenseGamepad class]])
-                touch = ((GCDualSenseGamepad *)pad).touchpadButton;
-            else if ([pad isKindOfClass:[GCDualShockGamepad class]])
-                touch = ((GCDualShockGamepad *)pad).touchpadButton;
+            GCControllerDirectionPad *finger1 = nil, *finger2 = nil;
+            if ([pad isKindOfClass:[GCDualSenseGamepad class]]) {
+                GCDualSenseGamepad *sense = (GCDualSenseGamepad *)pad;
+                touch = sense.touchpadButton;
+                finger1 = sense.touchpadPrimary; finger2 = sense.touchpadSecondary;
+            } else if ([pad isKindOfClass:[GCDualShockGamepad class]]) {
+                GCDualShockGamepad *shock = (GCDualShockGamepad *)pad;
+                touch = shock.touchpadButton;
+                finger1 = shock.touchpadPrimary; finger2 = shock.touchpadSecondary;
+            }
             if (g_appActive && touch.isPressed) hid.buttons |= IDECK_HID_TOUCHPAD;
+            // Touchpad fingers (DualSense and DualShock 4): GameController reports
+            // -1...1 on each axis; the HID report carries the pad's own resolution
+            // (1920 x 1080 on DualSense, 1920 x 942 on DualShock 4).
+            if (g_appActive) {
+                BOOL shock = [pad isKindOfClass:[GCDualShockGamepad class]];
+                GCControllerDirectionPad *fingers[2] = { finger1, finger2 };
+                for (int f = 0; f < 2; ++f) {
+                    GCControllerDirectionPad *finger = fingers[f];
+                    if (!finger) continue;
+                    float x = finger.xAxis.value, y = finger.yAxis.value;
+                    if (!isfinite(x) || !isfinite(y) || (x == 0 && y == 0)) continue;
+                    hid.touch[f] = 1;
+                    hid.touch_x[f] = (uint16_t)lrintf((fmaxf(-1, fminf(1, x)) + 1) * 0.5f * 1919);
+                    hid.touch_y[f] = (uint16_t)lrintf((1 - (fmaxf(-1, fminf(1, y)) + 1) * 0.5f) * (shock ? 941 : 1079));
+                }
+            }
+            // Motion (gyro and accelerometer), in the DualSense's raw units:
+            // 16 LSB per degree/s and 8192 LSB per g.
+            GCMotion *motion = controller.motion;
+            if (g_appActive && motion) {
+                if (motion.sensorsRequireManualActivation && !motion.sensorsActive) motion.sensorsActive = YES;
+                if (motion.hasRotationRate) {
+                    const double perRad = 57.29578 * 16.0;
+                    hid.gyro[0] = (int16_t)fmax(-32768, fmin(32767, motion.rotationRate.x * perRad));
+                    hid.gyro[1] = (int16_t)fmax(-32768, fmin(32767, motion.rotationRate.y * perRad));
+                    hid.gyro[2] = (int16_t)fmax(-32768, fmin(32767, motion.rotationRate.z * perRad));
+                }
+                GCAcceleration a = motion.acceleration;
+                if (motion.hasGravityAndUserAcceleration) {
+                    a.x = motion.gravity.x + motion.userAcceleration.x;
+                    a.y = motion.gravity.y + motion.userAcceleration.y;
+                    a.z = motion.gravity.z + motion.userAcceleration.z;
+                }
+                hid.accel[0] = (int16_t)fmax(-32768, fmin(32767, a.x * 8192.0));
+                hid.accel[1] = (int16_t)fmax(-32768, fmin(32767, a.y * 8192.0));
+                hid.accel[2] = (int16_t)fmax(-32768, fmin(32767, a.z * 8192.0));
+                hid.motion = 1;
+            }
             hid.battery = 0xff;
             GCDeviceBattery *battery = controller.battery;
             if (battery && battery.batteryState != GCDeviceBatteryStateUnknown &&
@@ -261,7 +305,8 @@ static void refresh_controllers(void) {
             g_slots[i] = controller;
             zero_vibration(i);
             output_slot(i, controller);
-            fprintf(stderr, "[iDeck gamepad] slot %d connected: %s\n", i, controller.vendorName.UTF8String ?: "unknown");
+            fprintf(stderr, "[iDeck gamepad] slot %d connected: %s (%s)\n", i, controller.vendorName.UTF8String ?: "unknown",
+                    controller.productCategory.UTF8String ?: "unknown");
             break;
         }
     }
