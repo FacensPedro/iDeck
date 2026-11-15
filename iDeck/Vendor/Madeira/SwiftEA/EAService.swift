@@ -269,7 +269,7 @@ final class EAService: @unchecked Sendable {
                 return EAXML.element("GetGameInfoResponse", [("GameInfo", info)])
 
             case "GetAllGameInfo":
-                let now = ISO8601DateFormatter().string(from: Date()).replacingOccurrences(of: "Z", with: "")
+                let now = ISOStamp.string(Date()).replacingOccurrences(of: "Z", with: "")
                 return EAXML.element("GetAllGameInfoResponse", [
                     ("FullGamePurchased", "true"), ("FullGameReleased", "true"), ("InstalledVersion", context.version.isEmpty ? "0" : context.version),
                     ("MaxGroupSize", "16"), ("Languages", EAService.languages), ("Expiration", "0000-00-00T00:00:00"), ("UpToDate", "true"),

@@ -8,6 +8,9 @@
 - A game that closes by itself keeps the session screen open with the reason: licence refused, anti-cheat, EA app client required, missing DLL, or how many seconds after starting it stopped.
 - Faster downloads: 16 files at once (was 12), 24 ranges per large file (was 16), 128 connections (was 80), 32 ranges in flight (was 28).
 
+### Stability
+- iDeck no longer crashes when a Windows session ends: the date formatter used for the session memory record (and other time stamps) is made once when iDeck opens, instead of after Wine, where ICU read a locale left behind by the finished Wine thread.
+
 ### Initial setup
 - Continue on the Madeira Dock step waits until the Steam DLLs are installed, not only the Steam client.
 

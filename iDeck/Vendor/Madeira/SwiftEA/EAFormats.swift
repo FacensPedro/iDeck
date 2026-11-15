@@ -922,10 +922,7 @@ struct EALicenseInfo: Equatable {
     }
 
     static func date(_ text: String) -> Date? {
-        let withFraction = ISO8601DateFormatter()
-        withFraction.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let date = withFraction.date(from: text) { return date }
-        return ISO8601DateFormatter().date(from: text)
+        ISOStamp.date(text)
     }
 }
 

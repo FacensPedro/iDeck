@@ -923,11 +923,9 @@ enum EAPrefixEvidence {
             guard attributes?[.type] as? FileAttributeType == .typeRegular else { return nil }
             return (name, (attributes?[.size] as? NSNumber)?.intValue ?? 0, attributes?[.modificationDate] as? Date ?? .distantPast)
         }.sorted { $0.date > $1.date }
-        let stamp = ISO8601DateFormatter()
-        stamp.timeZone = .current
         var lines: [String] = []
         for entry in entries.prefix(files) {
-            lines.append("\(entry.name), \(entry.size) B, \(stamp.string(from: entry.date))")
+            lines.append("\(entry.name), \(entry.size) B, \(ISOStamp.localString(entry.date))")
             // The reader page EA copies next to its logs is not a log.
             guard entry.size > 0, !entry.name.lowercased().hasSuffix("reader.html") else { continue }
             guard let handle = try? FileHandle(forReadingFrom: logs.appendingPathComponent(entry.name)) else { continue }

@@ -673,7 +673,7 @@ class SystemCoordinator: ObservableObject {
     static func recordLaunchJITState() {
         let snapshot = ideck_jit_snapshot()
         let text = "debugged=\(ideck_process_has_jit_permission() ? 1 : 0) debugger=\(snapshot.debugger_attached ? 1 : 0) "
-            + "pool=\(ideck_wine_jit_pool_ready() ? 1 : 0) at \(ISO8601DateFormatter().string(from: Date()))"
+            + "pool=\(ideck_wine_jit_pool_ready() ? 1 : 0) at \(ISOStamp.string(Date()))"
         UserDefaults.standard.set(text, forKey: lastLaunchJITKey)
         AppLog.record("[jit] preparation validated for launch: \(text)")
     }

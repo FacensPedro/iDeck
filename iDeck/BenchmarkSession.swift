@@ -37,7 +37,7 @@ enum BenchmarkSession {
         guard isEnabled, currentKind == nil,
               IDBenchmarkRecorder.start(withKind: kind, label: scenario) else { return }
         currentKind = kind
-        context = ["startedAt": ISO8601DateFormatter().string(from: Date()), "settings": settings]
+        context = ["startedAt": ISOStamp.string(Date()), "settings": settings]
     }
 
     static func mark(_ event: String, kind: String = "game") {
@@ -128,7 +128,7 @@ enum BenchmarkSession {
     private static func write(_ report: [String: Any], kind: String) {
         do {
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-            let stamp = ISO8601DateFormatter().string(from: Date()).replacingOccurrences(of: ":", with: "-")
+            let stamp = ISOStamp.string(Date()).replacingOccurrences(of: ":", with: "-")
             let file = folder.appendingPathComponent("\(kind)-\(stamp).json")
             let data = try JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys])
             try data.write(to: file, options: .atomic)

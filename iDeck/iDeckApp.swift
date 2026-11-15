@@ -6,6 +6,7 @@ struct iDeckApp: App {
     @StateObject private var coordinator = SystemCoordinator()
 
     init() {
+        ISOStamp.warmUp()
         // No shared URL cache: every response through URLSession.shared and the
         // default configurations was kept in RAM and in CFNetwork's Cache.db
         // (sqlite). Downloads write to disk themselves, and artwork has its own cache.

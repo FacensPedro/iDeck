@@ -1,5 +1,35 @@
 import Foundation
 
+/// One ISO 8601 formatter for the whole app, made when iDeck opens. A formatter
+/// made after a Windows session crashed iDeck inside ICU (udat_open read a locale
+/// left behind by the finished Wine thread, 2.6.0 Dragon Age log): it must exist
+/// before Wine ever runs and is never created again.
+enum ISOStamp {
+    private static let lock = NSLock()
+    nonisolated(unsafe) private static let formatter = ISO8601DateFormatter()  // guarded by lock
+    nonisolated(unsafe) private static let local: ISO8601DateFormatter = {  // guarded by lock
+        let f = ISO8601DateFormatter(); f.timeZone = .current; return f
+    }()
+    nonisolated(unsafe) private static let fraction: ISO8601DateFormatter = {  // guarded by lock
+        let f = ISO8601DateFormatter(); f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]; return f
+    }()
+    static func warmUp() { _ = string(Date()); _ = localString(Date()); _ = date("2000-01-01T00:00:00Z") }
+    /// In the device's time zone.
+    static func localString(_ date: Date) -> String {
+        lock.lock(); defer { lock.unlock() }
+        return local.string(from: date)
+    }
+    /// Parses with or without fractional seconds.
+    static func date(_ text: String) -> Date? {
+        lock.lock(); defer { lock.unlock() }
+        return fraction.date(from: text) ?? formatter.date(from: text)
+    }
+    static func string(_ date: Date) -> String {
+        lock.lock(); defer { lock.unlock() }
+        return formatter.string(from: date)
+    }
+}
+
 /// The memory record of each finished game session: footprint at the end, the
 /// session's peak, what iOS still had available and why the session ended.
 /// The last `limit` sessions are kept for Bugs & logs (a report made after a
@@ -16,7 +46,7 @@ enum SessionMemory {
         var reason: String
 
         var line: String {
-            "\(ISO8601DateFormatter().string(from: started)) \(launcher) \(game): \(durationSeconds)s, "
+            "\(ISOStamp.string(started)) \(launcher) \(game): \(durationSeconds)s, "
                 + "RAM \(currentMiB) MiB at the end, peak \(peakMiB) MiB, available \(availableMiB) MiB — \(reason)"
         }
     }

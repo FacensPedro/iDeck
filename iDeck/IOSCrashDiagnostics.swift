@@ -127,7 +127,7 @@ final class IOSCrashDiagnostics: NSObject, MXMetricManagerSubscriber {
     private func save(_ json: Data, kind: String, payload: MXDiagnosticPayload) {
         let fm = FileManager.default
         try? fm.createDirectory(at: Self.folder, withIntermediateDirectories: true)
-        let stamp = ISO8601DateFormatter().string(from: payload.timeStampEnd).replacingOccurrences(of: ":", with: "-")
+        let stamp = ISOStamp.string(payload.timeStampEnd).replacingOccurrences(of: ":", with: "-")
         let url = Self.folder.appendingPathComponent("\(kind)-\(stamp)-\(UUID().uuidString.prefix(6)).json")
         try? json.write(to: url, options: .atomic)
         // Keep the newest 20.
