@@ -2011,6 +2011,8 @@ class SystemCoordinator: ObservableObject {
         let hostTrap = outcome.ntstatus == 0xC000001D
             && IllegalInstructionOrigin.isHost(logURL: Self.wineLogURL, since: wineLogStartOffset)
         let shaderFailure = Self.sessionLogShowsShaderFailure(logURL: Self.wineLogURL, since: wineLogStartOffset)
+        EALibrary.noteSessionEnded(activationUI: Self.sessionLogContains(["activationui.exe"], logURL: Self.wineLogURL,
+                                                                        since: wineLogStartOffset))
         wineLogStartOffset = nil
         let ntstatus = outcome.ntstatus
         var reason = outcome.reason
@@ -2059,6 +2061,11 @@ class SystemCoordinator: ObservableObject {
     /// Whether the session's part of the Wine log (its last 16 MB at most) names a
     /// shader the game wrote to ShaderErrors after a failed compile.
     static func sessionLogShowsShaderFailure(logURL: URL?, since offset: Int64?) -> Bool {
+        sessionLogContains(["\\shadererrors\\compileerror", "\\\\shadererrors\\\\compileerror"], logURL: logURL, since: offset)
+    }
+
+    /// Whether this session's Wine log (its last 16 MB) contains any of the lower-case needles.
+    static func sessionLogContains(_ lowercaseNeedles: [String], logURL: URL?, since offset: Int64?) -> Bool {
         guard let logURL, let handle = try? FileHandle(forReadingFrom: logURL) else { return false }
         defer { try? handle.close() }
         let end = (try? handle.seekToEnd()) ?? 0
@@ -2066,8 +2073,7 @@ class SystemCoordinator: ObservableObject {
         try? handle.seek(toOffset: start)
         // Searched as bytes, 1 MB at a time with a short overlap, ASCII-lowercased in
         // place: no 16 MB String is built and no case-insensitive Unicode search runs.
-        let needles = [Data("\\shadererrors\\compileerror".utf8),
-                       Data("\\\\shadererrors\\\\compileerror".utf8)]
+        let needles = lowercaseNeedles.map { Data($0.utf8) }
         let overlap = needles.map(\.count).max() ?? 0
         var carry = Data()
         while let chunk = try? handle.read(upToCount: 1 << 20), !chunk.isEmpty {

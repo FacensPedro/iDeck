@@ -8,7 +8,7 @@ EA = (ROOT / "iDeck/EALibrary.swift").read_text()
 
 class EAHashCheckTests(unittest.TestCase):
     def test_check_recorded_and_reported(self):
-        self.assertIn("EAHashCheck.report(profile: profile, hashVersion: activation.hashVersion, drive: Self.drive)", EA)
+        self.assertIn("EAHashCheck.report(profile: licenceProfile, hashVersion: activation.hashVersion, drive: Self.drive)", EA)
         self.assertIn('lines.append("EA hash check: " + check)', (ROOT / "iDeck/BugReportView.swift").read_text())
 
     def test_header_matches_wine_reg_escaping(self):
