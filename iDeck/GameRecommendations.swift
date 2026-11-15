@@ -514,6 +514,18 @@ enum GameRecommendations {
         env.MADEIRA_CONTROLS_XBOX_DEFAULT = 1
         env.MADEIRA_EC_HOOK_TRACE = 0
         """)
+    /// Dragon Age: Inquisition (EA app; iPad mini A17 Pro, 2026-11-15). With the
+    /// executable window held at 192MB the free space above it is split only by the
+    /// main thread's stack (0x14c000000+504MB, 0x16c210000+317MB), so a single-region
+    /// pool shrank from 560 to 496MB. pool-split takes the pool past the stack.
+    static let dragonAgeInquisition = GameRecommendation(
+        id: "dragon-age-inquisition", title: "Dragon Age: Inquisition", version: 1,
+        config: """
+        # Madeira's recommended settings for Dragon Age: Inquisition.
+        # Reset to Recommended, at the bottom of the game's settings, brings them back.
+        pool-split = 1
+        env.MADEIRA_EC_HOOK_TRACE = 0
+        """)
     /// Fallout: New Vegas (tested on an iPhone, 2026-10-26): loading a save crashed at
     /// 00B57AA9 right after the game built a face, on Madeira's own card name and
     /// driver, which give it the basic render path (Shader Package 2). "Older NVIDIA
@@ -593,7 +605,7 @@ enum GameRecommendations {
         """)
 
     static let all = [rdr2Steam, rdr2Other, gta5EnhancedSteam, gta5EnhancedOther, ghostOfTsushima, godOfWar, horizonZeroDawn,
-                      darkSoulsRemastered, darkSoulsIII, falloutNewVegas, fallout3, blackOps2, crashBandicootNSane, standard]
+                      darkSoulsRemastered, darkSoulsIII, dragonAgeInquisition, falloutNewVegas, fallout3, blackOps2, crashBandicootNSane, standard]
 
     // MARK: Recognising a game
 
@@ -656,6 +668,8 @@ enum GameRecommendations {
             return darkSoulsRemastered
         case "darksoulsiii.exe":
             return darkSoulsIII
+        case "dragonageinquisition.exe":
+            return dragonAgeInquisition
         case "falloutnv.exe":
             return falloutNewVegas
         case "fallout3.exe":
