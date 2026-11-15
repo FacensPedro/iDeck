@@ -467,6 +467,41 @@ struct EAInstalledGame: Codable, Sendable {
     nonisolated static let licenceFactsKey = "diagnostics.eaLicence"
     nonisolated static let hashCheckKey = "diagnostics.eaHashCheck"
 
+    // MARK: Licence hash variant
+
+    /// Whether the game hashed its machine before Wine registered the display adapter.
+    /// Dragon Age: Inquisition (2.5.1, iPad mini A17 Pro) read its licence ("License
+    /// signature is good") and still started ActivationUI.exe, and the Wine log shows
+    /// `[vgpu] registered PCI\VEN_106B&DEV_0001...` only AFTER that first start: when the
+    /// activation library asked WMI for Win32_VideoController.PNPDeviceID there was no
+    /// adapter yet, so its hash had no "PCI" field and the licence (asked for with one)
+    /// never matched. Variant 1 asks for the licence without the adapter. The variant
+    /// flips after every session in which the game started ActivationUI.exe, and stays
+    /// once a session ends without it, so the licence converges to the hash the game
+    /// really computes.
+    nonisolated static let hashVariantPrefix = "ea.licenceHashVariant."
+    nonisolated(unsafe) static var lastPreparedContentID: String?
+
+    nonisolated static func hashVariant(contentID: String) -> Int {
+        UserDefaults.standard.integer(forKey: hashVariantPrefix + contentID)
+    }
+
+    /// The session of the last prepared EA game ended; `activationUI` says whether its
+    /// Wine log shows ActivationUI.exe, EA's activation window, being started.
+    nonisolated static func noteSessionEnded(activationUI: Bool) {
+        guard let content = lastPreparedContentID else { return }
+        lastPreparedContentID = nil
+        let variant = hashVariant(contentID: content)
+        guard activationUI else {
+            EALog.event("[ea-license] content=\(content) accepted its licence (hash variant \(variant))")
+            return
+        }
+        let next = variant == 0 ? 1 : 0
+        UserDefaults.standard.set(next, forKey: hashVariantPrefix + content)
+        EALog.event("[ea-license] content=\(content) started ActivationUI.exe with hash variant \(variant) "
+            + "(\(variant == 0 ? "display adapter hashed" : "no display adapter")): the next launch asks for a licence with variant \(next)")
+    }
+
     /// The activation library the game ships and what the licence is built for.
     nonisolated static func activationFacts(_ activation: EALicense.Activation, gameFolder: URL) -> String {
         guard activation.required else { return "no Core folder: the game checks no licence" }
@@ -533,14 +568,21 @@ struct EAInstalledGame: Codable, Sendable {
                                          gpuDevice: nvidia ? 0x2544 : 0x0001, avx: avx)
         let folder = Self.drive.appendingPathComponent(record.folder, isDirectory: true)
         let activation = EALicense.activation(gameFolder: folder)
+        var licenceProfile = profile
         // What the licence was prepared for, kept for the bug report: a game that does
         // not accept it starts EA's activation window, and only these facts say why.
         let facts = Self.activationFacts(activation, gameFolder: folder)
         UserDefaults.standard.set(facts + ", licence not prepared", forKey: Self.licenceFactsKey)
         if activation.required {
             guard !record.contentID.isEmpty else { throw EAAPIError.license("the game's content id is unknown") }
-            let (hash, _) = profile.machineHash(version: activation.hashVersion)
-            UserDefaults.standard.set(EAHashCheck.report(profile: profile, hashVersion: activation.hashVersion, drive: Self.drive),
+            Self.lastPreparedContentID = record.contentID
+            // See hashVariantPrefix: variant 1 is the hash taken before Wine registered the
+            // display adapter. The licence and the local service use it; the launch token keeps the device.
+            let variant = Self.hashVariant(contentID: record.contentID)
+            if variant == 1 { licenceProfile.gpuPNPDeviceID = "" }
+            EALog.event("[ea-license] content=\(record.contentID) hash variant \(variant)")
+            let (hash, _) = licenceProfile.machineHash(version: activation.hashVersion)
+            UserDefaults.standard.set(EAHashCheck.report(profile: licenceProfile, hashVersion: activation.hashVersion, drive: Self.drive),
                                       forKey: Self.hashCheckKey)
             let current = EALicense.current(contentID: record.contentID, drive: Self.drive)
             // Every launch asks EA for a fresh licence. A licence kept from an earlier
@@ -551,7 +593,7 @@ struct EAInstalledGame: Codable, Sendable {
             var renewal: EALicenseInfo?
             UserDefaults.standard.set(facts + ", licence request failed", forKey: Self.licenceFactsKey)
             do {
-                renewal = try await EALicense.renew(api: api, contentID: record.contentID, profile: profile, activation: activation, drive: Self.drive)
+                renewal = try await EALicense.renew(api: api, contentID: record.contentID, profile: licenceProfile, activation: activation, drive: Self.drive)
             } catch {
                 EALog.event("[ea-license] renewal failed content=\(record.contentID) stale=\(stale ? 1 : 0): \(error.localizedDescription)")
                 if stale { throw error }
@@ -592,7 +634,7 @@ struct EAInstalledGame: Codable, Sendable {
         for (name, value) in environment { setenv(name, value, 1) }
         try EAService.shared.start(EAServiceContext(
             offerID: id, contentID: record.contentID, title: record.title, version: record.version, multiplayerID: record.multiplayerID,
-            userID: session.userID, personaID: session.personaID, displayName: session.displayName, profile: profile, hashVersion: activation.hashVersion))
+            userID: session.userID, personaID: session.personaID, displayName: session.displayName, profile: licenceProfile, hashVersion: activation.hashVersion))
         launched = id
         startTimer()
         let hasUserToken = !opaque.isEmpty
