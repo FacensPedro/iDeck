@@ -35,7 +35,7 @@ enum MadeiraWinePool {
     }
 
     /// Steps the automatic pool may take, largest first.
-    static let automaticSteps = [560, 512, 384, 256]
+    static let automaticSteps = [896, 768, 640, 560, 512, 384, 256]
 
     /// The automatic pool (no choice in a game config, jit-pool.txt or Settings),
     /// fitted to this run: what the current game needed before (GameCompatibility),
@@ -45,8 +45,28 @@ enum MadeiraWinePool {
         var size = base
         var why: [String] = []
         let game = ProcessInfo.processInfo.environment["IDECK_COMPAT_GAME"]
-        if let game, let learned = GameCompatibility.profile(game) {
-            if learned.lastGoodPoolMiB >= 256, learned.lastGoodPoolMiB < size {
+        let learnedProfile = game.flatMap { GameCompatibility.profile($0) }
+        // More RAM for the JIT: with plenty of memory left and the extended guest
+        // window, ask for a bigger pool. The allocator (ml1036 hole census) shrinks
+        // it to the largest hole that fits, so this never asks for more than exists.
+        let freeMiB = Int(os_proc_available_memory() >> 20)
+        let cleanHistory = (learnedProfile?.consecutiveCrashes ?? 0) == 0
+            && (learnedProfile.map { $0.lastGoodPoolMiB < 256 || $0.lastGoodPoolMiB >= base } ?? true)
+        if AddressSpaceCheck.hasGuestWindow, cleanHistory {
+            let grown: Int
+            switch freeMiB {
+            case 8192...: grown = 896
+            case 6144...: grown = 768
+            case 5120...: grown = 640
+            default: grown = size
+            }
+            if grown > size {
+                size = grown
+                why.append("grown to \(grown) MB (\(freeMiB) MiB free)")
+            }
+        }
+        if let learned = learnedProfile {
+            if learned.lastGoodPoolMiB >= 256, learned.lastGoodPoolMiB < min(size, base) {
                 size = learned.lastGoodPoolMiB
                 why.append("last clean session ran with \(size) MB")
             } else if learned.consecutiveCrashes > 0, learned.lastPoolMiB > 256,
