@@ -93,7 +93,7 @@ class MadeiraCompatibilityBackportsTests(unittest.TestCase):
     def test_automatic_vc_setup_preserves_madeira_documents_overlay(self):
         settings = repo_text("iDeck/SettingsView.swift")
         bootstrap = repo_text("iDeck/VisualCRuntimeBootstrap.swift")
-        coordinator = repo_text("iDeck/SystemCoordinator.swift")
+        coordinator = repo_text("iDeck/WindowsInstallerEnvironment.swift")
         self.assertNotIn('settingsSection(title: tr("Windows compatibility"))', settings)
         self.assertIn('documents.appendingPathComponent("vcruntime", isDirectory: true)', bootstrap)
         self.assertIn('VisualCRuntimeBootstrap.extractAndInstall(', coordinator)

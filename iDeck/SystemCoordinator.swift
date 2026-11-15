@@ -1103,62 +1103,6 @@ class SystemCoordinator: ObservableObject {
         return true
     }
 
-    /// Set once per app run, so a failed package does not block every launch.
-    private var legacyVisualCRuntimeAttempted = false
-    private var legacyVisualCRuntimeTask: Task<Void, Never>?
-    private var legacyVisualCRuntimeGeneration = UUID()
-
-    private func beginLegacyVisualCRuntimeInstallation(documents: URL, resume: @escaping () -> Void) {
-        legacyVisualCRuntimeAttempted = true
-        setWindowsStatus(VisualCRuntimeLegacy.installStatus)
-        let generation = UUID()
-        legacyVisualCRuntimeGeneration = generation
-        legacyVisualCRuntimeTask = Task { @MainActor [weak self] in
-            let failures = await VisualCRuntimeLegacy.installAll(documents: documents) { name in
-                AppLog.record("[vcrt] installing Visual C++ \(name)")
-            }
-            guard let self, self.legacyVisualCRuntimeGeneration == generation else { return }
-            self.legacyVisualCRuntimeTask = nil
-            guard self.windowsStatus == VisualCRuntimeLegacy.installStatus else { return }
-            for failure in failures { AppLog.record("[vcrt] \(failure)") }
-            AppLog.record(failures.isEmpty ? "[vcrt] Visual C++ 2005-2013 and 32-bit runtimes installed"
-                                           : "[vcrt] \(failures.count) Visual C++ packages failed; retried next launch")
-            if self.windowsStatus == VisualCRuntimeLegacy.installStatus { self.setWindowsStatus("Windows Ready") }
-            resume()
-        }
-    }
-
-    private func beginVisualCRuntimeInstallation(prefix: URL, resume: @escaping () -> Void) {
-        guard !ideck_wineprocess_running() else {
-            setWindowsStatus("Visual C++ setup cannot start while another Wine session is running.")
-            return
-        }
-        setWindowsStatus(VisualCRuntimeBootstrap.installStatus)
-        VisualCRuntimeBootstrap.download(in: prefix) { [weak self] result in
-            guard let self, self.windowsStatus == VisualCRuntimeBootstrap.installStatus else { return }
-            switch result {
-            case .failure(let error):
-                self.setWindowsStatus("Visual C++ setup download failed: \(error.localizedDescription)")
-            case .success(let installer):
-                guard let documents = FileManager.default.urls(for: .documentDirectory,
-                                                               in: .userDomainMask).first else {
-                    self.setWindowsStatus("Visual C++ extraction failed: Documents folder unavailable.")
-                    return
-                }
-                VisualCRuntimeBootstrap.extractAndInstall(installer: installer, documents: documents) { [weak self] result in
-                    try? FileManager.default.removeItem(at: installer)
-                    guard let self, self.windowsStatus == VisualCRuntimeBootstrap.installStatus else { return }
-                    switch result {
-                    case .success:
-                        self.setWindowsStatus("Windows Ready")
-                        resume()
-                    case .failure(let error):
-                        self.setWindowsStatus("Visual C++ extraction failed: \(error.localizedDescription)")
-                    }
-                }
-            }
-        }
-    }
 
     /// Starts any Windows program or installer through the universal installer
     /// environment: installs the Visual C++ runtime or .NET support it imports, picks
@@ -1835,12 +1779,6 @@ class SystemCoordinator: ObservableObject {
     // terminate iDeck and all of its Steam library state.
     func requestCloseWindowsSession() {
         guard !isClosingWindowsSession else { return }
-        legacyVisualCRuntimeGeneration = UUID()
-        if let task = legacyVisualCRuntimeTask {
-            task.cancel()
-            legacyVisualCRuntimeTask = nil
-            legacyVisualCRuntimeAttempted = false
-        }
         isClosingWindowsSession = true
         cancelQueuedLaunches()
         onDemandInstallTask?.cancel()

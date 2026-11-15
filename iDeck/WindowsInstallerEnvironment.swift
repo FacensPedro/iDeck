@@ -355,12 +355,6 @@ enum NativeD3DX {
         AppLog.record("[d3dx] \(executable.lastPathComponent) failed to compile a shader with Wine's D3DX: Microsoft's D3DX is used for it from its next start")
     }
 
-    /// A session's log names a shader its game could not compile.
-    static func logShowsShaderFailure(_ log: String) -> Bool {
-        log.range(of: "\\ShaderErrors\\CompileError", options: .caseInsensitive) != nil
-            || log.range(of: "\\\\ShaderErrors\\\\CompileError", options: .caseInsensitive) != nil
-    }
-
     static func cache(machine: UInt16) -> URL {
         WindowsInstallerEnvironment.documents.appendingPathComponent("directx/" + (machine == 0x014c ? "x86" : "x64"), isDirectory: true)
     }

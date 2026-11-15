@@ -56,13 +56,4 @@ class JITEnabler {
         task.resume()
     }
 
-    /// The server mounts the Developer Disk Image itself (`pymobiledevice3 mounter auto-mount`),
-    /// so no local files need to be sent.
-    func mountDeveloperDiskImage(completion: @escaping (Bool) -> Void) {
-        guard let request = makeRequest(endpoint: "mount_ddi") else {
-            DispatchQueue.main.async { completion(false) }
-            return
-        }
-        send(request, completion: completion)
-    }
 }

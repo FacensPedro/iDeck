@@ -536,7 +536,6 @@ struct EpicInstalledDLC: Codable, Sendable {
         return nil
     }
 
-    func dlcTitle(_ app: String) -> String { dlcEntry(app)?.dlc.title ?? app }
 
     /// Installs or updates a DLC into its base game's folder, as the Epic launcher does.
     func installDLC(_ dlcApp: String) {
