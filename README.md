@@ -27,7 +27,19 @@ Building from source requires macOS, Xcode with the iOS 27 SDK and the appropria
 
 ## Installation
 
-Download a build from [Releases](https://github.com/FacensPedro/iDeck/releases) and install the IPA using a compatible signing method. Complete the initial runtime setup in iDeck before launching Windows games.
+Download a build from [Releases](https://github.com/FacensPedro/iDeck/releases) and install the IPA with **[Sideloadly](https://sideloadly.io/)**. Complete the initial runtime setup in iDeck before launching Windows games.
+
+### Memory+ (required for Windows games)
+
+Windows games need two memory capabilities from iOS: **Increased Memory Limit** and **Extended Virtual Addressing**. Sideloadly signs iDeck with the capabilities of your Apple ID's App ID, which by default includes only the first one, so you must add them with **[GetMoreRam](https://github.com/hugeBlack/GetMoreRam)**:
+
+1. Install GetMoreRam the same way you installed iDeck (with Sideloadly).
+2. In GetMoreRam, sign in with the Apple Account you used in Sideloadly.
+3. Open **App IDs**, tap **Refresh** and choose iDeck's App ID.
+4. Add the Increased Memory Limit (and Extended Virtual Addressing, if offered).
+5. Install iDeck again with Sideloadly, open it and check **Settings › Memory+**. Both entries should show **Active**.
+
+Without these capabilities iDeck cannot start Windows games and shows an "extended memory address space" error.
 
 **Important:** Not every release or CI artifact contains the native Madeira runtime. An interface-only IPA provides the interface but cannot execute Windows games.
 
