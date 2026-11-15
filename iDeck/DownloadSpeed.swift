@@ -2,11 +2,11 @@ import Foundation
 
 /// iDeck uses bounded, predictable download queues, sized per store.
 enum DownloadSpeed {
-    /// Parallel Steam chunk requests on the device (a chunk is about 1 MB, so 48 keep
-    /// about 48 MB in flight), and the connections one content server may hold. Valve fixes
+    /// Parallel Steam chunk requests on the device (a chunk is about 1 MB, so 72 keep
+    /// about 72 MB in flight), and the connections one content server may hold. Valve fixes
     /// the chunk size; only their number is iDeck's.
-    static let steamChunks = 48
-    static let steamConnections = 64
+    static let steamChunks = 72
+    static let steamConnections = 96
 
     /// Epic chunks (about 1 MB each) fetched ahead of the writer: at most ~48 MB of
     /// chunks in flight. Epic fixes the chunk size.
@@ -14,14 +14,14 @@ enum DownloadSpeed {
 
     /// EA: files fetched at once, ranges of one large file fetched at once, and the
     /// connections to EA's CDN they share.
-    static let eaFiles = 10
+    static let eaFiles = 12
     static let eaSegments = 16
-    static let eaConnections = 56
+    static let eaConnections = 80
     /// Whole-range requests in flight across all files (EARangeGate). Fewer than the
     /// connections, so none waits inside URLSession, where its timeout would run; the
     /// rest of the connections serve the small files' streams. Each holds one 4 MB range
-    /// until written: with 8 MB ranges, 20 keep at most 160 MB, only while downloading.
-    static let eaRangeRequests = 20
+    /// until written: with 8 MB ranges, 28 keep at most 224 MB, only while downloading.
+    static let eaRangeRequests = 28
 
     /// GOG: files fetched at once, and chunks of one file fetched ahead of its writer
     /// (they are written in order). A game that is one large archive used to download

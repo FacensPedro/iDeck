@@ -1,4 +1,18 @@
 ## What's Changed
+### JIT memory
+- The automatic JIT pool grows to 640, 768 or 896 MB when iOS leaves 5, 6 or 8 GB free and the extended address space is there (and the game has no recent crash). The allocator still shrinks it to the largest free area.
+
+### Downloads
+- Steam: 72 chunks in flight (was 48), 96 connections per content server (was 64) and 8 content servers in the pool (was 6).
+- EA app: 12 files at once (was 10), 80 CDN connections (was 56) and 28 range requests in flight (was 20).
+
+### Initial setup
+- The JIT step no longer shows a check before a method (StikDebug or Built-in) is chosen.
+
+### Release
+- Updated the application version to 2.5.3 (build 88).
+
+## What's Changed
 ### EA app games
 - A game that read its licence and still opened EA's activation window (Dragon Age: Inquisition) asked for a licence bound to the display adapter, which Wine registers only after the game has checked its licence. iDeck now notices when a game opens the activation window and asks for the licence without the adapter at the next launch, so the licence follows the machine identity the game really computes.
 

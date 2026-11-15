@@ -2589,6 +2589,9 @@ private struct IDeckFirstRunSetupView: View {
     @AppStorage(SystemCoordinator.jitMethodKey) private var jitMethod = "stikdebug"
     @ObservedObject private var wineMono = WineMonoModel.shared
     @AppStorage("firstRunSetup.step.v2") private var step = 0
+    /// The JIT step counts as done only after a method was picked here: the stored
+    /// default ("stikdebug") used to show the step finished before any choice.
+    @AppStorage("firstRunSetup.jitMethodChosen") private var jitMethodChosen = false
     @State private var installing = false
     @State private var installerStatus = ""
     @State private var refresh = 0
@@ -2655,7 +2658,7 @@ private struct IDeckFirstRunSetupView: View {
         case .visualCpp: return prefixReady && vcReady
         case .wineMono: return wineMono.installed
         case .dock: return MadeiraDock.clientInstalled
-        case .jit: return jitMethod != "builtIn" || coordinator.hasPairingFile
+        case .jit: return jitMethodChosen && (jitMethod != "builtIn" || coordinator.hasPairingFile)
         case .summary: return false
         }
     }
@@ -2996,12 +2999,16 @@ private struct IDeckFirstRunSetupView: View {
     private var jitStep: some View {
         VStack(alignment: .leading, spacing: 18) {
             stepHeader(.jit, "Choose how iDeck turns JIT on each time a game starts.")
-            Picker("JIT method", selection: $jitMethod) {
+            Picker("JIT method", selection: Binding(
+                get: { jitMethodChosen ? jitMethod : "" },
+                set: { jitMethod = $0; jitMethodChosen = true })) {
                 Text("StikDebug").tag("stikdebug")
                 Text("Built-in").tag("builtIn")
             }
             .pickerStyle(.segmented)
-            if jitMethod == "builtIn" {
+            if !jitMethodChosen {
+                note("Pick StikDebug or Built-in to finish this step.")
+            } else if jitMethod == "builtIn" {
                 componentList {
                     statusRow("Pairing file", coordinator.hasPairingFile, detail: coordinator.hasPairingFile ? "Imported" : "Missing")
                 }
@@ -3028,7 +3035,7 @@ private struct IDeckFirstRunSetupView: View {
                 Divider().overlay(hairline).padding(.leading, 43)
                 statusRow("Madeira Dock", MadeiraDock.clientInstalled)
                 Divider().overlay(hairline).padding(.leading, 43)
-                statusRow("JIT method", true, detail: jitMethod == "builtIn" ? "Built-in" : "StikDebug")
+                statusRow("JIT method", done(.jit), detail: !jitMethodChosen ? "Not chosen" : (jitMethod == "builtIn" ? "Built-in" : "StikDebug"))
             }
         }
     }
