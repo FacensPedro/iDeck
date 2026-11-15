@@ -16,7 +16,7 @@ class AutomaticWindowsRuntimeSettingsTests(unittest.TestCase):
 
     def test_auto_setup_remains(self):
         self.assertIn("prepareVisualCRuntimeIfNeeded(prefix:", COORDINATOR)
-        self.assertIn("VisualCRuntimeBootstrap.extractAndInstall(", COORDINATOR)
+        self.assertIn("VisualCRuntimeBootstrap.extractAndInstall(", repo_text("iDeck/WindowsInstallerEnvironment.swift"))
         self.assertIn('"Install Microsoft Visual C++?"', LOCALIZATION)
 
     def test_default_wine_dll_loading(self):

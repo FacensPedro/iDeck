@@ -115,16 +115,6 @@ enum StikJITHelper {
         return timer
     }
 
-    /// Allocate a JIT memory pool via BRK #0xf00d, then detach the debugger.
-    /// Call this after CS_DEBUGGED is confirmed.
-    /// Returns the allocated RX base address and RW mapping, or nil on failure.
-    static func allocateAndDetach(poolSize: Int = 128 * 1024 * 1024) -> (rx: UnsafeMutableRawPointer, rw: UnsafeMutableRawPointer, size: Int)? {
-        guard let result = allocatePool(poolSize: poolSize) else { return nil }
-        // Don't detach yet — Wine needs the debugger to prepare PE DLL code pages.
-        // Detach will happen later via detachDebugger().
-        return result
-    }
-
     /// Why the last allocatePool() returned nil, in words for the person playing
     /// (the library shows it); nil after a success.
     private(set) static var poolFailure: String?

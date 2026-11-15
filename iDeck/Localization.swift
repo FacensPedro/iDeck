@@ -203,7 +203,6 @@ enum Translations {
         "Play without installing": ["pt": "Jogar sem instalar", "es": "Jugar sin instalar"],
         "Installing Microsoft Visual C++ 2005-2013 and 32-bit runtimes...": ["pt": "Instalando Microsoft Visual C++ 2005-2013 e as versões de 32 bits...", "es": "Instalando Microsoft Visual C++ 2005-2013 y las versiones de 32 bits..."],
         "Installing Microsoft Visual C++...": ["pt": "Instalando Microsoft Visual C++...", "es": "Instalando Microsoft Visual C++..."],
-        "Visual C++ setup cannot start while another Wine session is running.": ["pt": "Não é possível instalar Visual C++ enquanto outra sessão Wine estiver ativa.", "es": "No se puede instalar Visual C++ mientras haya otra sesión de Wine activa."],
         "Language": ["pt": "Idioma", "es": "Idioma"],
         "System default": ["pt": "Padrão do sistema", "es": "Predeterminado del sistema"],
         "JIT & Debugging": ["pt": "JIT e depuração", "es": "JIT y depuración"],
