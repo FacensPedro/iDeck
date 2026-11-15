@@ -247,6 +247,10 @@ enum StikJITHelper {
     /// The executable window taken by holdExecutableWindowAtLaunch() (0 when the
     /// image-load constructor already held it, or the hold failed).
     private static var appWindowBase: vm_address_t = 0
+    /// The placeholder held directly above it, as the constructor's early pool
+    /// placeholder: released by allocatePool for the window's widening and the pool.
+    private static var appPoolBase: vm_address_t = 0
+    private static var appPoolSize: vm_address_t = 0
 
     /// iDeck 2.5.1: hold [0x140000000,+128MB) at app start when Madeira's image-load
     /// constructor did not (madeira_early_window_base == 0). The window was otherwise
@@ -266,6 +270,27 @@ enum StikJITHelper {
             vm_protect(mach_task_self_, addr, vm_size_t(0x8000000), 0, VM_PROT_NONE)
             appWindowBase = addr
             LogStore.shared.log("[exe-window] held [0x140000000,+128MB) at app start (no image-load hold)", level: .success)
+            // 2.5.1 (86), Dragon Age: Inquisition: the window alone made the next
+            // allocations pack against it, so [0x148000000,0x149c00000) was taken,
+            // exe-window-mb 192 could not widen (kr=3) and the run above split into
+            // 65+498MB (pool shrunk to 496MB). Hold the largest run above it too,
+            // in 16MB steps, up to 0x180000000.
+            let placeholderBase: vm_address_t = 0x148000000
+            var size: vm_address_t = 0x180000000 - placeholderBase
+            while size >= 64 << 20 {
+                var p = placeholderBase
+                let pk = vm_allocate(mach_task_self_, &p, vm_size_t(size), 0 /* VM_FLAGS_FIXED */)
+                if pk == KERN_SUCCESS && p == placeholderBase {
+                    vm_protect(mach_task_self_, p, vm_size_t(size), 0, VM_PROT_NONE)
+                    appPoolBase = p
+                    appPoolSize = size
+                    LogStore.shared.log(String(format: "[exe-window] held the pool placeholder 0x%lx+%luMB at app start",
+                                               Int(p), Int(size >> 20)), level: .success)
+                    break
+                }
+                if pk == KERN_SUCCESS { vm_deallocate(mach_task_self_, p, vm_size_t(size)) }
+                size -= 16 << 20
+            }
         } else {
             if kr == KERN_SUCCESS { vm_deallocate(mach_task_self_, addr, vm_size_t(0x8000000)) }
             LogStore.shared.log("[exe-window] could not hold [0x140000000,+128MB) at app start (kr=\(kr))", level: .error)
@@ -599,8 +624,8 @@ enum StikJITHelper {
         // pool would have had, for the check after the request.
         var pairA: (base: vm_address_t, size: vm_address_t)? = nil
         var pairSingle = 0
-        let earlyPoolBase = vm_address_t(madeira_early_pool_base)
-        let earlyPoolSize = vm_address_t(madeira_early_pool_size)
+        let earlyPoolBase = madeira_early_pool_base != 0 ? vm_address_t(madeira_early_pool_base) : appPoolBase
+        let earlyPoolSize = madeira_early_pool_base != 0 ? vm_address_t(madeira_early_pool_size) : appPoolSize
         if earlyPoolBase != 0 && earlyPoolReleased {
             LogStore.shared.log(String(format: "ml1234: the early pool placeholder 0x%lx+%luMB was released by an earlier pool request in this run; not unmapped again",
                                        Int(earlyPoolBase), Int(earlyPoolSize >> 20)))
