@@ -9,13 +9,35 @@ enum AddressSpaceCheck {
     static let guestWindow: vm_address_t = 0x70_0000_0000
 
     static let hasGuestWindow: Bool = {
+        // 1. The kernel's own answer: the highest address this task may map. With
+        //    extended virtual addressing it reaches past the guest window. This does
+        //    not depend on what is mapped at 0x7000000000 (an early pool reservation
+        //    made the probe below unreliable right after a reinstall).
+        if let top = maxAddress, top >= guestWindow + 0x4_0000_0000 { return true }
+        // 2. The profile iDeck was signed with authorizes it.
+        if MemoryPlus.state(MemoryPlus.extendedAddressingKey, in: MemoryPlus.profileEntitlements) == .granted {
+            return true
+        }
+        // 3. Probe: only "address out of range" proves the window is missing; a
+        //    mapping already there (the pool or Wine) or another error is not one.
         var address = guestWindow
         let size = vm_size_t(vm_page_size)
         let result = vm_allocate(mach_task_self_, &address, size, VM_FLAGS_FIXED)
         if result == KERN_SUCCESS { vm_deallocate(mach_task_self_, address, size) }
-        // Only "address out of range" proves the window is missing; a mapping
-        // already there (the pool or Wine) or another error is not taken as one.
         return result != KERN_INVALID_ADDRESS
+    }()
+
+    /// TASK_VM_INFO's max_address (nil when the kernel does not report it).
+    static let maxAddress: vm_address_t? = {
+        var info = task_vm_info_data_t()
+        var count = mach_msg_type_number_t(MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<natural_t>.size)
+        let kr = withUnsafeMutablePointer(to: &info) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+                task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), $0, &count)
+            }
+        }
+        guard kr == KERN_SUCCESS, info.max_address > 0 else { return nil }
+        return vm_address_t(info.max_address)
     }()
 
     static let message = "Execution Error: iOS did not give iDeck the extended memory address space Windows games need. Sign iDeck again with the extended virtual addressing entitlement (com.apple.developer.kernel.extended-virtual-addressing) and reopen it."

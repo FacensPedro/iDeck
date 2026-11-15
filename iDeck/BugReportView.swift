@@ -7,7 +7,7 @@ import Darwin
 /// what the Bugs & logs screen scans. Lines never contain credentials: the
 /// callers (SteamLog, status updates) already redact them.
 enum AppLog {
-    static let maximumBytes: UInt64 = 1024 * 1024
+    static let maximumBytes: UInt64 = 512 * 1024
     private static let queue = DispatchQueue(label: "ideck.app-log", qos: .utility)
     private static let stamp: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()

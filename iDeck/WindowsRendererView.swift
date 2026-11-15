@@ -126,15 +126,36 @@ struct WindowsRendererView: UIViewRepresentable {
     /// What touches are mapped through, for the [touch] log line.
     static var touchMappingSummary: String {
         guard let surface = currentSurface else { return "no surface" }
-        let client = gameClientRect.map { "client \(Int($0.minX)),\(Int($0.minY)) \(Int($0.width))x\(Int($0.height))" } ?? "monitor"
+        let client = installerTouchMapping ? "installer: monitor" : gameClientRect.map { "client \(Int($0.minX)),\(Int($0.minY)) \(Int($0.width))x\(Int($0.height))" } ?? "monitor"
         return "guest \(Int(surface.guest.width))x\(Int(surface.guest.height)), surface "
             + "\(Int(surface.bounds.minX)),\(Int(surface.bounds.minY)) \(Int(surface.bounds.width))x\(Int(surface.bounds.height)), "
             + "\(surface.mode), \(client)"
     }
 
+    /// True while an installer (setup.exe, an .msi, Inno Setup, NSIS…) runs: its
+    /// dialogs are GDI windows on the desktop, and the picture shown is the whole
+    /// desktop, so a tap maps onto the monitor. Mapping it into the "game window"
+    /// client area (the dialog) moved every tap off its button.
+    static var installerTouchMapping = false
+
+    /// A program name that is an installer by convention.
+    static func looksLikeInstaller(_ name: String) -> Bool {
+        let n = name.lowercased()
+        guard n.hasSuffix(".exe") else { return false }
+        return ["setup", "install", "unins", "redist", "vcredist", "dxsetup", "dotnet", "_isetup"]
+            .contains { n.contains($0) }
+    }
+
     static func guestPoint(fromWindow point: CGPoint) -> CGPoint? {
-        guard let surface = currentSurface else { return nil }
-        guard let client = gameClientRect else {
+        // No surface laid out yet (a GDI-only installer can run before the game
+        // surface is published): map onto the whole screen so the tap still lands.
+        guard let surface = currentSurface else {
+            guard let window = activeViewport?.window ?? UIApplication.shared.connectedScenes
+                    .compactMap({ ($0 as? UIWindowScene)?.keyWindow }).first else { return nil }
+            return RuntimeConfiguration.guestPoint(point, guest: currentGuestSize,
+                bounds: window.bounds, mode: .fit)
+        }
+        guard !installerTouchMapping, let client = gameClientRect else {
             return RuntimeConfiguration.guestPoint(point, guest: surface.guest,
                 drawable: surface.drawable, bounds: surface.bounds, mode: surface.mode)
         }

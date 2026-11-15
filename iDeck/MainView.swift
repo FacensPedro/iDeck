@@ -2302,7 +2302,7 @@ extension WindowsWorkspaceView {
     var consoleShelf: some View {
         ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(alignment: .top, spacing: isCompact ? 10 : 14) {
+                HStack(alignment: .top, spacing: isCompact ? 8 : 14) {
                     ForEach([GameStore.steam, .gog, .epic, .ea], id: \.self) { store in
                         shelfTile(.store(store))
                     }
@@ -2313,7 +2313,7 @@ extension WindowsWorkspaceView {
                 .padding(.vertical, 10)
                 // Room for the selected tile's 1.08 scale and border, which the
                 // scroll view's edge would otherwise cut on the first tile.
-                .padding(.horizontal, 14)
+                .padding(.horizontal, isCompact ? 10 : 14)
             }
             .onChange(of: shelf) { _, item in
                 withAnimation(.easeInOut(duration: 0.2)) { proxy.scrollTo(item, anchor: .center) }
@@ -2321,8 +2321,10 @@ extension WindowsWorkspaceView {
         }
     }
 
-    private var shelfTileWidth: CGFloat { isCompact ? 64 : 78 }
-    private var shelfTileHeight: CGFloat { isCompact ? 86 : 104 }
+    /// iPhone in portrait: 56 pt tiles, 8 pt apart, so five fit across a 6.1" (390 pt)
+    /// or smaller (375 pt) screen: 10 + 5 × 56 + 4 × 8 + 10 = 332 pt.
+    private var shelfTileWidth: CGFloat { isCompact ? 56 : 78 }
+    private var shelfTileHeight: CGFloat { isCompact ? 76 : 104 }
 
     private func shelfTile(_ item: ShelfItem) -> some View {
         let selected = currentShelf == item
@@ -2791,7 +2793,8 @@ private struct IDeckFirstRunSetupView: View {
                 .buttonStyle(.borderedProminent)
                 .disabled(installing || wineMono.busy
                           || (current == .visualCpp && !(prefixReady && vcReady))
-                          || (current == .wineMono && !wineMono.installed))
+                          || (current == .wineMono && !wineMono.installed)
+                          || (current == .dock && !MadeiraDock.clientInstalled))
             } else {
                 Button { step = 0; onFinish() } label: { Text("Start using iDeck").frame(minWidth: 160) }
                     .buttonStyle(.borderedProminent)
@@ -2990,7 +2993,6 @@ private struct IDeckFirstRunSetupView: View {
             if !prefixReady {
                 note("Install Visual C++ first: it prepares the Windows environment.", warning: true)
             }
-            note("Optional: only needed for Steam games.")
         }
     }
 
