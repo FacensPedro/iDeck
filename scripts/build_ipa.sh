@@ -55,42 +55,6 @@ if [[ "${IDECK_REQUIRE_MADEIRA:-0}" == "1" ]]; then
     echo "ERROR: IDECK_BUILD_WOW64 must be 0 or 1." >&2
     exit 2
   }
-  if [[ -n "${IDECK_MSC_PKG:-}" ]]; then
-    [[ "$IDECK_MADEIRA_GRAPHICS" == "d3d12" ]] || {
-      echo "ERROR: Apple Metal Shader Converter package is for an explicitly selected D3D12 build." >&2
-      exit 2
-    }
-    export IDECK_PREBUILT_MODE=off
-    export IDECK_MSC_REQUIRE_BETA3=1
-    MSC_ROOT="${IDECK_MADEIRA_ROOT:-$(pwd)/vendor/Madeira}"
-    if [[ ! -f "$MSC_ROOT/app/Madeira/FEXBridge.mm" ]]; then
-      bash scripts/fetch_madeira_sources.sh
-    fi
-    python3 scripts/prepare_apple_msc_beta3.py \
-      --pkg "$IDECK_MSC_PKG" \
-      --destination "$MSC_ROOT/app/Madeira/d3d12" \
-      --headers-destination "$MSC_ROOT/madeira-d3d12/third_party/metal-shader-converter/include" \
-      --acknowledge-license
-    # The audited beta 3 headers replace Madeira's vendored copy: record their
-    # checksums, as Madeira's own build/madeira-d3d12/fetch-converter.sh does, or
-    # deps.sh rejects them and madeira-d3d12 is not built.
-    (cd "$MSC_ROOT/madeira-d3d12/third_party/metal-shader-converter" &&
-      find include -type f | LC_ALL=C sort | xargs shasum -a 256 > SHA256SUMS)
-    # deps.sh pins Madeira's converter library (4.0 beta 2). Pin the audited beta 3
-    # library prepare_apple_msc_beta3.py just staged instead: one converter version
-    # for the headers and the library.
-    python3 - "$MSC_ROOT/build/madeira-d3d12/deps.sh" "$MSC_ROOT/app/Madeira/d3d12/libmetalirconverter.dylib" <<'PY'
-import hashlib, re, sys
-from pathlib import Path
-deps, library = Path(sys.argv[1]), Path(sys.argv[2])
-sha = hashlib.sha256(library.read_bytes()).hexdigest()
-text, count = re.subn(r'(local ios_lib_sha=")[0-9a-f]{64}(")', r"\g<1>" + sha + r"\g<2>", deps.read_text())
-if count != 1:
-    raise SystemExit("ERROR: deps.sh has no ios_lib_sha pin to update")
-deps.write_text(text)
-print(f"madeira-d3d12 now expects the beta 3 converter library {sha}")
-PY
-  fi
   KIT_FLAGS=(--graphics "$IDECK_MADEIRA_GRAPHICS")
   if [[ "$IDECK_BUILD_WOW64" == "1" ]]; then KIT_FLAGS+=(--wow64); fi
   if [[ "${IDECK_BUNDLE_WINE_MONO:-0}" == "1" ]]; then KIT_FLAGS+=(--mono); fi
@@ -246,12 +210,6 @@ fi
 # symlink/executable-bit preservation; do not duplicate the native app as
 # a temporary Payload tree or recompress PNG/ZIP/GZ assets.
 python3 scripts/package_ipa.py --app "$APP" --output iDeck.ipa --duplicate-report build/iDeck-duplicate-audit.json
-if [[ "${IDECK_REQUIRE_MADEIRA:-0}" == "1" && "${IDECK_MADEIRA_GRAPHICS:-d3d11}" == "d3d12" && -n "${IDECK_MSC_PKG:-}" ]]; then
-  python3 scripts/verify_apple_msc_beta3_bundle.py \
-    --source "${IDECK_MADEIRA_ROOT:-$(pwd)/vendor/Madeira}/app/Madeira" \
-    --app "$APP" \
-    --ipa iDeck.ipa
-fi
 if [[ "${IDECK_REQUIRE_MADEIRA:-0}" == "1" ]]; then
   python3 - <<'PY'
 import stat
