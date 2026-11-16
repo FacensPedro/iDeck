@@ -1,10 +1,8 @@
 ## What's Changed
-### Steam: uninstall and leftover downloads
-- A Steam download that failed (for example when the device ran out of space) or was stopped left its files behind, and the game page offered only Install, so the space could not be freed. The page now shows **Delete downloaded files** whenever such files exist, and removes the game folder, the download journal and the manifest.
-- The Uninstall button no longer does nothing when the Windows environment is not ready yet: it says so.
-
-### Diagnostics
-- The `[ideck-fault]` crash line from 2.7.5 stays.
+### Steam downloads
+- **Stop download** on the game page now uninstalls the game: it ends the download and removes the game folder, the download journal and the manifest (an installed game being updated is uninstalled too).
+- **Pause download** sits next to it and keeps the files; a paused download shows **Resume** and **Stop download** side by side.
+- **Delete downloaded files** (2.7.6) stays for downloads that failed on their own.
 
 ### Version
-- Updated the application version to 2.7.6 (build 96).
+- Updated the application version to 2.7.7 (build 97).

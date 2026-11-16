@@ -241,41 +241,32 @@ final class SteamOwnedGamesModel: ObservableObject {
         }
     }
 
+    /// Stop download: ends the download and uninstalls the game, removing every
+    /// file it wrote (the game folder, the download journal and the manifest).
     func cancelInstall(appID: UInt32) {
-        if let prefix = userPausedPrefixes.removeValue(forKey: appID) {
-            stoppingPausedInstalls.insert(appID)
-            cancellingApps.insert(appID)
-            let previous = installTasks[appID]
-            previous?.cancel()
-            stopCleanupTasks[appID] = Task { @MainActor in
-                await previous?.value
-                pausedInstalls.remove(appID)
-                if !isInstalled(appID: appID, prefixPath: prefix) {
-                    let drive = prefix.appendingPathComponent("drive_c", isDirectory: true)
-                    let steamApps = SteamInstallPaths.steamApps(drive: drive)
-                    let owned = steamApps.appendingPathComponent("downloading/\(appID)/.ideck-owned-folder")
-                    if let name = try? String(contentsOf: owned, encoding: .utf8),
-                       !name.isEmpty, !name.contains("/"), !name.contains("\\") {
-                        SteamInstallFiles.delete(appID: Int(appID), folderName: name, steamApps: steamApps)
-                    } else {
-                        try? FileManager.default.removeItem(
-                            at: steamApps.appendingPathComponent("downloading/\(appID)", isDirectory: true))
-                    }
-                }
-                downloadProgress.removeValue(forKey: appID)
-                cancellingApps.remove(appID)
-                stoppingPausedInstalls.remove(appID)
-                stopCleanupTasks.removeValue(forKey: appID)
-            }
-            return
-        }
-        guard let task = installTasks[appID] else { return }
+        guard !cancellingApps.contains(appID) else { return }
+        let paused = userPausedPrefixes.removeValue(forKey: appID)
+        guard let prefix = paused ?? installPrefixes[appID] else { return }
+        if paused != nil { stoppingPausedInstalls.insert(appID) }
         cancellingApps.insert(appID)
-        task.cancel()
+        let previous = installTasks[appID]
+        previous?.cancel()
+        stopCleanupTasks[appID] = Task { @MainActor in
+            await previous?.value
+            pausedInstalls.remove(appID)
+            if isInstalled(appID: appID, prefixPath: prefix) {
+                _ = uninstall(appID: appID, prefixPath: prefix)
+            } else {
+                _ = deleteLeftoverFiles(appID: appID, prefixPath: prefix)
+            }
+            AppLog.record("[steam-install] stopped and uninstalled app=\(appID)")
+            downloadProgress.removeValue(forKey: appID)
+            cancellingApps.remove(appID)
+            stoppingPausedInstalls.remove(appID)
+            stopCleanupTasks.removeValue(forKey: appID)
+        }
     }
 
-    /// A USB Stop response is returned only after file writes have stopped
-    /// and the cancelled installation's owned temporary files were removed.
     func cancelInstallAndWait(appID: UInt32) async {
         let previous = installTasks[appID]
         cancelInstall(appID: appID)

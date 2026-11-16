@@ -1348,20 +1348,22 @@ private struct SteamProgramDetailsView: View {
                     if steamLibrary.pausedInstalls.contains(game.appID) {
                         VStack(spacing: 10) {
                             Text(tr("Download paused")).foregroundColor(.white)
-                            Button {
-                                steamLibrary.resumeInstall(appID: game.appID)
-                            } label: {
-                                Label(tr("Resume"), systemImage: "play.fill")
-                                    .frame(maxWidth: .infinity)
+                            HStack(spacing: 10) {
+                                Button {
+                                    steamLibrary.resumeInstall(appID: game.appID)
+                                } label: {
+                                    Label(tr("Resume"), systemImage: "play.fill")
+                                        .frame(maxWidth: .infinity)
+                                }
+                                .buttonStyle(.borderedProminent)
+                                Button(role: .destructive) {
+                                    steamLibrary.cancelInstall(appID: game.appID)
+                                } label: {
+                                    Label(tr("Stop download"), systemImage: "stop.fill")
+                                        .frame(maxWidth: .infinity)
+                                }
+                                .buttonStyle(.bordered)
                             }
-                            .buttonStyle(.borderedProminent)
-                            Button(role: .destructive) {
-                                steamLibrary.cancelInstall(appID: game.appID)
-                            } label: {
-                                Label(tr("Stop download"), systemImage: "stop.fill")
-                                    .frame(maxWidth: .infinity)
-                            }
-                            .buttonStyle(.bordered)
                         }
                     } else if installing {
                         downloadStatus
@@ -1558,22 +1560,25 @@ private struct SteamProgramDetailsView: View {
                     .foregroundColor(.green)
             }
             if steamLibrary.canCancelInstall(appID: game.appID) {
-                Button {
-                    steamLibrary.pauseInstall(appID: game.appID)
-                } label: {
-                    Label(tr("Pause download"), systemImage: "pause.fill")
-                        .frame(maxWidth: .infinity)
+                // Pause keeps the files; Stop uninstalls the game.
+                HStack(spacing: 10) {
+                    Button {
+                        steamLibrary.pauseInstall(appID: game.appID)
+                    } label: {
+                        Label(tr("Pause download"), systemImage: "pause.fill")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .disabled(stopping)
+                    .buttonStyle(.bordered)
+                    Button(role: .destructive) {
+                        steamLibrary.cancelInstall(appID: game.appID)
+                    } label: {
+                        Label(stopping ? tr("Stopping...") : tr("Stop download"), systemImage: "stop.fill")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .disabled(stopping)
+                    .buttonStyle(.bordered)
                 }
-                .disabled(stopping)
-                .buttonStyle(.bordered)
-                Button(role: .destructive) {
-                    steamLibrary.cancelInstall(appID: game.appID)
-                } label: {
-                    Label(stopping ? tr("Stopping...") : tr("Stop download"), systemImage: "stop.fill")
-                        .frame(maxWidth: .infinity)
-                }
-                .disabled(stopping)
-                .buttonStyle(.bordered)
             }
         }
     }
