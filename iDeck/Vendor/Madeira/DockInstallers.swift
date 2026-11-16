@@ -713,6 +713,12 @@ enum DockInstallers {
         return machine == 0x14c && !has32Bit ? "32-bit installer" : nil
     }
 
+    nonisolated static func isUbisoftConnect(_ process: SteamInstallProcess) -> Bool {
+        let file = process.executable.lowercased()
+        return file.contains("ubisoftconnect") || file.contains("uplayinstaller") || file.contains("uplay_installer")
+            || process.run.name.lowercased().contains("ubisoft connect") || process.run.name.lowercased().contains("uplay")
+    }
+
     nonisolated static var bundleHas32Bit: Bool { bundled("i386-windows") }
     nonisolated static var bundleHasMsiexec: Bool {
         ["aarch64-windows", "arm64ec-windows", "i386-windows"].contains { bundled($0 + "/msiexec.exe") }
@@ -906,6 +912,15 @@ enum DockInstallers {
         if !directX.isEmpty {
             pending.removeAll { $0.executable.lowercased().hasSuffix("dxsetup.exe") }
             LogStore.shared.log("[dock-installers] app=\(app) DirectX setup skipped: Wine's built-in DirectX DLLs are used")
+        }
+        // iDeck: Ubisoft Connect (a game's own launcher installer) is left out, as a GOG
+        // game's GOG Galaxy is: iDeck does not run Ubisoft's launcher, and the game starts
+        // without it. A game that requires Ubisoft Connect can stop at its own start.
+        let ubisoft = pending.filter { Self.isUbisoftConnect($0) }
+        if !ubisoft.isEmpty {
+            pending.removeAll { Self.isUbisoftConnect($0) }
+            LogStore.shared.log("[dock-installers] app=\(app) Ubisoft Connect skipped: iDeck does not run Ubisoft's launcher; "
+                + "the game starts without it, as a GOG game does without GOG Galaxy")
         }
         var ledger = DockInstallLedger.load(prefix: prefix)
         // Programs the game's last batch started but never saw exit (absorbResults).
