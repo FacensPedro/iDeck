@@ -510,7 +510,7 @@ class SystemCoordinator: ObservableObject {
                 // debugger is attached. StikDebug may detach before the user taps
                 // Play; with the pool ready, the launch no longer reopens StikDebug.
                 self.wineJITAttemptedDuringAttachment = true
-                if Self.restartNeeded() == nil, MadeiraBundleIdentity.isNative, AddressSpaceCheck.hasGuestWindow,
+                if Self.restartNeeded() == nil, MadeiraBundleIdentity.isNative,
                    StikJITHelper.scriptData != nil, !ideck_wineprocess_running(),
                    !self.isClosingWindowsSession, !ideck_wineserver_running() {
                     self.wineJITPreparationInFlight = true
@@ -603,11 +603,13 @@ class SystemCoordinator: ObservableObject {
     /// launch (MadeiraWinePool), followed by Madeira's early detach.
     @discardableResult
     private func ensureJITForGameLaunch() -> Bool {
-        guard AddressSpaceCheck.hasGuestWindow else {
-            jitResume = nil
-            AppLog.record("[address-space] no mapping at 0x7000000000: extended virtual addressing is not active (\(AddressSpaceCheck.diagnostics))")
-            setWindowsStatus(AddressSpaceCheck.message)
-            return false
+        // Like Madeira, a 63 GB address map (no extended virtual addressing, as on
+        // iPhones signed with a free Apple ID) does not block the launch: the JIT
+        // pool's RW alias then goes below the map's end (MADEIRA_RW_ALIAS_RETRY)
+        // and the pool is capped (MadeiraWinePool). Only the increased memory limit
+        // is required.
+        if !AddressSpaceCheck.hasGuestWindow {
+            AppLog.record("[address-space] standard address map, launching without the extended guest window (\(AddressSpaceCheck.diagnostics))")
         }
         let resume = jitResume
         jitResume = nil
@@ -815,7 +817,7 @@ class SystemCoordinator: ObservableObject {
     /// opens on the tap instead of after the store answers. The launch itself still
     /// goes through ensureJITForGameLaunch and waits for the validated preparation.
     func prewarmJITForLaunch() {
-        guard Self.restartNeeded() == nil, MadeiraBundleIdentity.isNative, AddressSpaceCheck.hasGuestWindow,
+        guard Self.restartNeeded() == nil, MadeiraBundleIdentity.isNative,
               StikJITHelper.scriptData != nil, !isClosingWindowsSession else { return }
         refreshJITStatus()
         guard !Self.jitPreparationValidated() else { return }
@@ -851,7 +853,7 @@ class SystemCoordinator: ObservableObject {
         // How long the trip to StikDebug and back takes, for bug reports: when iDeck
         // is in front again, and whether the debugger was attached by then.
         let started = Date()
-        AppLog.record("[jit-handoff] StikDebug opened")
+        AppLog.record("[jit-handoff] opening StikDebug")
         if let previous = jitHandoffObserver { NotificationCenter.default.removeObserver(previous) }
         jitHandoffObserver = NotificationCenter.default.addObserver(forName: UIApplication.didBecomeActiveNotification,
                                                                     object: nil, queue: .main) { [weak self] _ in
