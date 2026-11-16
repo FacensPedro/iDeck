@@ -1,0 +1,54 @@
+diff --git a/build/ntdll-unix/process_ios.c b/build/ntdll-unix/process_ios.c
+index 244fa14..a20af35 100644
+--- a/build/ntdll-unix/process_ios.c
++++ b/build/ntdll-unix/process_ios.c
+@@ -26,6 +26,7 @@
+ #include "config.h"
+ 
+ #include <errno.h>
++#include <dlfcn.h>
+ #include <fcntl.h>
+ #include <signal.h>
+ #include <stdarg.h>
+@@ -747,7 +748,8 @@ NTSTATUS WINAPI __wine_unix_spawnvp( char * const argv[], int wait )
+     int fd[2], status, err;
+ 
+ #ifdef HAVE_PIPE2
+-    if (pipe2( fd, O_CLOEXEC ) == -1)
++    /* iDeck: pipe2 is missing before iOS 27 (NULL weak import). */
++    if (!dlsym( RTLD_DEFAULT, "pipe2" ) || pipe2( fd, O_CLOEXEC ) == -1)
+ #endif
+     {
+         if (pipe(fd) == -1) return STATUS_TOO_MANY_OPENED_FILES;
+@@ -853,7 +855,8 @@ static NTSTATUS fork_and_exec( OBJECT_ATTRIBUTES *attr, const char *unix_name, i
+     NTSTATUS status = STATUS_SUCCESS;
+ 
+ #ifdef HAVE_PIPE2
+-    if (pipe2( fd, O_CLOEXEC ) == -1)
++    /* iDeck: pipe2 is missing before iOS 27 (NULL weak import). */
++    if (!dlsym( RTLD_DEFAULT, "pipe2" ) || pipe2( fd, O_CLOEXEC ) == -1)
+ #endif
+     {
+         if (pipe(fd) == -1) return STATUS_TOO_MANY_OPENED_FILES;
+diff --git a/build/ntdll-unix/server_ios.c b/build/ntdll-unix/server_ios.c
+index c1a2038..4a636a8 100644
+--- a/build/ntdll-unix/server_ios.c
++++ b/build/ntdll-unix/server_ios.c
+@@ -4674,6 +4674,17 @@ int server_pipe( int fd[2] )
+     int ret;
+ #ifdef HAVE_PIPE2
+     static BOOL have_pipe2 = TRUE;
++#ifdef WINE_IOS
++    /* iDeck: Wine is configured against an SDK that has pipe2 (iOS 27). On iOS 26
++     * the weak import resolves to NULL and the call jumped to address 0 right after
++     * the first wineserver connection (iPhone 15, iOS 26.5: pc=0 esr=0x82000006). */
++    static BOOL pipe2_checked;
++    if (!pipe2_checked)
++    {
++        have_pipe2 = dlsym( RTLD_DEFAULT, "pipe2" ) != NULL;
++        pipe2_checked = TRUE;
++    }
++#endif
+ 
+     if (have_pipe2)
+     {

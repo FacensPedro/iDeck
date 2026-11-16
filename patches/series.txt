@@ -42,3 +42,4 @@ session   .      madeira-repeat-wine-sessions.patch
 
 # After the source scripts
 late      .      madeira-mscoree-fusion-negative-cache.patch
+late      .      madeira-pipe2-ios26.patch
