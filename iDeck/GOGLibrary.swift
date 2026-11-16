@@ -380,6 +380,7 @@ final class GOGLibraryModel: ObservableObject {
         }
         pausedDownloads.remove(game.id)
         resumeDownloads[game.id] = { [weak self] in self?.install(game, prefixPath: prefixPath, completion: completion) }
+        downloadPrefixes[game.id] = prefixPath
         downloadErrors[game.id] = nil
         downloadProgress[game.id] = 0
         resetDownloadETA(gameID: game.id)
@@ -571,8 +572,10 @@ final class GOGLibraryModel: ObservableObject {
     @discardableResult
     func uninstall(_ gameID: Int, prefixPath: URL) -> Bool {
         guard let game = installed[gameID] else { return false }
-        let drive = prefixPath.appendingPathComponent("drive_c", isDirectory: true).standardizedFileURL.path
-        let folder = Self.installFolder(containing: game.executable.deletingLastPathComponent()).standardizedFileURL
+        let drive = prefixPath.appendingPathComponent("drive_c", isDirectory: true)
+            .resolvingSymlinksInPath().standardizedFileURL.path
+        let folder = Self.installFolder(containing: game.executable.deletingLastPathComponent())
+            .resolvingSymlinksInPath().standardizedFileURL
         guard folder.path.hasPrefix(drive + "/"), folder.pathComponents.count > drive.split(separator: "/").count + 2 else { return false }
         do { try FileManager.default.removeItem(at: folder) } catch { return false }
         installed[gameID] = nil
@@ -590,6 +593,9 @@ final class GOGLibraryModel: ObservableObject {
     }
 
     /// Pause cancels network activity while retaining GOG's staged files.
+    /// The Windows prefix each download installs into, so Stop can uninstall it.
+    private var downloadPrefixes: [Int: URL] = [:]
+
     func pauseDownload(_ game: GOGGame) {
         guard let task = downloadTasks[game.id] else { return }
         pausedDownloads.insert(game.id)
@@ -617,6 +623,12 @@ final class GOGLibraryModel: ObservableObject {
             if let staging = stagingFolders.removeValue(forKey: game.id) {
                 try? FileManager.default.removeItem(at: staging)
             }
+            // Stop download uninstalls: an installed game being updated goes too.
+            if let prefix = downloadPrefixes.removeValue(forKey: game.id) {
+                refreshInstalled(prefixPath: prefix)
+                if installed[game.id] != nil { uninstall(game.id, prefixPath: prefix) }
+            }
+            downloadErrors.removeValue(forKey: game.id)
             downloadProgress.removeValue(forKey: game.id)
             cancellationCleanup.removeValue(forKey: game.id)
         }

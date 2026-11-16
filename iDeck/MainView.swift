@@ -1348,20 +1348,22 @@ private struct SteamProgramDetailsView: View {
                     if steamLibrary.pausedInstalls.contains(game.appID) {
                         VStack(spacing: 10) {
                             Text(tr("Download paused")).foregroundColor(.white)
-                            Button {
-                                steamLibrary.resumeInstall(appID: game.appID)
-                            } label: {
-                                Label(tr("Resume"), systemImage: "play.fill")
-                                    .frame(maxWidth: .infinity)
+                            HStack(spacing: 10) {
+                                Button {
+                                    steamLibrary.resumeInstall(appID: game.appID)
+                                } label: {
+                                    Label(tr("Resume"), systemImage: "play.fill")
+                                        .frame(maxWidth: .infinity)
+                                }
+                                .buttonStyle(.borderedProminent)
+                                Button(role: .destructive) {
+                                    steamLibrary.cancelInstall(appID: game.appID)
+                                } label: {
+                                    Label(tr("Stop download"), systemImage: "stop.fill")
+                                        .frame(maxWidth: .infinity)
+                                }
+                                .buttonStyle(.bordered)
                             }
-                            .buttonStyle(.borderedProminent)
-                            Button(role: .destructive) {
-                                steamLibrary.cancelInstall(appID: game.appID)
-                            } label: {
-                                Label(tr("Stop download"), systemImage: "stop.fill")
-                                    .frame(maxWidth: .infinity)
-                            }
-                            .buttonStyle(.bordered)
                         }
                     } else if installing {
                         downloadStatus
@@ -1377,7 +1379,10 @@ private struct SteamProgramDetailsView: View {
                         }
                         .buttonStyle(.borderedProminent)
                         Button(role: .destructive) {
-                            guard let prefixPath else { return }
+                            guard let prefixPath else {
+                                presentError(tr("Windows environment is not ready."))
+                                return
+                            }
                             if steamLibrary.uninstall(appID: game.appID, prefixPath: prefixPath) {
                                 library.removeProfile(for: "steam:\(game.appID)")
                                 dismiss()
@@ -1406,6 +1411,20 @@ private struct SteamProgramDetailsView: View {
                         }
                         .buttonStyle(.borderedProminent)
                         .disabled(prefixPath == nil || !game.installableOnWindows)
+                        // A failed or stopped download leaves its files behind; without
+                        // this the only way to get the space back was to install again.
+                        if let prefixPath, steamLibrary.hasLeftoverFiles(appID: game.appID, prefixPath: prefixPath) {
+                            Button(role: .destructive) {
+                                if !steamLibrary.deleteLeftoverFiles(appID: game.appID, prefixPath: prefixPath) {
+                                    presentError(tr("Could not remove this game's files."))
+                                }
+                            } label: {
+                                Label(tr("Delete downloaded files"), systemImage: "trash")
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 12)
+                            }
+                            .buttonStyle(.bordered)
+                        }
                     }
 
                     if let error = steamLibrary.downloadErrors[game.appID] {
@@ -1541,22 +1560,25 @@ private struct SteamProgramDetailsView: View {
                     .foregroundColor(.green)
             }
             if steamLibrary.canCancelInstall(appID: game.appID) {
-                Button {
-                    steamLibrary.pauseInstall(appID: game.appID)
-                } label: {
-                    Label(tr("Pause download"), systemImage: "pause.fill")
-                        .frame(maxWidth: .infinity)
+                // Pause keeps the files; Stop uninstalls the game.
+                HStack(spacing: 10) {
+                    Button {
+                        steamLibrary.pauseInstall(appID: game.appID)
+                    } label: {
+                        Label(tr("Pause download"), systemImage: "pause.fill")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .disabled(stopping)
+                    .buttonStyle(.bordered)
+                    Button(role: .destructive) {
+                        steamLibrary.cancelInstall(appID: game.appID)
+                    } label: {
+                        Label(stopping ? tr("Stopping...") : tr("Stop download"), systemImage: "stop.fill")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .disabled(stopping)
+                    .buttonStyle(.bordered)
                 }
-                .disabled(stopping)
-                .buttonStyle(.bordered)
-                Button(role: .destructive) {
-                    steamLibrary.cancelInstall(appID: game.appID)
-                } label: {
-                    Label(stopping ? tr("Stopping...") : tr("Stop download"), systemImage: "stop.fill")
-                        .frame(maxWidth: .infinity)
-                }
-                .disabled(stopping)
-                .buttonStyle(.bordered)
             }
         }
     }
@@ -1884,18 +1906,21 @@ private struct StoreGameDetailsView<Extra: View>: View {
                         .font(.caption2)
                         .foregroundColor(.green)
                 }
-                if let onPause {
-                    Button(action: onPause) {
-                        Label(tr("Pause download"), systemImage: "pause.fill")
+                // Pause keeps the files; Stop uninstalls the game.
+                HStack(spacing: 10) {
+                    if let onPause {
+                        Button(action: onPause) {
+                            Label(tr("Pause download"), systemImage: "pause.fill")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                    Button(role: .destructive, action: onStop) {
+                        Label(tr("Stop download"), systemImage: "stop.fill")
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.bordered)
                 }
-                Button(role: .destructive, action: onStop) {
-                    Label(tr("Stop download"), systemImage: "stop.fill")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.bordered)
             }
         } else if installed {
             // Starts the game; without JIT, StikDebug opens first.
@@ -1919,13 +1944,24 @@ private struct StoreGameDetailsView<Extra: View>: View {
         } else if AntiCheatPolicy.isBlocked(profileID: profileID, title: title) {
             AntiCheatBlockedButton()
         } else if canInstall {
-            Button(action: onInstall) {
-                Label(tr(paused ? "Resume" : "Install"),
-                      systemImage: paused ? "play.circle.fill" : "arrow.down.circle.fill")
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
+            // A paused or failed download keeps its files: Stop beside Resume removes them.
+            HStack(spacing: 10) {
+                Button(action: onInstall) {
+                    Label(tr(paused ? "Resume" : "Install"),
+                          systemImage: paused ? "play.circle.fill" : "arrow.down.circle.fill")
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                }
+                .buttonStyle(.borderedProminent)
+                if paused || errorText != nil {
+                    Button(role: .destructive, action: onStop) {
+                        Label(tr("Stop download"), systemImage: "stop.fill")
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                    }
+                    .buttonStyle(.bordered)
+                }
             }
-            .buttonStyle(.borderedProminent)
         } else {
             Text(tr("Not available for Windows"))
                 .font(.caption)
@@ -2034,7 +2070,7 @@ private struct EAGameDetailsSheet: View {
             onInstall: { ea.install(game.id) },
             onPause: { ea.pause(game.id) },
             onStop: { ea.cancel(game.id) },
-            onUninstall: download == nil ? { ea.uninstall(game.id); return true } : nil,
+            onUninstall: (download == nil || paused) ? { ea.uninstall(game.id); return ea.installed[game.id] == nil } : nil,
             library: library, coordinator: coordinator
         ) {
             if let installed {
@@ -2103,7 +2139,7 @@ private struct EpicGameDetailsSheet: View {
             onInstall: { epic.install(appName) },
             onPause: { epic.pause(appName) },
             onStop: { epic.cancel(appName) },
-            onUninstall: (epic.sessionRunning || EpicCloud.shared.isBusy) ? nil : { epic.uninstall(appName); return true },
+            onUninstall: (epic.sessionRunning || EpicCloud.shared.isBusy) ? nil : { epic.uninstall(appName); return epic.installed[appName] == nil },
             library: library, coordinator: coordinator
         ) {
             if installed != nil {

@@ -317,7 +317,8 @@ struct EAInstalledGame: Codable, Sendable {
         resumeAfterSession.remove(id); resumeAfterBackground.remove(id)
     }
 
-    /// Removes a first install's partial files; stops an update or repair without deleting the game.
+    /// Stop download: removes a first install's partial files and uninstalls an
+    /// installed game whose update or repair is stopped.
     func cancel(_ id: String) {
         pause(id)
         let kind = downloads[id]?.kind ?? .install
@@ -333,6 +334,7 @@ struct EAInstalledGame: Codable, Sendable {
             try? FileManager.default.removeItem(at: journal)
         }
         EALog.event("[ea-download] cancelled id=\(id) kind=\(kind.rawValue)")
+        if kind != .install, installed[id] != nil { uninstall(id) }
     }
 
     /// Deletes the game's files and records; its library entry goes with them.
