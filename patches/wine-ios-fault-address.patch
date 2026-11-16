@@ -1,0 +1,42 @@
+diff --git a/server/signal.c b/server/signal.c
+--- a/server/signal.c
++++ b/server/signal.c
+@@ -223,6 +223,25 @@ static void do_sigchld( int signum )
+ }
+
+ /* SIGSEGV handler */
++#if defined(WINE_IOS) && defined(__aarch64__)
++#include <ucontext.h>
++/* iDeck: the handler is process-wide on iOS (wineserver runs in-process), so a
++ * fault in any Wine thread lands here. Say where it happened before aborting. */
++static void do_sigsegv_info( int signum, siginfo_t *info, void *ctx )
++{
++    ucontext_t *uc = ctx;
++    fprintf( stderr, "[ideck-fault] signal=%d code=%d addr=%p pc=%p lr=%p sp=%p esr=0x%x far=%p\n",
++             signum, info ? info->si_code : -1, info ? info->si_addr : NULL,
++             uc ? (void *)uc->uc_mcontext->__ss.__pc : NULL,
++             uc ? (void *)uc->uc_mcontext->__ss.__lr : NULL,
++             uc ? (void *)uc->uc_mcontext->__ss.__sp : NULL,
++             uc ? uc->uc_mcontext->__es.__esr : 0,
++             uc ? (void *)uc->uc_mcontext->__es.__far : NULL );
++    fprintf( stderr, "wineserver crashed, please enable coredumps (ulimit -c unlimited) and restart.\n");
++    abort();
++}
++#endif
+ static void do_sigsegv( int signum )
+ {
+     fprintf( stderr, "wineserver crashed, please enable coredumps (ulimit -c unlimited) and restart.\n");
+@@ -309,6 +328,13 @@ void init_signals(void)
+     {
+         action.sa_handler = do_sigsegv;
+         sigaction( SIGSEGV, &action, NULL );
++#if defined(WINE_IOS) && defined(__aarch64__)
++        action.sa_sigaction = do_sigsegv_info;
++        action.sa_flags = SA_SIGINFO;
++        sigaction( SIGSEGV, &action, NULL );
++        sigaction( SIGBUS, &action, NULL );
++        action.sa_flags = 0;
++#endif
+     }
+     action.sa_handler = SIG_IGN;
+     sigaction( SIGXFSZ, &action, NULL );
