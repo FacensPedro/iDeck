@@ -33,7 +33,6 @@
 - Wine no longer writes the err:ole and err:winediag lines it repeats on every COM call; copied logs keep a line at most twice.
 
 ### Builds
-- The IPA now carries iDeck's entitlements in its executables (ad-hoc signature). iloader, SideStore, AltStore and Sideloadly read them to enable Extended Virtual Addressing and Increased Memory Limit on the App ID; the unsigned IPA asked for neither.
 - Every IPA built by iOS Build includes the Madeira runtime and Wine Mono: the Require Madeira runtime and Wine Mono options are gone, and so is Settings' note about Wine Mono not being included.
 
 ### Release
