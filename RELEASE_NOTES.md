@@ -1,6 +1,10 @@
 ## What's Changed
-### Diagnostics for iPhones without extended virtual addressing
-- On a 63 GB address map Wine still stops right after it connects to wineserver (in `server_pipe`, while the first thread sets up its pipes), even with the 2.7.4 limit. The SIGSEGV handler that catches it on iOS belongs to wineserver and only printed "wineserver crashed". It now also logs an `[ideck-fault]` line with the faulting address, PC, LR, SP, ESR and FAR, and catches SIGBUS too, so the next log names the exact memory access that fails.
+### Steam: uninstall and leftover downloads
+- A Steam download that failed (for example when the device ran out of space) or was stopped left its files behind, and the game page offered only Install, so the space could not be freed. The page now shows **Delete downloaded files** whenever such files exist, and removes the game folder, the download journal and the manifest.
+- The Uninstall button no longer does nothing when the Windows environment is not ready yet: it says so.
+
+### Diagnostics
+- The `[ideck-fault]` crash line from 2.7.5 stays.
 
 ### Version
-- Updated the application version to 2.7.5 (build 95).
+- Updated the application version to 2.7.6 (build 96).

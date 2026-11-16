@@ -416,6 +416,45 @@ final class SteamOwnedGamesModel: ObservableObject {
         return !isInstalled(appID: appID, prefixPath: prefixPath)
     }
 
+    /// Files a failed or stopped download left behind: the download journal,
+    /// the manifest or the game's folder, while the game is not installed.
+    func hasLeftoverFiles(appID: UInt32, prefixPath: URL) -> Bool {
+        guard !installingApps.contains(appID), !isInstalled(appID: appID, prefixPath: prefixPath) else { return false }
+        let fm = FileManager.default
+        let steamApps = SteamInstallPaths.steamApps(drive: prefixPath.appendingPathComponent("drive_c", isDirectory: true))
+        if fm.fileExists(atPath: steamApps.appendingPathComponent("downloading/\(appID)").path) ||
+           fm.fileExists(atPath: steamApps.appendingPathComponent("appmanifest_\(appID).acf").path) { return true }
+        guard let folder = leftoverFolderName(appID: appID, steamApps: steamApps) else { return false }
+        return fm.fileExists(atPath: steamApps.appendingPathComponent("common/" + folder).path)
+    }
+
+    /// Deletes what hasLeftoverFiles found. Returns true when nothing is left.
+    func deleteLeftoverFiles(appID: UInt32, prefixPath: URL) -> Bool {
+        guard !installingApps.contains(appID) else { return false }
+        let steamApps = SteamInstallPaths.steamApps(drive: prefixPath.appendingPathComponent("drive_c", isDirectory: true))
+        if let folder = leftoverFolderName(appID: appID, steamApps: steamApps) {
+            SteamInstallFiles.delete(appID: Int(appID), folderName: folder, steamApps: steamApps)
+        } else {
+            try? FileManager.default.removeItem(at: steamApps.appendingPathComponent("downloading/\(appID)", isDirectory: true))
+            try? FileManager.default.removeItem(at: steamApps.appendingPathComponent("appmanifest_\(appID).acf"))
+        }
+        downloadProgress.removeValue(forKey: appID)
+        downloadErrors.removeValue(forKey: appID)
+        installedSizes.removeValue(forKey: appID)
+        AppLog.record("[steam-install] deleted leftover files app=\(appID)")
+        return !hasLeftoverFiles(appID: appID, prefixPath: prefixPath)
+    }
+
+    private func leftoverFolderName(appID: UInt32, steamApps: URL) -> String? {
+        let owned = steamApps.appendingPathComponent("downloading/\(appID)/.ideck-owned-folder")
+        if let name = try? String(contentsOf: owned, encoding: .utf8)
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+           !name.isEmpty, !name.contains("/"), !name.contains("\\") { return name }
+        if let dir = games.first(where: { $0.appID == appID })?.installDir,
+           !dir.isEmpty, !dir.contains("/"), !dir.contains("\\") { return dir }
+        return nil
+    }
+
     func install(appID: UInt32, prefixPath: URL) async {
         guard !installingApps.contains(appID) else { return }
         if AntiCheatPolicy.isBlocked(title: games.first(where: { $0.appID == appID })?.name ?? "", steamAppID: appID) {

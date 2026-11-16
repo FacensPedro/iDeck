@@ -166,6 +166,7 @@ enum Translations {
         "Pause download": ["pt": "Pausar download", "es": "Pausar descarga"],
         "Download paused": ["pt": "Download pausado", "es": "Descarga pausada"],
         "Stop download": ["pt": "Parar download", "es": "Detener descarga"],
+        "Delete downloaded files": ["pt": "Apagar arquivos baixados", "es": "Borrar archivos descargados"],
         "Stopping...": ["pt": "Parando...", "es": "Deteniendo..."],
         "Preparing download...": ["pt": "Preparando download...", "es": "Preparando descarga..."],
         "Finishing installation...": ["pt": "Finalizando instalação...", "es": "Finalizando instalación..."],

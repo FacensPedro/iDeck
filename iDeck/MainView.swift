@@ -1377,7 +1377,10 @@ private struct SteamProgramDetailsView: View {
                         }
                         .buttonStyle(.borderedProminent)
                         Button(role: .destructive) {
-                            guard let prefixPath else { return }
+                            guard let prefixPath else {
+                                presentError(tr("Windows environment is not ready."))
+                                return
+                            }
                             if steamLibrary.uninstall(appID: game.appID, prefixPath: prefixPath) {
                                 library.removeProfile(for: "steam:\(game.appID)")
                                 dismiss()
@@ -1406,6 +1409,20 @@ private struct SteamProgramDetailsView: View {
                         }
                         .buttonStyle(.borderedProminent)
                         .disabled(prefixPath == nil || !game.installableOnWindows)
+                        // A failed or stopped download leaves its files behind; without
+                        // this the only way to get the space back was to install again.
+                        if let prefixPath, steamLibrary.hasLeftoverFiles(appID: game.appID, prefixPath: prefixPath) {
+                            Button(role: .destructive) {
+                                if !steamLibrary.deleteLeftoverFiles(appID: game.appID, prefixPath: prefixPath) {
+                                    presentError(tr("Could not remove this game's files."))
+                                }
+                            } label: {
+                                Label(tr("Delete downloaded files"), systemImage: "trash")
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 12)
+                            }
+                            .buttonStyle(.bordered)
+                        }
                     }
 
                     if let error = steamLibrary.downloadErrors[game.appID] {
