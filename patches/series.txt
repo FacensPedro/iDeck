@@ -36,6 +36,8 @@ native    .      madeira-arm64-getprocaddress-native.patch
 native    .      madeira-iat-life-pe32-skip.patch
 native    .      madeira-jit-alias-lifecycle.patch
 native    .      madeira-iat-jit-sync-after-bind.patch
+native    .      madeira-ec-bind-slot-sync.patch
+native    FEX    fex-ios-alias-table-1024.patch
 
 # Repeated Wine sessions in one app run
 session   .      madeira-repeat-wine-sessions.patch

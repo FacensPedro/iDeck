@@ -1,0 +1,19 @@
+diff --git a/Source/Windows/ARM64EC/IosJitAlias.cpp b/Source/Windows/ARM64EC/IosJitAlias.cpp
+index eef48750c..e80561a37 100644
+--- a/Source/Windows/ARM64EC/IosJitAlias.cpp
++++ b/Source/Windows/ARM64EC/IosJitAlias.cpp
+@@ -32,7 +32,13 @@ struct IosAliasEntry {
+   uint64_t Size;
+   uint64_t _Padding;  // Keeps the struct 32-byte to make array stride a power of 2.
+ };
+-constexpr int kMaxEntries = 256;
++/* iDeck: 256 was too few for the Steam client (steamclient64.dll and its
++ * dependencies besides every system DLL): once full, a new image got no entry,
++ * IosJitReverseTranslate could not map its pool-copy addresses back, and
++ * dockhost.exe's TLS callbacks reached CompileBlock with a pool address as the
++ * guest RIP ([JITPOOL_RIP] HOST PC LEAKED INTO STATE.RIP). The walks stop at
++ * IosAliasCount, so only the storage grows (32 KB). */
++constexpr int kMaxEntries = 1024;
+ 
+ // extern "C" storage (not anonymous-namespace) so Module.S's ExitFunctionEC
+ // can reach the table via adrp/:lo12: — it translates the branch target
