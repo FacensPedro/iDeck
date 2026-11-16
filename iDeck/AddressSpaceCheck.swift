@@ -3,8 +3,9 @@ import Foundation
 
 /// Whether iOS gives this process the extended address space Madeira's guest
 /// window needs ([0x7000000000, 0x7400000000)). Without the extended
-/// virtual addressing entitlement the process stops at 64 GB, the guest
-/// window cannot exist and wineserver crashes right after Wine starts.
+/// virtual addressing entitlement the process stops at 63 GB; games still
+/// launch, as in Madeira, with the JIT pool's RW alias placed lower and a
+/// smaller pool.
 enum AddressSpaceCheck {
     static let guestWindow: vm_address_t = 0x70_0000_0000
 
@@ -58,7 +59,6 @@ enum AddressSpaceCheck {
         return "max address \(top), extended addressing \(profile), increased memory limit \(memory)"
     }
 
-    static let message = "Execution Error: iOS did not give iDeck the extended memory address space Windows games need. Sign iDeck again with the extended virtual addressing entitlement (com.apple.developer.kernel.extended-virtual-addressing) and reopen it."
 }
 
 /// Memory+: the two memory capabilities Windows games need from iOS, and how a

@@ -1,6 +1,9 @@
 ## What's Changed
-### Wine Mono
-- Wine Mono is no longer included in the IPA. It is downloaded and installed only by the initial setup, on the device.
+### Memory+
+- Games no longer stop with "iOS did not give iDeck the extended memory address space" when the signing profile lacks extended virtual addressing (iPhones signed with a free Apple ID). As in Madeira, only the increased memory limit is required: on the standard 63 GB address map the JIT pool's memory is placed lower and the pool is kept smaller.
+
+### JIT
+- The log now says "opening StikDebug" before StikDebug is asked to open, instead of "StikDebug opened".
 
 ### Version
-- Updated the application version to 2.7.2 (build 92).
+- Updated the application version to 2.7.3 (build 93).
