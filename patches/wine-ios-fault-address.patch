@@ -1,12 +1,10 @@
 diff --git a/server/signal.c b/server/signal.c
 --- a/server/signal.c
 +++ b/server/signal.c
-@@ -223,6 +223,25 @@ static void do_sigchld( int signum )
- }
-
+@@ -225,4 +225,22 @@ static void do_sigchld( int signum )
  /* SIGSEGV handler */
 +#if defined(WINE_IOS) && defined(__aarch64__)
-+#include <ucontext.h>
++#include <sys/ucontext.h>
 +/* iDeck: the handler is process-wide on iOS (wineserver runs in-process), so a
 + * fault in any Wine thread lands here. Say where it happened before aborting. */
 +static void do_sigsegv_info( int signum, siginfo_t *info, void *ctx )
@@ -26,7 +24,7 @@ diff --git a/server/signal.c b/server/signal.c
  static void do_sigsegv( int signum )
  {
      fprintf( stderr, "wineserver crashed, please enable coredumps (ulimit -c unlimited) and restart.\n");
-@@ -309,6 +328,13 @@ void init_signals(void)
+@@ -309,6 +327,13 @@ void init_signals(void)
      {
          action.sa_handler = do_sigsegv;
          sigaction( SIGSEGV, &action, NULL );
