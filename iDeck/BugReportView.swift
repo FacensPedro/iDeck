@@ -466,7 +466,7 @@ final class BugReportModel: ObservableObject {
             "Memory: \(physical) MiB physical, \(ResourceGovernor.availableMiB()) MiB still allowed by iOS",
             "iDeck RAM now: " + (currentMiB >= 0 ? "\(currentMiB) MiB" : "unavailable"),
             (defaults.bool(forKey: "diagnostics.kernelPeak") ? "Last game session, iOS peak iDeck RAM: " : "Last game session, highest sampled iDeck RAM: ") + (peakMiB.map { "\($0) MiB" } ?? "unavailable"),
-            "Memory+: increased limit \(name(MemoryPlus.increasedLimit)), extended addressing \(name(MemoryPlus.extendedAddressing))",
+            "Memory+: increased limit \(name(MemoryPlus.increasedLimit)), extended addressing \(name(MemoryPlus.extendedAddressing)) (\(AddressSpaceCheck.diagnostics))",
             "JIT: method \(defaults.string(forKey: SystemCoordinator.jitMethodKey) ?? "stikdebug"), pool \(pool)",
             "Windows runtime: x64 \(MadeiraRuntime.installed("wine-x64") ? "installed" : "missing"), x86 \(MadeiraRuntime.installed("wine-x86") ? "installed" : "missing")",
             "Device language: \(Locale.preferredLanguages.first ?? "unknown")"
