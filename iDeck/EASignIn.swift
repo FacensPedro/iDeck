@@ -4,6 +4,7 @@
 // The EA sign-in sheet from Madeira's EAGames.swift (8b52c18), unchanged.
 
 import SwiftUI
+import AuthenticationServices
 import WebKit
 
 // MARK: - Sign-in
@@ -20,6 +21,14 @@ struct EASignInView: View {
     @State private var pasting = false
     @State private var pasted = ""
     @State private var reload = 0
+    @State private var inApp = false
+    @State private var opened = false
+
+    private func openSafari() {
+        SafariSignIn.shared.start(EALibrary.shared.loginURL(), callbackScheme: "qrc") { url in
+            if let url { submit(url.absoluteString) }
+        }
+    }
 
     var body: some View {
         NavigationStack {
@@ -29,7 +38,7 @@ struct EASignInView: View {
                         LabeledContent("Signed in as", value: ea.accountName ?? "EA account")
                         Button("Sign out", role: .destructive) { ea.signOut() }
                     }
-                } else {
+                } else if inApp {
                     EALoginWebView(reload: reload) { code in submit(code) }
                         .ignoresSafeArea(edges: .bottom)
                         .overlay {
@@ -38,6 +47,17 @@ struct EASignInView: View {
                                     .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
                             }
                         }
+                } else {
+                    Form {
+                        Section {
+                            Button { openSafari() } label: { Label(tr("Sign in with Safari"), systemImage: "safari") }
+                                .disabled(busy)
+                        } footer: {
+                            Text(tr("EA's login page opens in Safari and returns to iDeck by itself when you finish."))
+                        }
+                        if busy { Section { HStack(spacing: 12) { ProgressView(); Text("Signing in…") } } }
+                    }
+                    .onAppear { if !opened { opened = true; openSafari() } }
                 }
             }
             .navigationTitle("EA app").navigationBarTitleDisplayMode(.inline)
@@ -47,6 +67,8 @@ struct EASignInView: View {
                     ToolbarItem(placement: .primaryAction) {
                         Menu {
                             Button("Paste the sign-in address", systemImage: "doc.on.clipboard") { pasted = ""; pasting = true }
+                            Button(inApp ? tr("Sign in with Safari") : tr("Use the page inside iDeck"),
+                                   systemImage: inApp ? "safari" : "rectangle.inset.filled") { inApp.toggle() }
                             Button("Reload", systemImage: "arrow.clockwise") { reload += 1 }
                         } label: { Label("More", systemImage: "ellipsis.circle") }
                     }
@@ -149,6 +171,79 @@ struct EALoginWebView: UIViewRepresentable {
                      for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
             if navigationAction.targetFrame == nil { webView.load(navigationAction.request) }
             return nil
+        }
+    }
+}
+
+// MARK: - Safari sign-in (iDeck 2.7.1)
+
+
+/// Opens a store's login page in Safari's sign-in sheet (ASWebAuthenticationSession).
+/// It shares Safari's saved passwords, passkeys and existing sessions, and closes
+/// itself when the page navigates to `callbackScheme` (EA's qrc: address).
+@MainActor
+final class SafariSignIn: NSObject, ASWebAuthenticationPresentationContextProviding {
+    static let shared = SafariSignIn()
+    private var session: ASWebAuthenticationSession?
+
+    func start(_ url: URL, callbackScheme: String, completion: @escaping (URL?) -> Void) {
+        session?.cancel()
+        let session = ASWebAuthenticationSession(url: url, callbackURLScheme: callbackScheme) { callback, _ in
+            DispatchQueue.main.async { completion(callback) }
+        }
+        session.presentationContextProvider = self
+        session.prefersEphemeralWebBrowserSession = false
+        self.session = session
+        if !session.start() { completion(nil) }
+    }
+
+    nonisolated func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
+        MainActor.assumeIsolated {
+            UIApplication.shared.connectedScenes.compactMap { ($0 as? UIWindowScene)?.keyWindow }.first ?? ASPresentationAnchor()
+        }
+    }
+}
+
+/// Sign-in that opens the store's page in Safari. Stores whose login ends on their
+/// own https address (GOG, Epic) cannot hand the code back to an app, so the page
+/// address (GOG) or the code text (Epic) is copied in Safari and pasted here.
+struct SafariPasteSignIn: View {
+    let store: String
+    let openURL: URL
+    let steps: [String]
+    let placeholder: String
+    let busy: Bool
+    let submit: (String) -> Void
+    @State private var pasted = ""
+
+    var body: some View {
+        Form {
+            Section {
+                Button {
+                    UIApplication.shared.open(openURL)
+                } label: {
+                    Label(String(format: tr("Open %@ in Safari"), store), systemImage: "safari")
+                }
+            }
+            Section(tr("After signing in")) {
+                ForEach(Array(steps.enumerated()), id: \.offset) { index, step in
+                    Text("\(index + 1). " + tr(step)).font(.callout)
+                }
+                TextField(placeholder, text: $pasted, axis: .vertical)
+                    .autocorrectionDisabled().textInputAutocapitalization(.never)
+                    .lineLimit(1...4)
+                PasteButton(payloadType: String.self) { strings in
+                    if let text = strings.first {
+                        pasted = text
+                        submit(text)
+                    }
+                }
+                Button(tr("Sign in")) { submit(pasted) }
+                    .disabled(busy || pasted.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+            if busy {
+                Section { HStack(spacing: 12) { ProgressView(); Text(tr("Signing in…")) } }
+            }
         }
     }
 }

@@ -12,7 +12,7 @@ import UIKit
 struct SteamSignInView: View {
     @ObservedObject private var steam = SteamSignInModel.shared
     @Environment(\.dismiss) private var dismiss
-    @State private var method: SteamSignInModel.SignInMethod = UIDevice.current.userInterfaceIdiom == .pad ? .qr : .password
+    @State private var method: SteamSignInModel.SignInMethod = .qr
     @State private var account = ""
     @State private var password = ""
     @State private var code = ""
@@ -146,7 +146,7 @@ struct SteamSignInView: View {
                 Text("On another device, open the Steam app, go to Steam Guard, and scan this code.")
                 if let link = steam.qrLink {
                     Button { UIApplication.shared.open(link) } label: {
-                        Label("Open in the Steam app on this device", systemImage: "arrow.up.forward.app")
+                        Label("Approve in Safari or the Steam app", systemImage: "safari")
                     }
                 }
                 HStack(spacing: 12) { ProgressView(); Text("Waiting for approval…").foregroundStyle(.secondary) }
