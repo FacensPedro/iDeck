@@ -1,4 +1,16 @@
 ## What's Changed
+### Store sign-in
+- EA app: sign-in opens EA's login page in Safari's sign-in sheet, with Safari's saved passwords and passkeys, and comes back to iDeck by itself.
+- GOG and Epic Games: sign-in opens the store's page in Safari. GOG's success page address, or the text Epic shows, is pasted back in iDeck (a Paste button does it in one tap). The page inside iDeck stays available from the menu.
+- Steam: the QR code is the default on every device, and its approval link opens in Safari or the Steam app.
+
+### Builds
+- The IPA carries iDeck's entitlements in its executables (ad-hoc signature). iloader, SideStore, AltStore and Sideloadly read them to enable Extended Virtual Addressing and Increased Memory Limit on the App ID; the unsigned IPA asked for neither.
+
+### Release
+- Updated the application version to 2.7.1 (build 91).
+
+## What's Changed
 ### Controllers
 - New default controller API, "By controller": a DualSense or DualShock 4 reaches the game as a DualSense over HID; an Xbox One/Series, Xbox 360-style or other pad as an Xbox controller (XInput).
 - DualSense and DualShock 4 over HID now send touchpad finger positions and motion (gyro and accelerometer), not only the touchpad click.

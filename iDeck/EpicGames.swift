@@ -14,6 +14,8 @@ struct EpicSignInView: View {
     @State private var pasting = false
     @State private var pasted = ""
     @State private var reload = 0
+    @State private var inApp = false
+    @State private var opened = false
 
     var body: some View {
         NavigationStack {
@@ -23,6 +25,13 @@ struct EpicSignInView: View {
                         LabeledContent(tr("Signed in as"), value: epic.accountName ?? "Epic Games account")
                         Button(tr("Sign out"), role: .destructive) { epic.signOut() }
                     }
+                } else if !inApp {
+                    SafariPasteSignIn(store: "Epic Games", openURL: EpicAPI.loginURL,
+                                      steps: ["Sign in on Epic's page in Safari.",
+                                              "Epic then shows a short text with \"authorizationCode\": copy all of it.",
+                                              "Come back to iDeck and paste it here."],
+                                      placeholder: "authorizationCode", busy: busy) { submit($0) }
+                        .onAppear { if !opened { opened = true; UIApplication.shared.open(EpicAPI.loginURL) } }
                 } else {
                     EpicLoginWebView(reload: reload) { code in submit(code) }
                         .ignoresSafeArea(edges: .bottom)
@@ -42,6 +51,8 @@ struct EpicSignInView: View {
                         Menu {
                             Button(tr("Paste a sign-in code"), systemImage: "doc.on.clipboard") { pasted = ""; pasting = true }
                             Link(destination: EpicAPI.loginURL) { Label(tr("Open the login page in Safari"), systemImage: "safari") }
+                            Button(inApp ? tr("Sign in with Safari") : tr("Use the page inside iDeck"),
+                                   systemImage: inApp ? "safari" : "rectangle.inset.filled") { inApp.toggle() }
                             Button(tr("Reload"), systemImage: "arrow.clockwise") { reload += 1 }
                         } label: { Label(tr("More"), systemImage: "ellipsis.circle") }
                     }
