@@ -1,9 +1,6 @@
 ## What's Changed
-### Memory+
-- Games no longer stop with "iOS did not give iDeck the extended memory address space" when the signing profile lacks extended virtual addressing (iPhones signed with a free Apple ID). As in Madeira, only the increased memory limit is required: on the standard 63 GB address map the JIT pool's memory is placed lower and the pool is kept smaller.
-
-### JIT
-- The log now says "opening StikDebug" before StikDebug is asked to open, instead of "StikDebug opened".
+### iPhones without extended virtual addressing
+- Fixed the crash right after Wine started on a 63 GB address map (iPhone 15 signed without extended virtual addressing). Wine believed the map ended at 64 GB, placed the first thread's TEB in the last 128 KB below the real 0xfc0000000 ceiling, and crashed in `server_pipe` while setting up the thread. Wine now keeps 1 GB below the kernel's real ceiling on such maps.
 
 ### Version
-- Updated the application version to 2.7.3 (build 93).
+- Updated the application version to 2.7.4 (build 94).
