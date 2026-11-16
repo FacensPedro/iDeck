@@ -719,6 +719,16 @@ enum DockInstallers {
             || process.run.name.lowercased().contains("ubisoft connect") || process.run.name.lowercased().contains("uplay")
     }
 
+    /// iDeck: a Microsoft Visual C++ redistributable. iDeck already links its VC++ runtimes
+    /// (2005-2022, x86 and x64, side-by-side included) into every prefix at session start.
+    nonisolated static func isVCRedist(_ process: SteamInstallProcess) -> Bool {
+        let file = (process.executable.split(separator: "\\").last.map(String.init) ?? "").lowercased()
+        let name = process.run.name.lowercased()
+        return file.hasPrefix("vcredist") || file.hasPrefix("vc_redist") || file.hasPrefix("vcrun")
+            || process.executable.lowercased().contains("\\_commonredist\\vcredist\\")
+            || name.contains("visual c++") || name.contains("vc++") || name.contains("vcredist")
+    }
+
     nonisolated static var bundleHas32Bit: Bool { bundled("i386-windows") }
     nonisolated static var bundleHasMsiexec: Bool {
         ["aarch64-windows", "arm64ec-windows", "i386-windows"].contains { bundled($0 + "/msiexec.exe") }
@@ -921,6 +931,15 @@ enum DockInstallers {
             pending.removeAll { Self.isUbisoftConnect($0) }
             LogStore.shared.log("[dock-installers] app=\(app) Ubisoft Connect skipped: iDeck does not run Ubisoft's launcher; "
                 + "the game starts without it, as a GOG game does without GOG Galaxy")
+        }
+        // iDeck: Visual C++ redistributables are left out as DXSETUP is: iDeck links its own
+        // VC++ runtimes into the prefix, and the installers hung or crashed on device
+        // (Black Flag's 2008 SP1 x86/x64, 2026-11-16), leaving the Dock on "installing".
+        let vcRedist = pending.filter { Self.isVCRedist($0) }
+        if !vcRedist.isEmpty {
+            pending.removeAll { Self.isVCRedist($0) }
+            LogStore.shared.log("[dock-installers] app=\(app) Visual C++ redistributables skipped (\(vcRedist.count)): "
+                + "iDeck's bundled VC++ runtimes are used")
         }
         var ledger = DockInstallLedger.load(prefix: prefix)
         // Programs the game's last batch started but never saw exit (absorbResults).
