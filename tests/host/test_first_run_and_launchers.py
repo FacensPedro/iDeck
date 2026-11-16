@@ -29,7 +29,7 @@ class FirstRunLaunchersContract(unittest.TestCase):
         self.assertIn("programs/cmd/arm64ec-windows/cmd.exe", build)
         for source in (stage, verify, kit):
             self.assertIn("arm64ec-windows/cmd.exe", source)
-        self.assertIn("IDECK_BUNDLE_WINE_MONO: ${{ ((github.event_name == 'workflow_dispatch')", workflow)
+        self.assertIn("IDECK_BUNDLE_WINE_MONO: '0'", workflow)
         self.assertIn("dockInstallAfterPrefix", coordinator)
         self.assertIn("steamComponentsProgress = ", coordinator)
 
