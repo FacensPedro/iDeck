@@ -1353,14 +1353,14 @@ private struct SteamProgramDetailsView: View {
                                     steamLibrary.resumeInstall(appID: game.appID)
                                 } label: {
                                     Label(tr("Resume"), systemImage: "play.fill")
-                                        .frame(maxWidth: .infinity)
+                                        .downloadControlLabel()
                                 }
                                 .buttonStyle(.borderedProminent)
                                 Button(role: .destructive) {
                                     steamLibrary.cancelInstall(appID: game.appID)
                                 } label: {
                                     Label(tr("Stop download"), systemImage: "stop.fill")
-                                        .frame(maxWidth: .infinity)
+                                        .downloadControlLabel()
                                 }
                                 .buttonStyle(.bordered)
                             }
@@ -1566,7 +1566,7 @@ private struct SteamProgramDetailsView: View {
                         steamLibrary.pauseInstall(appID: game.appID)
                     } label: {
                         Label(tr("Pause download"), systemImage: "pause.fill")
-                            .frame(maxWidth: .infinity)
+                            .downloadControlLabel()
                     }
                     .disabled(stopping)
                     .buttonStyle(.bordered)
@@ -1574,7 +1574,7 @@ private struct SteamProgramDetailsView: View {
                         steamLibrary.cancelInstall(appID: game.appID)
                     } label: {
                         Label(stopping ? tr("Stopping...") : tr("Stop download"), systemImage: "stop.fill")
-                            .frame(maxWidth: .infinity)
+                            .downloadControlLabel()
                     }
                     .disabled(stopping)
                     .buttonStyle(.bordered)
@@ -1911,13 +1911,13 @@ private struct StoreGameDetailsView<Extra: View>: View {
                     if let onPause {
                         Button(action: onPause) {
                             Label(tr("Pause download"), systemImage: "pause.fill")
-                                .frame(maxWidth: .infinity)
+                                .downloadControlLabel()
                         }
                         .buttonStyle(.bordered)
                     }
                     Button(role: .destructive, action: onStop) {
                         Label(tr("Stop download"), systemImage: "stop.fill")
-                            .frame(maxWidth: .infinity)
+                            .downloadControlLabel()
                     }
                     .buttonStyle(.bordered)
                 }
@@ -1949,15 +1949,13 @@ private struct StoreGameDetailsView<Extra: View>: View {
                 Button(action: onInstall) {
                     Label(tr(paused ? "Resume" : "Install"),
                           systemImage: paused ? "play.circle.fill" : "arrow.down.circle.fill")
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
+                        .downloadControlLabel()
                 }
                 .buttonStyle(.borderedProminent)
                 if paused || errorText != nil {
                     Button(role: .destructive, action: onStop) {
                         Label(tr("Stop download"), systemImage: "stop.fill")
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
+                            .downloadControlLabel()
                     }
                     .buttonStyle(.bordered)
                 }
@@ -3128,5 +3126,16 @@ struct AntiCheatBlockedButton: View {
                 .foregroundColor(.gray)
                 .multilineTextAlignment(.center)
         }
+    }
+}
+
+
+/// Download controls (Pause, Stop, Resume) share one fixed size side by side.
+private extension View {
+    func downloadControlLabel() -> some View {
+        self.lineLimit(1)
+            .minimumScaleFactor(0.7)
+            .frame(maxWidth: .infinity)
+            .frame(height: 44)
     }
 }

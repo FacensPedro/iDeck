@@ -1,6 +1,6 @@
 ## What's Changed
 ### Downloads in every store (Steam, GOG, Epic Games, EA app)
-- **Pause download** and **Stop download** sit side by side on the game page. Pause keeps the files; Resume continues from them.
+- **Pause download** and **Stop download** sit side by side on the game page, with the same fixed size (as do Resume and Stop). Pause keeps the files; Resume continues from them.
 - **Stop download** uninstalls the game: it ends the download and removes its files. A first install loses its partial files, and an installed game whose update or repair is stopped is uninstalled.
 - A paused or failed download shows **Stop download** next to **Resume**/**Install**, so its files can be removed (Steam also offers **Delete downloaded files**).
 
