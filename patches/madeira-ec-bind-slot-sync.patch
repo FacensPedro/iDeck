@@ -1,0 +1,22 @@
+diff --git a/wine/dlls/ntdll/loader.c b/wine/dlls/ntdll/loader.c
+index f9f412be3d..6e70b6fe0b 100644
+--- a/wine/dlls/ntdll/loader.c
++++ b/wine/dlls/ntdll/loader.c
+@@ -1529,6 +1529,17 @@ static BOOL import_dll( WINE_MODREF *wm, const IMAGE_IMPORT_DESCRIPTOR *descr, L
+                 thunk_list->u1.Function = (ULONG_PTR)arm64ec_redirect_ptr( imp_mod,
+                                                                            (void *)thunk_list->u1.Function,
+                                                                            imp_metadata );
++                /* iDeck: copy a redirected slot into the image's JIT-pool copy right
++                 * away. Code reads the IAT PC-relatively from the pool copy, which was
++                 * taken at map time and still held the x64 thunk ([ec-bind] POOL STALE:
++                 * combase/ole32 -> rpcrt4!NdrClientCall2 reached the EC->x64 exit
++                 * thunk). The bulk IAT sync in fixup_imports does not cover a bind
++                 * done outside it, so each redirect is synced at the write. */
++                if (pre != (void *)thunk_list->u1.Function)
++                {
++                    struct ios_sync_pe_write_params sync = { &thunk_list->u1.Function, sizeof(ULONG_PTR), 0 };
++                    WINE_UNIX_CALL( unix_ios_sync_pe_write, &sync );
++                }
+                 /* iOS-Madeira ml230: does the EC->EC import bind actually land on native
+                  * code, and is that code MARKED EC?
+                  *
