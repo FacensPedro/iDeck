@@ -604,8 +604,21 @@ enum GameRecommendations {
         env.MADEIRA_EC_HOOK_TRACE = 0
         """)
 
+    /// Assassin's Creed IV Black Flag (242050), 32-bit (2026-11-16): with d3d9 left on
+    /// DXMT the game died while d3d9.dll loaded, as the forwarder's debug message
+    /// (40010006) came back through the WoW64 exception path with no context. Wine's
+    /// wined3d does not go through that forwarder.
+    static let blackFlag = GameRecommendation(
+        id: "ac4-black-flag", title: "Assassin's Creed IV Black Flag", version: 1,
+        config: """
+        # Madeira's recommended settings for Assassin's Creed IV Black Flag.
+        # Reset to Recommended, at the bottom of the game's settings, brings them back.
+        d3d9 = wined3d
+        env.MADEIRA_EC_HOOK_TRACE = 0
+        """)
+
     static let all = [rdr2Steam, rdr2Other, gta5EnhancedSteam, gta5EnhancedOther, ghostOfTsushima, godOfWar, horizonZeroDawn,
-                      darkSoulsRemastered, darkSoulsIII, dragonAgeInquisition, falloutNewVegas, fallout3, blackOps2, crashBandicootNSane, standard]
+                      darkSoulsRemastered, darkSoulsIII, dragonAgeInquisition, falloutNewVegas, fallout3, blackOps2, blackFlag, crashBandicootNSane, standard]
 
     // MARK: Recognising a game
 
@@ -616,6 +629,7 @@ enum GameRecommendations {
     /// Black Ops II's campaign, Zombies and multiplayer.
     static let blackOps2AppIDs: Set<Int> = [202970, 212910, 202990]
     static let crashBandicootNSaneAppID = 731490
+    static let blackFlagAppID = 242050
 
     /// The recommendation for a game, or nil.
     /// - windowsPath: a program ("C:\Games\GoW\GoW.exe"), or a library Steam
@@ -644,6 +658,7 @@ enum GameRecommendations {
                 || installFolder == "fallout 3 goty" { return fallout3 }
             if blackOps2AppIDs.contains(steamAppID ?? 0) || installFolder == "call of duty black ops ii" { return blackOps2 }
             if steamAppID == crashBandicootNSaneAppID || installFolder == "crash bandicoot - n sane trilogy" { return crashBandicootNSane }
+            if steamAppID == blackFlagAppID || installFolder == "assassin's creed iv black flag" { return blackFlag }
             return nil
         }
         // A program, wherever it was installed: only the game's own programs, so a
@@ -678,6 +693,8 @@ enum GameRecommendations {
             return blackOps2
         case "crashbandicootnsanetrilogy.exe":
             return crashBandicootNSane
+        case "ac4bfsp.exe":
+            return blackFlag
         default:
             return nil
         }

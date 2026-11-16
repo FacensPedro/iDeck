@@ -1,6 +1,6 @@
 ## What's Changed
-### Steam one-time installs
-- A game's Microsoft Visual C++ redistributables (for example Assassin's Creed IV Black Flag's 2008 SP1 x86 and x64) are no longer run before the game. On the device they crashed or never closed, so iDeck kept saying it was installing them while nothing was installed. iDeck already puts its own Visual C++ runtimes (2005 to 2022, 32- and 64-bit) into every prefix, so the game uses those, as it already did for DirectX setup.
+### Assassin's Creed IV Black Flag
+- Black Flag now gets its own recommended settings, which run Direct3D 9 on Wine's wined3d. With the default DXMT path the game closed while d3d9.dll was loading: a debug message from the d3d9 loader went back through the 32-bit exception path and the process ended before the game window opened. Reset to Recommended in the game's settings applies the list to an existing install.
 
 ### Version
-- Updated the application version to 2.8.1 (build 98).
+- Updated the application version to 2.8.2 (build 99).
