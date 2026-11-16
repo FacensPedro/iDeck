@@ -4,8 +4,6 @@
 // The EA sign-in sheet from Madeira's EAGames.swift (8b52c18), unchanged.
 
 import SwiftUI
-import AuthenticationServices
-import WebKit
 
 // MARK: - Sign-in
 
@@ -20,15 +18,11 @@ struct EASignInView: View {
     @State private var failure: String?
     @State private var pasting = false
     @State private var pasted = ""
-    @State private var reload = 0
-    @State private var inApp = false
     @State private var opened = false
 
-    private func openSafari() {
-        SafariSignIn.shared.start(EALibrary.shared.loginURL(), callbackScheme: "qrc") { url in
-            if let url { submit(url.absoluteString) }
-        }
-    }
+    /// EA's login page in Safari (outside iDeck). EA ends on qrc:///…?code=, an address
+    /// iDeck is registered for, so Safari hands it back to iDeck (iDeckApp.onOpenURL).
+    private func openSafari() { UIApplication.shared.open(EALibrary.shared.loginURL()) }
 
     var body: some View {
         NavigationStack {
@@ -38,15 +32,6 @@ struct EASignInView: View {
                         LabeledContent("Signed in as", value: ea.accountName ?? "EA account")
                         Button("Sign out", role: .destructive) { ea.signOut() }
                     }
-                } else if inApp {
-                    EALoginWebView(reload: reload) { code in submit(code) }
-                        .ignoresSafeArea(edges: .bottom)
-                        .overlay {
-                            if busy {
-                                ProgressView("Signing in…").padding(20)
-                                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
-                            }
-                        }
                 } else {
                     Form {
                         Section {
@@ -67,9 +52,6 @@ struct EASignInView: View {
                     ToolbarItem(placement: .primaryAction) {
                         Menu {
                             Button("Paste the sign-in address", systemImage: "doc.on.clipboard") { pasted = ""; pasting = true }
-                            Button(inApp ? tr("Sign in with Safari") : tr("Use the page inside iDeck"),
-                                   systemImage: inApp ? "safari" : "rectangle.inset.filled") { inApp.toggle() }
-                            Button("Reload", systemImage: "arrow.clockwise") { reload += 1 }
                         } label: { Label("More", systemImage: "ellipsis.circle") }
                     }
                 }
@@ -82,8 +64,11 @@ struct EASignInView: View {
                 Text("If the page shows an address that ends in login_successful.html with a code, copy that whole address and paste it here.")
             }
             .alert("EA app", isPresented: Binding(get: { failure != nil }, set: { if !$0 { failure = nil } })) {
-                Button("OK", role: .cancel) { failure = nil; reload += 1 }
+                Button("OK", role: .cancel) { failure = nil }
             } message: { Text(failure ?? "") }
+            .onReceive(NotificationCenter.default.publisher(for: EALibrary.redirectSignInFailed)) { note in
+                failure = note.object as? String
+            }
         }
     }
 
@@ -107,102 +92,29 @@ struct EASignInView: View {
     }
 }
 
-/// WKWebView with EA's login page, in a private (non-persistent) data store. The
-/// navigation to the EA app's private end-of-login address is stopped and handed on.
-struct EALoginWebView: UIViewRepresentable {
-    var reload: Int
-    var onCode: (String) -> Void
+// MARK: - Safari sign-in
 
-    func makeCoordinator() -> Coordinator { Coordinator(onCode: onCode) }
+extension EALibrary {
+    /// Posted with the error text when Safari's hand-back address could not sign in.
+    static let redirectSignInFailed = Notification.Name("iDeck.EASignInRedirectFailed")
 
-    func makeUIView(context: Context) -> WKWebView {
-        let config = WKWebViewConfiguration()
-        config.websiteDataStore = .nonPersistent()
-        let view = WKWebView(frame: .zero, configuration: config)
-        view.navigationDelegate = context.coordinator
-        view.uiDelegate = context.coordinator
-        view.load(URLRequest(url: EALibrary.shared.loginURL()))
-        context.coordinator.loadedReload = reload
-        return view
-    }
-
-    func updateUIView(_ view: WKWebView, context: Context) {
-        context.coordinator.onCode = onCode
-        if context.coordinator.loadedReload != reload {
-            context.coordinator.loadedReload = reload
-            context.coordinator.delivered = false
-            view.load(URLRequest(url: EALibrary.shared.loginURL()))
+    /// EA's end-of-login address (qrc:///html/login_successful.html?code=…) that
+    /// Safari opens in iDeck once the user signs in on EA's page.
+    static func handleSignInRedirect(_ url: URL) -> Bool {
+        guard url.scheme?.lowercased() == "qrc" else { return false }
+        guard let code = EAAPI.authorizationCode(in: url.absoluteString) else {
+            NotificationCenter.default.post(name: redirectSignInFailed,
+                                            object: "This is not an EA sign-in address. Copy the address of the page EA opens after you sign in.")
+            return true
         }
-    }
-
-    final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
-        var onCode: (String) -> Void
-        var loadedReload = 0
-        var delivered = false
-        init(onCode: @escaping (String) -> Void) { self.onCode = onCode }
-
-        func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
-                     decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
-            if let url = navigationAction.request.url, EAAPI.isRedirectPage(url) {
-                decisionHandler(.cancel)
-                deliver(url)
-                return
-            }
-            decisionHandler(.allow)
+        Task { @MainActor in
+            do { try await EALibrary.shared.signIn(code: code) }
+            catch { NotificationCenter.default.post(name: redirectSignInFailed, object: error.localizedDescription) }
         }
-
-        /// The private scheme could not load (the web view has no handler for it): its address has the code.
-        func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
-            if let url = (error as NSError).userInfo[NSURLErrorFailingURLErrorKey] as? URL, EAAPI.isRedirectPage(url) { deliver(url) }
-        }
-
-        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-            if let url = webView.url, EAAPI.isRedirectPage(url) { deliver(url) }
-        }
-
-        private func deliver(_ url: URL) {
-            guard !delivered, EAAPI.authorizationCode(in: url.absoluteString) != nil else { return }
-            delivered = true
-            onCode(url.absoluteString)
-        }
-
-        /// Links that open a new window load in this one.
-        func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
-                     for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
-            if navigationAction.targetFrame == nil { webView.load(navigationAction.request) }
-            return nil
-        }
+        return true
     }
 }
 
-// MARK: - Safari sign-in (iDeck 2.7.1)
-
-
-/// Opens a store's login page in Safari's sign-in sheet (ASWebAuthenticationSession).
-/// It shares Safari's saved passwords, passkeys and existing sessions, and closes
-/// itself when the page navigates to `callbackScheme` (EA's qrc: address).
-@MainActor
-final class SafariSignIn: NSObject, ASWebAuthenticationPresentationContextProviding {
-    static let shared = SafariSignIn()
-    private var session: ASWebAuthenticationSession?
-
-    func start(_ url: URL, callbackScheme: String, completion: @escaping (URL?) -> Void) {
-        session?.cancel()
-        let session = ASWebAuthenticationSession(url: url, callbackURLScheme: callbackScheme) { callback, _ in
-            DispatchQueue.main.async { completion(callback) }
-        }
-        session.presentationContextProvider = self
-        session.prefersEphemeralWebBrowserSession = false
-        self.session = session
-        if !session.start() { completion(nil) }
-    }
-
-    nonisolated func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
-        MainActor.assumeIsolated {
-            UIApplication.shared.connectedScenes.compactMap { ($0 as? UIWindowScene)?.keyWindow }.first ?? ASPresentationAnchor()
-        }
-    }
-}
 
 /// Sign-in that opens the store's page in Safari. Stores whose login ends on their
 /// own https address (GOG, Epic) cannot hand the code back to an app, so the page

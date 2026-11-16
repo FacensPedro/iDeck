@@ -13,7 +13,9 @@ class GOGIntegrationTests(unittest.TestCase):
         gog = read("iDeck/GOGLibrary.swift")
         self.assertIn('"https://auth.gog.com/auth"', gog)
         self.assertIn('static let redirectURI = "https://embed.gog.com/on_login_success?origin=client"', gog)
-        self.assertIn("configuration.websiteDataStore = .nonPersistent()", gog)
+        # Sign-in happens in Safari outside iDeck: no web view inside the app.
+        self.assertNotIn("WKWebView", gog)
+        self.assertIn("UIApplication.shared.open(GOGAPI.loginURL)", gog)
         self.assertIn("kSecAttrAccessibleWhenUnlockedThisDeviceOnly", gog)
         self.assertIn('URLQueryItem(name: "grant_type", value: "refresh_token")', gog)
         # Tokens are refreshed before expiry and never logged.

@@ -50,6 +50,8 @@ struct iDeckApp: App {
                 .preferredColorScheme(.dark)
                 // Remembered for launches prepared off the main thread (MetalFX size).
                 .onAppear { WindowsEnvironment.readScreenPixels() }
+                // Store sign-ins happen in Safari; EA's end-of-login address comes back here.
+                .onOpenURL { url in _ = EALibrary.handleSignInRedirect(url) }
         }
     }
 }

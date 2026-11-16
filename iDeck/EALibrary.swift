@@ -575,8 +575,13 @@ struct EAInstalledGame: Codable, Sendable {
         // not accept it starts EA's activation window, and only these facts say why.
         let facts = Self.activationFacts(activation, gameFolder: folder)
         UserDefaults.standard.set(facts + ", licence not prepared", forKey: Self.licenceFactsKey)
-        if activation.required {
-            guard !record.contentID.isEmpty else { throw EAAPIError.license("the game's content id is unknown") }
+        // As a GOG game runs offline when iDeck cannot answer as GOG Galaxy, a licence
+        // iDeck cannot prepare no longer stops the launch: the game starts and its own
+        // activation decides (EA's activation window, or the game runs).
+        if activation.required && record.contentID.isEmpty {
+            EALog.event("[ea-license] id=\(id): no content id; starting without a prepared licence")
+            UserDefaults.standard.set(facts + ", licence not prepared (no content id)", forKey: Self.licenceFactsKey)
+        } else if activation.required {
             Self.lastPreparedContentID = record.contentID
             // See hashVariantPrefix: variant 1 is the hash taken before Wine registered the
             // display adapter. The licence and the local service use it; the launch token keeps the device.
@@ -597,8 +602,8 @@ struct EAInstalledGame: Codable, Sendable {
             do {
                 renewal = try await EALicense.renew(api: api, contentID: record.contentID, profile: licenceProfile, activation: activation, drive: Self.drive)
             } catch {
-                EALog.event("[ea-license] renewal failed content=\(record.contentID) stale=\(stale ? 1 : 0): \(error.localizedDescription)")
-                if stale { throw error }
+                EALog.event("[ea-license] renewal failed content=\(record.contentID) stale=\(stale ? 1 : 0): \(error.localizedDescription)"
+                            + (stale ? "; starting with the kept licence, the game's activation decides" : ""))
             }
             if let renewed = renewal {
                 UserDefaults.standard.set(facts + ", licence renewed, game token \(renewed.gameToken == nil ? "absent" : "present")",
