@@ -1906,18 +1906,21 @@ private struct StoreGameDetailsView<Extra: View>: View {
                         .font(.caption2)
                         .foregroundColor(.green)
                 }
-                if let onPause {
-                    Button(action: onPause) {
-                        Label(tr("Pause download"), systemImage: "pause.fill")
+                // Pause keeps the files; Stop uninstalls the game.
+                HStack(spacing: 10) {
+                    if let onPause {
+                        Button(action: onPause) {
+                            Label(tr("Pause download"), systemImage: "pause.fill")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                    Button(role: .destructive, action: onStop) {
+                        Label(tr("Stop download"), systemImage: "stop.fill")
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.bordered)
                 }
-                Button(role: .destructive, action: onStop) {
-                    Label(tr("Stop download"), systemImage: "stop.fill")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.bordered)
             }
         } else if installed {
             // Starts the game; without JIT, StikDebug opens first.
@@ -1941,13 +1944,24 @@ private struct StoreGameDetailsView<Extra: View>: View {
         } else if AntiCheatPolicy.isBlocked(profileID: profileID, title: title) {
             AntiCheatBlockedButton()
         } else if canInstall {
-            Button(action: onInstall) {
-                Label(tr(paused ? "Resume" : "Install"),
-                      systemImage: paused ? "play.circle.fill" : "arrow.down.circle.fill")
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
+            // A paused or failed download keeps its files: Stop beside Resume removes them.
+            HStack(spacing: 10) {
+                Button(action: onInstall) {
+                    Label(tr(paused ? "Resume" : "Install"),
+                          systemImage: paused ? "play.circle.fill" : "arrow.down.circle.fill")
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                }
+                .buttonStyle(.borderedProminent)
+                if paused || errorText != nil {
+                    Button(role: .destructive, action: onStop) {
+                        Label(tr("Stop download"), systemImage: "stop.fill")
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                    }
+                    .buttonStyle(.bordered)
+                }
             }
-            .buttonStyle(.borderedProminent)
         } else {
             Text(tr("Not available for Windows"))
                 .font(.caption)
@@ -2056,7 +2070,7 @@ private struct EAGameDetailsSheet: View {
             onInstall: { ea.install(game.id) },
             onPause: { ea.pause(game.id) },
             onStop: { ea.cancel(game.id) },
-            onUninstall: download == nil ? { ea.uninstall(game.id); return true } : nil,
+            onUninstall: (download == nil || paused) ? { ea.uninstall(game.id); return ea.installed[game.id] == nil } : nil,
             library: library, coordinator: coordinator
         ) {
             if let installed {
@@ -2125,7 +2139,7 @@ private struct EpicGameDetailsSheet: View {
             onInstall: { epic.install(appName) },
             onPause: { epic.pause(appName) },
             onStop: { epic.cancel(appName) },
-            onUninstall: (epic.sessionRunning || EpicCloud.shared.isBusy) ? nil : { epic.uninstall(appName); return true },
+            onUninstall: (epic.sessionRunning || EpicCloud.shared.isBusy) ? nil : { epic.uninstall(appName); return epic.installed[appName] == nil },
             library: library, coordinator: coordinator
         ) {
             if installed != nil {

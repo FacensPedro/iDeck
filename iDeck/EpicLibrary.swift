@@ -473,14 +473,22 @@ struct EpicInstalledDLC: Codable, Sendable {
         resumeAfterSession.remove(app)
     }
 
-    /// Stops a download. A first install also loses its partial files; an update
-    /// or a repair is only stopped.
+    /// Stop download: ends the download and uninstalls the game. A first install
+    /// loses its partial files; an installed game being updated is uninstalled.
     func cancel(_ app: String) {
         let running = active?.app == app ? active?.task : nil
         let firstInstall = installed[app] == nil
         pause(app)
         downloads[app] = nil
-        guard firstInstall, let game = game(app) else { return }
+        if !firstInstall {
+            cancellationCleanup[app] = Task {
+                await running?.value
+                uninstall(app)
+                cancellationCleanup.removeValue(forKey: app)
+            }
+            return
+        }
+        guard let game = game(app) else { return }
         let folder = Self.drive.appendingPathComponent(Self.installRoot).appendingPathComponent(game.folderName)
         cancellationCleanup[app] = Task {
             await running?.value
