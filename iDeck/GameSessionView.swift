@@ -112,6 +112,8 @@ struct GameSessionView: View {
     @State private var logCopyMessage: String?
     @State private var isCopyingWineLog = false
     @State private var showControlsSheet = false
+    /// The close and settings buttons folded into a small tab, so they cover less of the game.
+    @AppStorage("gameButtonsMinimized") private var gameButtonsMinimized = false
     @AppStorage("touchMouseEnabled") private var touchMouseEnabled = true
     @State private var metalFXTurnedOff = false
 
@@ -230,6 +232,15 @@ struct GameSessionView: View {
 
             VStack {
                 HStack(alignment: .top) {
+                  if gameButtonsMinimized {
+                    Button { withAnimation(.easeOut(duration: 0.2)) { gameButtonsMinimized = false } } label: {
+                        Image(systemName: "chevron.right.circle.fill")
+                            .font(.system(size: 18))
+                            .foregroundColor(.white.opacity(0.45))
+                            .frame(width: 44, height: 44)
+                    }
+                    .accessibilityLabel(tr("Show the close and settings buttons"))
+                  } else {
                     Button(action: coordinator.requestCloseWindowsSession) {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 30))
@@ -247,6 +258,15 @@ struct GameSessionView: View {
                             .padding(.vertical, 8)
                     }
                     .accessibilityLabel(tr("Settings"))
+                    Button { withAnimation(.easeOut(duration: 0.2)) { gameButtonsMinimized = true } } label: {
+                        Image(systemName: "chevron.left.circle.fill")
+                            .font(.system(size: 18))
+                            .foregroundColor(.white.opacity(0.6))
+                            .frame(width: 44, height: 44)
+                            .padding(.vertical, 8)
+                    }
+                    .accessibilityLabel(tr("Minimize the close and settings buttons"))
+                  }
                     // The game's Metal surface covers everything below the
                     // top strip, so the startup progress lives up here.
                     if let loading = gameLoading {

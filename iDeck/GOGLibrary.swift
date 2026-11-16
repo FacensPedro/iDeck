@@ -1,14 +1,13 @@
 import Foundation
 import Security
 import SwiftUI
-import WebKit
 
 // GOG integration: sign-in, the GOG Galaxy library, Galaxy installs and the games
 // installed in the Wine prefix.
 //
 // GOG has no public store API; these are the endpoints GOG Galaxy itself uses
 // (documented at https://gogapidocs.readthedocs.io and used by Heroic, Lutris
-// and gogdl). Sign-in happens on GOG's own page in a web view: iDeck never
+// and gogdl). Sign-in happens on GOG's own page in Safari: iDeck never
 // sees the password, only the OAuth code GOG redirects to, and keeps the
 // resulting tokens in this device's Keychain.
 
@@ -660,7 +659,6 @@ struct GOGSignInView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var isFinishing = false
     @State private var errorMessage: String?
-    @State private var inApp = false
     @State private var opened = false
 
     private func finish(_ code: String) {
@@ -692,17 +690,13 @@ struct GOGSignInView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                if inApp {
-                    GOGLoginWebView { code in finish(code) }
-                } else {
-                    SafariPasteSignIn(store: "GOG", openURL: GOGAPI.loginURL,
+                SafariPasteSignIn(store: "GOG", openURL: GOGAPI.loginURL,
                                       steps: ["Sign in on GOG's page in Safari.",
                                               "GOG then opens a page whose address contains \"on_login_success\" and \"code=\": copy that address.",
                                               "Come back to iDeck and paste it here."],
                                       placeholder: "https://embed.gog.com/on_login_success?…code=…",
                                       busy: isFinishing) { submitPasted($0) }
-                        .onAppear { if !opened { opened = true; UIApplication.shared.open(GOGAPI.loginURL) } }
-                }
+                    .onAppear { if !opened { opened = true; UIApplication.shared.open(GOGAPI.loginURL) } }
                 if isFinishing {
                     Color.black.opacity(0.6).ignoresSafeArea()
                     ProgressView(tr("Signing in to GOG...")).tint(.white).foregroundColor(.white)
@@ -714,9 +708,6 @@ struct GOGSignInView: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(tr("Cancel")) { dismiss() }
                 }
-                ToolbarItem(placement: .primaryAction) {
-                    Button(inApp ? tr("Sign in with Safari") : tr("Use the page inside iDeck")) { inApp.toggle() }
-                }
             }
             .alert(tr("GOG sign-in"), isPresented: Binding(get: { errorMessage != nil },
                                                            set: { if !$0 { errorMessage = nil } })) {
@@ -726,78 +717,6 @@ struct GOGSignInView: View {
             }
         }
         .navigationViewStyle(.stack)
-    }
-}
-
-private struct GOGLoginWebView: UIViewRepresentable {
-    let onCode: (String) -> Void
-
-    func makeCoordinator() -> Coordinator { Coordinator(onCode: onCode) }
-
-    /// Google refuses to sign in inside embedded web views that announce
-    /// themselves as such, so the page sees mobile Safari's user agent.
-    static let safariUserAgent = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1"
-
-    func makeUIView(context: Context) -> WKWebView {
-        // A non-persistent store: GOG's session cookie is not kept by iDeck.
-        let configuration = WKWebViewConfiguration()
-        configuration.websiteDataStore = .nonPersistent()
-        configuration.preferences.javaScriptCanOpenWindowsAutomatically = true
-        let view = WKWebView(frame: .zero, configuration: configuration)
-        view.customUserAgent = Self.safariUserAgent
-        view.navigationDelegate = context.coordinator
-        view.uiDelegate = context.coordinator
-        view.load(URLRequest(url: GOGAPI.loginURL))
-        return view
-    }
-
-    func updateUIView(_ uiView: WKWebView, context: Context) {}
-
-    /// Handles GOG's redirect and the pop-up windows that "Sign in with
-    /// Google / Steam / Discord / Xbox" open. Each pop-up is shown on top of
-    /// the login page and shares its session, so the provider can hand the
-    /// result back to GOG's page through window.opener.
-    final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
-        let onCode: (String) -> Void
-        private var popups: [WKWebView] = []
-        init(onCode: @escaping (String) -> Void) { self.onCode = onCode }
-
-        func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
-                     decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
-            if let url = navigationAction.request.url, let code = GOGAPI.loginCode(from: url) {
-                decisionHandler(.cancel)
-                closeAllPopups()
-                onCode(code)
-                return
-            }
-            decisionHandler(.allow)
-        }
-
-        func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
-                     for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
-            // A link with target=_blank: keep it in the same page.
-            guard navigationAction.targetFrame == nil else { return nil }
-            let host = webView
-            let popup = WKWebView(frame: host.bounds, configuration: configuration)
-            popup.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-            popup.customUserAgent = GOGLoginWebView.safariUserAgent
-            popup.navigationDelegate = self
-            popup.uiDelegate = self
-            host.addSubview(popup)
-            popups.append(popup)
-            return popup
-        }
-
-        func webViewDidClose(_ webView: WKWebView) {
-            guard let index = popups.firstIndex(of: webView) else { return }
-            popups.remove(at: index)
-            webView.removeFromSuperview()
-        }
-
-        private func closeAllPopups() {
-            popups.forEach { $0.removeFromSuperview() }
-            popups.removeAll()
-        }
     }
 }
 

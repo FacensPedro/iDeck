@@ -5,6 +5,14 @@
 ### Download buttons
 - **Pause download** and **Stop download** have the same fixed size on every store's game page (Steam, GOG, Epic Games, EA app), and so do **Resume** and **Stop download** on a paused download. Long labels stay on one line and shrink slightly instead of wrapping.
 
+### Sign-in only in Safari
+- Steam, GOG, Epic Games and EA app sign-ins open in Safari, outside iDeck. The pages inside iDeck (and Safari's sign-in sheet for EA) are gone.
+- EA app: when you finish on EA's page, Safari hands the sign-in back to iDeck by itself (iDeck now opens EA's end-of-login address). Pasting the address still works.
+- GOG and Epic Games: copy the address or the code Safari shows and paste it in iDeck, as before.
+
+### In-game buttons
+- The close and settings buttons shown over a Windows game can be minimized into a small tab, and shown again from it. The choice is remembered.
+
 ### EA app and Ubisoft games, as GOG games
 - EA app: a licence iDeck cannot prepare (no content id, or EA refusing a renewal of an outdated licence) no longer stops the launch with a licence error. As a GOG game runs offline when iDeck cannot answer as GOG Galaxy, the game now starts and its own activation decides.
 - Ubisoft games on Steam: iDeck no longer runs the Ubisoft Connect installer among the one-time installs. It is left out as GOG Galaxy is, and the game starts without it (a game that requires Ubisoft Connect can still stop at its own start).
@@ -16,4 +24,4 @@
 - Faster IPA builds after a Wine patch: a patch to the wineserver or to a DLL's unix side no longer recompiles the 719 32-bit Wine modules, and the pinned Madeira sources come from a cache instead of being fetched again.
 
 ### Version
-- Updated the application version to 2.7.7 (build 97).
+- Updated the application version to 2.8.0 (build 97).
