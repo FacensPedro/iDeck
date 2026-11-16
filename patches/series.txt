@@ -17,6 +17,7 @@ early     .      madeira-small-map-va-limit.patch
 wine      wine   wine-arm64ec-null-thread-context.patch
 wine      wine   wine-wow64win-atoms.patch
 wine      wine   wine-ios-machine-identity.patch
+wine      wine   wine-ios-fault-address.patch
 
 # DXMT's iOS cache/sync work, then the upstream backports (before the VC++ overlay,
 # which edits the same bridge file)
