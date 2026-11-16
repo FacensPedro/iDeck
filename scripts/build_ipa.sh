@@ -206,6 +206,39 @@ if [[ "${IDECK_REQUIRE_MADEIRA:-0}" == "1" && "${IDECK_SPLIT_RUNTIME:-1}" != "0"
   python3 scripts/split_runtime_downloads.py --app "$APP" --out build/runtime-downloads
 fi
 
+# Embed the entitlements in the executables (ad-hoc signature, no certificate).
+# Sideloaders such as iloader, SideStore, AltStore and Sideloadly read the
+# entitlements an app asks for from its code signature and enable the matching
+# capabilities (Extended Virtual Addressing, Increased Memory Limit) on the App ID
+# before re-signing. An unsigned binary asks for nothing, so iOS never gave iDeck
+# the extended address space Windows games need.
+embed_entitlements() {
+  local binary="$1" entitlements="$2"
+  [[ -f "$binary" && -f "$entitlements" ]] || { echo "ERROR: cannot embed $entitlements into $binary" >&2; exit 2; }
+  if command -v ldid >/dev/null 2>&1; then
+    ldid -S"$entitlements" "$binary"
+  else
+    # Sign the Mach-O file itself (not the bundle): no resource seal, so the
+    # unsigned nested runtime files do not have to be signed first.
+    codesign --force --sign - --timestamp=none --generate-entitlement-der \
+      --entitlements "$entitlements" "$binary"
+  fi
+  if command -v ldid >/dev/null 2>&1; then
+    ldid -e "$binary" | grep -q "com.apple.developer.kernel.extended-virtual-addressing" \
+      || [[ "$entitlements" != *iDeck.entitlements ]] \
+      || { echo "ERROR: extended-virtual-addressing missing from $binary" >&2; exit 2; }
+  else
+    codesign -d --entitlements - "$binary" 2>/dev/null | grep -q "extended-virtual-addressing" \
+      || [[ "$entitlements" != *iDeck.entitlements ]] \
+      || { echo "ERROR: extended-virtual-addressing missing from $binary" >&2; exit 2; }
+  fi
+  echo "Embedded $(basename "$entitlements") into $(basename "$binary")"
+}
+VPN_EXE="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$APP/PlugIns/VPNExtension.appex/Info.plist")"
+APP_EXE="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$APP/Info.plist")"
+embed_entitlements "$APP/PlugIns/VPNExtension.appex/$VPN_EXE" VPNExtension/VPNExtension.entitlements
+embed_entitlements "$APP/$APP_EXE" iDeck/iDeck.entitlements
+
 # Stream the app directly into a valid IPA, with fast compression and
 # symlink/executable-bit preservation; do not duplicate the native app as
 # a temporary Payload tree or recompress PNG/ZIP/GZ assets.
