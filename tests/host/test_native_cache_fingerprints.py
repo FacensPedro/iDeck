@@ -62,6 +62,20 @@ class FingerprintTests(unittest.TestCase):
         self.assertNotEqual(after["i386"], before["i386"])
         self.assertEqual((after["deps"], after["gl"]), (before["deps"], before["gl"]))
 
+    def test_wineserver_and_unix_side_patches_keep_the_i386_farm(self):
+        (self.md / "wine/server").mkdir()
+        (self.md / "wine/server/signal.c").write_text("server")
+        (self.md / "wine/dlls/ntdll/unix").mkdir(parents=True)
+        (self.md / "wine/dlls/ntdll/unix/server.c").write_text("unix")
+        git(self.md / "wine", "add", "-A")
+        git(self.md / "wine", "commit", "-qm", "more")
+        before = self.prints()
+        (self.md / "wine/server/signal.c").write_text("patched server")
+        (self.md / "wine/dlls/ntdll/unix/server.c").write_text("patched unix")
+        self.assertEqual(self.prints()["i386"], before["i386"])
+        (self.md / "wine/dlls/source.c").write_text("patched PE")
+        self.assertNotEqual(self.prints()["i386"], before["i386"])
+
     def test_new_files_and_build_scripts_count(self):
         before = self.prints()
         (self.md / "dxmt/new.cpp").write_text("new")

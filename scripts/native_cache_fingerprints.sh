@@ -8,7 +8,8 @@
 # checked out and patched vendor/Madeira; prints `name=fingerprint` lines:
 #
 #   i386  wine and dxmt submodules as patched, and Madeira's build scripts and
-#         tools, without the iOS-only trees (app/, the *-unix and wineserver builds)
+#         tools, without the iOS-only trees (app/, the *-unix and wineserver builds,
+#         Wine's server/*.c and dlls/*/unix)
 #   deps  build/gnutls-ios, build/ffmpeg, build/freetype-ios
 #   gl    build/moltenvk-ios, build/mesa-ios
 #
@@ -39,10 +40,16 @@ IOS_ONLY=(':(exclude)app' ':(exclude)build/ntdll-unix' ':(exclude)build/win32u-u
           ':(exclude)toolchains' ':(exclude)research' ':(exclude)wine' ':(exclude)dxmt'
           ':(exclude)FEX' ':(exclude)madeira-dock')
 
+# Inside Wine, the wineserver sources and the dlls' unix sides are compiled only
+# into the iOS app (build/wineserver, build/ntdll-unix), never into a PE module:
+# a patch there (a wineserver fix, ntdll's unix side) keeps the i386 farm.
+WINE_IOS_ONLY=(':(glob,exclude)server/*.c' ':(glob,exclude)dlls/*/unix/**')
+
 i386="$( { tree_state "$MD" . "${IOS_ONLY[@]}"
            for sub in wine dxmt; do
              [[ -e "$MD/$sub/.git" ]] || { echo "ERROR: missing submodule $sub" >&2; exit 2; }
-             tree_state "$MD/$sub" .
+             if [[ "$sub" == wine ]]; then tree_state "$MD/$sub" . "${WINE_IOS_ONLY[@]}"
+             else tree_state "$MD/$sub" .; fi
            done; } | hash_stream )"
 deps="$(tree_state "$MD" build/gnutls-ios build/ffmpeg build/freetype-ios | hash_stream)"
 gl="$(tree_state "$MD" build/moltenvk-ios build/mesa-ios | hash_stream)"

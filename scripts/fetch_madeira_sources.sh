@@ -12,10 +12,12 @@ if [ ! -d "$DEST/.git" ]; then
   git clone --filter=blob:none https://github.com/willfaust/Madeira.git "$DEST"
 fi
 
-git -C "$DEST" fetch origin "$REV"
-git -C "$DEST" checkout --detach "$REV"
+# A cached .git (CI) arrives without its working tree: skip the fetch when the
+# pinned commit is already there, and force the checkouts so every file returns.
+git -C "$DEST" cat-file -e "$REV^{commit}" 2>/dev/null || git -C "$DEST" fetch origin "$REV"
+git -C "$DEST" checkout -f --detach "$REV"
 git -C "$DEST" submodule sync --recursive
-git -C "$DEST" submodule update --init --recursive --jobs 8 --filter=blob:none
+git -C "$DEST" submodule update --init --recursive --force --jobs 8 --filter=blob:none
 python3 "$ROOT/scripts/verify_madeira_sources.py" --root "$DEST" --revision "$REV"
 
 # Early overlays (patches/series.txt, group "early"): the early JIT hole, the ARM64
