@@ -20,6 +20,12 @@ git -C "$DEST" submodule sync --recursive
 git -C "$DEST" submodule update --init --recursive --force --jobs 8 --filter=blob:none
 python3 "$ROOT/scripts/verify_madeira_sources.py" --root "$DEST" --revision "$REV"
 
+# The forced checkouts above put every tracked file back to the pinned sources and a
+# cached .git (CI) has no untracked files, so no patch is applied any more: drop the
+# records apply_madeira_patches.py keeps, or it skips every patch and the build goes
+# on without them (the ARM host feature header, a file one of them adds, was missing).
+find "$DEST/.git" -name ideck-applied-patches -type f -delete 2>/dev/null || true
+
 # Early overlays (patches/series.txt, group "early"): the early JIT hole, the ARM64
 # CPU area for ARM64 processes in an ARM64EC session, fault diagnostics, concurrent
 # DXIL conversion and Wine's idle logging.
