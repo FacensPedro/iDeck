@@ -11,6 +11,7 @@ early     .      madeira-arm64-cpu-area.patch
 early     .      madeira-fault-diagnostics.patch
 early     .      madeira-dxil-concurrent-cache.patch
 early     .      madeira-wine-idle-logging.patch
+early     .      madeira-small-map-va-limit.patch
 
 # The Wine submodule
 wine      wine   wine-arm64ec-null-thread-context.patch

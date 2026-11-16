@@ -1,0 +1,22 @@
+diff --git a/build/ntdll-unix/virtual_ios.c b/build/ntdll-unix/virtual_ios.c
+index def1962..8798fe1 100644
+--- a/build/ntdll-unix/virtual_ios.c
++++ b/build/ntdll-unix/virtual_ios.c
+@@ -22848,6 +22848,17 @@ static void *get_host_addr_space_limit(void)
+             dprintf( 2, "[va-limit] ml749 walk=%p kernel_max=%p -> %s\n",
+                      walked, kern, kern > walked ? "USING KERNEL (walk underestimated)" : "keeping walk" );
+             if (kern > walked && (uintptr_t)kern >= 0x100000000ULL) return kern;
++            /* iDeck: a 63 GB map (no extended virtual addressing) ends at
++             * 0xfc0000000 while the walk says 64 GB, so top-down placement put the
++             * first TEB in the map's last 128 KB (0xfbffe0000) and init_thread_pipe
++             * faulted in server_pipe writing the wait fds there (iPhone 15, iOS
++             * 26.5). Keep Wine 1 GB below the real ceiling instead. */
++            if (kern < walked && (uintptr_t)kern >= 0x800000000ULL)
++            {
++                void *limit = (void *)((uintptr_t)kern - 0x40000000ULL);
++                dprintf( 2, "[va-limit] ideck 63 GB map: limit %p (1 GB below kernel max %p)\n", limit, kern );
++                return limit;
++            }
+         }
+         else dprintf( 2, "[va-limit] ml749 walk=%p kernel_max=UNAVAILABLE -> keeping walk\n", walked );
+ 
