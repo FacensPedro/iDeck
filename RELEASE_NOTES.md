@@ -8,5 +8,8 @@
 ### Bug reports
 - The `[ideck-fault]` line (faulting address, PC, LR, ESR and FAR of a Wine crash on iOS) now appears in the bug report; it was logged but left out of the report.
 
+### Builds
+- Faster IPA builds after a Wine patch: a patch to the wineserver or to a DLL's unix side no longer recompiles the 719 32-bit Wine modules, and the pinned Madeira sources come from a cache instead of being fetched again.
+
 ### Version
 - Updated the application version to 2.7.7 (build 97).
