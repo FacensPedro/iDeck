@@ -136,7 +136,7 @@ enum LogCompactor {
         flushRun()
         var result = out.joined(separator: "\n")
         if !dropped.isEmpty {
-            let top = dropped.values.sorted { $0.count > $1.count }.prefix(40)
+            let top = dropped.values.sorted { $0.count > $1.count }.prefix(15)
             result += "\n\n[iDeck] Lines left out after \(maximumRepeats) appearances (×count):\n"
             result += top.map { "(×\($0.count)) \($0.line)" }.joined(separator: "\n")
             if dropped.count > top.count { result += "\n… and \(dropped.count - top.count) more kinds of repeated lines" }
@@ -150,19 +150,39 @@ enum LogCompactor {
     static func normalized(_ line: Substring) -> String {
         var key = ""
         key.reserveCapacity(line.count)
-        var inNumber = false
+        var word = ""
+        func flushWord() {
+            guard !word.isEmpty else { return }
+            key += isNumberLike(word) ? "#" : word
+            word = ""
+        }
         for c in line.unicodeScalars {
-            let isDigit = c.properties.numericType != nil
-            let isHexAfterZeroX = inNumber && (("a"..."f").contains(c) || ("A"..."F").contains(c) || c == "x")
-            if isDigit || isHexAfterZeroX {
-                if !inNumber { key.unicodeScalars.append("#") }
-                inNumber = true
+            if ("0"..."9").contains(c) || ("a"..."z").contains(c) || ("A"..."Z").contains(c) {
+                word.unicodeScalars.append(c)
             } else {
-                inNumber = false
+                flushWord()
                 key.unicodeScalars.append(c)
             }
         }
+        flushWord()
         return key
+    }
+
+    /// A word that is a number: decimal, 0x-hex, a hex address or id without 0x
+    /// ("7ffe1a2b", "c000001d", "40010006"), or digits with a unit ("12ms", "4096KB").
+    /// Words such as "fixme" or "deadline" stay as they are.
+    static func isNumberLike(_ word: String) -> Bool {
+        let scalars = Array(word.unicodeScalars)
+        guard let first = scalars.first else { return false }
+        func isHex(_ c: Unicode.Scalar) -> Bool {
+            ("0"..."9").contains(c) || ("a"..."f").contains(c) || ("A"..."F").contains(c)
+        }
+        if scalars.count > 2, first == "0", scalars[1] == "x" || scalars[1] == "X" {
+            return scalars.dropFirst(2).allSatisfy(isHex)
+        }
+        if ("0"..."9").contains(first) { return true }
+        // Letters first: hex only when long and with a digit, so words are kept.
+        return scalars.count >= 6 && scalars.allSatisfy(isHex) && scalars.contains { ("0"..."9").contains($0) }
     }
 
     /// Writes `text` compacted and LZFSE-compressed (read back with `readCompressed`).
