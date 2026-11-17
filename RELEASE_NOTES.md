@@ -10,6 +10,10 @@
 ### Downloads
 - iPhones and iPads with 6 GB of RAM or less no longer overheat while downloading. The same number of chunks is still downloaded at once, so the speed does not change, but at most two are decompressed and checked at the same time instead of all of them. Devices with 8 GB or more are unchanged.
 
+### Game screen
+- On iPhones the game now fills the whole height of the screen once it shows its first frame. The close and settings buttons move to the free bar at the side of the picture instead of taking a strip at the top.
+- Games that do not draw through DXMT (for example DOOM + DOOM II) are now seen as running: the loading bar and the "no game frame" warnings no longer stay on screen around the game.
+
 ### Interface
 - The download buttons are shorter. In Portuguese they now read "Pausar" and "Parar"; in English "Pause" and "Stop", in Spanish "Pausar" and "Detener".
 
