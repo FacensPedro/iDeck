@@ -713,6 +713,38 @@ enum DockInstallers {
         return machine == 0x14c && !has32Bit ? "32-bit installer" : nil
     }
 
+    /// iDeck: Steam games whose executable refuses to run without Ubisoft Connect, kept
+    /// for games whose loader is not found by the folder scan below.
+    nonisolated static let ubisoftConnectRequired: Set<Int> = [
+        242050, // Assassin's Creed IV Black Flag
+    ]
+
+    /// Ubisoft's launcher bridge DLLs. A game that ships one of them talks to a running
+    /// Ubisoft Connect and quits when there is none.
+    nonisolated static let ubisoftLoaders: Set<String> = [
+        "uplay_r1_loader.dll", "uplay_r1_loader64.dll", "uplay_r2_loader.dll", "uplay_r2_loader64.dll",
+        "upc_r1_loader.dll", "upc_r1_loader64.dll", "upc_r2_loader.dll", "upc_r2_loader64.dll",
+    ]
+
+    nonisolated static func requiresUbisoftConnect(_ app: Int) -> Bool {
+        ubisoftConnectRequired.contains(app)
+    }
+
+    /// Any Ubisoft game: listed above, or one of the loaders sits in its folder (up to two
+    /// levels down, where Ubisoft places its binaries).
+    nonisolated static func requiresUbisoftConnect(_ game: DockGame, drive: URL) -> Bool {
+        if requiresUbisoftConnect(game.id) { return true }
+        let root = drive.appendingPathComponent(game.library).appendingPathComponent("common")
+            .appendingPathComponent(game.installDir)
+        guard let walker = FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil,
+                                                          options: [.skipsHiddenFiles, .skipsPackageDescendants]) else { return false }
+        for case let file as URL in walker {
+            if walker.level > 3 { walker.skipDescendants(); continue }
+            if ubisoftLoaders.contains(file.lastPathComponent.lowercased()) { return true }
+        }
+        return false
+    }
+
     nonisolated static func isUbisoftConnect(_ process: SteamInstallProcess) -> Bool {
         let file = process.executable.lowercased()
         return file.contains("ubisoftconnect") || file.contains("uplayinstaller") || file.contains("uplay_installer")
@@ -882,6 +914,10 @@ enum DockInstallers {
                         has32Bit: Bool = DockInstallers.bundleHas32Bit, hasMsiexec: Bool = DockInstallers.bundleHasMsiexec,
                         fusionSource: URL? = MadeiraRuntime.file("i386-windows/fusion.dll")) {
         script = nil; serverSync = false; note = nil; finishedAt = nil; logged = []; runningSince = nil; installsOnly = false
+        if Self.requiresUbisoftConnect(game, drive: drive) {
+            let users = UbisoftConnectLite.apply(drive: drive)
+            LogStore.shared.log("[ubisoft-lite] app=\(game.id) overlay off, launcher settings written for \(users) user(s)")
+        }
         allSucceeded = false
         let app = game.id
         let batchFile = drive.appendingPathComponent(scriptName)
@@ -924,10 +960,13 @@ enum DockInstallers {
             LogStore.shared.log("[dock-installers] app=\(app) DirectX setup skipped: Wine's built-in DirectX DLLs are used")
         }
         // iDeck: Ubisoft Connect (a game's own launcher installer) is left out, as a GOG
-        // game's GOG Galaxy is: iDeck does not run Ubisoft's launcher, and the game starts
-        // without it. A game that requires Ubisoft Connect can stop at its own start.
+        // game's GOG Galaxy is, unless the game cannot start without it: those games load
+        // uplay_r1_loader and quit with exit code 0 when the launcher is absent (Black Flag,
+        // 2026-11-17: AC4BFSP.exe -uplay_steam_mode closed after 26 s, no crash).
         let ubisoft = pending.filter { Self.isUbisoftConnect($0) }
-        if !ubisoft.isEmpty {
+        if !ubisoft.isEmpty, Self.requiresUbisoftConnect(game, drive: drive) {
+            LogStore.shared.log("[dock-installers] app=\(app) Ubisoft Connect kept: the game does not start without it")
+        } else if !ubisoft.isEmpty {
             pending.removeAll { Self.isUbisoftConnect($0) }
             LogStore.shared.log("[dock-installers] app=\(app) Ubisoft Connect skipped: iDeck does not run Ubisoft's launcher; "
                 + "the game starts without it, as a GOG game does without GOG Galaxy")
@@ -1145,5 +1184,65 @@ enum DockInstallers {
     static func restartNotice(_ ended: String?) -> String {
         if allSucceeded { return "One-time installs completed successfully. Close Madeira and open it again to play the game." }
         return (ended ?? "One-time installs ended.") + "\nClose Madeira and open it again to play the game."
+    }
+}
+
+
+/// iDeck: Ubisoft Connect with as little load as it allows. The launcher must run for a
+/// Ubisoft game to start, but its in-game overlay hooks every frame of the game's renderer
+/// and is its heaviest part on iOS. It is switched off in the launcher's own settings file
+/// (%LOCALAPPDATA%\Ubisoft Game Launcher\settings.yaml). Values the user set are kept;
+/// only the keys below are forced.
+enum UbisoftConnectLite {
+    static let forced: [(section: String, key: String, value: String)] = [
+        ("overlay", "enabled", "false"),
+        ("overlay", "fps_enabled", "false"),
+        ("overlay", "warning_enabled", "false"),
+        ("overlay", "forceunhookgame", "false"),
+        ("user", "closebehavior", "CloseBehavior_Close"),
+    ]
+
+    /// Writes the settings for every user profile in the prefix; returns how many.
+    @discardableResult
+    static func apply(drive: URL) -> Int {
+        let users = drive.appendingPathComponent("users", isDirectory: true)
+        let names = (try? FileManager.default.contentsOfDirectory(atPath: users.path)) ?? []
+        var count = 0
+        for name in names where name.lowercased() != "public" && !name.hasPrefix(".") {
+            let folder = users.appendingPathComponent(name + "/AppData/Local/Ubisoft Game Launcher", isDirectory: true)
+            let file = folder.appendingPathComponent("settings.yaml")
+            let old = (try? String(contentsOf: file, encoding: .utf8)) ?? ""
+            let new = merged(old)
+            if new != old {
+                try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                try? new.write(to: file, atomically: true, encoding: .utf8)
+            }
+            count += 1
+        }
+        return count
+    }
+
+    /// Sets each forced key inside its top-level section, adding the key or the section
+    /// when missing. Only two-space-indented keys directly under a section are touched.
+    static func merged(_ text: String) -> String {
+        var lines = text.isEmpty ? [] : text.components(separatedBy: "\n")
+        if lines.last == "" { lines.removeLast() }
+        for item in forced {
+            let header = item.section + ":"
+            let entry = "  \(item.key): \(item.value)"
+            guard let start = lines.firstIndex(where: { $0.trimmingCharacters(in: .whitespaces) == header && !$0.hasPrefix(" ") }) else {
+                lines.append(header); lines.append(entry); continue
+            }
+            var end = start + 1
+            while end < lines.count, lines[end].hasPrefix(" ") || lines[end].isEmpty { end += 1 }
+            if let at = (start + 1..<end).first(where: {
+                lines[$0].hasPrefix("  " + item.key + ":") && !lines[$0].hasPrefix("   ")
+            }) {
+                lines[at] = entry
+            } else {
+                lines.insert(entry, at: start + 1)
+            }
+        }
+        return lines.joined(separator: "\n") + "\n"
     }
 }
