@@ -14,4 +14,4 @@
 - The download buttons are shorter. In Portuguese they now read "Pausar" and "Parar"; in English "Pause" and "Stop", in Spanish "Pausar" and "Detener".
 
 ### Version
-- Updated the application version to 2.8.4 (build 101).
+- Updated the application version to 2.9.0 (build 101).
