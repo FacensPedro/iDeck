@@ -264,7 +264,7 @@ final class EpicDownloader: @unchecked Sendable {
                 let (data, response) = try await http.data(from: url)
                 let status = (response as? HTTPURLResponse)?.statusCode ?? 0
                 guard status == 200 else { throw EpicDownloadError.chunk("http \(status)") }
-                let window = try EpicChunk.decode(data, expected: info, secrets: secrets)
+                let window = try await DownloadCPU.run { try EpicChunk.decode(data, expected: info, secrets: secrets) }
                 meter.add(UInt64(max(0, info.fileSize)))
                 return window
             } catch let error as URLError where error.code == .cancelled {

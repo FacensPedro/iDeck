@@ -322,6 +322,25 @@ extern "C" int32_t ideck_runtime_launch(const char *executable_path,
         ideck_memory_pressure_publish();
         setenv("FEX_APP_CONFIG_LOCATION", "C:\\ProgramData\\fex-emu\\", 0);
         setenv("FEX_APP_DATA_LOCATION", "C:\\ProgramData\\fex-emu\\", 0);
+        // The directory and an empty FEX config exist in the prefix, so FEX reads
+        // them instead of failing a NtCreateFile for each (log: [file-fail]
+        // Config.json / AppConfig\<exe>.json). Existing files are left as they are.
+        {
+            NSFileManager *fm = [NSFileManager defaultManager];
+            NSString *fexDir = [[NSString stringWithUTF8String:wine_prefix]
+                stringByAppendingPathComponent:@"drive_c/ProgramData/fex-emu"];
+            NSString *appDir = [fexDir stringByAppendingPathComponent:@"AppConfig"];
+            [fm createDirectoryAtPath:appDir withIntermediateDirectories:YES attributes:nil error:nil];
+            NSData *empty = [@"{\n  \"Config\": {}\n}\n" dataUsingEncoding:NSUTF8StringEncoding];
+            NSString *exeName = [[winExe stringByReplacingOccurrencesOfString:@"\\" withString:@"/"] lastPathComponent];
+            NSMutableArray<NSString *> *files = [NSMutableArray arrayWithObject:
+                [fexDir stringByAppendingPathComponent:@"Config.json"]];
+            for (NSString *name in @[@"dockhost.exe", exeName ?: @""])
+                if (name.length) [files addObject:[appDir stringByAppendingPathComponent:
+                    [name stringByAppendingString:@".json"]]];
+            for (NSString *file in files)
+                if (![fm fileExistsAtPath:file]) [empty writeToFile:file atomically:YES];
+        }
         if (setenv("WINEPREFIX", wine_prefix, 1) != 0 ||
             setenv("MADEIRA_EXE", winExe.UTF8String, 1) != 0 ||
             setenv("MADEIRA_ARGS", argString.UTF8String, 1) != 0) return errno;

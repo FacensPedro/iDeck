@@ -521,12 +521,13 @@ final class GOGContentInstaller: @unchecked Sendable {
                 }
                 // Check the *compressed* checksum before inflating. Each GOG
                 // content-system chunk has both hashes in its depot manifest.
-                guard Self.md5(data) == chunk.compressedMd5.lowercased() else {
-                    throw GOGContentError.checksum(label)
+                let compressedMd5 = chunk.compressedMd5.lowercased(), md5 = chunk.md5.lowercased()
+                return try await DownloadCPU.run {
+                    guard Self.md5(data) == compressedMd5 else { throw GOGContentError.checksum(label) }
+                    let inflated = try GOGContentSystem.inflate(data)
+                    guard Self.md5(inflated) == md5 else { throw GOGContentError.checksum(label) }
+                    return inflated
                 }
-                let inflated = try GOGContentSystem.inflate(data)
-                guard Self.md5(inflated) == chunk.md5.lowercased() else { throw GOGContentError.checksum(label) }
-                return inflated
             } catch is CancellationError {
                 throw CancellationError()
             } catch let error as URLError where error.code == .cancelled {

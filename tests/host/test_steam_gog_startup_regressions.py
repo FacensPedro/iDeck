@@ -21,7 +21,7 @@ class SteamSetupAndGOGCDNTests(unittest.TestCase):
         self.assertIn('throw GOGContentError.unavailable(label)', source)
         self.assertIn('case 401, 403:', source)
         self.assertIn('await linkCache.store(entry, for: productID)', source)
-        self.assertIn('Self.md5(data) == chunk.compressedMd5.lowercased()', source)
+        self.assertIn('Self.md5(data) == compressedMd5', source)
         self.assertIn('catch let error as URLError where error.code == .cancelled', source)
         self.assertIn('throw CancellationError()', source)
         self.assertIn('try Task.checkCancellation()', source)

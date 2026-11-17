@@ -28,8 +28,18 @@ private final class GameRuntimeMetrics: ObservableObject {
     private var previousFrames: UInt64?
     private typealias PresentCount = @convention(c) () -> UInt64
     /// Madeira's present counter, resolved once (nil in an interface-only build).
-    private static let presentCount: PresentCount? =
-        NativeSymbol.address("madeira_get_present_count").map { unsafeBitCast($0, to: PresentCount.self) }
+    /// DXMT's presents, plus GL presents (madeira_frame_count) and the game window
+    /// images Wine's compositor showed (winios_surface_present_count). Counting DXMT
+    /// alone missed games that draw another way: DOOM + DOOM II played while the
+    /// screen still said no frame had arrived.
+    private static let mainCount: PresentCount? =
+        (NativeSymbol.address("madeira_frame_count") ?? NativeSymbol.address("madeira_get_present_count"))
+            .map { unsafeBitCast($0, to: PresentCount.self) }
+    private static let surfaceCount: PresentCount? =
+        NativeSymbol.address("winios_surface_present_count").map { unsafeBitCast($0, to: PresentCount.self) }
+    private static let presentCount: (() -> UInt64)? = mainCount == nil && surfaceCount == nil ? nil : {
+        (mainCount?() ?? 0) &+ (surfaceCount?() ?? 0)
+    }
 
     init() {
         // Capture the in-process present counter when the game session view
@@ -112,6 +122,7 @@ struct GameSessionView: View {
     @State private var logCopyMessage: String?
     @State private var isCopyingWineLog = false
     @State private var showControlsSheet = false
+    @State private var sideControls = false
     /// The close and settings buttons folded into a small tab, so they cover less of the game.
     @AppStorage("gameButtonsMinimized") private var gameButtonsMinimized = false
     @AppStorage("touchMouseEnabled") private var touchMouseEnabled = true
@@ -456,6 +467,36 @@ struct GameSessionView: View {
                 }
                 Spacer()
             }
+            .opacity(sideControls ? 0 : 1)
+            .allowsHitTesting(!sideControls)
+
+            // iPhone, full-height picture: the buttons stay in the side bar it leaves.
+            if sideControls {
+                HStack {
+                    VStack(spacing: 6) {
+                        Button(action: coordinator.requestCloseWindowsSession) {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 26))
+                                .foregroundColor(.white.opacity(0.85))
+                                .frame(width: 44, height: 44)
+                        }
+                        .disabled(coordinator.isClosingWindowsSession)
+                        .accessibilityLabel(tr("Close Wine and return to the library"))
+                        Button { showControlsSheet = true } label: {
+                            Image(systemName: "gearshape.fill")
+                                .font(.system(size: 20))
+                                .foregroundColor(.white.opacity(0.85))
+                                .frame(width: 44, height: 44)
+                        }
+                        .accessibilityLabel(tr("Settings"))
+                        Spacer()
+                    }
+                    .frame(width: WindowsRendererView.sideBarWidth)
+                    .padding(.top, 8)
+                    Spacer()
+                }
+                .ignoresSafeArea()
+            }
         }
         .modifier(WineGamepadEventClaim())
         .sheet(isPresented: $showControlsSheet) { SessionControlsSheet(coordinator: coordinator) }
@@ -489,6 +530,8 @@ struct GameSessionView: View {
                 WindowsRendererView.refreshNativeDisplay()
             }
             metrics.sample(collectPerformance: showGamePerformanceOverlay)
+            WindowsRendererView.immersive = metrics.receivedNewFrames && !coordinator.isClosingWindowsSession
+            if sideControls != WindowsRendererView.sideControls { sideControls = WindowsRendererView.sideControls }
             if coordinator.windowsStatus == "Wine started; waiting for game..." &&
                metrics.receivedNewFrames &&
                (!coordinator.currentSteamLaunchUsesDock || coordinator.dockLaunchAccepted) {
