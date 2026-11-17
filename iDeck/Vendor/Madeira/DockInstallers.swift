@@ -713,6 +713,15 @@ enum DockInstallers {
         return machine == 0x14c && !has32Bit ? "32-bit installer" : nil
     }
 
+    /// iDeck: Steam games whose executable refuses to run without Ubisoft Connect.
+    nonisolated static let ubisoftConnectRequired: Set<Int> = [
+        242050, // Assassin's Creed IV Black Flag
+    ]
+
+    nonisolated static func requiresUbisoftConnect(_ app: Int) -> Bool {
+        ubisoftConnectRequired.contains(app)
+    }
+
     nonisolated static func isUbisoftConnect(_ process: SteamInstallProcess) -> Bool {
         let file = process.executable.lowercased()
         return file.contains("ubisoftconnect") || file.contains("uplayinstaller") || file.contains("uplay_installer")
@@ -924,10 +933,13 @@ enum DockInstallers {
             LogStore.shared.log("[dock-installers] app=\(app) DirectX setup skipped: Wine's built-in DirectX DLLs are used")
         }
         // iDeck: Ubisoft Connect (a game's own launcher installer) is left out, as a GOG
-        // game's GOG Galaxy is: iDeck does not run Ubisoft's launcher, and the game starts
-        // without it. A game that requires Ubisoft Connect can stop at its own start.
+        // game's GOG Galaxy is, unless the game cannot start without it: those games load
+        // uplay_r1_loader and quit with exit code 0 when the launcher is absent (Black Flag,
+        // 2026-11-17: AC4BFSP.exe -uplay_steam_mode closed after 26 s, no crash).
         let ubisoft = pending.filter { Self.isUbisoftConnect($0) }
-        if !ubisoft.isEmpty {
+        if !ubisoft.isEmpty, Self.requiresUbisoftConnect(app) {
+            LogStore.shared.log("[dock-installers] app=\(app) Ubisoft Connect kept: the game does not start without it")
+        } else if !ubisoft.isEmpty {
             pending.removeAll { Self.isUbisoftConnect($0) }
             LogStore.shared.log("[dock-installers] app=\(app) Ubisoft Connect skipped: iDeck does not run Ubisoft's launcher; "
                 + "the game starts without it, as a GOG game does without GOG Galaxy")
