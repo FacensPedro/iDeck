@@ -686,9 +686,12 @@ final class DepotDownloader {
             let data: Data
             do {
                 let encrypted = try await download(url)
-                data = try ContentDecryptor.processChunk(encryptedData: encrypted, depotKey: plan.key,
-                                                             expectedCRC: chunk.crc,
-                                                             expectedSize: Int(chunk.uncompressedSize))
+                let key = plan.key
+                data = try await DownloadCPU.run {
+                    try ContentDecryptor.processChunk(encryptedData: encrypted, depotKey: key,
+                                                      expectedCRC: chunk.crc,
+                                                      expectedSize: Int(chunk.uncompressedSize))
+                }
                 guard data.count == Int(chunk.uncompressedSize) else { throw SteamError.checksumMismatch }
             } catch is CancellationError {
                 throw CancellationError()

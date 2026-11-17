@@ -183,3 +183,39 @@ enum ProgressThrottle {
         last[key] = nil
     }
 }
+
+/// iDeck: CPU work of downloads (decrypting, decompressing, checksums) on devices with
+/// 6 GB of RAM or less. Those devices overheated while downloading: every chunk in
+/// flight (72 for Steam) was decompressed at once, so all cores ran flat out in bursts.
+/// The network side is unchanged (the same requests stay in flight, so the speed is the
+/// same); only the CPU step after a chunk arrives waits for one of `slots`. Two cores
+/// decompress far faster than a phone's connection delivers. Devices with 8 GB or more
+/// are not limited.
+enum DownloadCPU {
+    static let limited = ProcessInfo.processInfo.physicalMemory <= 7 << 30
+    static let slots = 2
+    private static let gate = DownloadCPUGate(slots)
+
+    static func run<T>(_ work: () throws -> T) async throws -> T {
+        guard limited else { return try work() }
+        await gate.acquire()
+        defer { Task { await gate.release() } }
+        try Task.checkCancellation()
+        return try work()
+    }
+}
+
+actor DownloadCPUGate {
+    private var free: Int
+    private var waiting: [CheckedContinuation<Void, Never>] = []
+    init(_ slots: Int) { free = slots }
+
+    func acquire() async {
+        if free > 0 { free -= 1; return }
+        await withCheckedContinuation { waiting.append($0) }
+    }
+
+    func release() {
+        if waiting.isEmpty { free += 1 } else { waiting.removeFirst().resume() }
+    }
+}
