@@ -1,0 +1,59 @@
+diff --git a/build/ntdll-unix/signal_arm64_ios.c b/build/ntdll-unix/signal_arm64_ios.c
+index cc4aac6..a5bb7af 100644
+--- a/build/ntdll-unix/signal_arm64_ios.c
++++ b/build/ntdll-unix/signal_arm64_ios.c
+@@ -15466,7 +15466,15 @@ void init_syscall_frame( LPTHREAD_START_ROUTINE entry, void *arg, BOOL suspend,
+      * address → undispatchable BUS → NtTerminateProcess. Observed killing
+      * Thumper's worker-thread spawn at ~2:30 (thread 0054, splash wall). */
+     static int ios_page0_attempted = 0;
+-    if (ios_page0_attempted) {
++    /* iDeck: XNU never lets a process map address 0, and on device all eight
++     * approaches failed every run (M8's StikDebug BRK came back as a stray trap).
++     * They only cost start-up time, so they run only with MADEIRA_PAGE0_PROBE=1;
++     * otherwise the Mach handler covers x18=0 straight away. */
++    const char *ios_page0_probe = getenv( "MADEIRA_PAGE0_PROBE" );
++    if (!ios_page0_attempted && (!ios_page0_probe || strcmp( ios_page0_probe, "1" ))) {
++        ios_page0_attempted = 1;
++        ERR("page0: mapping attempts skipped (iOS refuses address 0) — Mach handler covers x18=0\n");
++    } else if (ios_page0_attempted) {
+         ERR("page0: already attempted by first thread — skipping (Mach handler covers x18=0)\n");
+     } else {
+         ios_page0_attempted = 1;
+diff --git a/build/ntdll-unix/virtual_ios.c b/build/ntdll-unix/virtual_ios.c
+index def1962..5550c88 100644
+--- a/build/ntdll-unix/virtual_ios.c
++++ b/build/ntdll-unix/virtual_ios.c
+@@ -20252,6 +20252,33 @@ static NTSTATUS map_view( struct file_view **view_ret, void *base, size_t size,
+             start = (void *)ios_usable_va_floor;
+ 
+ #ifdef WINE_IOS
++        /* iDeck: XNU refuses every address between 4 GB and the first mapped
++         * region (the app's own image, e.g. 0x1020b4000), even when it is free:
++         * scans that began at 0x100000000 failed ~1,200 times per call
++         * ("[va-scan] SLOW ... firstfail=0x100000000 errno=12"). No placement is
++         * lost by starting at that region: nothing below it can be mapped. */
++        {
++            static char *refused_end;
++            if (!refused_end)
++            {
++                mach_vm_address_t ra = 0x100000000ULL;
++                mach_vm_size_t rs = 0;
++                vm_region_basic_info_data_64_t ri;
++                mach_msg_type_number_t rc = VM_REGION_BASIC_INFO_COUNT_64;
++                mach_port_t ro = MACH_PORT_NULL;
++                refused_end = (char *)0x100000000ULL;
++                if (mach_vm_region( mach_task_self(), &ra, &rs, VM_REGION_BASIC_INFO_64,
++                                    (vm_region_info_t)&ri, &rc, &ro ) == KERN_SUCCESS &&
++                    ra > 0x100000000ULL && ra < 0x200000000ULL)
++                    refused_end = (char *)(uintptr_t)ra;
++                dprintf( 2, "[va-scan] iDeck refused low band ends at %p\n", refused_end );
++            }
++            if ((char *)start >= (char *)0x100000000ULL && (char *)start < refused_end &&
++                (char *)end > refused_end &&
++                (size_t)((char *)end - refused_end) >= view_size)
++                start = refused_end;
++        }
++
+         /* ml1070 [laa] LOW HALF FIRST for a SYNTHESISED 4 GB ceiling.
+          *
+          * See ios_wow_laa_synth.  The ceiling was raised for an image that never

@@ -991,6 +991,19 @@ enum DockInstallers {
             ledger.runNext[String(app)] = false
             LogStore.shared.log("[dock-installers] app=\(app) choice=run pending=\(pending.count); the next start skips them")
         }
+        // iDeck: Ubisoft Connect ships inside the app (scripts/bundle_ubisoft_connect.sh).
+        // A Ubisoft game gets it installed silently into its prefix at the first start,
+        // whatever the One-time installs choice, and the game's own (downloading) copy of
+        // the installer is not needed.
+        if Self.requiresUbisoftConnect(game, drive: drive) {
+            if UbisoftConnectBundle.installed(drive: drive) {
+                pending.removeAll { Self.isUbisoftConnect($0) }
+            } else if let process = UbisoftConnectBundle.stage(drive: drive) {
+                pending.removeAll { Self.isUbisoftConnect($0) }
+                pending.insert(process, at: 0)
+                LogStore.shared.log("[dock-installers] app=\(app) bundled Ubisoft Connect queued for a silent install")
+            }
+        }
         // Installers expect a service manager, and a Dock session starts none before the
         // host. With madsync, Wine's services.exe never answered its RPC clients in the
         // fork's device runs, so the service step and then every installer waited; msiexec's
@@ -1183,3 +1196,36 @@ enum DockInstallers {
     }
 }
 
+
+/// iDeck: the Ubisoft Connect installer bundled in the app (iDeck.app/ubisoft).
+enum UbisoftConnectBundle {
+    static let installerName = "UbisoftConnectInstaller.exe"
+    static let launcherFolder = "Program Files (x86)/Ubisoft/Ubisoft Game Launcher"
+
+    static var bundled: URL? {
+        let file = Bundle.main.bundleURL.appendingPathComponent("ubisoft/" + installerName)
+        return FileManager.default.fileExists(atPath: file.path) ? file : nil
+    }
+
+    /// The launcher is already in the prefix.
+    static func installed(drive: URL) -> Bool {
+        let folder = drive.appendingPathComponent(launcherFolder, isDirectory: true)
+        return ["UbisoftConnect.exe", "upc.exe"].contains {
+            FileManager.default.fileExists(atPath: folder.appendingPathComponent($0).path)
+        }
+    }
+
+    /// Copies the installer to C:\iDeck and returns its silent run; nil when the app has none.
+    static func stage(drive: URL, source: URL? = bundled) -> SteamInstallProcess? {
+        guard let source else { return nil }
+        let folder = drive.appendingPathComponent("iDeck", isDirectory: true)
+        let target = folder.appendingPathComponent(installerName)
+        let fm = FileManager.default
+        if !fm.fileExists(atPath: target.path) {
+            try? fm.createDirectory(at: folder, withIntermediateDirectories: true)
+            guard (try? fm.copyItem(at: source, to: target)) != nil else { return nil }
+        }
+        let run = SteamInstallRun(name: "UbisoftConnect", hive: .machine, key: "Software\\iDeck\\UbisoftConnect", value: 1)
+        return SteamInstallProcess(run: run, executable: "C:\\iDeck\\" + installerName, arguments: "/S")
+    }
+}
