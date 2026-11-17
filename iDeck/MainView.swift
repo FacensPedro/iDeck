@@ -1359,7 +1359,7 @@ private struct SteamProgramDetailsView: View {
                                 Button(role: .destructive) {
                                     steamLibrary.cancelInstall(appID: game.appID)
                                 } label: {
-                                    Label(tr("Stop download"), systemImage: "stop.fill")
+                                    Label(tr("Stop"), systemImage: "stop.fill")
                                         .downloadControlLabel()
                                 }
                                 .buttonStyle(.bordered)
@@ -1565,7 +1565,7 @@ private struct SteamProgramDetailsView: View {
                     Button {
                         steamLibrary.pauseInstall(appID: game.appID)
                     } label: {
-                        Label(tr("Pause download"), systemImage: "pause.fill")
+                        Label(tr("Pause"), systemImage: "pause.fill")
                             .downloadControlLabel()
                     }
                     .disabled(stopping)
@@ -1573,7 +1573,7 @@ private struct SteamProgramDetailsView: View {
                     Button(role: .destructive) {
                         steamLibrary.cancelInstall(appID: game.appID)
                     } label: {
-                        Label(stopping ? tr("Stopping...") : tr("Stop download"), systemImage: "stop.fill")
+                        Label(stopping ? tr("Stopping...") : tr("Stop"), systemImage: "stop.fill")
                             .downloadControlLabel()
                     }
                     .disabled(stopping)
@@ -1910,13 +1910,13 @@ private struct StoreGameDetailsView<Extra: View>: View {
                 HStack(spacing: 10) {
                     if let onPause {
                         Button(action: onPause) {
-                            Label(tr("Pause download"), systemImage: "pause.fill")
+                            Label(tr("Pause"), systemImage: "pause.fill")
                                 .downloadControlLabel()
                         }
                         .buttonStyle(.bordered)
                     }
                     Button(role: .destructive, action: onStop) {
-                        Label(tr("Stop download"), systemImage: "stop.fill")
+                        Label(tr("Stop"), systemImage: "stop.fill")
                             .downloadControlLabel()
                     }
                     .buttonStyle(.bordered)
@@ -1954,7 +1954,7 @@ private struct StoreGameDetailsView<Extra: View>: View {
                 .buttonStyle(.borderedProminent)
                 if paused || errorText != nil {
                     Button(role: .destructive, action: onStop) {
-                        Label(tr("Stop download"), systemImage: "stop.fill")
+                        Label(tr("Stop"), systemImage: "stop.fill")
                             .downloadControlLabel()
                     }
                     .buttonStyle(.bordered)

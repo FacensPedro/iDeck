@@ -32,7 +32,7 @@ class DownloadPauseContractTests(unittest.TestCase):
         self.assertIn("func cancelAndWait(_ app: String) async", EPIC)
 
     def test_interface_distinguishes_pause_stop_and_resume(self):
-        self.assertIn('tr("Pause download")', VIEW)
+        self.assertIn('tr("Pause")', VIEW)
         # The controls are on each game's page, not under its library card.
         self.assertIn("steamLibrary.pauseInstall(appID: game.appID)", VIEW)
         self.assertIn("gog.resumeDownload(game)", VIEW)

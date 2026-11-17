@@ -8,7 +8,7 @@
 - FEX's config files (`Config.json` and the per-program files) are created in `C:\ProgramData\fex-emu`, so FEX no longer fails to open them at each start.
 
 ### Interface
-- The download buttons in Portuguese now read "Pausar" and "Parar".
+- The download buttons are shorter. In Portuguese they now read "Pausar" and "Parar"; in English "Pause" and "Stop", in Spanish "Pausar" and "Detener".
 
 ### Version
 - Updated the application version to 2.8.4 (build 101).
