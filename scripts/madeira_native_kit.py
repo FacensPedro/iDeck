@@ -168,6 +168,9 @@ def digest_file(path: Path) -> str:
     return sha.hexdigest()
 
 
+WINE_FONTS = ("tahoma.ttf", "marlett.ttf")
+
+
 def check_assets(app: Path, wow64: bool, mono: bool, graphics: str = "d3d12") -> None:
     if graphics not in ("d3d11", "d3d12"):
         raise KitError("Unsupported native runtime graphics profile")
@@ -246,6 +249,15 @@ def collect(madeira: Path, bridge: Path, wow64: bool, mono: bool,
             if file.stat().st_size == 0 or file.name in (".gitkeep", ".DS_Store"):
                 continue
             entries["resources/" + file.relative_to(app).as_posix()] = file
+    # Wine's system fonts (win32u loads them from <bundle>/fonts). Kept in the kit so a
+    # build from a cached kit, without the Wine sources, still stages them.
+    fonts = app / "fonts" if (app / "fonts/tahoma.ttf").is_file() else madeira / "wine/fonts"
+    for file in sorted(fonts.glob("*.ttf")):
+        if file.stat().st_size:
+            entries["resources/fonts/" + file.name] = file
+    for name in WINE_FONTS:
+        if "resources/fonts/" + name not in entries:
+            raise KitError("Missing Wine font: " + str(fonts / name))
     for key, path in entries.items():
         if not path.is_file() or not path.stat().st_size:
             raise KitError("Missing compiled output: " + key + " → " + str(path))
@@ -388,6 +400,9 @@ def inspect(archive: Path, wow64: bool, mono: bool, graphics: str = "d3d12"):
                  name in ("resources/" + item for item in D3D12_PE + ("aarch64-windows/d3d12.dll",))
                  for name in files):
             raise KitError("D3D11 native kit includes forbidden D3D12 content")
+        for name in WINE_FONTS:
+            if "resources/fonts/" + name not in files:
+                raise KitError("Kit predates the bundled Wine fonts: " + name)
         if wow64:
             for name in WOW64_FILES:
                 if "resources/" + name not in files:
