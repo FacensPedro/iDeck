@@ -65,6 +65,8 @@ class MadeiraNativeKitTests(unittest.TestCase):
             "resources/d3d12/canary_ps.dxil": b"dxil",
             "resources/d3d12/canary_layout_vs.dxil": b"dxil",
             "resources/d3d12/canary_layout_ps.dxil": b"dxil",
+            "resources/fonts/tahoma.ttf": b"\x00\x01\x00\x00tahoma",
+            "resources/fonts/marlett.ttf": b"\x00\x01\x00\x00marlett",
         })
         for name in kit.REQUIRED_PE + (kit.D3D12_PE if graphics == "d3d12" else ()) + (
             kit.WOW64_FILES if wow64 else ()
@@ -275,6 +277,13 @@ class MadeiraNativeKitTests(unittest.TestCase):
         path = self.save(self.entries(), revision="0" * 40)
         with self.assertRaisesRegex(kit.KitError, "revision/platform/options mismatch"):
             kit.inspect(path, False, False)
+
+    def test_rejects_kit_without_wine_fonts(self):
+        data = self.entries()
+        del data["resources/fonts/tahoma.ttf"]
+        path = self.save(data)
+        with self.assertRaisesRegex(kit.KitError, "bundled Wine fonts"):
+            kit.install(path, self.root / "no-fonts", False, False)
 
     def test_rejects_symlink_entries(self):
         path = self.save(self.entries())

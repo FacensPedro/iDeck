@@ -127,7 +127,11 @@ done
 # win32u loads Wine's own system fonts (Tahoma, Marlett, ...) from <data dir>/fonts,
 # which on iOS is the bundle root. Without them the log shows iDeck.app/fonts as
 # missing and windows draw with fallback glyphs.
-FONTS_SOURCE="${IDECK_MADEIRA_ROOT:-$SOURCE/../..}/wine/fonts"
+FONTS_SOURCE=""
+for candidate in "$SOURCE/fonts" "${IDECK_MADEIRA_ROOT:-$ROOT/vendor/Madeira}/wine/fonts" \
+                 "$ROOT/vendor/Madeira/wine/fonts" "$SOURCE/../../wine/fonts"; do
+  if [[ -s "$candidate/tahoma.ttf" ]]; then FONTS_SOURCE="$candidate"; break; fi
+done
 compgen -G "$FONTS_SOURCE/*.ttf" >/dev/null || {
   echo "ERROR: Wine fonts missing: $FONTS_SOURCE" >&2; exit 2;
 }
