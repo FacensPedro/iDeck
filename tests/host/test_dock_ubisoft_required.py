@@ -13,11 +13,9 @@ class DockUbisoftRequiredTests(unittest.TestCase):
         for dll in ("uplay_r1_loader.dll", "uplay_r1_loader64.dll", "upc_r2_loader64.dll"):
             self.assertIn(f'"{dll}"', SRC)
 
-    def test_launcher_runs_lite(self):
-        self.assertIn("enum UbisoftConnectLite", SRC)
-        self.assertIn('("overlay", "enabled", "false")', SRC)
-        self.assertIn("Ubisoft Game Launcher", SRC)
-        self.assertIn("let users = UbisoftConnectLite.apply(drive: drive)", SRC)
+    def test_launcher_runs_unmodified(self):
+        self.assertNotIn("UbisoftConnectLite", SRC)
+        self.assertNotIn("settings.yaml", SRC)
         self.assertIn("} else if !ubisoft.isEmpty {", SRC)
 
 

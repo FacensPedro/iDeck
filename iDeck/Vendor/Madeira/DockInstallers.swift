@@ -914,10 +914,6 @@ enum DockInstallers {
                         has32Bit: Bool = DockInstallers.bundleHas32Bit, hasMsiexec: Bool = DockInstallers.bundleHasMsiexec,
                         fusionSource: URL? = MadeiraRuntime.file("i386-windows/fusion.dll")) {
         script = nil; serverSync = false; note = nil; finishedAt = nil; logged = []; runningSince = nil; installsOnly = false
-        if Self.requiresUbisoftConnect(game, drive: drive) {
-            let users = UbisoftConnectLite.apply(drive: drive)
-            LogStore.shared.log("[ubisoft-lite] app=\(game.id) overlay off, launcher settings written for \(users) user(s)")
-        }
         allSucceeded = false
         let app = game.id
         let batchFile = drive.appendingPathComponent(scriptName)
@@ -1187,62 +1183,3 @@ enum DockInstallers {
     }
 }
 
-
-/// iDeck: Ubisoft Connect with as little load as it allows. The launcher must run for a
-/// Ubisoft game to start, but its in-game overlay hooks every frame of the game's renderer
-/// and is its heaviest part on iOS. It is switched off in the launcher's own settings file
-/// (%LOCALAPPDATA%\Ubisoft Game Launcher\settings.yaml). Values the user set are kept;
-/// only the keys below are forced.
-enum UbisoftConnectLite {
-    static let forced: [(section: String, key: String, value: String)] = [
-        ("overlay", "enabled", "false"),
-        ("overlay", "fps_enabled", "false"),
-        ("overlay", "warning_enabled", "false"),
-        ("overlay", "forceunhookgame", "false"),
-        ("user", "closebehavior", "CloseBehavior_Close"),
-    ]
-
-    /// Writes the settings for every user profile in the prefix; returns how many.
-    @discardableResult
-    static func apply(drive: URL) -> Int {
-        let users = drive.appendingPathComponent("users", isDirectory: true)
-        let names = (try? FileManager.default.contentsOfDirectory(atPath: users.path)) ?? []
-        var count = 0
-        for name in names where name.lowercased() != "public" && !name.hasPrefix(".") {
-            let folder = users.appendingPathComponent(name + "/AppData/Local/Ubisoft Game Launcher", isDirectory: true)
-            let file = folder.appendingPathComponent("settings.yaml")
-            let old = (try? String(contentsOf: file, encoding: .utf8)) ?? ""
-            let new = merged(old)
-            if new != old {
-                try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-                try? new.write(to: file, atomically: true, encoding: .utf8)
-            }
-            count += 1
-        }
-        return count
-    }
-
-    /// Sets each forced key inside its top-level section, adding the key or the section
-    /// when missing. Only two-space-indented keys directly under a section are touched.
-    static func merged(_ text: String) -> String {
-        var lines = text.isEmpty ? [] : text.components(separatedBy: "\n")
-        if lines.last == "" { lines.removeLast() }
-        for item in forced {
-            let header = item.section + ":"
-            let entry = "  \(item.key): \(item.value)"
-            guard let start = lines.firstIndex(where: { $0.trimmingCharacters(in: .whitespaces) == header && !$0.hasPrefix(" ") }) else {
-                lines.append(header); lines.append(entry); continue
-            }
-            var end = start + 1
-            while end < lines.count, lines[end].hasPrefix(" ") || lines[end].isEmpty { end += 1 }
-            if let at = (start + 1..<end).first(where: {
-                lines[$0].hasPrefix("  " + item.key + ":") && !lines[$0].hasPrefix("   ")
-            }) {
-                lines[at] = entry
-            } else {
-                lines.insert(entry, at: start + 1)
-            }
-        }
-        return lines.joined(separator: "\n") + "\n"
-    }
-}
