@@ -263,11 +263,8 @@ struct SettingsView: View {
     private var eaPage: some View {
         Form {
             Section {
-                Button("EA app") {
-                    let client = MadeiraDock.prefix.appendingPathComponent("drive_c/Program Files/Electronic Arts/EA Desktop/EA Desktop/EADesktop.exe")
-                    if FileManager.default.fileExists(atPath: client.path) {
-                        coordinator.launchWindowsProgram(at: client, detectInstaller: false)
-                    } else { coordinator.installDefaultStoreClients() }
+                Button(tr(SystemCoordinator.StoreClient.ea.installedURL == nil ? "Install" : "Launch")) {
+                    coordinator.openStoreClient(.ea)
                 }
                 LabeledContent(tr("Account"),
                                value: eaLibrary.signedIn ? (eaLibrary.accountName ?? tr("Connected")) : tr("Not connected"))

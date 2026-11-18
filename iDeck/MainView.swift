@@ -8,6 +8,7 @@ struct MainView: View {
     // the Steam session is not constructed during process cold-start.
     @State private var steamLibrary: SteamOwnedGamesModel?
     @AppStorage("firstRunSetup.complete.v1") private var firstRunSetupComplete = false
+    @State private var checkedStoreClients = false
     @State private var isFirstRunSetupPresented = false
 
     var body: some View {
@@ -39,12 +40,15 @@ struct MainView: View {
             if !complete { isFirstRunSetupPresented = true }
         }
         .fullScreenCover(isPresented: $isFirstRunSetupPresented, onDismiss: {
-            if firstRunSetupComplete { coordinator.installDefaultStoreClients() }
+            if firstRunSetupComplete { checkDefaultStoreClients() }
         }) {
             IDeckFirstRunSetupView(coordinator: coordinator) {
                 firstRunSetupComplete = true
                 isFirstRunSetupPresented = false
             }
+        }
+        .onChange(of: coordinator.windowsStatus) { _, status in
+            if status == "Windows Runtime Ready" && !isFirstRunSetupPresented { checkDefaultStoreClients() }
         }
         .onChange(of: scenePhase) { _, phase in
             UIApplication.shared.isIdleTimerDisabled = phase == .active
@@ -107,6 +111,13 @@ struct MainView: View {
             GameSessionView(coordinator: coordinator)
         }
     }
+    private func checkDefaultStoreClients() {
+        guard firstRunSetupComplete, !checkedStoreClients, MadeiraBundleIdentity.isNative,
+              PrefixInstaller.isPrefixInstalled(at: MadeiraDock.prefix) else { return }
+        checkedStoreClients = true
+        coordinator.installDefaultStoreClients()
+    }
+
 
 
 }
@@ -910,7 +921,7 @@ struct WindowsWorkspaceView: View {
                 Text("EA app")
                     .font(.headline)
                     .foregroundColor(.white)
-                Text(tr("Sign in on EA's own page to see your EA games and install them without the EA app. iDeck keeps only the sign-in token, in this device's Keychain."))
+                Text(tr("Sign in to EA to see your games. iDeck keeps the sign-in token in this device's Keychain."))
                     .font(.caption)
                     .foregroundColor(.gray)
                     .fixedSize(horizontal: false, vertical: true)
@@ -2524,13 +2535,8 @@ extension WindowsWorkspaceView {
                 }
             case .ubisoft:
                 UbisoftAccountLink()
-                Button(tr("Launch")) {
-                    let drive = MadeiraDock.prefix.appendingPathComponent("drive_c")
-                    let folder = drive.appendingPathComponent(UbisoftConnectBundle.launcherFolder)
-                    if let client = ["UbisoftConnect.exe", "upc.exe"].map({ folder.appendingPathComponent($0) })
-                        .first(where: { FileManager.default.fileExists(atPath: $0.path) }) {
-                        coordinator.launchWindowsProgram(at: client, detectInstaller: false)
-                    } else { coordinator.installDefaultStoreClients() }
+                Button(tr(SystemCoordinator.StoreClient.ubisoft.installedURL == nil ? "Install" : "Launch")) {
+                    coordinator.openStoreClient(.ubisoft)
                 }
             case .ea:
                 if eaLibrary.signedIn {
@@ -2724,8 +2730,15 @@ private struct IDeckFirstRunSetupView: View {
                 background.ignoresSafeArea()
                 ScrollView {
                     VStack(alignment: .leading, spacing: setupHeight == .compact ? 10 : 28) {
-                        header(current)
-                        stepper(current)
+                        if setupHeight == .compact {
+                            HStack(spacing: 16) {
+                                header(current).frame(maxWidth: 270)
+                                stepper(current)
+                            }
+                        } else {
+                            header(current)
+                            stepper(current)
+                        }
                         VStack(alignment: .leading, spacing: 20) {
                             switch current {
                             case .visualCpp: visualCppStep
@@ -2740,12 +2753,17 @@ private struct IDeckFirstRunSetupView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
                         .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(hairline, lineWidth: 1))
-                        footer(current)
+                        if setupHeight != .compact { footer(current) }
                     }
                     .padding(.horizontal, 24)
                     .padding(.vertical, setupHeight == .compact ? 8 : 32)
                     .frame(maxWidth: setupHeight == .compact ? 840 : 640)
                     .frame(maxWidth: .infinity)
+                }
+            }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if setupHeight == .compact {
+                    footer(current).padding(.horizontal, 20).padding(.vertical, 4).background(background)
                 }
             }
             .navigationBarHidden(true)

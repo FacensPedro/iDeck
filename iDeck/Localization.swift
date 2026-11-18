@@ -101,7 +101,7 @@ enum Translations {
         "Install iDeck again from SideStore or AltStore, then open it and check this page.": ["pt": "Instale o iDeck de novo pelo SideStore ou AltStore, abra-o e confira esta página.", "es": "Instala iDeck otra vez desde SideStore o AltStore, ábrelo y revisa esta página."],
         "Connect EA": ["pt": "Conectar EA", "es": "Conectar EA"],
         "Loading EA app library...": ["pt": "Carregando a biblioteca do EA app...", "es": "Cargando la biblioteca de EA app..."],
-        "Sign in on EA's own page to see your EA games and install them without the EA app. iDeck keeps only the sign-in token, in this device's Keychain.": ["pt": "Entre pela página da EA para ver seus jogos da EA e instalá-los sem o EA app. O iDeck guarda só o token de acesso, no Keychain deste aparelho.", "es": "Inicia sesión en la página de EA para ver tus juegos de EA e instalarlos sin EA app. iDeck solo guarda el token de acceso, en el Llavero de este dispositivo."],
+        "Sign in to EA to see your games. iDeck keeps the sign-in token in this device's Keychain.": ["pt": "Entre na EA para ver seus jogos. O iDeck guarda só o token de acesso, no Keychain deste aparelho.", "es": "Inicia sesión en EA para ver tus juegos. iDeck solo guarda el token de acceso, en el Llavero de este dispositivo."],
         "Not downloaded": ["pt": "Não baixado", "es": "No descargado"],
         "Time left": ["pt": "Tempo restante", "es": "Tiempo restante"],
 
