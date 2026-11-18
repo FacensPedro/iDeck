@@ -1219,6 +1219,12 @@ class SystemCoordinator: ObservableObject {
                     }
                 }
                 self.storeClientDownload = nil
+                if missing == [.ubisoft], let installer = StoreClient.ubisoft.installer {
+                    self.requestedStoreClients = missing
+                    let profile = WindowsGameProfile(id: "ideck:store-setup", title: StoreClient.ubisoft.rawValue)
+                    self.launchWindowsExecutable(at: installer, profile: profile, installer: true)
+                    return
+                }
                 var commands = ["@echo off"]
                 for client in missing {
                     let switches = client == .ubisoft ? "" : " /passive /norestart"
