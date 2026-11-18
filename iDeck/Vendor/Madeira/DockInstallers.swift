@@ -1197,22 +1197,16 @@ enum DockInstallers {
 }
 
 
-/// iDeck: the Ubisoft Connect installer bundled in the app (iDeck.app/ubisoft).
+/// iDeck: Ubisoft Connect's installer, downloaded from Settings › Stores › Ubisoft Connect
+/// into C:\iDeck (it is not in the IPA). A Ubisoft game installs it from there silently.
 enum UbisoftConnectBundle {
     static let installerName = "UbisoftConnectInstaller.exe"
-    static let launcherFolder = "Program Files (x86)/Ubisoft/Ubisoft Game Launcher"
 
-    static var bundled: URL? {
-        let file = Bundle.main.bundleURL.appendingPathComponent("ubisoft/" + installerName)
-        return FileManager.default.fileExists(atPath: file.path) ? file : nil
-    }
+    static var bundled: URL? { SystemCoordinator.StoreClient.ubisoft.installer }
 
-    /// The launcher is already in the prefix.
+    /// The launcher is already in the prefix (its registry folder or either Program Files).
     static func installed(drive: URL) -> Bool {
-        let folder = drive.appendingPathComponent(launcherFolder, isDirectory: true)
-        return ["UbisoftConnect.exe", "upc.exe"].contains {
-            FileManager.default.fileExists(atPath: folder.appendingPathComponent($0).path)
-        }
+        SystemCoordinator.StoreClient.ubisoft.installedURL != nil
     }
 
     /// Copies the installer to C:\iDeck and returns its silent run; nil when the app has none.

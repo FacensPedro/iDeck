@@ -9,12 +9,23 @@ def text(path):
 
 
 class UbisoftConnectBundleTests(unittest.TestCase):
-    def test_installer_ships_in_the_app(self):
+    def test_installers_are_not_in_the_ipa(self):
         build = text("scripts/build_ipa.sh")
-        self.assertIn('bash scripts/bundle_ubisoft_connect.sh "$APP"', build)
-        script = text("scripts/bundle_ubisoft_connect.sh")
-        self.assertIn('OUT="$APP/ubisoft/UbisoftConnectInstaller.exe"', script)
-        self.assertIn('"MZ"', script)
+        self.assertNotIn("bundle_ubisoft_connect.sh", build)
+        self.assertNotIn("EAappInstaller.exe", build)
+        coordinator = text("iDeck/SystemCoordinator.swift")
+        self.assertIn("URLSession.shared.download(from: client.downloadURL)", coordinator)
+
+    def test_ubisoft_install_detection(self):
+        coordinator = text("iDeck/SystemCoordinator.swift")
+        self.assertIn('"Program Files/Ubisoft/Ubisoft Game Launcher"', coordinator)
+        self.assertIn('name: "InstallDir"', coordinator)
+
+    def test_store_setup_is_not_automatic(self):
+        self.assertNotIn("installDefaultStoreClients()", text("iDeck/MainView.swift"))
+        settings = text("iDeck/SettingsView.swift")
+        self.assertIn("NavigationLink { ubisoftPage }", settings)
+        self.assertIn("StoreClientButton(client: .ea", settings)
 
     def test_dock_installs_bundled_launcher_silently(self):
         src = text("iDeck/Vendor/Madeira/DockInstallers.swift")

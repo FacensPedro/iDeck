@@ -248,7 +248,13 @@ struct SettingsView: View {
                                 asset: "StoreBadgeEpic")
                 }
             }
-            Section { UbisoftAccountLink() }
+            Section {
+                NavigationLink { ubisoftPage } label: {
+                    SettingsRow(icon: "u.square.fill", color: .black, title: "Ubisoft Connect",
+                                value: tr(SystemCoordinator.StoreClient.ubisoft.installedURL == nil ? "Not installed" : "Installed"),
+                                asset: "StoreBadgeUbisoft", assetKeepsColors: true)
+                }
+            }
             Section {
                 NavigationLink { eaPage } label: {
                     SettingsRow(icon: "square.stack", color: .blue, title: "EA app",
@@ -260,12 +266,26 @@ struct SettingsView: View {
         .navigationTitle(tr("Stores & launchers"))
     }
 
+    private var ubisoftPage: some View {
+        Form {
+            Section {
+                StoreClientButton(client: .ubisoft, coordinator: coordinator)
+                Link(destination: URL(string: "https://account.ubisoft.com/")!) {
+                    Text(tr("Ubisoft account")).foregroundStyle(Color.primary)
+                }
+            } header: {
+                launcherHeader("Ubisoft Connect", asset: "StoreBadgeUbisoft")
+            } footer: {
+                Text(tr("The installer is downloaded from Ubisoft when you tap Install. Sign in inside Ubisoft Connect after it opens."))
+            }
+        }
+        .navigationTitle("Ubisoft Connect")
+    }
+
     private var eaPage: some View {
         Form {
             Section {
-                Button(tr(SystemCoordinator.StoreClient.ea.installedURL == nil ? "Install" : "Launch")) {
-                    coordinator.openStoreClient(.ea)
-                }
+                StoreClientButton(client: .ea, coordinator: coordinator)
                 LabeledContent(tr("Account"),
                                value: eaLibrary.signedIn ? (eaLibrary.accountName ?? tr("Connected")) : tr("Not connected"))
                 if eaLibrary.signedIn {
@@ -656,16 +676,49 @@ private struct SettingsStatusPill: View {
     }
 }
 
-struct UbisoftAccountLink: View {
+/// Install (downloads the official installer, then runs it) or Launch for a store's
+/// own Windows client, with the download's progress.
+struct StoreClientButton: View {
+    let client: SystemCoordinator.StoreClient
+    @ObservedObject var coordinator: SystemCoordinator
+
     var body: some View {
-        Link(destination: URL(string: "https://account.ubisoft.com/")!) {
-            HStack {
-                Image("StoreBadgeUbisoft").renderingMode(.original).resizable().scaledToFit()
-                    .frame(width: 32, height: 32).background(.black).clipShape(RoundedRectangle(cornerRadius: 6))
-                Text("Ubisoft Connect")
-                Spacer()
-                Image(systemName: "safari")
+        if let progress = coordinator.storeClientDownload {
+            HStack(spacing: 10) {
+                ProgressView()
+                Text(progress).foregroundStyle(.secondary)
+            }
+        } else {
+            Button(tr(client.installedURL == nil ? "Install" : "Launch")) {
+                coordinator.openStoreClient(client)
             }
         }
+    }
+}
+
+/// A store page's card for a store whose games iDeck does not list (Ubisoft Connect).
+struct StoreClientCard: View {
+    let client: SystemCoordinator.StoreClient
+    @ObservedObject var coordinator: SystemCoordinator
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(client.rawValue)
+                .font(.headline)
+                .foregroundColor(.white)
+            Text(tr(client.installedURL == nil
+                ? "Install it in Settings › Stores & launchers › %@."
+                : "Installed. Open it to sign in and play your games.", client.rawValue))
+                .font(.subheadline)
+                .foregroundColor(.gray)
+            if client.installedURL != nil {
+                Button(tr("Launch")) { coordinator.openStoreClient(client) }
+                    .buttonStyle(.borderedProminent)
+            }
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.white.opacity(0.06))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
     }
 }

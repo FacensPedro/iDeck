@@ -8,7 +8,6 @@ struct MainView: View {
     // the Steam session is not constructed during process cold-start.
     @State private var steamLibrary: SteamOwnedGamesModel?
     @AppStorage("firstRunSetup.complete.v1") private var firstRunSetupComplete = false
-    @State private var checkedStoreClients = false
     @State private var isFirstRunSetupPresented = false
 
     var body: some View {
@@ -39,16 +38,11 @@ struct MainView: View {
         .onChange(of: firstRunSetupComplete) { _, complete in
             if !complete { isFirstRunSetupPresented = true }
         }
-        .fullScreenCover(isPresented: $isFirstRunSetupPresented, onDismiss: {
-            if firstRunSetupComplete { checkDefaultStoreClients() }
-        }) {
+        .fullScreenCover(isPresented: $isFirstRunSetupPresented) {
             IDeckFirstRunSetupView(coordinator: coordinator) {
                 firstRunSetupComplete = true
                 isFirstRunSetupPresented = false
             }
-        }
-        .onChange(of: coordinator.windowsStatus) { _, status in
-            if status == "Windows Runtime Ready" && !isFirstRunSetupPresented { checkDefaultStoreClients() }
         }
         .onChange(of: scenePhase) { _, phase in
             UIApplication.shared.isIdleTimerDisabled = phase == .active
@@ -110,12 +104,6 @@ struct MainView: View {
         )) {
             GameSessionView(coordinator: coordinator)
         }
-    }
-    private func checkDefaultStoreClients() {
-        guard firstRunSetupComplete, !checkedStoreClients, MadeiraBundleIdentity.isNative,
-              PrefixInstaller.isPrefixInstalled(at: MadeiraDock.prefix) else { return }
-        checkedStoreClients = true
-        coordinator.installDefaultStoreClients()
     }
 
 
@@ -2399,7 +2387,6 @@ extension WindowsWorkspaceView {
         case .store(let store):
             ZStack {
                 panelColor
-                if store == .ubisoft { Color.black }
                 Image(storeAsset(store))
                     .renderingMode(store == .steam || store == .ea || store == .ubisoft ? .original : .template)
                     .resizable()
@@ -2534,10 +2521,7 @@ extension WindowsWorkspaceView {
                     epicContent
                 }
             case .ubisoft:
-                UbisoftAccountLink()
-                Button(tr(SystemCoordinator.StoreClient.ubisoft.installedURL == nil ? "Install" : "Launch")) {
-                    coordinator.openStoreClient(.ubisoft)
-                }
+                StoreClientCard(client: .ubisoft, coordinator: coordinator)
             case .ea:
                 if eaLibrary.signedIn {
                     storeGrid(loading: eaLibrary.refreshing, error: eaLibrary.error,

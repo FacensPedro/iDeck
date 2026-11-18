@@ -27,7 +27,7 @@ class Release20Tests(unittest.TestCase):
         self.assertIn('AppLanguage.gameLocale(separator: "-")', read("EpicLibrary.swift"))
 
     def test_stores_in_separate_sections(self):
-        page = read("SettingsView.swift").split("private var accountsPage")[1].split("private var eaPage")[0]
+        page = read("SettingsView.swift").split("private var accountsPage")[1].split("private var ubisoftPage")[0]
         self.assertEqual(page.count("Section"), 5)
 
     def test_i386_farm_key_ignores_the_components_script(self):

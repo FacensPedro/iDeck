@@ -35,7 +35,7 @@ class EAStoreTests(unittest.TestCase):
 
     def test_ubisoft_store_uses_its_account_page_and_badge(self):
         self.assertTrue((ROOT / "iDeck/Assets.xcassets/StoreBadgeUbisoft.imageset/Ubisoft.png").is_file())
-        self.assertIn("UbisoftAccountLink()", repo_text("iDeck/MainView.swift"))
+        self.assertIn("StoreClientCard(client: .ubisoft", repo_text("iDeck/MainView.swift"))
         self.assertIn("https://account.ubisoft.com/", repo_text("iDeck/SettingsView.swift"))
 
 

@@ -1115,25 +1115,74 @@ class SystemCoordinator: ObservableObject {
     enum StoreClient: String, CaseIterable {
         case ubisoft = "Ubisoft Connect", ea = "EA app"
 
+        static var drive: URL { MadeiraDock.prefix.appendingPathComponent("drive_c") }
+
         var installedURL: URL? {
-            let drive = MadeiraDock.prefix.appendingPathComponent("drive_c")
-            let candidates: [String]
+            let drive = Self.drive
+            var folders: [String] = []
+            let names: [String]
             switch self {
-            case .ubisoft: candidates = ["UbisoftConnect.exe", "upc.exe"].map { UbisoftConnectBundle.launcherFolder + "/" + $0 }
-            case .ea: candidates = ["Program Files/Electronic Arts/EA Desktop/EA Desktop/EADesktop.exe"]
+            case .ubisoft:
+                // Where the installer put it (its own registry value), then both Program
+                // Files folders: a 64-bit installer does not use Program Files (x86), so
+                // checking that folder alone missed an installed launcher.
+                if let dir = Self.registryValue(key: "Software\\Wow6432Node\\Ubisoft\\Launcher", name: "InstallDir")
+                    ?? Self.registryValue(key: "Software\\Ubisoft\\Launcher", name: "InstallDir") {
+                    folders.append(dir)
+                }
+                folders += ["Program Files (x86)/Ubisoft/Ubisoft Game Launcher", "Program Files/Ubisoft/Ubisoft Game Launcher"]
+                names = ["UbisoftConnect.exe", "upc.exe"]
+            case .ea:
+                folders = ["Program Files/Electronic Arts/EA Desktop/EA Desktop", "Program Files (x86)/Electronic Arts/EA Desktop/EA Desktop"]
+                names = ["EADesktop.exe"]
             }
-            return candidates.map { drive.appendingPathComponent($0) }.first {
-                VisualCRuntimeBootstrap.hasPE($0, machines: [0x014c, 0x8664])
+            for folder in folders {
+                for name in names {
+                    let url = drive.appendingPathComponent(folder).appendingPathComponent(name)
+                    if VisualCRuntimeBootstrap.hasPE(url, machines: [0x014c, 0x8664, 0xaa64]) { return url }
+                }
+            }
+            return nil
+        }
+
+        /// A C:\ path value from the prefix's system.reg, as a drive-relative path.
+        static func registryValue(key: String, name: String) -> String? {
+            let file = MadeiraDock.prefix.appendingPathComponent("system.reg")
+            guard let text = try? String(contentsOf: file, encoding: .utf8) else { return nil }
+            // Wine's .reg files write each backslash of a key name twice.
+            let header = "[" + key.lowercased().replacingOccurrences(of: "\\", with: "\\\\") + "]"
+            var inside = false
+            for line in text.split(whereSeparator: \.isNewline) {
+                let l = line.trimmingCharacters(in: .whitespaces)
+                if l.hasPrefix("[") { inside = l.lowercased().hasPrefix(header); continue }
+                guard inside, l.lowercased().hasPrefix("\"" + name.lowercased() + "\"=\"") else { continue }
+                var value = String(l.dropFirst(name.count + 4).dropLast())
+                value = value.replacingOccurrences(of: "\\\\", with: "/")
+                guard value.lowercased().hasPrefix("c:/") else { return nil }
+                return String(value.dropFirst(3)).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            }
+            return nil
+        }
+
+        /// The official installer, downloaded when the user taps Install (not in the IPA).
+        var downloadURL: URL {
+            switch self {
+            case .ubisoft: return URL(string: "https://static3.cdn.ubi.com/orbit/launcher_installer/UbisoftConnectInstaller.exe")!
+            case .ea: return URL(string: "https://origin-a.akamaihd.net/EA-Desktop-Client-Download/installer-releases/EAappInstaller.exe")!
             }
         }
 
+        var installerName: String { downloadURL.lastPathComponent }
+
+        /// The downloaded installer in C:\iDeck, when present.
         var installer: URL? {
-            switch self {
-            case .ubisoft: return UbisoftConnectBundle.bundled
-            case .ea: return Bundle.main.url(forResource: "EAappInstaller", withExtension: "exe", subdirectory: "ea")
-            }
+            let url = Self.drive.appendingPathComponent("iDeck/" + installerName)
+            return VisualCRuntimeBootstrap.hasPE(url, machines: [0x014c, 0x8664, 0xaa64]) ? url : nil
         }
     }
+
+    /// The store client whose installer is downloading, and its progress text.
+    @Published private(set) var storeClientDownload: String?
 
     private var requestedStoreClients: [StoreClient] = []
 
@@ -1144,38 +1193,50 @@ class SystemCoordinator: ObservableObject {
     }
 
     func installDefaultStoreClients(_ clients: [StoreClient] = StoreClient.allCases) {
-        guard !isClosingWindowsSession, !ideck_wineprocess_running() else { return }
+        guard !isClosingWindowsSession, !ideck_wineprocess_running(), storeClientDownload == nil else { return }
         let missing = clients.filter { $0.installedURL == nil }
         guard !missing.isEmpty else { return }
-        let folder = MadeiraDock.prefix.appendingPathComponent("drive_c/iDeck", isDirectory: true)
-        let fm = FileManager.default
-        var commands = ["@echo off"]
-        do {
-            try fm.createDirectory(at: folder, withIntermediateDirectories: true)
-            for client in missing {
-                guard let source = client.installer, VisualCRuntimeBootstrap.hasPE(source, machines: [0x014c, 0x8664]) else {
-                    setWindowsStatus("Execution Error: " + client.rawValue + " installer missing or invalid.")
-                    return
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            let folder = StoreClient.drive.appendingPathComponent("iDeck", isDirectory: true)
+            let fm = FileManager.default
+            do {
+                try fm.createDirectory(at: folder, withIntermediateDirectories: true)
+                for client in missing where client.installer == nil {
+                    self.storeClientDownload = tr("Downloading %@ installer...", client.rawValue)
+                    let (temporary, response) = try await URLSession.shared.download(from: client.downloadURL)
+                    guard (response as? HTTPURLResponse)?.statusCode == 200 else {
+                        throw CocoaError(.fileReadUnknown)
+                    }
+                    let target = folder.appendingPathComponent(client.installerName)
+                    try? fm.removeItem(at: target)
+                    try fm.moveItem(at: temporary, to: target)
+                    guard client.installer != nil else {
+                        try? fm.removeItem(at: target)
+                        self.storeClientDownload = nil
+                        self.setWindowsStatus("Execution Error: " + client.rawValue + " installer missing or invalid.")
+                        return
+                    }
                 }
-                let target = folder.appendingPathComponent(source.lastPathComponent)
-                let temporary = folder.appendingPathComponent(UUID().uuidString)
-                defer { try? fm.removeItem(at: temporary) }
-                try fm.copyItem(at: source, to: temporary)
-                if fm.fileExists(atPath: target.path) { _ = try fm.replaceItemAt(target, withItemAt: temporary) }
-                else { try fm.moveItem(at: temporary, to: target) }
-                let switches = client == .ubisoft ? "/S" : "/passive /norestart"
-                let windowsPath = #"C:\iDeck\"# + target.lastPathComponent
-                commands.append("start /wait \"\" \"" + windowsPath + "\" " + switches)
-                commands.append("if errorlevel 1 echo " + client.rawValue + " installer returned %errorlevel%")
+                self.storeClientDownload = nil
+                var commands = ["@echo off"]
+                for client in missing {
+                    let switches = client == .ubisoft ? "" : " /passive /norestart"
+                    commands.append("start /wait \"\" \"C:\\iDeck\\" + client.installerName + "\"" + switches)
+                    commands.append("if errorlevel 1 echo " + client.rawValue + " installer returned %errorlevel%")
+                }
+                guard let shell = MadeiraDock.stageCommandShell() else { throw CocoaError(.fileNoSuchFile) }
+                try (commands.joined(separator: "\r\n") + "\r\n").write(
+                    to: folder.appendingPathComponent("install-store-clients.cmd"), atomically: true, encoding: .utf8)
+                var profile = WindowsGameProfile(id: "ideck:store-setup", title: missing.map(\.rawValue).joined(separator: " / "))
+                profile.arguments = #"/d /c C:\iDeck\install-store-clients.cmd"#
+                self.requestedStoreClients = missing
+                self.launchWindowsExecutable(at: shell, profile: profile, installer: true)
+            } catch {
+                self.storeClientDownload = nil
+                self.setWindowsStatus("Execution Error: " + tr("Could not download the installer. Check the connection and try again."))
             }
-            guard let shell = MadeiraDock.stageCommandShell() else { throw CocoaError(.fileNoSuchFile) }
-            try (commands.joined(separator: "\r\n") + "\r\n").write(
-                to: folder.appendingPathComponent("install-store-clients.cmd"), atomically: true, encoding: .utf8)
-            var profile = WindowsGameProfile(id: "ideck:store-setup", title: missing.map(\.rawValue).joined(separator: " / "))
-            profile.arguments = #"/d /c C:\iDeck\install-store-clients.cmd"#
-            requestedStoreClients = missing
-            launchWindowsExecutable(at: shell, profile: profile, installer: true)
-        } catch { setWindowsStatus("Execution Error: " + error.localizedDescription) }
+        }
     }
 
     /// Starts any Windows program or installer through the universal installer

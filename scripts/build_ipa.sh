@@ -172,14 +172,8 @@ if [ "${IDECK_REQUIRE_MADEIRA:-0}" = "1" ]; then
   if [[ "${IDECK_SPLIT_RUNTIME:-1}" == "0" && "${IDECK_BUNDLE_VCRUNTIME:-1}" != "0" ]]; then
     bash scripts/bundle_vcruntime.sh "$APP"
   fi
-  # Ubisoft Connect is pre-installed in iDeck: its installer ships in the app.
-  if [[ "${IDECK_BUNDLE_UBISOFT_CONNECT:-1}" != "0" ]]; then
-    bash scripts/bundle_ubisoft_connect.sh "$APP"
-  fi
-  mkdir -p "$APP/ea"
-  curl --fail --location --retry 4 --output "$APP/ea/EAappInstaller.exe" \
-    https://origin-a.akamaihd.net/EA-Desktop-Client-Download/installer-releases/EAappInstaller.exe
-  [[ "$(head -c 2 "$APP/ea/EAappInstaller.exe")" == "MZ" ]] || { echo "Invalid EA installer" >&2; exit 2; }
+  # Ubisoft Connect's and the EA app's installers are not in the IPA: each store's
+  # page in Settings downloads its own when the user taps Install.
   # Native builds use the Debug configuration (upstream Madeira's guest code
   # is unreliable in Release). Drop only the debugger's STABS debug map from
   # the executables: exported and global symbols stay for dlsym and crash logs.

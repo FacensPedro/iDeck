@@ -1,6 +1,10 @@
 ## What's Changed
-### Ubisoft Connect
-- Ubisoft Connect now ships inside iDeck. At a Ubisoft game's first start it is installed silently into the game's prefix before the game opens, so the game finds its launcher without downloading it.
+### Ubisoft Connect and EA app
+- The IPA is smaller: Ubisoft Connect's and the EA app's installers are no longer inside it. Each one is downloaded from Ubisoft or EA when you tap Install in Settings › Stores & launchers, and nothing installs them on its own any more.
+- Ubisoft Connect now has its own page in Stores & launchers, like the other stores, instead of a blue web link.
+- iDeck now recognizes an installed Ubisoft Connect: it looks where the installer recorded it and in both Program Files folders.
+- After Ubisoft Connect is installed, a Ubisoft game uses it at its first start.
+- The Ubisoft Connect tile in the store bar has the same background as the other stores.
 
 ### Wine runtime
 - iDeck no longer tries to map address 0 at start-up (eight attempts that iOS always refused). The Mach handler already covers it.
@@ -18,4 +22,4 @@
 - The download buttons are shorter. In Portuguese they now read "Pausar" and "Parar"; in English "Pause" and "Stop", in Spanish "Pausar" and "Detener".
 
 ### Version
-- Updated the application version to 2.9.1 (build 102).
+- Updated the application version to 2.9.2 (build 103).
