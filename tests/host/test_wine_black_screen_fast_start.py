@@ -36,7 +36,7 @@ class WineBlackScreenAndFastStartupTests(unittest.TestCase):
         self.assertIn("Do NOT write host.metalLayer.drawableSize here", RENDERER)
         self.assertIn("lastGuestSize = nil", RENDERER)
         self.assertIn("winios_display_mode_changed", RENDERER)
-        self.assertIn("let toolbar = min(84.0, max(64.0", RENDERER)
+        self.assertIn("let bounds = frame", RENDERER)
         self.assertIn("host.frame = positioned", RENDERER)
         self.assertIn('"winios_set_compositor_frame"', RENDERER)
         self.assertIn('"winios_set_desktop_rect"', RENDERER)

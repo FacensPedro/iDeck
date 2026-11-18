@@ -56,11 +56,6 @@ struct WindowsRendererView: UIViewRepresentable {
     private static var layerRegistered = false
     private static var lastGuestSize: CGSize?
     private static var drawableObservation: NSKeyValueObservation?
-    /// Set by the session once the game showed its first frame (iPhone full height).
-    static var immersive = false
-    /// True while the picture uses the whole screen and the buttons sit in its side bar.
-    private(set) static var sideControls = false
-    static let sideBarWidth: CGFloat = 52
     private static var currentSurface: (guest: CGSize, drawable: CGSize, bounds: CGRect, mode: RuntimeConfiguration.SurfaceMode)?
 
     static var isNativeDisplayLinked: Bool {
@@ -236,29 +231,12 @@ struct WindowsRendererView: UIViewRepresentable {
         }
         let frame = viewport.convert(viewport.bounds, to: window)
         guard frame.width >= 2 && frame.height >= 2 else { return }
-        // The raw surface sits above the SwiftUI hierarchy. Reserve the
-        // session toolbar's top strip so Close, diagnostics and the optional
-        // FPS overlay stay visible and accessible during gameplay.
-        let toolbar = min(84.0, max(64.0, frame.height * 0.10))
-        var bounds = CGRect(x: frame.minX, y: frame.minY + toolbar,
-                            width: frame.width, height: max(1, frame.height - toolbar))
+        // The toolbar and progress panel have separate window overlays.
+        let bounds = frame
         let guest = currentGuestSize
         let mode = RuntimeConfiguration.SurfaceMode(
             saved: getenv("IDECK_DISPLAY_SCALING").map { String(cString: $0) } ?? "fit")
         let drawable = host.metalLayer.drawableSize
-        // iPhone in landscape: the top strip took 64-84 pt of a ~430 pt screen, so a
-        // fitted game was ~15% smaller than the screen allows. Once the game shows
-        // its first frame, the picture uses the whole height and the session buttons
-        // move to the side bar the picture leaves free (sideControls).
-        var side = false
-        if immersive, window.traitCollection.userInterfaceIdiom == .phone, frame.width > frame.height {
-            let full = RuntimeConfiguration.surfaceRect(guest: guest, drawable: drawable, bounds: frame, mode: mode)
-            if full.minX - frame.minX >= sideBarWidth {
-                bounds = frame
-                side = true
-            }
-        }
-        sideControls = side
         let positioned = RuntimeConfiguration.surfaceRect(
             guest: guest, drawable: drawable, bounds: bounds, mode: mode)
         currentSurface = (guest: guest, drawable: drawable, bounds: bounds, mode: mode)
@@ -290,15 +268,12 @@ struct WindowsRendererView: UIViewRepresentable {
     static func refreshNativeDisplay() {
         guard let viewport = activeViewport, viewport.window != nil else { return }
         attachViewport(viewport)
-        layoutViewport(viewport)
     }
 
     fileprivate static func detachViewport(_ viewport: UIView) {
         guard activeViewport === viewport else { return }
         activeViewport = nil
         lastGuestSize = nil
-        immersive = false
-        sideControls = false
         currentSurface = nil
         // Keep the persistent layer object alive for DXMT's cached
         // swapchain pointer, but remove its window overlay on dismissal.
@@ -323,7 +298,6 @@ struct WindowsRendererView: UIViewRepresentable {
     func updateUIView(_ uiView: UIView, context: Context) {
         if let viewport = uiView as? MadeiraMetalViewport {
             Self.attachViewport(viewport)
-            Self.layoutViewport(viewport)
         }
     }
 

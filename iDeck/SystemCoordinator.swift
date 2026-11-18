@@ -1112,6 +1112,41 @@ class SystemCoordinator: ObservableObject {
     }
 
 
+    /// The first-run wizard has prepared Wine and selected the JIT method before this runs.
+    func installDefaultStoreClients() {
+        let drive = MadeiraDock.prefix.appendingPathComponent("drive_c")
+        let ea = drive.appendingPathComponent("Program Files/Electronic Arts/EA Desktop/EA Desktop/EADesktop.exe")
+        let fm = FileManager.default
+        let folder = drive.appendingPathComponent("iDeck", isDirectory: true)
+        var commands = ["@echo off"]
+        do {
+            try fm.createDirectory(at: folder, withIntermediateDirectories: true)
+            if !UbisoftConnectBundle.installed(drive: drive), UbisoftConnectBundle.bundled != nil {
+                guard UbisoftConnectBundle.stage(drive: drive) != nil else { throw CocoaError(.fileWriteUnknown) }
+                commands.append(#"start /wait "" "C:\iDeck\UbisoftConnectInstaller.exe" /S"#)
+            }
+            if !fm.fileExists(atPath: ea.path),
+               let installer = Bundle.main.url(forResource: "EAappInstaller", withExtension: "exe", subdirectory: "ea") {
+                let target = folder.appendingPathComponent("EAappInstaller.exe")
+                let temporary = folder.appendingPathComponent(UUID().uuidString)
+                defer { try? fm.removeItem(at: temporary) }
+                try fm.copyItem(at: installer, to: temporary)
+                if fm.fileExists(atPath: target.path) {
+                    _ = try fm.replaceItemAt(target, withItemAt: temporary)
+                } else { try fm.moveItem(at: temporary, to: target) }
+                commands.append(#"start /wait "" "C:\iDeck\EAappInstaller.exe" /passive /norestart"#)
+            }
+            guard commands.count > 1 else { return }
+            guard let shell = MadeiraDock.stageCommandShell() else { throw CocoaError(.fileNoSuchFile) }
+            try commands.joined(separator: "\r\n").appending("\r\n").write(
+                to: folder.appendingPathComponent("install-store-clients.cmd"), atomically: true, encoding: .utf8)
+            var profile = WindowsGameProfile(id: "ideck:store-setup", title: "Ubisoft Connect / EA app")
+            profile.arguments = #"/d /c C:\iDeck\install-store-clients.cmd"#
+            nextLaunchIsInstaller = true
+            launchWindowsExecutable(at: shell, profile: profile)
+        } catch { setWindowsStatus("Execution Error: " + error.localizedDescription) }
+    }
+
     /// Starts any Windows program or installer through the universal installer
     /// environment: installs the Visual C++ runtime or .NET support it imports, picks
     /// the installer technology's switches (an .msi runs through msiexec), then starts it.

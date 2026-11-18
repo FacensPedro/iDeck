@@ -102,7 +102,6 @@ enum Translations {
         "Connect EA": ["pt": "Conectar EA", "es": "Conectar EA"],
         "Loading EA app library...": ["pt": "Carregando a biblioteca do EA app...", "es": "Cargando la biblioteca de EA app..."],
         "Sign in on EA's own page to see your EA games and install them without the EA app. iDeck keeps only the sign-in token, in this device's Keychain.": ["pt": "Entre pela página da EA para ver seus jogos da EA e instalá-los sem o EA app. O iDeck guarda só o token de acesso, no Keychain deste aparelho.", "es": "Inicia sesión en la página de EA para ver tus juegos de EA e instalarlos sin EA app. iDeck solo guarda el token de acceso, en el Llavero de este dispositivo."],
-        "EA games are downloaded from EA and started without the EA app: iDeck signs in to EA, gets each game's licence and answers the game as the EA app would.": ["pt": "Os jogos da EA são baixados da EA e abertos sem o EA app: o iDeck entra na EA, obtém a licença de cada jogo e responde ao jogo como o EA app faria.", "es": "Los juegos de EA se descargan de EA y se abren sin EA app: iDeck inicia sesión en EA, obtiene la licencia de cada juego y responde al juego como lo haría EA app."],
         "Not downloaded": ["pt": "Não baixado", "es": "No descargado"],
         "Time left": ["pt": "Tempo restante", "es": "Tiempo restante"],
 
@@ -196,7 +195,6 @@ enum Translations {
 
         // Settings
         "iDeck can download and extract the official Microsoft x64 Visual C++ Redistributable directly on this iPad before launching a Windows game. No Windows installer needs to run. The 14 x64 DLLs are verified before they are made available to Wine.": ["pt": "O iDeck pode baixar e extrair o redistribuível oficial do Microsoft Visual C++ diretamente neste iPad antes de abrir um jogo Windows. Não é necessário executar instalador Windows. As 14 DLLs x64 são verificadas antes do uso pelo Wine.", "es": "iDeck puede descargar y extraer el redistribuible oficial de Microsoft Visual C++ directamente en este iPad antes de abrir un juego de Windows. No es necesario ejecutar un instalador de Windows. Se verifican las 14 DLL x64 antes de utilizarlas con Wine."],
-        "Preparing Wine and graphics...": ["pt": "Iniciando o Wine e preparando os gráficos...", "es": "Iniciando Wine y preparando los gráficos..."],
         "Install Microsoft Visual C++?": ["pt": "Instalar Microsoft Visual C++?", "es": "¿Instalar Microsoft Visual C++?"],
         "Install and play": ["pt": "Instalar e jogar", "es": "Instalar y jugar"],
         "Play without installing": ["pt": "Jogar sem instalar", "es": "Jugar sin instalar"],

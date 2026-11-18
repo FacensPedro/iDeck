@@ -43,7 +43,7 @@ class MadeiraTouchVirtualControllerTests(unittest.TestCase):
         renderer = (ROOT / "iDeck/WindowsRendererView.swift").read_text()
         # No on-screen controller band: the surface fills all below the toolbar.
         self.assertNotIn("IDECK_TOUCH_CONTROLS_ACTIVE", renderer)
-        self.assertIn("frame.height - toolbar", renderer)
+        self.assertIn("let bounds = frame", renderer)
         self.assertNotIn("isUserInteractionEnabled = true", renderer)
 
 

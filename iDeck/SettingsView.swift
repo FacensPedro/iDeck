@@ -248,6 +248,7 @@ struct SettingsView: View {
                                 asset: "StoreBadgeEpic")
                 }
             }
+            Section { UbisoftAccountLink() }
             Section {
                 NavigationLink { eaPage } label: {
                     SettingsRow(icon: "square.stack", color: .blue, title: "EA app",
@@ -262,6 +263,12 @@ struct SettingsView: View {
     private var eaPage: some View {
         Form {
             Section {
+                Button("EA app") {
+                    let client = MadeiraDock.prefix.appendingPathComponent("drive_c/Program Files/Electronic Arts/EA Desktop/EA Desktop/EADesktop.exe")
+                    if FileManager.default.fileExists(atPath: client.path) {
+                        coordinator.launchWindowsProgram(at: client, detectInstaller: false)
+                    } else { coordinator.installDefaultStoreClients() }
+                }
                 LabeledContent(tr("Account"),
                                value: eaLibrary.signedIn ? (eaLibrary.accountName ?? tr("Connected")) : tr("Not connected"))
                 if eaLibrary.signedIn {
@@ -271,8 +278,7 @@ struct SettingsView: View {
                 }
             } header: {
                 launcherHeader("EA app", asset: "StoreBadgeEA")
-            } footer: {
-                Text(tr("EA games are downloaded from EA and started without the EA app: iDeck signs in to EA, gets each game's licence and answers the game as the EA app would."))
+
             }
         }
         .navigationTitle("EA app")
@@ -650,5 +656,19 @@ private struct SettingsStatusPill: View {
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
             .background(color.opacity(0.15), in: Capsule())
+    }
+}
+
+struct UbisoftAccountLink: View {
+    var body: some View {
+        Link(destination: URL(string: "https://account.ubisoft.com/")!) {
+            HStack {
+                Image("StoreBadgeUbisoft").renderingMode(.original).resizable().scaledToFit()
+                    .frame(width: 32, height: 32).background(.black).clipShape(RoundedRectangle(cornerRadius: 6))
+                Text("Ubisoft Connect")
+                Spacer()
+                Image(systemName: "safari")
+            }
+        }
     }
 }

@@ -14,7 +14,7 @@ class MadeiraBlackScreenCloseAndLocalizationTests(unittest.TestCase):
         self.assertGreater(compositor, code.index("if host.frame != positioned"))
         self.assertIn("static func refreshNativeDisplay()", code)
         self.assertIn("attachViewport(viewport)", code)
-        self.assertIn("layoutViewport(viewport)", code)
+        self.assertIn("layoutViewport(viewport)", renderer.split("fileprivate static func attachViewport", 1)[1].split("fileprivate static func layoutViewport", 1)[0])
         self.assertIn("Do NOT write host.metalLayer.drawableSize here", code)
         self.assertLess(code.index("if host.frame != positioned"), compositor)
         guard_start = code.index("if host.frame != positioned")

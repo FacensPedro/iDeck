@@ -722,4 +722,4 @@ struct GOGSignInView: View {
 
 // MARK: - Store
 
-enum GameStore { case steam, gog, epic, ea }
+enum GameStore { case steam, gog, epic, ea, ubisoft }

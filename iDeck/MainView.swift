@@ -38,7 +38,9 @@ struct MainView: View {
         .onChange(of: firstRunSetupComplete) { _, complete in
             if !complete { isFirstRunSetupPresented = true }
         }
-        .fullScreenCover(isPresented: $isFirstRunSetupPresented) {
+        .fullScreenCover(isPresented: $isFirstRunSetupPresented, onDismiss: {
+            if firstRunSetupComplete { coordinator.installDefaultStoreClients() }
+        }) {
             IDeckFirstRunSetupView(coordinator: coordinator) {
                 firstRunSetupComplete = true
                 isFirstRunSetupPresented = false
@@ -2337,7 +2339,7 @@ extension WindowsWorkspaceView {
         ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(alignment: .top, spacing: isCompact ? 8 : 14) {
-                    ForEach([GameStore.steam, .gog, .epic, .ea], id: \.self) { store in
+                    ForEach([GameStore.steam, .gog, .epic, .ea, .ubisoft], id: \.self) { store in
                         shelfTile(.store(store))
                     }
                     ForEach(shelfGames, id: \.self) { item in
@@ -2386,8 +2388,9 @@ extension WindowsWorkspaceView {
         case .store(let store):
             ZStack {
                 panelColor
+                if store == .ubisoft { Color.black }
                 Image(storeAsset(store))
-                    .renderingMode(store == .steam || store == .ea ? .original : .template)
+                    .renderingMode(store == .steam || store == .ea || store == .ubisoft ? .original : .template)
                     .resizable()
                     .scaledToFit()
                     .foregroundColor(textColor)
@@ -2413,6 +2416,7 @@ extension WindowsWorkspaceView {
         case .steam: return "StoreBadgeSteam"
         case .gog: return "StoreBadgeGOG"
         case .epic: return "StoreBadgeEpic"
+        case .ubisoft: return "StoreBadgeUbisoft"
         case .ea: return "StoreBadgeEA"
         }
     }
@@ -2423,6 +2427,7 @@ extension WindowsWorkspaceView {
         case .store(.gog): return "GOG"
         case .store(.epic): return "Epic Games"
         case .store(.ea): return "EA app"
+        case .store(.ubisoft): return "Ubisoft Connect"
         case .steam(let id): return steamLibrary.games.first { $0.appID == id }?.name ?? "Steam"
         case .gog(let id): return gogLibrary.installed[id]?.name ?? "GOG"
         case .gogInstalling(let id): return gogLibrary.games.first { $0.id == id }?.title ?? "GOG"
@@ -2467,6 +2472,7 @@ extension WindowsWorkspaceView {
     @ViewBuilder
     private func storePage(_ store: GameStore) -> some View {
         VStack(alignment: .leading, spacing: 16) {
+            if store != .ubisoft {
             HStack(spacing: 10) {
                 searchField
                 Button { refreshAllLibraries() } label: {
@@ -2480,6 +2486,7 @@ extension WindowsWorkspaceView {
                 }
                 .disabled(mixedLibraryLoading)
                 .accessibilityLabel(tr("Refresh"))
+            }
             }
             switch store {
             case .steam:
@@ -2514,6 +2521,16 @@ extension WindowsWorkspaceView {
                               count: epicLibrary.owned.count, entries: filteredEpicGames.map { .epic($0) })
                 } else {
                     epicContent
+                }
+            case .ubisoft:
+                UbisoftAccountLink()
+                Button(tr("Launch")) {
+                    let drive = MadeiraDock.prefix.appendingPathComponent("drive_c")
+                    let folder = drive.appendingPathComponent(UbisoftConnectBundle.launcherFolder)
+                    if let client = ["UbisoftConnect.exe", "upc.exe"].map({ folder.appendingPathComponent($0) })
+                        .first(where: { FileManager.default.fileExists(atPath: $0.path) }) {
+                        coordinator.launchWindowsProgram(at: client, detectInstaller: false)
+                    } else { coordinator.installDefaultStoreClients() }
                 }
             case .ea:
                 if eaLibrary.signedIn {
@@ -2619,6 +2636,7 @@ extension WindowsWorkspaceView {
 // MARK: First-run setup
 
 private struct IDeckFirstRunSetupView: View {
+    @Environment(\.verticalSizeClass) private var setupHeight
     @ObservedObject var coordinator: SystemCoordinator
     let onFinish: () -> Void
 
@@ -2705,7 +2723,7 @@ private struct IDeckFirstRunSetupView: View {
             ZStack {
                 background.ignoresSafeArea()
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 28) {
+                    VStack(alignment: .leading, spacing: setupHeight == .compact ? 10 : 28) {
                         header(current)
                         stepper(current)
                         VStack(alignment: .leading, spacing: 20) {
@@ -2725,8 +2743,8 @@ private struct IDeckFirstRunSetupView: View {
                         footer(current)
                     }
                     .padding(.horizontal, 24)
-                    .padding(.vertical, 32)
-                    .frame(maxWidth: 640)
+                    .padding(.vertical, setupHeight == .compact ? 8 : 32)
+                    .frame(maxWidth: setupHeight == .compact ? 840 : 640)
                     .frame(maxWidth: .infinity)
                 }
             }
