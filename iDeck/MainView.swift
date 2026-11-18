@@ -241,6 +241,7 @@ struct WindowsWorkspaceView: View {
     @ObservedObject var steamLibrary: SteamOwnedGamesModel
 
     @State private var pendingStore: SystemCoordinator.StoreClient?
+    @State private var eaClientInstalled = false
     @State private var isSettingsPresented = false
     @State private var searchText = ""
     /// The selected tile of the console-style shelf (a store or a game).
@@ -2532,12 +2533,21 @@ extension WindowsWorkspaceView {
             case .ubisoft:
                 StoreClientCard(client: .ubisoft, coordinator: coordinator)
             case .ea:
-                StoreClientCard(client: .ea, coordinator: coordinator)
-                if eaLibrary.signedIn {
-                    storeGrid(loading: eaLibrary.refreshing, error: eaLibrary.error,
-                              count: eaLibrary.owned.count, entries: filteredEAGames.map { .ea($0) })
-                } else {
-                    eaContent
+                Group {
+                    if !eaClientInstalled {
+                        StoreClientCard(client: .ea, coordinator: coordinator)
+                    } else if eaLibrary.signedIn {
+                        storeGrid(loading: eaLibrary.refreshing, error: eaLibrary.error,
+                                  count: eaLibrary.owned.count, entries: filteredEAGames.map { .ea($0) })
+                    } else {
+                        eaContent
+                    }
+                }
+                .task(id: coordinator.windowsStatus) {
+                    let installed = await Task.detached(priority: .utility) {
+                        SystemCoordinator.StoreClient.ea.installedURL != nil
+                    }.value
+                    if !Task.isCancelled { eaClientInstalled = installed }
                 }
             }
         }
