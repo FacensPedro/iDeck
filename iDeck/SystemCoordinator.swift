@@ -1140,10 +1140,10 @@ class SystemCoordinator: ObservableObject {
     func openStoreClient(_ client: StoreClient) {
         if let executable = client.installedURL {
             launchWindowsProgram(at: executable, detectInstaller: false)
-        } else { installDefaultStoreClients([client]) }
+        } else { installDefaultStoreClients([client], interactiveUbisoft: true) }
     }
 
-    func installDefaultStoreClients(_ clients: [StoreClient] = StoreClient.allCases) {
+    func installDefaultStoreClients(_ clients: [StoreClient] = StoreClient.allCases, interactiveUbisoft: Bool = false) {
         guard !isClosingWindowsSession, !ideck_wineprocess_running() else { return }
         let missing = clients.filter { $0.installedURL == nil }
         guard !missing.isEmpty else { return }
@@ -1163,9 +1163,9 @@ class SystemCoordinator: ObservableObject {
                 try fm.copyItem(at: source, to: temporary)
                 if fm.fileExists(atPath: target.path) { _ = try fm.replaceItemAt(target, withItemAt: temporary) }
                 else { try fm.moveItem(at: temporary, to: target) }
-                let switches = client == .ubisoft ? "/S" : "/passive /norestart"
+                let switches = client == .ubisoft ? (interactiveUbisoft ? "" : " /S") : " /passive /norestart"
                 let windowsPath = #"C:\iDeck\"# + target.lastPathComponent
-                commands.append("start /wait \"\" \"" + windowsPath + "\" " + switches)
+                commands.append("start /wait \"\" \"" + windowsPath + "\"" + switches)
                 commands.append("if errorlevel 1 echo " + client.rawValue + " installer returned %errorlevel%")
             }
             guard let shell = MadeiraDock.stageCommandShell() else { throw CocoaError(.fileNoSuchFile) }
