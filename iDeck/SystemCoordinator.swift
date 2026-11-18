@@ -1112,6 +1112,72 @@ class SystemCoordinator: ObservableObject {
     }
 
 
+    enum StoreClient: String, CaseIterable {
+        case ubisoft = "Ubisoft Connect", ea = "EA app"
+
+        var installedURL: URL? {
+            let drive = MadeiraDock.prefix.appendingPathComponent("drive_c")
+            let candidates: [String]
+            switch self {
+            case .ubisoft: candidates = ["UbisoftConnect.exe", "upc.exe"].map { UbisoftConnectBundle.launcherFolder + "/" + $0 }
+            case .ea: candidates = ["Program Files/Electronic Arts/EA Desktop/EA Desktop/EADesktop.exe"]
+            }
+            return candidates.map { drive.appendingPathComponent($0) }.first {
+                VisualCRuntimeBootstrap.hasPE($0, machines: [0x014c, 0x8664])
+            }
+        }
+
+        var installer: URL? {
+            switch self {
+            case .ubisoft: return UbisoftConnectBundle.bundled
+            case .ea: return Bundle.main.url(forResource: "EAappInstaller", withExtension: "exe", subdirectory: "ea")
+            }
+        }
+    }
+
+    private var requestedStoreClients: [StoreClient] = []
+
+    func openStoreClient(_ client: StoreClient) {
+        if let executable = client.installedURL {
+            launchWindowsProgram(at: executable, detectInstaller: false)
+        } else { installDefaultStoreClients([client]) }
+    }
+
+    func installDefaultStoreClients(_ clients: [StoreClient] = StoreClient.allCases) {
+        guard !isClosingWindowsSession, !ideck_wineprocess_running() else { return }
+        let missing = clients.filter { $0.installedURL == nil }
+        guard !missing.isEmpty else { return }
+        let folder = MadeiraDock.prefix.appendingPathComponent("drive_c/iDeck", isDirectory: true)
+        let fm = FileManager.default
+        var commands = ["@echo off"]
+        do {
+            try fm.createDirectory(at: folder, withIntermediateDirectories: true)
+            for client in missing {
+                guard let source = client.installer, VisualCRuntimeBootstrap.hasPE(source, machines: [0x014c, 0x8664]) else {
+                    setWindowsStatus("Execution Error: " + client.rawValue + " installer missing or invalid.")
+                    return
+                }
+                let target = folder.appendingPathComponent(source.lastPathComponent)
+                let temporary = folder.appendingPathComponent(UUID().uuidString)
+                defer { try? fm.removeItem(at: temporary) }
+                try fm.copyItem(at: source, to: temporary)
+                if fm.fileExists(atPath: target.path) { _ = try fm.replaceItemAt(target, withItemAt: temporary) }
+                else { try fm.moveItem(at: temporary, to: target) }
+                let switches = client == .ubisoft ? "/S" : "/passive /norestart"
+                let windowsPath = #"C:\iDeck\"# + target.lastPathComponent
+                commands.append("start /wait \"\" \"" + windowsPath + "\" " + switches)
+                commands.append("if errorlevel 1 echo " + client.rawValue + " installer returned %errorlevel%")
+            }
+            guard let shell = MadeiraDock.stageCommandShell() else { throw CocoaError(.fileNoSuchFile) }
+            try (commands.joined(separator: "\r\n") + "\r\n").write(
+                to: folder.appendingPathComponent("install-store-clients.cmd"), atomically: true, encoding: .utf8)
+            var profile = WindowsGameProfile(id: "ideck:store-setup", title: missing.map(\.rawValue).joined(separator: " / "))
+            profile.arguments = #"/d /c C:\iDeck\install-store-clients.cmd"#
+            requestedStoreClients = missing
+            launchWindowsExecutable(at: shell, profile: profile, installer: true)
+        } catch { setWindowsStatus("Execution Error: " + error.localizedDescription) }
+    }
+
     /// Starts any Windows program or installer through the universal installer
     /// environment: installs the Visual C++ runtime or .NET support it imports, picks
     /// the installer technology's switches (an .msi runs through msiexec), then starts it.
@@ -1176,10 +1242,11 @@ class SystemCoordinator: ObservableObject {
     /// Set by launchWindowsProgram right before an installer starts; read once.
     private var nextLaunchIsInstaller = false
 
-    func launchWindowsExecutable(at url: URL, profile: WindowsGameProfile? = nil) {
-        WindowsRendererView.installerTouchMapping = nextLaunchIsInstaller
+    func launchWindowsExecutable(at url: URL, profile: WindowsGameProfile? = nil, installer: Bool = false) {
+        let installerSession = installer || nextLaunchIsInstaller
             || url.pathExtension.lowercased() == "msi"
             || WindowsRendererView.looksLikeInstaller(url.lastPathComponent)
+        WindowsRendererView.installerTouchMapping = installerSession
         nextLaunchIsInstaller = false
         sessionStartedAt = Date()
         guard !isClosingWindowsSession else { return }
@@ -1262,9 +1329,9 @@ class SystemCoordinator: ObservableObject {
                     }
                     let prefix = URL(fileURLWithPath: mountPath, isDirectory: true)
                     if self.prepareVisualCRuntimeIfNeeded(prefix: prefix, executable: destination, resume: { [weak self] in
-                        self?.launchWindowsExecutable(at: destination, profile: profile)
+                        self?.launchWindowsExecutable(at: destination, profile: profile, installer: installerSession)
                     }) { return }
-                    self.jitResume = { [weak self] in self?.launchWindowsExecutable(at: destination, profile: profile) }
+                    self.jitResume = { [weak self] in self?.launchWindowsExecutable(at: destination, profile: profile, installer: installerSession) }
                     guard self.ensureJITForGameLaunch() else { return }
                     self.windowsEnvironment.configureWine(prefix: mountPath)
                     self.mountExternalDrives(prefix: mountPath)
@@ -1992,6 +2059,14 @@ class SystemCoordinator: ObservableObject {
             }
         }
         var outcome = wineExitResult()
+        if endedGame == "ideck:store-setup" {
+            let absent = requestedStoreClients.filter { $0.installedURL == nil }
+            requestedStoreClients = []
+            if !absent.isEmpty {
+                outcome.reason = "Execution Error: " + absent.map(\.rawValue).joined(separator: ", ")
+                    + " installation did not finish. Open the store to retry."
+            }
+        }
         // EA app games that close by themselves (licence, anti-cheat, missing EA app)
         // used to return to the library with no word: say what went wrong and keep
         // the session screen open on it.

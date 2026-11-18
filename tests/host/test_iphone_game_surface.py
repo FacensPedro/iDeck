@@ -12,11 +12,10 @@ class IPhoneGameSurfaceTests(unittest.TestCase):
 
     def test_iphone_uses_full_height_after_first_frame(self):
         view = (ROOT / "iDeck/WindowsRendererView.swift").read_text()
-        self.assertIn("userInterfaceIdiom == .phone", view)
-        self.assertIn("full.minX - frame.minX >= sideBarWidth", view)
+        self.assertIn("let bounds = frame", view)
         session = (ROOT / "iDeck/GameSessionView.swift").read_text()
-        self.assertIn("WindowsRendererView.immersive = metrics.receivedNewFrames", session)
-        self.assertIn("if sideControls {", session)
+        self.assertIn("SessionWindowOverlay(interactive: true,", session)
+        self.assertIn(".statusBarHidden(true)", session)
 
 
 if __name__ == "__main__":

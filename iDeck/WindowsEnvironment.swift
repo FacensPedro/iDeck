@@ -724,6 +724,10 @@ class WindowsEnvironment {
             if low { setenv("DXMT_MAX_FRAME_LATENCY", "1", 1) } else { unsetenv("DXMT_MAX_FRAME_LATENCY") }
             AppLog.record("[memory] DXMT frames in flight: \(low ? 1 : 2) (\(Int(os_proc_available_memory() >> 20)) MiB left)")
         }
+        // Reuse compiled Metal pipelines across launches when memory permits.
+        if MadeiraConfig.get("env.DXMT_PIPELINE_ARCHIVE") == nil {
+            setenv("DXMT_PIPELINE_ARCHIVE", os_proc_available_memory() >= 4096 * 1024 * 1024 ? "1" : "0", 1)
+        }
         setenv("DXMT_SHADER_CACHE_MAX_MB", "128", 0)
         // Fastsync's per-game switches, only when Settings chose Fastsync.
         if MadeiraSyncEngine.current == .fastsync {

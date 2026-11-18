@@ -52,7 +52,7 @@ enum MadeiraWinePool {
         let freeMiB = Int(os_proc_available_memory() >> 20)
         let cleanHistory = (learnedProfile?.consecutiveCrashes ?? 0) == 0
             && (learnedProfile.map { $0.lastGoodPoolMiB < 256 || $0.lastGoodPoolMiB >= base } ?? true)
-        if AddressSpaceCheck.hasGuestWindow, cleanHistory {
+        if AddressSpaceCheck.hasGuestWindow, cleanHistory, let learnedProfile, learnedProfile.lastGoodPoolMiB > base {
             let grown: Int
             switch freeMiB {
             case 8192...: grown = 896
@@ -61,7 +61,7 @@ enum MadeiraWinePool {
             default: grown = size
             }
             if grown > size {
-                size = grown
+                size = min(grown, learnedProfile.lastGoodPoolMiB)
                 why.append("grown to \(grown) MB (\(freeMiB) MiB free)")
             }
         }
@@ -77,7 +77,7 @@ enum MadeiraWinePool {
         }
         // The RW mirror is touched as code is translated: with little memory left a
         // large pool only moves the game closer to iOS's limit.
-        let available = Int(os_proc_available_memory() >> 20)
+        let available = freeMiB
         let memoryCap: Int
         switch available {
         case ..<1: memoryCap = size

@@ -122,13 +122,13 @@ struct GameSessionView: View {
     @State private var logCopyMessage: String?
     @State private var isCopyingWineLog = false
     @State private var showControlsSheet = false
-    @State private var sideControls = false
     /// The close and settings buttons folded into a small tab, so they cover less of the game.
-    @AppStorage("gameButtonsMinimized") private var gameButtonsMinimized = false
+    @AppStorage("gameButtonsMinimized") private var gameButtonsMinimized = true
     @AppStorage("touchMouseEnabled") private var touchMouseEnabled = true
     @State private var metalFXTurnedOff = false
 
     private var gameLoading: (progress: Double, stage: String)? {
+        if metrics.receivedNewFrames { return nil }
         let status = coordinator.windowsStatus
         if status == VisualCRuntimeBootstrap.installStatus {
             return (0.15, "Preparing Microsoft Visual C++")
@@ -162,6 +162,7 @@ struct GameSessionView: View {
         return nil
     }
     private var hasWineProblem: Bool {
+        if metrics.receivedNewFrames { return false }
         let status = coordinator.windowsStatus
         if status.hasPrefix("Execution Error") { return true }
         if status == "Running" &&
@@ -229,7 +230,7 @@ struct GameSessionView: View {
             // Edge to edge: on iPhones the safe area (Dynamic Island, notch,
             // home indicator) would otherwise shrink the game image; the
             // surface mode letterboxes it within the whole screen.
-            if !coordinator.windowsStatus.hasPrefix("Execution Error") {
+            if metrics.receivedNewFrames || !coordinator.windowsStatus.hasPrefix("Execution Error") {
                 GeometryReader { geometry in
                     WindowsRendererView()
                         .frame(width: geometry.size.width, height: geometry.size.height)
@@ -237,50 +238,8 @@ struct GameSessionView: View {
                 .ignoresSafeArea()
             }
 
-            if touchMouseEnabled {
-                TouchMouseView().ignoresSafeArea()
-            }
-
-            VStack {
-                HStack(alignment: .top) {
-                  if gameButtonsMinimized {
-                    Button { withAnimation(.easeOut(duration: 0.2)) { gameButtonsMinimized = false } } label: {
-                        Image(systemName: "chevron.right.circle.fill")
-                            .font(.system(size: 18))
-                            .foregroundColor(.white.opacity(0.45))
-                            .frame(width: 44, height: 44)
-                    }
-                    .accessibilityLabel(tr("Show the close and settings buttons"))
-                  } else {
-                    Button(action: coordinator.requestCloseWindowsSession) {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 30))
-                            .foregroundColor(.white.opacity(0.85))
-                            .frame(width: 44, height: 44)
-                            .padding(8)
-                    }
-                    .disabled(coordinator.isClosingWindowsSession)
-                    .accessibilityLabel(tr("Close Wine and return to the library"))
-                    Button { showControlsSheet = true } label: {
-                        Image(systemName: "gearshape.fill")
-                            .font(.system(size: 22))
-                            .foregroundColor(.white.opacity(0.85))
-                            .frame(width: 44, height: 44)
-                            .padding(.vertical, 8)
-                    }
-                    .accessibilityLabel(tr("Settings"))
-                    Button { withAnimation(.easeOut(duration: 0.2)) { gameButtonsMinimized = true } } label: {
-                        Image(systemName: "chevron.left.circle.fill")
-                            .font(.system(size: 18))
-                            .foregroundColor(.white.opacity(0.6))
-                            .frame(width: 44, height: 44)
-                            .padding(.vertical, 8)
-                    }
-                    .accessibilityLabel(tr("Minimize the close and settings buttons"))
-                  }
-                    // The game's Metal surface covers everything below the
-                    // top strip, so the startup progress lives up here.
                     if let loading = gameLoading {
+                        SessionWindowOverlay {
                         VStack(alignment: .leading, spacing: 5) {
                             HStack {
                                 Text(tr(loading.stage))
@@ -301,8 +260,52 @@ struct GameSessionView: View {
                         .accessibilityElement(children: .combine)
                         .accessibilityHint(Text("Startup milestone, not the game's internal loading percentage."))
                         .background(.black.opacity(0.8), in: RoundedRectangle(cornerRadius: 10))
-                        .padding(.top, 8)
+                        .padding(.horizontal, 16)
+                        }
                     }
+            if touchMouseEnabled {
+                TouchMouseView().ignoresSafeArea()
+            }
+
+            SessionWindowOverlay(interactive: true, compactTab: gameButtonsMinimized && metrics.receivedNewFrames && !showGamePerformanceOverlay && !coordinator.isClosingWindowsSession) {
+            VStack {
+                HStack(alignment: .top) {
+                  if gameButtonsMinimized {
+                    Button { withAnimation(.easeOut(duration: 0.2)) { gameButtonsMinimized = false } } label: {
+                        Image(systemName: "chevron.right.circle.fill")
+                            .font(.system(size: 18))
+                            .foregroundColor(.white.opacity(0.45))
+                            .frame(width: 44, height: 44)
+                    }
+                    .accessibilityLabel(tr("Show the close and settings buttons"))
+                  } else {
+                    Button { withAnimation(.easeOut(duration: 0.2)) { gameButtonsMinimized = true } } label: {
+                        Image(systemName: "chevron.left.circle.fill")
+                            .font(.system(size: 18))
+                            .foregroundColor(.white.opacity(0.6))
+                            .frame(width: 44, height: 44)
+                            .padding(.vertical, 8)
+                    }
+                    .accessibilityLabel(tr("Minimize the close and settings buttons"))
+                    Button(action: coordinator.requestCloseWindowsSession) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 30))
+                            .foregroundColor(.white.opacity(0.85))
+                            .frame(width: 44, height: 44)
+                            .padding(8)
+                    }
+                    .disabled(coordinator.isClosingWindowsSession)
+                    .accessibilityLabel(tr("Close Wine and return to the library"))
+                    Button { showControlsSheet = true } label: {
+                        Image(systemName: "gearshape.fill")
+                            .font(.system(size: 22))
+                            .foregroundColor(.white.opacity(0.85))
+                            .frame(width: 44, height: 44)
+                            .padding(.vertical, 8)
+                    }
+                    .accessibilityLabel(tr("Settings"))
+
+                  }
                     // The Metal layer sits directly over the SwiftUI content
                     // outside this top strip. Keep first-frame failures and
                     // shutdown progress VISIBLE even when the drawable is black.
@@ -311,7 +314,7 @@ struct GameSessionView: View {
                             .foregroundColor(.white)
                             .font(.caption.weight(.semibold))
                             .lineLimit(2)
-                    } else if metalFXTurnedOff {
+                    } else if !metrics.receivedNewFrames && metalFXTurnedOff {
                         Text(tr("The game showed no image with MetalFX, so MetalFX is now off for it. Close the game and open it again."))
                             .foregroundColor(.yellow)
                             .font(.caption2.weight(.semibold))
@@ -382,27 +385,11 @@ struct GameSessionView: View {
                     .background(.black.opacity(0.8), in: RoundedRectangle(cornerRadius: 10))
                     .padding(.horizontal, 14)
                 }
-                if coordinator.windowsStatus == "Launching Steam game..." ||
-                    coordinator.windowsStatus == "Launching Steam client..." ||
-                    coordinator.windowsStatus == "Launching Windows app..." ||
-                    coordinator.windowsStatus == "Installing Steam prerequisites..." ||
-                    coordinator.windowsStatus == VisualCRuntimeBootstrap.installStatus ||
-                    coordinator.windowsStatus == SystemCoordinator.steamComponentsInstallStatus {
-                    HStack {
-                        ProgressView()
-                        Text(coordinator.windowsStatus == VisualCRuntimeBootstrap.installStatus
-                            ? tr("Installing Microsoft Visual C++...")
-                            : coordinator.windowsStatus == SystemCoordinator.steamComponentsInstallStatus
-                            ? tr("Installing Steam client components...") + (coordinator.steamComponentsProgress.map { "\n" + tr($0) } ?? "")
-                            : tr("Preparing Wine and graphics..."))
-                    }
-                    .padding(10)
-                    .background(.black.opacity(0.7), in: RoundedRectangle(cornerRadius: 8))
-                } else if coordinator.windowsStatus.hasPrefix("Visual C++") {
+                if !metrics.receivedNewFrames && coordinator.windowsStatus.hasPrefix("Visual C++") {
                     Text(trStatus(coordinator.windowsStatus))
                         .font(.caption)
                         .foregroundColor(.orange)
-                } else if coordinator.windowsStatus.hasPrefix("Execution Error") {
+                } else if !metrics.receivedNewFrames && coordinator.windowsStatus.hasPrefix("Execution Error") {
                     VStack(alignment: .leading, spacing: 10) {
                         Text(trStatus(coordinator.windowsStatus))
                             .foregroundColor(.red)
@@ -430,12 +417,12 @@ struct GameSessionView: View {
                     .padding(12)
                     .background(.black.opacity(0.7), in: RoundedRectangle(cornerRadius: 8))
                     .padding(.horizontal, 12)
-                } else if coordinator.windowsStatus == "Running" && !WindowsRendererView.isNativeDisplayLinked {
+                } else if !metrics.receivedNewFrames && coordinator.windowsStatus == "Running" && !WindowsRendererView.isNativeDisplayLinked {
                     Text(tr("Madeira display backend is missing. This build cannot present Windows graphics."))
                         .foregroundColor(.orange)
                         .padding(10)
                         .background(.black.opacity(0.7), in: RoundedRectangle(cornerRadius: 8))
-                } else if coordinator.windowsStatus == "Running" && !metrics.presentCounterAvailable {
+                } else if !metrics.receivedNewFrames && coordinator.windowsStatus == "Running" && !metrics.presentCounterAvailable {
                     Text(tr("Wine started, but the Metal presentation counter is unavailable. Graphics are not verified."))
                         .foregroundColor(.orange)
                         .padding(10)
@@ -465,39 +452,12 @@ struct GameSessionView: View {
                     .background(.black.opacity(0.7), in: RoundedRectangle(cornerRadius: 8))
                     .padding(.horizontal, 12)
                 }
-                Spacer()
             }
-            .opacity(sideControls ? 0 : 1)
-            .allowsHitTesting(!sideControls)
-
-            // iPhone, full-height picture: the buttons stay in the side bar it leaves.
-            if sideControls {
-                HStack {
-                    VStack(spacing: 6) {
-                        Button(action: coordinator.requestCloseWindowsSession) {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(.system(size: 26))
-                                .foregroundColor(.white.opacity(0.85))
-                                .frame(width: 44, height: 44)
-                        }
-                        .disabled(coordinator.isClosingWindowsSession)
-                        .accessibilityLabel(tr("Close Wine and return to the library"))
-                        Button { showControlsSheet = true } label: {
-                            Image(systemName: "gearshape.fill")
-                                .font(.system(size: 20))
-                                .foregroundColor(.white.opacity(0.85))
-                                .frame(width: 44, height: 44)
-                        }
-                        .accessibilityLabel(tr("Settings"))
-                        Spacer()
-                    }
-                    .frame(width: WindowsRendererView.sideBarWidth)
-                    .padding(.top, 8)
-                    Spacer()
-                }
-                .ignoresSafeArea()
             }
+            .frame(maxHeight: .infinity, alignment: .top)
         }
+        .statusBarHidden(true)
+        .persistentSystemOverlays(.hidden)
         .modifier(WineGamepadEventClaim())
         .sheet(isPresented: $showControlsSheet) { SessionControlsSheet(coordinator: coordinator) }
         .onChange(of: showGamePerformanceOverlay) { _, on in
@@ -530,8 +490,7 @@ struct GameSessionView: View {
                 WindowsRendererView.refreshNativeDisplay()
             }
             metrics.sample(collectPerformance: showGamePerformanceOverlay)
-            WindowsRendererView.immersive = metrics.receivedNewFrames && !coordinator.isClosingWindowsSession
-            if sideControls != WindowsRendererView.sideControls { sideControls = WindowsRendererView.sideControls }
+
             if coordinator.windowsStatus == "Wine started; waiting for game..." &&
                metrics.receivedNewFrames &&
                (!coordinator.currentSteamLaunchUsesDock || coordinator.dockLaunchAccepted) {
@@ -563,4 +522,49 @@ struct GameSessionView: View {
             Text(tr(coordinator.windowsCloseWarning ?? ""))
         }
     }
+}
+
+/// Overlay controls share the presenting UIWindow with Wine's persistent Metal surface.
+private struct SessionWindowOverlay<Content: View>: UIViewRepresentable {
+    var interactive = false
+    var compactTab = false
+    @ViewBuilder var content: () -> Content
+
+    final class Mount: UIView {
+        var compactTab = false
+        let host: UIHostingController<Content>
+        init(root: Content) {
+            host = UIHostingController(rootView: root)
+            super.init(frame: .zero)
+            host.view.backgroundColor = .clear
+            isUserInteractionEnabled = false
+        }
+        required init?(coder: NSCoder) { nil }
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            host.view.removeFromSuperview()
+            if let window { window.addSubview(host.view) }
+            setNeedsLayout()
+        }
+        override func layoutSubviews() {
+            super.layoutSubviews()
+            if let window {
+                var rect = convert(bounds, to: window)
+                if host.view.isUserInteractionEnabled {
+                    if compactTab { rect.size.width = min(rect.width, 44) }
+                    rect.size.height = min(rect.height, host.sizeThatFits(in: rect.size).height)
+                }
+                host.view.frame = rect
+            }
+        }
+    }
+    func makeUIView(context: Context) -> Mount { Mount(root: content()) }
+    func updateUIView(_ view: Mount, context: Context) {
+        view.compactTab = compactTab
+        view.host.rootView = content()
+        view.setNeedsLayout()
+        view.host.view.isUserInteractionEnabled = interactive
+        if let window = view.window { window.bringSubviewToFront(view.host.view) }
+    }
+    static func dismantleUIView(_ view: Mount, coordinator: ()) { view.host.view.removeFromSuperview() }
 }

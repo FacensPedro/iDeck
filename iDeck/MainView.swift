@@ -8,6 +8,7 @@ struct MainView: View {
     // the Steam session is not constructed during process cold-start.
     @State private var steamLibrary: SteamOwnedGamesModel?
     @AppStorage("firstRunSetup.complete.v1") private var firstRunSetupComplete = false
+    @State private var checkedStoreClients = false
     @State private var isFirstRunSetupPresented = false
 
     var body: some View {
@@ -38,11 +39,16 @@ struct MainView: View {
         .onChange(of: firstRunSetupComplete) { _, complete in
             if !complete { isFirstRunSetupPresented = true }
         }
-        .fullScreenCover(isPresented: $isFirstRunSetupPresented) {
+        .fullScreenCover(isPresented: $isFirstRunSetupPresented, onDismiss: {
+            if firstRunSetupComplete { checkDefaultStoreClients() }
+        }) {
             IDeckFirstRunSetupView(coordinator: coordinator) {
                 firstRunSetupComplete = true
                 isFirstRunSetupPresented = false
             }
+        }
+        .onChange(of: coordinator.windowsStatus) { _, status in
+            if status == "Windows Runtime Ready" && !isFirstRunSetupPresented { checkDefaultStoreClients() }
         }
         .onChange(of: scenePhase) { _, phase in
             UIApplication.shared.isIdleTimerDisabled = phase == .active
@@ -105,6 +111,13 @@ struct MainView: View {
             GameSessionView(coordinator: coordinator)
         }
     }
+    private func checkDefaultStoreClients() {
+        guard firstRunSetupComplete, !checkedStoreClients, MadeiraBundleIdentity.isNative,
+              PrefixInstaller.isPrefixInstalled(at: MadeiraDock.prefix) else { return }
+        checkedStoreClients = true
+        coordinator.installDefaultStoreClients()
+    }
+
 
 
 }
@@ -908,7 +921,7 @@ struct WindowsWorkspaceView: View {
                 Text("EA app")
                     .font(.headline)
                     .foregroundColor(.white)
-                Text(tr("Sign in on EA's own page to see your EA games and install them without the EA app. iDeck keeps only the sign-in token, in this device's Keychain."))
+                Text(tr("Sign in to EA to see your games. iDeck keeps the sign-in token in this device's Keychain."))
                     .font(.caption)
                     .foregroundColor(.gray)
                     .fixedSize(horizontal: false, vertical: true)
@@ -1222,7 +1235,6 @@ private struct WindowsExecutableDetailsView: View {
                             .padding(.vertical, 14)
                     }
                     .buttonStyle(.borderedProminent)
-                    WindowsGameProfileForm(profile: $profile)
                     Button(role: .destructive) {
                         guard let prefixPath else {
                             errorMessage = tr("Windows environment is not ready.")
@@ -1243,6 +1255,7 @@ private struct WindowsExecutableDetailsView: View {
                             .padding(.vertical, 12)
                     }
                     .buttonStyle(.bordered)
+                    WindowsGameProfileForm(profile: $profile)
                 }
                 .padding(22)
             }
@@ -2337,7 +2350,7 @@ extension WindowsWorkspaceView {
         ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(alignment: .top, spacing: isCompact ? 8 : 14) {
-                    ForEach([GameStore.steam, .gog, .epic, .ea], id: \.self) { store in
+                    ForEach([GameStore.steam, .gog, .epic, .ea, .ubisoft], id: \.self) { store in
                         shelfTile(.store(store))
                     }
                     ForEach(shelfGames, id: \.self) { item in
@@ -2386,8 +2399,9 @@ extension WindowsWorkspaceView {
         case .store(let store):
             ZStack {
                 panelColor
+                if store == .ubisoft { Color.black }
                 Image(storeAsset(store))
-                    .renderingMode(store == .steam || store == .ea ? .original : .template)
+                    .renderingMode(store == .steam || store == .ea || store == .ubisoft ? .original : .template)
                     .resizable()
                     .scaledToFit()
                     .foregroundColor(textColor)
@@ -2413,6 +2427,7 @@ extension WindowsWorkspaceView {
         case .steam: return "StoreBadgeSteam"
         case .gog: return "StoreBadgeGOG"
         case .epic: return "StoreBadgeEpic"
+        case .ubisoft: return "StoreBadgeUbisoft"
         case .ea: return "StoreBadgeEA"
         }
     }
@@ -2423,6 +2438,7 @@ extension WindowsWorkspaceView {
         case .store(.gog): return "GOG"
         case .store(.epic): return "Epic Games"
         case .store(.ea): return "EA app"
+        case .store(.ubisoft): return "Ubisoft Connect"
         case .steam(let id): return steamLibrary.games.first { $0.appID == id }?.name ?? "Steam"
         case .gog(let id): return gogLibrary.installed[id]?.name ?? "GOG"
         case .gogInstalling(let id): return gogLibrary.games.first { $0.id == id }?.title ?? "GOG"
@@ -2467,6 +2483,7 @@ extension WindowsWorkspaceView {
     @ViewBuilder
     private func storePage(_ store: GameStore) -> some View {
         VStack(alignment: .leading, spacing: 16) {
+            if store != .ubisoft {
             HStack(spacing: 10) {
                 searchField
                 Button { refreshAllLibraries() } label: {
@@ -2480,6 +2497,7 @@ extension WindowsWorkspaceView {
                 }
                 .disabled(mixedLibraryLoading)
                 .accessibilityLabel(tr("Refresh"))
+            }
             }
             switch store {
             case .steam:
@@ -2514,6 +2532,11 @@ extension WindowsWorkspaceView {
                               count: epicLibrary.owned.count, entries: filteredEpicGames.map { .epic($0) })
                 } else {
                     epicContent
+                }
+            case .ubisoft:
+                UbisoftAccountLink()
+                Button(tr(SystemCoordinator.StoreClient.ubisoft.installedURL == nil ? "Install" : "Launch")) {
+                    coordinator.openStoreClient(.ubisoft)
                 }
             case .ea:
                 if eaLibrary.signedIn {
@@ -2619,6 +2642,7 @@ extension WindowsWorkspaceView {
 // MARK: First-run setup
 
 private struct IDeckFirstRunSetupView: View {
+    @Environment(\.verticalSizeClass) private var setupHeight
     @ObservedObject var coordinator: SystemCoordinator
     let onFinish: () -> Void
 
@@ -2705,9 +2729,16 @@ private struct IDeckFirstRunSetupView: View {
             ZStack {
                 background.ignoresSafeArea()
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 28) {
-                        header(current)
-                        stepper(current)
+                    VStack(alignment: .leading, spacing: setupHeight == .compact ? 10 : 28) {
+                        if setupHeight == .compact {
+                            HStack(spacing: 16) {
+                                header(current).frame(maxWidth: 270)
+                                stepper(current)
+                            }
+                        } else {
+                            header(current)
+                            stepper(current)
+                        }
                         VStack(alignment: .leading, spacing: 20) {
                             switch current {
                             case .visualCpp: visualCppStep
@@ -2722,12 +2753,17 @@ private struct IDeckFirstRunSetupView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
                         .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(hairline, lineWidth: 1))
-                        footer(current)
+                        if setupHeight != .compact { footer(current) }
                     }
                     .padding(.horizontal, 24)
-                    .padding(.vertical, 32)
-                    .frame(maxWidth: 640)
+                    .padding(.vertical, setupHeight == .compact ? 8 : 32)
+                    .frame(maxWidth: setupHeight == .compact ? 840 : 640)
                     .frame(maxWidth: .infinity)
+                }
+            }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if setupHeight == .compact {
+                    footer(current).padding(.horizontal, 20).padding(.vertical, 4).background(background)
                 }
             }
             .navigationBarHidden(true)

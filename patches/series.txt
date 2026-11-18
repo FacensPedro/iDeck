@@ -46,3 +46,8 @@ session   .      madeira-repeat-wine-sessions.patch
 # After the source scripts
 late      .      madeira-mscoree-fusion-negative-cache.patch
 late      .      madeira-pipe2-ios26.patch
+
+# iDeck: accurate Win32 protection results and sandbox data paths
+native    FEX    fex-windows-protection-result.patch
+native    .      madeira-layerkit-contiguous-range.patch
+native    .      madeira-fex-init-diagnostics.patch

@@ -19,6 +19,7 @@ final class TouchMouseSurface: UIView {
     private static let up = symbol("winios_post_touch_up")
 
     private weak var tracked: UITouch?
+    private var lastGuestPoint: (Int32, Int32)?
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -54,18 +55,22 @@ final class TouchMouseSurface: UIView {
                           + "(\(WindowsRendererView.touchMappingSummary)); down=\(Self.down != nil)")
         }
         tracked = touch
+        lastGuestPoint = p
+        Self.move?(p.0, p.1)
         Self.down?(p.0, p.1)
     }
 
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
         guard let touch = tracked, touches.contains(touch), let p = guest(touch) else { return }
+        lastGuestPoint = p
         Self.move?(p.0, p.1)
     }
 
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
         guard let touch = tracked, touches.contains(touch) else { return }
         tracked = nil
-        if let p = guest(touch) { Self.up?(p.0, p.1) }
+        if let p = guest(touch) ?? lastGuestPoint { Self.up?(p.0, p.1) }
+        lastGuestPoint = nil
     }
 
     override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {

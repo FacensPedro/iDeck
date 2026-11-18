@@ -53,7 +53,9 @@ struct WindowsPEInfo: Equatable {
         case 0x20b: directories = optional + 112     // PE32+
         default: return nil
         }
-        let directoryCount = Int(data.u32(directories - 4))
+        guard directories <= optional + optionalSize else { return nil }
+        let directoryCount = min(Int(data.u32(directories - 4)), (optional + optionalSize - directories) / 8)
+        let imageBase32 = magic == 0x10b ? Int(data.u32(optional + 28)) : 0
         func directory(_ index: Int) -> (rva: Int, size: Int) {
             guard index < directoryCount, directories + index * 8 + 8 <= data.count else { return (0, 0) }
             return (Int(data.u32(directories + index * 8)), Int(data.u32(directories + index * 8 + 4)))
@@ -106,7 +108,10 @@ struct WindowsPEInfo: Equatable {
                 guard at + 32 <= data.count else { break }
                 let nameRVA = Int(data.u32(at + 4))
                 if nameRVA == 0 { break }
-                if let name = cString(nameRVA), !name.isEmpty { imports.insert(name) }
+                // Older PE32 delay descriptors store a VA instead of an RVA.
+                let isVA = data.u32(at) & 1 == 0 && magic == 0x10b
+                let rva = isVA ? nameRVA - imageBase32 : nameRVA
+                if rva > 0, let name = cString(rva), !name.isEmpty { imports.insert(name) }
                 at += 32
             }
         }
