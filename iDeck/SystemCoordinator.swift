@@ -1152,8 +1152,12 @@ class SystemCoordinator: ObservableObject {
             // Wine's .reg files write each backslash of a key name twice.
             let header = "[" + key.lowercased().replacingOccurrences(of: "\\", with: "\\\\") + "]"
             var inside = false
-            for line in text.split(whereSeparator: \.isNewline) {
-                let l = line.trimmingCharacters(in: .whitespaces)
+            var cursor = text.startIndex
+            while cursor < text.endIndex {
+                let end = text.utf8[cursor...].firstIndex(of: 10) ?? text.endIndex
+                let line = text.utf8[cursor..<end]
+                cursor = end == text.endIndex ? end : text.utf8.index(after: end)
+                let l = String(decoding: line, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
                 if l.hasPrefix("[") { inside = l.lowercased().hasPrefix(header); continue }
                 guard inside, l.lowercased().hasPrefix("\"" + name.lowercased() + "\"=\"") else { continue }
                 var value = String(l.dropFirst(name.count + 4).dropLast())

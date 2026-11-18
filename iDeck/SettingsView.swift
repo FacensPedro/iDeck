@@ -5,6 +5,7 @@ import UniformTypeIdentifiers
 /// Settings: a grouped list of categories, each opening its own page.
 struct SettingsView: View {
     @ObservedObject var coordinator: SystemCoordinator
+    var openStore: (SystemCoordinator.StoreClient) -> Void
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dismiss) private var dismiss
     @StateObject private var inputManager = InputManager.shared
@@ -281,7 +282,7 @@ struct SettingsView: View {
                 launcherHeader("Ubisoft Connect", asset: "StoreBadgeUbisoft")
             }
             Section {
-                StoreClientButton(client: .ubisoft, coordinator: coordinator)
+                StoreClientButton(client: .ubisoft, coordinator: coordinator, openStore: openStore)
             } footer: {
                 Text(tr("The installer is downloaded from Ubisoft when you tap Install. Sign in inside Ubisoft Connect after it opens."))
             }
@@ -293,7 +294,7 @@ struct SettingsView: View {
     private var eaPage: some View {
         Form {
             Section {
-                StoreClientButton(client: .ea, coordinator: coordinator)
+                StoreClientButton(client: .ea, coordinator: coordinator, openStore: openStore)
                 LabeledContent(tr("Account"),
                                value: eaLibrary.signedIn ? (eaLibrary.accountName ?? tr("Connected")) : tr("Not connected"))
                 if eaLibrary.signedIn {
@@ -690,16 +691,25 @@ struct StoreClientButton: View {
     let client: SystemCoordinator.StoreClient
     @ObservedObject var coordinator: SystemCoordinator
 
+    let openStore: (SystemCoordinator.StoreClient) -> Void
+    @State private var installed = false
+
     var body: some View {
-        if let progress = coordinator.storeClientDownload {
-            HStack(spacing: 10) {
-                ProgressView()
-                Text(progress).foregroundStyle(.secondary)
+        Group {
+            if let progress = coordinator.storeClientDownload {
+                HStack(spacing: 10) {
+                    ProgressView()
+                    Text(progress).foregroundStyle(.secondary)
+                }
+            } else {
+                Button(tr(installed ? "Launch" : "Install")) {
+                    openStore(client)
+                }
             }
-        } else {
-            Button(tr(client.installedURL == nil ? "Install" : "Launch")) {
-                coordinator.openStoreClient(client)
-            }
+        }
+        .task(id: coordinator.windowsStatus) {
+            let result = await Task.detached(priority: .utility) { [client] in client.installedURL != nil }.value
+            if !Task.isCancelled { installed = result }
         }
     }
 }
@@ -709,17 +719,19 @@ struct StoreClientCard: View {
     let client: SystemCoordinator.StoreClient
     @ObservedObject var coordinator: SystemCoordinator
 
+    @State private var installed = false
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(client.rawValue)
                 .font(.headline)
                 .foregroundColor(.white)
-            Text(tr(client.installedURL == nil
+            Text(tr(!installed
                 ? "Install it in Settings › Stores & launchers › %@."
                 : "Installed. Open it to sign in and play your games.", client.rawValue))
                 .font(.subheadline)
                 .foregroundColor(.gray)
-            if client.installedURL != nil {
+            if installed {
                 Button(tr("Launch")) { coordinator.openStoreClient(client) }
                     .buttonStyle(.borderedProminent)
             }
@@ -728,6 +740,10 @@ struct StoreClientCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.white.opacity(0.06))
         .clipShape(RoundedRectangle(cornerRadius: 10))
+        .task(id: coordinator.windowsStatus) {
+            let result = await Task.detached(priority: .utility) { [client] in client.installedURL != nil }.value
+            if !Task.isCancelled { installed = result }
+        }
     }
 }
 
@@ -763,6 +779,10 @@ private struct UbisoftLoginView: View {
                 if !error.isEmpty { Text(error).foregroundStyle(.red) }
             }
             .navigationTitle("Ubisoft Connect")
+            .safeAreaInset(edge: .bottom) {
+                Link(tr("Ubisoft account"), destination: URL(string: "https://account.ubisoft.com/")!)
+                    .padding()
+            }
             .toolbar { Button(tr("Cancel")) { dismiss() } }
         }
         .onDisappear { request?.cancel() }
