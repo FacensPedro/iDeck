@@ -138,7 +138,17 @@ compgen -G "$FONTS_SOURCE/*.ttf" >/dev/null || {
 rm -rf "$APP/fonts"
 mkdir -p "$APP/fonts"
 cp "$FONTS_SOURCE"/*.ttf "$APP/fonts/"
-for font in tahoma.ttf marlett.ttf; do
+FONTS_BITMAP_SOURCE=""
+for candidate in "$SOURCE/fonts" "${IDECK_MADEIRA_ROOT:-$ROOT/vendor/Madeira}/app/Madeira/fonts" \
+                 "$SOURCE/../../wine/fonts" "$FONTS_SOURCE"; do
+  if [[ -s "$candidate/vgasys.fon" && -s "$candidate/vgafix.fon" && -s "$candidate/vgaoem.fon" ]]; then
+    FONTS_BITMAP_SOURCE="$candidate"
+    break
+  fi
+done
+[[ -n "$FONTS_BITMAP_SOURCE" ]] || { echo "ERROR: Wine bitmap fonts missing; rebuild the native runtime" >&2; exit 2; }
+cp "$FONTS_BITMAP_SOURCE/"*.fon "$APP/fonts/"
+for font in tahoma.ttf marlett.ttf vgasys.fon vgafix.fon vgaoem.fon; do
   [[ -s "$APP/fonts/$font" ]] || { echo "ERROR: Wine font missing: $font" >&2; exit 2; }
 done
 

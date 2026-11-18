@@ -136,6 +136,7 @@ if [[ "$REBUILD" == "1" ]]; then
     echo "PASS: public FEX iPhoneOS ARM64 and ARM64EC JIT artifacts compiled; Wine/DXMT not yet validated."
     exit 0
   fi
+  bash "$ROOT/scripts/build_wine_fonts.sh"
   bash "$MD/build/wine-pe/build-ntdll.sh"
   [[ -s "$MD/app/Madeira/arm64ec-windows/ntdll.dll" ]] || {
     echo "ERROR: Wine ARM64EC ntdll.dll was not generated." >&2; exit 2;

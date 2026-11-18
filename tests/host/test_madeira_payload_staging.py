@@ -68,7 +68,7 @@ class MadeiraPayloadStagingTests(unittest.TestCase):
             (self.source / "nls" / f"{table}.nls").write_bytes(b"table")
         fonts = base / "madeira" / "wine" / "fonts"
         fonts.mkdir(parents=True)
-        for name in ("tahoma.ttf", "marlett.ttf", "symbol.ttf"):
+        for name in ("tahoma.ttf", "marlett.ttf", "symbol.ttf", "vgasys.fon", "vgafix.fon", "vgaoem.fon"):
             (fonts / name).write_bytes(b"\x00\x01\x00\x00font")
         (self.source / "prefix-template.tar.gz").write_bytes(
             b"\x1f\x8b" + bytes(64)
@@ -117,7 +117,7 @@ class MadeiraPayloadStagingTests(unittest.TestCase):
         for name in ("d3d11.dll", "dxgi.dll", "winemetal.dll"):
             self.assertTrue((self.app / "arm64ec-windows" / name).is_file())
         self.assertTrue((self.source / "d3d12/libmetalirconverter.dylib").is_file())
-        for name in ("tahoma.ttf", "marlett.ttf", "symbol.ttf"):
+        for name in ("tahoma.ttf", "marlett.ttf", "symbol.ttf", "vgasys.fon", "vgafix.fon", "vgaoem.fon"):
             self.assertTrue((self.app / "fonts" / name).is_file())
 
     def test_d3d11_opt_in_wow64_requires_full_i386_farm_and_stages_it(self):

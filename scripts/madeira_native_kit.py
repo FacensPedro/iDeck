@@ -168,7 +168,7 @@ def digest_file(path: Path) -> str:
     return sha.hexdigest()
 
 
-WINE_FONTS = ("tahoma.ttf", "marlett.ttf")
+WINE_FONTS = ("tahoma.ttf", "marlett.ttf", "vgasys.fon", "vgafix.fon", "vgaoem.fon")
 
 
 def check_assets(app: Path, wow64: bool, mono: bool, graphics: str = "d3d12") -> None:
@@ -252,7 +252,7 @@ def collect(madeira: Path, bridge: Path, wow64: bool, mono: bool,
     # Wine's system fonts (win32u loads them from <bundle>/fonts). Kept in the kit so a
     # build from a cached kit, without the Wine sources, still stages them.
     fonts = app / "fonts" if (app / "fonts/tahoma.ttf").is_file() else madeira / "wine/fonts"
-    for file in sorted(fonts.glob("*.ttf")):
+    for file in sorted((*fonts.glob("*.ttf"), *fonts.glob("*.fon"))):
         if file.stat().st_size:
             entries["resources/fonts/" + file.name] = file
     for name in WINE_FONTS:

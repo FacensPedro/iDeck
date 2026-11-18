@@ -66,6 +66,9 @@ class MadeiraNativeKitTests(unittest.TestCase):
             "resources/d3d12/canary_layout_vs.dxil": b"dxil",
             "resources/d3d12/canary_layout_ps.dxil": b"dxil",
             "resources/fonts/tahoma.ttf": b"\x00\x01\x00\x00tahoma",
+            "resources/fonts/vgasys.fon": b"MZfont-system",
+            "resources/fonts/vgafix.fon": b"MZfont-fixed",
+            "resources/fonts/vgaoem.fon": b"MZfont-oem",
             "resources/fonts/marlett.ttf": b"\x00\x01\x00\x00marlett",
         })
         for name in kit.REQUIRED_PE + (kit.D3D12_PE if graphics == "d3d12" else ()) + (

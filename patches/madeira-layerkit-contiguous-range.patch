@@ -1,0 +1,51 @@
+--- a/build/ntdll-unix/virtual_ios.c
++++ b/build/ntdll-unix/virtual_ios.c
+@@ -13587,7 +13587,9 @@
+     if (mach_vm_region( mach_task_self(), &rbase, &rsize, VM_REGION_BASIC_INFO_64,
+                         (vm_region_info_t)&info, &cnt, &obj ) != KERN_SUCCESS)
+         return 0;
+-    if (rbase > a || !rsize)
++    if (obj != MACH_PORT_NULL) mach_port_deallocate( mach_task_self(), obj );
++    if (!rsize || (rbase < a && rsize <= a - rbase) ||
++        (rbase >= a && rbase - a >= size))
+         return 0;         /* addr is in a free hole: mmap failed for some other reason
+                              (iOS refuses certain addresses), so stepping is correct */
+     if (top_down)
+@@ -22773,9 +22775,34 @@
+             if (kr != KERN_SUCCESS) break;
+             got[n++] = a; if (a < lo) lo = a; if (a + (256ULL << 20) > hi) hi = a + (256ULL << 20);
+         }
+-        dprintf( 2, "[layerkit-range] rev=ml898 %s: %u x 256MB tag-51 chunks before kr=%d; span 0x%llx..0x%llx (%llu MB) -- guest views must stay OUT of this\n",
+-                 when, n, kr, (unsigned long long)lo, (unsigned long long)hi, (unsigned long long)((hi - lo) >> 20) );
+-        if (n && !ios_layerkit_hi) { ios_layerkit_lo = lo; ios_layerkit_hi = hi; }   /* ml900: first measurement wins */
++        /* The tagged allocator may return disjoint bands. Their bounding box
++         * can cover almost the entire guest VA (5 GB..480 GB on device).
++         * Reserve only the largest contiguous run for CoreAnimation; actual
++         * occupied regions elsewhere are still skipped by ios_skip_occupied. */
++        if (n)
++        {
++            unsigned j, k;
++            mach_vm_address_t run_lo, run_hi;
++            for (j = 1; j < n; j++)
++            {
++                mach_vm_address_t value = got[j];
++                for (k = j; k && got[k - 1] > value; k--) got[k] = got[k - 1];
++                got[k] = value;
++            }
++            lo = run_lo = got[0];
++            hi = run_hi = lo + (256ULL << 20);
++            for (j = 1; j < n; j++)
++            {
++                if (got[j] != run_hi) run_lo = got[j];
++                run_hi = got[j] + (256ULL << 20);
++                if (run_hi - run_lo > hi - lo) { lo = run_lo; hi = run_hi; }
++            }
++            if (!ios_layerkit_hi) { ios_layerkit_lo = lo; ios_layerkit_hi = hi; }
++        }
++        else lo = hi = 0;
++        dprintf( 2, "[layerkit-range] %s: %u tag-51 probes; largest contiguous band 0x%llx..0x%llx (%llu MB), kr=%d\n",
++                 when, n, (unsigned long long)lo, (unsigned long long)hi,
++                 (unsigned long long)((hi - lo) >> 20), kr );
+         while (n) { n--; mach_vm_deallocate( mach_task_self(), got[n], 256ULL << 20 ); }
+     }
+ }

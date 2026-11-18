@@ -1,0 +1,24 @@
+--- a/build/ntdll-unix/virtual_ios.c
++++ b/build/ntdll-unix/virtual_ios.c
+@@ -4588,8 +4588,8 @@
+          * FIRST libarm64ecfex.dll mapping globally, and there are several
+          * pseudo-process instances in one Mach task. */
+         dprintf( 2, "[fex-exports] ml614 module=%s base=%p rip_from_hostpc=%p release_holds=%p "
+-                    "(%s) -- RECORDED BUT NOT ARMED: EC PE exports are not callable "
+-                    "from native code (ml613 regression)\n",
++                    "(%s) -- diagnostic addresses only; raw EC PE exports are not callable "
++                    "from native code; hold-release registers a redirected RX callback separately\n",
+                  nm, ios_jit_mappings[i].pe_base, rip_cb, rel_cb,
+                  (rip_cb && rel_cb) ? "both found"
+                                     : (rel_cb ? "release-only" : (rip_cb ? "rip-only" : "neither — will retry")) );
+--- a/wine/dlls/ntdll/signal_arm64ec.c
++++ b/wine/dlls/ntdll/signal_arm64ec.c
+@@ -724,7 +724,7 @@
+                  *len, *len, log );
+         else
+             ERR( "[va-profile] ml755 selector log EMPTY at dispatcher init "
+-                 "(len=%p log=%p) -- band selection has not run yet\n", len, log );
++                 "(len=%p log=%p) -- pre-init: published arena handoff follows\n", len, log );
+     }
+ 
+     /* ml797: hand the arena to the emulator's band selector as PLAIN DATA.

@@ -153,6 +153,11 @@ jobs:
           python3 -m unittest discover -s tests/host -p 'test_shader_cache_safety.py' -v
           python3 -m unittest discover -s tests/host -p 'test_madeira_game_backports.py' -v
 
+      - name: Test FEX protection results and LayerKit ranges
+        run: |
+          bash -n scripts/build_wine_fonts.sh
+          python3 -m unittest discover -s tests/host -p 'test_fex_memory_fixes.py' -v
+
       - name: Test native ARM64EC syscall context restoration
         run: |
           python3 -m unittest discover -s tests/host -p 'test_arm64ec_mach_slowpath.py' -v
@@ -507,7 +512,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: build/native-cache
-          key: madeira-kit-v3-${{ runner.os }}-${{ runner.arch }}-${{ env.IDECK_MADEIRA_GRAPHICS }}-${{ env.IDECK_BUILD_WOW64 == '1' && 'wow64' || 'no-wow64' }}-${{ env.IDECK_BUNDLE_WINE_MONO == '1' && 'mono' || 'no-mono' }}-${{ hashFiles('scripts/madeira_native_kit.py', 'scripts/build_madeira_components.sh', 'scripts/build_madeira_dcomp.sh', 'scripts/build_madeira_luajit.sh', 'scripts/link_madeira_native.sh', 'scripts/fetch_madeira_sources.sh', 'scripts/apply_madeira_*.py', 'build/dcomp/*', 'build/compat-dlls/*', 'scripts/arm64ec_extra_modules.txt', 'scripts/build_compat_dlls.sh', 'scripts/build_d3d_stub_dlls.sh', 'build/d3d-stubs/*', 'build/wineserver/*', 'build/host/*', 'scripts/build_madeira_gl_vulkan.sh', 'scripts/stage_madeira_payload.sh', 'patches/**') }}
+          key: madeira-kit-v3-${{ runner.os }}-${{ runner.arch }}-${{ env.IDECK_MADEIRA_GRAPHICS }}-${{ env.IDECK_BUILD_WOW64 == '1' && 'wow64' || 'no-wow64' }}-${{ env.IDECK_BUNDLE_WINE_MONO == '1' && 'mono' || 'no-mono' }}-${{ hashFiles('scripts/madeira_native_kit.py', 'scripts/build_madeira_components.sh', 'scripts/build_wine_fonts.sh', 'scripts/build_madeira_dcomp.sh', 'scripts/build_madeira_luajit.sh', 'scripts/link_madeira_native.sh', 'scripts/fetch_madeira_sources.sh', 'scripts/apply_madeira_*.py', 'build/dcomp/*', 'build/compat-dlls/*', 'scripts/arm64ec_extra_modules.txt', 'scripts/build_compat_dlls.sh', 'scripts/build_d3d_stub_dlls.sh', 'build/d3d-stubs/*', 'build/wineserver/*', 'build/host/*', 'scripts/build_madeira_gl_vulkan.sh', 'scripts/stage_madeira_payload.sh', 'patches/**') }}
 
       - name: Locate repository or cached Madeira runtime
         if: ${{ env.IDECK_NATIVE_BUILD == '1' }}
@@ -593,6 +598,7 @@ jobs:
           if (( ${#MISSING[@]} )); then
             HOMEBREW_NO_AUTO_UPDATE=1 brew install "${MISSING[@]}"
           fi
+          pkg-config --exists freetype2 || HOMEBREW_NO_AUTO_UPDATE=1 brew install freetype
           # The system bison exists on macOS but is 2.3 (not Wine-compatible).
           # This step tests the version, installs Homebrew Bison 3+, and
           # persists its bin directory to PATH for all later Actions steps.

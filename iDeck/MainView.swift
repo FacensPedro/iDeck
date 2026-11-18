@@ -1222,7 +1222,6 @@ private struct WindowsExecutableDetailsView: View {
                             .padding(.vertical, 14)
                     }
                     .buttonStyle(.borderedProminent)
-                    WindowsGameProfileForm(profile: $profile)
                     Button(role: .destructive) {
                         guard let prefixPath else {
                             errorMessage = tr("Windows environment is not ready.")
@@ -1243,6 +1242,7 @@ private struct WindowsExecutableDetailsView: View {
                             .padding(.vertical, 12)
                     }
                     .buttonStyle(.bordered)
+                    WindowsGameProfileForm(profile: $profile)
                 }
                 .padding(22)
             }
