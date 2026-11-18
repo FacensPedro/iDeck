@@ -263,7 +263,7 @@ struct GameSessionView: View {
                         .padding(.horizontal, 16)
                         }
                     }
-            if touchMouseEnabled {
+            if touchMouseEnabled || WindowsRendererView.installerTouchMapping {
                 TouchMouseView().ignoresSafeArea()
             }
 
@@ -464,8 +464,8 @@ struct GameSessionView: View {
             metrics.sample(collectPerformance: on)
         }
         .onAppear {
-            // Touch is direct: no Windows mouse cursor is drawn.
-            TouchMouseCursor.hide()
+            // Installer dialogs use a visible mouse pointer.
+            TouchMouseCursor.setVisible(WindowsRendererView.installerTouchMapping)
             WineInputBridge.shared.startBridging()
             metrics.sample(collectPerformance: showGamePerformanceOverlay)
             updateRecentWineLogFinding()

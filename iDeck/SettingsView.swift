@@ -1,4 +1,5 @@
 import SwiftUI
+import Security
 import UserNotifications
 import UniformTypeIdentifiers
 
@@ -20,7 +21,7 @@ struct SettingsView: View {
     @State private var winePoolChangeRequiresRestart = false
     @AppStorage(ResourceGovernor.pauseInBackgroundKey) private var pauseGamesInBackground = true
     @StateObject private var updater = UpdateChecker()
-    @AppStorage("ubisoftAccountName") private var ubisoftAccountName = ""
+    @State private var ubisoftAccountName = UbisoftSavedSession.load()?.name ?? ""
     @State private var ubisoftLoginPresented = false
     @State private var isSteamSignInPresented = false
     @ObservedObject private var gogLibrary = GOGLibraryModel.shared
@@ -98,6 +99,7 @@ struct SettingsView: View {
                     }
                 }
             }
+            .task { await restoreUbisoftSession() }
             .navigationTitle(tr("Settings"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -276,7 +278,9 @@ struct SettingsView: View {
                 if ubisoftAccountName.isEmpty {
                     Button(tr("Sign in")) { ubisoftLoginPresented = true }
                 } else {
-                    Button(tr("Sign out"), role: .destructive) { ubisoftAccountName = "" }
+                    Button(tr("Sign out"), role: .destructive) {
+                        if UbisoftSavedSession.clear() { ubisoftAccountName = "" }
+                    }
                 }
             } header: {
                 launcherHeader("Ubisoft Connect", asset: "StoreBadgeUbisoft")
@@ -289,6 +293,28 @@ struct SettingsView: View {
         }
         .navigationTitle("Ubisoft Connect")
         .sheet(isPresented: $ubisoftLoginPresented) { UbisoftLoginView(accountName: $ubisoftAccountName) }
+    }
+
+    @MainActor private func restoreUbisoftSession() async {
+        guard let saved = UbisoftSavedSession.load(), saved.expired else { return }
+        guard let remember = saved.remember, !remember.isEmpty else {
+            if UbisoftSavedSession.clear() { ubisoftAccountName = "" }
+            return
+        }
+        var request = UbisoftSavedSession.request()
+        request.setValue("ubi_rm_v1 t=" + remember, forHTTPHeaderField: "Authorization")
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard !Task.isCancelled, UbisoftSavedSession.load()?.ticket == saved.ticket,
+                  let http = response as? HTTPURLResponse else { return }
+            if http.statusCode == 401 {
+                if UbisoftSavedSession.clear() { ubisoftAccountName = "" }
+            } else if (200..<300).contains(http.statusCode) {
+                let renewed = try UbisoftSavedSession.decode(data, previous: saved)
+                try renewed.save()
+                ubisoftAccountName = renewed.name
+            }
+        } catch { return }
     }
 
     private var eaPage: some View {
@@ -792,10 +818,7 @@ private struct UbisoftLoginView: View {
     @MainActor private func authenticate() async {
         defer { busy = false }
         error = ""
-        var login = URLRequest(url: URL(string: "https://public-ubiservices.ubi.com/v3/profiles/sessions")!)
-        login.httpMethod = "POST"
-        login.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        login.setValue("39baebad-39e5-4552-8c25-2c9b919064e2", forHTTPHeaderField: "Ubi-AppId")
+        var login = UbisoftSavedSession.request()
         if let challenge {
             login.setValue("ubi_2fa_v1 t=" + challenge, forHTTPHeaderField: "Authorization")
             login.setValue(code, forHTTPHeaderField: "Ubi-2FACode")
@@ -803,7 +826,6 @@ private struct UbisoftLoginView: View {
             let credentials = Data((email.trimmingCharacters(in: .whitespacesAndNewlines) + ":" + password).utf8)
             login.setValue("Basic " + credentials.base64EncodedString(), forHTTPHeaderField: "Authorization")
         }
-        login.httpBody = Data(#"{"rememberMe":false}"#.utf8)
         do {
             let (data, response) = try await URLSession.shared.data(for: login)
             try Task.checkCancellation()
@@ -819,10 +841,71 @@ private struct UbisoftLoginView: View {
                 error = (fields?["message"] as? String) ?? tr("Sign-in failed")
                 return
             }
+            try UbisoftSavedSession.decode(data).save()
             accountName = name
             dismiss()
         } catch {
             if !Task.isCancelled { self.error = error.localizedDescription }
         }
+    }
+}
+
+private struct UbisoftSavedSession: Codable {
+    let name: String
+    let ticket: String
+    let remember: String?
+    let expiry: Date
+    let sessionID: String?
+    var expired: Bool { expiry <= Date() }
+
+    static func request() -> URLRequest {
+        var login = URLRequest(url: URL(string: "https://public-ubiservices.ubi.com/v3/profiles/sessions")!)
+        login.httpMethod = "POST"
+        login.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        login.setValue("39baebad-39e5-4552-8c25-2c9b919064e2", forHTTPHeaderField: "Ubi-AppId")
+        login.httpBody = Data(#"{"rememberMe":true}"#.utf8)
+        return login
+    }
+
+    static func decode(_ data: Data, previous: Self? = nil) throws -> Self {
+        let fields = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        guard let name = fields?["nameOnPlatform"] as? String, !name.isEmpty,
+              let ticket = fields?["ticket"] as? String, !ticket.isEmpty,
+              let timestamp = fields?["expiration"] as? String else { throw URLError(.cannotParseResponse) }
+        let format = ISO8601DateFormatter()
+        let seconds = format.date(from: timestamp)
+        format.formatOptions.insert(.withFractionalSeconds)
+        guard let expiry = seconds ?? format.date(from: timestamp) else { throw URLError(.cannotParseResponse) }
+        return Self(name: name, ticket: ticket, remember: fields?["rememberMeTicket"] as? String ?? previous?.remember,
+                    expiry: expiry, sessionID: fields?["sessionId"] as? String)
+    }
+
+    private static var query: [String: Any] {
+        [kSecClass as String: kSecClassGenericPassword,
+         kSecAttrService as String: "iDeck.Ubisoft", kSecAttrAccount as String: "session"]
+    }
+
+    static func load() -> Self? {
+        var search = query
+        search[kSecReturnData as String] = true
+        var item: CFTypeRef?
+        guard SecItemCopyMatching(search as CFDictionary, &item) == errSecSuccess,
+              let data = item as? Data else { return nil }
+        return try? JSONDecoder().decode(Self.self, from: data)
+    }
+
+    func save() throws {
+        let values: [String: Any] = [kSecValueData as String: try JSONEncoder().encode(self),
+                                     kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly]
+        var status = SecItemUpdate(Self.query as CFDictionary, values as CFDictionary)
+        if status == errSecItemNotFound {
+            status = SecItemAdd(Self.query.merging(values) { _, new in new } as CFDictionary, nil)
+        }
+        guard status == errSecSuccess else { throw NSError(domain: NSOSStatusErrorDomain, code: Int(status)) }
+    }
+
+    static func clear() -> Bool {
+        let status = SecItemDelete(query as CFDictionary)
+        return status == errSecSuccess || status == errSecItemNotFound
     }
 }

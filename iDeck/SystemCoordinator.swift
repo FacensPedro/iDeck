@@ -1239,9 +1239,9 @@ class SystemCoordinator: ObservableObject {
                     }
                 }
                 self.storeClientDownload = nil
-                if missing == [.ubisoft], let installer = StoreClient.ubisoft.installer {
+                if missing.count == 1, let client = missing.first, let installer = client.installer {
                     self.requestedStoreClients = missing
-                    let profile = WindowsGameProfile(id: "ideck:store-setup", title: StoreClient.ubisoft.rawValue)
+                    let profile = WindowsGameProfile(id: "ideck:store-setup", title: client.rawValue)
                     self.launchWindowsExecutable(at: installer, profile: profile, installer: true)
                     return
                 }
