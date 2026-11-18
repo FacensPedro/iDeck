@@ -19,6 +19,8 @@ struct SettingsView: View {
     @State private var winePoolChangeRequiresRestart = false
     @AppStorage(ResourceGovernor.pauseInBackgroundKey) private var pauseGamesInBackground = true
     @StateObject private var updater = UpdateChecker()
+    @AppStorage("ubisoftAccountName") private var ubisoftAccountName = ""
+    @State private var ubisoftLoginPresented = false
     @State private var isSteamSignInPresented = false
     @ObservedObject private var gogLibrary = GOGLibraryModel.shared
     @ObservedObject private var epicLibrary = EpicLibrary.shared
@@ -251,7 +253,7 @@ struct SettingsView: View {
             Section {
                 NavigationLink { ubisoftPage } label: {
                     SettingsRow(icon: "u.square.fill", color: .black, title: "Ubisoft Connect",
-                                value: tr(SystemCoordinator.StoreClient.ubisoft.installedURL == nil ? "Not installed" : "Installed"),
+                                value: ubisoftAccountName.isEmpty ? tr("Not connected") : ubisoftAccountName,
                                 asset: "StoreBadgeUbisoft", assetKeepsColors: true)
                 }
             }
@@ -269,17 +271,23 @@ struct SettingsView: View {
     private var ubisoftPage: some View {
         Form {
             Section {
-                StoreClientButton(client: .ubisoft, coordinator: coordinator)
-                Link(destination: URL(string: "https://account.ubisoft.com/")!) {
-                    Text(tr("Ubisoft account")).foregroundStyle(Color.primary)
+                LabeledContent(tr("Account"), value: ubisoftAccountName.isEmpty ? tr("Not connected") : ubisoftAccountName)
+                if ubisoftAccountName.isEmpty {
+                    Button(tr("Sign in")) { ubisoftLoginPresented = true }
+                } else {
+                    Button(tr("Sign out"), role: .destructive) { ubisoftAccountName = "" }
                 }
             } header: {
                 launcherHeader("Ubisoft Connect", asset: "StoreBadgeUbisoft")
+            }
+            Section {
+                StoreClientButton(client: .ubisoft, coordinator: coordinator)
             } footer: {
                 Text(tr("The installer is downloaded from Ubisoft when you tap Install. Sign in inside Ubisoft Connect after it opens."))
             }
         }
         .navigationTitle("Ubisoft Connect")
+        .sheet(isPresented: $ubisoftLoginPresented) { UbisoftLoginView(accountName: $ubisoftAccountName) }
     }
 
     private var eaPage: some View {
@@ -720,5 +728,80 @@ struct StoreClientCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.white.opacity(0.06))
         .clipShape(RoundedRectangle(cornerRadius: 10))
+    }
+}
+
+
+private struct UbisoftLoginView: View {
+    @Binding var accountName: String
+    @Environment(\.dismiss) private var dismiss
+    @State private var email = ""
+    @State private var password = ""
+    @State private var challenge: String?
+    @State private var code = ""
+    @State private var busy = false
+    @State private var error = ""
+    @State private var request: Task<Void, Never>?
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                if challenge == nil {
+                    TextField(tr("Email"), text: $email)
+                        .keyboardType(.emailAddress).textContentType(.username)
+                        .textInputAutocapitalization(.never).autocorrectionDisabled()
+                    SecureField(tr("Password"), text: $password).textContentType(.password)
+                } else {
+                    TextField(tr("Verification code"), text: $code).textContentType(.oneTimeCode)
+                }
+                Button(tr("Sign in")) {
+                    busy = true
+                    request = Task { await authenticate() }
+                }
+                .disabled(busy || (challenge == nil ? email.isEmpty || password.isEmpty : code.isEmpty))
+                if busy { ProgressView() }
+                if !error.isEmpty { Text(error).foregroundStyle(.red) }
+            }
+            .navigationTitle("Ubisoft Connect")
+            .toolbar { Button(tr("Cancel")) { dismiss() } }
+        }
+        .onDisappear { request?.cancel() }
+    }
+
+    @MainActor private func authenticate() async {
+        defer { busy = false }
+        error = ""
+        var login = URLRequest(url: URL(string: "https://public-ubiservices.ubi.com/v3/profiles/sessions")!)
+        login.httpMethod = "POST"
+        login.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        login.setValue("39baebad-39e5-4552-8c25-2c9b919064e2", forHTTPHeaderField: "Ubi-AppId")
+        if let challenge {
+            login.setValue("ubi_2fa_v1 t=" + challenge, forHTTPHeaderField: "Authorization")
+            login.setValue(code, forHTTPHeaderField: "Ubi-2FACode")
+        } else {
+            let credentials = Data((email.trimmingCharacters(in: .whitespacesAndNewlines) + ":" + password).utf8)
+            login.setValue("Basic " + credentials.base64EncodedString(), forHTTPHeaderField: "Authorization")
+        }
+        login.httpBody = Data(#"{"rememberMe":false}"#.utf8)
+        do {
+            let (data, response) = try await URLSession.shared.data(for: login)
+            try Task.checkCancellation()
+            let fields = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+            if let token = fields?["twoFactorAuthenticationTicket"] as? String, !token.isEmpty {
+                challenge = token
+                password = ""
+                return
+            }
+            guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode),
+                  fields?["ticket"] is String,
+                  let name = fields?["nameOnPlatform"] as? String, !name.isEmpty else {
+                error = (fields?["message"] as? String) ?? tr("Sign-in failed")
+                return
+            }
+            accountName = name
+            dismiss()
+        } catch {
+            if !Task.isCancelled { self.error = error.localizedDescription }
+        }
     }
 }
