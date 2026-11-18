@@ -294,7 +294,6 @@ struct SettingsView: View {
     private var eaPage: some View {
         Form {
             Section {
-                StoreClientButton(client: .ea, coordinator: coordinator, openStore: openStore)
                 LabeledContent(tr("Account"),
                                value: eaLibrary.signedIn ? (eaLibrary.accountName ?? tr("Connected")) : tr("Not connected"))
                 if eaLibrary.signedIn {
@@ -304,7 +303,9 @@ struct SettingsView: View {
                 }
             } header: {
                 launcherHeader("EA app", asset: "StoreBadgeEA")
-
+            }
+            Section {
+                StoreClientButton(client: .ea, coordinator: coordinator, openStore: openStore)
             }
         }
         .navigationTitle("EA app")

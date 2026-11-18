@@ -1115,6 +1115,22 @@ class SystemCoordinator: ObservableObject {
     enum StoreClient: String, CaseIterable {
         case ubisoft = "Ubisoft Connect", ea = "EA app"
 
+        static func required(for publishers: [String], title: String) -> Self? {
+            for publisher in publishers {
+                let name = publisher.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+                if name.hasPrefix("ubisoft") || name == "uplay" { return .ubisoft }
+                if name.hasPrefix("electronic arts") || ["ea", "ea sports", "ea originals", "origin"].contains(name) {
+                    let words = title.lowercased().split { !$0.isLetter && !$0.isNumber }
+                    return words.prefix(2).elementsEqual(["battlefield", "6"]) ? nil : .ea
+                }
+            }
+            return nil
+        }
+
+        var installInstruction: String {
+            tr("Install it in Settings › Stores & launchers › %@.", rawValue)
+        }
+
         static var drive: URL { MadeiraDock.prefix.appendingPathComponent("drive_c") }
 
         var installedURL: URL? {

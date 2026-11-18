@@ -2532,6 +2532,7 @@ extension WindowsWorkspaceView {
             case .ubisoft:
                 StoreClientCard(client: .ubisoft, coordinator: coordinator)
             case .ea:
+                StoreClientCard(client: .ea, coordinator: coordinator)
                 if eaLibrary.signedIn {
                     storeGrid(loading: eaLibrary.refreshing, error: eaLibrary.error,
                               count: eaLibrary.owned.count, entries: filteredEAGames.map { .ea($0) })

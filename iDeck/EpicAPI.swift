@@ -70,6 +70,7 @@ struct EpicAsset: Codable, Sendable, Hashable {
 
 /// What the catalog says about a game.
 struct EpicCatalogItem: Sendable {
+    var publishers: [String] = []
     var title: String
     var images: [String: URL]
     var attributes: [String: String]
@@ -329,7 +330,8 @@ actor EpicAPI {
             if let value = (value as? [String: Any])?["value"] as? String { attributes[key] = value }
         }
         let categories = (item["categories"] as? [[String: Any]] ?? []).compactMap { $0["path"] as? String }
-        return EpicCatalogItem(title: item["title"] as? String ?? "", images: images, attributes: attributes,
+        return EpicCatalogItem(publishers: [item["publisher"] as? String, item["developer"] as? String,
+                                            attributes["PartnerLinkType"]].compactMap { $0 }, title: item["title"] as? String ?? "", images: images, attributes: attributes,
                                isDLC: item["mainGameItem"] != nil, categories: categories,
                                mainGameID: (item["mainGameItem"] as? [String: Any])?["id"] as? String)
     }

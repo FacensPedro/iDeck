@@ -35,6 +35,7 @@ struct EpicOwnedGame: Codable, Identifiable, Hashable, Sendable {
     var additionalCommandLine: String?
     /// The catalog's category paths ("games", "engines", ...); nil in a list cached
     /// before they were kept, which looks the game up again.
+    var publishers: [String]? = nil
     var categories: [String]? = nil
     var id: String { appName }
 }
@@ -355,7 +356,7 @@ struct EpicInstalledDLC: Codable, Sendable {
             // Catalog details for new games, games whose build changed and games cached without
             // their categories; at most eight at once.
             let wanted = assets.filter {
-                known[$0.appName] == nil || known[$0.appName]?.buildVersion != $0.buildVersion || known[$0.appName]?.categories == nil
+                known[$0.appName] == nil || known[$0.appName]?.buildVersion != $0.buildVersion || known[$0.appName]?.categories == nil || known[$0.appName]?.publishers == nil
             }
             var details: [String: EpicCatalogItem] = [:]
             try await withThrowingTaskGroup(of: (String, EpicCatalogItem?).self) { group in
@@ -394,7 +395,7 @@ struct EpicInstalledDLC: Codable, Sendable {
                         folderName: Self.safeName(item.attributes["FolderName"] ?? asset.appName),
                         canRunOffline: (item.attributes["CanRunOffline"] ?? "true").lowercased() == "true",
                         requiresOwnershipToken: (item.attributes["OwnershipToken"] ?? "false").lowercased() == "true",
-                        additionalCommandLine: item.attributes["AdditionalCommandLine"], categories: item.categories))
+                        additionalCommandLine: item.attributes["AdditionalCommandLine"], publishers: item.publishers, categories: item.categories))
                 } else if var game = known[asset.appName], Self.isGame(categories: game.categories ?? []) {
                     game.buildVersion = asset.buildVersion
                     games.append(game)
@@ -686,6 +687,17 @@ struct EpicInstalledDLC: Codable, Sendable {
                               canRunOffline: record.canRunOffline, requiresOwnershipToken: record.requiresOwnershipToken,
                               additionalCommandLine: record.additionalCommandLine)
             }) else { throw EpicAPIError.invalid("unknown-game") }
+            if kind == .install {
+                var publishers = game.publishers
+                if publishers == nil {
+                    publishers = try await api.catalogItem(namespace: game.namespace, id: game.catalogItemID)?.publishers
+                }
+                if let client = SystemCoordinator.StoreClient.required(for: publishers ?? [], title: game.title),
+                   await Task.detached(priority: .utility, operation: { client.installedURL == nil }).value {
+                    throw NSError(domain: "iDeck.StoreClient", code: 1,
+                                  userInfo: [NSLocalizedDescriptionKey: client.installInstruction])
+                }
+            }
             let asset = EpicAsset(appName: game.appName, labelName: "Live", buildVersion: game.buildVersion,
                                   catalogItemId: game.catalogItemID, namespace: game.namespace)
             // iDeck: the installed build's file list is read and parsed while the new

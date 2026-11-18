@@ -12,6 +12,7 @@ import Foundation
 struct SteamAppInfo {
     let appID: UInt32
     var name: String = ""
+    var publishers: [String] = []
     var type: AppType = .game
     var installDir: String = ""
     var oslist: String = ""         // "macos", "windows", "macos,windows", etc.
@@ -395,8 +396,16 @@ struct SteamAppInfo {
             appInfo = vdf
         }
 
+        if let extended = appInfo["extended"] as? [String: Any], let publisher = extended["publisher"] as? String {
+            info.publishers.append(publisher)
+        }
         // Common section
         if let common = appInfo["common"] as? [String: Any] {
+            if let associations = common["associations"] as? [String: Any] {
+                for case let entry as [String: Any] in associations.values where entry["type"] as? String == "publisher" {
+                    if let name = entry["name"] as? String { info.publishers.append(name) }
+                }
+            }
             info.name = common["name"] as? String ?? ""
             info.type = AppType(pics: common["type"] as? String ?? "")
             info.oslist = common["oslist"] as? String ?? ""

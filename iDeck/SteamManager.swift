@@ -503,6 +503,11 @@ final class SteamOwnedGamesModel: ObservableObject {
             guard let app = try await fetcher.fetchInstallInfo(appID: appID) else {
                 throw SteamError.depotNotFound(appID)
             }
+            if !wasInstalled, let client = SystemCoordinator.StoreClient.required(for: app.publishers, title: app.name),
+               client.installedURL == nil {
+                throw NSError(domain: "iDeck.StoreClient", code: 1,
+                              userInfo: [NSLocalizedDescriptionKey: client.installInstruction])
+            }
             installFolder = SteamInstallFiles.safeFolderName(
                 app.installDir.isEmpty ? "app_\(app.appID)" : app.installDir)
             if let installFolder {
