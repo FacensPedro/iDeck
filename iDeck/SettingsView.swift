@@ -5,6 +5,7 @@ import UniformTypeIdentifiers
 /// Settings: a grouped list of categories, each opening its own page.
 struct SettingsView: View {
     @ObservedObject var coordinator: SystemCoordinator
+    var openStore: (SystemCoordinator.StoreClient) -> Void
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dismiss) private var dismiss
     @StateObject private var inputManager = InputManager.shared
@@ -19,6 +20,8 @@ struct SettingsView: View {
     @State private var winePoolChangeRequiresRestart = false
     @AppStorage(ResourceGovernor.pauseInBackgroundKey) private var pauseGamesInBackground = true
     @StateObject private var updater = UpdateChecker()
+    @AppStorage("ubisoftAccountName") private var ubisoftAccountName = ""
+    @State private var ubisoftLoginPresented = false
     @State private var isSteamSignInPresented = false
     @ObservedObject private var gogLibrary = GOGLibraryModel.shared
     @ObservedObject private var epicLibrary = EpicLibrary.shared
@@ -251,7 +254,7 @@ struct SettingsView: View {
             Section {
                 NavigationLink { ubisoftPage } label: {
                     SettingsRow(icon: "u.square.fill", color: .black, title: "Ubisoft Connect",
-                                value: tr(SystemCoordinator.StoreClient.ubisoft.installedURL == nil ? "Not installed" : "Installed"),
+                                value: ubisoftAccountName.isEmpty ? tr("Not connected") : ubisoftAccountName,
                                 asset: "StoreBadgeUbisoft", assetKeepsColors: true)
                 }
             }
@@ -269,23 +272,28 @@ struct SettingsView: View {
     private var ubisoftPage: some View {
         Form {
             Section {
-                StoreClientButton(client: .ubisoft, coordinator: coordinator)
-                Link(destination: URL(string: "https://account.ubisoft.com/")!) {
-                    Text(tr("Ubisoft account")).foregroundStyle(Color.primary)
+                LabeledContent(tr("Account"), value: ubisoftAccountName.isEmpty ? tr("Not connected") : ubisoftAccountName)
+                if ubisoftAccountName.isEmpty {
+                    Button(tr("Sign in")) { ubisoftLoginPresented = true }
+                } else {
+                    Button(tr("Sign out"), role: .destructive) { ubisoftAccountName = "" }
                 }
             } header: {
                 launcherHeader("Ubisoft Connect", asset: "StoreBadgeUbisoft")
+            }
+            Section {
+                StoreClientButton(client: .ubisoft, coordinator: coordinator, openStore: openStore)
             } footer: {
                 Text(tr("The installer is downloaded from Ubisoft when you tap Install. Sign in inside Ubisoft Connect after it opens."))
             }
         }
         .navigationTitle("Ubisoft Connect")
+        .sheet(isPresented: $ubisoftLoginPresented) { UbisoftLoginView(accountName: $ubisoftAccountName) }
     }
 
     private var eaPage: some View {
         Form {
             Section {
-                StoreClientButton(client: .ea, coordinator: coordinator)
                 LabeledContent(tr("Account"),
                                value: eaLibrary.signedIn ? (eaLibrary.accountName ?? tr("Connected")) : tr("Not connected"))
                 if eaLibrary.signedIn {
@@ -295,7 +303,9 @@ struct SettingsView: View {
                 }
             } header: {
                 launcherHeader("EA app", asset: "StoreBadgeEA")
-
+            }
+            Section {
+                StoreClientButton(client: .ea, coordinator: coordinator, openStore: openStore)
             }
         }
         .navigationTitle("EA app")
@@ -682,16 +692,25 @@ struct StoreClientButton: View {
     let client: SystemCoordinator.StoreClient
     @ObservedObject var coordinator: SystemCoordinator
 
+    let openStore: (SystemCoordinator.StoreClient) -> Void
+    @State private var installed = false
+
     var body: some View {
-        if let progress = coordinator.storeClientDownload {
-            HStack(spacing: 10) {
-                ProgressView()
-                Text(progress).foregroundStyle(.secondary)
+        Group {
+            if let progress = coordinator.storeClientDownload {
+                HStack(spacing: 10) {
+                    ProgressView()
+                    Text(progress).foregroundStyle(.secondary)
+                }
+            } else {
+                Button(tr(installed ? "Launch" : "Install")) {
+                    openStore(client)
+                }
             }
-        } else {
-            Button(tr(client.installedURL == nil ? "Install" : "Launch")) {
-                coordinator.openStoreClient(client)
-            }
+        }
+        .task(id: coordinator.windowsStatus) {
+            let result = await Task.detached(priority: .utility) { [client] in client.installedURL != nil }.value
+            if !Task.isCancelled { installed = result }
         }
     }
 }
@@ -701,17 +720,19 @@ struct StoreClientCard: View {
     let client: SystemCoordinator.StoreClient
     @ObservedObject var coordinator: SystemCoordinator
 
+    @State private var installed = false
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(client.rawValue)
                 .font(.headline)
                 .foregroundColor(.white)
-            Text(tr(client.installedURL == nil
+            Text(tr(!installed
                 ? "Install it in Settings › Stores & launchers › %@."
                 : "Installed. Open it to sign in and play your games.", client.rawValue))
                 .font(.subheadline)
                 .foregroundColor(.gray)
-            if client.installedURL != nil {
+            if installed {
                 Button(tr("Launch")) { coordinator.openStoreClient(client) }
                     .buttonStyle(.borderedProminent)
             }
@@ -720,5 +741,88 @@ struct StoreClientCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.white.opacity(0.06))
         .clipShape(RoundedRectangle(cornerRadius: 10))
+        .task(id: coordinator.windowsStatus) {
+            let result = await Task.detached(priority: .utility) { [client] in client.installedURL != nil }.value
+            if !Task.isCancelled { installed = result }
+        }
+    }
+}
+
+
+private struct UbisoftLoginView: View {
+    @Binding var accountName: String
+    @Environment(\.dismiss) private var dismiss
+    @State private var email = ""
+    @State private var password = ""
+    @State private var challenge: String?
+    @State private var code = ""
+    @State private var busy = false
+    @State private var error = ""
+    @State private var request: Task<Void, Never>?
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                if challenge == nil {
+                    TextField(tr("Email"), text: $email)
+                        .keyboardType(.emailAddress).textContentType(.username)
+                        .textInputAutocapitalization(.never).autocorrectionDisabled()
+                    SecureField(tr("Password"), text: $password).textContentType(.password)
+                } else {
+                    TextField(tr("Verification code"), text: $code).textContentType(.oneTimeCode)
+                }
+                Button(tr("Sign in")) {
+                    busy = true
+                    request = Task { await authenticate() }
+                }
+                .disabled(busy || (challenge == nil ? email.isEmpty || password.isEmpty : code.isEmpty))
+                if busy { ProgressView() }
+                if !error.isEmpty { Text(error).foregroundStyle(.red) }
+            }
+            .navigationTitle("Ubisoft Connect")
+            .safeAreaInset(edge: .bottom) {
+                Link(tr("Ubisoft account"), destination: URL(string: "https://account.ubisoft.com/")!)
+                    .padding()
+            }
+            .toolbar { Button(tr("Cancel")) { dismiss() } }
+        }
+        .onDisappear { request?.cancel() }
+    }
+
+    @MainActor private func authenticate() async {
+        defer { busy = false }
+        error = ""
+        var login = URLRequest(url: URL(string: "https://public-ubiservices.ubi.com/v3/profiles/sessions")!)
+        login.httpMethod = "POST"
+        login.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        login.setValue("39baebad-39e5-4552-8c25-2c9b919064e2", forHTTPHeaderField: "Ubi-AppId")
+        if let challenge {
+            login.setValue("ubi_2fa_v1 t=" + challenge, forHTTPHeaderField: "Authorization")
+            login.setValue(code, forHTTPHeaderField: "Ubi-2FACode")
+        } else {
+            let credentials = Data((email.trimmingCharacters(in: .whitespacesAndNewlines) + ":" + password).utf8)
+            login.setValue("Basic " + credentials.base64EncodedString(), forHTTPHeaderField: "Authorization")
+        }
+        login.httpBody = Data(#"{"rememberMe":false}"#.utf8)
+        do {
+            let (data, response) = try await URLSession.shared.data(for: login)
+            try Task.checkCancellation()
+            let fields = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+            if let token = fields?["twoFactorAuthenticationTicket"] as? String, !token.isEmpty {
+                challenge = token
+                password = ""
+                return
+            }
+            guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode),
+                  fields?["ticket"] is String,
+                  let name = fields?["nameOnPlatform"] as? String, !name.isEmpty else {
+                error = (fields?["message"] as? String) ?? tr("Sign-in failed")
+                return
+            }
+            accountName = name
+            dismiss()
+        } catch {
+            if !Task.isCancelled { self.error = error.localizedDescription }
+        }
     }
 }

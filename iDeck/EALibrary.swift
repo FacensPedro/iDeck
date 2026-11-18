@@ -292,6 +292,8 @@ struct EAInstalledGame: Codable, Sendable {
 
     private func enqueue(_ id: String, kind: Download.Kind) {
         guard signedIn || installed[id] != nil else { error = "Sign in to EA to download games."; return }
+        if kind == .install, let client = SystemCoordinator.StoreClient.required(for: ["Electronic Arts"], title: game(id)?.title ?? ""),
+           client.installedURL == nil { error = client.installInstruction; return }
         if kind == .install, AntiCheatPolicy.isBlocked(title: game(id)?.title ?? "") { error = AntiCheatPolicy.message; return }
         guard signedIn else { error = EAAPIError.signedOut.localizedDescription; return }
         if let current = downloads[id], current.state == .active || current.state == .queued { return }

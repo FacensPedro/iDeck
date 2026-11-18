@@ -1115,6 +1115,22 @@ class SystemCoordinator: ObservableObject {
     enum StoreClient: String, CaseIterable {
         case ubisoft = "Ubisoft Connect", ea = "EA app"
 
+        static func required(for publishers: [String], title: String) -> Self? {
+            for publisher in publishers {
+                let name = publisher.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+                if name.hasPrefix("ubisoft") || name == "uplay" { return .ubisoft }
+                if name.hasPrefix("electronic arts") || ["ea", "ea sports", "ea originals", "origin"].contains(name) {
+                    let words = title.lowercased().split { !$0.isLetter && !$0.isNumber }
+                    return words.prefix(2).elementsEqual(["battlefield", "6"]) ? nil : .ea
+                }
+            }
+            return nil
+        }
+
+        var installInstruction: String {
+            tr("Install it in Settings › Stores & launchers › %@.", rawValue)
+        }
+
         static var drive: URL { MadeiraDock.prefix.appendingPathComponent("drive_c") }
 
         var installedURL: URL? {
@@ -1152,8 +1168,12 @@ class SystemCoordinator: ObservableObject {
             // Wine's .reg files write each backslash of a key name twice.
             let header = "[" + key.lowercased().replacingOccurrences(of: "\\", with: "\\\\") + "]"
             var inside = false
-            for line in text.split(whereSeparator: \.isNewline) {
-                let l = line.trimmingCharacters(in: .whitespaces)
+            var cursor = text.startIndex
+            while cursor < text.endIndex {
+                let end = text.utf8[cursor...].firstIndex(of: 10) ?? text.endIndex
+                let line = text.utf8[cursor..<end]
+                cursor = end == text.endIndex ? end : text.utf8.index(after: end)
+                let l = String(decoding: line, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
                 if l.hasPrefix("[") { inside = l.lowercased().hasPrefix(header); continue }
                 guard inside, l.lowercased().hasPrefix("\"" + name.lowercased() + "\"=\"") else { continue }
                 var value = String(l.dropFirst(name.count + 4).dropLast())
@@ -1219,6 +1239,12 @@ class SystemCoordinator: ObservableObject {
                     }
                 }
                 self.storeClientDownload = nil
+                if missing == [.ubisoft], let installer = StoreClient.ubisoft.installer {
+                    self.requestedStoreClients = missing
+                    let profile = WindowsGameProfile(id: "ideck:store-setup", title: StoreClient.ubisoft.rawValue)
+                    self.launchWindowsExecutable(at: installer, profile: profile, installer: true)
+                    return
+                }
                 var commands = ["@echo off"]
                 for client in missing {
                     let switches = client == .ubisoft ? "" : " /passive /norestart"

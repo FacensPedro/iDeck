@@ -240,6 +240,7 @@ struct WindowsWorkspaceView: View {
     @ObservedObject var coordinator: SystemCoordinator
     @ObservedObject var steamLibrary: SteamOwnedGamesModel
 
+    @State private var pendingStore: SystemCoordinator.StoreClient?
     @State private var isSettingsPresented = false
     @State private var searchText = ""
     /// The selected tile of the console-style shelf (a store or a game).
@@ -418,8 +419,16 @@ struct WindowsWorkspaceView: View {
                 }
             }
         }
-        .sheet(isPresented: $isSettingsPresented) {
-            SettingsView(coordinator: coordinator)
+        .sheet(isPresented: $isSettingsPresented, onDismiss: {
+            if let client = pendingStore {
+                pendingStore = nil
+                coordinator.openStoreClient(client)
+            }
+        }) {
+            SettingsView(coordinator: coordinator, openStore: { client in
+                pendingStore = client
+                isSettingsPresented = false
+            })
         }
         .sheet(isPresented: $isGOGSignInPresented) {
             GOGSignInView()
@@ -2523,6 +2532,7 @@ extension WindowsWorkspaceView {
             case .ubisoft:
                 StoreClientCard(client: .ubisoft, coordinator: coordinator)
             case .ea:
+                StoreClientCard(client: .ea, coordinator: coordinator)
                 if eaLibrary.signedIn {
                     storeGrid(loading: eaLibrary.refreshing, error: eaLibrary.error,
                               count: eaLibrary.owned.count, entries: filteredEAGames.map { .ea($0) })
