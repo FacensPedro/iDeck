@@ -1221,8 +1221,8 @@ class SystemCoordinator: ObservableObject {
                 self.storeClientDownload = nil
                 var commands = ["@echo off"]
                 for client in missing {
-                    let switches = client == .ubisoft ? "/S" : "/passive /norestart"
-                    commands.append("start /wait \"\" \"C:\\iDeck\\" + client.installerName + "\" " + switches)
+                    let switches = client == .ubisoft ? "" : " /passive /norestart"
+                    commands.append("start /wait \"\" \"C:\\iDeck\\" + client.installerName + "\"" + switches)
                     commands.append("if errorlevel 1 echo " + client.rawValue + " installer returned %errorlevel%")
                 }
                 guard let shell = MadeiraDock.stageCommandShell() else { throw CocoaError(.fileNoSuchFile) }
