@@ -83,7 +83,9 @@ enum SteamDLLRepair {
         }
         guard (try? folder.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey]))?.isDirectory == true,
               (try? folder.resourceValues(forKeys: [.isSymbolicLinkKey]))?.isSymbolicLink != true,
-              root.standardizedFileURL.path == root.resolvingSymlinksInPath().standardizedFileURL.path else {
+              root.resolvingSymlinksInPath().standardizedFileURL.path == folder.deletingLastPathComponent()
+                  .resolvingSymlinksInPath().appendingPathComponent("wine/drive_c")
+                  .appendingPathComponent(SteamRuntimeFiles.relativeRoot).standardizedFileURL.path else {
             return Report(copied: [], missing: missingBefore, invalid: ["unsafe import folder"])
         }
         let invalidSources = clientLibraries.filter { name in
@@ -189,11 +191,15 @@ enum SteamVideoLibraries {
     /// FFmpeg DLLs and SDL3.dll in Documents/SteamDLLs, where
     /// SteamDLLRepair validates and installs them. Nothing is executed.
     static func fetch(progress: @escaping @Sendable (String) async -> Void) async throws {
-        guard let folder = SteamDLLRepair.sourceFolder else { return }
+        guard let folder = SteamDLLRepair.sourceFolder else { throw CocoaError(.fileNoSuchFile) }
         let fm = FileManager.default
-        let names = SteamDLLRepair.mediaLibraries + [SteamDLLRepair.sdlLibrary]
-        guard !names.allSatisfy({ SteamDLLRepair.validX64DLL(folder.appendingPathComponent($0)) }) else { return }
-        let wanted = Set(names.map { $0.lowercased() })
+        let names = SteamDLLRepair.clientLibraries.filter {
+            !SteamDLLRepair.validX64DLL(MadeiraDock.clientRoot.appendingPathComponent($0))
+        }
+        var wanted = Dictionary(uniqueKeysWithValues: names.filter {
+            !SteamDLLRepair.validX64DLL(folder.appendingPathComponent($0))
+        }.map { ($0.lowercased(), $0) })
+        guard !wanted.isEmpty else { return }
         try fm.createDirectory(at: folder, withIntermediateDirectories: true)
         let configuration = URLSessionConfiguration.ephemeral
         configuration.httpCookieStorage = nil; configuration.urlCredentialStorage = nil
@@ -230,15 +236,19 @@ enum SteamVideoLibraries {
             guard hash(archive) == package.sha256 else { throw SteamRuntimeFiles.Failure.invalidPackage }
             await progress("Verifying Steam DLLs…")
             try SteamRuntimeFiles.unpack(archive) { name, bytes in
-                guard !name.contains("/"), wanted.contains(name.lowercased()) else { return }
-                let target = folder.appendingPathComponent(name)
-                guard !SteamDLLRepair.validX64DLL(target) else { return }
+                guard let leaf = name.split(separator: "/").last,
+                      let canonical = wanted[leaf.lowercased()] else { return }
+                let temporary = folder.appendingPathComponent(UUID().uuidString)
+                try bytes.write(to: temporary)
+                defer { try? fm.removeItem(at: temporary) }
+                guard SteamDLLRepair.validX64DLL(temporary) else { return }
+                let target = folder.appendingPathComponent(canonical)
                 try bytes.write(to: target, options: .atomic)
-                guard SteamDLLRepair.validX64DLL(target) else {
-                    try? fm.removeItem(at: target)
-                    throw SteamRuntimeFiles.Failure.invalidPackage
-                }
+                wanted.removeValue(forKey: leaf.lowercased())
             }
+        }
+        guard wanted.isEmpty else {
+            throw DockError.message("Missing Steam DLLs: " + wanted.values.sorted().joined(separator: ", "))
         }
         await progress("Steam DLLs are ready.")
     }
