@@ -376,7 +376,7 @@ class SystemCoordinator: ObservableObject {
         steamComponentsTask = Task(priority: .utility) { @MainActor [weak self] in
             do {
                 if !MadeiraDock.clientInstalled {
-                    try await SteamRuntimeInstaller.shared.prepare(prefix: MadeiraDock.prefix) { [weak self] message in
+                    try await SteamRuntimeInstaller.shared.prepare(prefix: MadeiraDock.prefix.deletingLastPathComponent().resolvingSymlinksInPath().appendingPathComponent("wine", isDirectory: true)) { [weak self] message in
                         AppLog.record("[steam-components] " + message)
                         await self?.publishSteamComponentsProgress(message)
                     }
@@ -1671,7 +1671,7 @@ class SystemCoordinator: ObservableObject {
             if !MadeiraDock.clientInstalled {
                 let owner = self
                 do {
-                    try await SteamRuntimeInstaller.shared.prepare(prefix: MadeiraDock.prefix) { message in
+                    try await SteamRuntimeInstaller.shared.prepare(prefix: MadeiraDock.prefix.deletingLastPathComponent().resolvingSymlinksInPath().appendingPathComponent("wine", isDirectory: true)) { message in
                         AppLog.record("[steam-components] " + message)
                         await MainActor.run { owner?.steamComponentsProgress = message }
                     }
