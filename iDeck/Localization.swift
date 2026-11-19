@@ -105,8 +105,6 @@ enum Translations {
         "Not downloaded": ["pt": "Não baixado", "es": "No descargado"],
         "Time left": ["pt": "Tempo restante", "es": "Tiempo restante"],
 
-        "Waiting for the first Windows game frame...": ["pt": "Aguardando o primeiro quadro do jogo Windows...", "es": "Esperando el primer fotograma del juego de Windows..."],
-        "No Windows game frame detected. Check the Wine log.": ["pt": "Nenhum quadro do jogo Windows detectado. Verifique o log do Wine.", "es": "No se detectaron fotogramas del juego de Windows. Consulta el registro de Wine."],
         "Closing Wine and wineserver...": ["pt": "Encerrando o Wine e o servidor Wine...", "es": "Cerrando Wine y el servidor de Wine..."],
         "Closing Windows session...": ["pt": "Encerrando a sessão Windows...", "es": "Cerrando la sesión de Windows..."],
         "Wine did not close": ["pt": "O Wine não foi encerrado", "es": "Wine no se ha cerrado"],
