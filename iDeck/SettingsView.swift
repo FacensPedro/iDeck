@@ -746,17 +746,22 @@ struct StoreClientCard: View {
     let client: SystemCoordinator.StoreClient
     @ObservedObject var coordinator: SystemCoordinator
 
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+    private var compactUbisoftText: Bool {
+        client == .ubisoft && UIDevice.current.userInterfaceIdiom == .phone && verticalSizeClass == .compact
+    }
+
     @State private var installed = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(client.rawValue)
-                .font(.headline)
+                .font(compactUbisoftText ? .subheadline.weight(.semibold) : .headline)
                 .foregroundColor(.white)
             Text(tr(!installed
                 ? "Install it in Settings › Stores & launchers › %@."
                 : "Installed. Open it to sign in and play your games.", client.rawValue))
-                .font(.subheadline)
+                .font(compactUbisoftText ? .footnote : .subheadline)
                 .foregroundColor(.gray)
             if installed {
                 Button(tr("Launch")) { coordinator.openStoreClient(client) }

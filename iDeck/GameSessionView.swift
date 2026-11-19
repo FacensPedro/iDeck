@@ -151,13 +151,6 @@ struct GameSessionView: View {
             if coordinator.currentSteamLaunchUsesDock && !coordinator.dockLaunchAccepted {
                 return (0.70, coordinator.steamDockLaunchStage ?? "Starting Madeira Dock")
             }
-            // The bar goes away with the first frame: secondsSinceLaunch stops being
-            // published once frames arrive, so a 2.5 s "displayed" stage never ended.
-            if metrics.receivedNewFrames { return nil }
-            if coordinator.currentSteamLaunchUsesDock {
-                return (0.90, "Waiting for a Metal frame after Steam's LaunchApp")
-            }
-            return (0.90, "Waiting for the first game frame")
         }
         return nil
     }
@@ -325,15 +318,6 @@ struct GameSessionView: View {
                             .foregroundColor(.yellow)
                             .font(.caption2.weight(.semibold))
                             .lineLimit(3)
-                    } else if !metrics.receivedNewFrames &&
-                              (coordinator.windowsStatus == "Wine started; waiting for game..." ||
-                               coordinator.windowsStatus == "Running") {
-                        Text(tr(metrics.secondsSinceLaunch >= 20
-                            ? "No Windows game frame detected. Check the Wine log."
-                            : "Waiting for the first Windows game frame..."))
-                            .foregroundColor(metrics.secondsSinceLaunch >= 20 ? .yellow : .white)
-                            .font(.caption2.weight(.semibold))
-                            .lineLimit(2)
                     }
                     Spacer(minLength: 4)
                     if hasWineProblem && wineLogURL != nil {

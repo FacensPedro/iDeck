@@ -6,6 +6,9 @@ import Darwin
 /// (Madeira's winios touch bridge).
 struct TouchMouseView: UIViewRepresentable {
     func makeUIView(context: Context) -> TouchMouseSurface { TouchMouseSurface() }
+    static func dismantleUIView(_ view: TouchMouseSurface, coordinator: ()) {
+        view.releaseInstallerClick()
+    }
     func updateUIView(_ uiView: TouchMouseSurface, context: Context) {}
 }
 
@@ -37,6 +40,26 @@ final class TouchMouseSurface: UIView {
         if let p = lastGuestPoint { Self.move?(p.0, p.1) }
     }
 
+    private var pendingRelease: DispatchWorkItem?
+    private var pressedPoint: (Int32, Int32)?
+
+    fileprivate func releaseInstallerClick() {
+        pendingRelease?.cancel()
+        pendingRelease = nil
+        guard let point = pressedPoint else { return }
+        pressedPoint = nil
+        Self.up?(point.0, point.1)
+    }
+
+    private func clickInstallerPointer(at point: (Int32, Int32)) {
+        Self.down?(point.0, point.1)
+        pressedPoint = point
+        // Give the dialog's 16 ms input loop time to observe the pressed state.
+        let release = DispatchWorkItem { [weak self] in self?.releaseInstallerClick() }
+        pendingRelease = release
+        DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(50), execute: release)
+    }
+
     private weak var tracked: UITouch?
     private var lastGuestPoint: (Int32, Int32)?
 
@@ -60,6 +83,7 @@ final class TouchMouseSurface: UIView {
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         guard tracked == nil, let touch = touches.first else { return }
+        releaseInstallerClick()
         let windowPoint = window.map { touch.location(in: $0) } ?? .zero
         if WindowsRendererView.installerTouchMapping && touch.type != .indirectPointer {
             tracked = touch
@@ -100,7 +124,7 @@ final class TouchMouseSurface: UIView {
         tracked = nil
         if WindowsRendererView.installerTouchMapping && touch.type != .indirectPointer {
             moveInstallerPointer(touch)
-            if !moved, let p = lastGuestPoint { Self.down?(p.0, p.1); Self.up?(p.0, p.1) }
+            if !moved, let p = lastGuestPoint { clickInstallerPointer(at: p) }
             lastGuestPoint = nil
             return
         }

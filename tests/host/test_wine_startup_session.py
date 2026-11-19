@@ -16,7 +16,9 @@ class WineStartupSessionTests(unittest.TestCase):
     def test_progress_is_milestone_not_fake_game_download(self):
         self.assertIn("private var gameLoading:", VIEW)
         self.assertIn("ProgressView(value: loading.progress, total: 1)", VIEW)
-        self.assertIn('0.90, "Waiting for the first game frame"', VIEW)
+        self.assertNotIn("Waiting for the first game frame", VIEW)
+        self.assertNotIn("Waiting for the first Windows game frame", VIEW)
+        self.assertNotIn("No Windows game frame detected", VIEW)
         self.assertIn('if metrics.receivedNewFrames { return nil }', VIEW)
         self.assertIn("metrics.receivedNewFrames", VIEW)
         self.assertIn("Startup milestone, not the game's internal loading percentage.", VIEW)

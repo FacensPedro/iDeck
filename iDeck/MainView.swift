@@ -3052,7 +3052,7 @@ private struct IDeckFirstRunSetupView: View {
 
     private var dockStep: some View {
         VStack(alignment: .leading, spacing: 18) {
-            stepHeader(.dock, "Runs Valve's official Steam client, so Steam games start with their licence and DRM intact.")
+            stepHeader(.dock, "Launches games through Steam.")
             componentList {
                 statusRow("Steam client", MadeiraDock.clientInstalled)
                 Divider().overlay(hairline).padding(.leading, 43)
