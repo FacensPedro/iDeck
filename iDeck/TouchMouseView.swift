@@ -61,7 +61,7 @@ final class TouchMouseSurface: UIView {
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         guard tracked == nil, let touch = touches.first else { return }
         let windowPoint = window.map { touch.location(in: $0) } ?? .zero
-        if WindowsRendererView.installerTouchMapping {
+        if WindowsRendererView.installerTouchMapping && touch.type != .indirectPointer {
             tracked = touch
             fingerOrigin = windowPoint
             lastFinger = windowPoint
@@ -89,7 +89,7 @@ final class TouchMouseSurface: UIView {
 
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
         guard let touch = tracked, touches.contains(touch) else { return }
-        if WindowsRendererView.installerTouchMapping { moveInstallerPointer(touch); return }
+        if WindowsRendererView.installerTouchMapping && touch.type != .indirectPointer { moveInstallerPointer(touch); return }
         guard let p = guest(touch) else { return }
         lastGuestPoint = p
         Self.move?(p.0, p.1)
@@ -98,7 +98,7 @@ final class TouchMouseSurface: UIView {
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
         guard let touch = tracked, touches.contains(touch) else { return }
         tracked = nil
-        if WindowsRendererView.installerTouchMapping {
+        if WindowsRendererView.installerTouchMapping && touch.type != .indirectPointer {
             moveInstallerPointer(touch)
             if !moved, let p = lastGuestPoint { Self.down?(p.0, p.1); Self.up?(p.0, p.1) }
             lastGuestPoint = nil
@@ -109,7 +109,7 @@ final class TouchMouseSurface: UIView {
     }
 
     override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
-        if WindowsRendererView.installerTouchMapping { tracked = nil; lastGuestPoint = nil; return }
+        if WindowsRendererView.installerTouchMapping && tracked?.type != .indirectPointer { tracked = nil; lastGuestPoint = nil; return }
         touchesEnded(touches, with: event)
     }
 }
