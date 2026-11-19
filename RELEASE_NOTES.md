@@ -1,6 +1,4 @@
 ## What's Changed
-- Hold installer trackpad clicks for 50 ms so dialogs have time to process the press.
-- Remove the first-frame waiting notices from Wine sessions.
-- Shorten the Steam launcher description in initial setup.
-- Reduce the Ubisoft Connect card text size on iPhones in landscape.
-- Updated the application version to 2.9.5 (build 106).
+- Avoid a debug-print exception during 32-bit Direct3D 9 startup without a Windows debugger.
+- Report fatal Windows child process exceptions even when the Steam host exits successfully.
+- Updated the application version to 2.9.6 (build 107).

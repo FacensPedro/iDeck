@@ -5,6 +5,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -122,54 +123,38 @@ int32_t ideck_wine_log_diagnose(const char *path) {
     return code;
 }
 
-// The Wine host may return exit code 0 even after its Steam-launched child
-// pseudo-process aborted with STATUS_ACCESS_VIOLATION. Read only bytes logged
-// after the active launch began: earlier game crashes must not poison a later
-// successful exit. We require abort_process rather than a handled SEH fault.
-int32_t ideck_wine_log_fatal_av_since(const char *path, int64_t start_offset) {
-    if (!path || !*path || start_offset < 0) return 0;
+// The host can exit successfully after a child abort. Diagnostic callbacks can
+// continue writing for megabytes afterwards, so stream the whole active session.
+uint32_t ideck_wine_log_child_abort_since(const char *path, int64_t start_offset) {
+    if (!path || start_offset < 0) return 0;
     int fd = open(path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
     if (fd < 0) return 0;
     struct stat info;
-    if (fstat(fd, &info) || !S_ISREG(info.st_mode) || info.st_size <= 0) {
-        close(fd);
-        return 0;
+    if (fstat(fd, &info) || !S_ISREG(info.st_mode)) { close(fd); return 0; }
+    FILE *file = fdopen(fd, "r");
+    if (!file) { close(fd); return 0; }
+    off_t start = start_offset <= info.st_size ? start_offset : 0;
+    uint32_t fatal = 0;
+    unsigned exception_thread = 0, exception_code = 0;
+    char line[4096];
+    if (fseeko(file, start, SEEK_SET) == 0) {
+        while (fgets(line, sizeof(line), file)) {
+            unsigned tid, code;
+            if (strstr(line, "[wineserver-bridge] ws_log test")) {
+                fatal = exception_code = 0;
+            } else if (strstr(line, "Unhandled exception code ") && sscanf(line, "%x:err:seh:NtRaiseException Unhandled exception code %x",
+                              &tid, &code) == 2) {
+                exception_thread = tid;
+                exception_code = code;
+            } else if (strstr(line, "abort_process: status=") && sscanf(line, "%x:err:thread:abort_process abort_process: status=0x%x",
+                              &tid, &code) == 2) {
+                if (code == 0xc0000005 || (tid == exception_thread && code == exception_code && code))
+                    fatal = code;
+            } else if (!strncmp(line, "abort_process: status=0xc0000005", strlen("abort_process: status=0xc0000005"))) {
+                fatal = 0xc0000005;
+            }
+        }
     }
-    // If Madeira truncated the previous log when opening the new session,
-    // inspect the new log from its beginning.
-    off_t start = (off_t)start_offset;
-    if (start > info.st_size) start = 0;
-    off_t floor = info.st_size > WINE_LOG_TAIL_LIMIT
-        ? info.st_size - WINE_LOG_TAIL_LIMIT : 0;
-    if (start < floor) start = floor;
-    size_t length = (size_t)(info.st_size - start);
-    if (!length) { close(fd); return 0; }
-    char *buffer = malloc(length + 1);
-    if (!buffer) { close(fd); return 0; }
-    size_t done = 0;
-    while (done < length) {
-        ssize_t n = pread(fd, buffer + done, length - done, start + (off_t)done);
-        if (n < 0 && errno == EINTR) continue;
-        if (n <= 0) break;
-        done += (size_t)n;
-    }
-    close(fd);
-    buffer[done] = '\0';
-    for (size_t i = 0; i < done; ++i) {
-        if (buffer[i] == '\0') buffer[i] = ' ';
-        if (buffer[i] >= 'A' && buffer[i] <= 'Z')
-            buffer[i] = (char)(buffer[i] - 'A' + 'a');
-    }
-    // The Steam Dock host can exit successfully while the launched game dies.
-    // Ignore merely handled exceptions and diagnostics from older sessions.
-    const char *current = buffer;
-    const char *marker = "[wineserver-bridge] ws_log test";
-    const char *next = buffer;
-    while ((next = strstr(next, marker)) != NULL) {
-        current = next;
-        next += strlen(marker);
-    }
-    int32_t found = strstr(current, "abort_process: status=0xc0000005") != NULL;
-    free(buffer);
-    return found;
+    fclose(file);
+    return fatal;
 }

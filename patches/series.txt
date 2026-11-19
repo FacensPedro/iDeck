@@ -22,6 +22,7 @@ wine      wine   wine-ios-fault-address.patch
 # DXMT's iOS cache/sync work, then the upstream backports (before the VC++ overlay,
 # which edits the same bridge file)
 backports dxmt   dxmt-ios-cache-sync-reuse.patch
+backports dxmt   dxmt-i386-debug-output.patch
 backports .      madeira-game-compat-backports.patch
 
 # FEX host features, the ARM64EC context return and the loader/JIT fixes
