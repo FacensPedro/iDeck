@@ -2480,7 +2480,7 @@ extension WindowsWorkspaceView {
     @ViewBuilder
     private func storePage(_ store: GameStore) -> some View {
         VStack(alignment: .leading, spacing: 16) {
-            if store != .ubisoft {
+            if store != .ubisoft && (store != .ea || eaClientInstalled) {
             HStack(spacing: 10) {
                 searchField
                 Button { refreshAllLibraries() } label: {
@@ -2647,6 +2647,7 @@ extension WindowsWorkspaceView {
 
 private struct IDeckFirstRunSetupView: View {
     @Environment(\.verticalSizeClass) private var setupHeight
+    private var compactPhone: Bool { setupHeight == .compact && UIDevice.current.userInterfaceIdiom == .phone }
     @ObservedObject var coordinator: SystemCoordinator
     let onFinish: () -> Void
 
@@ -2789,14 +2790,14 @@ private struct IDeckFirstRunSetupView: View {
     private func header(_ current: Step) -> some View {
         HStack(alignment: .center, spacing: 14) {
             Image(systemName: "square.stack.3d.up.fill")
-                .font(.system(size: 22, weight: .semibold))
+                .font(.system(size: compactPhone ? 16 : 22, weight: .semibold))
                 .foregroundStyle(.white)
-                .frame(width: 48, height: 48)
+                .frame(width: compactPhone ? 34 : 48, height: compactPhone ? 34 : 48)
                 .background(LinearGradient(colors: [Color.blue, Color.indigo], startPoint: .topLeading, endPoint: .bottomTrailing),
                             in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
                 Text("Welcome to iDeck")
-                    .font(.system(size: 26, weight: .bold))
+                    .font(.system(size: compactPhone ? 20 : 26, weight: .bold))
                     .foregroundStyle(.white)
                 Text("Step \(current.rawValue + 1) of \(Step.allCases.count) · \(current.title)")
                     .font(.subheadline)
@@ -2820,7 +2821,7 @@ private struct IDeckFirstRunSetupView: View {
                             Circle()
                                 .fill(isCurrent ? item.tint : (finished ? Color.green.opacity(0.18) : surface))
                                 .overlay(Circle().stroke(isCurrent ? Color.clear : hairline, lineWidth: 1))
-                                .frame(width: 32, height: 32)
+                                .frame(width: compactPhone ? 24 : 32, height: compactPhone ? 24 : 32)
                             if finished {
                                 Image(systemName: "checkmark").font(.system(size: 13, weight: .bold)).foregroundStyle(.green)
                             } else {
