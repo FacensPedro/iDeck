@@ -1,0 +1,18 @@
+diff --git a/src/d3d9shim/d3d9shim_main.c b/src/d3d9shim/d3d9shim_main.c
+--- a/src/d3d9shim/d3d9shim_main.c
++++ b/src/d3d9shim/d3d9shim_main.c
+@@ -55,8 +55,12 @@ d3d9shim_trace(const char *msg)
+ {
+     if (!msg)
+         return;
+-    OutputDebugStringA(msg);
+-    OutputDebugStringA("\n");
++    /* A debug print raises a guest exception. Use it only for an attached
++     * Windows debugger; stderr also reaches the runtime log. */
++    if (IsDebuggerPresent()) {
++        OutputDebugStringA(msg);
++        OutputDebugStringA("\n");
++    }
+     fprintf(stderr, "%s\n", msg);
+     fflush(stderr);
+ }

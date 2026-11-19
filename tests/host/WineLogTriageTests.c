@@ -128,23 +128,26 @@ int main(void) {
 
     // A Steam-launched game may crash while the Wine/Dock host returns 0.
     // Require a fatal child abort within this launch, not an old log entry.
-    write_log(path, "abort_process: status=0xc0000005\\n");
-    assert(ideck_wine_log_fatal_av_since(path, 0) == 1);
-    assert(ideck_wine_log_fatal_av_since(path, (int64_t)strlen("abort_process: status=0xc0000005\\n")) == 0);
+    write_log(path, "abort_process: status=0xc0000005\n");
+    assert(ideck_wine_log_child_abort_since(path, 0) == 0xc0000005u);
+    assert(ideck_wine_log_child_abort_since(path, (int64_t)strlen("abort_process: status=0xc0000005\n")) == 0);
     FILE *append = fopen(path, "ab");
     assert(append);
-    assert(fputs("wine: Unhandled page fault on read access\\n", append) > 0);
+    assert(fputs("wine: Unhandled page fault on read access\n", append) > 0);
     assert(fclose(append) == 0);
-    assert(ideck_wine_log_fatal_av_since(path, (int64_t)strlen("abort_process: status=0xc0000005\\n")) == 0);
+    assert(ideck_wine_log_child_abort_since(path, (int64_t)strlen("abort_process: status=0xc0000005\n")) == 0);
     append = fopen(path, "ab");
     assert(append);
-    assert(fputs("0094:err:thread:abort_process abort_process: status=0xc0000005\\n", append) > 0);
+    assert(fputs("0094:err:thread:abort_process abort_process: status=0xc0000005\n", append) > 0);
     assert(fclose(append) == 0);
-    assert(ideck_wine_log_fatal_av_since(path, (int64_t)strlen("abort_process: status=0xc0000005\\n")) == 1);
-    assert(ideck_wine_log_fatal_av_since(path, -1) == 0);
+    assert(ideck_wine_log_child_abort_since(path, (int64_t)strlen("abort_process: status=0xc0000005\n")) == 0xc0000005u);
+    assert(ideck_wine_log_child_abort_since(path, -1) == 0);
 
+    write_log(path, "008c:err:seh:NtRaiseException Unhandled exception code 2dfffc80 flags 1 addr 0x0\n"
+                    "008c:err:thread:abort_process abort_process: status=0x2dfffc80\n");
+    assert(ideck_wine_log_child_abort_since(path, 0) == 0x2dfffc80u);
     assert(symlink(path, alias) == 0);
-    assert(ideck_wine_log_fatal_av_since(alias, 0) == 0);
+    assert(ideck_wine_log_child_abort_since(alias, 0) == 0);
     assert(ideck_wine_log_diagnose(alias) == IDECK_WINE_LOG_NONE);
     assert(unlink(alias) == 0);
     assert(unlink(path) == 0);

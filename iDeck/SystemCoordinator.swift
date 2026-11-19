@@ -81,17 +81,15 @@ class SystemCoordinator: ObservableObject {
         var nativeCrashStatus: UInt32 = 0
         let code = ideck_wineprocess_last_exit_code(&nativeExitCode) ? nativeExitCode : nil
         let nativeStatus = ideck_wineprocess_last_ntstatus(&nativeCrashStatus) ? nativeCrashStatus : nil
-        let childAV: Bool
+        var childStatus: UInt32 = 0
         if code == 0, nativeStatus == nil,
            let start = wineLogStartOffset, let path = Self.wineLogURL?.path {
-            childAV = path.withCString { ideck_wine_log_fatal_av_since($0, start) != 0 }
-        } else {
-            childAV = false
+            childStatus = path.withCString { ideck_wine_log_child_abort_since($0, start) }
         }
-        let effectiveStatus = nativeStatus ?? (childAV ? UInt32(0xC0000005) : nil)
+        let effectiveStatus = nativeStatus ?? (childStatus == 0 ? nil : childStatus)
         var reason = WineExitDiagnostics.message(exitCode: code, crashStatus: effectiveStatus)
-        if childAV {
-            reason += " Wine's host returned exit code 0, but a Windows child process terminated with an access violation."
+        if childStatus != 0 {
+            reason += " The Windows child process aborted. The Wine host exited with code 0."
         }
         return (reason, effectiveStatus)
     }

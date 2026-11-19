@@ -24,9 +24,7 @@ typedef enum {
     IDECK_WINE_LOG_DOWNLOAD_INTEGRITY = 13
 } IDeckWineLogDiagnosis;
 int32_t ideck_wine_log_diagnose(const char *path);
-// Detect fatal guest access violations written after a particular launch began.
-// Bounded to the latest 512 KiB and returns no user-controlled log text.
-int32_t ideck_wine_log_fatal_av_since(const char *path, int64_t start_offset);
+uint32_t ideck_wine_log_child_abort_since(const char *path, int64_t start_offset);
 
 #ifdef __cplusplus
 }
