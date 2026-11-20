@@ -10,5 +10,5 @@
 ### Logs
 - Compact repeated progress lines in copied Wine logs.
 
-### Release
-- iDeck 2.10.0 (build 108).
+### Version
+- Updated the application version to 2.10.0 (build 108).
