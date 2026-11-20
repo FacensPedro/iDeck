@@ -120,7 +120,19 @@ enum LogCompactor {
             if run > 0 { out.append("↑ repeated \(run) more time\(run == 1 ? "" : "s")") }
             run = 0
         }
+        var progressShown = Set<String>()
         for line in text.split(separator: "\n", omittingEmptySubsequences: false) {
+            // A program's progress ("Loading 1%", "Loading 2%"...) is not a Wine error:
+            // it is written once, without the percentage, and its repeats are left out.
+            if let progress = withoutPercentages(line) {
+                let key = normalized(Substring(progress))
+                if progressShown.insert(key).inserted {
+                    flushRun()
+                    lastKey = nil
+                    out.append(progress)
+                }
+                continue
+            }
             let key = normalized(line)
             if key == lastKey { run += 1; continue }
             flushRun()
@@ -143,6 +155,37 @@ enum LogCompactor {
             result += "\n"
         }
         return result
+    }
+
+    /// The line without its percentages ("12%", "45.5 %"), or nil when it has none.
+    static func withoutPercentages(_ line: Substring) -> String? {
+        guard line.contains("%") else { return nil }
+        var result = ""
+        var digits = ""
+        var found = false
+        let chars = Array(line)
+        var i = 0
+        while i < chars.count {
+            let c = chars[i]
+            if c.isNumber || (c == "." && !digits.isEmpty) {
+                digits.append(c); i += 1; continue
+            }
+            if !digits.isEmpty {
+                var j = i
+                while j < chars.count, chars[j] == " " { j += 1 }
+                if j < chars.count, chars[j] == "%", digits.last != "." {
+                    found = true; digits = ""; i = j + 1; continue
+                }
+                result += digits; digits = ""
+            }
+            result.append(c); i += 1
+        }
+        result += digits
+        guard found else { return nil }
+        let collapsed = result.split(separator: " ", omittingEmptySubsequences: true).joined(separator: " ")
+        var text = collapsed
+        while let last = text.last, " :-(,".contains(last) { text.removeLast() }
+        return text
     }
 
     /// The line with timestamps, hex addresses, numbers and thread ids replaced, so

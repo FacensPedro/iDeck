@@ -39,6 +39,9 @@ enum WineLogClipboardTests {
             preconditionFailure("Symlinks must not be copied to the clipboard")
         } catch WineLogClipboard.ReadError.invalidFile {
         }
+        let progress = LogCompactor.compact("Loading 1%\nLoading 2%\n0024:err:module:load failed\nLoading 100 %\n")
+        precondition(progress == "Loading\n0024:err:module:load failed\n", progress)
+        precondition(LogCompactor.withoutPercentages("0024:fixme:msg %s") == nil)
         print("PASS: Wine clipboard copies complete small logs and bounded large-log tails")
     }
 }

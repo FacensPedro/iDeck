@@ -33,7 +33,11 @@ struct SessionControlsSheet: View {
                     Toggle(tr("Auto Save"), isOn: $autoSave)
                 }
                 Section {
-                    Toggle(tr("MetalFX Upscaling"), isOn: binding(\.metalFXEnabled, false))
+                    Picker("MetalFX", selection: WindowsGameProfile.metalFXAllowed
+                           ? binding(\.metalFXMode, "Off") : .constant("Off")) {
+                        ForEach(WindowsGameProfile.metalFXModes, id: \.self) { Text(tr($0)).tag($0) }
+                    }
+                    .disabled(!WindowsGameProfile.metalFXAllowed)
                     Picker(tr("Frame rate limit"), selection: Binding(
                         get: { profile?.fpsLimit ?? "60" },
                         set: { limit in

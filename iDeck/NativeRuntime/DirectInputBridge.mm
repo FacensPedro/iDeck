@@ -134,6 +134,35 @@ static uint16_t buttons_for_pad(GCExtendedGamepad *pad) {
     return buttons;
 }
 
+/// iDeck: a controller iDeck gives to Windows. A single Joy-Con (Switch 1 or 2) held
+/// sideways has only GameController's micro profile (its stick, four face buttons and
+/// SL/SR), so it counts as well as an extended gamepad (Pro Controller, a Joy-Con pair).
+static BOOL ideck_pad_usable(GCController *controller) {
+    return controller.extendedGamepad != nil || controller.microGamepad != nil;
+}
+
+/// A sideways Joy-Con as an XInput pad: the stick (micro dpad, analog) is the left
+/// stick, the face buttons are A/B, its + or - is Start, SL/SR are the shoulders.
+static IDeckGamepad state_for_micro(GCController *controller) {
+    IDeckGamepad state = {};
+    state.connected = 1;
+    GCMicroGamepad *micro = controller.microGamepad;
+    if (!micro) return state;
+    IDeckPadStick stick = ideck_pad_stick(micro.dpad.xAxis.value, micro.dpad.yAxis.value,
+                                          g_leftSensitivity, g_stickDeadzone);
+    state.lx = stick.x; state.ly = stick.y;
+    if (micro.buttonA.isPressed) state.buttons |= 0x1000;
+    if (micro.buttonX.isPressed) state.buttons |= 0x2000;
+    if (micro.buttonMenu.isPressed) state.buttons |= 0x0010;
+    NSDictionary<NSString *, GCControllerButtonInput *> *buttons = controller.physicalInputProfile.buttons;
+    if (buttons[GCInputLeftShoulder].isPressed) state.buttons |= 0x0100;
+    if (buttons[GCInputRightShoulder].isPressed) state.buttons |= 0x0200;
+    if (buttons[GCInputButtonB].isPressed) state.buttons |= 0x2000;
+    if (buttons[GCInputButtonY].isPressed) state.buttons |= 0x8000;
+    if (buttons[GCInputButtonHome].isPressed) state.buttons |= 0x0400;
+    return state;
+}
+
 static void sample_gamepads(void) {
     if (!g_sessionActive) return;
     if (!g_xinputEnabled) {
@@ -149,6 +178,13 @@ static void sample_gamepads(void) {
     for (int i = 0; i < IDECK_PAD_COUNT; ++i) {
         GCController *controller = g_slots[i];
         GCExtendedGamepad *pad = controller.extendedGamepad;
+        if (!pad && controller.microGamepad) {
+            IDeckGamepad state = {};
+            state.connected = 1;
+            if (g_appActive) state = state_for_micro(controller);
+            publish_pad(i, &state);
+            continue;
+        }
         if (!pad) {
             if (i == virtualSlot) {
                 IDeckGamepad state = g_touchState;
@@ -286,7 +322,7 @@ static void refresh_controllers(void) {
     NSArray<GCController *> *all = [GCController controllers];
     for (int i = 0; i < IDECK_PAD_COUNT; ++i) {
         GCController *old = g_slots[i];
-        if (old && (![all containsObject:old] || !old.extendedGamepad)) {
+        if (old && (![all containsObject:old] || !ideck_pad_usable(old))) {
             g_slots[i] = nil;
             output_slot(i, nil);
             zero_vibration(i);
@@ -295,7 +331,7 @@ static void refresh_controllers(void) {
         }
     }
     for (GCController *controller in all) {
-        if (!controller.extendedGamepad) continue;
+        if (!ideck_pad_usable(controller)) continue;
         BOOL assigned = NO;
         for (int i = 0; i < IDECK_PAD_COUNT; ++i)
             if (g_slots[i] == controller) { assigned = YES; break; }
