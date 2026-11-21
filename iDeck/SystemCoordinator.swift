@@ -1131,8 +1131,11 @@ class SystemCoordinator: ObservableObject {
 
         static var drive: URL { MadeiraDock.prefix.appendingPathComponent("drive_c") }
 
-        var installedURL: URL? {
-            let drive = Self.drive
+        var installedURL: URL? { installedURL(prefix: MadeiraDock.prefix) }
+
+        /// The launcher in `prefix`, or nil when it is not installed there.
+        func installedURL(prefix: URL) -> URL? {
+            let drive = prefix.appendingPathComponent("drive_c")
             var folders: [String] = []
             let names: [String]
             switch self {
@@ -1140,8 +1143,8 @@ class SystemCoordinator: ObservableObject {
                 // Where the installer put it (its own registry value), then both Program
                 // Files folders: a 64-bit installer does not use Program Files (x86), so
                 // checking that folder alone missed an installed launcher.
-                if let dir = Self.registryValue(key: "Software\\Wow6432Node\\Ubisoft\\Launcher", name: "InstallDir")
-                    ?? Self.registryValue(key: "Software\\Ubisoft\\Launcher", name: "InstallDir") {
+                if let dir = Self.registryValue(key: "Software\\Wow6432Node\\Ubisoft\\Launcher", name: "InstallDir", prefix: prefix)
+                    ?? Self.registryValue(key: "Software\\Ubisoft\\Launcher", name: "InstallDir", prefix: prefix) {
                     folders.append(dir)
                 }
                 folders += ["Program Files (x86)/Ubisoft/Ubisoft Game Launcher", "Program Files/Ubisoft/Ubisoft Game Launcher"]
@@ -1160,8 +1163,8 @@ class SystemCoordinator: ObservableObject {
         }
 
         /// A C:\ path value from the prefix's system.reg, as a drive-relative path.
-        static func registryValue(key: String, name: String) -> String? {
-            let file = MadeiraDock.prefix.appendingPathComponent("system.reg")
+        static func registryValue(key: String, name: String, prefix: URL = MadeiraDock.prefix) -> String? {
+            let file = prefix.appendingPathComponent("system.reg")
             guard let text = try? String(contentsOf: file, encoding: .utf8) else { return nil }
             // Wine's .reg files write each backslash of a key name twice.
             let header = "[" + key.lowercased().replacingOccurrences(of: "\\", with: "\\\\") + "]"
@@ -1191,6 +1194,15 @@ class SystemCoordinator: ObservableObject {
         }
 
         var installerName: String { downloadURL.lastPathComponent }
+
+        /// The launcher's name for its executable (the library shows it, not the file name).
+        static func displayName(for executable: URL) -> String? {
+            switch executable.lastPathComponent.lowercased() {
+            case "ubisoftconnect.exe", "upc.exe": return Self.ubisoft.rawValue
+            case "eadesktop.exe": return Self.ea.rawValue
+            default: return nil
+            }
+        }
 
         /// The downloaded installer in C:\iDeck, when present.
         var installer: URL? {

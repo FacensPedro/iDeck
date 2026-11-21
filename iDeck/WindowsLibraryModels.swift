@@ -226,6 +226,17 @@ final class WindowsLibraryStore: ObservableObject {
         if hidden != Self.hiddenInstallers { Self.hiddenInstallers = hidden }
         executableURLs = executableURLs.filter { hidden[$0.lastPathComponent.lowercased()] == nil }
         executableURLs += installed
+        // The EA app and Ubisoft Connect are listed with the installed games once their
+        // installer has put them in the prefix, even when no shortcut of theirs names them.
+        let listed = Set(executableURLs.map { $0.standardizedFileURL.path.lowercased() })
+        executableURLs += SystemCoordinator.StoreClient.allCases
+            .compactMap { $0.installedURL(prefix: prefixPath) }
+            .filter { !listed.contains($0.standardizedFileURL.path.lowercased()) }
+    }
+
+    /// The name the library shows for a program: a launcher's own name, else the file's.
+    nonisolated static func displayName(for executable: URL) -> String {
+        SystemCoordinator.StoreClient.displayName(for: executable) ?? executable.deletingPathExtension().lastPathComponent
     }
 
     // MARK: Installers replaced by what they installed

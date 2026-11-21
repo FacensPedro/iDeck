@@ -11,6 +11,9 @@
 ### Steam
 - Before a Steam game starts, ask Steam to end a game this account is playing in another session, as Steam on a PC does, instead of failing with "playing in another session".
 
+### Stores
+- List the EA app and Ubisoft Connect with the installed games once they are installed, under their own names, instead of only in Settings.
+
 ### Logs
 - Compact repeated progress lines in copied Wine logs.
 
