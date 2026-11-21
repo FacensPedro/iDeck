@@ -710,8 +710,8 @@ private struct SettingsStatusPill: View {
     }
 }
 
-/// Install (downloads the official installer, then runs it) or Launch for a store's
-/// own Windows client, with the download's progress.
+/// Install (downloads the official installer, then runs it) for a store's own Windows
+/// client, with the download's progress; once installed, only its state.
 struct StoreClientButton: View {
     let client: SystemCoordinator.StoreClient
     @ObservedObject var coordinator: SystemCoordinator
@@ -727,8 +727,11 @@ struct StoreClientButton: View {
                     Text(progress).foregroundStyle(.secondary)
                 }
             } else {
-                Button(tr(installed ? "Open store" : "Install")) {
-                    openStore(client)
+                if installed {
+                    // The launcher is not opened from iDeck: its games are on its store page.
+                    LabeledContent(client.rawValue, value: tr("Installed"))
+                } else {
+                    Button(tr("Install")) { openStore(client) }
                 }
             }
         }

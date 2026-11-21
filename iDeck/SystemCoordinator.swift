@@ -1264,10 +1264,11 @@ class SystemCoordinator: ObservableObject {
 
     private var requestedStoreClients: [StoreClient] = []
 
+    /// Installs the launcher when it is missing. An installed launcher is not opened from
+    /// iDeck: its games are on its store page.
     func openStoreClient(_ client: StoreClient) {
-        if let executable = client.installedURL {
-            launchWindowsProgram(at: executable, detectInstaller: false)
-        } else { installDefaultStoreClients([client]) }
+        guard client.installedURL == nil else { return }
+        installDefaultStoreClients([client])
     }
 
     func installDefaultStoreClients(_ clients: [StoreClient] = StoreClient.allCases) {

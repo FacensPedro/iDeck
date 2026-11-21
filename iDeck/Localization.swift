@@ -171,7 +171,6 @@ enum Translations {
         "Ubisoft account": ["pt": "Conta Ubisoft", "es": "Cuenta de Ubisoft"],
         "Install it in Settings › Stores & launchers › %@.": ["pt": "Instale em Ajustes › Lojas e launchers › %@.", "es": "Instálalo en Ajustes › Tiendas y launchers › %@."],
         "Installed. Open it in Settings › Stores & launchers › %@.": ["pt": "Instalado. Abra em Ajustes › Lojas e launchers › %@.", "es": "Instalado. Ábrelo en Ajustes › Tiendas y launchers › %@."],
-        "Open store": ["pt": "Abrir loja", "es": "Abrir tienda"],
         "Downloading %@ installer...": ["pt": "Baixando o instalador do %@...", "es": "Descargando el instalador de %@..."],
         "Could not download the installer. Check the connection and try again.": ["pt": "Não foi possível baixar o instalador. Verifique a conexão e tente de novo.", "es": "No se pudo descargar el instalador. Revisa la conexión e inténtalo de nuevo."],
         "Download paused": ["pt": "Download pausado", "es": "Descarga pausada"],
