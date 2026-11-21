@@ -56,9 +56,9 @@ class SystemCoordinator: ObservableObject {
         let folder = url.deletingLastPathComponent()
         let previous = folder.appendingPathComponent("madeira-log.previous.txt.lzfse")
         try? FileManager.default.removeItem(at: folder.appendingPathComponent("madeira-log.previous.txt"))
-        guard let data = try? Data(contentsOf: url) else { return }
+        guard let data = try? Data(contentsOf: url, options: .alwaysMapped) else { return }
         try? FileManager.default.removeItem(at: previous)
-        if (try? LogCompactor.writeCompressed(String(decoding: data, as: UTF8.self), to: previous)) != nil {
+        if (try? LogCompactor.writeCompressed(data: data, to: previous)) != nil {
             try? FileManager.default.removeItem(at: url)
             let kept = ((try? FileManager.default.attributesOfItem(atPath: previous.path)[.size] as? NSNumber)?.int64Value ?? 0)
             AppLog.record("[wine-log] madeira-log.txt reached \(size >> 20) MB: kept compacted as madeira-log.previous.txt.lzfse (\(kept >> 10) KB)")

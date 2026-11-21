@@ -27,9 +27,9 @@ enum WineLogClipboard {
             let destination = FileManager.default.temporaryDirectory
                 .appendingPathComponent(name + "-" + UUID().uuidString + ".txt")
             // The copy is compacted: repeated lines are folded, so it is much smaller.
+            // Compacted byte by byte: no String of the whole log, no Character per line.
             let raw = try Data(contentsOf: source)
-            try Data(LogCompactor.compact(String(decoding: raw, as: UTF8.self)).utf8)
-                .write(to: destination, options: .atomic)
+            try LogCompactor.compactedData(raw).write(to: destination, options: .atomic)
             return destination
         }.value
         let provider = NSItemProvider()
@@ -110,51 +110,115 @@ enum LogCompactor {
     /// - a line already written `maximumRepeats` times is left out; the most
     ///   repeated ones are listed at the end with their counts.
     static func compact(_ text: String) -> String {
-        var out: [String] = []
-        out.reserveCapacity(1024)
-        var seen: [String: Int] = [:]
-        var dropped: [String: (line: Substring, count: Int)] = [:]
-        var lastKey: String?
-        var run = 0
-        func flushRun() {
-            if run > 0 { out.append("↑ repeated \(run) more time\(run == 1 ? "" : "s")") }
-            run = 0
-        }
-        var progressShown = Set<String>()
-        for line in text.split(separator: "\n", omittingEmptySubsequences: false) {
-            // A program's progress ("Loading 1%", "Loading 2%"...) is not a Wine error:
-            // it is written once, without the percentage, and its repeats are left out.
-            if let progress = withoutPercentages(line) {
-                let key = normalized(Substring(progress))
-                if progressShown.insert(key).inserted {
-                    flushRun()
-                    lastKey = nil
-                    out.append(progress)
+        String(decoding: compactedData(Data(text.utf8)), as: UTF8.self)
+    }
+
+    /// `compact` on UTF-8 bytes. It works on the bytes of each line (no Character or
+    /// String per line), so a Wine log of tens of MB is copied in a moment.
+    static func compactedData(_ data: Data) -> Data {
+        data.withUnsafeBytes { raw -> Data in
+            let bytes = raw.bindMemory(to: UInt8.self)
+            var out = [UInt8]()
+            out.reserveCapacity(min(bytes.count, 1 << 20))
+            var firstLine = true
+            func emit<C: Collection>(_ line: C) where C.Element == UInt8 {
+                if !firstLine { out.append(0x0A) }
+                firstLine = false
+                out.append(contentsOf: line)
+            }
+            var seen: [[UInt8]: Int] = [:]
+            var dropped: [[UInt8]: (line: Range<Int>, count: Int)] = [:]
+            var lastKey: [UInt8]?
+            var run = 0
+            func flushRun() {
+                if run > 0 { emit(Array("↑ repeated \(run) more time\(run == 1 ? "" : "s")".utf8)) }
+                run = 0
+            }
+            var progressShown = Set<[UInt8]>()
+            var key = [UInt8]()
+            key.reserveCapacity(256)
+            var start = 0
+            let count = bytes.count
+            while start <= count {
+                var end = start
+                while end < count, bytes[end] != 0x0A { end += 1 }
+                let line = UnsafeBufferPointer(rebasing: bytes[start..<end])
+                let range = start..<end
+                start = end + 1
+                // A program's progress ("Loading 1%", "Loading 2%"...) is not a Wine error:
+                // it is written once, without the percentage, and its repeats are left out.
+                if line.contains(0x25),
+                   let progress = withoutPercentages(Substring(String(decoding: line, as: UTF8.self))) {
+                    let progressBytes = Array(progress.utf8)
+                    normalizedKey(progressBytes, into: &key)
+                    if progressShown.insert(key).inserted {
+                        flushRun()
+                        lastKey = nil
+                        emit(progressBytes)
+                    }
+                    continue
                 }
-                continue
+                normalizedKey(line, into: &key)
+                if key == lastKey { run += 1; continue }
+                flushRun()
+                lastKey = key
+                let times = (seen[key] ?? 0) + 1
+                seen[key] = times
+                if times <= maximumRepeats {
+                    emit(line)
+                } else {
+                    dropped[key, default: (range, 0)].count += 1
+                }
             }
-            let key = normalized(line)
-            if key == lastKey { run += 1; continue }
             flushRun()
-            lastKey = key
-            let count = (seen[key] ?? 0) + 1
-            seen[key] = count
-            if count <= maximumRepeats {
-                out.append(String(line))
+            if !dropped.isEmpty {
+                let top = dropped.values.sorted { $0.count > $1.count }.prefix(15)
+                var summary = "\n\n[iDeck] Lines left out after \(maximumRepeats) appearances (×count):\n"
+                summary += top.map { "(×\($0.count)) " + String(decoding: UnsafeBufferPointer(rebasing: bytes[$0.line]), as: UTF8.self) }
+                    .joined(separator: "\n")
+                if dropped.count > top.count { summary += "\n… and \(dropped.count - top.count) more kinds of repeated lines" }
+                summary += "\n"
+                out.append(contentsOf: summary.utf8)
+            }
+            return Data(out)
+        }
+    }
+
+    /// The line with timestamps, hex addresses, numbers and thread ids replaced by "#",
+    /// so repeats that differ only in them share a key; written into `key` (reused).
+    static func normalizedKey<C: Collection>(_ line: C, into key: inout [UInt8]) where C.Element == UInt8 {
+        key.removeAll(keepingCapacity: true)
+        var wordStart = -1
+        func flushWord() {
+            guard wordStart >= 0 else { return }
+            if isNumberLike(key[wordStart...]) {
+                key.removeSubrange(wordStart...)
+                key.append(0x23) // "#"
+            }
+            wordStart = -1
+        }
+        for c in line {
+            if (c >= 0x30 && c <= 0x39) || (c >= 0x61 && c <= 0x7A) || (c >= 0x41 && c <= 0x5A) {
+                if wordStart < 0 { wordStart = key.count }
+                key.append(c)
             } else {
-                dropped[key, default: (line, 0)].count += 1
+                flushWord()
+                key.append(c)
             }
         }
-        flushRun()
-        var result = out.joined(separator: "\n")
-        if !dropped.isEmpty {
-            let top = dropped.values.sorted { $0.count > $1.count }.prefix(15)
-            result += "\n\n[iDeck] Lines left out after \(maximumRepeats) appearances (×count):\n"
-            result += top.map { "(×\($0.count)) \($0.line)" }.joined(separator: "\n")
-            if dropped.count > top.count { result += "\n… and \(dropped.count - top.count) more kinds of repeated lines" }
-            result += "\n"
+        flushWord()
+    }
+
+    /// `isNumberLike` on an ASCII word's bytes (same rules).
+    static func isNumberLike(_ word: ArraySlice<UInt8>) -> Bool {
+        guard let first = word.first else { return false }
+        func isDigit(_ c: UInt8) -> Bool { c >= 0x30 && c <= 0x39 }
+        func isHex(_ c: UInt8) -> Bool { isDigit(c) || (c >= 0x61 && c <= 0x66) || (c >= 0x41 && c <= 0x46) }
+        if word.count > 2, first == 0x30, word[word.startIndex + 1] == 0x78 || word[word.startIndex + 1] == 0x58 {
+            return word.dropFirst(2).allSatisfy(isHex)
         }
-        return result
+        if isDigit(first) { return true }
+        return word.count >= 6 && word.allSatisfy(isHex) && word.contains(where: isDigit)
     }
 
     /// The line without its percentages ("12%", "45.5 %"), or nil when it has none.
@@ -188,29 +252,6 @@ enum LogCompactor {
         return text
     }
 
-    /// The line with timestamps, hex addresses, numbers and thread ids replaced, so
-    /// repeats that differ only in them share a key.
-    static func normalized(_ line: Substring) -> String {
-        var key = ""
-        key.reserveCapacity(line.count)
-        var word = ""
-        func flushWord() {
-            guard !word.isEmpty else { return }
-            key += isNumberLike(word) ? "#" : word
-            word = ""
-        }
-        for c in line.unicodeScalars {
-            if ("0"..."9").contains(c) || ("a"..."z").contains(c) || ("A"..."Z").contains(c) {
-                word.unicodeScalars.append(c)
-            } else {
-                flushWord()
-                key.unicodeScalars.append(c)
-            }
-        }
-        flushWord()
-        return key
-    }
-
     /// A word that is a number: decimal, 0x-hex, a hex address or id without 0x
     /// ("7ffe1a2b", "c000001d", "40010006"), or digits with a unit ("12ms", "4096KB").
     /// Words such as "fixme" or "deadline" stay as they are.
@@ -230,7 +271,11 @@ enum LogCompactor {
 
     /// Writes `text` compacted and LZFSE-compressed (read back with `readCompressed`).
     static func writeCompressed(_ text: String, to url: URL) throws {
-        let data = Data(compact(text).utf8) as NSData
+        try writeCompressed(data: Data(text.utf8), to: url)
+    }
+
+    static func writeCompressed(data text: Data, to url: URL) throws {
+        let data = compactedData(text) as NSData
         try data.compressed(using: .lzfse).write(to: url, options: .atomic)
     }
 
