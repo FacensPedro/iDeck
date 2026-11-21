@@ -1,0 +1,96 @@
+diff --git a/build/win32u-unix/message_ios.c b/build/win32u-unix/message_ios.c
+index 48405a0..602a658 100644
+--- a/build/win32u-unix/message_ios.c
++++ b/build/win32u-unix/message_ios.c
+@@ -2614,6 +2614,24 @@ static WORD pointer_buttons_from_mouse_buttons( WORD mouse_flags )
+ }
+ 
+ #ifdef WINE_IOS
++/* ml2190: the first button presses of a run are logged with the window they
++ * reached, so a tap that "did nothing" shows where it went. */
++static void ios_click_trace( const MSG *msg, INT hittest, const char *what )
++{
++    static LONG count;
++    WCHAR cls[64];
++    char name[64];
++    int i, len;
++
++    if (msg->message < WM_LBUTTONDOWN || msg->message > WM_MBUTTONDBLCLK) return;
++    if (InterlockedIncrement( &count ) > 60) return;
++    len = NtUserGetClassName( msg->hwnd, FALSE, &(UNICODE_STRING){ 0, sizeof(cls), cls } );
++    for (i = 0; i < len && i < ARRAY_SIZE(name) - 1; i++) name[i] = cls[i] < 0x80 ? (char)cls[i] : '?';
++    name[i] = 0;
++    fprintf( stderr, "[click] msg=0x%x hwnd=%p class=%s hit=%d at (%d,%d): %s\n",
++             msg->message, msg->hwnd, name, hittest, (int)msg->pt.x, (int)msg->pt.y, what );
++}
++
+ /* ml2181: a button press on a window that is already active gives its
+  * top-level window keyboard focus when nothing in it has focus (Wine moves
+  * the focus only while activating). See winios_click_focus in driver_ios.c;
+@@ -2673,6 +2691,9 @@ static BOOL process_mouse_message( MSG *msg, UINT hw_id, ULONG_PTR extra_info, H
+ 
+     if (!msg->hwnd || !is_current_thread_window( msg->hwnd ))
+     {
++#ifdef WINE_IOS
++        ios_click_trace( msg, hittest, "dropped: no window of this thread under it" );
++#endif
+         accept_hardware_message( hw_id );
+         return FALSE;
+     }
+@@ -2818,6 +2839,9 @@ static BOOL process_mouse_message( MSG *msg, UINT hw_id, ULONG_PTR extra_info, H
+         hook.wHitTestCode = hittest;
+         hook.dwExtraInfo  = extra_info;
+         hook.mouseData    = msg->wParam;
++#ifdef WINE_IOS
++        ios_click_trace( msg, hittest, "dropped: a mouse hook ate it" );
++#endif
+         accept_hardware_message( hw_id );
+         call_hooks( WH_CBT, HCBT_CLICKSKIPPED, message, (LPARAM)&hook, sizeof(hook) );
+         return FALSE;
+@@ -2825,6 +2849,9 @@ static BOOL process_mouse_message( MSG *msg, UINT hw_id, ULONG_PTR extra_info, H
+ 
+     if ((hittest == HTERROR) || (hittest == HTNOWHERE))
+     {
++#ifdef WINE_IOS
++        ios_click_trace( msg, hittest, "dropped: hit test says nowhere" );
++#endif
+         send_message( msg->hwnd, WM_SETCURSOR, (WPARAM)msg->hwnd, MAKELONG( hittest, msg->message ));
+         accept_hardware_message( hw_id );
+         return FALSE;
+@@ -2836,6 +2863,7 @@ static BOOL process_mouse_message( MSG *msg, UINT hw_id, ULONG_PTR extra_info, H
+     {
+ #ifdef WINE_IOS
+         if (remove) ios_click_focus( msg );   /* ml2181: a captured click activates nothing */
++        if (remove) ios_click_trace( msg, hittest, info.hwndCapture ? "delivered to the capture window" : "delivered" );
+ #endif
+         msg->message = message;
+         return TRUE;
+@@ -2876,7 +2904,17 @@ static BOOL process_mouse_message( MSG *msg, UINT hw_id, ULONG_PTR extra_info, H
+                     /* fall through */
+                 case MA_ACTIVATE:
+                 case 0:
+-                    if (!set_foreground_window( hwndTop, TRUE, FALSE )) eat_msg = TRUE;
++                    if (!set_foreground_window( hwndTop, TRUE, FALSE ))
++                    {
++#ifdef WINE_IOS
++                        /* ml2190: iOS runs one Wine session on screen, so nothing else
++                         * can hold the foreground against a tap. A refused activation
++                         * used to eat the press, and an installer button never saw it. */
++                        ios_click_trace( msg, hittest, "foreground refused, press kept" );
++#else
++                        eat_msg = TRUE;
++#endif
++                    }
+                     break;
+                 default:
+                     WARN( "unknown WM_MOUSEACTIVATE code %d\n", ret );
+@@ -2895,6 +2933,9 @@ static BOOL process_mouse_message( MSG *msg, UINT hw_id, ULONG_PTR extra_info, H
+        in the WM_SETCURSOR message even if it's non-client mouse message */
+     send_message( msg->hwnd, WM_SETCURSOR, (WPARAM)msg->hwnd, MAKELONG( hittest, msg->message ));
+ 
++#ifdef WINE_IOS
++    ios_click_trace( msg, hittest, eat_msg ? "eaten by WM_MOUSEACTIVATE" : "delivered" );
++#endif
+     msg->message = message;
+     return !eat_msg;
+ }

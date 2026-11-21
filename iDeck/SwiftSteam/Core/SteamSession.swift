@@ -24,6 +24,10 @@ class SteamSession {
     /// runs, and Valve's own client must be the only one logged on with this
     /// account (see `suspend()`).
     private(set) var isSuspended = false
+    /// The last ClientPlayingSessionState: true while another session of this
+    /// account plays a game, which makes Valve's client refuse a launch (35).
+    private(set) var playingBlocked = false
+    private(set) var playingSessionStateSeen = false
 
     // MARK: - Internal State
 
@@ -226,6 +230,64 @@ class SteamSession {
 
     func resume() { isSuspended = false }
 
+    /// Before a game starts: when Steam reports that another session of this
+    /// account is playing, ask it to end that game, as Steam on a PC does when
+    /// you choose to play anyway. Valve's client would otherwise refuse the
+    /// launch with OtherSessionPlaying (35) for as long as the other game runs.
+    /// Returns true when Steam no longer blocks a launch here.
+    @discardableResult
+    func freeOtherPlayingSession(timeout: TimeInterval = 10) async -> Bool {
+        guard !isSuspended else { return false }
+        let deadline = Date().addingTimeInterval(timeout)
+        do { try await ensureConnected() } catch {
+            SteamLog.event("[playing-session] could not connect to check for another playing session: \(error)")
+            return false
+        }
+        // Steam sends the state soon after logon; a launch is not held longer than
+        // three seconds waiting for it.
+        let stateDeadline = min(deadline, Date().addingTimeInterval(3))
+        while !playingSessionStateSeen, Date() < stateDeadline {
+            try? await Task.sleep(nanoseconds: 100_000_000)
+        }
+        guard playingBlocked else {
+            SteamLog.event("[playing-session] no other session is playing (state seen=\(playingSessionStateSeen ? 1 : 0))")
+            return true
+        }
+        SteamLog.event("[playing-session] another session of this account is playing: asking Steam to end it")
+        var kick = ProtobufEncoder()
+        kick.writeBool(fieldNumber: 1, value: false)   // only_stop_game: end the whole playing session
+        do { try await sendMessage(eMsg: .clientKickPlayingSession, body: kick.data) } catch {
+            SteamLog.event("[playing-session] the request failed: \(error)")
+            return false
+        }
+        while playingBlocked, Date() < deadline {
+            try? await Task.sleep(nanoseconds: 100_000_000)
+        }
+        SteamLog.event("[playing-session] other session \(playingBlocked ? "still playing after the request" : "ended")")
+        return !playingBlocked
+    }
+
+    private func handlePlayingSessionState(_ body: Data) {
+        var decoder = ProtobufDecoder(body)
+        var blocked = false
+        var app: UInt64 = 0
+        do {
+            while let tag = try decoder.readTag() {
+                switch (tag.fieldNumber, tag.wireType) {
+                case (2, .varint): blocked = try decoder.readVarint() != 0
+                case (3, .varint): app = try decoder.readVarint()
+                default: try decoder.skip(wireType: tag.wireType)
+                }
+            }
+        } catch {
+            SteamLog.trace("Bad ClientPlayingSessionState: \(error)")
+            return
+        }
+        playingBlocked = blocked
+        playingSessionStateSeen = true
+        SteamLog.event("[playing-session] state blocked=\(blocked ? 1 : 0) app=\(app)")
+    }
+
     /// Log in using the refresh token from the auth flow.
     /// NOTE: Despite the parameter name, CM logon requires the *refresh* token (audience: "renew"),
     /// not the access token (audience: "web"). The CMsgClientLogon.access_token field accepts both,
@@ -422,6 +484,8 @@ class SteamSession {
         connectionState = .disconnected
         steamID = 0
         sessionID = 0
+        playingBlocked = false
+        playingSessionStateSeen = false
         SteamLog.trace("Session disconnected")
     }
 
@@ -766,6 +830,8 @@ class SteamSession {
 
     private func handleUnsolicitedMessage(_ message: SteamMessageCodec.IncomingMessage) {
         switch message.rawEMsg {
+        case EMsg.clientPlayingSessionState.rawValue:
+            handlePlayingSessionState(message.body)
         case EMsg.clientLoggedOff.rawValue:
             SteamLog.trace("Received ClientLoggedOff")
             handleDisconnect(error: nil)

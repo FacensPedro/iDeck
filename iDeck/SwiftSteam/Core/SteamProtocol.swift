@@ -44,6 +44,11 @@ enum EMsg: UInt32 {
     case clientCheckAppBetaPasswordResponse = 5451
     case clientPICSPrivateBetaRequest = 8907
     case clientPICSPrivateBetaResponse = 8908
+    /// Steam's verdict on whether this account may start a game here: another
+    /// session of the account playing a game blocks it.
+    case clientPlayingSessionState = 9600
+    /// Asks Steam to end the other session's game so this one may play.
+    case clientKickPlayingSession = 9601
     case serviceMethod = 146
     case serviceMethodResponse = 147
     case serviceMethodCallFromClient = 151
