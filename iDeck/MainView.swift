@@ -1227,8 +1227,8 @@ private struct WindowsExecutableDetailsView: View {
                         library.save(profile)
                         dismiss()
                         // A launcher (EA app, Ubisoft Connect) starts as a program, not as a setup.
-                        coordinator.launchWindowsProgram(at: executableURL, profile: profile,
-                                                         detectInstaller: SystemCoordinator.StoreClient.displayName(for: executableURL) == nil)
+                        let isSetup = SystemCoordinator.StoreClient.displayName(for: executableURL) == nil
+                        coordinator.launchWindowsProgram(at: executableURL, profile: profile, detectInstaller: isSetup)
                     } label: {
                         Label(tr("Launch"), systemImage: "play.fill")
                             .frame(maxWidth: .infinity)
