@@ -1158,7 +1158,7 @@ private struct WindowsExecutableArtworkView: View {
     let fallbackColor: Color
 
     var body: some View {
-        let profile = library.profile(for: library.profileID(for: executableURL), title: WindowsLibraryStore.displayName(for: executableURL))
+        let profile = library.profile(for: library.profileID(for: executableURL), title: executableURL.deletingPathExtension().lastPathComponent)
         Group {
             if let url = library.artworkURL(for: profile), let image = UIImage(contentsOfFile: url.path) {
                 Image(uiImage: image)
@@ -1196,7 +1196,7 @@ private struct WindowsExecutableDetailsView: View {
         self.library = library
         self.coordinator = coordinator
         let profileID = library.profileID(for: executableURL)
-        _profile = State(initialValue: library.profile(for: profileID, title: WindowsLibraryStore.displayName(for: executableURL)))
+        _profile = State(initialValue: library.profile(for: profileID, title: executableURL.deletingPathExtension().lastPathComponent))
     }
 
     var body: some View {
@@ -1213,7 +1213,7 @@ private struct WindowsExecutableDetailsView: View {
                             Label(tr("Change cover"), systemImage: "photo")
                         }
                         .buttonStyle(.bordered)
-                        Text(WindowsLibraryStore.displayName(for: executableURL))
+                        Text(executableURL.deletingPathExtension().lastPathComponent)
                             .font(.title2.bold())
                             .foregroundColor(.white)
                         Text(executableURL.lastPathComponent)
@@ -1226,9 +1226,7 @@ private struct WindowsExecutableDetailsView: View {
                     Button {
                         library.save(profile)
                         dismiss()
-                        // A launcher (EA app, Ubisoft Connect) starts as a program, not as a setup.
-                        let isSetup = SystemCoordinator.StoreClient.displayName(for: executableURL) == nil
-                        coordinator.launchWindowsProgram(at: executableURL, profile: profile, detectInstaller: isSetup)
+                        coordinator.launchWindowsProgram(at: executableURL, profile: profile)
                     } label: {
                         Label(tr("Launch"), systemImage: "play.fill")
                             .frame(maxWidth: .infinity)
@@ -2452,7 +2450,7 @@ extension WindowsWorkspaceView {
         case .epic(let app): return epicLibrary.installed[app]?.title ?? "Epic"
         case .epicInstalling(let app): return epicLibrary.game(app)?.title ?? "Epic"
         case .ea(let id): return eaTitle(id)
-        case .exe(let path): return WindowsLibraryStore.displayName(for: URL(fileURLWithPath: path))
+        case .exe(let path): return URL(fileURLWithPath: path).deletingPathExtension().lastPathComponent
         }
     }
 

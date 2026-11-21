@@ -1195,7 +1195,7 @@ class SystemCoordinator: ObservableObject {
 
         var installerName: String { downloadURL.lastPathComponent }
 
-        /// The launcher's name for its executable (the library shows it, not the file name).
+        /// The launcher an executable is (EA app, Ubisoft Connect), or nil for any other program.
         static func displayName(for executable: URL) -> String? {
             switch executable.lastPathComponent.lowercased() {
             case "ubisoftconnect.exe", "upc.exe": return Self.ubisoft.rawValue
