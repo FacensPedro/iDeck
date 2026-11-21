@@ -1204,7 +1204,8 @@ class SystemCoordinator: ObservableObject {
             let fm = FileManager.default
             let source = MadeiraRuntime.file("aarch64-windows/cmd.exe")
             let target = drive.appendingPathComponent("iDeck/ideck-cmd.exe")
-            func isARM64(_ url: URL) -> Bool { url.path.withCString { ideck_native_pe_machine($0) } == 0xAA64 }
+            // ideck_native_pe_machine answers 0 for ARM64 images: read the header here.
+            func isARM64(_ url: URL) -> Bool { MadeiraRuntime.peMachine(url) == 0xAA64 }
             guard isARM64(source) else { return nil }
             if !fm.contentsEqual(atPath: source.path, andPath: target.path) {
                 try? fm.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -1306,7 +1307,7 @@ class SystemCoordinator: ObservableObject {
                 // services.exe starts first, then each installer.
                 let nativeShell = StoreClient.stageNativeShell()
                 if nativeShell == nil, missing.count == 1, let client = missing.first, let installer = client.installer {
-                    AppLog.record("[store-setup] no ARM64 cmd.exe: \(client.installerName) starts without the service manager")
+                    AppLog.record("[store-setup] no ARM64 cmd.exe at \(MadeiraRuntime.file("aarch64-windows/cmd.exe").path): \(client.installerName) starts without the service manager")
                     self.requestedStoreClients = missing
                     var profile = WindowsGameProfile(id: "ideck:store-setup", title: client.rawValue)
                     profile.keepChildProcessesRunning = true
