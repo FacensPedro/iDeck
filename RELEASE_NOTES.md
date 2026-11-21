@@ -19,4 +19,4 @@
 - Compact repeated progress lines in copied Wine logs.
 
 ### Version
-- Updated the application version to 2.10.0 (build 108).
+- Updated the application version to 2.10.1 (build 109).
