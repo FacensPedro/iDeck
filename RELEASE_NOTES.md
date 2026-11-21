@@ -1,4 +1,14 @@
 ## What's Changed
-- Avoid a debug-print exception during 32-bit Direct3D 9 startup without a Windows debugger.
-- Report fatal Windows child process exceptions even when the Steam host exits successfully.
-- Updated the application version to 2.9.6 (build 107).
+### MetalFX
+- Combine upscaling and frame generation in one setting with Off, Quality, Performance, Frame generation, and combined modes.
+- Disable MetalFX on devices with less than 8 GB of physical memory.
+
+### Controls
+- Add standalone sideways Joy-Con support and clearer Nintendo controller names.
+- Improve installer touch clicks by moving the pointer before pressing and holding the click long enough for the dialog to receive it.
+
+### Logs
+- Compact repeated progress lines in copied Wine logs.
+
+### Version
+- Updated the application version to 2.10.0 (build 108).

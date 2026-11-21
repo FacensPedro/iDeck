@@ -46,6 +46,32 @@ struct WindowsGameProfile: Codable, Equatable, Identifiable {
     var fastSync: Bool = true
     static let d3d12Renderers = ["Madeira D3D12", "VKD3D-Proton"]
     var metalFXEnabled: Bool = false
+    /// MetalFX at its performance scale (the game renders at half the screen) instead
+    /// of quality (two thirds).
+    var metalFXPerformance: Bool = false
+
+    /// One MetalFX setting for upscaling and frame generation (MADEIRA_FRAMEGEN).
+    static let metalFXModes = ["Off", "Quality", "Performance", "Frame generation",
+                               "Quality + frame generation", "Performance + frame generation"]
+    /// Devices with 8 GB of RAM or more (6 GB models report under 7 GiB).
+    static let metalFXAllowed = ProcessInfo.processInfo.physicalMemory > 7 << 30
+
+    var metalFXMode: String {
+        get {
+            let scale = metalFXPerformance ? "Performance" : "Quality"
+            switch (metalFXEnabled, frameGeneration) {
+            case (false, false): return "Off"
+            case (false, true): return "Frame generation"
+            case (true, false): return scale
+            case (true, true): return scale + " + frame generation"
+            }
+        }
+        set {
+            metalFXEnabled = newValue.hasPrefix("Quality") || newValue.hasPrefix("Performance")
+            metalFXPerformance = newValue.hasPrefix("Performance")
+            frameGeneration = newValue.lowercased().contains("frame generation")
+        }
+    }
     var fpsLimit: String = "30"
     /// The frame-rate limits a game can use; "Auto" lets Madeira's power
     /// governor move the cap between 60 and 20 fps.
@@ -64,7 +90,7 @@ struct WindowsGameProfile: Codable, Equatable, Identifiable {
     var updatedAt: Date = Date()
 
     private enum CodingKeys: String, CodingKey {
-        case id, title, arguments, resolution, surfaceScaling, graphicsAPI, controllerAPI, metalFXEnabled, fpsLimit, avxEnabled, keepChildProcessesRunning, artworkFilename, updatedAt, vulkanMode, openGLBackend, useRecommended, launchThroughSteam, codeChecks, d3d12Renderer, reducedX87, cpuCount, jitPoolMiB, anisotropyLimit, frameGeneration, reportNVIDIA, fastSync, resolutionDefaults
+        case id, title, arguments, resolution, surfaceScaling, graphicsAPI, controllerAPI, metalFXEnabled, fpsLimit, avxEnabled, keepChildProcessesRunning, artworkFilename, updatedAt, vulkanMode, openGLBackend, useRecommended, launchThroughSteam, codeChecks, d3d12Renderer, reducedX87, cpuCount, jitPoolMiB, anisotropyLimit, frameGeneration, metalFXPerformance, reportNVIDIA, fastSync, resolutionDefaults
     }
 
     static let vulkanModes = ["Automatic", "On", "Off"]
@@ -127,6 +153,7 @@ struct WindowsGameProfile: Codable, Equatable, Identifiable {
         let savedAniso = (try? values.decodeIfPresent(Int.self, forKey: .anisotropyLimit)) ?? 0
         anisotropyLimit = Self.anisotropyLimits.contains(savedAniso) ? savedAniso : 0
         frameGeneration = (try? values.decodeIfPresent(Bool.self, forKey: .frameGeneration)) ?? false
+        metalFXPerformance = (try? values.decodeIfPresent(Bool.self, forKey: .metalFXPerformance)) ?? false
         reportNVIDIA = (try? values.decodeIfPresent(Bool.self, forKey: .reportNVIDIA)) ?? false
         fastSync = (try? values.decodeIfPresent(Bool.self, forKey: .fastSync)) ?? true
     }

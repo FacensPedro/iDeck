@@ -1703,8 +1703,18 @@ private struct WindowsGameProfileForm: View {
                 DetailPickerRow(title: tr("Frame rate limit"), selection: $profile.fpsLimit,
                                 choices: WindowsGameProfile.fpsLimits,
                                 icon: "speedometer", iconColor: .orange)
-                DetailToggleRow(title: tr("MetalFX upscaling"), isOn: $profile.metalFXEnabled, showsDivider: false,
+                DetailPickerRow(title: "MetalFX", selection: WindowsGameProfile.metalFXAllowed
+                                    ? $profile.metalFXMode : .constant("Off"),
+                                choices: WindowsGameProfile.metalFXModes, showsDivider: false,
                                 icon: "sparkles", iconColor: .purple)
+                    .disabled(!WindowsGameProfile.metalFXAllowed)
+                if !WindowsGameProfile.metalFXAllowed {
+                    Text(tr("MetalFX needs a device with 8 GB of RAM or more."))
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                        .padding(.horizontal, 14)
+                        .padding(.bottom, 10)
+                }
             }
             DetailCard(title: tr("Graphics"),
                        footer: tr("Direct3D 11 and Direct3D 12 are chosen automatically for each game.")) {
@@ -1733,10 +1743,8 @@ private struct WindowsGameProfileForm: View {
                                     set: { value in profile.jitPoolMiB = Int(value.split(separator: " ").first ?? "") ?? 0 }),
                                 choices: WindowsGameProfile.jitPoolChoices.map { $0 == 0 ? tr("Automatic") : "\($0) MB" },
                                 icon: "memorychip", iconColor: .orange)
-                DetailToggleRow(title: tr("Fast synchronization"), isOn: $profile.fastSync,
+                DetailToggleRow(title: tr("Fast synchronization"), isOn: $profile.fastSync, showsDivider: false,
                                 icon: "bolt.fill", iconColor: .yellow)
-                DetailToggleRow(title: tr("Frame generation"), isOn: $profile.frameGeneration, showsDivider: false,
-                                icon: "film.stack", iconColor: .purple)
             }
             DetailCard(title: tr("Compatibility"),
                        footer: tr("Games iDeck recognises get the settings they were tested with.")) {

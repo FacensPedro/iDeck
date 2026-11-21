@@ -94,7 +94,7 @@ class ControllerCalibrationTests(unittest.TestCase):
         self.assertIn('zero_vibration(i);', BRIDGE)
         self.assertIn('publish_pad(i, NULL);', BRIDGE)
         self.assertIn('if (battery && battery.batteryState != GCDeviceBatteryStateUnknown &&', BRIDGE)
-        self.assertIn('GCController.controllers().filter { $0.extendedGamepad != nil }', INPUT)
+        self.assertIn('GCController.controllers().filter { $0.extendedGamepad != nil || $0.microGamepad != nil }', INPUT)
 
 
 if __name__ == "__main__":

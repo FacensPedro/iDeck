@@ -705,7 +705,8 @@ class WindowsEnvironment {
         else { unsetenv("MADEIRA_CPU_COUNT") }
         if [1, 2, 4, 8].contains(profile.anisotropyLimit) { setenv("DXMT_D9_ANISO_LIMIT", String(profile.anisotropyLimit), 1) }
         else { unsetenv("DXMT_D9_ANISO_LIMIT") }
-        if profile.frameGeneration { setenv("MADEIRA_FRAMEGEN", "1", 1) } else { unsetenv("MADEIRA_FRAMEGEN") }
+        // MetalFX (upscaling and frame generation) only on devices with 8 GB or more.
+        if profile.frameGeneration && WindowsGameProfile.metalFXAllowed { setenv("MADEIRA_FRAMEGEN", "1", 1) } else { unsetenv("MADEIRA_FRAMEGEN") }
         if profile.reportNVIDIA { setenv("DXMT_ENABLE_NVEXT", "1", 1) } else { unsetenv("DXMT_ENABLE_NVEXT") }
         // Every game: DXGI lists the same monitor and display modes as
         // user32 (win32u's mode table). DXGI's own three-mode list disagreed
@@ -799,7 +800,9 @@ class WindowsEnvironment {
         // MetalFX at "Device native": the game renders at 2/3 of the screen
         // and MetalFX enlarges it 1.5x, about 55% fewer pixels for the GPU to
         // shade with little visible loss.
-        let resolution = Self.renderResolution(profile.resolution, metalFX: profile.metalFXEnabled, screen: screen)
+        let metalFXOn = profile.metalFXEnabled && WindowsGameProfile.metalFXAllowed
+        let resolution = Self.renderResolution(profile.resolution, metalFX: metalFXOn, screen: screen,
+                                                performance: profile.metalFXPerformance)
         if resolution == "Device native" {
             unsetenv("MADEIRA_SCREEN_W")
             unsetenv("MADEIRA_SCREEN_H")
@@ -828,7 +831,7 @@ class WindowsEnvironment {
             unsetenv("MADEIRA_FEX_AVX")
         }
 
-        sessionMetalFXFactor = profile.metalFXEnabled
+        sessionMetalFXFactor = metalFXOn
             ? Self.metalFXFactor(resolution: resolution, screenLongSide: max(screen.width, screen.height))
             : nil
         if let factor = sessionMetalFXFactor {
@@ -837,7 +840,9 @@ class WindowsEnvironment {
             SteamLog.event(String(format: "[wine-launch] MetalFX spatial upscaling %.2fx", factor))
         } else {
             unsetenv("DXMT_METALFX_SPATIAL_SWAPCHAIN")
-            if profile.metalFXEnabled {
+            if profile.metalFXEnabled && !WindowsGameProfile.metalFXAllowed {
+                SteamLog.event("[wine-launch] MetalFX off: this device has less than 8 GB of RAM")
+            } else if profile.metalFXEnabled {
                 SteamLog.event("[wine-launch] MetalFX skipped: the game already renders at the screen's resolution")
             }
         }
@@ -912,10 +917,12 @@ class WindowsEnvironment {
 
     /// The resolution the game renders at: "Device native" with MetalFX on
     /// becomes 2/3 of the screen (landscape, even sizes), for MetalFX to enlarge.
-    static func renderResolution(_ resolution: String, metalFX: Bool, screen: CGSize) -> String {
+    static func renderResolution(_ resolution: String, metalFX: Bool, screen: CGSize, performance: Bool = false) -> String {
         guard metalFX, resolution == "Device native", screen.width > 0, screen.height > 0 else { return resolution }
         let long = max(screen.width, screen.height), short = min(screen.width, screen.height)
-        let width = Int(long * 2 / 3) & ~1, height = Int(short * 2 / 3) & ~1
+        // Quality: 2/3 of the screen, enlarged 1.5x. Performance: half, enlarged 2x.
+        let scale: CGFloat = performance ? 1.0 / 2.0 : 2.0 / 3.0
+        let width = Int(long * scale) & ~1, height = Int(short * scale) & ~1
         guard (320...7680).contains(width), (240...4320).contains(height) else { return resolution }
         return "\(width)x\(height)"
     }
