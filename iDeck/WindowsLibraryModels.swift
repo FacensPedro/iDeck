@@ -226,6 +226,9 @@ final class WindowsLibraryStore: ObservableObject {
         if hidden != Self.hiddenInstallers { Self.hiddenInstallers = hidden }
         executableURLs = executableURLs.filter { hidden[$0.lastPathComponent.lowercased()] == nil }
         executableURLs += installed
+        // The EA app and Ubisoft Connect open only from their page in Settings: their
+        // shortcuts do not put them next to the stores and games.
+        executableURLs = executableURLs.filter { SystemCoordinator.StoreClient.displayName(for: $0) == nil }
     }
 
     // MARK: Installers replaced by what they installed

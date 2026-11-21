@@ -729,7 +729,7 @@ struct StoreClientButton: View {
                     Text(progress).foregroundStyle(.secondary)
                 }
             } else {
-                Button(tr(installed ? "Launch" : "Install")) {
+                Button(tr(installed ? "Open store" : "Install")) {
                     openStore(client)
                 }
             }
@@ -760,13 +760,9 @@ struct StoreClientCard: View {
                 .foregroundColor(.white)
             Text(tr(!installed
                 ? "Install it in Settings › Stores & launchers › %@."
-                : "Installed. Open it to sign in and play your games.", client.rawValue))
+                : "Installed. Open it in Settings › Stores & launchers › %@.", client.rawValue))
                 .font(compactUbisoftText ? .footnote : .subheadline)
                 .foregroundColor(.gray)
-            if installed {
-                Button(tr("Launch")) { coordinator.openStoreClient(client) }
-                    .buttonStyle(.borderedProminent)
-            }
         }
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
