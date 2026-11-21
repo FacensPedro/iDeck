@@ -39,7 +39,8 @@ class InstallerClickTests(unittest.TestCase):
         self.assertIn("self.downSent = true", touch)
 
     def test_refused_foreground_keeps_the_press(self):
-        msg = text("vendor/Madeira/build/win32u-unix/message_ios.c")
+        self.assertIn("native    .      madeira-installer-click-delivery.patch", text("patches/series.txt"))
+        msg = text("patches/madeira-installer-click-delivery.patch")
         self.assertIn('ios_click_trace( msg, hittest, "foreground refused, press kept" );', msg)
         self.assertIn('"[click] msg=0x%x hwnd=%p class=%s hit=%d at (%d,%d): %s\\n"', msg)
 
