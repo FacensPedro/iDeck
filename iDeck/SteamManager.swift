@@ -61,6 +61,9 @@ final class SteamOwnedGamesModel: ObservableObject {
     /// Madeira Dock is about to sign Valve's client in: iDeck's own connection
     /// logs off and stays closed (no refresh, no reconnect) until `releaseDock()`.
     func holdForDock() async {
+        // Steam refuses the launch (OtherSessionPlaying, 35) while another session
+        // of the account plays a game: end that one first, as Steam on a PC does.
+        await session.freeOtherPlayingSession()
         await session.suspend()
         SteamLog.event("[dock-launch] iDeck's Steam connection logged off for the Dock session")
     }

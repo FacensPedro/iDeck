@@ -6,6 +6,10 @@
 ### Controls
 - Add standalone sideways Joy-Con support and clearer Nintendo controller names.
 - Improve installer touch clicks by moving the pointer before pressing and holding the click long enough for the dialog to receive it.
+- Keep an installer tap when Wine refuses to bring its window to the front, which had made buttons such as the EA app's ignore the click, and log where each tap lands.
+
+### Steam
+- Before a Steam game starts, ask Steam to end a game this account is playing in another session, as Steam on a PC does, instead of failing with "playing in another session".
 
 ### Logs
 - Compact repeated progress lines in copied Wine logs.

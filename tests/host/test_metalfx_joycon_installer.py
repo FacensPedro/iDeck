@@ -38,6 +38,25 @@ class InstallerClickTests(unittest.TestCase):
         self.assertIn("> 12 { moved = true }", touch)
         self.assertIn("self.downSent = true", touch)
 
+    def test_refused_foreground_keeps_the_press(self):
+        self.assertIn("native    .      madeira-installer-click-delivery.patch", text("patches/series.txt"))
+        msg = text("patches/madeira-installer-click-delivery.patch")
+        self.assertIn('ios_click_trace( msg, hittest, "foreground refused, press kept" );', msg)
+        self.assertIn('"[click] msg=0x%x hwnd=%p class=%s hit=%d at (%d,%d): %s\\n"', msg)
+
+
+class SteamPlayingSessionTests(unittest.TestCase):
+    def test_other_playing_session_is_ended_before_the_dock(self):
+        proto = text("iDeck/SwiftSteam/Core/SteamProtocol.swift")
+        self.assertIn("case clientPlayingSessionState = 9600", proto)
+        self.assertIn("case clientKickPlayingSession = 9601", proto)
+        session = text("iDeck/SwiftSteam/Core/SteamSession.swift")
+        self.assertIn("func freeOtherPlayingSession(timeout: TimeInterval = 10) async -> Bool", session)
+        self.assertIn("handlePlayingSessionState(message.body)", session)
+        manager = text("iDeck/SteamManager.swift")
+        self.assertLess(manager.index("await session.freeOtherPlayingSession()"),
+                        manager.index("await session.suspend()"))
+
 
 if __name__ == "__main__":
     unittest.main()

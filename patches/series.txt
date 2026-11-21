@@ -52,3 +52,6 @@ late      .      madeira-pipe2-ios26.patch
 native    FEX    fex-windows-protection-result.patch
 native    .      madeira-layerkit-contiguous-range.patch
 native    .      madeira-fex-init-diagnostics.patch
+
+# iDeck: installer taps kept when activation is refused, and logged where they land
+native    .      madeira-installer-click-delivery.patch
