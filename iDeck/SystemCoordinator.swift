@@ -1195,15 +1195,23 @@ class SystemCoordinator: ObservableObject {
 
         var installerName: String { downloadURL.lastPathComponent }
 
-        /// The batch line that makes Wine's service control manager answer before an
-        /// installer runs: Madeira Dock's host in its service mode (it starts
-        /// services.exe only when no manager answers, waits up to 20 s and loads no
-        /// Steam client), else services.exe itself.
-        static func serviceStartCommand() -> String {
-            if (try? MadeiraDock.stageHost()) != nil {
-                return "\"" + MadeiraDock.executable + "\" --start-services"
+        /// Wine's ARM64 cmd.exe, copied to C:\iDeck\ideck-cmd.exe. Started as the
+        /// session's program it makes the session ARM64, as a 32-bit installer's own
+        /// session is: services.exe and start.exe exist only as ARM64 programs, and
+        /// as children of the x64 cmd.exe they stopped at their first write
+        /// (stack overflow, c00000fd), so the installer never started.
+        static func stageNativeShell(drive: URL = drive) -> URL? {
+            let fm = FileManager.default
+            let source = MadeiraRuntime.file("aarch64-windows/cmd.exe")
+            let target = drive.appendingPathComponent("iDeck/ideck-cmd.exe")
+            func isARM64(_ url: URL) -> Bool { url.path.withCString { ideck_native_pe_machine($0) } == 0xAA64 }
+            guard isARM64(source) else { return nil }
+            if !fm.contentsEqual(atPath: source.path, andPath: target.path) {
+                try? fm.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try? fm.removeItem(at: target)
+                guard (try? fm.copyItem(at: source, to: target)) != nil else { return nil }
             }
-            return #"start "" "C:\windows\system32\services.exe""#
+            return isARM64(target) ? target : nil
         }
 
         /// The programs of the EA app and Ubisoft Connect that check which Windows
@@ -1257,32 +1265,9 @@ class SystemCoordinator: ObservableObject {
     private var requestedStoreClients: [StoreClient] = []
 
     func openStoreClient(_ client: StoreClient) {
-        guard let executable = client.installedURL else { installDefaultStoreClients([client]); return }
-        // The EA app signs in through EABackgroundService and Ubisoft Connect through
-        // UplayService: the service manager starts first, then the launcher, in one session.
-        let drive = StoreClient.drive.standardizedFileURL.resolvingSymlinksInPath().path
-        let path = executable.standardizedFileURL.resolvingSymlinksInPath().path
-        guard !isClosingWindowsSession, !ideck_wineprocess_running(), path.hasPrefix(drive + "/"),
-              let shell = MadeiraDock.stageCommandShell() else {
+        if let executable = client.installedURL {
             launchWindowsProgram(at: executable, detectInstaller: false)
-            return
-        }
-        StoreClient.prepareInstallEnvironment()
-        let windowsPath = "C:\\" + path.dropFirst(drive.count + 1).replacingOccurrences(of: "/", with: "\\")
-        let folder = StoreClient.drive.appendingPathComponent("iDeck", isDirectory: true)
-        let commands = ["@echo off", StoreClient.serviceStartCommand(), "start \"\" \"" + windowsPath + "\""]
-        do {
-            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-            try (commands.joined(separator: "\r\n") + "\r\n").write(
-                to: folder.appendingPathComponent("open-store-client.cmd"), atomically: true, encoding: .utf8)
-        } catch {
-            launchWindowsProgram(at: executable, detectInstaller: false)
-            return
-        }
-        var profile = WindowsGameProfile(id: "ideck:store-client", title: client.rawValue)
-        profile.arguments = #"/d /c C:\iDeck\open-store-client.cmd"#
-        profile.keepChildProcessesRunning = true
-        launchWindowsExecutable(at: shell, profile: profile)
+        } else { installDefaultStoreClients([client]) }
     }
 
     func installDefaultStoreClients(_ clients: [StoreClient] = StoreClient.allCases) {
@@ -1316,15 +1301,27 @@ class SystemCoordinator: ObservableObject {
                 // The installers register Windows services (EABackgroundService,
                 // UplayService) and ask the service manager whether the system is
                 // usable; a plain session starts none, so the EA app's installer
-                // found no Windows environment to install into. The service manager
-                // starts first, then each installer, in one session.
-                var commands = ["@echo off", StoreClient.serviceStartCommand()]
+                // found no Windows environment to install into. In an ARM64 session
+                // services.exe starts first, then each installer.
+                let nativeShell = StoreClient.stageNativeShell()
+                if nativeShell == nil, missing.count == 1, let client = missing.first, let installer = client.installer {
+                    AppLog.record("[store-setup] no ARM64 cmd.exe: \(client.installerName) starts without the service manager")
+                    self.requestedStoreClients = missing
+                    var profile = WindowsGameProfile(id: "ideck:store-setup", title: client.rawValue)
+                    profile.keepChildProcessesRunning = true
+                    self.launchWindowsExecutable(at: installer, profile: profile, installer: true)
+                    return
+                }
+                var commands = ["@echo off"]
+                if nativeShell != nil { commands.append(#"start "" "C:\windows\system32\services.exe""#) }
                 for client in missing {
                     let switches = missing.count == 1 || client == .ubisoft ? "" : " /passive /norestart"
-                    commands.append("start /wait \"\" \"C:\\iDeck\\" + client.installerName + "\"" + switches)
+                    let program = "\"C:\\iDeck\\" + client.installerName + "\"" + switches
+                    // Without start.exe (x64 shell), cmd waits for a program a batch runs.
+                    commands.append(nativeShell != nil ? "start /wait \"\" " + program : program)
                     commands.append("if errorlevel 1 echo " + client.rawValue + " installer returned %errorlevel%")
                 }
-                guard let shell = MadeiraDock.stageCommandShell() else { throw CocoaError(.fileNoSuchFile) }
+                guard let shell = nativeShell ?? MadeiraDock.stageCommandShell() else { throw CocoaError(.fileNoSuchFile) }
                 try (commands.joined(separator: "\r\n") + "\r\n").write(
                     to: folder.appendingPathComponent("install-store-clients.cmd"), atomically: true, encoding: .utf8)
                 var profile = WindowsGameProfile(id: "ideck:store-setup", title: missing.map(\.rawValue).joined(separator: " / "))
@@ -1499,7 +1496,7 @@ class SystemCoordinator: ObservableObject {
                     self.mountExternalDrives(prefix: mountPath)
                     let effectiveProfile = profile ?? WindowsGameProfile(id: destination.path, title: destination.deletingPathExtension().lastPathComponent)
                     self.windowsEnvironment.applyGameProfile(effectiveProfile)
-                    // Store installers and launchers: Wine's services.exe never answered its RPC clients
+                    // Store installers: Wine's services.exe never answered its RPC clients
                     // under madsync, so the service manager and msiexec's custom actions
                     // waited. That session uses Wine's standard synchronization.
                     if effectiveProfile.id.hasPrefix("ideck:store-") { setenv("MADEIRA_MADSYNC_SESSION", "0", 1) }
