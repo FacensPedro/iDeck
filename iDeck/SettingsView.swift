@@ -287,8 +287,6 @@ struct SettingsView: View {
             }
             Section {
                 StoreClientButton(client: .ubisoft, coordinator: coordinator, openStore: openStore)
-            } footer: {
-                Text(tr("The installer is downloaded from Ubisoft when you tap Install. Sign in inside Ubisoft Connect after it opens."))
             }
         }
         .navigationTitle("Ubisoft Connect")
@@ -851,7 +849,9 @@ private struct UbisoftLoginView: View {
     }
 }
 
-private struct UbisoftSavedSession: Codable {
+struct UbisoftSavedSession: Codable {
+    static let appID = "39baebad-39e5-4552-8c25-2c9b919064e2"
+
     let name: String
     let ticket: String
     let remember: String?
@@ -863,7 +863,7 @@ private struct UbisoftSavedSession: Codable {
         var login = URLRequest(url: URL(string: "https://public-ubiservices.ubi.com/v3/profiles/sessions")!)
         login.httpMethod = "POST"
         login.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        login.setValue("39baebad-39e5-4552-8c25-2c9b919064e2", forHTTPHeaderField: "Ubi-AppId")
+        login.setValue(appID, forHTTPHeaderField: "Ubi-AppId")
         login.httpBody = Data(#"{"rememberMe":true}"#.utf8)
         return login
     }

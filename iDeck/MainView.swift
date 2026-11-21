@@ -264,6 +264,8 @@ struct WindowsWorkspaceView: View {
     @State private var isEpicSignInPresented = false
     @State private var isEASignInPresented = false
     @ObservedObject private var eaLibrary = EALibrary.shared
+    @ObservedObject private var ubisoftLibrary = UbisoftLibrary.shared
+    @State private var ubisoftClientInstalled = false
     @State private var selectedEpicGame: SelectedEpicGame?
     @State private var selectedEAGame: EAOwnedGame?
     @State private var selectedGOGGame: GOGGame?
@@ -579,6 +581,7 @@ struct WindowsWorkspaceView: View {
         case gog(GOGGame)
         case epic(EpicOwnedGame)
         case ea(EAOwnedGame)
+        case ubisoft(UbisoftGame)
 
         var id: String {
             switch self {
@@ -586,6 +589,7 @@ struct WindowsWorkspaceView: View {
             case .gog(let game): return "gog:\(game.id)"
             case .epic(let game): return "epic:\(game.id)"
             case .ea(let game): return "ea:\(game.id)"
+            case .ubisoft(let game): return "ubisoft:\(game.id)"
             }
         }
 
@@ -595,6 +599,7 @@ struct WindowsWorkspaceView: View {
             case .gog(let game): return game.title
             case .epic(let game): return game.title
             case .ea(let game): return game.title
+            case .ubisoft(let game): return game.title
             }
         }
     }
@@ -653,6 +658,7 @@ struct WindowsWorkspaceView: View {
         if gogLibrary.isSignedIn { Task { await gogLibrary.refresh() } }
         if epicLibrary.signedIn { Task { await epicLibrary.refreshLibrary() } }
         if eaLibrary.signedIn { Task { await eaLibrary.refreshLibrary() } }
+        if ubisoftClientInstalled { ubisoftLibrary.refresh() }
     }
 
     private func gameCard(_ game: SteamAppInfo) -> some View {
@@ -964,6 +970,50 @@ struct WindowsWorkspaceView: View {
                     .foregroundColor(.red)
                     .lineLimit(2)
             }
+        }
+        .padding(4)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var filteredUbisoftGames: [UbisoftGame] {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return ubisoftLibrary.games }
+        return ubisoftLibrary.games.filter { $0.title.localizedCaseInsensitiveContains(query) }
+    }
+
+    /// An installed Ubisoft game starts its own program directly; one the account owns
+    /// but has not installed says where to install it.
+    private func ubisoftCard(_ game: UbisoftGame) -> some View {
+        let open = {
+            if let executable = game.executable {
+                let profile = windowsLibrary.profile(for: "ubisoft:\(game.id)", title: game.title)
+                coordinator.launchWindowsProgram(at: executable, profile: profile, detectInstaller: false)
+            } else {
+                installMessage = tr("Install it in Ubisoft Connect: Settings › Stores & launchers › Ubisoft Connect.")
+                isShowingInstallResult = true
+            }
+        }
+        return VStack(alignment: .leading, spacing: 6) {
+            ZStack {
+                if let executable = game.executable {
+                    WindowsExecutableArtworkView(executableURL: executable, library: windowsLibrary, fallbackColor: secondaryColor)
+                } else {
+                    secondaryColor
+                    Text(game.title)
+                        .font(.headline)
+                        .foregroundColor(textColor)
+                        .multilineTextAlignment(.center)
+                        .padding(10)
+                }
+            }
+            .libraryCoverFrame()
+            .blur(radius: game.executable == nil ? Self.uninstalledCoverBlur : 0)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .clipped()
+            .contentShape(Rectangle())
+            .onTapGesture(perform: open)
+            Button(action: open) { cardTitle(game.title) }
+                .buttonStyle(.plain)
         }
         .padding(4)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -2488,7 +2538,7 @@ extension WindowsWorkspaceView {
     @ViewBuilder
     private func storePage(_ store: GameStore) -> some View {
         VStack(alignment: .leading, spacing: 16) {
-            if store != .ubisoft && (store != .ea || eaClientInstalled) {
+            if (store != .ubisoft || ubisoftClientInstalled) && (store != .ea || eaClientInstalled) {
             HStack(spacing: 10) {
                 searchField
                 Button { refreshAllLibraries() } label: {
@@ -2539,7 +2589,22 @@ extension WindowsWorkspaceView {
                     epicContent
                 }
             case .ubisoft:
-                StoreClientCard(client: .ubisoft, coordinator: coordinator)
+                Group {
+                    if ubisoftClientInstalled {
+                        storeGrid(loading: ubisoftLibrary.refreshing, error: ubisoftLibrary.error,
+                                  count: ubisoftLibrary.games.count, entries: filteredUbisoftGames.map { .ubisoft($0) })
+                    } else {
+                        StoreClientCard(client: .ubisoft, coordinator: coordinator)
+                    }
+                }
+                .task(id: coordinator.windowsStatus) {
+                    let installed = await Task.detached(priority: .utility) {
+                        SystemCoordinator.StoreClient.ubisoft.installedURL != nil
+                    }.value
+                    guard !Task.isCancelled else { return }
+                    ubisoftClientInstalled = installed
+                    if installed { ubisoftLibrary.refresh() }
+                }
             case .ea:
                 Group {
                     if !eaClientInstalled {
@@ -2585,6 +2650,7 @@ extension WindowsWorkspaceView {
                     case .gog(let game): gogCard(game)
                     case .epic(let game): epicCard(game)
                     case .ea(let game): eaCard(game)
+                    case .ubisoft(let game): ubisoftCard(game)
                     }
                 }
             }

@@ -1,7 +1,7 @@
 ## What's Changed
 ### Stores
-- Run the EA app and Ubisoft Connect installers in an ARM64 session that starts Windows' service manager first, so the EA app installer finds a Windows environment to install into. In 2.10.1 the x64 command shell stopped the service manager and the installer before they started.
-- Open an installed EA app or Ubisoft Connect directly again, as before 2.10.1.
+- Show the Ubisoft Connect store page's game library once Ubisoft Connect is installed: the games it installed, and the games the iDeck Ubisoft account owns. An installed game starts its own program directly, without opening Ubisoft Connect from iDeck.
+- Remove the installer explanation from the Ubisoft Connect page in Settings.
 
 ### Version
-- Updated the application version to 2.10.2 (build 110).
+- Updated the application version to 2.10.3 (build 111).
