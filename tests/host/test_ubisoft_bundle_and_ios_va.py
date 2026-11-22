@@ -31,6 +31,13 @@ class UbisoftConnectBundleTests(unittest.TestCase):
         self.assertIn('MadeiraRuntime.file("i386-windows/cmd.exe")', coordinator)
         self.assertIn(r'C:\windows\sysnative\services.exe', coordinator)
         self.assertNotIn("stageNativeShell", coordinator)
+
+    def test_launchers_install_without_wine_screen(self):
+        view = text("iDeck/MainView.swift")
+        self.assertIn("!coordinator.storeSetupInBackground && (coordinator.windowsStatus", view)
+        coordinator = text("iDeck/SystemCoordinator.swift")
+        self.assertIn("self.storeSetupInBackground = true", coordinator)
+        self.assertIn("self.storeClientError = status == \"Windows Ready\" ? nil : status", coordinator)
         settings = text("iDeck/SettingsView.swift")
         self.assertIn("NavigationLink { ubisoftPage }", settings)
         self.assertIn("StoreClientButton(client: .ea", settings)
