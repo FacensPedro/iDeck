@@ -32,6 +32,7 @@ struct iDeckApp: App {
         // Report the interruption, never assume Jetsam or discard game files.
         let diagnostics = UserDefaults.standard
         SystemCoordinator.SessionOutcome.noteAppRestart()
+        SystemCoordinator.noteFreshInstanceAfterRelaunch()
         if let inFlight = diagnostics.string(forKey: "diagnostics.installInFlight"), !inFlight.isEmpty {
             AppLog.record("[startup] warning: previous Steam installation did not finish normally: \(inFlight); cause undetermined")
             diagnostics.removeObject(forKey: "diagnostics.installInFlight")

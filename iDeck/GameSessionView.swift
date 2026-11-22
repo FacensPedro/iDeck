@@ -312,12 +312,6 @@ struct GameSessionView: View {
                             .foregroundColor(.yellow)
                             .font(.caption2.weight(.semibold))
                             .lineLimit(3)
-                    } else if !metrics.receivedNewFrames && StikJITHelper.smallPoolMB > 0 {
-                        Text(tr("The pool is only %d MB.",
-                                StikJITHelper.smallPoolMB))
-                            .foregroundColor(.yellow)
-                            .font(.caption2.weight(.semibold))
-                            .lineLimit(3)
                     }
                     Spacer(minLength: 4)
                     if hasWineProblem && wineLogURL != nil {

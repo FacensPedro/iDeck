@@ -19,15 +19,15 @@ class DownloadETACoreContract(unittest.TestCase):
         self.assertIn('let remaining = DownloadETA.label(eta)', view)
         self.assertIn('Label(tr("Time left") + ": " + remaining', view)
 
-    def test_download_button_over_blurred_cover_is_separate_control(self):
+    def test_cover_has_no_install_button_and_blurs_only_anti_cheat_games(self):
         view = source("iDeck/MainView.swift")
-        self.assertIn("downloadCoverButton", view)
-        self.assertIn(".blur(radius:", view)
-        # Only the symbol, round, in the middle of the cover: no text.
-        button = view[view.index("private func downloadCoverButton("):view.index("private var antiCheatCoverBadge")]
-        self.assertIn("Circle().fill(LinearGradient(", button)
-        self.assertIn("alignment: .center", button)
-        self.assertNotIn("Text(", button)
+        # No Install button over the cover; only games blocked by Easy Anti-Cheat
+        # are blurred and show the struck-through symbol.
+        self.assertNotIn("downloadCoverButton", view)
+        self.assertIn("antiCheatCoverBadge", view)
+        for line in view.splitlines():
+            if "Self.uninstalledCoverBlur : 0" in line:
+                self.assertIn("AntiCheatPolicy.isBlocked(", line)
         self.assertNotIn("Image(\"DownloadCloud\")", view)
 
     def test_first_architecture_bootstrap_is_win64_wow64(self):

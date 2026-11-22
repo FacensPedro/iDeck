@@ -1,4 +1,4 @@
-"""A shrunk JIT pool is shown on the loading screen, not only in the log."""
+"""A shrunk JIT pool is only logged: the loading screen shows no pool size."""
 import unittest
 from pathlib import Path
 
@@ -11,14 +11,11 @@ class SmallPoolNoticeTests(unittest.TestCase):
     def test_reset_each_launch_and_set_where_the_pool_shrinks(self):
         allocate = HELPER[HELPER.index("static func allocatePool("):]
         self.assertLess(allocate.index("smallPoolMB = 0"), allocate.index("SMALL JIT POOL"))
-        self.assertIn("smallPoolMB = Int(best >> 20)", HELPER)
-        self.assertIn("smallPoolMB = fit >> 20", HELPER)
 
-    def test_loading_screen_shows_it_before_the_first_frame(self):
-        self.assertIn("} else if !metrics.receivedNewFrames && StikJITHelper.smallPoolMB > 0 {", SESSION)
+    def test_loading_screen_shows_no_pool_size(self):
+        self.assertNotIn("StikJITHelper.smallPoolMB", SESSION)
         strings = (ROOT / "iDeck/Localization.swift").read_text()
-        self.assertIn('"The pool is only %d MB.": ["pt": "O pool ficou só com %d MB."', strings)
-        self.assertNotIn("heavy games may freeze", strings)
+        self.assertNotIn('"The pool is only %d MB."', strings)
 
 
 if __name__ == "__main__":

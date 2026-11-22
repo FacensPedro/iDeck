@@ -90,6 +90,38 @@ enum StikJITHelper {
         }
     }
 
+    /// UserDefaults key: when iDeck last asked StikDebug for a fresh instance.
+    static let relaunchRequestedAtKey = "jit.relaunchRequestedAt"
+
+    /// Asks StikDebug for a NEW iDeck process with JIT: the same URL as enableJIT,
+    /// but without `pid`, so StikDebug launches iDeck by bundle ID instead of
+    /// attaching to this one. Wine runs inside iDeck and a second Windows session
+    /// cannot start in a process that already ran one; a fresh process starts with
+    /// all of its memory free. Calls back with whether iOS opened StikDebug; the
+    /// caller exits this process then, before StikDebug launches the new one.
+    static func requestFreshInstance(completion: @escaping (Bool) -> Void) {
+        guard let bundleID = Bundle.main.bundleIdentifier, let scriptData else {
+            completion(false); return
+        }
+        func url(_ scheme: String) -> URL? {
+            var components = URLComponents()
+            components.scheme = scheme
+            components.host = "enable-jit"
+            components.queryItems = [
+                URLQueryItem(name: "bundle-id", value: bundleID),
+                URLQueryItem(name: "script-data", value: scriptData.base64EncodedString()),
+            ]
+            return components.url
+        }
+        guard let primary = url("stikdebug") else { completion(false); return }
+        UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: relaunchRequestedAtKey)
+        UIApplication.shared.open(primary, options: [:]) { opened in
+            if opened { completion(true); return }
+            guard let legacy = url("stikjit") else { completion(false); return }
+            UIApplication.shared.open(legacy, options: [:]) { completion($0) }
+        }
+    }
+
     /// ml1235 (local, 2026-10-02) is folded in here: upstream's waitForDebugger
     /// waits for `ready` (CS_DEBUGGED and a live debugger), which is what ml1235's
     /// pollForJIT did; the flag-only poll reported success at once in the
