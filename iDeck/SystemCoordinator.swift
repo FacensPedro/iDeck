@@ -1195,24 +1195,36 @@ class SystemCoordinator: ObservableObject {
 
         var installerName: String { downloadURL.lastPathComponent }
 
-        /// Wine's ARM64 cmd.exe, copied to C:\iDeck\ideck-cmd.exe. Started as the
+        /// Wine's 32-bit cmd.exe, copied to C:\iDeck\ideck-cmd32.exe. Started as the
         /// session's program it makes the session ARM64, as a 32-bit installer's own
-        /// session is: services.exe and start.exe exist only as ARM64 programs, and
-        /// as children of the x64 cmd.exe they stopped at their first write
-        /// (stack overflow, c00000fd), so the installer never started.
-        static func stageNativeShell(drive: URL = drive) -> URL? {
+        /// session is, so the ARM64 services.exe (C:\windows\sysnative) can run in it:
+        /// as children of the x64 cmd.exe services.exe and start.exe stopped at their
+        /// first write (stack overflow, c00000fd). Wine's ARM64 cmd.exe cannot be the
+        /// session's program: iDeck's launcher starts only i386 and x64 programs, and
+        /// rejected it ("invalid Windows launch request", code 22).
+        static func stageInstallerShell(drive: URL = drive) -> URL? {
             let fm = FileManager.default
-            let source = MadeiraRuntime.file("aarch64-windows/cmd.exe")
-            let target = drive.appendingPathComponent("iDeck/ideck-cmd.exe")
-            // ideck_native_pe_machine answers 0 for ARM64 images: read the header here.
-            func isARM64(_ url: URL) -> Bool { MadeiraRuntime.peMachine(url) == 0xAA64 }
-            guard isARM64(source) else { return nil }
+            try? fm.removeItem(at: drive.appendingPathComponent("iDeck/ideck-cmd.exe"))
+            let source = MadeiraRuntime.file("i386-windows/cmd.exe")
+            let target = drive.appendingPathComponent("iDeck/ideck-cmd32.exe")
+            func isI386(_ url: URL) -> Bool { MadeiraRuntime.peMachine(url) == 0x014C }
+            guard isI386(source) else { return nil }
             if !fm.contentsEqual(atPath: source.path, andPath: target.path) {
                 try? fm.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
                 try? fm.removeItem(at: target)
                 guard (try? fm.copyItem(at: source, to: target)) != nil else { return nil }
             }
-            return isARM64(target) ? target : nil
+            return isI386(target) ? target : nil
+        }
+
+        /// The switches that install the launcher without questions: the EA app's
+        /// installer is a WiX Burn bundle, Ubisoft Connect's an NSIS installer. Other
+        /// installers iDeck starts keep their own windows.
+        var silentSwitches: String {
+            switch self {
+            case .ea: return "/quiet /norestart"
+            case .ubisoft: return "/S"
+            }
         }
 
         /// The programs of the EA app and Ubisoft Connect that check which Windows
@@ -1304,26 +1316,27 @@ class SystemCoordinator: ObservableObject {
                 // UplayService) and ask the service manager whether the system is
                 // usable; a plain session starts none, so the EA app's installer
                 // found no Windows environment to install into. In an ARM64 session
-                // services.exe starts first, then each installer.
-                let nativeShell = StoreClient.stageNativeShell()
-                if nativeShell == nil, missing.count == 1, let client = missing.first, let installer = client.installer {
-                    AppLog.record("[store-setup] no ARM64 cmd.exe at \(MadeiraRuntime.file("aarch64-windows/cmd.exe").path): \(client.installerName) starts without the service manager")
+                // services.exe starts first, then each installer, without questions.
+                let installerShell = StoreClient.stageInstallerShell()
+                if installerShell == nil, missing.count == 1, let client = missing.first, let installer = client.installer {
+                    AppLog.record("[store-setup] no 32-bit cmd.exe at \(MadeiraRuntime.file("i386-windows/cmd.exe").path): \(client.installerName) starts without the service manager")
                     self.requestedStoreClients = missing
                     var profile = WindowsGameProfile(id: "ideck:store-setup", title: client.rawValue)
+                    profile.arguments = client.silentSwitches
                     profile.keepChildProcessesRunning = true
                     self.launchWindowsExecutable(at: installer, profile: profile, installer: true)
                     return
                 }
                 var commands = ["@echo off"]
-                if nativeShell != nil { commands.append(#"start "" "C:\windows\system32\services.exe""#) }
+                // The 32-bit shell sees system32 as syswow64: sysnative is the ARM64 system32.
+                if installerShell != nil { commands.append(#"start "" "C:\windows\sysnative\services.exe""#) }
                 for client in missing {
-                    let switches = missing.count == 1 || client == .ubisoft ? "" : " /passive /norestart"
-                    let program = "\"C:\\iDeck\\" + client.installerName + "\"" + switches
+                    let program = "\"C:\\iDeck\\" + client.installerName + "\" " + client.silentSwitches
                     // Without start.exe (x64 shell), cmd waits for a program a batch runs.
-                    commands.append(nativeShell != nil ? "start /wait \"\" " + program : program)
+                    commands.append(installerShell != nil ? "start /wait \"\" " + program : program)
                     commands.append("if errorlevel 1 echo " + client.rawValue + " installer returned %errorlevel%")
                 }
-                guard let shell = nativeShell ?? MadeiraDock.stageCommandShell() else { throw CocoaError(.fileNoSuchFile) }
+                guard let shell = installerShell ?? MadeiraDock.stageCommandShell() else { throw CocoaError(.fileNoSuchFile) }
                 try (commands.joined(separator: "\r\n") + "\r\n").write(
                     to: folder.appendingPathComponent("install-store-clients.cmd"), atomically: true, encoding: .utf8)
                 var profile = WindowsGameProfile(id: "ideck:store-setup", title: missing.map(\.rawValue).joined(separator: " / "))

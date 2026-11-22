@@ -21,8 +21,16 @@ class UbisoftConnectBundleTests(unittest.TestCase):
         self.assertIn('"Program Files/Ubisoft/Ubisoft Game Launcher"', coordinator)
         self.assertIn('name: "InstallDir"', coordinator)
 
-    def test_store_setup_is_not_automatic(self):
-        self.assertNotIn("installDefaultStoreClients()", text("iDeck/MainView.swift"))
+    def test_store_setup_installs_launchers_in_initial_setup(self):
+        view = text("iDeck/MainView.swift")
+        step = view[view.index("private var launchersStep: some View"):view.index("// MARK: - JIT")]
+        self.assertIn("coordinator.installDefaultStoreClients()", step)
+        coordinator = text("iDeck/SystemCoordinator.swift")
+        self.assertIn('case .ea: return "/quiet /norestart"', coordinator)
+        self.assertIn('case .ubisoft: return "/S"', coordinator)
+        self.assertIn('MadeiraRuntime.file("i386-windows/cmd.exe")', coordinator)
+        self.assertIn(r'C:\windows\sysnative\services.exe', coordinator)
+        self.assertNotIn("stageNativeShell", coordinator)
         settings = text("iDeck/SettingsView.swift")
         self.assertIn("NavigationLink { ubisoftPage }", settings)
         self.assertIn("StoreClientButton(client: .ea", settings)

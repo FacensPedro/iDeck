@@ -241,7 +241,6 @@ struct WindowsWorkspaceView: View {
     @ObservedObject var steamLibrary: SteamOwnedGamesModel
 
     @State private var pendingStore: SystemCoordinator.StoreClient?
-    @State private var eaClientInstalled = false
     @State private var isSettingsPresented = false
     @State private var searchText = ""
     /// The selected tile of the console-style shelf (a store or a game).
@@ -266,6 +265,7 @@ struct WindowsWorkspaceView: View {
     @ObservedObject private var eaLibrary = EALibrary.shared
     @ObservedObject private var ubisoftLibrary = UbisoftLibrary.shared
     @State private var ubisoftClientInstalled = false
+    @State private var ubisoftSignedIn = false
     @State private var selectedEpicGame: SelectedEpicGame?
     @State private var selectedEAGame: EAOwnedGame?
     @State private var selectedGOGGame: GOGGame?
@@ -658,7 +658,7 @@ struct WindowsWorkspaceView: View {
         if gogLibrary.isSignedIn { Task { await gogLibrary.refresh() } }
         if epicLibrary.signedIn { Task { await epicLibrary.refreshLibrary() } }
         if eaLibrary.signedIn { Task { await eaLibrary.refreshLibrary() } }
-        if ubisoftClientInstalled { ubisoftLibrary.refresh() }
+        if ubisoftClientInstalled || ubisoftSignedIn { ubisoftLibrary.refresh() }
     }
 
     private func gameCard(_ game: SteamAppInfo) -> some View {
@@ -2538,7 +2538,7 @@ extension WindowsWorkspaceView {
     @ViewBuilder
     private func storePage(_ store: GameStore) -> some View {
         VStack(alignment: .leading, spacing: 16) {
-            if (store != .ubisoft || ubisoftClientInstalled) && (store != .ea || eaClientInstalled) {
+            if (store != .ubisoft || ubisoftClientInstalled || ubisoftSignedIn) && (store != .ea || eaLibrary.signedIn) {
             HStack(spacing: 10) {
                 searchField
                 Button { refreshAllLibraries() } label: {
@@ -2590,10 +2590,11 @@ extension WindowsWorkspaceView {
                 }
             case .ubisoft:
                 Group {
-                    if ubisoftClientInstalled {
+                    if ubisoftClientInstalled || ubisoftSignedIn {
                         storeGrid(loading: ubisoftLibrary.refreshing, error: ubisoftLibrary.error,
                                   count: ubisoftLibrary.games.count, entries: filteredUbisoftGames.map { .ubisoft($0) })
                     } else {
+                        // The launcher is installed by the initial setup: what is missing is the sign-in.
                         StoreClientCard(client: .ubisoft, coordinator: coordinator)
                     }
                 }
@@ -2603,24 +2604,15 @@ extension WindowsWorkspaceView {
                     }.value
                     guard !Task.isCancelled else { return }
                     ubisoftClientInstalled = installed
-                    if installed { ubisoftLibrary.refresh() }
+                    ubisoftSignedIn = UbisoftSavedSession.load() != nil
+                    if installed || ubisoftSignedIn { ubisoftLibrary.refresh() }
                 }
             case .ea:
-                Group {
-                    if !eaClientInstalled {
-                        StoreClientCard(client: .ea, coordinator: coordinator)
-                    } else if eaLibrary.signedIn {
-                        storeGrid(loading: eaLibrary.refreshing, error: eaLibrary.error,
-                                  count: eaLibrary.owned.count, entries: filteredEAGames.map { .ea($0) })
-                    } else {
-                        eaContent
-                    }
-                }
-                .task(id: coordinator.windowsStatus) {
-                    let installed = await Task.detached(priority: .utility) {
-                        SystemCoordinator.StoreClient.ea.installedURL != nil
-                    }.value
-                    if !Task.isCancelled { eaClientInstalled = installed }
+                if eaLibrary.signedIn {
+                    storeGrid(loading: eaLibrary.refreshing, error: eaLibrary.error,
+                              count: eaLibrary.owned.count, entries: filteredEAGames.map { .ea($0) })
+                } else {
+                    eaContent
                 }
             }
         }
@@ -2735,14 +2727,19 @@ private struct IDeckFirstRunSetupView: View {
     @State private var installerStatus = ""
     @State private var refresh = 0
     @State private var pairingImporterPresented = false
+    @State private var eaAppInstalled = false
+    @State private var ubisoftConnectInstalled = false
+    /// The launchers step starts their installation once per appearance.
+    @State private var launchersRequested = false
 
     private enum Step: Int, CaseIterable {
-        case visualCpp, wineMono, dock, jit, summary
+        case visualCpp, wineMono, dock, launchers, jit, summary
         var title: String {
             switch self {
             case .visualCpp: return "Visual C++"
             case .wineMono: return "Wine Mono"
             case .dock: return "Madeira Dock"
+            case .launchers: return "Launchers"
             case .jit: return "JIT"
             case .summary: return "Summary"
             }
@@ -2752,6 +2749,7 @@ private struct IDeckFirstRunSetupView: View {
             case .visualCpp: return "shippingbox.fill"
             case .wineMono: return "gearshape.2.fill"
             case .dock: return "dock.rectangle"
+            case .launchers: return "square.grid.2x2.fill"
             case .jit: return "bolt.fill"
             case .summary: return "checkmark.seal.fill"
             }
@@ -2761,6 +2759,7 @@ private struct IDeckFirstRunSetupView: View {
             case .visualCpp: return .blue
             case .wineMono: return .purple
             case .dock: return .teal
+            case .launchers: return .red
             case .jit: return .orange
             case .summary: return .green
             }
@@ -2797,6 +2796,7 @@ private struct IDeckFirstRunSetupView: View {
         case .visualCpp: return prefixReady && vcReady
         case .wineMono: return wineMono.installed
         case .dock: return MadeiraDock.clientInstalled && steamDLLsReady && !coordinator.steamComponentsInstalling
+        case .launchers: return eaAppInstalled && ubisoftConnectInstalled
         case .jit: return jitMethodChosen && (jitMethod != "builtIn" || coordinator.hasPairingFile)
         case .summary: return false
         }
@@ -2823,6 +2823,7 @@ private struct IDeckFirstRunSetupView: View {
                             case .visualCpp: visualCppStep
                             case .wineMono: wineMonoStep
                             case .dock: dockStep
+                            case .launchers: launchersStep
                             case .jit: jitStep
                             case .summary: completeStep
                             }
@@ -2855,6 +2856,13 @@ private struct IDeckFirstRunSetupView: View {
             coordinator.refreshJITStatus()
             coordinator.refreshPairingFileState()
             wineMono.refresh()
+        }
+        .task {
+            // The launchers' rows follow what their installers put in the prefix.
+            while !Task.isCancelled {
+                await refreshLaunchers()
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
+            }
         }
         .preferredColorScheme(.dark)
     }
@@ -3146,6 +3154,60 @@ private struct IDeckFirstRunSetupView: View {
         }
     }
 
+    // MARK: - Launchers
+
+    private var launchersBusy: Bool {
+        coordinator.storeClientDownload != nil || coordinator.windowsStatus.hasPrefix("Running")
+            || coordinator.windowsStatus.hasPrefix("Wine started") || coordinator.windowsStatus.hasPrefix("Launching")
+            || coordinator.windowsStatus.hasPrefix("Preparing executable")
+    }
+
+    private var launchersStep: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            stepHeader(.launchers, "Installs the EA app and Ubisoft Connect automatically, so their games can start.")
+            componentList {
+                statusRow("EA app", eaAppInstalled)
+                Divider().overlay(hairline).padding(.leading, 43)
+                statusRow("Ubisoft Connect", ubisoftConnectInstalled)
+            }
+            primaryButton(done(.launchers) ? "Installed" : (launchersBusy ? "Installing…" : "Install"),
+                          systemImage: done(.launchers) ? "checkmark" : "arrow.down.circle",
+                          disabled: done(.launchers) || launchersBusy || !prefixReady) {
+                coordinator.installDefaultStoreClients()
+            }
+            if let progress = coordinator.storeClientDownload {
+                note(progress)
+            } else if launchersBusy {
+                progressNote
+            } else if coordinator.windowsStatus.hasPrefix("Execution Error") {
+                note(coordinator.windowsStatus, warning: true)
+            }
+            if !prefixReady {
+                note("Install Visual C++ first: it prepares the Windows environment.", warning: true)
+            } else {
+                note("Sign in to EA and Ubisoft in Settings › Stores & launchers to see your games.")
+            }
+        }
+        .task {
+            // Entering the step installs the missing launchers, without questions.
+            await refreshLaunchers()
+            if !launchersRequested, prefixReady, !done(.launchers), !launchersBusy,
+               !coordinator.steamComponentsInstalling {
+                launchersRequested = true
+                coordinator.installDefaultStoreClients()
+            }
+        }
+    }
+
+    private func refreshLaunchers() async {
+        let (ea, ubisoft) = await Task.detached(priority: .utility) {
+            (SystemCoordinator.StoreClient.ea.installedURL != nil,
+             SystemCoordinator.StoreClient.ubisoft.installedURL != nil)
+        }.value
+        eaAppInstalled = ea
+        ubisoftConnectInstalled = ubisoft
+    }
+
     // MARK: - JIT
 
     private var jitStep: some View {
@@ -3186,6 +3248,10 @@ private struct IDeckFirstRunSetupView: View {
                 statusRow("Wine Mono", wineMono.installed)
                 Divider().overlay(hairline).padding(.leading, 43)
                 statusRow("Madeira Dock", MadeiraDock.clientInstalled)
+                Divider().overlay(hairline).padding(.leading, 43)
+                statusRow("EA app", eaAppInstalled)
+                Divider().overlay(hairline).padding(.leading, 43)
+                statusRow("Ubisoft Connect", ubisoftConnectInstalled)
                 Divider().overlay(hairline).padding(.leading, 43)
                 statusRow("JIT method", done(.jit), detail: !jitMethodChosen ? "Not chosen" : (jitMethod == "builtIn" ? "Built-in" : "StikDebug"))
             }

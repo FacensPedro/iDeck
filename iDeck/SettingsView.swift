@@ -742,7 +742,8 @@ struct StoreClientButton: View {
     }
 }
 
-/// A store page's card for a store whose games iDeck does not list (Ubisoft Connect).
+/// A store page's card while the account is not connected: the launcher is installed
+/// by the initial setup, so the card asks for the sign-in.
 struct StoreClientCard: View {
     let client: SystemCoordinator.StoreClient
     @ObservedObject var coordinator: SystemCoordinator
@@ -752,16 +753,12 @@ struct StoreClientCard: View {
         client == .ubisoft && UIDevice.current.userInterfaceIdiom == .phone && verticalSizeClass == .compact
     }
 
-    @State private var installed = false
-
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(client.rawValue)
                 .font(compactUbisoftText ? .subheadline.weight(.semibold) : .headline)
                 .foregroundColor(.white)
-            Text(tr(!installed
-                ? "Install it in Settings › Stores & launchers › %@."
-                : "Installed. Open it in Settings › Stores & launchers › %@.", client.rawValue))
+            Text(tr("Sign in in Settings › Stores & launchers › %@.", client.rawValue))
                 .font(compactUbisoftText ? .footnote : .subheadline)
                 .foregroundColor(.gray)
         }
@@ -769,10 +766,6 @@ struct StoreClientCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.white.opacity(0.06))
         .clipShape(RoundedRectangle(cornerRadius: 10))
-        .task(id: coordinator.windowsStatus) {
-            let result = await Task.detached(priority: .utility) { [client] in client.installedURL != nil }.value
-            if !Task.isCancelled { installed = result }
-        }
     }
 }
 
