@@ -172,6 +172,9 @@ enum MadeiraWinePool {
         defer { preparationLock.unlock() }
         guard let pool = prepared else { return nil }
         for key in exports { unsetenv(key) }
+        // Wine's pool warmer keeps reading the pool every 2 s: stop it first, or it
+        // reads the unmapped memory (SEGV at the RW base right after the release).
+        ideck_wine_jit_pool_forget()
         StikJITHelper.discardPool(pool)
         StikJITHelper.smallPoolMB = 0
         prepared = nil

@@ -68,6 +68,7 @@ enum StikJITHelper {
 
         LogStore.shared.log("Opening StikDebug to enable JIT...")
 
+        whenActive {
         UIApplication.shared.open(url, options: [:]) { success in
             if !success {
                 var legacy = components
@@ -87,6 +88,25 @@ enum StikJITHelper {
                 return
             }
             waitForDebugger(completion: completion)
+        }
+        }
+    }
+
+    /// iOS refuses to open another app's URL while iDeck is in the background (a
+    /// download that finished with the screen off asked for StikDebug and got "not
+    /// installed"). Runs `body` now when iDeck is in front, otherwise as soon as it
+    /// comes back to the front.
+    static func whenActive(_ body: @escaping () -> Void) {
+        DispatchQueue.main.async {
+            if UIApplication.shared.applicationState == .active { body(); return }
+            LogStore.shared.log("[jit-handoff] iDeck is in the background: StikDebug opens when iDeck is back in front")
+            var token: NSObjectProtocol?
+            token = NotificationCenter.default.addObserver(forName: UIApplication.didBecomeActiveNotification,
+                                                           object: nil, queue: .main) { _ in
+                if let token { NotificationCenter.default.removeObserver(token) }
+                token = nil
+                body()
+            }
         }
     }
 
@@ -115,10 +135,12 @@ enum StikJITHelper {
         }
         guard let primary = url("stikdebug") else { completion(false); return }
         UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: relaunchRequestedAtKey)
-        UIApplication.shared.open(primary, options: [:]) { opened in
-            if opened { completion(true); return }
-            guard let legacy = url("stikjit") else { completion(false); return }
-            UIApplication.shared.open(legacy, options: [:]) { completion($0) }
+        whenActive {
+            UIApplication.shared.open(primary, options: [:]) { opened in
+                if opened { completion(true); return }
+                guard let legacy = url("stikjit") else { completion(false); return }
+                UIApplication.shared.open(legacy, options: [:]) { completion($0) }
+            }
         }
     }
 

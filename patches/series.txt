@@ -59,3 +59,6 @@ native    .      madeira-installer-click-delivery.patch
 
 # iDeck: the fd ledger without a TEB (32-bit boot thread, after-session reclaim)
 native    .      madeira-fdt-no-teb.patch
+
+# iDeck: the pool warmer stops before the app frees the JIT pool (SEGV at the RW base after a session)
+native    .      madeira-pool-warmer-forget.patch
