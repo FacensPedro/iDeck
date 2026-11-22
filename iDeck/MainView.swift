@@ -81,8 +81,7 @@ struct MainView: View {
         }
         .fullScreenCover(isPresented: Binding<Bool>(
             get: {
-                // The EA app and Ubisoft Connect install without opening Wine's screen.
-                !coordinator.storeSetupInBackground && (coordinator.windowsStatus == "Closing Windows session..." ||
+                coordinator.windowsStatus == "Closing Windows session..." ||
                 coordinator.windowsStatus == "Steam Running" ||
                 coordinator.windowsStatus == "Running" ||
                 coordinator.windowsStatus == "Wine started; waiting for game..." ||
@@ -94,7 +93,7 @@ struct MainView: View {
                 coordinator.windowsStatus == VisualCRuntimeBootstrap.installStatus ||
                 coordinator.windowsStatus == SystemCoordinator.steamComponentsInstallStatus ||
                 coordinator.windowsStatus.hasPrefix("Visual C++") ||
-                coordinator.windowsStatus.hasPrefix("Execution Error:"))
+                coordinator.windowsStatus.hasPrefix("Execution Error:")
             },
             set: { presented in
                 if !presented && coordinator.windowsStatus != "Windows Ready" &&
@@ -351,31 +350,61 @@ struct WindowsWorkspaceView: View {
             .accessibilityLabel(title)
     }
 
+    /// The cover's Install button: a small capsule at the bottom of the cover, so the
+    /// artwork stays visible (it was a large white disc over its middle).
     private func downloadCoverButton(action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Image("DownloadCloud")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 48, height: 48)
-                .padding(8)
-                .background(.white)
-                .clipShape(Circle())
-                .shadow(color: .black.opacity(0.5), radius: 12, y: 4)
+            HStack(spacing: 5) {
+                Image(systemName: "arrow.down.circle.fill")
+                    .font(.system(size: 14, weight: .semibold))
+                Text(tr("Install"))
+                    .font(.caption.weight(.bold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+            }
+            .foregroundColor(.white)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(
+                Capsule().fill(LinearGradient(colors: [Color(red: 0.22, green: 0.56, blue: 1.0),
+                                                       Color(red: 0.11, green: 0.38, blue: 0.92)],
+                                              startPoint: .top, endPoint: .bottom))
+            )
+            .overlay(Capsule().strokeBorder(.white.opacity(0.28), lineWidth: 0.5))
+            .shadow(color: .black.opacity(0.45), radius: 6, y: 2)
+            .contentShape(Capsule())
         }
         .buttonStyle(.plain)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+        .padding(.bottom, 10)
+        .padding(.horizontal, 8)
         .accessibilityLabel(tr("Install"))
     }
 
-    /// In place of the download button on a game that needs Easy Anti-Cheat: the
-    /// download symbol struck through, not tappable.
+    /// In place of the Install button on a game that needs Easy Anti-Cheat: the same
+    /// capsule, grey and red, not tappable.
     private var antiCheatCoverBadge: some View {
-        AntiCheatBlockedSymbol(size: 48)
-            .padding(8)
-            .background(Color(white: 0.85))
-            .clipShape(Circle())
-            .shadow(color: .black.opacity(0.5), radius: 12, y: 4)
-            .allowsHitTesting(false)
-            .accessibilityLabel(tr(AntiCheatPolicy.shortMessage))
+        HStack(spacing: 5) {
+            Image(systemName: "nosign")
+                .font(.system(size: 13, weight: .bold))
+                .foregroundColor(Color(red: 1.0, green: 0.42, blue: 0.4))
+            Text(tr("Cannot install"))
+                .font(.caption.weight(.semibold))
+                .foregroundColor(.white.opacity(0.92))
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        }
+        .padding(.horizontal, 11)
+        .padding(.vertical, 7)
+        .background(.ultraThinMaterial, in: Capsule())
+        .background(Capsule().fill(Color.black.opacity(0.45)))
+        .overlay(Capsule().strokeBorder(Color(red: 1.0, green: 0.42, blue: 0.4).opacity(0.55), lineWidth: 0.75))
+        .shadow(color: .black.opacity(0.4), radius: 6, y: 2)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+        .padding(.bottom, 10)
+        .padding(.horizontal, 8)
+        .allowsHitTesting(false)
+        .accessibilityLabel(tr(AntiCheatPolicy.shortMessage))
     }
 
     /// A collapsible "owned games" header (store, count, chevron).
@@ -513,10 +542,21 @@ struct WindowsWorkspaceView: View {
         }
         // A finished Wine session may have installed a game (a GOG installer,
         // a setup program): look for new installs whenever Wine stops.
-        .onChange(of: coordinator.windowsStatus) { _, _ in
-            guard let prefixPath, !ideck_wineprocess_running() else { return }
-            gogLibrary.refreshInstalled(prefixPath: prefixPath)
-            windowsLibrary.refresh(prefixPath: prefixPath)
+        .onChange(of: coordinator.windowsStatus) { _, status in
+            guard let prefixPath else { return }
+            let ended = status == "Windows Ready" || status.hasPrefix("Execution Error") || status.hasPrefix("Cannot launch")
+            Task { @MainActor in
+                // Wine can still be closing when the session's end is shown: wait for it
+                // (up to 20 s), so the installer leaves the list as soon as Wine stops.
+                var waited = 0
+                while ended && ideck_wineprocess_running() && waited < 40 {
+                    try? await Task.sleep(nanoseconds: 500_000_000)
+                    waited += 1
+                }
+                guard !ideck_wineprocess_running() else { return }
+                gogLibrary.refreshInstalled(prefixPath: prefixPath)
+                windowsLibrary.refresh(prefixPath: prefixPath)
+            }
         }
         .preferredColorScheme(.dark)
     }
@@ -1209,7 +1249,7 @@ private struct WindowsExecutableArtworkView: View {
     let fallbackColor: Color
 
     var body: some View {
-        let profile = library.profile(for: library.profileID(for: executableURL), title: executableURL.deletingPathExtension().lastPathComponent)
+        let profile = library.profile(forExecutable: executableURL)
         Group {
             if let url = library.artworkURL(for: profile), let image = UIImage(contentsOfFile: url.path) {
                 Image(uiImage: image)
@@ -1246,8 +1286,7 @@ private struct WindowsExecutableDetailsView: View {
         self.prefixPath = prefixPath
         self.library = library
         self.coordinator = coordinator
-        let profileID = library.profileID(for: executableURL)
-        _profile = State(initialValue: library.profile(for: profileID, title: executableURL.deletingPathExtension().lastPathComponent))
+        _profile = State(initialValue: library.profile(forExecutable: executableURL))
     }
 
     var body: some View {
@@ -1264,7 +1303,7 @@ private struct WindowsExecutableDetailsView: View {
                             Label(tr("Change cover"), systemImage: "photo")
                         }
                         .buttonStyle(.bordered)
-                        Text(executableURL.deletingPathExtension().lastPathComponent)
+                        Text(library.displayName(for: executableURL))
                             .font(.title2.bold())
                             .foregroundColor(.white)
                         Text(executableURL.lastPathComponent)
@@ -2501,7 +2540,7 @@ extension WindowsWorkspaceView {
         case .epic(let app): return epicLibrary.installed[app]?.title ?? "Epic"
         case .epicInstalling(let app): return epicLibrary.game(app)?.title ?? "Epic"
         case .ea(let id): return eaTitle(id)
-        case .exe(let path): return URL(fileURLWithPath: path).deletingPathExtension().lastPathComponent
+        case .exe(let path): return windowsLibrary.displayName(for: URL(fileURLWithPath: path))
         }
     }
 
@@ -2731,7 +2770,6 @@ private struct IDeckFirstRunSetupView: View {
     @State private var eaAppInstalled = false
     @State private var ubisoftConnectInstalled = false
     /// The launchers step starts their installation once per appearance.
-    @State private var launchersRequested = false
 
     private enum Step: Int, CaseIterable {
         case visualCpp, wineMono, dock, launchers, jit, summary
@@ -3166,7 +3204,7 @@ private struct IDeckFirstRunSetupView: View {
 
     private var launchersStep: some View {
         VStack(alignment: .leading, spacing: 18) {
-            stepHeader(.launchers, "Installs the EA app and Ubisoft Connect automatically, so their games can start.")
+            stepHeader(.launchers, "Installs the EA app and Ubisoft Connect, so their games can start.")
             componentList {
                 statusRow("EA app", eaAppInstalled)
                 Divider().overlay(hairline).padding(.leading, 43)
@@ -3180,7 +3218,12 @@ private struct IDeckFirstRunSetupView: View {
             if let progress = coordinator.storeClientDownload {
                 note(progress)
             } else if launchersBusy {
-                progressNote
+                // The Visual C++ step's own text stayed in installerStatus and was shown here.
+                HStack(spacing: 10) {
+                    ProgressView().controlSize(.small)
+                    Text(tr("Installing %@...", launchersInstalling))
+                        .font(.caption).foregroundStyle(.secondary)
+                }
             } else if let error = coordinator.storeClientError {
                 note(error, warning: true)
             }
@@ -3190,15 +3233,16 @@ private struct IDeckFirstRunSetupView: View {
                 note("Sign in to EA and Ubisoft in Settings › Stores & launchers to see your games.")
             }
         }
-        .task {
-            // Entering the step installs the missing launchers, without questions.
-            await refreshLaunchers()
-            if !launchersRequested, prefixReady, !done(.launchers), !launchersBusy,
-               !coordinator.steamComponentsInstalling {
-                launchersRequested = true
-                coordinator.installDefaultStoreClients()
-            }
-        }
+        // The launchers install only when Install is tapped.
+        .task { await refreshLaunchers() }
+    }
+
+    /// The launchers the Install button installs, for the progress line.
+    private var launchersInstalling: String {
+        var names: [String] = []
+        if !eaAppInstalled { names.append("EA app") }
+        if !ubisoftConnectInstalled { names.append("Ubisoft Connect") }
+        return names.isEmpty ? "EA app / Ubisoft Connect" : names.joined(separator: " / ")
     }
 
     private func refreshLaunchers() async {

@@ -313,7 +313,7 @@ struct GameSessionView: View {
                             .font(.caption2.weight(.semibold))
                             .lineLimit(3)
                     } else if !metrics.receivedNewFrames && StikJITHelper.smallPoolMB > 0 {
-                        Text(tr("The JIT pool is only %d MB this time, so heavy games may freeze for about a second now and then. Close iDeck and open it again for a full pool.",
+                        Text(tr("The pool is only %d MB.",
                                 StikJITHelper.smallPoolMB))
                             .foregroundColor(.yellow)
                             .font(.caption2.weight(.semibold))
@@ -388,12 +388,12 @@ struct GameSessionView: View {
                                     Label(tr("Copy Wine log"), systemImage: "doc.on.doc")
                                 }
                                 .disabled(isCopyingWineLog)
-                                ShareLink(item: logURL) {
+                                ShareLink(item: RedactedLogFile(url: logURL), preview: SharePreview("Wine-log.txt")) {
                                     Label(tr("Share Wine log"), systemImage: "square.and.arrow.up")
                                 }
                             }
                             .font(.subheadline.weight(.semibold))
-                            Text(tr("Wine logs can contain personal or account information. Review before sharing."))
+                            Text(tr("Passwords, account names, e-mail and IP addresses are removed from copied and shared logs."))
                                 .font(.caption)
                                 .foregroundColor(.gray)
                         }
@@ -423,11 +423,11 @@ struct GameSessionView: View {
                             .font(.caption)
                             .foregroundColor(.white.opacity(0.75))
                         if let logURL = wineLogURL {
-                            ShareLink(item: logURL) {
+                            ShareLink(item: RedactedLogFile(url: logURL), preview: SharePreview("Wine-log.txt")) {
                                 Label(tr("Share Wine log"), systemImage: "square.and.arrow.up")
                             }
                             .font(.subheadline)
-                            Text(tr("Wine logs can contain personal or account information. Review before sharing."))
+                            Text(tr("Passwords, account names, e-mail and IP addresses are removed from copied and shared logs."))
                                 .font(.caption2)
                                 .foregroundColor(.gray)
                         }

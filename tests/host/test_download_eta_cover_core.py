@@ -21,10 +21,13 @@ class DownloadETACoreContract(unittest.TestCase):
 
     def test_download_button_over_blurred_cover_is_separate_control(self):
         view = source("iDeck/MainView.swift")
-        self.assertIn("Image(\"DownloadCloud\")", view)
         self.assertIn("downloadCoverButton", view)
         self.assertIn(".blur(radius:", view)
-        self.assertTrue((ROOT / "iDeck/Assets.xcassets/DownloadCloud.imageset/download.png").exists())
+        # A capsule at the bottom of the cover, not a disc over the artwork's middle.
+        button = view[view.index("private func downloadCoverButton("):view.index("private var antiCheatCoverBadge")]
+        self.assertIn("Capsule().fill(LinearGradient(", button)
+        self.assertIn("alignment: .bottom", button)
+        self.assertNotIn("Image(\"DownloadCloud\")", view)
 
     def test_first_architecture_bootstrap_is_win64_wow64(self):
         view = source("iDeck/MainView.swift")

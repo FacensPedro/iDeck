@@ -303,7 +303,7 @@ final class GOGLibraryModel: ObservableObject {
     static let shared = GOGLibraryModel()
 
     @Published private(set) var isSignedIn = GOGTokenStore.load() != nil
-    @Published private(set) var username: String?
+    @Published private(set) var username: String? { didSet { PrivacyRedactor.register(username) } }
     @Published private(set) var games: [GOGGame] = []
     @Published private(set) var isLoading = false
     @Published private(set) var errorMessage: String?

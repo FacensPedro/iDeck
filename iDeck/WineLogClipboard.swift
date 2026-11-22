@@ -2,6 +2,7 @@ import Foundation
 #if canImport(UIKit)
 import UIKit
 import UniformTypeIdentifiers
+import CoreTransferable
 #endif
 
 enum WineLogClipboard {
@@ -29,7 +30,7 @@ enum WineLogClipboard {
             // The copy is compacted: repeated lines are folded, so it is much smaller.
             // Compacted byte by byte: no String of the whole log, no Character per line.
             let raw = try Data(contentsOf: source)
-            try LogCompactor.compactedData(raw).write(to: destination, options: .atomic)
+            try PrivacyRedactor.redact(LogCompactor.compactedData(raw)).write(to: destination, options: .atomic)
             return destination
         }.value
         let provider = NSItemProvider()
@@ -45,7 +46,7 @@ enum WineLogClipboard {
     /// Puts `text` on the pasteboard as a .txt file named `name`.
     static func copyText(_ text: String, named name: String) throws {
         let destination = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + "-" + name)
-        try Data(LogCompactor.compact(text).utf8).write(to: destination, options: .atomic)
+        try Data(PrivacyRedactor.redact(LogCompactor.compact(text)).utf8).write(to: destination, options: .atomic)
         let provider = NSItemProvider()
         provider.suggestedName = name
         provider.registerFileRepresentation(forTypeIdentifier: UTType.plainText.identifier,
@@ -80,7 +81,7 @@ enum WineLogClipboard {
             throw ReadError.empty
         }
 
-        var text = String(decoding: data, as: UTF8.self)
+        var text = PrivacyRedactor.redact(String(decoding: data, as: UTF8.self))
         if truncated {
             if let newline = text.firstIndex(of: "\n") {
                 text = String(text[text.index(after: newline)...])
@@ -285,3 +286,100 @@ enum LogCompactor {
         return String(decoding: plain as Data, as: UTF8.self)
     }
 }
+
+/// Removes what identifies the user from iDeck's and Wine's logs before they are
+/// written, copied or shared: passwords, tokens, account names, e-mail addresses,
+/// IP addresses and the Windows user folder's name.
+enum PrivacyRedactor {
+    private static let lock = NSLock()
+    nonisolated(unsafe) private static var identifiers: Set<String> = []
+
+    /// An account name or display name iDeck learned at sign-in (Steam, EA, Epic, GOG):
+    /// it is removed wherever it appears in a log.
+    static func register(_ identifier: String?) {
+        guard let value = identifier?.trimmingCharacters(in: .whitespacesAndNewlines), value.count >= 3 else { return }
+        lock.lock(); identifiers.insert(value); lock.unlock()
+    }
+
+    private static func regex(_ pattern: String) -> NSRegularExpression {
+        try! NSRegularExpression(pattern: pattern, options: [.caseInsensitive])
+    }
+
+    /// (pattern, template): applied in order.
+    private static let rules: [(NSRegularExpression, String)] = [
+        // key=value and "key": "value" pairs that hold a secret or an account.
+        (regex(#"(\b(?:password|passwd|pwd|pass|secret|token|access_token|refresh_token|id_token|auth_?code|authcode|code_verifier|session_?id|sessionkey|ticket|cookie|apikey|api_key|client_secret|license_?key|username|user_?name|user|account_?name|accountname|account|account_?id|steam_?id|login|email|persona_?name|display_?name|nickname)\\?"?\s*[:=]\s*\\?"?)[^\s"&,;}\]\\]+"#), "$1<redacted>"),
+        (regex(#"(authorization\s*:\s*(?:bearer|basic|token)?\s*)[^\s"]+"#), "$1<redacted>"),
+        (regex(#"(set-cookie|cookie)(\s*:\s*)[^\r\n]+"#), "$1$2<redacted>"),
+        (regex(#"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}"#), "<email>"),
+        // IPv4 (loopback and 0.0.0.0 stay: they say nothing about the user).
+        (regex(#"\b(?!127\.)(?!0\.0\.0\.0\b)(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)\b"#), "<ip>"),
+        // IPv6 (at least three groups, so times such as 12:34:56 are kept).
+        (regex(#"\b(?:[0-9A-F]{1,4}:){3,7}[0-9A-F]{1,4}\b|\b(?:[0-9A-F]{1,4}:){1,6}:(?:[0-9A-F]{1,4}:?){1,6}\b"#), "<ip>"),
+        // C:\users\<name>\ and drive_c/users/<name>/: the Windows profile's name.
+        (regex(#"((?:[A-Z]:\\+|drive_c/)users[\\/]+)(?!public\b|default\b|steamuser\b|all users\b)[^\\/\s"']+"#), "$1<user>"),
+        // Long tokens (JWTs, OAuth codes, hex keys).
+        (regex(#"\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}"#), "<redacted>"),
+    ]
+
+    /// Words that must appear in the text for a rule to run (lowercased): a rule
+    /// whose words are all absent is skipped, so a long Wine log is not scanned by
+    /// every expression.
+    private static let ruleHints: [[String]] = [
+        ["pass", "pwd", "secret", "token", "auth", "code", "session", "ticket", "cookie", "key",
+         "user", "account", "login", "mail", "steam", "persona", "name"],
+        ["authorization"],
+        ["cookie"],
+        ["@"],
+        ["."],
+        [":"],
+        ["users"],
+        ["eyj"],
+    ]
+
+    static func redact(_ text: String) -> String {
+        guard !text.isEmpty else { return text }
+        // One NSMutableString for every rule: no UTF-16 copy of the log per rule.
+        let result = NSMutableString(string: text)
+        let lowered = text.lowercased()
+        for (index, (expression, template)) in rules.enumerated() {
+            guard ruleHints[index].contains(where: { lowered.contains($0) }) else { continue }
+            expression.replaceMatches(in: result, range: NSRange(location: 0, length: result.length),
+                                      withTemplate: template)
+        }
+        lock.lock(); let known = identifiers; lock.unlock()
+        for identifier in known.sorted(by: { $0.count > $1.count }) where lowered.contains(identifier.lowercased()) {
+            result.replaceOccurrences(of: identifier, with: "<account>", options: .caseInsensitive,
+                                      range: NSRange(location: 0, length: result.length))
+        }
+        return result as String
+    }
+
+    static func redact(_ data: Data) -> Data {
+        Data(redact(String(decoding: data, as: UTF8.self)).utf8)
+    }
+
+    /// A redacted copy of a log file, for sharing.
+    static func redactedCopy(of source: URL, name: String) throws -> URL {
+        let destination = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
+        let file = destination.appendingPathComponent(name + ".txt")
+        try redact(LogCompactor.compactedData(try Data(contentsOf: source))).write(to: file, options: .atomic)
+        return file
+    }
+}
+
+#if canImport(UIKit)
+/// A log shared through ShareLink: the file handed over is a redacted copy.
+struct RedactedLogFile: Transferable {
+    let url: URL
+    var name = "Wine-log"
+
+    static var transferRepresentation: some TransferRepresentation {
+        FileRepresentation(exportedContentType: .plainText) { log in
+            SentTransferredFile(try PrivacyRedactor.redactedCopy(of: log.url, name: log.name))
+        }
+    }
+}
+#endif

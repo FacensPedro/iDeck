@@ -163,6 +163,10 @@ struct WindowsGameProfile: Codable, Equatable, Identifiable {
 final class WindowsLibraryStore: ObservableObject {
     @Published private(set) var executableURLs: [URL] = []
     @Published private(set) var profiles: [String: WindowsGameProfile] = [:]
+    /// Installed program path (lowercased) -> the name of the shortcut its installer created.
+    @Published private(set) var shortcutNames: [String: String] = [:]
+    /// Programs whose icon was already looked for, so a refresh does not read them again.
+    private var iconLookups: Set<String> = []
 
     private let fileManager = FileManager.default
 
@@ -213,8 +217,12 @@ final class WindowsLibraryStore: ObservableObject {
         // created in the Start Menu and on the Desktop name their executables.
         let drive = prefixPath.appendingPathComponent("drive_c", isDirectory: true)
         let known = Set(executableURLs.map { $0.standardizedFileURL.path.lowercased() })
-        let installed = WindowsShortcutScanner.programs(in: drive)
-            .filter { !known.contains($0.standardizedFileURL.path.lowercased()) }
+        let shortcuts = WindowsShortcutScanner.shortcuts(in: drive)
+            .filter { !known.contains($0.exe.standardizedFileURL.path.lowercased()) }
+        let installed = shortcuts.map(\.exe)
+        var names: [String: String] = [:]
+        for shortcut in shortcuts { names[shortcut.exe.standardizedFileURL.path.lowercased()] = shortcut.name }
+        if names != shortcutNames { shortcutNames = names }
         // An installer that installed something leaves the list: only what it
         // installed is shown. It comes back if all of that is gone again.
         let installedPaths = Set(installed.map { $0.standardizedFileURL.path.lowercased() })
@@ -229,6 +237,29 @@ final class WindowsLibraryStore: ObservableObject {
         // The EA app and Ubisoft Connect open only from their page in Settings: their
         // shortcuts do not put them next to the stores and games.
         executableURLs = executableURLs.filter { SystemCoordinator.StoreClient.displayName(for: $0) == nil }
+        // A program installed while iDeck runs gets its cover (its own icon) now, not
+        // at the next start of iDeck.
+        let pending = executableURLs.filter { iconLookups.insert($0.standardizedFileURL.path.lowercased()).inserted }
+        if !pending.isEmpty {
+            Task { [weak self] in
+                for executable in pending { await self?.importEmbeddedIcon(for: executable) }
+            }
+        }
+    }
+
+    /// The program's name: its installer's shortcut name ("Tor Browser"), otherwise
+    /// the file name without .exe.
+    func displayName(for url: URL) -> String {
+        shortcutNames[url.standardizedFileURL.path.lowercased()] ?? url.deletingPathExtension().lastPathComponent
+    }
+
+    /// The program's profile. One saved with the file name as its title (an icon
+    /// import used to save "firefox" for Tor Browser) takes the shortcut's name.
+    func profile(forExecutable url: URL) -> WindowsGameProfile {
+        let fileTitle = url.deletingPathExtension().lastPathComponent
+        var saved = self.profile(for: profileID(for: url), title: displayName(for: url))
+        if saved.title.caseInsensitiveCompare(fileTitle) == .orderedSame { saved.title = displayName(for: url) }
+        return saved
     }
 
     // MARK: Installers replaced by what they installed
@@ -357,7 +388,7 @@ final class WindowsLibraryStore: ObservableObject {
 
     func importEmbeddedIcon(for executable: URL) async {
         let profileID = profileID(for: executable)
-        let current = profile(for: profileID, title: executable.deletingPathExtension().lastPathComponent)
+        let current = profile(forExecutable: executable)
         guard artworkURL(for: current) == nil else { return }
         let data = await Task.detached(priority: .utility) {
             WindowsPEIcon.pngData(from: executable)
@@ -630,6 +661,12 @@ struct SelectedEpicGame: Identifiable {
 /// Desktop folders: what an installer leaves for the programs it installed.
 enum WindowsShortcutScanner {
     static func programs(in drive: URL) -> [URL] {
+        shortcuts(in: drive).map(\.exe)
+    }
+
+    /// Each program a shortcut names, with the shortcut's own name ("Tor Browser"
+    /// for Tor Browser's firefox.exe): the name the installer gave the program.
+    static func shortcuts(in drive: URL) -> [(exe: URL, name: String)] {
         let fm = FileManager.default
         var roots = ["ProgramData/Microsoft/Windows/Start Menu/Programs", "users/Public/Desktop"]
         if let users = try? fm.contentsOfDirectory(atPath: drive.appendingPathComponent("users").path) {
@@ -638,7 +675,7 @@ enum WindowsShortcutScanner {
                 roots.append("users/\(user)/Desktop")
             }
         }
-        var found: [String: URL] = [:]
+        var found: [String: (exe: URL, name: String)] = [:]
         for root in roots {
             guard let walker = fm.enumerator(at: drive.appendingPathComponent(root, isDirectory: true),
                                              includingPropertiesForKeys: nil) else { continue }
@@ -647,13 +684,18 @@ enum WindowsShortcutScanner {
                 count += 1
                 guard item.pathExtension.lowercased() == "lnk",
                       let target = target(of: item), let exe = hostURL(target, drive: drive) else { continue }
-                let name = exe.lastPathComponent.lowercased()
-                guard !name.hasPrefix("unins"), !name.contains("uninstall"), name != "winhlp32.exe",
+                let file = exe.lastPathComponent.lowercased()
+                guard !file.hasPrefix("unins"), !file.contains("uninstall"), file != "winhlp32.exe",
                       !exe.path.lowercased().contains("/windows/") else { continue }
-                found[exe.standardizedFileURL.path.lowercased()] = exe
+                let key = exe.standardizedFileURL.path.lowercased()
+                let name = item.deletingPathExtension().lastPathComponent.trimmingCharacters(in: .whitespaces)
+                // The first shortcut wins (Start Menu before Desktop); a shorter name of
+                // the same program replaces a longer one ("Tor Browser" over "Start Tor Browser").
+                if let previous = found[key], previous.name.count <= name.count || name.isEmpty { continue }
+                found[key] = (exe, name.isEmpty ? exe.deletingPathExtension().lastPathComponent : name)
             }
         }
-        return found.values.sorted { $0.lastPathComponent.localizedCaseInsensitiveCompare($1.lastPathComponent) == .orderedAscending }
+        return found.values.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 
     /// C:\... -> the file under drive_c, matched without case; nil when missing or not an .exe.

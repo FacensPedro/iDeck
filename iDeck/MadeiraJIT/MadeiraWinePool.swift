@@ -10,6 +10,8 @@ enum MadeiraWinePool {
     private static let preparationLock = NSLock()
     private static let exports = ["WINE_IOS_JIT_RX", "WINE_IOS_JIT_RW", "WINE_IOS_JIT_SIZE",
                                   "WINE_IOS_JIT_HOLE", "WINE_IOS_JIT_HOLE2", "WINE_IOS_JIT_TAIL_REGION"]
+    /// The pool this process prepared, freed by release() when its session has ended.
+    private static var prepared: (rx: UnsafeMutableRawPointer, rw: UnsafeMutableRawPointer, size: Int)?
     /// A game's explicit Madeira configuration wins. The per-executable JIT
     /// pool list then takes precedence over the global Madeira/default pool,
     /// so a title that needs a smaller contiguous RX mapping does not silently
@@ -121,6 +123,7 @@ enum MadeiraWinePool {
             LogStore.shared.log("JIT pool allocation FAILED — not starting Wine.", level: .error)
             return StikJITHelper.poolFailure ?? "The Wine JIT pool could not be allocated."
         }
+        prepared = pool
         LogStore.shared.log("JIT pool: RX=\(String(format: "%p", Int(bitPattern: pool.rx))), RW=\(String(format: "%p", Int(bitPattern: pool.rw))), size=\(pool.size / 1024 / 1024)MB", level: .success)
         setenv("WINE_IOS_JIT_RX", String(format: "%lx", Int(bitPattern: pool.rx)), 1)
         setenv("WINE_IOS_JIT_RW", String(format: "%lx", Int(bitPattern: pool.rw)), 1)
@@ -143,6 +146,7 @@ enum MadeiraWinePool {
         guard ideck_wine_jit_pool_ready() else {
             for key in exports { unsetenv(key) }
             StikJITHelper.discardPool(pool)
+            prepared = nil
             let reason = "The JIT pool failed executable/writable memory validation. Wine was not started. Reconnect StikDebug and try again."
             LogStore.shared.log(reason, level: .error)
             return reason
@@ -156,6 +160,24 @@ enum MadeiraWinePool {
         let dms = (CFAbsoluteTimeGetCurrent() - dt0) * 1000.0
         LogStore.shared.log(String(format: "[early-detach] rev=ml524 took %.0f ms", dms), level: dms > 5000 ? .error : .success)
         return nil
+    }
+
+    /// Frees the pool once its Windows session has ended (an installer finished or
+    /// was stopped, a game closed): its memory goes back to iOS instead of staying
+    /// reserved until iDeck is reopened. Only call it after the Wine worker and the
+    /// wineserver have stopped. Returns the freed size in MB, or nil when nothing was held.
+    @discardableResult
+    static func release() -> Int? {
+        preparationLock.lock()
+        defer { preparationLock.unlock() }
+        guard let pool = prepared else { return nil }
+        for key in exports { unsetenv(key) }
+        StikJITHelper.discardPool(pool)
+        StikJITHelper.smallPoolMB = 0
+        prepared = nil
+        let mb = pool.size >> 20
+        LogStore.shared.log("[jit-pool] \(mb) MB pool released: its Windows session ended", level: .success)
+        return mb
     }
 }
 
