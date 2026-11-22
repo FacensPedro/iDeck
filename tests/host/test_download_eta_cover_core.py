@@ -32,7 +32,7 @@ class DownloadETACoreContract(unittest.TestCase):
         # Visual C++ and Wine Mono, and the Steam client only in the Madeira Dock step.
         self.assertIn('private func installVisualCpp()', view)
         self.assertIn('coordinator.installMadeiraDock()', view)
-        self.assertIn('case visualCpp, wineMono, dock, jit, summary', view)
+        self.assertIn('case visualCpp, wineMono, dock, launchers, jit, summary', view)
         self.assertIn('coordinator.openMadeiraWorkspace()', view)
         self.assertNotIn('SteamVideoLibraries.fetch', view)
         self.assertNotIn('statusRow("Steam client", steamClientReady)', view)
