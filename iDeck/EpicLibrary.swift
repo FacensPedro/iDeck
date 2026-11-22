@@ -71,6 +71,10 @@ struct EpicInstalledGame: Codable, Sendable {
             relativePath = "Maneater/Binaries/Win64/Maneater-Win64-Shipping.exe"
         case ("borderlands 2", "launcher.exe"):
             relativePath = "Binaries/Win32/Borderlands2.exe"
+        // Mafia: Definitive Edition's launcher.exe is the 2K launcher (a web view that
+        // stops while FEX loads it); the game's own exe sits beside it.
+        case (let name, "launcher.exe") where name.contains("mafia") && name.contains("definitive"):
+            relativePath = "mafiadefinitiveedition.exe"
         default:
             return manifestURL
         }

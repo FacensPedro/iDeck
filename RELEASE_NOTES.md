@@ -9,6 +9,7 @@
 - After an .exe installer finishes, it leaves the list by the stores as soon as Wine stops (also for .msi installers).
 - Programs an installer put in the prefix use the name of the shortcut it created (Tor Browser, not firefox).
 - Programs installed while iDeck runs get their cover (their own icon) right away.
+- Mafia: Definitive Edition (Epic) starts the game's own exe instead of the 2K launcher, which stopped while it loaded.
 
 ### Privacy
 - iDeck's log, copied bugs and copied or shared Wine logs no longer contain passwords, tokens, account names, e-mail addresses, IP addresses or the Windows user folder's name.
