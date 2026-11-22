@@ -350,61 +350,48 @@ struct WindowsWorkspaceView: View {
             .accessibilityLabel(title)
     }
 
-    /// The cover's Install button: a small capsule at the bottom of the cover, so the
-    /// artwork stays visible (it was a large white disc over its middle).
+    /// The cover's Install button: only the symbol, a round button in the middle of
+    /// the cover, with no text.
     private func downloadCoverButton(action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            HStack(spacing: 5) {
-                Image(systemName: "arrow.down.circle.fill")
-                    .font(.system(size: 14, weight: .semibold))
-                Text(tr("Install"))
-                    .font(.caption.weight(.bold))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
-            }
-            .foregroundColor(.white)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 7)
-            .background(
-                Capsule().fill(LinearGradient(colors: [Color(red: 0.22, green: 0.56, blue: 1.0),
-                                                       Color(red: 0.11, green: 0.38, blue: 0.92)],
-                                              startPoint: .top, endPoint: .bottom))
-            )
-            .overlay(Capsule().strokeBorder(.white.opacity(0.28), lineWidth: 0.5))
-            .shadow(color: .black.opacity(0.45), radius: 6, y: 2)
-            .contentShape(Capsule())
+            Image(systemName: "arrow.down")
+                .font(.system(size: 20, weight: .bold))
+                .foregroundColor(.white)
+                .frame(width: 46, height: 46)
+                .background(
+                    Circle().fill(LinearGradient(colors: [Color(red: 0.22, green: 0.56, blue: 1.0),
+                                                          Color(red: 0.11, green: 0.38, blue: 0.92)],
+                                                 startPoint: .top, endPoint: .bottom))
+                )
+                .overlay(Circle().strokeBorder(.white.opacity(0.35), lineWidth: 1))
+                .shadow(color: .black.opacity(0.45), radius: 8, y: 3)
+                .contentShape(Circle())
         }
         .buttonStyle(.plain)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-        .padding(.bottom, 10)
-        .padding(.horizontal, 8)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
         .accessibilityLabel(tr("Install"))
     }
 
-    /// In place of the Install button on a game that needs Easy Anti-Cheat: the same
-    /// capsule, grey and red, not tappable.
+    /// In place of the Install button on a game that needs Easy Anti-Cheat: only the
+    /// struck-through symbol, in the middle of the cover, not tappable.
     private var antiCheatCoverBadge: some View {
-        HStack(spacing: 5) {
-            Image(systemName: "nosign")
-                .font(.system(size: 13, weight: .bold))
-                .foregroundColor(Color(red: 1.0, green: 0.42, blue: 0.4))
-            Text(tr("Cannot install"))
-                .font(.caption.weight(.semibold))
-                .foregroundColor(.white.opacity(0.92))
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-        }
-        .padding(.horizontal, 11)
-        .padding(.vertical, 7)
-        .background(.ultraThinMaterial, in: Capsule())
-        .background(Capsule().fill(Color.black.opacity(0.45)))
-        .overlay(Capsule().strokeBorder(Color(red: 1.0, green: 0.42, blue: 0.4).opacity(0.55), lineWidth: 0.75))
-        .shadow(color: .black.opacity(0.4), radius: 6, y: 2)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-        .padding(.bottom, 10)
-        .padding(.horizontal, 8)
-        .allowsHitTesting(false)
-        .accessibilityLabel(tr(AntiCheatPolicy.shortMessage))
+        Image(systemName: "arrow.down")
+            .font(.system(size: 20, weight: .bold))
+            .foregroundColor(.white.opacity(0.75))
+            .frame(width: 46, height: 46)
+            .overlay(
+                Capsule()
+                    .fill(Color(red: 1.0, green: 0.36, blue: 0.34))
+                    .frame(width: 34, height: 3.5)
+                    .rotationEffect(.degrees(-45))
+            )
+            .background(.ultraThinMaterial, in: Circle())
+            .background(Circle().fill(Color.black.opacity(0.5)))
+            .overlay(Circle().strokeBorder(Color(red: 1.0, green: 0.42, blue: 0.4).opacity(0.6), lineWidth: 1))
+            .shadow(color: .black.opacity(0.4), radius: 8, y: 3)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+            .allowsHitTesting(false)
+            .accessibilityLabel(tr(AntiCheatPolicy.shortMessage))
     }
 
     /// A collapsible "owned games" header (store, count, chevron).
