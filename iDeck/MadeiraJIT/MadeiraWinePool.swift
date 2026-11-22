@@ -172,6 +172,15 @@ enum MadeiraWinePool {
         defer { preparationLock.unlock() }
         guard let pool = prepared else { return nil }
         for key in exports { unsetenv(key) }
+        // Wine's pool warmer keeps reading the pool every 2 s: stop it first, or it
+        // reads the unmapped memory (SEGV at the RW base right after the release).
+        // Looked up at run time: the Wine runtime built into the app has it only
+        // once madeira-pool-warmer-forget.patch is in it, and the link must not fail
+        // with an older runtime.
+        if let symbol = NativeSymbol.address("ideck_wine_jit_pool_forget") {
+            typealias Forget = @convention(c) () -> Void
+            unsafeBitCast(symbol, to: Forget.self)()
+        }
         StikJITHelper.discardPool(pool)
         StikJITHelper.smallPoolMB = 0
         prepared = nil

@@ -52,8 +52,17 @@ def check(root: pathlib.Path) -> list[str]:
 
     # 3. Every .cpp is reachable through Objective-C++ or extern "C".
     mm_text = "\n".join(p.read_text(errors="replace") for p in sources if p.suffix == ".mm")
+    # A vendored .cpp compiled inside another unit (LzhamCodec.cpp includes
+    # Vendor/LZHAM/*.cpp) is reached through that unit's extern "C" ABI.
+    unity_parts: set[pathlib.Path] = set()
     for path in sources:
-        if path.suffix != ".cpp":
+        if path.suffix == ".cpp":
+            text = path.read_text(errors="replace")
+            if 'extern "C"' in text:
+                for inc in re.findall(r'#include\s+"([^"]+\.cpp)"', text):
+                    unity_parts.add((path.parent / inc).resolve())
+    for path in sources:
+        if path.suffix != ".cpp" or path.resolve() in unity_parts:
             continue
         text = path.read_text(errors="replace")
         own_header = path.with_suffix(".hpp").name

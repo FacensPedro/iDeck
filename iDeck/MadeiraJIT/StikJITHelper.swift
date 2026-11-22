@@ -1,3 +1,4 @@
+import Darwin
 import UIKit
 
 /// Helper to enable JIT via StikDebug/StikJIT URL scheme.
@@ -68,6 +69,7 @@ enum StikJITHelper {
 
         LogStore.shared.log("Opening StikDebug to enable JIT...")
 
+        whenActive {
         UIApplication.shared.open(url, options: [:]) { success in
             if !success {
                 var legacy = components
@@ -87,6 +89,25 @@ enum StikJITHelper {
                 return
             }
             waitForDebugger(completion: completion)
+        }
+        }
+    }
+
+    /// iOS refuses to open another app's URL while iDeck is in the background (a
+    /// download that finished with the screen off asked for StikDebug and got "not
+    /// installed"). Runs `body` now when iDeck is in front, otherwise as soon as it
+    /// comes back to the front.
+    static func whenActive(_ body: @escaping () -> Void) {
+        DispatchQueue.main.async {
+            if UIApplication.shared.applicationState == .active { body(); return }
+            LogStore.shared.log("[jit-handoff] iDeck is in the background: StikDebug opens when iDeck is back in front")
+            var token: NSObjectProtocol?
+            token = NotificationCenter.default.addObserver(forName: UIApplication.didBecomeActiveNotification,
+                                                           object: nil, queue: .main) { _ in
+                if let token { NotificationCenter.default.removeObserver(token) }
+                token = nil
+                body()
+            }
         }
     }
 
@@ -115,10 +136,12 @@ enum StikJITHelper {
         }
         guard let primary = url("stikdebug") else { completion(false); return }
         UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: relaunchRequestedAtKey)
-        UIApplication.shared.open(primary, options: [:]) { opened in
-            if opened { completion(true); return }
-            guard let legacy = url("stikjit") else { completion(false); return }
-            UIApplication.shared.open(legacy, options: [:]) { completion($0) }
+        whenActive {
+            UIApplication.shared.open(primary, options: [:]) { opened in
+                if opened { completion(true); return }
+                guard let legacy = url("stikjit") else { completion(false); return }
+                UIApplication.shared.open(legacy, options: [:]) { completion($0) }
+            }
         }
     }
 
@@ -379,13 +402,30 @@ enum StikJITHelper {
     /// about a second each time. Shown on the loading screen, not only in the log.
     static var smallPoolMB = 0
 
+    /// Below this much memory left with the pool counted, the pool can close heavy games.
+    static let footprintWarningMB = 2048
+
+    /// iDeck: iOS refuses the exemption on every launch of every log (the ownership call
+    /// with VM_LEDGER_FLAG_NO_FOOTPRINT is for Apple's own processes), so the refusal
+    /// alone says nothing: the app already has com.apple.developer.kernel.increased-memory-limit,
+    /// and with it 5-6 GB stayed available with the pool counted (iPhone, 2026-11-22,
+    /// BioShock 2: 5481 MiB at session start). Warn only when what is left is short.
     static func reportNoFootprint(_ applied: Bool, poolBytes: Int) {
         poolCountsAgainstFootprint = !applied
-        LogStore.shared.log("[no-footprint] pool applied=\(applied)", level: applied ? .success : .error)
-        if !applied {
-            LogStore.shared.log("⚠️ iOS did not exempt the \(poolBytes >> 20)MB JIT pool from the app's memory limit: "
-                + "it counts toward the limit this session, so heavy games may close without an error. "
+        guard !applied else {
+            LogStore.shared.log("[no-footprint] pool applied=true", level: .success)
+            return
+        }
+        let availableMB = Int(os_proc_available_memory() >> 20)
+        if availableMB < footprintWarningMB {
+            LogStore.shared.log("[no-footprint] pool applied=false available=\(availableMB)MB", level: .error)
+            LogStore.shared.log("⚠️ The \(poolBytes >> 20)MB JIT pool counts toward iOS's memory limit and only "
+                + "\(availableMB) MB are left: heavy games may close without an error. "
                 + "Use a smaller JIT pool (Settings › JIT) if that happens.", level: .error)
+        } else {
+            LogStore.shared.log("[no-footprint] pool applied=false available=\(availableMB)MB: the \(poolBytes >> 20)MB pool "
+                + "counts toward iOS's memory limit (the exemption is only for Apple's apps), and \(availableMB) MB are "
+                + "still left with it counted")
         }
     }
 
@@ -631,8 +671,19 @@ enum StikJITHelper {
         // next allocation of this size is the debugger's.
         var plugs: [(vm_address_t, vm_size_t)] = []
         // madeira-bcd split pool switch (see SPLIT POOL below); the census reads it too.
-        let splitValue = (MadeiraConfig.gameValue("pool-split") ?? MadeiraConfig.get("pool-split") ?? "")
+        let splitSetting = (MadeiraConfig.gameValue("pool-split") ?? MadeiraConfig.get("pool-split") ?? "")
             .trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        // iDeck: a widened executable window takes its extra MB from the run above it,
+        // where the pool goes, and the main thread's stack caps that run: BioShock 2
+        // (192MB window, 2026-11-22) had 501MB left above the window, a below-window run
+        // split by an app mapping, and three launches shrunk to 496MB. Split, the pool
+        // continues past the stack (Dragon Age: Inquisition's list does the same).
+        // `pool-split = 0` in the game's file or madeira.cfg keeps a single region.
+        let splitValue = splitSetting.isEmpty && exeWinWantedMB > 128 ? "1" : splitSetting
+        if splitSetting.isEmpty && exeWinWantedMB > 128 {
+            LogStore.shared.log("[pool-split] on for this launch: the executable window is widened to \(exeWinWantedMB)MB, "
+                + "so the pool may continue past the main thread's stack (pool-split = 0 turns this off)")
+        }
         // Opt-in: keep page-sized remainders in A/B instead of discarding up to
         // 16MB from each free run. The requested A+B budget and region C stay unchanged.
         let pageFit = ["1", "on", "true", "yes"].contains(splitValue)

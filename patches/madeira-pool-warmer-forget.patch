@@ -1,0 +1,63 @@
+diff --git a/build/ntdll-unix/virtual_ios.c b/build/ntdll-unix/virtual_ios.c
+index def1962..818bb21 100644
+--- a/build/ntdll-unix/virtual_ios.c
++++ b/build/ntdll-unix/virtual_ios.c
+@@ -1054,6 +1054,28 @@ static unsigned ios_warmer_sweep_cycles( void )
+     return v;
+ }
+ 
++/* iDeck: the app frees the JIT pool when its Windows session ends (MadeiraWinePool
++ * release) while this process keeps running. The warmer kept the old addresses and
++ * read the unmapped RW alias at the next cycle: SEGV at 0x7000000000 in
++ * ios_pool_warmer_thread, right after "[jit-pool] ... pool released". The app now
++ * calls ideck_wine_jit_pool_forget() before it unmaps the pool: the warmer stops
++ * touching it (waiting out a pass already running) until a new pool is exported. */
++static volatile int ios_pool_gone;
++static volatile int ios_pool_warmer_busy;
++extern void *ios_jit_rx_base_global, *ios_jit_rw_base_global;
++extern size_t ios_jit_pool_size_global;
++
++void ideck_wine_jit_pool_forget( void )
++{
++    int i;
++    __atomic_store_n( &ios_pool_gone, 1, __ATOMIC_SEQ_CST );
++    for (i = 0; i < 400 && __atomic_load_n( &ios_pool_warmer_busy, __ATOMIC_SEQ_CST ); i++) usleep( 5000 );
++    ios_jit_rw_base_global = NULL;
++    ios_jit_rx_base_global = NULL;
++    ios_jit_pool_size_global = 0;
++    dprintf( 2, "[pool-warmer] pool forgotten before release (waited %d ms)\n", i * 5 );
++}
++
+ static void *ios_pool_warmer_thread( void *arg )
+ {
+     unsigned cycle = 0;
+@@ -1098,6 +1120,13 @@ static void *ios_pool_warmer_thread( void *arg )
+             }
+             last_full = now_ts;
+         }
++        __atomic_store_n( &ios_pool_warmer_busy, 1, __ATOMIC_SEQ_CST );
++        if (__atomic_load_n( &ios_pool_gone, __ATOMIC_SEQ_CST ))
++        {
++            __atomic_store_n( &ios_pool_warmer_busy, 0, __ATOMIC_SEQ_CST );
++            usleep( 250000 );
++            continue;
++        }
+         volatile const char *rw = (volatile const char *)ios_jit_rw_base_global;
+         /* ml121: warm the RX ALIAS TOO. The warmer only ever touched the RW
+          * alias, but execution faults on the RX one -- they are two separate
+@@ -1598,6 +1627,7 @@ static void *ios_pool_warmer_thread( void *arg )
+          * to 250ms so the terminal burst is actually captured. The expensive
+          * region/band accounting above stays on the slow cycle; only the cheap
+          * task_info() footprint line runs at the fast rate. */
++        __atomic_store_n( &ios_pool_warmer_busy, 0, __ATOMIC_SEQ_CST );
+         {
+             extern unsigned long long ios_last_footprint_mb;
+             extern int ios_fast_footprint;
+@@ -17360,6 +17390,7 @@ static inline int mprotect_exec( void *base, size_t size, int unix_prot )
+                 ios_jit_rx_base_global = jit_rx_base;
+                 ios_jit_rw_base_global = jit_rw_base;
+                 ios_jit_pool_size_global = jit_pool_size;
++                __atomic_store_n( &ios_pool_gone, 0, __ATOMIC_SEQ_CST );   /* iDeck: a new pool, warm it */
+ 
+                 /* madeira-bcd split pool: the app names the hole between its two
+                  * debugger regions (see ios_jit_hole_off). Anything malformed is
