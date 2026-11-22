@@ -138,6 +138,7 @@
 		BEEF20261107000000000710 /* EASignIn.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEEF20261107000000000720 /* EASignIn.swift */; };
 		BEEF20261107000000000610 /* EALibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEEF20261107000000000620 /* EALibrary.swift */; };
 		BEEF20261121000000000710 /* UbisoftLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEEF20261121000000000720 /* UbisoftLibrary.swift */; };
+		BEEF20261122000000000810 /* UbisoftDownloader.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEEF20261122000000000820 /* UbisoftDownloader.swift */; };
 		BEEF20261107000000000510 /* EAService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEEF20261107000000000520 /* EAService.swift */; };
 		BEEF20261107000000000410 /* EALicense.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEEF20261107000000000420 /* EALicense.swift */; };
 		BEEF20261107000000000310 /* EAFormats.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEEF20261107000000000320 /* EAFormats.swift */; };
@@ -286,6 +287,7 @@
 		BEEF20261107000000000720 /* EASignIn.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EASignIn.swift; sourceTree = "<group>"; };
 		BEEF20261107000000000620 /* EALibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EALibrary.swift; sourceTree = "<group>"; };
 		BEEF20261121000000000720 /* UbisoftLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UbisoftLibrary.swift; sourceTree = "<group>"; };
+		BEEF20261122000000000820 /* UbisoftDownloader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UbisoftDownloader.swift; sourceTree = "<group>"; };
 		BEEF20261107000000000520 /* EAService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Vendor/Madeira/SwiftEA/EAService.swift"; sourceTree = "<group>"; };
 		BEEF20261107000000000420 /* EALicense.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Vendor/Madeira/SwiftEA/EALicense.swift"; sourceTree = "<group>"; };
 		BEEF20261107000000000320 /* EAFormats.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Vendor/Madeira/SwiftEA/EAFormats.swift"; sourceTree = "<group>"; };
@@ -447,6 +449,7 @@
 				BEEF20261107000000000710 /* EASignIn.swift in Sources */,
 				BEEF20261107000000000610 /* EALibrary.swift in Sources */,
 				BEEF20261121000000000710 /* UbisoftLibrary.swift in Sources */,
+				BEEF20261122000000000810 /* UbisoftDownloader.swift in Sources */,
 				BEEF20261107000000000510 /* EAService.swift in Sources */,
 				BEEF20261107000000000410 /* EALicense.swift in Sources */,
 				BEEF20261107000000000310 /* EAFormats.swift in Sources */,
@@ -616,6 +619,7 @@
 				BEEF20261107000000000720 /* EASignIn.swift */,
 				BEEF20261107000000000620 /* EALibrary.swift */,
 				BEEF20261121000000000720 /* UbisoftLibrary.swift */,
+				BEEF20261122000000000820 /* UbisoftDownloader.swift */,
 				BEEF20261107000000000520 /* EAService.swift */,
 				BEEF20261107000000000420 /* EALicense.swift */,
 				BEEF20261107000000000320 /* EAFormats.swift */,
@@ -814,7 +818,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 2.12.1;
+				MARKETING_VERSION = 2.13.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ideck.ideck.VPNExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -839,7 +843,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 2.12.1;
+				MARKETING_VERSION = 2.13.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ideck.ideck.VPNExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -942,7 +946,7 @@
 					"$(inherited)",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 2.12.1;
+				MARKETING_VERSION = 2.13.0;
 				"OTHER_LDFLAGS[sdk=iphoneos*]" = (
 					"$(inherited)",
 					"-framework",
@@ -972,7 +976,7 @@
 					"$(inherited)",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 2.12.1;
+				MARKETING_VERSION = 2.13.0;
 				"OTHER_LDFLAGS[sdk=iphoneos*]" = (
 					"$(inherited)",
 					"-framework",
@@ -1067,7 +1071,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.12.1;
+				MARKETING_VERSION = 2.13.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ideck.ideck;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -1104,7 +1108,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.12.1;
+				MARKETING_VERSION = 2.13.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ideck.ideck;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;

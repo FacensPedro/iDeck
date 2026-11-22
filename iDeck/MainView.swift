@@ -505,6 +505,12 @@ struct WindowsWorkspaceView: View {
         .onAppear {
             resolvePrefixPath()
         }
+        .onChange(of: ubisoftLibrary.downloadError) { _, message in
+            guard let message else { return }
+            installMessage = message
+            isShowingInstallResult = true
+            ubisoftLibrary.downloadError = nil
+        }
         // A finished Wine session may have installed a game (a GOG installer,
         // a setup program): look for new installs whenever Wine stops.
         .onChange(of: coordinator.windowsStatus) { _, status in
@@ -982,9 +988,14 @@ struct WindowsWorkspaceView: View {
             if let executable = game.executable {
                 let profile = windowsLibrary.profile(for: "ubisoft:\(game.id)", title: game.title)
                 coordinator.launchWindowsProgram(at: executable, profile: profile, detectInstaller: false)
+            } else if let download = ubisoftLibrary.downloads[game.id] {
+                // Tap: pause a running download, resume a paused or failed one.
+                switch download.state {
+                case .active, .queued: ubisoftLibrary.pause(game)
+                case .paused, .failed: ubisoftLibrary.install(game)
+                }
             } else {
-                installMessage = tr("Install it in Ubisoft Connect: Settings › Stores & launchers › Ubisoft Connect.")
-                isShowingInstallResult = true
+                ubisoftLibrary.install(game)
             }
         }
         return VStack(alignment: .leading, spacing: 6) {
@@ -1008,15 +1019,47 @@ struct WindowsWorkspaceView: View {
             }
             .libraryCoverFrame()
             .blur(radius: game.executable == nil && AntiCheatPolicy.isBlocked(title: game.title) ? Self.uninstalledCoverBlur : 0)
+            .overlay(alignment: .bottom) {
+                if let download = ubisoftLibrary.downloads[game.id] { ubisoftDownloadBadge(download) }
+            }
             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             .clipped()
             .contentShape(Rectangle())
             .onTapGesture(perform: open)
+            .contextMenu {
+                if ubisoftLibrary.downloads[game.id] != nil {
+                    Button(role: .destructive) { ubisoftLibrary.cancel(game) } label: {
+                        Label(tr("Stop download"), systemImage: "xmark.circle")
+                    }
+                }
+            }
             Button(action: open) { cardTitle(game.title) }
                 .buttonStyle(.plain)
         }
         .padding(4)
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// A Ubisoft download's state over its cover: the step or the percentage, and a bar.
+    private func ubisoftDownloadBadge(_ download: UbisoftLibrary.Download) -> some View {
+        let text: String
+        switch download.state {
+        case .queued: text = tr("Waiting…")
+        case .active: text = download.total > 0 ? "\(Int(download.fraction * 100))%" : download.step
+        case .paused: text = tr("Paused") + (download.total > 0 ? " · \(Int(download.fraction * 100))%" : "")
+        case .failed: text = tr("Download failed")
+        }
+        return VStack(spacing: 4) {
+            Text(text)
+                .font(.caption.weight(.semibold))
+                .foregroundColor(.white)
+                .lineLimit(1)
+            ProgressView(value: download.fraction)
+                .tint(.white)
+        }
+        .padding(8)
+        .frame(maxWidth: .infinity)
+        .background(Color.black.opacity(0.6))
     }
 
     /// Licence, registry, the EA app's environment and local service, then Wine.

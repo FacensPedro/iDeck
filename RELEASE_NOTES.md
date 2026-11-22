@@ -1,5 +1,6 @@
 ## What's Changed
 ### Ubisoft Connect
+- Ubisoft games now install from the library, like the other stores: tap a game that is not installed and iDeck downloads it straight from Ubisoft's servers. If Ubisoft Connect is not installed yet, it is installed first. A progress bar shows on the cover. Tap the cover to pause or resume, and long-press it to stop the download and remove the files. The game uses the device's language when Ubisoft has it, otherwise English. Signing in to Ubisoft in Settings is required.
 - Ubisoft games show their cover in the library again. Ubisoft's account service gives only the game names, so iDeck finds the same game in Steam's store and uses its portrait cover. Each cover is looked up once and remembered.
 
 ### Tor Browser and Firefox
@@ -13,4 +14,4 @@
 - When a download finishes while iDeck is in the background and a game is started, iDeck now waits until it is back in front to open StikDebug. Before, iOS refused and iDeck wrongly said StikDebug was not installed.
 
 ### Version
-- Updated the application version to 2.12.1 (build 118).
+- Updated the application version to 2.13.0 (build 118).
