@@ -440,6 +440,12 @@ final class WindowsLibraryStore: ObservableObject {
     func uninstallExecutable(at url: URL, prefixPath: URL) throws {
         let directory = prefixPath.appendingPathComponent("drive_c/WindowsDownloads", isDirectory: true).standardizedFileURL
         let target = url.standardizedFileURL
+        // A program an installer put in the prefix (Tor Browser in Program Files or
+        // on the Desktop): its install folder and its shortcuts go.
+        if target.deletingLastPathComponent() != directory {
+            try uninstallInstalledProgram(at: target, prefixPath: prefixPath)
+            return
+        }
         guard target.deletingLastPathComponent() == directory,
               ["exe", "msi"].contains(target.pathExtension.lowercased()),
               target.resolvingSymlinksInPath().deletingLastPathComponent() == directory.resolvingSymlinksInPath() else {
@@ -455,6 +461,64 @@ final class WindowsLibraryStore: ObservableObject {
         try fileManager.removeItem(at: target)
         profiles.removeValue(forKey: id)
         persistProfiles()
+        refresh(prefixPath: prefixPath)
+    }
+
+    /// Folders under drive_c that hold many programs (or Windows itself): never
+    /// removed whole; the program's own folder is the one inside them.
+    nonisolated static let sharedFolders: Set<String> = [
+        "program files", "program files (x86)", "programdata", "users", "windows", "windowsdownloads",
+        "ideck", "external", "common files", "internet explorer", "windows nt", "windows media player",
+        "microsoft", "appdata", "local", "roaming", "locallow", "desktop", "documents", "downloads",
+        "start menu", "programs", "public", "electronic arts", "ea games", "origin games", "ubisoft",
+        "ubisoft game launcher", "epic games", "steam", "steamapps", "common", "gog games", "gog galaxy",
+        "games", "temp", "microsoft.net", "dotnet", "mono",
+    ]
+
+    /// The program's own folder: the first folder on the way from C:\ to the .exe
+    /// that is not a shared one (C:\Program Files\Tor Browser, ...\Desktop\Tor Browser).
+    /// nil when the .exe sits directly in a shared folder or outside drive_c.
+    nonisolated static func installFolder(of exe: URL, drive: URL) -> URL? {
+        let drivePath = drive.resolvingSymlinksInPath().standardizedFileURL.path
+        let exePath = exe.resolvingSymlinksInPath().standardizedFileURL.path
+        guard exePath.hasPrefix(drivePath + "/") else { return nil }
+        let parts = exePath.dropFirst(drivePath.count + 1).split(separator: "/").map(String.init)
+        guard parts.count >= 2 else { return nil }
+        var folder = URL(fileURLWithPath: drivePath, isDirectory: true)
+        for (index, part) in parts.dropLast().enumerated() {
+            folder.appendPathComponent(part, isDirectory: true)
+            let name = part.lowercased()
+            // users\<name> is a user's home, not a program.
+            let isUserHome = index == 1 && parts[0].lowercased() == "users"
+            if !sharedFolders.contains(name) && !isUserHome { return folder }
+        }
+        return nil
+    }
+
+    private func uninstallInstalledProgram(at target: URL, prefixPath: URL) throws {
+        let drive = prefixPath.appendingPathComponent("drive_c", isDirectory: true)
+        guard !ideck_wineprocess_running(),
+              ["exe"].contains(target.pathExtension.lowercased()),
+              let folder = Self.installFolder(of: target, drive: drive) else {
+            throw WindowsLibraryError.unsafePath
+        }
+        // Its shortcuts first, while they can still be matched to the folder.
+        let folderPath = folder.standardizedFileURL.path.lowercased() + "/"
+        for link in WindowsShortcutScanner.shortcutFiles(in: drive)
+        where link.exe.resolvingSymlinksInPath().standardizedFileURL.path.lowercased().hasPrefix(folderPath) {
+            try? fileManager.removeItem(at: link.file)
+        }
+        let id = profileID(for: target)
+        if let artworkFilename = profiles[id]?.artworkFilename {
+            let artwork = artworkDirectory.appendingPathComponent(artworkFilename).standardizedFileURL
+            if artwork.deletingLastPathComponent() == artworkDirectory.standardizedFileURL {
+                try? fileManager.removeItem(at: artwork)
+            }
+        }
+        try fileManager.removeItem(at: folder)
+        profiles.removeValue(forKey: id)
+        persistProfiles()
+        AppLog.record("[uninstall] removed \(folder.lastPathComponent) and its shortcuts")
         refresh(prefixPath: prefixPath)
     }
 
@@ -492,7 +556,7 @@ enum WindowsLibraryError: LocalizedError {
         case .unsupportedExecutable:
             return "Choose a Windows .exe or .msi file."
         case .unsafePath:
-            return "iDeck refused to remove a file outside its Windows library."
+            return tr("iDeck could not find this program's own folder, or a Windows program is still running. Close it and try again.")
         case .unsupportedArtwork:
             return "Choose a PNG, JPG, JPEG or HEIC image for the cover."
         }
@@ -696,6 +760,31 @@ enum WindowsShortcutScanner {
             }
         }
         return found.values.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
+    /// Every Start Menu and Desktop shortcut with the program it opens.
+    static func shortcutFiles(in drive: URL) -> [(file: URL, exe: URL)] {
+        let fm = FileManager.default
+        var roots = ["ProgramData/Microsoft/Windows/Start Menu/Programs", "users/Public/Desktop"]
+        if let users = try? fm.contentsOfDirectory(atPath: drive.appendingPathComponent("users").path) {
+            for user in users {
+                roots.append("users/\(user)/AppData/Roaming/Microsoft/Windows/Start Menu/Programs")
+                roots.append("users/\(user)/Desktop")
+            }
+        }
+        var links: [(file: URL, exe: URL)] = []
+        for root in roots {
+            guard let walker = fm.enumerator(at: drive.appendingPathComponent(root, isDirectory: true),
+                                             includingPropertiesForKeys: nil) else { continue }
+            var count = 0
+            while let item = walker.nextObject() as? URL, count < 2000 {
+                count += 1
+                guard item.pathExtension.lowercased() == "lnk",
+                      let target = target(of: item), let exe = hostURL(target, drive: drive) else { continue }
+                links.append((item, exe))
+            }
+        }
+        return links
     }
 
     /// C:\... -> the file under drive_c, matched without case; nil when missing or not an .exe.
