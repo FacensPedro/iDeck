@@ -38,7 +38,7 @@ class ReleaseInterfaceCDNTests(unittest.TestCase):
 
     def test_long_game_titles_are_truncated_and_header_is_ideck(self):
         start = VIEW.index("    private func cardTitle(_ title: String)")
-        end = VIEW.index("    private func downloadCoverButton(", start)
+        end = VIEW.index("    private var antiCheatCoverBadge", start)
         card = VIEW[start:end]
         # Long names wrap to a second line; every title reserves two lines.
         self.assertIn(".lineLimit(2, reservesSpace: true)", card)

@@ -299,7 +299,7 @@ struct SettingsView: View {
             if UbisoftSavedSession.clear() { ubisoftAccountName = "" }
             return
         }
-        var request = UbisoftSavedSession.request()
+        var request = UbisoftSavedSession.request(appID: saved.appIDUsed ?? UbisoftSavedSession.appIDs[0])
         request.setValue("ubi_rm_v1 t=" + remember, forHTTPHeaderField: "Authorization")
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
@@ -785,6 +785,7 @@ private struct UbisoftLoginView: View {
     @State private var email = ""
     @State private var password = ""
     @State private var challenge: String?
+    @State private var challengeAppID: String?
     @State private var code = ""
     @State private var busy = false
     @State private var error = ""
@@ -822,20 +823,31 @@ private struct UbisoftLoginView: View {
     @MainActor private func authenticate() async {
         defer { busy = false }
         error = ""
-        var login = UbisoftSavedSession.request()
-        if let challenge {
-            login.setValue("ubi_2fa_v1 t=" + challenge, forHTTPHeaderField: "Authorization")
-            login.setValue(code, forHTTPHeaderField: "Ubi-2FACode")
-        } else {
-            let credentials = Data((email.trimmingCharacters(in: .whitespacesAndNewlines) + ":" + password).utf8)
-            login.setValue("Basic " + credentials.base64EncodedString(), forHTTPHeaderField: "Authorization")
-        }
+        // A 2FA answer goes with the Ubi-AppId that asked for it.
+        let candidates = challenge == nil ? UbisoftSavedSession.appIDs : [challengeAppID ?? UbisoftSavedSession.appIDs[0]]
         do {
-            let (data, response) = try await URLSession.shared.data(for: login)
-            try Task.checkCancellation()
+            var data = Data()
+            var response: URLResponse?
+            var usedAppID = candidates[0]
+            for appID in candidates {
+                var login = UbisoftSavedSession.request(appID: appID)
+                if let challenge {
+                    login.setValue("ubi_2fa_v1 t=" + challenge, forHTTPHeaderField: "Authorization")
+                    login.setValue(code, forHTTPHeaderField: "Ubi-2FACode")
+                } else {
+                    let credentials = Data((email.trimmingCharacters(in: .whitespacesAndNewlines) + ":" + password).utf8)
+                    login.setValue("Basic " + credentials.base64EncodedString(), forHTTPHeaderField: "Authorization")
+                }
+                (data, response) = try await URLSession.shared.data(for: login)
+                try Task.checkCancellation()
+                usedAppID = appID
+                let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+                if (200..<300).contains(status) || !UbisoftSavedSession.refusedAppID(data) { break }
+            }
             let fields = try JSONSerialization.jsonObject(with: data) as? [String: Any]
             if let token = fields?["twoFactorAuthenticationTicket"] as? String, !token.isEmpty {
                 challenge = token
+                challengeAppID = usedAppID
                 password = ""
                 return
             }
@@ -845,7 +857,7 @@ private struct UbisoftLoginView: View {
                 error = (fields?["message"] as? String) ?? tr("Sign-in failed")
                 return
             }
-            try UbisoftSavedSession.decode(data).save()
+            try UbisoftSavedSession.decode(data, appID: usedAppID).save()
             accountName = name
             dismiss()
         } catch {
@@ -855,25 +867,41 @@ private struct UbisoftLoginView: View {
 }
 
 struct UbisoftSavedSession: Codable {
-    static let appID = "39baebad-39e5-4552-8c25-2c9b919064e2"
+    /// The Ubi-AppId values tried, in order: Ubisoft Connect for PC first, then
+    /// Ubisoft's web account pages. Ubisoft refused the old one
+    /// ("The Ubi-AppId header is invalid"); the first one Ubisoft accepts is kept
+    /// with the session and used for its renewal and the library.
+    static let appIDs = ["f68a4bb5-608a-4ff2-8123-be8ef797e0a6",
+                         "314d4fef-e568-454a-ae06-43e3bece12a6",
+                         "82b650c0-6cb3-40c0-9f41-25a53b62b206"]
+    static var appID: String { load()?.appIDUsed ?? appIDs[0] }
 
     let name: String
     let ticket: String
     let remember: String?
     let expiry: Date
     let sessionID: String?
+    /// The Ubi-AppId Ubisoft accepted for this session (nil: saved before 2.11.2).
+    var appIDUsed: String?
     var expired: Bool { expiry <= Date() }
 
-    static func request() -> URLRequest {
+    /// Whether Ubisoft refused the request's Ubi-AppId (try the next one).
+    static func refusedAppID(_ data: Data) -> Bool {
+        let text = String(decoding: data, as: UTF8.self).lowercased()
+        return text.contains("ubi-appid") || text.contains("appid")
+    }
+
+    static func request(appID: String = appID) -> URLRequest {
         var login = URLRequest(url: URL(string: "https://public-ubiservices.ubi.com/v3/profiles/sessions")!)
         login.httpMethod = "POST"
         login.setValue("application/json", forHTTPHeaderField: "Content-Type")
         login.setValue(appID, forHTTPHeaderField: "Ubi-AppId")
+        login.setValue("uplay", forHTTPHeaderField: "Ubi-RequestedPlatformType")
         login.httpBody = Data(#"{"rememberMe":true}"#.utf8)
         return login
     }
 
-    static func decode(_ data: Data, previous: Self? = nil) throws -> Self {
+    static func decode(_ data: Data, previous: Self? = nil, appID: String? = nil) throws -> Self {
         let fields = try JSONSerialization.jsonObject(with: data) as? [String: Any]
         guard let name = fields?["nameOnPlatform"] as? String, !name.isEmpty,
               let ticket = fields?["ticket"] as? String, !ticket.isEmpty,
@@ -883,7 +911,8 @@ struct UbisoftSavedSession: Codable {
         format.formatOptions.insert(.withFractionalSeconds)
         guard let expiry = seconds ?? format.date(from: timestamp) else { throw URLError(.cannotParseResponse) }
         return Self(name: name, ticket: ticket, remember: fields?["rememberMeTicket"] as? String ?? previous?.remember,
-                    expiry: expiry, sessionID: fields?["sessionId"] as? String)
+                    expiry: expiry, sessionID: fields?["sessionId"] as? String,
+                    appIDUsed: appID ?? previous?.appIDUsed)
     }
 
     private static var query: [String: Any] {

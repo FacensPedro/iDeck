@@ -329,7 +329,7 @@ struct WindowsWorkspaceView: View {
 
     private var isCompact: Bool { horizontalSizeClass == .compact }
 
-    /// Blur of a cover whose game is not installed.
+    /// Blur of the cover of a game that cannot be installed (Easy Anti-Cheat).
     private static let uninstalledCoverBlur: CGFloat = 1.5
 
     /// Madeira's library lattice: 20 pt between columns, 18 pt between rows.
@@ -348,28 +348,6 @@ struct WindowsWorkspaceView: View {
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .top)
             .accessibilityLabel(title)
-    }
-
-    /// The cover's Install button: only the symbol, a round button in the middle of
-    /// the cover, with no text.
-    private func downloadCoverButton(action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: "arrow.down")
-                .font(.system(size: 20, weight: .bold))
-                .foregroundColor(.white)
-                .frame(width: 46, height: 46)
-                .background(
-                    Circle().fill(LinearGradient(colors: [Color(red: 0.22, green: 0.56, blue: 1.0),
-                                                          Color(red: 0.11, green: 0.38, blue: 0.92)],
-                                                 startPoint: .top, endPoint: .bottom))
-                )
-                .overlay(Circle().strokeBorder(.white.opacity(0.35), lineWidth: 1))
-                .shadow(color: .black.opacity(0.45), radius: 8, y: 3)
-                .contentShape(Circle())
-        }
-        .buttonStyle(.plain)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-        .accessibilityLabel(tr("Install"))
     }
 
     /// In place of the Install button on a game that needs Easy Anti-Cheat: only the
@@ -698,14 +676,11 @@ struct WindowsWorkspaceView: View {
                     Button { selectedSteamGame = SelectedSteamGame(game: game) } label: {
                         SteamGameArtworkView(game: game)
                             .libraryCoverFrame()
-                            .blur(radius: !installed && !steamLibrary.installingApps.contains(game.appID) && !steamLibrary.pausedInstalls.contains(game.appID) && game.installableOnWindows ? Self.uninstalledCoverBlur : 0)
+                            .blur(radius: !installed && AntiCheatPolicy.isBlocked(title: game.name, steamAppID: game.appID) ? Self.uninstalledCoverBlur : 0)
                     }
                     .buttonStyle(.plain)
                     if !installed && AntiCheatPolicy.isBlocked(title: game.name, steamAppID: game.appID) {
                         antiCheatCoverBadge
-                    } else if !installed && !steamLibrary.installingApps.contains(game.appID) &&
-                        !steamLibrary.pausedInstalls.contains(game.appID) && game.installableOnWindows {
-                        downloadCoverButton { install(game) }
                     }
                 }
                 .libraryCoverFrame()
@@ -805,16 +780,11 @@ struct WindowsWorkspaceView: View {
                     Button { selectedGOGGame = game } label: {
                         GOGArtworkView(urls: game.artworkCandidates, fallbackColor: secondaryColor, fill: true)
                             .libraryCoverFrame()
-                            .blur(radius: installed == nil && gogLibrary.downloadProgress[game.id] == nil &&
-                                  !gogLibrary.pausedDownloads.contains(game.id) && game.worksOnWindows ? Self.uninstalledCoverBlur : 0)
+                            .blur(radius: installed == nil && AntiCheatPolicy.isBlocked(title: game.title) ? Self.uninstalledCoverBlur : 0)
                     }
                     .buttonStyle(.plain)
                     if installed == nil && AntiCheatPolicy.isBlocked(title: game.title) {
                         antiCheatCoverBadge
-                    } else if installed == nil && gogLibrary.downloadProgress[game.id] == nil &&
-                        !gogLibrary.pausedDownloads.contains(game.id) && game.worksOnWindows {
-                        downloadCoverButton { downloadGOGInstaller(game) }
-                            .disabled(prefixPath == nil)
                     }
                 }
                 .libraryCoverFrame()
@@ -912,13 +882,11 @@ struct WindowsWorkspaceView: View {
                     Button { selectedEpicGame = SelectedEpicGame(id: game.appName) } label: {
                         GOGArtworkView(urls: [game.cover].compactMap { $0 }, fallbackColor: secondaryColor, fill: true)
                             .libraryCoverFrame()
-                            .blur(radius: installed == nil && download == nil ? Self.uninstalledCoverBlur : 0)
+                            .blur(radius: installed == nil && AntiCheatPolicy.isBlocked(title: game.title, epicAppName: game.appName) ? Self.uninstalledCoverBlur : 0)
                     }
                     .buttonStyle(.plain)
                     if installed == nil && AntiCheatPolicy.isBlocked(title: game.title, epicAppName: game.appName) {
                         antiCheatCoverBadge
-                    } else if installed == nil && download == nil {
-                        downloadCoverButton { epicLibrary.install(game.appName) }
                     }
                 }
                 .libraryCoverFrame()
@@ -979,11 +947,9 @@ struct WindowsWorkspaceView: View {
                         .libraryCoverFrame()
                         .contentShape(Rectangle())
                         .onTapGesture { selectedEAGame = game }
-                        .blur(radius: installed == nil && download == nil ? Self.uninstalledCoverBlur : 0)
+                        .blur(radius: installed == nil && AntiCheatPolicy.isBlocked(title: game.title) ? Self.uninstalledCoverBlur : 0)
                     if installed == nil && AntiCheatPolicy.isBlocked(title: game.title) {
                         antiCheatCoverBadge
-                    } else if installed == nil && download == nil {
-                        downloadCoverButton { eaLibrary.install(game.id) }
                     }
                 }
                 .libraryCoverFrame()
@@ -1035,7 +1001,7 @@ struct WindowsWorkspaceView: View {
                 }
             }
             .libraryCoverFrame()
-            .blur(radius: game.executable == nil ? Self.uninstalledCoverBlur : 0)
+            .blur(radius: game.executable == nil && AntiCheatPolicy.isBlocked(title: game.title) ? Self.uninstalledCoverBlur : 0)
             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             .clipped()
             .contentShape(Rectangle())

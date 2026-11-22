@@ -119,7 +119,7 @@ final class UbisoftLibrary: ObservableObject {
         request.httpMethod = "POST"
         request.timeoutInterval = 30
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue(UbisoftSavedSession.appID, forHTTPHeaderField: "Ubi-AppId")
+        request.setValue(session.appIDUsed ?? UbisoftSavedSession.appIDs[0], forHTTPHeaderField: "Ubi-AppId")
         request.setValue("Ubi_v1 t=" + session.ticket, forHTTPHeaderField: "Authorization")
         if let id = session.sessionID { request.setValue(id, forHTTPHeaderField: "Ubi-SessionId") }
         let query = "query AllGames { viewer { id ownedGames: games(filterBy: {isOwned: true}) "
