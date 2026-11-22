@@ -401,6 +401,7 @@ class WindowsEnvironment {
             setenv("IDECK_JIT_GAME_EXE", binary.lastPathComponent, 1)
             if let steamAppID { setenv("IDECK_JIT_GAME_STEAM", String(steamAppID), 1) } else { unsetenv("IDECK_JIT_GAME_STEAM") }
         }
+        Self.turnOffFirefoxSandbox(binary: binary)
         writeSessionGraphicsConfig(binary: binary, is32Bit: needsWoW64,
                                    steamAppID: steamAppID, steamInstallDirectory: steamInstallDirectory)
 
@@ -689,6 +690,63 @@ class WindowsEnvironment {
         } catch {
             unsetenv("MADEIRA_CFG_GAME")
             SteamLog.event("[wine-launch] could not write the game graphics config: \(error.localizedDescription)")
+        }
+    }
+
+    /// Firefox's sandbox (Tor Browser, Firefox, Waterfox, LibreWolf) cannot work under
+    /// Wine on iOS: its broker writes into the child processes and starts them with a
+    /// restricted token, and Wine refuses both (NtWriteVirtualMemory and
+    /// NtCreateUserProcess return c0000022), so tabs, the GPU process and tor's helpers
+    /// never start. Every launch gets Mozilla's switches that turn the sandboxes off
+    /// (they do nothing for other programs), and a Firefox profile next to the program
+    /// gets a user.js with the same choice and fewer helper processes.
+    static let mozillaSandboxSwitches = [
+        "MOZ_DISABLE_CONTENT_SANDBOX", "MOZ_DISABLE_GPU_SANDBOX", "MOZ_DISABLE_RDD_SANDBOX",
+        "MOZ_DISABLE_SOCKET_PROCESS_SANDBOX", "MOZ_DISABLE_UTILITY_SANDBOX", "MOZ_DISABLE_GMP_SANDBOX",
+        "MOZ_DISABLE_VR_SANDBOX",
+    ]
+    static let firefoxUserJSMarker = "// iDeck: Firefox sandbox off under Wine"
+    static let firefoxUserJS = [
+        firefoxUserJSMarker,
+        "user_pref(\"security.sandbox.content.level\", 0);",
+        "user_pref(\"security.sandbox.gpu.level\", 0);",
+        "user_pref(\"security.sandbox.rdd.level\", 0);",
+        "user_pref(\"security.sandbox.socket.process.level\", 0);",
+        "user_pref(\"security.sandbox.utility.level\", 0);",
+        "user_pref(\"browser.launcherProcess.enabled\", false);",
+        "user_pref(\"layers.gpu-process.enabled\", false);",
+        "user_pref(\"media.rdd-process.enabled\", false);",
+        "user_pref(\"network.process.enabled\", false);",
+        "user_pref(\"fission.autostart\", false);",
+        "user_pref(\"dom.ipc.processCount\", 1);",
+        "// iDeck: end",
+    ].joined(separator: "\n")
+
+    static func turnOffFirefoxSandbox(binary: URL) {
+        for name in mozillaSandboxSwitches { setenv(name, "1", 1) }
+        let folder = binary.deletingLastPathComponent()
+        let fm = FileManager.default
+        // Tor Browser: Browser/firefox.exe, started directly or by "Start Tor Browser.exe".
+        let browser = [folder, folder.appendingPathComponent("Browser")]
+            .first { fm.fileExists(atPath: $0.appendingPathComponent("firefox.exe").path) }
+        guard let browser else { return }
+        let tor = browser.appendingPathComponent("TorBrowser")
+        guard fm.fileExists(atPath: tor.path) else { return }
+        // The profile may not exist before the first start: Firefox fills the folder in.
+        let profiles = [tor.appendingPathComponent("Data/Browser/profile.default")]
+        for profile in profiles {
+            try? fm.createDirectory(at: profile, withIntermediateDirectories: true)
+            let userJS = profile.appendingPathComponent("user.js")
+            var text = (try? String(contentsOf: userJS, encoding: .utf8)) ?? ""
+            guard !text.contains(firefoxUserJSMarker) else { continue }
+            if !text.isEmpty && !text.hasSuffix("\n") { text += "\n" }
+            text += firefoxUserJS + "\n"
+            do {
+                try text.write(to: userJS, atomically: true, encoding: .utf8)
+                SteamLog.event("[firefox] sandbox turned off in the Tor Browser profile (user.js)")
+            } catch {
+                SteamLog.event("[firefox] could not write user.js: \(error.localizedDescription)")
+            }
         }
     }
 

@@ -989,7 +989,13 @@ struct WindowsWorkspaceView: View {
         }
         return VStack(alignment: .leading, spacing: 6) {
             ZStack {
-                if let executable = game.executable {
+                if let cover = game.coverURL {
+                    ArtworkImage(url: cover) { image in
+                        image.resizable().scaledToFill()
+                    } placeholder: {
+                        secondaryColor
+                    }
+                } else if let executable = game.executable {
                     WindowsExecutableArtworkView(executableURL: executable, library: windowsLibrary, fallbackColor: secondaryColor)
                 } else {
                     secondaryColor
