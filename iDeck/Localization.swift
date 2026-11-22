@@ -170,6 +170,7 @@ enum Translations {
         "Could not load the owned games.": ["pt": "Não foi possível carregar os jogos da conta.", "es": "No se pudieron cargar los juegos de la cuenta."],
         "Ubisoft account": ["pt": "Conta Ubisoft", "es": "Cuenta de Ubisoft"],
         "Install it in Settings › Stores & launchers › %@.": ["pt": "Instale em Ajustes › Lojas e launchers › %@.", "es": "Instálalo en Ajustes › Tiendas y launchers › %@."],
+        "Installing %@...": ["pt": "Instalando %@...", "es": "Instalando %@..."],
         "Sign in in Settings › Stores & launchers › %@.": ["pt": "Faça login em Ajustes › Lojas e launchers › %@.", "es": "Inicia sesión en Ajustes › Tiendas y launchers › %@."],
         "Downloading %@ installer...": ["pt": "Baixando o instalador do %@...", "es": "Descargando el instalador de %@..."],
         "Could not download the installer. Check the connection and try again.": ["pt": "Não foi possível baixar o instalador. Verifique a conexão e tente de novo.", "es": "No se pudo descargar el instalador. Revisa la conexión e inténtalo de nuevo."],

@@ -441,6 +441,13 @@ class SystemCoordinator: ObservableObject {
         SessionOutcome.status(status)
         recordBenchmarkMilestone(status)
         let update = {
+            // The launchers install in the background: their session never shows Wine's
+            // screen, and how it ended goes to the setup step and Settings.
+            if self.storeSetupInBackground, status == "Windows Ready" || status.hasPrefix("Execution Error")
+                || status.hasPrefix("Cannot launch") {
+                self.storeSetupInBackground = false
+                self.storeClientError = status == "Windows Ready" ? nil : status
+            }
             if status == "Windows Ready" || status.hasPrefix("Execution Error") || status.hasPrefix("Cannot launch") {
                 self.finishMemorySampling(reason: status == "Windows Ready" ? "the game exited and Wine closed normally" : status)
                 MainActor.assumeIsolated { EALibrary.shared.launchEnded() }
@@ -1277,6 +1284,11 @@ class SystemCoordinator: ObservableObject {
 
     private var requestedStoreClients: [StoreClient] = []
 
+    /// The EA app and Ubisoft Connect are installing in a session that does not show Wine.
+    @Published private(set) var storeSetupInBackground = false
+    /// Why the last background installation of the launchers failed.
+    @Published private(set) var storeClientError: String?
+
     /// Installs the launcher when it is missing. An installed launcher is not opened from
     /// iDeck: its games are on its store page.
     func openStoreClient(_ client: StoreClient) {
@@ -1312,6 +1324,8 @@ class SystemCoordinator: ObservableObject {
                 }
                 self.storeClientDownload = nil
                 StoreClient.prepareInstallEnvironment()
+                self.storeClientError = nil
+                self.storeSetupInBackground = true
                 // The installers register Windows services (EABackgroundService,
                 // UplayService) and ask the service manager whether the system is
                 // usable; a plain session starts none, so the EA app's installer
@@ -1347,7 +1361,8 @@ class SystemCoordinator: ObservableObject {
                 self.launchWindowsExecutable(at: shell, profile: profile, installer: true)
             } catch {
                 self.storeClientDownload = nil
-                self.setWindowsStatus("Execution Error: " + tr("Could not download the installer. Check the connection and try again."))
+                self.storeSetupInBackground = false
+                self.storeClientError = "Execution Error: " + tr("Could not download the installer. Check the connection and try again.")
             }
         }
     }

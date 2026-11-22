@@ -730,8 +730,16 @@ struct StoreClientButton: View {
                 if installed {
                     // The launcher is not opened from iDeck: its games are on its store page.
                     LabeledContent(client.rawValue, value: tr("Installed"))
+                } else if coordinator.storeSetupInBackground {
+                    HStack(spacing: 10) {
+                        ProgressView()
+                        Text(tr("Installing %@...", client.rawValue)).foregroundStyle(.secondary)
+                    }
                 } else {
                     Button(tr("Install")) { openStore(client) }
+                    if let error = coordinator.storeClientError {
+                        Text(error).font(.footnote).foregroundStyle(.orange)
+                    }
                 }
             }
         }

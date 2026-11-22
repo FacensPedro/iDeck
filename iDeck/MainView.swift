@@ -81,7 +81,8 @@ struct MainView: View {
         }
         .fullScreenCover(isPresented: Binding<Bool>(
             get: {
-                coordinator.windowsStatus == "Closing Windows session..." ||
+                // The EA app and Ubisoft Connect install without opening Wine's screen.
+                !coordinator.storeSetupInBackground && (coordinator.windowsStatus == "Closing Windows session..." ||
                 coordinator.windowsStatus == "Steam Running" ||
                 coordinator.windowsStatus == "Running" ||
                 coordinator.windowsStatus == "Wine started; waiting for game..." ||
@@ -93,7 +94,7 @@ struct MainView: View {
                 coordinator.windowsStatus == VisualCRuntimeBootstrap.installStatus ||
                 coordinator.windowsStatus == SystemCoordinator.steamComponentsInstallStatus ||
                 coordinator.windowsStatus.hasPrefix("Visual C++") ||
-                coordinator.windowsStatus.hasPrefix("Execution Error:")
+                coordinator.windowsStatus.hasPrefix("Execution Error:"))
             },
             set: { presented in
                 if !presented && coordinator.windowsStatus != "Windows Ready" &&
@@ -3157,7 +3158,8 @@ private struct IDeckFirstRunSetupView: View {
     // MARK: - Launchers
 
     private var launchersBusy: Bool {
-        coordinator.storeClientDownload != nil || coordinator.windowsStatus.hasPrefix("Running")
+        coordinator.storeClientDownload != nil || coordinator.storeSetupInBackground
+            || coordinator.windowsStatus.hasPrefix("Running")
             || coordinator.windowsStatus.hasPrefix("Wine started") || coordinator.windowsStatus.hasPrefix("Launching")
             || coordinator.windowsStatus.hasPrefix("Preparing executable")
     }
@@ -3179,8 +3181,8 @@ private struct IDeckFirstRunSetupView: View {
                 note(progress)
             } else if launchersBusy {
                 progressNote
-            } else if coordinator.windowsStatus.hasPrefix("Execution Error") {
-                note(coordinator.windowsStatus, warning: true)
+            } else if let error = coordinator.storeClientError {
+                note(error, warning: true)
             }
             if !prefixReady {
                 note("Install Visual C++ first: it prepares the Windows environment.", warning: true)
