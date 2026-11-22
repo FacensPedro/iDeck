@@ -125,7 +125,7 @@ struct EpicInstalledDLC: Codable, Sendable {
 
     @Published private(set) var signedIn = false
     private(set) var accountID: String?
-    @Published private(set) var accountName: String?
+    @Published private(set) var accountName: String? { didSet { PrivacyRedactor.register(accountName) } }
     @Published private(set) var owned: [EpicOwnedGame] = []
     @Published private(set) var installed: [String: EpicInstalledGame] = [:]
     /// Base game app name -> its downloadable DLC the account owns.

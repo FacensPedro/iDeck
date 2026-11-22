@@ -6,6 +6,7 @@
 #import "MadeiraDock/MadeiraDockABI.h"
 #import "NativeRuntime/RuntimeSupport.h"
 #import "NativeRuntime/VCArchiveExtractor.h"
+#import "NativeRuntime/LauncherArchiveExtractor.h"
 
 #import "ZipNative.h"
 #import "EpicChunkBridge.h"

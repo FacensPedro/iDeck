@@ -441,13 +441,6 @@ class SystemCoordinator: ObservableObject {
         SessionOutcome.status(status)
         recordBenchmarkMilestone(status)
         let update = {
-            // The launchers install in the background: their session never shows Wine's
-            // screen, and how it ended goes to the setup step and Settings.
-            if self.storeSetupInBackground, status == "Windows Ready" || status.hasPrefix("Execution Error")
-                || status.hasPrefix("Cannot launch") {
-                self.storeSetupInBackground = false
-                self.storeClientError = status == "Windows Ready" ? nil : status
-            }
             if status == "Windows Ready" || status.hasPrefix("Execution Error") || status.hasPrefix("Cannot launch") {
                 self.finishMemorySampling(reason: status == "Windows Ready" ? "the game exited and Wine closed normally" : status)
                 MainActor.assumeIsolated { EALibrary.shared.launchEnded() }
@@ -1203,35 +1196,149 @@ class SystemCoordinator: ObservableObject {
 
         var installerName: String { downloadURL.lastPathComponent }
 
-        /// Wine's 32-bit cmd.exe, copied to C:\iDeck\ideck-cmd32.exe. Started as the
-        /// session's program it makes the session ARM64, as a 32-bit installer's own
-        /// session is, so the ARM64 services.exe (C:\windows\sysnative) can run in it:
-        /// as children of the x64 cmd.exe services.exe and start.exe stopped at their
-        /// first write (stack overflow, c00000fd). Wine's ARM64 cmd.exe cannot be the
-        /// session's program: iDeck's launcher starts only i386 and x64 programs, and
-        /// rejected it ("invalid Windows launch request", code 22).
-        static func stageInstallerShell(drive: URL = drive) -> URL? {
-            let fm = FileManager.default
-            try? fm.removeItem(at: drive.appendingPathComponent("iDeck/ideck-cmd.exe"))
-            let source = MadeiraRuntime.file("i386-windows/cmd.exe")
-            let target = drive.appendingPathComponent("iDeck/ideck-cmd32.exe")
-            func isI386(_ url: URL) -> Bool { MadeiraRuntime.peMachine(url) == 0x014C }
-            guard isI386(source) else { return nil }
-            if !fm.contentsEqual(atPath: source.path, andPath: target.path) {
-                try? fm.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
-                try? fm.removeItem(at: target)
-                guard (try? fm.copyItem(at: source, to: target)) != nil else { return nil }
+        struct InstallError: Error { let reason: String }
+
+        /// Where the launcher's files go, relative to drive_c.
+        var installFolder: String {
+            switch self {
+            case .ubisoft: return "Program Files (x86)/Ubisoft/Ubisoft Game Launcher"
+            case .ea: return "Program Files/Electronic Arts/EA Desktop"
             }
-            return isI386(target) ? target : nil
         }
 
-        /// The switches that install the launcher without questions: the EA app's
-        /// installer is a WiX Burn bundle, Ubisoft Connect's an NSIS installer. Other
-        /// installers iDeck starts keep their own windows.
-        var silentSwitches: String {
-            switch self {
-            case .ea: return "/quiet /norestart"
-            case .ubisoft: return "/S"
+        /// Downloads the official installer and copies the launcher's files into the
+        /// prefix, as its installer would: Ubisoft Connect's NSIS installer is opened
+        /// on the device; the EA app's installer only names the Windows Installer
+        /// package it downloads, which is downloaded and opened instead.
+        static func installWithoutWine(_ client: StoreClient, progress: @escaping @MainActor (String) -> Void) async throws {
+            let fm = FileManager.default
+            let drive = Self.drive
+            let folder = drive.appendingPathComponent("iDeck", isDirectory: true)
+            try fm.createDirectory(at: folder, withIntermediateDirectories: true)
+            if client.installer == nil {
+                await progress(tr("Downloading %@ installer...", client.rawValue))
+                try await download(client.downloadURL, to: folder.appendingPathComponent(client.installerName))
+            }
+            guard let installer = client.installer else {
+                throw InstallError(reason: tr("The installer is missing or invalid."))
+            }
+            var archive = installer
+            if client == .ea {
+                let manifest = folder.appendingPathComponent("EAappInstaller-manifest.xml")
+                defer { try? fm.removeItem(at: manifest) }
+                try await Task.detached(priority: .userInitiated) {
+                    try check { ideck_burn_manifest(installer.path, manifest.path, $0, $1) }
+                }.value
+                guard let package = packageURL(manifest: (try? String(contentsOf: manifest, encoding: .utf8)) ?? "") else {
+                    throw InstallError(reason: tr("The installer does not name the EA app's package."))
+                }
+                archive = folder.appendingPathComponent(package.lastPathComponent)
+                if !fm.fileExists(atPath: archive.path) {
+                    await progress(tr("Downloading %@...", client.rawValue))
+                    try await download(package, to: archive)
+                }
+            }
+            await progress(tr("Installing %@...", client.rawValue))
+            // Extracted next to drive_c (same volume), then moved into place.
+            let staging = folder.appendingPathComponent(".staging-" + UUID().uuidString, isDirectory: true)
+            try fm.createDirectory(at: staging, withIntermediateDirectories: true)
+            defer { try? fm.removeItem(at: staging) }
+            let target = client == .ubisoft ? staging.appendingPathComponent(client.installFolder, isDirectory: true) : staging
+            try fm.createDirectory(at: target, withIntermediateDirectories: true)
+            let source = archive
+            try await Task.detached(priority: .userInitiated) {
+                if client == .ubisoft {
+                    try check { ideck_nsis_extract(source.path, target.path, $0, $1) }
+                } else {
+                    try check { ideck_msi_extract(source.path, target.path, $0, $1) }
+                }
+            }.value
+            try await Task.detached(priority: .userInitiated) { try merge(staging, into: drive) }.value
+            if client == .ea { try? fm.removeItem(at: archive) }
+            guard client.installedURL != nil else {
+                throw InstallError(reason: tr("The launcher's files were copied, but its program is missing."))
+            }
+            writeRegistry(client)
+        }
+
+        /// Runs an extractor call with an error buffer; a negative result throws its reason.
+        private static func check(_ call: (UnsafeMutablePointer<CChar>, Int) -> Int32) throws {
+            var message = [CChar](repeating: 0, count: 512)
+            let result = message.withUnsafeMutableBufferPointer { call($0.baseAddress!, $0.count) }
+            if result < 0 { throw InstallError(reason: tr(String(cString: message))) }
+        }
+
+        /// The Windows Installer package a Burn manifest downloads, on EA's own server only.
+        static func packageURL(manifest: String) -> URL? {
+            guard let range = manifest.range(of: #"DownloadUrl="https://[^"]+\.msi""#, options: .regularExpression) else { return nil }
+            let value = manifest[range].dropFirst("DownloadUrl=\"".count).dropLast()
+            guard let url = URL(string: String(value)), url.scheme == "https",
+                  url.host == "origin-a.akamaihd.net", url.path.hasPrefix("/EA-Desktop-Client-Download/") else { return nil }
+            return url
+        }
+
+        private static func download(_ url: URL, to target: URL) async throws {
+            let (temporary, response) = try await URLSession.shared.download(from: url)
+            guard (response as? HTTPURLResponse)?.statusCode == 200 else {
+                try? FileManager.default.removeItem(at: temporary)
+                throw CocoaError(.fileReadUnknown)
+            }
+            try? FileManager.default.removeItem(at: target)
+            try FileManager.default.moveItem(at: temporary, to: target)
+        }
+
+        /// Moves every file of `staging` to the same place under `drive`, replacing
+        /// an older copy (a launcher reinstalled over itself).
+        static func merge(_ staging: URL, into drive: URL) throws {
+            let fm = FileManager.default
+            let base = staging.standardizedFileURL.path + "/"
+            guard let walker = fm.enumerator(at: staging, includingPropertiesForKeys: [.isRegularFileKey]) else { return }
+            for case let file as URL in walker {
+                guard (try? file.resourceValues(forKeys: [.isRegularFileKey]))?.isRegularFile == true else { continue }
+                let relative = String(file.standardizedFileURL.path.dropFirst(base.count))
+                guard !relative.isEmpty, !relative.hasPrefix(".") else { continue }
+                let destination = drive.appendingPathComponent(relative)
+                try fm.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try? fm.removeItem(at: destination)
+                try fm.moveItem(at: file, to: destination)
+            }
+        }
+
+        /// The registry values the installer would write: the install folder (read by
+        /// games and by installedURL), and the EA app's background service.
+        static func writeRegistry(_ client: StoreClient, prefix: URL = MadeiraDock.prefix) {
+            guard wine_process_is_running() == 0, wineserver_is_running() == 0 else { return }
+            let windowsFolder = "C:\\" + client.installFolder.replacingOccurrences(of: "/", with: "\\")
+            var values: [SteamInstallValue]
+            switch client {
+            case .ubisoft:
+                values = ["Software\\Wow6432Node\\Ubisoft\\Launcher", "Software\\Ubisoft\\Launcher"].map {
+                    SteamInstallValue(hive: .machine, key: $0, name: "InstallDir", data: .string(windowsFolder + "\\"), followsInstall: true)
+                }
+            case .ea:
+                let service = "System\\CurrentControlSet\\Services\\EABackgroundService"
+                let program = windowsFolder + "\\EA Desktop\\EABackgroundService.exe"
+                values = [
+                    SteamInstallValue(hive: .machine, key: "Software\\Electronic Arts\\EA Desktop", name: "InstallLocation",
+                                      data: .string(windowsFolder), followsInstall: true),
+                    SteamInstallValue(hive: .machine, key: "Software\\Electronic Arts\\EA Desktop", name: "InstallSuccessful",
+                                      data: .string("true"), followsInstall: false),
+                    SteamInstallValue(hive: .machine, key: service, name: "Type", data: .dword(0x110), followsInstall: false),
+                    SteamInstallValue(hive: .machine, key: service, name: "Start", data: .dword(3), followsInstall: false),
+                    SteamInstallValue(hive: .machine, key: service, name: "ErrorControl", data: .dword(1), followsInstall: false),
+                    SteamInstallValue(hive: .machine, key: service, name: "ImagePath",
+                                      data: .string("\"" + program + "\" -start"), followsInstall: true),
+                    SteamInstallValue(hive: .machine, key: service, name: "DisplayName",
+                                      data: .string("EABackgroundService"), followsInstall: false),
+                    SteamInstallValue(hive: .machine, key: service, name: "ObjectName",
+                                      data: .string("LocalSystem"), followsInstall: false),
+                ]
+            }
+            do {
+                let changed = try EARegistry.write(values, prefix: prefix)
+                AppLog.record("[store-setup] \(client.rawValue): \(changed) registry line(s) written")
+            } catch {
+                AppLog.record("[store-setup] \(client.rawValue): registry not written: \(error.localizedDescription)")
             }
         }
 
@@ -1283,9 +1390,7 @@ class SystemCoordinator: ObservableObject {
     /// The store client whose installer is downloading, and its progress text.
     @Published private(set) var storeClientDownload: String?
 
-    private var requestedStoreClients: [StoreClient] = []
-
-    /// The EA app and Ubisoft Connect are installing in a session that does not show Wine.
+    /// The EA app and Ubisoft Connect are installing (downloaded and copied on the device, without Wine).
     @Published private(set) var storeSetupInBackground = false
     /// Why the last background installation of the launchers failed.
     @Published private(set) var storeClientError: String?
@@ -1297,74 +1402,38 @@ class SystemCoordinator: ObservableObject {
         installDefaultStoreClients([client])
     }
 
+    /// Installs the EA app and Ubisoft Connect without Wine or JIT: each official
+    /// installer is downloaded and opened on the device (LauncherArchiveExtractor),
+    /// its files are copied into the prefix and its registry values written. No
+    /// Windows program runs, so nothing waits for StikDebug or a Metal surface.
     func installDefaultStoreClients(_ clients: [StoreClient] = StoreClient.allCases) {
-        guard !isClosingWindowsSession, !ideck_wineprocess_running(), storeClientDownload == nil else { return }
+        guard !isClosingWindowsSession, !ideck_wineprocess_running(), storeClientDownload == nil,
+              !storeSetupInBackground else { return }
         let missing = clients.filter { $0.installedURL == nil }
         guard !missing.isEmpty else { return }
+        storeSetupInBackground = true
+        storeClientError = nil
         Task { @MainActor [weak self] in
             guard let self else { return }
-            let folder = StoreClient.drive.appendingPathComponent("iDeck", isDirectory: true)
-            let fm = FileManager.default
-            do {
-                try fm.createDirectory(at: folder, withIntermediateDirectories: true)
-                for client in missing where client.installer == nil {
-                    self.storeClientDownload = tr("Downloading %@ installer...", client.rawValue)
-                    let (temporary, response) = try await URLSession.shared.download(from: client.downloadURL)
-                    guard (response as? HTTPURLResponse)?.statusCode == 200 else {
-                        throw CocoaError(.fileReadUnknown)
-                    }
-                    let target = folder.appendingPathComponent(client.installerName)
-                    try? fm.removeItem(at: target)
-                    try fm.moveItem(at: temporary, to: target)
-                    guard client.installer != nil else {
-                        try? fm.removeItem(at: target)
-                        self.storeClientDownload = nil
-                        self.setWindowsStatus("Execution Error: " + client.rawValue + " installer missing or invalid.")
-                        return
-                    }
-                }
-                self.storeClientDownload = nil
-                StoreClient.prepareInstallEnvironment()
-                self.storeClientError = nil
-                self.storeSetupInBackground = true
-                // The installers register Windows services (EABackgroundService,
-                // UplayService) and ask the service manager whether the system is
-                // usable; a plain session starts none, so the EA app's installer
-                // found no Windows environment to install into. In an ARM64 session
-                // services.exe starts first, then each installer, without questions.
-                let installerShell = StoreClient.stageInstallerShell()
-                if installerShell == nil, missing.count == 1, let client = missing.first, let installer = client.installer {
-                    AppLog.record("[store-setup] no 32-bit cmd.exe at \(MadeiraRuntime.file("i386-windows/cmd.exe").path): \(client.installerName) starts without the service manager")
-                    self.requestedStoreClients = missing
-                    var profile = WindowsGameProfile(id: "ideck:store-setup", title: client.rawValue)
-                    profile.arguments = client.silentSwitches
-                    profile.keepChildProcessesRunning = true
-                    self.launchWindowsExecutable(at: installer, profile: profile, installer: true)
-                    return
-                }
-                var commands = ["@echo off"]
-                // The 32-bit shell sees system32 as syswow64: sysnative is the ARM64 system32.
-                if installerShell != nil { commands.append(#"start "" "C:\windows\sysnative\services.exe""#) }
-                for client in missing {
-                    let program = "\"C:\\iDeck\\" + client.installerName + "\" " + client.silentSwitches
-                    // Without start.exe (x64 shell), cmd waits for a program a batch runs.
-                    commands.append(installerShell != nil ? "start /wait \"\" " + program : program)
-                    commands.append("if errorlevel 1 echo " + client.rawValue + " installer returned %errorlevel%")
-                }
-                guard let shell = installerShell ?? MadeiraDock.stageCommandShell() else { throw CocoaError(.fileNoSuchFile) }
-                try (commands.joined(separator: "\r\n") + "\r\n").write(
-                    to: folder.appendingPathComponent("install-store-clients.cmd"), atomically: true, encoding: .utf8)
-                var profile = WindowsGameProfile(id: "ideck:store-setup", title: missing.map(\.rawValue).joined(separator: " / "))
-                profile.arguments = #"/d /c C:\iDeck\install-store-clients.cmd"#
-                // The launcher an installer starts at its end keeps running after it.
-                profile.keepChildProcessesRunning = true
-                self.requestedStoreClients = missing
-                self.launchWindowsExecutable(at: shell, profile: profile, installer: true)
-            } catch {
+            defer {
                 self.storeClientDownload = nil
                 self.storeSetupInBackground = false
-                self.storeClientError = "Execution Error: " + tr("Could not download the installer. Check the connection and try again.")
             }
+            for client in missing {
+                do {
+                    try await StoreClient.installWithoutWine(client) { [weak self] text in
+                        self?.storeClientDownload = text
+                    }
+                    AppLog.record("[store-setup] \(client.rawValue) installed without Wine")
+                } catch {
+                    let reason = (error as? StoreClient.InstallError)?.reason
+                        ?? tr("Could not download the installer. Check the connection and try again.")
+                    AppLog.record("[store-setup] \(client.rawValue) not installed: \(reason)")
+                    self.storeClientError = "Execution Error: " + client.rawValue + ": " + reason
+                    return
+                }
+            }
+            StoreClient.prepareInstallEnvironment()
         }
     }
 
@@ -2282,14 +2351,6 @@ class SystemCoordinator: ObservableObject {
             }
         }
         var outcome = wineExitResult()
-        if endedGame == "ideck:store-setup" {
-            let absent = requestedStoreClients.filter { $0.installedURL == nil }
-            requestedStoreClients = []
-            if !absent.isEmpty {
-                outcome.reason = "Execution Error: " + absent.map(\.rawValue).joined(separator: ", ")
-                    + " installation did not finish. Open the store to retry."
-            }
-        }
         // EA app games that close by themselves (licence, anti-cheat, missing EA app)
         // used to return to the library with no word: say what went wrong and keep
         // the session screen open on it.

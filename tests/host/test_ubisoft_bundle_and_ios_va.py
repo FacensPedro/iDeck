@@ -14,7 +14,7 @@ class UbisoftConnectBundleTests(unittest.TestCase):
         self.assertNotIn("bundle_ubisoft_connect.sh", build)
         self.assertNotIn("EAappInstaller.exe", build)
         coordinator = text("iDeck/SystemCoordinator.swift")
-        self.assertIn("URLSession.shared.download(from: client.downloadURL)", coordinator)
+        self.assertIn("try await download(client.downloadURL, to: folder.appendingPathComponent(client.installerName))", coordinator)
 
     def test_ubisoft_install_detection(self):
         coordinator = text("iDeck/SystemCoordinator.swift")
@@ -26,30 +26,19 @@ class UbisoftConnectBundleTests(unittest.TestCase):
         step = view[view.index("private var launchersStep: some View"):view.index("// MARK: - JIT")]
         self.assertIn("coordinator.installDefaultStoreClients()", step)
         coordinator = text("iDeck/SystemCoordinator.swift")
-        self.assertIn('case .ea: return "/quiet /norestart"', coordinator)
-        self.assertIn('case .ubisoft: return "/S"', coordinator)
-        self.assertIn('MadeiraRuntime.file("i386-windows/cmd.exe")', coordinator)
-        self.assertIn(r'C:\windows\sysnative\services.exe', coordinator)
-        self.assertNotIn("stageNativeShell", coordinator)
+        # No Windows program runs: no silent switches, no cmd.exe, no services.exe.
+        self.assertNotIn('MadeiraRuntime.file("i386-windows/cmd.exe")', coordinator)
+        self.assertNotIn("silentSwitches", coordinator)
 
-    def test_launchers_install_without_wine_screen(self):
+    def test_launchers_install_without_wine(self):
         view = text("iDeck/MainView.swift")
-        self.assertIn("!coordinator.storeSetupInBackground && (coordinator.windowsStatus", view)
+        self.assertNotIn("!coordinator.storeSetupInBackground && (coordinator.windowsStatus", view)
+        self.assertNotIn("BackgroundStoreSetupSurface", view)
         coordinator = text("iDeck/SystemCoordinator.swift")
-        self.assertIn("self.storeSetupInBackground = true", coordinator)
-        self.assertIn("self.storeClientError = status == \"Windows Ready\" ? nil : status", coordinator)
+        self.assertIn("storeSetupInBackground = true", coordinator)
         settings = text("iDeck/SettingsView.swift")
         self.assertIn("NavigationLink { ubisoftPage }", settings)
         self.assertIn("StoreClientButton(client: .ea", settings)
-
-    def test_background_launcher_install_has_hidden_metal_surface(self):
-        view = text("iDeck/MainView.swift")
-        self.assertIn("WindowsRendererView(hiddenSurface: true)", view)
-        self.assertEqual(view.count(".background(BackgroundStoreSetupSurface(coordinator: coordinator))"), 2)
-        renderer = text("iDeck/WindowsRendererView.swift")
-        self.assertIn("host.isHidden = viewport.hiddenSurface", renderer)
-        self.assertIn("_ = show(viewport.hiddenSurface ? 1 : 0)", renderer)
-        self.assertIn("attachViewport(next)", renderer)
 
     def test_dock_installs_bundled_launcher_silently(self):
         src = text("iDeck/Vendor/Madeira/DockInstallers.swift")

@@ -123,6 +123,7 @@
 		BEEF00000000000000000001 /* WindowsLaunchArguments.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEEF00000000000000000002 /* WindowsLaunchArguments.swift */; };
 		DAD020261110000000000001 /* RuntimeFileUtilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAD020261110000000000002 /* RuntimeFileUtilities.swift */; };
 		AC100000000000000000010 /* VCArchiveExtractor.c in Sources */ = {isa = PBXBuildFile; fileRef = AC200000000000000000010 /* VCArchiveExtractor.c */; };
+		AC100000000000000000099 /* LauncherArchiveExtractor.c in Sources */ = {isa = PBXBuildFile; fileRef = AC200000000000000000099 /* LauncherArchiveExtractor.c */; };
 		AC100000000000000000011 /* cabd.c in Sources */ = {isa = PBXBuildFile; fileRef = AC200000000000000000011 /* cabd.c */; };
 		AC100000000000000000012 /* cabc.c in Sources */ = {isa = PBXBuildFile; fileRef = AC200000000000000000012 /* cabc.c */; };
 		AC100000000000000000013 /* system.c in Sources */ = {isa = PBXBuildFile; fileRef = AC200000000000000000013 /* system.c */; };
@@ -270,6 +271,7 @@
 		BEEF00000000000000000002 /* WindowsLaunchArguments.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowsLaunchArguments.swift; sourceTree = "<group>"; };
 		DAD020261110000000000002 /* RuntimeFileUtilities.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeFileUtilities.swift; sourceTree = "<group>"; };
 		AC200000000000000000010 /* VCArchiveExtractor.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = NativeRuntime/VCArchiveExtractor.c; sourceTree = "<group>"; };
+		AC200000000000000000099 /* LauncherArchiveExtractor.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = NativeRuntime/LauncherArchiveExtractor.c; sourceTree = "<group>"; };
 		AC200000000000000000011 /* cabd.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = ThirdParty/libmspack/cabd.c; sourceTree = "<group>"; };
 		AC200000000000000000012 /* cabc.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = ThirdParty/libmspack/cabc.c; sourceTree = "<group>"; };
 		AC200000000000000000013 /* system.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = ThirdParty/libmspack/system.c; sourceTree = "<group>"; };
@@ -466,6 +468,7 @@
 				BEEF20261107000000000001 /* NativeSymbol.swift in Sources */,
 				BEEF20261106000000000101 /* WineMono.swift in Sources */,
 				AC100000000000000000010 /* VCArchiveExtractor.c in Sources */,
+				AC100000000000000000099 /* LauncherArchiveExtractor.c in Sources */,
 				AC100000000000000000011 /* cabd.c in Sources */,
 				AC100000000000000000012 /* cabc.c in Sources */,
 				AC100000000000000000013 /* system.c in Sources */,
@@ -635,6 +638,7 @@
 				BEEF20261107000000000002 /* NativeSymbol.swift */,
 				BEEF20261106000000000102 /* WineMono.swift */,
 				AC200000000000000000010 /* VCArchiveExtractor.c */,
+				AC200000000000000000099 /* LauncherArchiveExtractor.c */,
 				AC200000000000000000011 /* cabd.c */,
 				AC200000000000000000012 /* cabc.c */,
 				AC200000000000000000013 /* system.c */,

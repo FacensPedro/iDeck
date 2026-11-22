@@ -123,9 +123,9 @@ enum Translations {
         "Last Wine log indicates a missing or incompatible DLL.": ["pt": "O último log do Wine indica uma DLL ausente ou incompatível.", "es": "El último registro de Wine indica una DLL ausente o incompatible."],
         "A 32-bit Windows program could not reserve its WoW64 address window. The iOS device's virtual address space is insufficient for the current Madeira memory policy.": ["pt": "Um programa Windows de 32 bits não conseguiu reservar a janela de endereços WoW64. O espaço de endereçamento virtual do dispositivo iOS é insuficiente para a política de memória atual do Madeira.", "es": "Un programa Windows de 32 bits no pudo reservar la ventana de direcciones WoW64. El espacio de direcciones virtuales del dispositivo iOS es insuficiente para la política de memoria actual de Madeira."],
         "Wine/FEX encountered an unhandled native ARM64EC exception (x18 handler) and terminated with NTSTATUS 0xC000001D. This is a runtime compatibility failure, not proof of a missing game DLL.": ["pt": "O Wine/FEX encontrou uma exceção nativa ARM64EC não tratada (manipulador x18) e terminou com NTSTATUS 0xC000001D. É uma falha de compatibilidade do runtime, não uma indicação de DLL ausente.", "es": "Wine/FEX encontró una excepción nativa ARM64EC no controlada (manejador x18) y terminó con NTSTATUS 0xC000001D. Es un fallo de compatibilidad del runtime, no una prueba de DLL ausente."],
-        "Wine logs can contain personal or account information. Review before sharing.": [
-            "pt": "Os logs podem conter informações pessoais ou da conta. Revise antes de compartilhar.",
-            "es": "Los registros pueden contener información personal o de cuenta. Revísalos antes de compartir."
+        "Passwords, account names, e-mail and IP addresses are removed from copied and shared logs.": [
+            "pt": "Senhas, nomes de conta, e-mails e endereços IP são removidos dos logs copiados e compartilhados.",
+            "es": "Las contraseñas, los nombres de cuenta, los correos y las direcciones IP se eliminan de los registros copiados y compartidos."
         ],
         "Checking existing files %d%%": ["pt": "Verificando arquivos existentes %d%%", "es": "Verificando archivos existentes %d%%"],
         "Installed: %@": ["pt": "Instalado: %@", "es": "Instalado: %@"],
@@ -172,6 +172,10 @@ enum Translations {
         "Install it in Settings › Stores & launchers › %@.": ["pt": "Instale em Ajustes › Lojas e launchers › %@.", "es": "Instálalo en Ajustes › Tiendas y launchers › %@."],
         "Installing %@...": ["pt": "Instalando %@...", "es": "Instalando %@..."],
         "Sign in in Settings › Stores & launchers › %@.": ["pt": "Faça login em Ajustes › Lojas e launchers › %@.", "es": "Inicia sesión en Ajustes › Tiendas y launchers › %@."],
+        "Downloading %@...": ["pt": "Baixando %@...", "es": "Descargando %@..."],
+        "The installer is missing or invalid.": ["pt": "O instalador está faltando ou é inválido.", "es": "Falta el instalador o no es válido."],
+        "The installer does not name the EA app's package.": ["pt": "O instalador não indica o pacote do EA app.", "es": "El instalador no indica el paquete de la EA app."],
+        "The launcher's files were copied, but its program is missing.": ["pt": "Os arquivos do launcher foram copiados, mas o programa dele está faltando.", "es": "Se copiaron los archivos del launcher, pero falta su programa."],
         "Downloading %@ installer...": ["pt": "Baixando o instalador do %@...", "es": "Descargando el instalador de %@..."],
         "Could not download the installer. Check the connection and try again.": ["pt": "Não foi possível baixar o instalador. Verifique a conexão e tente de novo.", "es": "No se pudo descargar el instalador. Revisa la conexión e inténtalo de nuevo."],
         "Download paused": ["pt": "Download pausado", "es": "Descarga pausada"],

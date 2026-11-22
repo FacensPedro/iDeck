@@ -39,7 +39,7 @@ enum AppLog {
     /// or ids) is left out, and a run of repeats in a row ends with one
     /// "repeated N more times" line, so the log stays short.
     static func record(_ message: String) {
-        let text = message.replacingOccurrences(of: "\n", with: " ⏎ ")
+        let text = PrivacyRedactor.redact(message.replacingOccurrences(of: "\n", with: " ⏎ "))
         let date = Date()
         queue.async {
             let key = LogIssueScanner.normalized(text.lowercased())
@@ -339,7 +339,7 @@ final class BugReportModel: ObservableObject {
     }
 
     func copy(_ issue: LogIssue) {
-        UIPasteboard.general.string = report(for: [issue])
+        UIPasteboard.general.string = PrivacyRedactor.redact(report(for: [issue]))
         notice = tr("Bug copied to the clipboard.")
     }
 
@@ -485,6 +485,7 @@ final class BugReportModel: ObservableObject {
 
     /// A paste-ready report: device, app build and the selected problems.
     private func report(for selected: [LogIssue]) -> String {
+        PrivacyRedactor.register(SteamSignIn.accountName)
         let info = Bundle.main.infoDictionary
         let version = (info?["CFBundleShortVersionString"] as? String ?? "?") + " (" + (info?["CFBundleVersion"] as? String ?? "?") + ")"
         var lines = [

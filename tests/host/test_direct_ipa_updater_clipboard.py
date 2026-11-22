@@ -41,7 +41,7 @@ class DirectIPAUpdaterAndClipboardTests(unittest.TestCase):
         self.assertIn('registerFileRepresentation', helper)
         self.assertIn('name: String = "Wine-log"', helper)
         self.assertIn('suggestedName = name + ".txt"', helper)
-        self.assertIn('ShareLink(item: logURL)', view)
+        self.assertIn('ShareLink(item: RedactedLogFile(url: logURL)', view)
         self.assertIn("maximumCopiedBytes = 4 * 1024 * 1024", helper)
         self.assertIn("isSymbolicLink != true", helper)
         self.assertEqual(project.count("WineLogClipboard.swift in Sources */,"), 1)

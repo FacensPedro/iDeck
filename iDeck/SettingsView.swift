@@ -425,7 +425,8 @@ struct SettingsView: View {
             settingsSection(title: tr("Controller")) {
                 Picker(tr("Windows controller API"), selection: $wineControllerAPI) {
                     ForEach(["By controller", "XInput", "XInput + DirectInput", "HID", "DualSense HID", "Generic HID"], id: \.self) { api in
-                        Text(tr(api)).tag(api)
+                        // "By controller" (the stored value) picks the API from the pad itself.
+                        Text(api == "By controller" ? tr("Automatic") : tr(api)).tag(api)
                     }
                 }
                 LabeledContent(tr("Connected controller")) {

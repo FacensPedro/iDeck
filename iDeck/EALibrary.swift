@@ -46,7 +46,7 @@ struct EAInstalledGame: Codable, Sendable {
     static var enabled: Bool { SteamSignIn.flag("MADEIRA_EA", default: true) }
 
     @Published private(set) var signedIn = false
-    @Published private(set) var accountName: String?
+    @Published private(set) var accountName: String? { didSet { PrivacyRedactor.register(accountName) } }
     @Published private(set) var owned: [EAOwnedGame] = []
     @Published private(set) var installed: [String: EAInstalledGame] = [:]
     @Published private(set) var refreshing = false

@@ -83,7 +83,7 @@ class SettingsAndDiagnosticsTests(unittest.TestCase):
         bugs = read("iDeck/BugReportView.swift")
         self.assertIn('appendingPathComponent("iDeck-app-log.txt"', bugs)
         self.assertIn('appendingPathComponent("madeira-log.txt"', bugs)
-        self.assertIn("UIPasteboard.general.string = report(for: [issue])", bugs)
+        self.assertIn("UIPasteboard.general.string = PrivacyRedactor.redact(report(for: [issue]))", bugs)
         self.assertIn("static let maximumBytes: UInt64 = 512 * 1024", bugs)
         # Madeira's SteamLog writes to LogStore, which iDeck forwards to AppLog.
         self.assertIn("LogStore.shared.log(message)", read("iDeck/SwiftSteam/Helpers/SteamLog.swift"))

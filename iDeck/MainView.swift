@@ -38,9 +38,6 @@ struct MainView: View {
         .onChange(of: firstRunSetupComplete) { _, complete in
             if !complete { isFirstRunSetupPresented = true }
         }
-        // Wine needs a Metal layer before it starts, even when its screen is
-        // never shown (the EA app and Ubisoft Connect installing in the background).
-        .background(BackgroundStoreSetupSurface(coordinator: coordinator))
         .fullScreenCover(isPresented: $isFirstRunSetupPresented) {
             IDeckFirstRunSetupView(coordinator: coordinator) {
                 firstRunSetupComplete = true
@@ -84,8 +81,7 @@ struct MainView: View {
         }
         .fullScreenCover(isPresented: Binding<Bool>(
             get: {
-                // The EA app and Ubisoft Connect install without opening Wine's screen.
-                !coordinator.storeSetupInBackground && (coordinator.windowsStatus == "Closing Windows session..." ||
+                coordinator.windowsStatus == "Closing Windows session..." ||
                 coordinator.windowsStatus == "Steam Running" ||
                 coordinator.windowsStatus == "Running" ||
                 coordinator.windowsStatus == "Wine started; waiting for game..." ||
@@ -97,7 +93,7 @@ struct MainView: View {
                 coordinator.windowsStatus == VisualCRuntimeBootstrap.installStatus ||
                 coordinator.windowsStatus == SystemCoordinator.steamComponentsInstallStatus ||
                 coordinator.windowsStatus.hasPrefix("Visual C++") ||
-                coordinator.windowsStatus.hasPrefix("Execution Error:"))
+                coordinator.windowsStatus.hasPrefix("Execution Error:")
             },
             set: { presented in
                 if !presented && coordinator.windowsStatus != "Windows Ready" &&
@@ -112,22 +108,6 @@ struct MainView: View {
 
 
 
-}
-
-/// A hidden Metal surface for the launchers' background install: Wine starts
-/// only once a layer is registered, and GameSessionView (which normally holds
-/// it) stays closed so Wine's screen never opens.
-private struct BackgroundStoreSetupSurface: View {
-    @ObservedObject var coordinator: SystemCoordinator
-
-    var body: some View {
-        if coordinator.storeSetupInBackground {
-            WindowsRendererView(hiddenSurface: true)
-                .ignoresSafeArea()
-                .allowsHitTesting(false)
-                .accessibilityHidden(true)
-        }
-    }
 }
 
 struct SteamGameArtworkView: View {
@@ -370,31 +350,61 @@ struct WindowsWorkspaceView: View {
             .accessibilityLabel(title)
     }
 
+    /// The cover's Install button: a small capsule at the bottom of the cover, so the
+    /// artwork stays visible (it was a large white disc over its middle).
     private func downloadCoverButton(action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Image("DownloadCloud")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 48, height: 48)
-                .padding(8)
-                .background(.white)
-                .clipShape(Circle())
-                .shadow(color: .black.opacity(0.5), radius: 12, y: 4)
+            HStack(spacing: 5) {
+                Image(systemName: "arrow.down.circle.fill")
+                    .font(.system(size: 14, weight: .semibold))
+                Text(tr("Install"))
+                    .font(.caption.weight(.bold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+            }
+            .foregroundColor(.white)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(
+                Capsule().fill(LinearGradient(colors: [Color(red: 0.22, green: 0.56, blue: 1.0),
+                                                       Color(red: 0.11, green: 0.38, blue: 0.92)],
+                                              startPoint: .top, endPoint: .bottom))
+            )
+            .overlay(Capsule().strokeBorder(.white.opacity(0.28), lineWidth: 0.5))
+            .shadow(color: .black.opacity(0.45), radius: 6, y: 2)
+            .contentShape(Capsule())
         }
         .buttonStyle(.plain)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+        .padding(.bottom, 10)
+        .padding(.horizontal, 8)
         .accessibilityLabel(tr("Install"))
     }
 
-    /// In place of the download button on a game that needs Easy Anti-Cheat: the
-    /// download symbol struck through, not tappable.
+    /// In place of the Install button on a game that needs Easy Anti-Cheat: the same
+    /// capsule, grey and red, not tappable.
     private var antiCheatCoverBadge: some View {
-        AntiCheatBlockedSymbol(size: 48)
-            .padding(8)
-            .background(Color(white: 0.85))
-            .clipShape(Circle())
-            .shadow(color: .black.opacity(0.5), radius: 12, y: 4)
-            .allowsHitTesting(false)
-            .accessibilityLabel(tr(AntiCheatPolicy.shortMessage))
+        HStack(spacing: 5) {
+            Image(systemName: "nosign")
+                .font(.system(size: 13, weight: .bold))
+                .foregroundColor(Color(red: 1.0, green: 0.42, blue: 0.4))
+            Text(tr("Cannot install"))
+                .font(.caption.weight(.semibold))
+                .foregroundColor(.white.opacity(0.92))
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        }
+        .padding(.horizontal, 11)
+        .padding(.vertical, 7)
+        .background(.ultraThinMaterial, in: Capsule())
+        .background(Capsule().fill(Color.black.opacity(0.45)))
+        .overlay(Capsule().strokeBorder(Color(red: 1.0, green: 0.42, blue: 0.4).opacity(0.55), lineWidth: 0.75))
+        .shadow(color: .black.opacity(0.4), radius: 6, y: 2)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+        .padding(.bottom, 10)
+        .padding(.horizontal, 8)
+        .allowsHitTesting(false)
+        .accessibilityLabel(tr(AntiCheatPolicy.shortMessage))
     }
 
     /// A collapsible "owned games" header (store, count, chevron).
@@ -2886,7 +2896,6 @@ private struct IDeckFirstRunSetupView: View {
             coordinator.refreshPairingFileState()
             wineMono.refresh()
         }
-        .background(BackgroundStoreSetupSurface(coordinator: coordinator))
         .task {
             // The launchers' rows follow what their installers put in the prefix.
             while !Task.isCancelled {

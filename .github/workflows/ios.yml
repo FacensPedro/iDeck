@@ -269,6 +269,17 @@ jobs:
           xcrun clang -std=c99 -I . -c tests/host/VisualCRuntimeCABHostTests.c \
             -o /tmp/ideck-vcrt-objects/VisualCRuntimeCABHostTests.o
           xcrun clang /tmp/ideck-vcrt-objects/*.o -o /tmp/ideck-vcrt-extractor-tests
+          # The EA app's and Ubisoft Connect's installers, opened without Wine.
+          mkdir -p /tmp/ideck-launcher-objects
+          cp /tmp/ideck-vcrt-objects/{cabd,system,mszipd,lzxd,qtmd,crc32}.o /tmp/ideck-launcher-objects/
+          xcrun clang -std=c99 -D_POSIX_C_SOURCE=200809L -Wall -Wextra -Werror \
+            -I iDeck/ThirdParty/libmspack \
+            -c iDeck/NativeRuntime/LauncherArchiveExtractor.c \
+            -o /tmp/ideck-launcher-objects/LauncherArchiveExtractor.o
+          xcrun clang -std=c99 -I . -c tests/host/LauncherArchiveHostTests.c \
+            -o /tmp/ideck-launcher-objects/LauncherArchiveHostTests.o
+          xcrun clang /tmp/ideck-launcher-objects/*.o -lz -o /tmp/ideck-launcher-extractor-tests
+          IDECK_LAUNCHER_EXTRACTOR=/tmp/ideck-launcher-extractor-tests python3 tests/host/test_launcher_archive_extractor.py
           python3 tests/host/test_vcrt_cab_extractor.py /tmp/ideck-vcrt-extractor-tests
           xcrun swiftc -import-objc-header iDeck/NativeRuntime/VCArchiveExtractor.h \
             iDeck/VisualCRuntimeBootstrap.swift tests/host/VisualCRuntimeBootstrapTests.swift \
