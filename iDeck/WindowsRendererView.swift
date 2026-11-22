@@ -34,6 +34,10 @@ private final class MadeiraWindowMetalHost: UIView {
 
 private final class MadeiraMetalViewport: UIView {
     var generation = 0
+    /// A viewport for a session whose screen is never shown (the EA app and
+    /// Ubisoft Connect installing in the background): Wine gets its Metal
+    /// layer, but the layer stays hidden and the compositor presents nothing.
+    var hiddenSurface = false
 
     override func didMoveToWindow() {
         super.didMoveToWindow()
@@ -52,6 +56,8 @@ private final class MadeiraMetalViewport: UIView {
 
 struct WindowsRendererView: UIViewRepresentable {
     fileprivate static weak var activeViewport: MadeiraMetalViewport?
+    private static let viewports = NSHashTable<MadeiraMetalViewport>.weakObjects()
+    var hiddenSurface = false
     private static var nextGeneration = 0
     private static var layerRegistered = false
     private static var lastGuestSize: CGSize?
@@ -177,7 +183,7 @@ struct WindowsRendererView: UIViewRepresentable {
         activeViewport = viewport
         if let symbol = NativeSymbol.address("winios_compositor_set_hidden") {
             let show = unsafeBitCast(symbol, to: ShowCompositor.self)
-            _ = show(0)
+            _ = show(viewport.hiddenSurface ? 1 : 0)
         }
         let host = MadeiraWindowMetalHost.shared
         guard host.metalLayer.device != nil else { return }
@@ -185,6 +191,7 @@ struct WindowsRendererView: UIViewRepresentable {
             host.removeFromSuperview()
             window.addSubview(host)
         }
+        host.isHidden = viewport.hiddenSurface
         layoutViewport(viewport)
         // On iPhone Duo the window can migrate between the outer and inner
         // displays while the same native Wine session remains active.
@@ -282,12 +289,21 @@ struct WindowsRendererView: UIViewRepresentable {
             let hide = unsafeBitCast(symbol, to: ShowCompositor.self)
             _ = hide(1)
         }
+        // Another viewport still on screen (the hidden one under the first-run
+        // setup, or the main view's) takes the layer over, newest first.
+        if let next = viewports.allObjects
+            .filter({ $0 !== viewport && $0.window != nil })
+            .max(by: { $0.generation < $1.generation }) {
+            attachViewport(next)
+        }
     }
 
     func makeUIView(context: Context) -> UIView {
         let view = MadeiraMetalViewport(frame: .zero)
         Self.nextGeneration += 1
         view.generation = Self.nextGeneration
+        view.hiddenSurface = hiddenSurface
+        Self.viewports.add(view)
         view.backgroundColor = .clear
         view.isOpaque = false
         view.isUserInteractionEnabled = false
@@ -297,6 +313,7 @@ struct WindowsRendererView: UIViewRepresentable {
 
     func updateUIView(_ uiView: UIView, context: Context) {
         if let viewport = uiView as? MadeiraMetalViewport {
+            viewport.hiddenSurface = hiddenSurface
             Self.attachViewport(viewport)
         }
     }

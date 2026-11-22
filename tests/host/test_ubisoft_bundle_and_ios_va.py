@@ -42,6 +42,15 @@ class UbisoftConnectBundleTests(unittest.TestCase):
         self.assertIn("NavigationLink { ubisoftPage }", settings)
         self.assertIn("StoreClientButton(client: .ea", settings)
 
+    def test_background_launcher_install_has_hidden_metal_surface(self):
+        view = text("iDeck/MainView.swift")
+        self.assertIn("WindowsRendererView(hiddenSurface: true)", view)
+        self.assertEqual(view.count(".background(BackgroundStoreSetupSurface(coordinator: coordinator))"), 2)
+        renderer = text("iDeck/WindowsRendererView.swift")
+        self.assertIn("host.isHidden = viewport.hiddenSurface", renderer)
+        self.assertIn("_ = show(viewport.hiddenSurface ? 1 : 0)", renderer)
+        self.assertIn("attachViewport(next)", renderer)
+
     def test_dock_installs_bundled_launcher_silently(self):
         src = text("iDeck/Vendor/Madeira/DockInstallers.swift")
         self.assertIn("enum UbisoftConnectBundle", src)

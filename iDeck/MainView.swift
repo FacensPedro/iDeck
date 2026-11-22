@@ -38,6 +38,9 @@ struct MainView: View {
         .onChange(of: firstRunSetupComplete) { _, complete in
             if !complete { isFirstRunSetupPresented = true }
         }
+        // Wine needs a Metal layer before it starts, even when its screen is
+        // never shown (the EA app and Ubisoft Connect installing in the background).
+        .background(BackgroundStoreSetupSurface(coordinator: coordinator))
         .fullScreenCover(isPresented: $isFirstRunSetupPresented) {
             IDeckFirstRunSetupView(coordinator: coordinator) {
                 firstRunSetupComplete = true
@@ -109,6 +112,22 @@ struct MainView: View {
 
 
 
+}
+
+/// A hidden Metal surface for the launchers' background install: Wine starts
+/// only once a layer is registered, and GameSessionView (which normally holds
+/// it) stays closed so Wine's screen never opens.
+private struct BackgroundStoreSetupSurface: View {
+    @ObservedObject var coordinator: SystemCoordinator
+
+    var body: some View {
+        if coordinator.storeSetupInBackground {
+            WindowsRendererView(hiddenSurface: true)
+                .ignoresSafeArea()
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+        }
+    }
 }
 
 struct SteamGameArtworkView: View {
@@ -2858,6 +2877,7 @@ private struct IDeckFirstRunSetupView: View {
             coordinator.refreshPairingFileState()
             wineMono.refresh()
         }
+        .background(BackgroundStoreSetupSurface(coordinator: coordinator))
         .task {
             // The launchers' rows follow what their installers put in the prefix.
             while !Task.isCancelled {
