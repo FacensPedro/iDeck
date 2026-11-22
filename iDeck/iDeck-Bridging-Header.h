@@ -10,6 +10,7 @@
 
 #import "ZipNative.h"
 #import "EpicChunkBridge.h"
+#import "LzhamCodec.h"
 #import "BenchmarkBridge.h"
 #import "PipelineCounters.h"
 #import "GraphicsAPIScan.h"

@@ -83,7 +83,6 @@ enum Translations {
         "Ubisoft sent an answer iDeck cannot read (%@).": ["pt": "A Ubisoft mandou uma resposta que o iDeck não consegue ler (%@).", "es": "Ubisoft envió una respuesta que iDeck no puede leer (%@)."],
         "sign in to Ubisoft in Settings › Stores & launchers › Ubisoft Connect": ["pt": "entre na Ubisoft em Ajustes › Lojas e launchers › Ubisoft Connect", "es": "inicia sesión en Ubisoft en Ajustes › Tiendas y launchers › Ubisoft Connect"],
         "the account does not own this game": ["pt": "a conta não tem este jogo", "es": "la cuenta no tiene este juego"],
-        "this game uses a compression iDeck cannot read yet (LZHAM)": ["pt": "este jogo usa uma compressão que o iDeck ainda não lê (LZHAM)", "es": "este juego usa una compresión que iDeck aún no puede leer (LZHAM)"],
         "Sign in to Ubisoft in Settings › Stores & launchers › Ubisoft Connect.": ["pt": "Entre na Ubisoft em Ajustes › Lojas e launchers › Ubisoft Connect.", "es": "Inicia sesión en Ubisoft en Ajustes › Tiendas y launchers › Ubisoft Connect."],
         "Waiting…": ["pt": "Aguardando…", "es": "Esperando…"],
         "Installing Ubisoft Connect…": ["pt": "Instalando o Ubisoft Connect…", "es": "Instalando Ubisoft Connect…"],

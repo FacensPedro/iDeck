@@ -486,6 +486,32 @@ enum UbisoftInflate {
         output.removeSubrange(written...)
         return output
     }
+
+    /// LZHAM 1.x through the app's C++ codec (LzhamCodec.cpp, Vendor/LZHAM). Ubisoft
+    /// writes slices as LZHAM zlib streams with a 2^15 dictionary (as UplayDB's
+    /// UplayApps reads them); the codec takes the dictionary size from the stream's
+    /// header and checks its Adler-32. Returns the bytes, or the codec's status on failure.
+    static func lzham(_ input: [UInt8], expected: Int) -> Result<[UInt8], LzhamFailure> {
+        var capacity = expected > 0 ? expected : max(input.count * 8, 1 << 20)
+        while true {
+            var output = [UInt8](repeating: 0, count: capacity)
+            let written = input.withUnsafeBufferPointer { src in
+                output.withUnsafeMutableBufferPointer { dst in
+                    ideck_lzham_decompress(src.baseAddress, src.count, dst.baseAddress, dst.count, 15)
+                }
+            }
+            if written >= 0 {
+                output.removeSubrange(Int(written)...)
+                return .success(output)
+            }
+            // Without a known size, a too-small buffer ends as DEST_BUF_TOO_SMALL (5) or,
+            // in LZHAM's unbuffered mode, BAD_CODE (7): grow and try again.
+            if written == -5 || written == -7, expected <= 0, capacity < 1 << 28 { capacity *= 4; continue }
+            return .failure(LzhamFailure(status: Int(-written)))
+        }
+    }
+
+    struct LzhamFailure: Error { let status: Int }
 }
 
 /// Installs a game from its manifest: downloads every slice, decompresses it and
@@ -583,7 +609,12 @@ struct UbisoftInstaller {
                     }
                     return out
                 case .lzham:
-                    throw UbisoftDemuxError.malformed(tr("this game uses a compression iDeck cannot read yet (LZHAM)"))
+                    switch UbisoftInflate.lzham(raw, expected: expected) {
+                    case .success(let out): return out
+                    case .failure(let failure):
+                        AppLog.record("[ubisoft-download] LZHAM slice failed: status \(failure.status), \(raw.count) bytes in, \(expected) expected")
+                        throw UbisoftDemuxError.malformed("LZHAM slice")
+                    }
                 }
             } catch let error as UbisoftDemuxError {
                 if case .malformed = error { throw error }
