@@ -12,6 +12,8 @@
 
 ### Game session
 - Fixed iDeck crashing a few seconds after a game closed: a part of Wine kept reading the game's JIT memory after iDeck had freed it. It now stops before the memory is freed.
+- Games whose executable needs a larger memory window (such as BioShock 2) no longer get a smaller JIT pool after iDeck reopens ("SMALL JIT POOL (496MB)"): the pool now continues past the area iOS keeps for iDeck's main thread, as it already did for Dragon Age: Inquisition. `pool-split = 0` in a game's settings turns this off.
+- The "iOS did not exempt the JIT pool from the app's memory limit" warning appeared on every launch, although iOS never grants that exemption to apps outside Apple and iDeck still had more than 5 GB free. It now appears only when less than 2 GB is left with the pool counted.
 - When a download finishes while iDeck is in the background and a game is started, iDeck now waits until it is back in front to open StikDebug. Before, iOS refused and iDeck wrongly said StikDebug was not installed.
 
 ### Version
