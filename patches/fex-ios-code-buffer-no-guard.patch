@@ -1,0 +1,26 @@
+diff --git a/FEXCore/Source/Interface/Core/CPUBackend.cpp b/FEXCore/Source/Interface/Core/CPUBackend.cpp
+index 05895e90d..e49b04d22 100644
+--- a/FEXCore/Source/Interface/Core/CPUBackend.cpp
++++ b/FEXCore/Source/Interface/Core/CPUBackend.cpp
+@@ -532,6 +532,7 @@ namespace CPU {
+ #endif
+     LOGMAN_THROW_A_FMT(!!Ptr, "Couldn't allocate code buffer");
+ 
++#ifndef FEX_IOS_HOST
+     // Protect the last page of the allocated buffer to trigger SIGSEGV on write access
+     uintptr_t LastPageAddr = AlignDown(reinterpret_cast<uintptr_t>(Ptr) + Size - 1, FEXCore::Utils::FEX_PAGE_SIZE);
+     if (!FEXCore::Allocator::VirtualProtect(reinterpret_cast<void*>(LastPageAddr), FEXCore::Utils::FEX_PAGE_SIZE,
+@@ -543,6 +544,13 @@ namespace CPU {
+ 
+     // Huge-pages reduce the amount of iTLB misses dramatically when it works.
+     FEXCore::Allocator::VirtualTHPControl(reinterpret_cast<void*>(Ptr), Size, FEXCore::Allocator::THPControl::Enable);
++#else
++    /* iDeck: on iOS a code buffer is a carve of the debugger-blessed JIT pool. Its
++     * protection cannot be lowered to PAGE_NOACCESS (every buffer logged "Failed to
++     * mprotect last page of code buffer" and kept no guard page), and iOS has no
++     * huge pages or VMA names. The three calls are skipped: two NtProtect/NtAllocate
++     * round trips into Wine's pool ledger fewer per buffer, and no false error. */
++#endif
+ 
+     LookupCache = fextl::make_unique<GuestToHostMap>();
+   }

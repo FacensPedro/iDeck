@@ -50,6 +50,7 @@ late      .      madeira-pipe2-ios26.patch
 
 # iDeck: accurate Win32 protection results and sandbox data paths
 native    FEX    fex-windows-protection-result.patch
+native    FEX    fex-ios-code-buffer-no-guard.patch
 native    .      madeira-layerkit-contiguous-range.patch
 native    .      madeira-fex-init-diagnostics.patch
 
