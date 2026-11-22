@@ -56,3 +56,6 @@ native    .      madeira-fex-init-diagnostics.patch
 
 # iDeck: installer taps kept when activation is refused, and logged where they land
 native    .      madeira-installer-click-delivery.patch
+
+# iDeck: the fd ledger without a TEB (32-bit boot thread, after-session reclaim)
+native    .      madeira-fdt-no-teb.patch
