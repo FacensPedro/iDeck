@@ -12,6 +12,7 @@
 
 ### Privacy
 - iDeck's log, copied bugs and copied or shared Wine logs no longer contain passwords, tokens, account names, e-mail addresses, IP addresses or the Windows user folder's name.
+- Copying the Wine log is fast again: the privacy filter runs once over the text and skips the checks the log does not need.
 
 ### Controls
 - The Windows controller API that follows the connected controller is now called "Automatic".

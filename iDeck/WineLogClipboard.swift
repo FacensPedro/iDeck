@@ -322,18 +322,37 @@ enum PrivacyRedactor {
         (regex(#"\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}"#), "<redacted>"),
     ]
 
+    /// Words that must appear in the text for a rule to run (lowercased): a rule
+    /// whose words are all absent is skipped, so a long Wine log is not scanned by
+    /// every expression.
+    private static let ruleHints: [[String]] = [
+        ["pass", "pwd", "secret", "token", "auth", "code", "session", "ticket", "cookie", "key",
+         "user", "account", "login", "mail", "steam", "persona", "name"],
+        ["authorization"],
+        ["cookie"],
+        ["@"],
+        ["."],
+        [":"],
+        ["users"],
+        ["eyj"],
+    ]
+
     static func redact(_ text: String) -> String {
         guard !text.isEmpty else { return text }
-        var result = text
-        for (expression, template) in rules {
-            let range = NSRange(result.startIndex..., in: result)
-            result = expression.stringByReplacingMatches(in: result, range: range, withTemplate: template)
+        // One NSMutableString for every rule: no UTF-16 copy of the log per rule.
+        let result = NSMutableString(string: text)
+        let lowered = text.lowercased()
+        for (index, (expression, template)) in rules.enumerated() {
+            guard ruleHints[index].contains(where: { lowered.contains($0) }) else { continue }
+            expression.replaceMatches(in: result, range: NSRange(location: 0, length: result.length),
+                                      withTemplate: template)
         }
         lock.lock(); let known = identifiers; lock.unlock()
-        for identifier in known.sorted(by: { $0.count > $1.count }) {
-            result = result.replacingOccurrences(of: identifier, with: "<account>", options: .caseInsensitive)
+        for identifier in known.sorted(by: { $0.count > $1.count }) where lowered.contains(identifier.lowercased()) {
+            result.replaceOccurrences(of: identifier, with: "<account>", options: .caseInsensitive,
+                                      range: NSRange(location: 0, length: result.length))
         }
-        return result
+        return result as String
     }
 
     static func redact(_ data: Data) -> Data {
