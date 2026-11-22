@@ -83,7 +83,6 @@ enum Translations {
         "Achievements": ["pt": "Conquistas", "es": "Logros"],
         "%d achievements in this game. The highlighted ones are shown.": ["pt": "%d conquistas neste jogo. As destacadas aparecem aqui.", "es": "%d logros en este juego. Se muestran los destacados."],
         "%d achievements": ["pt": "%d conquistas", "es": "%d logros"],
-        "The pool is only %d MB.": ["pt": "O pool ficou só com %d MB.", "es": "El pool quedó con solo %d MB."],
         "Waiting for the previous Windows session to finish…": ["pt": "Aguardando a sessão anterior do Windows terminar…", "es": "Esperando a que termine la sesión anterior de Windows…"],
         "Execution Error: the previous Windows session did not finish closing. Wine runs inside iDeck, so restart iDeck to start another game: swipe iDeck away in the app switcher, then open it again.": ["pt": "Erro de execução: a sessão anterior do Windows não terminou de fechar. O Wine roda dentro do iDeck, então reinicie o iDeck para abrir outro jogo: deslize o iDeck para fora no seletor de apps e abra de novo.", "es": "Error de ejecución: la sesión anterior de Windows no terminó de cerrarse. Wine se ejecuta dentro de iDeck, así que reinicia iDeck para abrir otro juego: desliza iDeck fuera del selector de apps y ábrelo de nuevo."],
         "Active": ["pt": "Ativo", "es": "Activo"],

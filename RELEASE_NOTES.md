@@ -6,6 +6,9 @@
 ### Game page
 - The Pause and Stop buttons of a download have no background: Pause is white text, Stop is red.
 
+### Game session
+- The loading screen no longer shows how big the JIT pool ended up ("The pool is only X MB."); the size is still written to iDeck's log.
+
 ### Settings
 - Download notifications switches itself off when Don't Allow is tapped in iOS's notification prompt, and turning it on asks iOS again (it stays off if notifications are refused).
 
