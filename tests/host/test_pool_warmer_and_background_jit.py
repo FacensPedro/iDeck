@@ -16,10 +16,11 @@ class PoolWarmerForgetTests(unittest.TestCase):
         self.assertIn("ios_pool_gone, 0, __ATOMIC_SEQ_CST );   /* iDeck: a new pool", PATCH)
 
     def test_release_forgets_before_unmapping(self):
-        self.assertIn("void ideck_wine_jit_pool_forget(void);", BRIDGE)
+        self.assertNotIn("ideck_wine_jit_pool_forget", BRIDGE)
+        self.assertIn('NativeSymbol.address("ideck_wine_jit_pool_forget")', POOL)
         start = POOL.index("static func release() -> Int?")
         body = POOL[start:POOL.index("return mb", start)]
-        self.assertLess(body.index("ideck_wine_jit_pool_forget()"), body.index("StikJITHelper.discardPool(pool)"))
+        self.assertLess(body.index("ideck_wine_jit_pool_forget"), body.index("StikJITHelper.discardPool(pool)"))
 
 
 class StikDebugInBackgroundTests(unittest.TestCase):
