@@ -23,10 +23,11 @@ class DownloadETACoreContract(unittest.TestCase):
         view = source("iDeck/MainView.swift")
         self.assertIn("downloadCoverButton", view)
         self.assertIn(".blur(radius:", view)
-        # A capsule at the bottom of the cover, not a disc over the artwork's middle.
+        # Only the symbol, round, in the middle of the cover: no text.
         button = view[view.index("private func downloadCoverButton("):view.index("private var antiCheatCoverBadge")]
-        self.assertIn("Capsule().fill(LinearGradient(", button)
-        self.assertIn("alignment: .bottom", button)
+        self.assertIn("Circle().fill(LinearGradient(", button)
+        self.assertIn("alignment: .center", button)
+        self.assertNotIn("Text(", button)
         self.assertNotIn("Image(\"DownloadCloud\")", view)
 
     def test_first_architecture_bootstrap_is_win64_wow64(self):
