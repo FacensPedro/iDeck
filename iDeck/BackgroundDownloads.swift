@@ -226,6 +226,8 @@ final class BackgroundDownloads {
                     DispatchQueue.main.async {
                         MainActor.assumeIsolated {
                             Self.notificationsAllowed = granted
+                            // Don't Allow switches Download notifications off in Settings.
+                            if !granted { UserDefaults.standard.set(false, forKey: Self.notificationsKey) }
                             if granted { action() }
                         }
                     }
@@ -235,6 +237,7 @@ final class BackgroundDownloads {
                 DispatchQueue.main.async {
                     MainActor.assumeIsolated {
                         Self.notificationsAllowed = allowed
+                        if !allowed { UserDefaults.standard.set(false, forKey: Self.notificationsKey) }
                         if allowed { action() }
                     }
                 }

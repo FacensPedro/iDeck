@@ -122,6 +122,22 @@ struct SettingsView: View {
             await refreshNotificationPermission()
             await updater.check()
         }
+        .onChange(of: downloadNotifications) { _, on in
+            // Turning it on asks iOS; Don't Allow (now or earlier) turns it back off.
+            guard on else { return }
+            Task {
+                let center = UNUserNotificationCenter.current()
+                var status = await center.notificationSettings().authorizationStatus
+                if status == .notDetermined {
+                    _ = try? await center.requestAuthorization(options: [.alert, .sound])
+                    status = await center.notificationSettings().authorizationStatus
+                }
+                if status == .denied || status == .notDetermined {
+                    downloadNotifications = false
+                    notificationsDenied = status == .denied
+                }
+            }
+        }
         .onChange(of: wineJITPoolMiB) { _, selected in
             winePoolChangeRequiresRestart = !coordinator.updateWineJITPoolPreference(selected)
         }

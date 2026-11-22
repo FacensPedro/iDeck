@@ -1416,7 +1416,8 @@ private struct SteamProgramDetailsView: View {
                                     Label(tr("Stop"), systemImage: "stop.fill")
                                         .downloadControlLabel()
                                 }
-                                .buttonStyle(.bordered)
+                                .buttonStyle(.plain)
+                                .foregroundColor(.red)
                             }
                         }
                     } else if installing {
@@ -1623,7 +1624,8 @@ private struct SteamProgramDetailsView: View {
                             .downloadControlLabel()
                     }
                     .disabled(stopping)
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.plain)
+                    .foregroundColor(.white)
                     Button(role: .destructive) {
                         steamLibrary.cancelInstall(appID: game.appID)
                     } label: {
@@ -1631,7 +1633,8 @@ private struct SteamProgramDetailsView: View {
                             .downloadControlLabel()
                     }
                     .disabled(stopping)
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.plain)
+                    .foregroundColor(.red)
                 }
             }
         }
@@ -1975,13 +1978,15 @@ private struct StoreGameDetailsView<Extra: View>: View {
                             Label(tr("Pause"), systemImage: "pause.fill")
                                 .downloadControlLabel()
                         }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(.plain)
+                        .foregroundColor(.white)
                     }
                     Button(role: .destructive, action: onStop) {
                         Label(tr("Stop"), systemImage: "stop.fill")
                             .downloadControlLabel()
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.plain)
+                    .foregroundColor(.red)
                 }
             }
         } else if installed {
@@ -2019,7 +2024,8 @@ private struct StoreGameDetailsView<Extra: View>: View {
                         Label(tr("Stop"), systemImage: "stop.fill")
                             .downloadControlLabel()
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.plain)
+                    .foregroundColor(.red)
                 }
             }
         } else {
