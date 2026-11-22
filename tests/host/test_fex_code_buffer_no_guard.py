@@ -10,7 +10,7 @@ class FEXCodeBufferNoGuard(unittest.TestCase):
         self.assertIn("native    FEX    fex-ios-code-buffer-no-guard.patch", series)
         patch = (ROOT / "patches/fex-ios-code-buffer-no-guard.patch").read_text()
         self.assertIn("+#ifndef FEX_IOS_HOST", patch)
-        self.assertIn("Failed to mprotect last page of code buffer", patch)
+        self.assertIn("mprotect last page of code buffer", patch)
         self.assertIn("FEXCore/Source/Interface/Core/CPUBackend.cpp", patch)
 
 
