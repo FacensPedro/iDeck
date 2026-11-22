@@ -451,6 +451,7 @@ class SystemCoordinator: ObservableObject {
             if status == "Windows Ready" || status.hasPrefix("Execution Error") || status.hasPrefix("Cannot launch") {
                 self.finishMemorySampling(reason: status == "Windows Ready" ? "the game exited and Wine closed normally" : status)
                 MainActor.assumeIsolated { EALibrary.shared.launchEnded() }
+                self.releaseJITPoolAfterSession()
             }
             self.windowsStatus = status
             self.currentStatus = status
@@ -1380,6 +1381,9 @@ class SystemCoordinator: ObservableObject {
             return
         }
         if let kind = plan.kind { AppLog.record("[installer] \(url.lastPathComponent): \(kind.rawValue)") }
+        // An .msi starts through msiexec: remember the installer itself, so it leaves
+        // the list once what it installed is there.
+        if plan.kind != nil { WindowsLibraryStore.noteLaunch(of: url) }
         Task { @MainActor [weak self] in
             guard let self else { return }
             if !WindowsInstallerEnvironment.missing(plan.requirements).isEmpty {
@@ -2033,6 +2037,32 @@ class SystemCoordinator: ObservableObject {
             if ideck_runtime_complete_session() { return true }
             if ideck_wineprocess_running() || Date() >= deadline { return false }
             RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        }
+    }
+
+    /// When a Windows session has ended (an installer finished or was stopped, a game
+    /// closed), frees its JIT pool as soon as the Wine worker and the wineserver have
+    /// stopped. A launch that failed before Wine started keeps the pool for the retry.
+    private func releaseJITPoolAfterSession(remaining: Int = 40) {
+        guard WindowsEnvironment.sessionsThisRun > 0 else { return }
+        if !ideck_wineprocess_running() {
+            if ideck_wineprocess_thread_finished() && ideck_wineserver_running() {
+                _ = ideck_wineserver_stop_if_idle()
+            }
+            if ideck_runtime_complete_session() {
+                DispatchQueue.global(qos: .utility).async {
+                    MadeiraWinePool.release()
+                    DispatchQueue.main.async { self.refreshJITStatus() }
+                }
+                return
+            }
+        }
+        guard remaining > 0 else {
+            AppLog.record("[jit-pool] kept: the Windows session did not finish closing")
+            return
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.releaseJITPoolAfterSession(remaining: remaining - 1)
         }
     }
 

@@ -16,7 +16,9 @@ class SmallPoolNoticeTests(unittest.TestCase):
 
     def test_loading_screen_shows_it_before_the_first_frame(self):
         self.assertIn("} else if !metrics.receivedNewFrames && StikJITHelper.smallPoolMB > 0 {", SESSION)
-        self.assertIn('"The JIT pool is only %d MB this time', (ROOT / "iDeck/Localization.swift").read_text())
+        strings = (ROOT / "iDeck/Localization.swift").read_text()
+        self.assertIn('"The pool is only %d MB.": ["pt": "O pool ficou só com %d MB."', strings)
+        self.assertNotIn("heavy games may freeze", strings)
 
 
 if __name__ == "__main__":

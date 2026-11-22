@@ -532,10 +532,21 @@ struct WindowsWorkspaceView: View {
         }
         // A finished Wine session may have installed a game (a GOG installer,
         // a setup program): look for new installs whenever Wine stops.
-        .onChange(of: coordinator.windowsStatus) { _, _ in
-            guard let prefixPath, !ideck_wineprocess_running() else { return }
-            gogLibrary.refreshInstalled(prefixPath: prefixPath)
-            windowsLibrary.refresh(prefixPath: prefixPath)
+        .onChange(of: coordinator.windowsStatus) { _, status in
+            guard let prefixPath else { return }
+            let ended = status == "Windows Ready" || status.hasPrefix("Execution Error") || status.hasPrefix("Cannot launch")
+            Task { @MainActor in
+                // Wine can still be closing when the session's end is shown: wait for it
+                // (up to 20 s), so the installer leaves the list as soon as Wine stops.
+                var waited = 0
+                while ended && ideck_wineprocess_running() && waited < 40 {
+                    try? await Task.sleep(nanoseconds: 500_000_000)
+                    waited += 1
+                }
+                guard !ideck_wineprocess_running() else { return }
+                gogLibrary.refreshInstalled(prefixPath: prefixPath)
+                windowsLibrary.refresh(prefixPath: prefixPath)
+            }
         }
         .preferredColorScheme(.dark)
     }
@@ -1228,7 +1239,7 @@ private struct WindowsExecutableArtworkView: View {
     let fallbackColor: Color
 
     var body: some View {
-        let profile = library.profile(for: library.profileID(for: executableURL), title: executableURL.deletingPathExtension().lastPathComponent)
+        let profile = library.profile(forExecutable: executableURL)
         Group {
             if let url = library.artworkURL(for: profile), let image = UIImage(contentsOfFile: url.path) {
                 Image(uiImage: image)
@@ -1265,8 +1276,7 @@ private struct WindowsExecutableDetailsView: View {
         self.prefixPath = prefixPath
         self.library = library
         self.coordinator = coordinator
-        let profileID = library.profileID(for: executableURL)
-        _profile = State(initialValue: library.profile(for: profileID, title: executableURL.deletingPathExtension().lastPathComponent))
+        _profile = State(initialValue: library.profile(forExecutable: executableURL))
     }
 
     var body: some View {
@@ -1283,7 +1293,7 @@ private struct WindowsExecutableDetailsView: View {
                             Label(tr("Change cover"), systemImage: "photo")
                         }
                         .buttonStyle(.bordered)
-                        Text(executableURL.deletingPathExtension().lastPathComponent)
+                        Text(library.displayName(for: executableURL))
                             .font(.title2.bold())
                             .foregroundColor(.white)
                         Text(executableURL.lastPathComponent)
@@ -2520,7 +2530,7 @@ extension WindowsWorkspaceView {
         case .epic(let app): return epicLibrary.installed[app]?.title ?? "Epic"
         case .epicInstalling(let app): return epicLibrary.game(app)?.title ?? "Epic"
         case .ea(let id): return eaTitle(id)
-        case .exe(let path): return URL(fileURLWithPath: path).deletingPathExtension().lastPathComponent
+        case .exe(let path): return windowsLibrary.displayName(for: URL(fileURLWithPath: path))
         }
     }
 
@@ -2750,7 +2760,6 @@ private struct IDeckFirstRunSetupView: View {
     @State private var eaAppInstalled = false
     @State private var ubisoftConnectInstalled = false
     /// The launchers step starts their installation once per appearance.
-    @State private var launchersRequested = false
 
     private enum Step: Int, CaseIterable {
         case visualCpp, wineMono, dock, launchers, jit, summary
@@ -3186,7 +3195,7 @@ private struct IDeckFirstRunSetupView: View {
 
     private var launchersStep: some View {
         VStack(alignment: .leading, spacing: 18) {
-            stepHeader(.launchers, "Installs the EA app and Ubisoft Connect automatically, so their games can start.")
+            stepHeader(.launchers, "Installs the EA app and Ubisoft Connect, so their games can start.")
             componentList {
                 statusRow("EA app", eaAppInstalled)
                 Divider().overlay(hairline).padding(.leading, 43)
@@ -3200,7 +3209,12 @@ private struct IDeckFirstRunSetupView: View {
             if let progress = coordinator.storeClientDownload {
                 note(progress)
             } else if launchersBusy {
-                progressNote
+                // The Visual C++ step's own text stayed in installerStatus and was shown here.
+                HStack(spacing: 10) {
+                    ProgressView().controlSize(.small)
+                    Text(tr("Installing %@...", launchersInstalling))
+                        .font(.caption).foregroundStyle(.secondary)
+                }
             } else if let error = coordinator.storeClientError {
                 note(error, warning: true)
             }
@@ -3210,15 +3224,16 @@ private struct IDeckFirstRunSetupView: View {
                 note("Sign in to EA and Ubisoft in Settings › Stores & launchers to see your games.")
             }
         }
-        .task {
-            // Entering the step installs the missing launchers, without questions.
-            await refreshLaunchers()
-            if !launchersRequested, prefixReady, !done(.launchers), !launchersBusy,
-               !coordinator.steamComponentsInstalling {
-                launchersRequested = true
-                coordinator.installDefaultStoreClients()
-            }
-        }
+        // The launchers install only when Install is tapped.
+        .task { await refreshLaunchers() }
+    }
+
+    /// The launchers the Install button installs, for the progress line.
+    private var launchersInstalling: String {
+        var names: [String] = []
+        if !eaAppInstalled { names.append("EA app") }
+        if !ubisoftConnectInstalled { names.append("Ubisoft Connect") }
+        return names.isEmpty ? "EA app / Ubisoft Connect" : names.joined(separator: " / ")
     }
 
     private func refreshLaunchers() async {
