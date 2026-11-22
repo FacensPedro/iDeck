@@ -897,7 +897,7 @@ struct UbisoftSavedSession: Codable {
     let remember: String?
     let expiry: Date
     let sessionID: String?
-    /// The Ubi-AppId Ubisoft accepted for this session (nil: saved before 2.11.2).
+    /// The Ubi-AppId Ubisoft accepted for this session (nil: saved before 2.12.0).
     var appIDUsed: String?
     var expired: Bool { expiry <= Date() }
 
