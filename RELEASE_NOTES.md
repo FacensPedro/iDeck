@@ -21,4 +21,4 @@
 - The JIT pool is freed automatically when an installer finishes or is stopped and when a game closes.
 
 ### Version
-- Updated the application version to 2.10.7 (build 115).
+- Updated the application version to 2.11.0 (build 115).

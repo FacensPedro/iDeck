@@ -684,8 +684,8 @@ enum WindowsShortcutScanner {
                 count += 1
                 guard item.pathExtension.lowercased() == "lnk",
                       let target = target(of: item), let exe = hostURL(target, drive: drive) else { continue }
-                let name = exe.lastPathComponent.lowercased()
-                guard !name.hasPrefix("unins"), !name.contains("uninstall"), name != "winhlp32.exe",
+                let file = exe.lastPathComponent.lowercased()
+                guard !file.hasPrefix("unins"), !file.contains("uninstall"), file != "winhlp32.exe",
                       !exe.path.lowercased().contains("/windows/") else { continue }
                 let key = exe.standardizedFileURL.path.lowercased()
                 let name = item.deletingPathExtension().lastPathComponent.trimmingCharacters(in: .whitespaces)
