@@ -32,7 +32,7 @@ class Release17Tests(unittest.TestCase):
         tile = view.split("private func shelfTile(_ item: ShelfItem)", 1)[1].split("private func shelfArtwork", 1)[0]
         self.assertNotIn("Text(shelfTitle(item))", tile)
         self.assertIn('Text(tr("Installed: %@", installedText))', view)
-        self.assertEqual(view.count("installedBytesText(done:"), 4)
+        self.assertEqual(view.count("installedBytesText(done:"), 5)   # + the Ubisoft page (2.13.3)
 
     def test_notifications_settings_and_launch(self):
         background = repo_text("iDeck/BackgroundDownloads.swift")

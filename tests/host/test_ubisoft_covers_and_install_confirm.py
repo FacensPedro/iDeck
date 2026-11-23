@@ -34,17 +34,35 @@ class CoverTests(unittest.TestCase):
         self.assertIn("} else if let fallbackTitle {", VIEW)
 
 
-class InstallConfirmTests(unittest.TestCase):
+class UbisoftPageTests(unittest.TestCase):
+    """2.13.3: a tap opens the game's page (as EA, Epic and GOG), where installing starts."""
+
     def card(self) -> str:
         start = VIEW.index("private func ubisoftCard(")
         return VIEW[start:VIEW.index("private func ubisoftDownloadBadge", start)]
 
-    def test_tap_asks_first(self):
+    def page(self) -> str:
+        start = VIEW.index("private struct UbisoftGameDetailsSheet: View {")
+        return VIEW[start:VIEW.index("/// Epic game page.", start)]
+
+    def test_tap_opens_the_page(self):
         card = self.card()
-        self.assertIn("pendingUbisoftInstall = game", card)
-        self.assertEqual(card.count("ubisoftLibrary.install(game)"), 1)   # only resuming a paused/failed one
-        self.assertIn('.confirmationDialog(tr("Install %@?", pendingUbisoftInstall?.title ?? "")', VIEW)
-        self.assertIn("if let game = pendingUbisoftInstall { ubisoftLibrary.install(game) }", VIEW)
+        self.assertIn("let open = { selectedUbisoftGame = game }", card)
+        self.assertNotIn("ubisoftLibrary.install(game)", card)
+        self.assertIn("UbisoftGameDetailsSheet(gameID: game.id, fallback: game, ubisoft: ubisoftLibrary", VIEW)
+        self.assertNotIn("pendingUbisoftInstall", VIEW)
+
+    def test_page_like_the_other_stores(self):
+        page = self.page()
+        self.assertIn("StoreGameDetailsView(", page)
+        self.assertIn("store: .ubisoft", page)
+        self.assertIn("errorText: failed", page)
+        self.assertIn("coordinator.launchWindowsProgram(at: executable", page)
+
+    def test_errors_stay_with_the_game(self):
+        self.assertNotIn("downloadError", UBI)
+        self.assertNotIn("ubisoftLibrary.downloadError", VIEW)
+        self.assertIn("downloads[game.id] = Download(state: .failed(AntiCheatPolicy.message), step: \"\")", UBI)
 
     def test_failure_reason_under_the_card(self):
         self.assertIn("if case .failed(let message)? = ubisoftLibrary.downloads[game.id]?.state {", self.card())

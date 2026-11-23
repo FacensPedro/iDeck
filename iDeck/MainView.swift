@@ -269,8 +269,7 @@ struct WindowsWorkspaceView: View {
     private var ubisoftSignedIn: Bool { ubisoftLibrary.signedIn }
     @State private var selectedEpicGame: SelectedEpicGame?
     @State private var selectedEAGame: EAOwnedGame?
-    /// The Ubisoft game whose install is being confirmed.
-    @State private var pendingUbisoftInstall: UbisoftGame?
+    @State private var selectedUbisoftGame: UbisoftGame?
     @State private var selectedGOGGame: GOGGame?
     @AppStorage("library.epicOwnedCollapsed") private var epicOwnedCollapsed = false
     @Environment(\.openURL) private var openURL
@@ -453,6 +452,10 @@ struct WindowsWorkspaceView: View {
             EAGameDetailsSheet(game: game, ea: eaLibrary, library: windowsLibrary,
                                coordinator: coordinator) { installed in launchEAGame(installed) }
         }
+        .sheet(item: $selectedUbisoftGame) { game in
+            UbisoftGameDetailsSheet(gameID: game.id, fallback: game, ubisoft: ubisoftLibrary, library: windowsLibrary,
+                                    coordinator: coordinator)
+        }
         .onAppear {
             epicLibrary.start()
             eaLibrary.start()
@@ -507,12 +510,6 @@ struct WindowsWorkspaceView: View {
 
         .onAppear {
             resolvePrefixPath()
-        }
-        .onChange(of: ubisoftLibrary.downloadError) { _, message in
-            guard let message else { return }
-            installMessage = message
-            isShowingInstallResult = true
-            ubisoftLibrary.downloadError = nil
         }
         // A finished Wine session may have installed a game (a GOG installer,
         // a setup program): look for new installs whenever Wine stops.
@@ -987,21 +984,9 @@ struct WindowsWorkspaceView: View {
     /// An installed Ubisoft game starts its own program directly; one the account owns
     /// but has not installed says where to install it.
     private func ubisoftCard(_ game: UbisoftGame) -> some View {
-        let open = {
-            if let executable = game.executable {
-                let profile = windowsLibrary.profile(for: "ubisoft:\(game.id)", title: game.title)
-                coordinator.launchWindowsProgram(at: executable, profile: profile, detectInstaller: false)
-            } else if let download = ubisoftLibrary.downloads[game.id] {
-                // Tap: pause a running download, resume a paused or failed one.
-                switch download.state {
-                case .active, .queued: ubisoftLibrary.pause(game)
-                case .paused, .failed: ubisoftLibrary.install(game)
-                }
-            } else {
-                // A download is tens of GB: asked first, never started by a stray tap.
-                pendingUbisoftInstall = game
-            }
-        }
+        // Opens the game's page, as for the other stores: install, pause, stop and
+        // errors are there.
+        let open = { selectedUbisoftGame = game }
         return VStack(alignment: .leading, spacing: 6) {
             ZStack {
                 if !game.coverURLs.isEmpty {
@@ -2227,6 +2212,53 @@ private struct EAGameDetailsSheet: View {
     }
 }
 
+/// Ubisoft Connect game page, as EA's: install, pause, stop, the download's error, and
+/// Play once installed (the game's own program; the launcher is not opened).
+private struct UbisoftGameDetailsSheet: View {
+    let gameID: String
+    /// The game as the card showed it, while the library list is being replaced.
+    let fallback: UbisoftGame
+    @ObservedObject var ubisoft: UbisoftLibrary
+    @ObservedObject var library: WindowsLibraryStore
+    @ObservedObject var coordinator: SystemCoordinator
+
+    var body: some View {
+        let game = ubisoft.game(gameID) ?? fallback
+        let download = ubisoft.downloads[gameID]
+        let failed: String? = { if case .failed(let message)? = download?.state { return message }; return nil }()
+        let paused: Bool = { if case .paused? = download?.state { return true }; return false }()
+        let installed = game.executable != nil
+        let sizeText: String = {
+            guard let total = download?.total, total > 0 else { return tr(installed ? "Installed" : "Size unavailable") }
+            return tr("Download: %@", ByteCountFormatter.string(fromByteCount: Int64(clamping: total), countStyle: .file))
+        }()
+        StoreGameDetailsView(
+            title: game.title, store: .ubisoft, profileID: "ubisoft:\(gameID)",
+            covers: game.coverURLs.filter { $0.lastPathComponent != "header.jpg" },
+            banners: game.coverURLs.filter { $0.lastPathComponent == "header.jpg" },
+            installed: installed && download == nil,
+            progress: (download != nil && failed == nil) ? download?.fraction : nil,
+            installedText: download.flatMap { installedBytesText(done: $0.done, total: $0.total) },
+            paused: paused, sizeText: sizeText, errorText: failed,
+            canInstall: !installed && !AntiCheatPolicy.isBlocked(title: game.title),
+            onLaunch: {
+                guard let executable = game.executable else { return }
+                let profile = library.profile(for: "ubisoft:\(gameID)", title: game.title)
+                coordinator.launchWindowsProgram(at: executable, profile: profile, detectInstaller: false)
+            },
+            onInstall: { ubisoft.install(game) },
+            onPause: { ubisoft.pause(game) },
+            onStop: { ubisoft.cancel(game) },
+            onUninstall: nil,
+            library: library, coordinator: coordinator
+        ) {
+            if let download, case .active = download.state, download.total == 0 {
+                Text(download.step).font(.caption).foregroundColor(.gray)
+            }
+        }
+    }
+}
+
 /// Epic game page.
 private struct EpicGameDetailsSheet: View {
     let appName: String
@@ -2661,18 +2693,6 @@ extension WindowsWorkspaceView {
                         // The launcher is installed by the initial setup: what is missing is the sign-in.
                         StoreClientCard(client: .ubisoft, coordinator: coordinator)
                     }
-                }
-                .confirmationDialog(tr("Install %@?", pendingUbisoftInstall?.title ?? ""),
-                                    isPresented: Binding(get: { pendingUbisoftInstall != nil },
-                                                         set: { if !$0 { pendingUbisoftInstall = nil } }),
-                                    titleVisibility: .visible) {
-                    Button(tr("Install")) {
-                        if let game = pendingUbisoftInstall { ubisoftLibrary.install(game) }
-                        pendingUbisoftInstall = nil
-                    }
-                    Button(tr("Cancel"), role: .cancel) { pendingUbisoftInstall = nil }
-                } message: {
-                    Text(tr("iDeck downloads it from Ubisoft's servers."))
                 }
                 .task(id: coordinator.windowsStatus) {
                     let installed = await Task.detached(priority: .utility) {

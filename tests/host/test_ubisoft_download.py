@@ -47,12 +47,15 @@ class UbisoftDemuxProtocolTests(unittest.TestCase):
 
 
 class UbisoftInstallFlowTests(unittest.TestCase):
-    def test_card_installs_instead_of_pointing_to_settings(self):
-        start = VIEW.index("private func ubisoftCard(")
-        card = VIEW[start:VIEW.index("private func launchEAGame", start)]
-        self.assertIn("ubisoftLibrary.install(game)", card)
-        self.assertIn("ubisoftLibrary.pause(game)", card)
-        self.assertIn("ubisoftLibrary.cancel(game)", card)
+    def test_page_installs_instead_of_pointing_to_settings(self):
+        # 2.13.3: the card opens the game's page, which installs, pauses and stops.
+        start = VIEW.index("private struct UbisoftGameDetailsSheet: View {")
+        page = VIEW[start:VIEW.index("/// Epic game page.", start)]
+        self.assertIn("onInstall: { ubisoft.install(game) }", page)
+        self.assertIn("onPause: { ubisoft.pause(game) }", page)
+        self.assertIn("onStop: { ubisoft.cancel(game) }", page)
+        card = VIEW[VIEW.index("private func ubisoftCard("):VIEW.index("private func launchEAGame")]
+        self.assertIn("let open = { selectedUbisoftGame = game }", card)
         self.assertNotIn("Install it in Ubisoft Connect", card)
 
     def test_install_records_and_registry(self):

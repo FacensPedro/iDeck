@@ -1,13 +1,10 @@
 ## What's Changed
 ### Ubisoft Connect
-- Ubisoft covers appear much sooner. iDeck now looks them up as soon as the game list shows, six at a time. Before, it waited for Ubisoft's download service to answer and then looked them up one by one, so the cards stayed black for a long time.
-- Covers that stayed black now load:
-  - iDeck tries Steam's newer address for game art, then the older one, and finally the game's wide header picture.
-  - Titles with ® or ™ (such as Assassin's Creed® Chronicles: China) are searched without those signs, which Steam did not match.
-  - Covers that were not found before are looked up again once.
-- When no picture exists, the card shows the game's name instead of a plain dark box.
-- Tapping a Ubisoft game that is not installed now asks "Install …?" first. Before, one tap started the download straight away, so a stray tap could start one (and show "Download failed").
-- A failed download now shows its reason under the card.
+- Tapping a Ubisoft game now opens its page, as for Steam, GOG, Epic and the EA app. Install, Pause, Stop and Play are on the page, with the download's progress and size.
+- Download errors (failed, not signed in, anti-cheat) now appear on the game's page and under its card, as in the other stores, instead of in a pop-up.
+
+### Wine log
+- Copying the Wine log is much faster. iDeck now finds the last session from the end of the file and checks each line in place, instead of searching the whole file and converting every line to text.
 
 ### Version
-- Updated the application version to 2.13.2 (build 120).
+- Updated the application version to 2.13.3 (build 121).

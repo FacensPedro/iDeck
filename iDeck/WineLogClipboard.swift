@@ -29,7 +29,7 @@ enum WineLogClipboard {
                 .appendingPathComponent(name + "-" + UUID().uuidString + ".txt")
             // The copy is compacted: repeated lines are folded, so it is much smaller.
             // Compacted byte by byte: no String of the whole log, no Character per line.
-            let raw = try Data(contentsOf: source)
+            let raw = try Data(contentsOf: source, options: .alwaysMapped)   // read in place, not copied whole
             try PrivacyRedactor.redact(WineLogDigest.shared(raw, from: source)).write(to: destination, options: .atomic)
             return destination
         }.value
@@ -113,58 +113,98 @@ enum WineLogDigest {
 
     static func applies(to url: URL) -> Bool { url.lastPathComponent.hasPrefix("madeira-log") }
 
-    static func digest(_ data: Data) -> Data {
-        // The last session.
-        var start = data.startIndex
-        var earlier = 0
-        var search = data.startIndex..<data.endIndex
-        while let found = data.range(of: sessionMarker, options: [], in: search) {
-            if found.lowerBound != data.startIndex { earlier += 1 }
-            start = found.lowerBound
-            search = found.upperBound..<data.endIndex
-        }
-        if earlier > 0, let lineStart = data[data.startIndex..<start].lastIndex(of: 0x0A) {
-            start = data.index(after: lineStart)
-        }
-        let session = data[start...]
+    /// Byte patterns of `callTraces`, `keptTraces` and ":trace:", for the line filter.
+    private static let callNeedles = callTraces.map { Array($0.utf8) }
+    private static let keptNeedles = keptTraces.map { Array($0.utf8) }
+    private static let traceNeedle = Array(":trace:".utf8)
+    /// Where a line's channel is: "0024:trace:file:..." and "0024:SysCall ..." have it
+    /// in their first few bytes.
+    private static let headBytes96 = 96
 
-        var kept = [UInt8]()
-        kept.reserveCapacity(min(session.count, 4 << 20))
-        var calls = 0, traces = 0, cut = 0
-        var lineStart = session.startIndex
-        while lineStart < session.endIndex {
-            let lineEnd = session[lineStart...].firstIndex(of: 0x0A) ?? session.endIndex
-            let line = session[lineStart..<lineEnd]
-            lineStart = lineEnd < session.endIndex ? session.index(after: lineEnd) : session.endIndex
-            let head = String(decoding: line.prefix(96), as: UTF8.self)
-            if callTraces.contains(where: head.contains) { calls += 1; continue }
-            if head.contains(":trace:") && !keptTraces.contains(where: head.contains) { traces += 1; continue }
-            if line.count > maximumLineBytes {
-                var end = line.startIndex + maximumLineBytes
-                while end > line.startIndex, line[end] & 0xC0 == 0x80 { end -= 1 }   // whole UTF-8 characters
-                kept.append(contentsOf: line[line.startIndex..<end])
-                kept.append(contentsOf: Array(" …".utf8))
-                cut += 1
-            } else {
-                kept.append(contentsOf: line)
+    /// Works on the bytes alone (2.13.3): 2.13.2 decoded the head of every line into a
+    /// String and searched the whole file for the session marker, which took long on a
+    /// log of tens of MB. The marker is now found from the end, and each line is
+    /// checked in place.
+    static func digest(_ data: Data) -> Data {
+        data.withUnsafeBytes { raw -> Data in
+            let bytes = raw.bindMemory(to: UInt8.self)
+            let count = bytes.count
+            let marker = [UInt8](sessionMarker)
+
+            func matches(_ needle: [UInt8], at index: Int) -> Bool {
+                guard index + needle.count <= count else { return false }
+                for k in 0..<needle.count where bytes[index + k] != needle[k] { return false }
+                return true
             }
-            kept.append(0x0A)
+            func lineHas(_ needle: [UInt8], from start: Int, to end: Int) -> Bool {
+                let last = min(end, start + headBytes96) - needle.count
+                guard last >= start else { return false }
+                let first = needle[0]
+                var i = start
+                while i <= last {
+                    if bytes[i] == first && matches(needle, at: i) { return true }
+                    i += 1
+                }
+                return false
+            }
+
+            // The last session: the last marker, searched from the end; earlier ones counted.
+            var start = 0
+            var index = count - marker.count
+            while index >= 0 {
+                if bytes[index] == marker[0] && matches(marker, at: index) { start = index; break }
+                index -= 1
+            }
+            var earlier = 0
+            if start > 0 {
+                while start > 0 && bytes[start - 1] != 0x0A { start -= 1 }
+                var i = 0
+                while i < start {
+                    if bytes[i] == marker[0] && matches(marker, at: i) { earlier += 1; i += marker.count } else { i += 1 }
+                }
+            }
+
+            var kept = [UInt8]()
+            kept.reserveCapacity(min(count - start, 4 << 20))
+            var calls = 0, traces = 0, cut = 0
+            var lineStart = start
+            while lineStart < count {
+                var lineEnd = lineStart
+                while lineEnd < count && bytes[lineEnd] != 0x0A { lineEnd += 1 }
+                defer { lineStart = lineEnd + 1 }
+                if callNeedles.contains(where: { lineHas($0, from: lineStart, to: lineEnd) }) { calls += 1; continue }
+                if lineHas(traceNeedle, from: lineStart, to: lineEnd)
+                    && !keptNeedles.contains(where: { lineHas($0, from: lineStart, to: lineEnd) }) {
+                    traces += 1
+                    continue
+                }
+                if lineEnd - lineStart > maximumLineBytes {
+                    var end = lineStart + maximumLineBytes
+                    while end > lineStart && bytes[end] & 0xC0 == 0x80 { end -= 1 }   // whole UTF-8 characters
+                    kept.append(contentsOf: UnsafeBufferPointer(rebasing: bytes[lineStart..<end]))
+                    kept.append(contentsOf: Array(" …".utf8))
+                    cut += 1
+                } else {
+                    kept.append(contentsOf: UnsafeBufferPointer(rebasing: bytes[lineStart..<lineEnd]))
+                }
+                kept.append(0x0A)
+            }
+
+            var body = LogCompactor.compactedData(Data(kept))
+            if body.count > maximumBytes {
+                let headEnd = body[..<(body.startIndex + headBytes)].lastIndex(of: 0x0A) ?? body.startIndex + headBytes
+                let tailFrom = body.endIndex - (maximumBytes - headBytes)
+                let tailStart = body[tailFrom...].firstIndex(of: 0x0A).map { body.index(after: $0) } ?? tailFrom
+                let left = body[headEnd..<tailStart].reduce(0) { $0 + ($1 == 0x0A ? 1 : 0) }
+                let middle = "\n[iDeck] … \(left) lines left out here to keep the log readable (madeira-log.txt on the device has them) …\n"
+                body = body[..<headEnd] + Data(middle.utf8) + body[tailStart...]
+            }
+            var header = "[iDeck] Wine log of the last session"
+            if earlier > 0 { header += " (\(earlier) earlier session\(earlier == 1 ? "" : "s") left out)" }
+            header += ". Left out: \(calls) system-call trace lines, \(traces) other trace lines"
+            header += "; \(cut) lines longer than \(maximumLineBytes) bytes cut.\n\n"
+            return Data(header.utf8) + body
         }
-        var body = LogCompactor.compactedData(Data(kept))
-        var middle = ""
-        if body.count > maximumBytes {
-            let headEnd = body[..<(body.startIndex + headBytes)].lastIndex(of: 0x0A) ?? body.startIndex + headBytes
-            let tailFrom = body.endIndex - (maximumBytes - headBytes)
-            let tailStart = body[tailFrom...].firstIndex(of: 0x0A).map { body.index(after: $0) } ?? tailFrom
-            let left = body[headEnd..<tailStart].reduce(0) { $0 + ($1 == 0x0A ? 1 : 0) }
-            middle = "\n[iDeck] … \(left) lines left out here to keep the log readable (madeira-log.txt on the device has them) …\n"
-            body = body[..<headEnd] + Data(middle.utf8) + body[tailStart...]
-        }
-        var header = "[iDeck] Wine log of the last session"
-        if earlier > 0 { header += " (\(earlier) earlier session\(earlier == 1 ? "" : "s") left out)" }
-        header += ". Left out: \(calls) system-call trace lines, \(traces) other trace lines"
-        header += "; \(cut) lines longer than \(maximumLineBytes) bytes cut.\n\n"
-        return Data(header.utf8) + body
     }
 
     /// The file's bytes as they are copied or shared: the digest for the Wine log.
@@ -445,7 +485,7 @@ enum PrivacyRedactor {
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
         let file = destination.appendingPathComponent(name + ".txt")
-        try redact(WineLogDigest.shared(try Data(contentsOf: source), from: source)).write(to: file, options: .atomic)
+        try redact(WineLogDigest.shared(try Data(contentsOf: source, options: .alwaysMapped), from: source)).write(to: file, options: .atomic)
         return file
     }
 }
