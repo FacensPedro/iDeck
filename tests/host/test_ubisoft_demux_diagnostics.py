@@ -13,13 +13,14 @@ SRC = (pathlib.Path(__file__).resolve().parents[2] / "iDeck" / "UbisoftDownloade
 
 class DemuxDiagnosticsTests(unittest.TestCase):
     def open_body(self) -> str:
-        start = SRC.index("private func open(ipv4Only: Bool) async throws -> NWConnection {")
+        start = SRC.index("private func open(ipv4Only: Bool, tls12: Bool = false) async throws -> NWConnection {")
         return SRC[start:SRC.index("\n    }\n", SRC.index("return connection", start))]
 
     def test_two_attempts_the_second_over_ipv4(self):
-        self.assertIn("for attempt in 1...2 {", SRC)
-        self.assertIn("opened = try await open(ipv4Only: attempt == 2)", SRC)
+        self.assertIn("for attempt in 1...3 {", SRC)
+        self.assertIn("opened = try await open(ipv4Only: attempt == 3, tls12: attempt >= 2)", SRC)
         self.assertIn("ip.version = .v4", self.open_body())
+        self.assertIn("sec_protocol_options_set_max_tls_protocol_version(tls.securityProtocolOptions, .TLSv12)", self.open_body())
 
     def test_states_and_reasons_logged(self):
         body = self.open_body()

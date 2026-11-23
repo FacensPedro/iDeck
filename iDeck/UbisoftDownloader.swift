@@ -61,9 +61,12 @@ final class UbisoftDemux: @unchecked Sendable {
     func connect() async throws {
         var lastError: Error = UbisoftDemuxError.timeout("connection")
         var opened: NWConnection?
-        for attempt in 1...2 {
+        // 2.14.1: the server closed the TLS handshake (errSSLClosedNoNotify, -9816) on an
+        // iPad for both attempts of 2.14.0; attempts 2 and 3 offer TLS 1.2 only, the
+        // version older Ubisoft Connect clients speak.
+        for attempt in 1...3 {
             do {
-                opened = try await open(ipv4Only: attempt == 2)
+                opened = try await open(ipv4Only: attempt == 3, tls12: attempt >= 2)
                 break
             } catch {
                 lastError = error
@@ -80,13 +83,17 @@ final class UbisoftDemux: @unchecked Sendable {
         send(upstream.bytes)
     }
 
-    private func open(ipv4Only: Bool) async throws -> NWConnection {
-        let parameters = NWParameters(tls: NWProtocolTLS.Options())
+    private func open(ipv4Only: Bool, tls12: Bool = false) async throws -> NWConnection {
+        let tls = NWProtocolTLS.Options()
+        if tls12 {
+            sec_protocol_options_set_max_tls_protocol_version(tls.securityProtocolOptions, .TLSv12)
+        }
+        let parameters = NWParameters(tls: tls)
         if ipv4Only, let ip = parameters.defaultProtocolStack.internetProtocol as? NWProtocolIP.Options {
             ip.version = .v4
         }
         let connection = NWConnection(host: NWEndpoint.Host(Self.host), port: 443, using: parameters)
-        let label = ipv4Only ? "IPv4" : "any"
+        let label = (ipv4Only ? "IPv4" : "any") + (tls12 ? ", TLS 1.2" : "")
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             var resumed = false
             var reason = "no answer"
