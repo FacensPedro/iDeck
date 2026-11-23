@@ -11,6 +11,9 @@
 ### 32-bit games
 - Second fix for 32-bit games that closed seconds after starting (Assassin's Creed IV Black Flag, BioShock 2). The 2.13.1 fix changed a part of Wine that the build does not recompile, so it never reached the app. The whole fix is now in the part that is recompiled.
 
+### Library
+- After StikDebug sends you back to iDeck, the library stays on the store you were using (for example the EA app) instead of switching to Steam. iDeck now remembers the last store tab you chose.
+
 ### Settings
 - A game's settings on its page are saved as you change them. The blue ✓ button and the Done button are gone: close the page by swiping it down.
 - Removed the note "Direct3D 11 and Direct3D 12 are chosen automatically for each game".

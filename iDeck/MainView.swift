@@ -244,7 +244,12 @@ struct WindowsWorkspaceView: View {
     @State private var isSettingsPresented = false
     @State private var searchText = ""
     /// The selected tile of the console-style shelf (a store or a game).
-    @State var shelf: ShelfItem = .store(.steam)
+    /// The selected store or game. Starts on the store chosen last (2.13.3): the
+    /// library view is rebuilt when iDeck comes back from StikDebug, and an EA game's
+    /// launch returned to the Steam tab.
+    @State var shelf: ShelfItem = .store(ShelfItem.savedStore)
+    /// The last store tab chosen, kept across view rebuilds and app restarts.
+    @AppStorage("library.lastStore") private var lastStore = "steam"
     @State private var prefixPath: URL?
     @StateObject private var windowsLibrary = WindowsLibraryStore()
     @State private var isExecutablePickerPresented = false
@@ -2416,6 +2421,20 @@ struct SteamDLCArtworkView: View {
 
 /// One tile of the top shelf: a store, or a game that is installed or installing.
 enum ShelfItem: Hashable {
+    static func storeKey(_ store: GameStore) -> String {
+        switch store { case .steam: "steam"; case .gog: "gog"; case .epic: "epic"; case .ea: "ea"; case .ubisoft: "ubisoft" }
+    }
+    /// The store tab saved in "library.lastStore" (Steam when none).
+    static var savedStore: GameStore {
+        switch UserDefaults.standard.string(forKey: "library.lastStore") {
+        case "gog": .gog
+        case "epic": .epic
+        case "ea": .ea
+        case "ubisoft": .ubisoft
+        default: .steam
+        }
+    }
+
     case store(GameStore)
     case steam(UInt32)
     case gog(Int)
@@ -2452,7 +2471,7 @@ extension WindowsWorkspaceView {
     /// The selected tile, or the Steam store when it no longer exists.
     var currentShelf: ShelfItem {
         if case .store = shelf { return shelf }
-        return shelfGames.contains(shelf) ? shelf : .store(.steam)
+        return shelfGames.contains(shelf) ? shelf : .store(ShelfItem.savedStore)
     }
 
     var consoleShelf: some View {
@@ -2473,6 +2492,7 @@ extension WindowsWorkspaceView {
             }
             .onChange(of: shelf) { _, item in
                 withAnimation(.easeInOut(duration: 0.2)) { proxy.scrollTo(item, anchor: .center) }
+                if case .store(let store) = item { lastStore = ShelfItem.storeKey(store) }
             }
         }
     }
