@@ -17,6 +17,9 @@
 ### Game session
 - A game that needs a larger memory area for its program (such as Dragon Age: Inquisition) now gets it on the second launch in the same iDeck run too. iDeck kept that area reserved from the first launch and then failed to reserve it again ("could NOT widen the window to 192MB"); it now reuses it.
 
+### Steam
+- Fixed BioShock 2 Remastered failing to download with "Steam's download servers would not hand out this game's file list (HTTP 401)". One of its file packs comes from another Steam app, and Steam refused it. iDeck now asks for it as part of the game itself and, if the account does not own it, installs the game without that pack.
+
 ### Visual C++
 - iDeck's Visual C++ install now also includes Microsoft Visual C++ 2015-2019 (32-bit and 64-bit), alongside 2005-2013 and 2015-2022. The newer 2015-2022 files are kept where the two share a name. iDeck installs the runtimes again once to add it.
 

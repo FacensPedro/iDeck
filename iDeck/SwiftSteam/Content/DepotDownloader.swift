@@ -176,11 +176,35 @@ final class DepotDownloader {
                 throw SteamError.depotKeyNotFound(refused)
             }
             if session.steamID != 0 { accountID = session.steamID }
-            let contentAppID = !app.freeToDownload ? (depot.fromApp ?? app.appID) : app.appID
+            var contentAppID = !app.freeToDownload ? (depot.fromApp ?? app.appID) : app.appID
             // A beta's own manifest is requested under its branch name.
-            let manifest = try await fetchManifest(depotID: depot.depotID, appID: contentAppID,
-                                                   manifestGID: gid, key: key, hosts: hosts,
-                                                   branch: depot.hasOwnManifest(app.branch) ? app.branch : nil)
+            let branch = depot.hasOwnManifest(app.branch) ? app.branch : nil
+            let manifest: DepotManifest
+            do {
+                manifest = try await fetchManifest(depotID: depot.depotID, appID: contentAppID,
+                                                   manifestGID: gid, key: key, hosts: hosts, branch: branch)
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch where contentAppID != app.appID {
+                // 2.13.3: a depot taken from another app (BioShock 2 Remastered's 1523211, from
+                // 1523210) whose file list Steam refuses (HTTP 401) failed the whole install.
+                // It is asked for under the game's own app; content the account does not
+                // own is then left out, as a refused depot key is above.
+                do {
+                    manifest = try await fetchManifest(depotID: depot.depotID, appID: app.appID,
+                                                       manifestGID: gid, key: key, hosts: hosts, branch: branch)
+                    contentAppID = app.appID
+                } catch is CancellationError {
+                    throw CancellationError()
+                } catch let refusal {
+                    if let owned = await ownedDepots(), !owned.isEmpty, !owned.contains(depot.depotID) {
+                        SteamLog.event("[steam-depot] manifest refused app=\(app.appID) depot=\(depot.depotID) from=\(depot.fromApp ?? 0): not owned, left out")
+                        licenseSkipped.append(depot.depotID)
+                        continue
+                    }
+                    throw refusal
+                }
+            }
             let auth = await cdnAuthFragments(depotID: depot.depotID, appID: contentAppID, hosts: pool)
             plans.append(DepotPlan(depotID: depot.depotID, manifestGID: gid, key: key, manifest: manifest,
                                    hosts: pool, auth: auth,
