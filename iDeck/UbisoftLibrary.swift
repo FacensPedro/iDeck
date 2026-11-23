@@ -92,44 +92,81 @@ final class UbisoftLibrary: ObservableObject {
     private var downloadTask: (id: String, task: Task<Void, Never>)?
 
     private var task: Task<Void, Never>?
+    /// A refresh asked for while one runs (a sign-in during the first load): run once more after it.
+    private var refreshAgain = false
 
+    /// An iDeck Ubisoft session is saved. Published so the store page follows a sign-in
+    /// or sign-out made in Settings without waiting for Windows to change state.
+    @Published private(set) var signedIn = UbisoftSavedSession.load() != nil
+
+    /// Installed games and the account's titles (Ubisoft's GraphQL service) are shown as
+    /// soon as they are known. The ownership service (the demux), which only adds each
+    /// game's product id and manifest for installing, is asked afterwards: 2.13.0 waited
+    /// for it before showing anything, and the library stayed on "loading" while it did.
     func refresh() {
-        guard task == nil else { return }
+        signedIn = UbisoftSavedSession.load() != nil
+        guard task == nil else { refreshAgain = true; return }
         refreshing = true
         task = Task { [weak self] in
             let drive = MadeiraDock.drive
             let installed = await Task.detached(priority: .utility) { Self.installedGames(drive: drive) }.value
             var owned: [String] = []
             var failure: String?
-            if let session = UbisoftSavedSession.load(), !session.expired {
+            // current() renews an expired session with its remember-me ticket.
+            let session = await UbisoftSavedSession.current()
+            if let session {
                 do { owned = try await Self.ownedTitles(session: session) }
-                catch { failure = "Ubisoft: " + tr("Could not load the owned games.") }
-            }
-            // The ownership service also names each game's product id and newest
-            // manifest, which installing needs; its list replaces the account's when it answers.
-            var products: [UbisoftOwnedProduct] = []
-            if UbisoftSavedSession.load() != nil, let client = try? await UbisoftContentClient.signedIn() {
-                products = (try? await client.ownedGames()) ?? []
-                client.close()
+                catch {
+                    failure = "Ubisoft: " + tr("Could not load the owned games.")
+                    AppLog.record("[ubisoft-library] owned games: \(error.localizedDescription)")
+                }
+            } else if UbisoftSavedSession.load() != nil {
+                failure = "Ubisoft: " + tr("The Ubisoft session expired. Sign in again in Settings.")
             }
             guard let self else { return }
-            for product in products where product.productType == 0 && !product.manifest.isEmpty && !product.name.isEmpty {
-                self.products[Self.key(product.name)] = product
-                if !owned.contains(where: { Self.key($0) == Self.key(product.name) }) { owned.append(product.name) }
-            }
-            if !products.isEmpty { failure = nil }
-            let names = Set(installed.map { Self.key($0.title) })
-            let missing = owned.filter { !names.contains(Self.key($0)) }
-                .map { UbisoftGame(id: "owned:" + Self.key($0), title: $0, executable: nil) }
-            self.games = (installed + missing).map { game in
-                var game = game
-                game.coverURL = UbisoftCovers.cached(game.title).flatMap(UbisoftCovers.url(appID:))
-                return game
-            }
+            if session == nil { self.products = [:] }
+            self.publish(installed: installed, owned: owned)
             self.error = failure
             self.refreshing = false
+            AppLog.record("[ubisoft-library] installed=\(installed.count) owned=\(owned.count) signed-in=\(session != nil)")
+
+            if session != nil {
+                var products: [UbisoftOwnedProduct] = []
+                do {
+                    let client = try await UbisoftContentClient.signedIn()
+                    defer { client.close() }
+                    products = try await client.ownedGames()
+                } catch {
+                    AppLog.record("[ubisoft-library] ownership service: \(error.localizedDescription)")
+                }
+                for product in products where product.productType == 0 && !product.manifest.isEmpty && !product.name.isEmpty {
+                    self.products[Self.key(product.name)] = product
+                    if !owned.contains(where: { Self.key($0) == Self.key(product.name) }) { owned.append(product.name) }
+                }
+                if !products.isEmpty {
+                    self.publish(installed: installed, owned: owned)
+                    self.error = nil
+                }
+            }
             self.task = nil
+            if self.refreshAgain {
+                self.refreshAgain = false
+                self.refresh()
+                return
+            }
             await self.findCovers()
+        }
+    }
+
+    private func publish(installed: [UbisoftGame], owned: [String]) {
+        let names = Set(installed.map { Self.key($0.title) })
+        let missing = owned.filter { !names.contains(Self.key($0)) }
+            .map { UbisoftGame(id: "owned:" + Self.key($0), title: $0, executable: nil) }
+        games = (installed + missing).map { game in
+            var game = game
+            game.coverURL = games.first(where: { $0.id == game.id })?.coverURL
+                ?? UbisoftCovers.cached(game.title).flatMap(UbisoftCovers.url(appID:))
+            return game
         }
     }
 

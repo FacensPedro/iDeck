@@ -33,10 +33,11 @@ class EAStoreTests(unittest.TestCase):
         self.assertIn('"Software\\\\Wow6432Node\\\\" + key.dropFirst("Software\\\\".count)', glue)
         self.assertIn('return name + String(format: "=dword:%08x", number)', glue)
 
-    def test_ubisoft_store_uses_its_account_page_and_badge(self):
+    def test_ubisoft_store_uses_its_badge_and_in_app_sign_in(self):
         self.assertTrue((ROOT / "iDeck/Assets.xcassets/StoreBadgeUbisoft.imageset/Ubisoft.png").is_file())
         self.assertIn("StoreClientCard(client: .ubisoft", repo_text("iDeck/MainView.swift"))
-        self.assertIn("https://account.ubisoft.com/", repo_text("iDeck/SettingsView.swift"))
+        # The sign-in sheet no longer sends the user to Safari.
+        self.assertNotIn("https://account.ubisoft.com/", repo_text("iDeck/SettingsView.swift"))
 
 
 if __name__ == "__main__":

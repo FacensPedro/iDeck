@@ -260,20 +260,27 @@ class WindowsEnvironment {
         return missing
     }
 
+    /// Wine's log channels for every session (see configureWine).
+    static let wineDebugChannels = "err+all,err-ole,err-winediag,fixme-all,warn-all,trace+process,trace+loaddll"
+
     func configureWine(prefix: String) {
         self.winePrefixPath = prefix
         setenv("WINEPREFIX", prefix, 1)
-        // Full logs for every session: Bugs & logs needs the lines Wine and Madeira
-        // print before a failure, and a game that failed cannot be asked to fail again
-        // with logging on. Madeira's Wine thread configures WINEDEBUG from this flag.
-        setenv("MADEIRA_DEBUG_VERBOSE", "1", 1)
+        // 2.13.1: MADEIRA_DEBUG_VERBOSE=1 made Madeira's Wine thread REPLACE the value
+        // below with its verbose set (trace+syscall, trace+file, trace+module,
+        // trace+win, fixme+all...): a 16 MB, 220,000-line madeira-log.txt for one
+        // session, 82,000 of its lines NtFlushInstructionCache calls, too large to
+        // read. Off, Madeira keeps this WINEDEBUG (madeira-wine-idle-logging.patch).
+        setenv("MADEIRA_DEBUG_VERBOSE", "0", 1)
         // Errors from every channel, without the fixme/warn lines Wine repeats for
         // every call of an unimplemented function (thousands per minute in some games):
         // they fill madeira-log.txt and make each scan of it slower. A game's own
         // config (GameRecommendations, env.WINEDEBUG) still overrides this.
         // err:ole and err:winediag repeat harmless probing on every COM call and
         // Bugs & logs already ignores them: they are not written at all.
-        setenv("WINEDEBUG", "err+all,err-ole,err-winediag,fixme-all,warn-all", 1)
+        // trace:process and trace:loaddll stay: Bugs & logs lists the programs a
+        // session started (SessionProgramsTrace) and an EA game's activation from them.
+        setenv("WINEDEBUG", Self.wineDebugChannels, 1)
         setenv("WINEARCH", "win64", 1)
         setenv("STEAM_COMPAT_CLIENT_INSTALL_PATH", prefix + "/drive_c/Program Files (x86)/Steam", 1)
         

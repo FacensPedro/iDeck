@@ -16,7 +16,7 @@ class ReportAdditionsTests(unittest.TestCase):
 
     def test_session_outcome_recorded_and_reported(self):
         for line in ("SessionOutcome.began()", "SessionOutcome.status(status)",
-                     'SessionOutcome.ended("closed with the X button (iDeck reopened with the memory free)")'):
+                     'SessionOutcome.ended("closed with the X button")'):
             self.assertIn(line, COORDINATOR)
         self.assertIn("SystemCoordinator.SessionOutcome.noteAppRestart()", (ROOT / "iDeck/iDeckApp.swift").read_text())
         self.assertIn('" | last stage reached: "', REPORT)

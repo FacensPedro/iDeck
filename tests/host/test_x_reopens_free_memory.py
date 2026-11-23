@@ -17,11 +17,23 @@ class XReopensWithFreeMemoryTests(unittest.TestCase):
         self.assertNotIn("pid", body)
         self.assertNotIn("exit(0)", body)
 
-    def test_x_and_force_close_reopen_through_stikdebug(self):
+    def test_stikdebug_opens_only_for_the_next_game(self):
+        # 2.13.1: closing a game (X, its own exit, force close) never opens StikDebug;
+        # the launch of the next game does, when the process needs replacing.
         self.assertIn("func reopenWithFreeMemory(reason: String, exitAnyway: Bool = true) -> Bool", COORD)
-        self.assertIn('reopenWithFreeMemory(reason: "the X closed a running session")', COORD)
-        self.assertIn('reopenWithFreeMemory(reason: "the game did not exit")', COORD)
+        calls = [line for line in COORD.splitlines() if "reopenWithFreeMemory(" in line and "func " not in line]
+        self.assertEqual(len(calls), 1, calls)
+        self.assertIn('reopenWithFreeMemory(reason: "next launch needs a fresh process', calls[0])
+        self.assertNotIn('"the X closed a running session"', COORD)
+        self.assertNotIn('"the game did not exit")', COORD)
+        self.assertNotIn('reason: "session closed (', COORD)
         self.assertIn("StikJITHelper.requestFreshInstance", COORD)
+
+    def test_force_close_only_exits(self):
+        start = COORD.index("func forceCloseIDeck()")
+        body = COORD[start:COORD.index("\n    }\n", start)]
+        self.assertIn("exit(0)", body)
+        self.assertNotIn("requestFreshInstance", body)
 
     def test_new_process_notes_the_reopen(self):
         self.assertIn("SystemCoordinator.noteFreshInstanceAfterRelaunch()", APP)

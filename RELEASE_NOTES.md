@@ -1,20 +1,31 @@
 ## What's Changed
 ### Ubisoft Connect
-- Ubisoft games now install from the library, like the other stores: tap a game that is not installed and iDeck downloads it straight from Ubisoft's servers. If Ubisoft Connect is not installed yet, it is installed first. A progress bar shows on the cover. Tap the cover to pause or resume, and long-press it to stop the download and remove the files. The game uses the device's language when Ubisoft has it, otherwise English. Signing in to Ubisoft in Settings is required.
-- iDeck now reads every compression Ubisoft uses for game files: zlib, Zstandard and LZHAM. Games packed with LZHAM install too, instead of stopping with "this game uses a compression iDeck cannot read yet".
-- Ubisoft games show their cover in the library again. Ubisoft's account service gives only the game names, so iDeck finds the same game in Steam's store and uses its portrait cover. Each cover is looked up once and remembered.
-
-### Tor Browser and Firefox
-- Firefox's sandbox is turned off under Wine, so Tor Browser's tabs and helper processes can start. Wine refused the sandbox's way of starting them. Every launch sets Mozilla's switches that turn the sandboxes off, and Tor Browser's profile gets a user.js with the sandbox off and fewer helper processes.
-
-### Windows programs
-- Uninstall now works for programs installed with a .exe installer (such as Tor Browser): iDeck removes the program's own folder and its Start Menu and Desktop shortcuts. Before, it refused with "iDeck refused to remove a file outside its Windows library". Folders shared by many programs (Program Files, the Desktop, Windows, store folders) are never removed whole, and nothing is removed while a Windows program is running.
+- The Ubisoft library loads again after signing in. Version 2.13.0 waited for Ubisoft's download service before showing any game, and that connection could wait forever, so the page stayed on "loading". The account's games now appear as soon as Ubisoft lists them, and the download information follows in the background.
+- Signing in or out in Settings now updates the Ubisoft page right away, without reopening iDeck.
+- An expired Ubisoft session is renewed automatically when the library loads. If it cannot be renewed, the page asks to sign in again.
+- If the connection to Ubisoft's download service does not open within 20 seconds, iDeck stops waiting: the games already listed stay on the page, and the reason goes to iDeck's log.
+- The Ubisoft sign-in now stays saved like Steam, GOG, Epic and EA: it is kept in the device's Keychain, which iOS keeps even when iDeck is deleted, and only Sign out removes it. Before, iDeck deleted the account by itself when Ubisoft refused to renew the session. Now the account stays, and Settings offers "Sign in again" to update it.
+- The sign-in screen no longer has the "Ubisoft account" button that opened Safari. Signing in happens only inside iDeck.
 
 ### Game session
-- Fixed iDeck crashing a few seconds after a game closed: a part of Wine kept reading the game's JIT memory after iDeck had freed it. It now stops before the memory is freed.
-- Games whose executable needs a larger memory window (such as BioShock 2) no longer get a smaller JIT pool after iDeck reopens ("SMALL JIT POOL (496MB)"): the pool now continues past the area iOS keeps for iDeck's main thread, as it already did for Dragon Age: Inquisition. `pool-split = 0` in a game's settings turns this off.
-- The "iOS did not exempt the JIT pool from the app's memory limit" warning appeared on every launch, although iOS never grants that exemption to apps outside Apple and iDeck still had more than 5 GB free. It now appears only when less than 2 GB is left with the pool counted.
-- When a download finishes while iDeck is in the background and a game is started, iDeck now waits until it is back in front to open StikDebug. Before, iOS refused and iDeck wrongly said StikDebug was not installed.
+- Closing a game no longer opens StikDebug by itself. Before, iDeck reopened itself through StikDebug as soon as Wine closed. Now StikDebug opens only when you start the next game and iDeck needs a fresh process for it.
+- The X button now only closes the game. If the game does not exit, the usual warning appears, with Retry and Close iDeck. Close iDeck now just closes it, without opening StikDebug.
+- Removed the note under the Wine log buttons that said which data is removed from logs. Copied and shared logs still have passwords, account names, e-mail and IP addresses removed.
+
+### 32-bit games
+- Fixed 32-bit games closing a few seconds after they start, such as BioShock 2. When the game created its first window, Wine's return from the window's callback tried to walk back through the translated game code, which it cannot do. It kept trying until it ran out of stack, and the game closed. That return now jumps straight back.
+
+### Wine log
+- The Wine log is much smaller. A setting iDeck turned on made Wine record every system call and file access, about 16 MB and 220,000 lines for a single session. iDeck now logs Wine's errors and the programs each session starts and loads, which is what Bugs & logs reads.
+- A copied or shared Wine log is now a short version:
+  - only the last session;
+  - no system-call and file trace lines (their count is noted at the top);
+  - lines longer than 400 characters cut;
+  - repeated lines folded;
+  - at most 256 KB, keeping the session's start and its end.
+
+### Settings
+- "Madeira native" no longer appears on the Windows runtime row in Settings. It is shown only on that page, as the IPA runtime.
 
 ### Version
-- Updated the application version to 2.13.0 (build 118).
+- Updated the application version to 2.13.1 (build 119).
