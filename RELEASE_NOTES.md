@@ -14,6 +14,9 @@
 ### Library
 - After StikDebug sends you back to iDeck, the library stays on the store you were using (for example the EA app) instead of switching to Steam. iDeck now remembers the last store tab you chose.
 
+### Game session
+- A game that needs a larger memory area for its program (such as Dragon Age: Inquisition) now gets it on the second launch in the same iDeck run too. iDeck kept that area reserved from the first launch and then failed to reserve it again ("could NOT widen the window to 192MB"); it now reuses it.
+
 ### Settings
 - A game's settings on its page are saved as you change them. The blue ✓ button and the Done button are gone: close the page by swiping it down.
 - Removed the note "Direct3D 11 and Direct3D 12 are chosen automatically for each game".
