@@ -131,7 +131,7 @@ enum LogIssueScanner {
     /// Counters that report no problem at all ("launch-client-error=0").
     private static let zeroCount = try! NSRegularExpression(pattern: #"\b(error|errors|failed|failures|missing)\s*[=:]\s*0\b"#)
     /// Informational lines a report keeps although they name no failure.
-    private static let diagnostics = ["[ideck-fault]", "[dock-installers]", "[steam-redist]", "[touch] tap", "[memory] session", "[ea-service]", "[ea-license]", "[jit-handoff]", "[download]", "[ea-download]"]
+    private static let diagnostics = ["[ideck-fault]", "[dock-installers]", "[steam-redist]", "[touch] tap", "[memory] session", "[ea-service]", "[ea-license]", "[ea-activation-log]", "[jit-handoff]", "[download]", "[ea-download]"]
     /// Lines from iDeck's Steam client, downloads and Madeira Dock.
     private static let steamTags = ["[steam", "[dock", "steam client", "steam's", "madeira dock", "steamworks", "steam_api"]
 
@@ -913,6 +913,20 @@ enum EAPrefixEvidence {
             text = text.replacingOccurrences(of: entity, with: character)
         }
         return text
+    }
+
+    /// The newest lines EA's activation window wrote, for iDeck's own log after a session in
+    /// which the game started ActivationUI.exe: they say why the licence was refused.
+    /// Addresses, e-mails, long tokens and the account names in `hidden` are removed.
+    static func activationReason(drive: URL, hidden: [String], lines count: Int = 20) -> [String] {
+        originLogs(drive: drive, files: 1, linesPerFile: count).map { line in
+            var text = line.replacingOccurrences(of: #"\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b"#, with: "<ip>", options: .regularExpression)
+            text = text.replacingOccurrences(of: #"\b[0-9a-fA-F]{1,4}(?::[0-9a-fA-F]{0,4}){4,7}\b"#, with: "<ip>", options: .regularExpression)
+            for name in hidden where name.count >= 3 {
+                text = text.replacingOccurrences(of: name, with: "<account>", options: .caseInsensitive)
+            }
+            return text
+        }
     }
 
     /// The newest files of EA's log folder: name, size and time, then each one's last lines.

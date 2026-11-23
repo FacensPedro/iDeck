@@ -513,6 +513,17 @@ struct EAInstalledGame: Codable, Sendable {
         UserDefaults.standard.set(next, forKey: hashVariantPrefix + content)
         EALog.event("[ea-license] content=\(content) started ActivationUI.exe with hash variant \(variant) "
             + "(\(variant == 0 ? "display adapter hashed" : "no display adapter")): the next launch asks for a licence with variant \(next)")
+        // EA's activation window writes why it opened in C:\ProgramData\Origin\Logs; the
+        // game itself says nothing, so those lines go in iDeck's log.
+        let account = EAAPI.shared.account()
+        let hidden = [account?.displayName, account?.userID, account?.personaID].compactMap { $0 }
+        let reason = EAPrefixEvidence.activationReason(
+            drive: FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("wine/drive_c", isDirectory: true),
+            hidden: hidden)
+        if reason.isEmpty {
+            EALog.event("[ea-activation-log] EA's activation window left no log in C:\\ProgramData\\Origin\\Logs")
+        }
+        for line in reason { EALog.event("[ea-activation-log] " + line.trimmingCharacters(in: .whitespaces)) }
     }
 
     /// The activation library the game ships and what the licence is built for.
