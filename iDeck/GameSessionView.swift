@@ -123,7 +123,9 @@ struct GameSessionView: View {
     @State private var isCopyingWineLog = false
     @State private var showControlsSheet = false
     /// The close and settings buttons folded into a small tab, so they cover less of the game.
-    @AppStorage("gameButtonsMinimized") private var gameButtonsMinimized = true
+    /// 2.14.1: every game starts with the buttons minimized (it was remembered, so one
+    /// expand kept them expanded in every later game).
+    @State private var gameButtonsMinimized = true
     @AppStorage("touchMouseEnabled") private var touchMouseEnabled = true
     @State private var metalFXTurnedOff = false
 
@@ -269,6 +271,7 @@ struct GameSessionView: View {
                             .font(.system(size: 18))
                             .foregroundColor(.white.opacity(0.45))
                             .frame(width: 44, height: 44)
+                            .padding(.vertical, 8)   // the same place as when expanded
                     }
                     .accessibilityLabel(tr("Show the close and settings buttons"))
                   } else {
