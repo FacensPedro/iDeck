@@ -23,6 +23,9 @@ struct SettingsView: View {
     @StateObject private var updater = UpdateChecker()
     @State private var ubisoftAccountName = UbisoftSavedSession.load()?.name ?? ""
     @State private var ubisoftLoginPresented = false
+    /// The saved Ubisoft session could not be renewed. The account stays saved (only
+    /// Sign out removes it, as for the other stores); signing in again updates it.
+    @State private var ubisoftSessionExpired = false
     @State private var isSteamSignInPresented = false
     @ObservedObject private var gogLibrary = GOGLibraryModel.shared
     @ObservedObject private var epicLibrary = EpicLibrary.shared
@@ -294,6 +297,11 @@ struct SettingsView: View {
                 if ubisoftAccountName.isEmpty {
                     Button(tr("Sign in")) { ubisoftLoginPresented = true }
                 } else {
+                    if ubisoftSessionExpired {
+                        Text(tr("Ubisoft did not renew the session. Sign in again to load your games; the account stays saved until you sign out."))
+                            .font(.footnote).foregroundStyle(.secondary)
+                        Button(tr("Sign in again")) { ubisoftLoginPresented = true }
+                    }
                     Button(tr("Sign out"), role: .destructive) {
                         if UbisoftSavedSession.clear() { ubisoftAccountName = ""; UbisoftLibrary.shared.refresh() }
                     }
@@ -306,29 +314,34 @@ struct SettingsView: View {
             }
         }
         .navigationTitle("Ubisoft Connect")
-        .sheet(isPresented: $ubisoftLoginPresented) { UbisoftLoginView(accountName: $ubisoftAccountName) }
+        .sheet(isPresented: $ubisoftLoginPresented, onDismiss: { Task { await restoreUbisoftSession() } }) {
+            UbisoftLoginView(accountName: $ubisoftAccountName)
+        }
     }
 
+    /// Renews an expired Ubisoft session with its remember-me ticket. Nothing here
+    /// removes the saved account: a refused or failed renewal only marks the session
+    /// expired, and Sign out is the one way to remove it (as for Steam, GOG, Epic and EA).
+    /// The session lives in the Keychain, which iOS keeps when the app is deleted.
     @MainActor private func restoreUbisoftSession() async {
-        guard let saved = UbisoftSavedSession.load(), saved.expired else { return }
-        guard let remember = saved.remember, !remember.isEmpty else {
-            if UbisoftSavedSession.clear() { ubisoftAccountName = ""; UbisoftLibrary.shared.refresh() }
+        guard let saved = UbisoftSavedSession.load() else {
+            ubisoftSessionExpired = false
             return
         }
-        var request = UbisoftSavedSession.request(appID: saved.appIDUsed ?? UbisoftSavedSession.appIDs[0])
-        request.setValue("ubi_rm_v1 t=" + remember, forHTTPHeaderField: "Authorization")
-        do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            guard !Task.isCancelled, UbisoftSavedSession.load()?.ticket == saved.ticket,
-                  let http = response as? HTTPURLResponse else { return }
-            if http.statusCode == 401 {
-                if UbisoftSavedSession.clear() { ubisoftAccountName = ""; UbisoftLibrary.shared.refresh() }
-            } else if (200..<300).contains(http.statusCode) {
-                let renewed = try UbisoftSavedSession.decode(data, previous: saved)
-                try renewed.save()
-                ubisoftAccountName = renewed.name
-            }
-        } catch { return }
+        ubisoftAccountName = saved.name
+        guard saved.expired else {
+            ubisoftSessionExpired = false
+            return
+        }
+        let renewed = await UbisoftSavedSession.current()
+        guard !Task.isCancelled else { return }
+        if let renewed, !renewed.expired {
+            ubisoftAccountName = renewed.name
+            ubisoftSessionExpired = false
+            UbisoftLibrary.shared.refresh()
+        } else {
+            ubisoftSessionExpired = true
+        }
     }
 
     private var eaPage: some View {

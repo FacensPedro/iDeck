@@ -4,6 +4,7 @@
 - Signing in or out in Settings now updates the Ubisoft page right away, without reopening iDeck.
 - An expired Ubisoft session is renewed automatically when the library loads. If it cannot be renewed, the page asks to sign in again.
 - If the connection to Ubisoft's download service does not open within 20 seconds, iDeck stops waiting: the games already listed stay on the page, and the reason goes to iDeck's log.
+- The Ubisoft sign-in now stays saved like Steam, GOG, Epic and EA: it is kept in the device's Keychain, which iOS keeps even when iDeck is deleted, and only Sign out removes it. Before, iDeck deleted the account by itself when Ubisoft refused to renew the session. Now the account stays, and Settings offers "Sign in again" to update it.
 - The sign-in screen no longer has the "Ubisoft account" button that opened Safari. Signing in happens only inside iDeck.
 
 ### Version

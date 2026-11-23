@@ -301,6 +301,8 @@ enum Translations {
         "Madeira signs in with Steam directly. Your password is sent only to Steam and is never stored. A sign-in token is kept in this device's Keychain until you sign out.": ["pt": "O login é feito diretamente com o Steam. Sua senha é enviada apenas ao Steam e nunca é armazenada. O token da sessão fica no Chaves do iPad até você sair da conta.", "es": "El inicio de sesión se realiza directamente con Steam. Tu contraseña solo se envía a Steam y nunca se guarda. El token de sesión permanece en el llavero del dispositivo hasta que cierres sesión."],
         "Cancel": ["pt": "Cancelar", "es": "Cancelar"],
         "Sign out": ["pt": "Sair da conta", "es": "Cerrar sesión"],
+        "Sign in again": ["pt": "Entrar de novo", "es": "Volver a iniciar sesión"],
+        "Ubisoft did not renew the session. Sign in again to load your games; the account stays saved until you sign out.": ["pt": "A Ubisoft não renovou a sessão. Entre de novo para carregar seus jogos; a conta continua salva até você sair dela.", "es": "Ubisoft no renovó la sesión. Vuelve a iniciar sesión para cargar tus juegos; la cuenta sigue guardada hasta que cierres sesión."],
         "Signing out removes the token from this device's Keychain.": ["pt": "Ao sair, o token é removido do Chaves deste dispositivo.", "es": "Al cerrar sesión, se elimina el token del llavero de este dispositivo."],
         "Steam account name": ["pt": "Nome de usuário Steam", "es": "Nombre de usuario de Steam"],
         "Sign in": ["pt": "Entrar", "es": "Iniciar sesión"],
