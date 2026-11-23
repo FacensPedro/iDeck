@@ -9,7 +9,7 @@ ENV = repo_text("iDeck/WindowsEnvironment.swift")
 
 class UbisoftCoverTests(unittest.TestCase):
     def test_covers_come_from_steam_by_title(self):
-        self.assertIn("var coverURL: URL? = nil", UBI)
+        self.assertIn("var coverURLs: [URL] = []", UBI)
         self.assertIn("store.steampowered.com/api/storesearch/", UBI)
         self.assertIn("library_600x900.jpg", UBI)
         self.assertIn("await self.findCovers()", UBI)
@@ -17,8 +17,7 @@ class UbisoftCoverTests(unittest.TestCase):
     def test_card_shows_the_cover(self):
         start = VIEW.index("private func ubisoftCard(")
         card = VIEW[start:VIEW.index("private func launchEAGame", start)]
-        self.assertIn("if let cover = game.coverURL", card)
-        self.assertIn("ArtworkImage(url: cover)", card)
+        self.assertIn("GOGArtworkView(urls: game.coverURLs, fallbackColor: secondaryColor, fill: true, fallbackTitle: game.title)", card)
 
 
 class FirefoxSandboxTests(unittest.TestCase):

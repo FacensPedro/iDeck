@@ -269,6 +269,8 @@ struct WindowsWorkspaceView: View {
     private var ubisoftSignedIn: Bool { ubisoftLibrary.signedIn }
     @State private var selectedEpicGame: SelectedEpicGame?
     @State private var selectedEAGame: EAOwnedGame?
+    /// The Ubisoft game whose install is being confirmed.
+    @State private var pendingUbisoftInstall: UbisoftGame?
     @State private var selectedGOGGame: GOGGame?
     @AppStorage("library.epicOwnedCollapsed") private var epicOwnedCollapsed = false
     @Environment(\.openURL) private var openURL
@@ -996,17 +998,15 @@ struct WindowsWorkspaceView: View {
                 case .paused, .failed: ubisoftLibrary.install(game)
                 }
             } else {
-                ubisoftLibrary.install(game)
+                // A download is tens of GB: asked first, never started by a stray tap.
+                pendingUbisoftInstall = game
             }
         }
         return VStack(alignment: .leading, spacing: 6) {
             ZStack {
-                if let cover = game.coverURL {
-                    ArtworkImage(url: cover) { image in
-                        image.resizable().scaledToFill()
-                    } placeholder: {
-                        secondaryColor
-                    }
+                if !game.coverURLs.isEmpty {
+                    GOGArtworkView(urls: game.coverURLs, fallbackColor: secondaryColor, fill: true, fallbackTitle: game.title)
+                        .id(game.coverURLs)
                 } else if let executable = game.executable {
                     WindowsExecutableArtworkView(executableURL: executable, library: windowsLibrary, fallbackColor: secondaryColor)
                 } else {
@@ -1036,6 +1036,12 @@ struct WindowsWorkspaceView: View {
             }
             Button(action: open) { cardTitle(game.title) }
                 .buttonStyle(.plain)
+            if case .failed(let message)? = ubisoftLibrary.downloads[game.id]?.state {
+                Text(message)
+                    .font(.caption2)
+                    .foregroundColor(.red)
+                    .lineLimit(2)
+            }
         }
         .padding(4)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -1213,6 +1219,8 @@ private struct GOGArtworkView: View {
     let fallbackColor: Color
     /// Fill the frame and crop (EA's 9:16 pack art in a 2:3 card); fit otherwise.
     var fill = false
+    /// Shown instead of the controller icon when no address gave a picture.
+    var fallbackTitle: String? = nil
     @State private var index = 0
 
     var body: some View {
@@ -1230,6 +1238,13 @@ private struct GOGArtworkView: View {
                     fallbackColor.overlay(ProgressView().tint(.gray))
                 }
                 .id(index)
+            } else if let fallbackTitle {
+                fallbackColor.overlay(
+                    Text(fallbackTitle)
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .multilineTextAlignment(.center)
+                        .padding(10))
             } else {
                 fallbackColor.overlay(
                     Image(systemName: "gamecontroller")
@@ -2646,6 +2661,18 @@ extension WindowsWorkspaceView {
                         // The launcher is installed by the initial setup: what is missing is the sign-in.
                         StoreClientCard(client: .ubisoft, coordinator: coordinator)
                     }
+                }
+                .confirmationDialog(tr("Install %@?", pendingUbisoftInstall?.title ?? ""),
+                                    isPresented: Binding(get: { pendingUbisoftInstall != nil },
+                                                         set: { if !$0 { pendingUbisoftInstall = nil } }),
+                                    titleVisibility: .visible) {
+                    Button(tr("Install")) {
+                        if let game = pendingUbisoftInstall { ubisoftLibrary.install(game) }
+                        pendingUbisoftInstall = nil
+                    }
+                    Button(tr("Cancel"), role: .cancel) { pendingUbisoftInstall = nil }
+                } message: {
+                    Text(tr("iDeck downloads it from Ubisoft's servers."))
                 }
                 .task(id: coordinator.windowsStatus) {
                     let installed = await Task.detached(priority: .utility) {
