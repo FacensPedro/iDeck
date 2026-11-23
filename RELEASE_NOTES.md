@@ -17,6 +17,9 @@
 ### Game session
 - A game that needs a larger memory area for its program (such as Dragon Age: Inquisition) now gets it on the second launch in the same iDeck run too. iDeck kept that area reserved from the first launch and then failed to reserve it again ("could NOT widen the window to 192MB"); it now reuses it.
 
+### Visual C++
+- iDeck's Visual C++ install now also includes Microsoft Visual C++ 2015-2019 (32-bit and 64-bit), alongside 2005-2013 and 2015-2022. The newer 2015-2022 files are kept where the two share a name. iDeck installs the runtimes again once to add it.
+
 ### Settings
 - A game's settings on its page are saved as you change them. The blue ✓ button and the Done button are gone: close the page by swiping it down.
 - Removed the note "Direct3D 11 and Direct3D 12 are chosen automatically for each game".

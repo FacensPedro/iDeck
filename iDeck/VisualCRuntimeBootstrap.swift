@@ -209,8 +209,8 @@ enum VisualCRuntimeLegacy {
 
     static let x86Machine: Int32 = 0x014c
     static let x64Machine: Int32 = 0x8664
-    static let installStatus = "Installing Microsoft Visual C++ 2005-2013 and 32-bit runtimes..."
-    static let markerName = ".legacy-v1"
+    static let installStatus = "Installing Microsoft Visual C++ 2005-2019 and 32-bit runtimes..."
+    static let markerName = ".legacy-v2"   // v2 (2.13.3): with Visual C++ 2015-2019
 
     private static let ms = "https://download.microsoft.com/download/"
 
@@ -243,6 +243,14 @@ enum VisualCRuntimeLegacy {
         add("2013", "120", x86: "https://aka.ms/highdpimfc2013x86enu",
             x64: "https://aka.ms/highdpimfc2013x64enu",
             extra: ["vcomp120.dll", "vcamp120.dll", "vccorlib120.dll"])
+        // Visual C++ 2015-2019 (14.29, Visual Studio 2019's last), before 2015-2022 so the
+        // newer DLLs of the same names are the ones kept; x64 adds MFC/OpenMP only, as above.
+        list.append(Package(name: "2015-2019 x86", url: URL(string: "https://aka.ms/vs/16/release/vc_redist.x86.exe")!,
+                            machine: x86Machine, dlls: VisualCRuntimeBootstrap.requiredDLLs,
+                            required: "vcruntime140.dll"))
+        list.append(Package(name: "2015-2019 x64", url: URL(string: "https://aka.ms/vs/16/release/vc_redist.x64.exe")!,
+                            machine: x64Machine, dlls: dlls("140", cores: false, extra: ["vcomp140.dll"]),
+                            required: "mfc140.dll"))
         list.append(Package(name: "2015-2022 x86", url: URL(string: "https://aka.ms/vc14/vc_redist.x86.exe")!,
                             machine: x86Machine, dlls: VisualCRuntimeBootstrap.requiredDLLs,
                             required: "vcruntime140.dll"))

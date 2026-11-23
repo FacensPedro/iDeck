@@ -222,7 +222,7 @@ enum Translations {
         "Install Microsoft Visual C++?": ["pt": "Instalar Microsoft Visual C++?", "es": "¿Instalar Microsoft Visual C++?"],
         "Install and play": ["pt": "Instalar e jogar", "es": "Instalar y jugar"],
         "Play without installing": ["pt": "Jogar sem instalar", "es": "Jugar sin instalar"],
-        "Installing Microsoft Visual C++ 2005-2013 and 32-bit runtimes...": ["pt": "Instalando Microsoft Visual C++ 2005-2013 e as versões de 32 bits...", "es": "Instalando Microsoft Visual C++ 2005-2013 y las versiones de 32 bits..."],
+        "Installing Microsoft Visual C++ 2005-2019 and 32-bit runtimes...": ["pt": "Instalando Microsoft Visual C++ 2005-2019 e as versões de 32 bits...", "es": "Instalando Microsoft Visual C++ 2005-2019 y las versiones de 32 bits..."],
         "Installing Microsoft Visual C++...": ["pt": "Instalando Microsoft Visual C++...", "es": "Instalando Microsoft Visual C++..."],
         "Language": ["pt": "Idioma", "es": "Idioma"],
         "System default": ["pt": "Padrão do sistema", "es": "Predeterminado del sistema"],
