@@ -2204,18 +2204,12 @@ class SystemCoordinator: ObservableObject {
             } else {
                 SteamLog.event("[wine-close] Alt+F4 requested; waiting for guest and wineserver")
             }
-            // The X closes iDeck together with the session: Wine runs inside this
-            // process, and a session that has ended leaves memory behind that keeps
-            // the next game from getting its JIT pool. The game gets Alt+F4 first and
-            // a moment to save; iDeck is opened again for the next game.
-            AppLog.record("[wine-close] X pressed with a session running: iDeck reopens with its memory free")
-            SessionOutcome.ended("closed with the X button (iDeck reopened with the memory free)")
-            finishMemorySampling(reason: "closed with the X button (iDeck reopened with the memory free)")
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
-                guard let self else { exit(0) }
-                self.reopenWithFreeMemory(reason: "the X closed a running session")
-            }
-            return
+            // 2.13.1: the X only closes the game (Alt+F4, retried, then the close
+            // warning). iDeck no longer reopens itself through StikDebug here: a
+            // process that ran a Windows session is replaced when the NEXT game is
+            // started (restartNeeded() in the launch path), not when one closes.
+            AppLog.record("[wine-close] X pressed with a session running: waiting for the game to exit")
+            SessionOutcome.ended("closed with the X button")
         }
         pollWindowsSessionClose()
     }
@@ -2232,17 +2226,14 @@ class SystemCoordinator: ObservableObject {
     }
 
     /// The game did not exit: iDeck closes itself, the only way to end an in-process
-    /// Wine thread that ignores Alt+F4 (Madeira offers the same). Open it again from
-    /// StikDebug to start another game.
+    /// Wine thread that ignores Alt+F4 (Madeira offers the same). StikDebug is not
+    /// opened here: the next game started after iDeck is opened again asks for JIT.
     func forceCloseIDeck() {
         SteamLog.event("[wine-close] game did not exit; iDeck closed by the user")
         AppLog.record("[wine-close] force close: iDeck exits so the stuck Windows session ends")
         SessionOutcome.ended("the game did not exit; iDeck was closed from the close warning")
         finishMemorySampling(reason: "the game did not exit; iDeck was force-closed")
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
-            guard let self else { exit(0) }
-            self.reopenWithFreeMemory(reason: "the game did not exit")
-        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { exit(0) }
     }
 
     /// Ends this iDeck process and has StikDebug open a new one, so the next game or
@@ -2339,7 +2330,7 @@ class SystemCoordinator: ObservableObject {
         }
         if seconds >= 15, !windowsCloseWarningWasShown {
             windowsCloseWarningWasShown = true
-            windowsCloseWarning = "The Windows game has not exited. Close it from its own menu, retry, or close iDeck: unsaved progress is lost, and iDeck reopens through StikDebug with its memory free."
+            windowsCloseWarning = "The Windows game has not exited. Close it from its own menu, retry, or close iDeck: unsaved progress is lost."
             SteamLog.event("[wine-close] guest or wineserver did not exit after 15 seconds")
         }
     }
@@ -2365,11 +2356,9 @@ class SystemCoordinator: ObservableObject {
         windowsStatusBeforeClose = nil
         SteamLog.event("[wine-close] Wine and wineserver exited; returning to Steam library")
         setWindowsStatus("Windows Ready")
-        // The X frees the memory: a process that ran a Windows session cannot start
-        // another one, so iDeck reopens fresh instead of refusing the next game.
-        if let why = Self.restartNeeded(), UIApplication.shared.applicationState == .active {
-            reopenWithFreeMemory(reason: "session closed (\(why))", exitAnyway: false)
-        }
+        // 2.13.1: nothing more here. A process that ran a Windows session cannot start
+        // another one; StikDebug opens a fresh iDeck when the next game is started
+        // (restartNeeded() in the launch path), not as soon as this one closes.
     }
 
     func refreshWindowsSessionHealth() {

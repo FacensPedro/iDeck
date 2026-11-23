@@ -387,9 +387,6 @@ struct GameSessionView: View {
                                 }
                             }
                             .font(.subheadline.weight(.semibold))
-                            Text(tr("Passwords, account names, e-mail and IP addresses are removed from copied and shared logs."))
-                                .font(.caption)
-                                .foregroundColor(.gray)
                         }
                     }
                     .padding(12)
@@ -421,9 +418,6 @@ struct GameSessionView: View {
                                 Label(tr("Share Wine log"), systemImage: "square.and.arrow.up")
                             }
                             .font(.subheadline)
-                            Text(tr("Passwords, account names, e-mail and IP addresses are removed from copied and shared logs."))
-                                .font(.caption2)
-                                .foregroundColor(.gray)
                         }
                     }
                     .padding(12)

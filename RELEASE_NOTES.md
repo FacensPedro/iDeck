@@ -7,5 +7,10 @@
 - The Ubisoft sign-in now stays saved like Steam, GOG, Epic and EA: it is kept in the device's Keychain, which iOS keeps even when iDeck is deleted, and only Sign out removes it. Before, iDeck deleted the account by itself when Ubisoft refused to renew the session. Now the account stays, and Settings offers "Sign in again" to update it.
 - The sign-in screen no longer has the "Ubisoft account" button that opened Safari. Signing in happens only inside iDeck.
 
+### Game session
+- Closing a game no longer opens StikDebug by itself. Before, iDeck reopened itself through StikDebug as soon as Wine closed. Now StikDebug opens only when you start the next game and iDeck needs a fresh process for it.
+- The X button now only closes the game. If the game does not exit, the usual warning appears, with Retry and Close iDeck. Close iDeck now just closes it, without opening StikDebug.
+- Removed the note under the Wine log buttons that said which data is removed from logs. Copied and shared logs still have passwords, account names, e-mail and IP addresses removed.
+
 ### Version
 - Updated the application version to 2.13.1 (build 119).

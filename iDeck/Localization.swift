@@ -74,7 +74,7 @@ enum Translations {
         "Free space": ["pt": "Espaço livre", "es": "Espacio libre"],
         "%@ free of %@": ["pt": "%@ livres de %@", "es": "%@ libres de %@"],
         "Close iDeck": ["pt": "Fechar o iDeck", "es": "Cerrar iDeck"],
-        "The Windows game has not exited. Close it from its own menu, retry, or close iDeck: unsaved progress is lost, and iDeck reopens through StikDebug with its memory free.": ["pt": "O jogo do Windows não fechou. Feche pelo menu do próprio jogo, tente de novo ou feche o iDeck: o progresso não salvo é perdido e o iDeck reabre pelo StikDebug com a memória livre.", "es": "El juego de Windows no se cerró. Ciérralo desde su propio menú, vuelve a intentarlo o cierra iDeck: se pierde el progreso no guardado e iDeck se vuelve a abrir desde StikDebug con la memoria libre."],
+        "The Windows game has not exited. Close it from its own menu, retry, or close iDeck: unsaved progress is lost.": ["pt": "O jogo do Windows não fechou. Feche pelo menu do próprio jogo, tente de novo ou feche o iDeck: o progresso não salvo é perdido.", "es": "El juego de Windows no se cerró. Ciérralo desde su propio menú, vuelve a intentarlo o cierra iDeck: se pierde el progreso no guardado."],
         "Freeing memory: iDeck reopens through StikDebug…": ["pt": "Liberando a memória: o iDeck reabre pelo StikDebug…", "es": "Liberando memoria: iDeck se vuelve a abrir desde StikDebug…"],
         "JIT pool": ["pt": "Pool JIT", "es": "Pool JIT"],
         "Ubisoft's download service closed the connection (%@).": ["pt": "O serviço de download da Ubisoft fechou a conexão (%@).", "es": "El servicio de descargas de Ubisoft cerró la conexión (%@)."],
@@ -140,10 +140,6 @@ enum Translations {
         "Last Wine log indicates a missing or incompatible DLL.": ["pt": "O último log do Wine indica uma DLL ausente ou incompatível.", "es": "El último registro de Wine indica una DLL ausente o incompatible."],
         "A 32-bit Windows program could not reserve its WoW64 address window. The iOS device's virtual address space is insufficient for the current Madeira memory policy.": ["pt": "Um programa Windows de 32 bits não conseguiu reservar a janela de endereços WoW64. O espaço de endereçamento virtual do dispositivo iOS é insuficiente para a política de memória atual do Madeira.", "es": "Un programa Windows de 32 bits no pudo reservar la ventana de direcciones WoW64. El espacio de direcciones virtuales del dispositivo iOS es insuficiente para la política de memoria actual de Madeira."],
         "Wine/FEX encountered an unhandled native ARM64EC exception (x18 handler) and terminated with NTSTATUS 0xC000001D. This is a runtime compatibility failure, not proof of a missing game DLL.": ["pt": "O Wine/FEX encontrou uma exceção nativa ARM64EC não tratada (manipulador x18) e terminou com NTSTATUS 0xC000001D. É uma falha de compatibilidade do runtime, não uma indicação de DLL ausente.", "es": "Wine/FEX encontró una excepción nativa ARM64EC no controlada (manejador x18) y terminó con NTSTATUS 0xC000001D. Es un fallo de compatibilidad del runtime, no una prueba de DLL ausente."],
-        "Passwords, account names, e-mail and IP addresses are removed from copied and shared logs.": [
-            "pt": "Senhas, nomes de conta, e-mails e endereços IP são removidos dos logs copiados e compartilhados.",
-            "es": "Las contraseñas, los nombres de cuenta, los correos y las direcciones IP se eliminan de los registros copiados y compartidos."
-        ],
         "Checking existing files %d%%": ["pt": "Verificando arquivos existentes %d%%", "es": "Verificando archivos existentes %d%%"],
         "Installed: %@": ["pt": "Instalado: %@", "es": "Instalado: %@"],
         "Wine log copied as a .txt file.": ["pt": "Log do Wine copiado como arquivo .txt.", "es": "Registro de Wine copiado como archivo .txt."],
