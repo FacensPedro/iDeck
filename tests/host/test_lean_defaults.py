@@ -6,8 +6,10 @@ from support import repo_text
 class LeanDefaultsTests(unittest.TestCase):
     def test_logs_are_detailed_without_the_slow_profilers(self):
         environment = repo_text("iDeck/WindowsEnvironment.swift")
-        self.assertIn('setenv("WINEDEBUG", "err+all,err-ole,err-winediag,fixme-all,warn-all", 1)', environment)
-        self.assertIn('setenv("MADEIRA_DEBUG_VERBOSE", "1", 1)', environment)
+        self.assertIn('static let wineDebugChannels = "err+all,err-ole,err-winediag,fixme-all,warn-all,trace+process,trace+loaddll"', environment)
+        self.assertIn('setenv("WINEDEBUG", Self.wineDebugChannels, 1)', environment)
+        # Verbose would make Madeira replace WINEDEBUG with trace+syscall/trace+file.
+        self.assertIn('setenv("MADEIRA_DEBUG_VERBOSE", "0", 1)', environment)
         # The PC sampler and the JIT dump stay off: they are what slowed games down.
         self.assertIn('setenv("MADEIRA_QUIET", "1", 1)', environment)
         self.assertIn('setenv("MADEIRA_JIT_DUMP", "0", 1)', environment)

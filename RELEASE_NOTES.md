@@ -12,5 +12,17 @@
 - The X button now only closes the game. If the game does not exit, the usual warning appears, with Retry and Close iDeck. Close iDeck now just closes it, without opening StikDebug.
 - Removed the note under the Wine log buttons that said which data is removed from logs. Copied and shared logs still have passwords, account names, e-mail and IP addresses removed.
 
+### Wine log
+- The Wine log is much smaller. A setting iDeck turned on made Wine record every system call and file access, about 16 MB and 220,000 lines for a single session. iDeck now logs Wine's errors and the programs each session starts and loads, which is what Bugs & logs reads.
+- A copied or shared Wine log is now a short version:
+  - only the last session;
+  - no system-call and file trace lines (their count is noted at the top);
+  - lines longer than 400 characters cut;
+  - repeated lines folded;
+  - at most 256 KB, keeping the session's start and its end.
+
+### Settings
+- "Madeira native" no longer appears on the Windows runtime row in Settings. It is shown only on that page, as the IPA runtime.
+
 ### Version
 - Updated the application version to 2.13.1 (build 119).

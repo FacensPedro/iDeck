@@ -30,7 +30,7 @@ enum WineLogClipboard {
             // The copy is compacted: repeated lines are folded, so it is much smaller.
             // Compacted byte by byte: no String of the whole log, no Character per line.
             let raw = try Data(contentsOf: source)
-            try PrivacyRedactor.redact(LogCompactor.compactedData(raw)).write(to: destination, options: .atomic)
+            try PrivacyRedactor.redact(WineLogDigest.shared(raw, from: source)).write(to: destination, options: .atomic)
             return destination
         }.value
         let provider = NSItemProvider()
@@ -90,6 +90,86 @@ enum WineLogClipboard {
         }
 
         return Content(text: LogCompactor.compact(text), truncated: truncated)
+    }
+}
+
+/// The Wine log as it is copied and shared: small enough to read whole (2.13.1).
+/// A 16 MB, 220,000-line madeira-log.txt could not be read at all. The copy keeps:
+/// - the last session only (from its "[wineserver-bridge] ws_log test" line);
+/// - no per-call trace lines (SysCall/SysRet, trace:file, trace:module...), counted;
+/// - each line cut to `maximumLineBytes`;
+/// - repeats folded (LogCompactor);
+/// - past `maximumBytes`, the session's start and its end (where a crash is), with
+///   the number of lines left out between them.
+/// madeira-log.txt itself is unchanged: Bugs & logs scans it whole.
+enum WineLogDigest {
+    static let maximumLineBytes = 400
+    static let maximumBytes = 256 << 10
+    static let headBytes = 64 << 10
+    static let sessionMarker = Data("[wineserver-bridge] ws_log test".utf8)
+    /// Lines kept even though they are traces: what Bugs & logs reads from them.
+    static let keptTraces = [":trace:process:", ":trace:loaddll:"]
+    static let callTraces = [":SysCall ", ":SysRet ", ":Call ", ":Ret "]
+
+    static func applies(to url: URL) -> Bool { url.lastPathComponent.hasPrefix("madeira-log") }
+
+    static func digest(_ data: Data) -> Data {
+        // The last session.
+        var start = data.startIndex
+        var earlier = 0
+        var search = data.startIndex..<data.endIndex
+        while let found = data.range(of: sessionMarker, options: [], in: search) {
+            if found.lowerBound != data.startIndex { earlier += 1 }
+            start = found.lowerBound
+            search = found.upperBound..<data.endIndex
+        }
+        if earlier > 0, let lineStart = data[data.startIndex..<start].lastIndex(of: 0x0A) {
+            start = data.index(after: lineStart)
+        }
+        let session = data[start...]
+
+        var kept = [UInt8]()
+        kept.reserveCapacity(min(session.count, 4 << 20))
+        var calls = 0, traces = 0, cut = 0
+        var lineStart = session.startIndex
+        while lineStart < session.endIndex {
+            let lineEnd = session[lineStart...].firstIndex(of: 0x0A) ?? session.endIndex
+            let line = session[lineStart..<lineEnd]
+            lineStart = lineEnd < session.endIndex ? session.index(after: lineEnd) : session.endIndex
+            let head = String(decoding: line.prefix(96), as: UTF8.self)
+            if callTraces.contains(where: head.contains) { calls += 1; continue }
+            if head.contains(":trace:") && !keptTraces.contains(where: head.contains) { traces += 1; continue }
+            if line.count > maximumLineBytes {
+                var end = line.startIndex + maximumLineBytes
+                while end > line.startIndex, line[end] & 0xC0 == 0x80 { end -= 1 }   // whole UTF-8 characters
+                kept.append(contentsOf: line[line.startIndex..<end])
+                kept.append(contentsOf: Array(" …".utf8))
+                cut += 1
+            } else {
+                kept.append(contentsOf: line)
+            }
+            kept.append(0x0A)
+        }
+        var body = LogCompactor.compactedData(Data(kept))
+        var middle = ""
+        if body.count > maximumBytes {
+            let headEnd = body[..<(body.startIndex + headBytes)].lastIndex(of: 0x0A) ?? body.startIndex + headBytes
+            let tailFrom = body.endIndex - (maximumBytes - headBytes)
+            let tailStart = body[tailFrom...].firstIndex(of: 0x0A).map { body.index(after: $0) } ?? tailFrom
+            let left = body[headEnd..<tailStart].reduce(0) { $0 + ($1 == 0x0A ? 1 : 0) }
+            middle = "\n[iDeck] … \(left) lines left out here to keep the log readable (madeira-log.txt on the device has them) …\n"
+            body = body[..<headEnd] + Data(middle.utf8) + body[tailStart...]
+        }
+        var header = "[iDeck] Wine log of the last session"
+        if earlier > 0 { header += " (\(earlier) earlier session\(earlier == 1 ? "" : "s") left out)" }
+        header += ". Left out: \(calls) system-call trace lines, \(traces) other trace lines"
+        header += "; \(cut) lines longer than \(maximumLineBytes) bytes cut.\n\n"
+        return Data(header.utf8) + body
+    }
+
+    /// The file's bytes as they are copied or shared: the digest for the Wine log.
+    static func shared(_ data: Data, from url: URL) -> Data {
+        applies(to: url) ? digest(data) : LogCompactor.compactedData(data)
     }
 }
 
@@ -365,7 +445,7 @@ enum PrivacyRedactor {
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
         let file = destination.appendingPathComponent(name + ".txt")
-        try redact(LogCompactor.compactedData(try Data(contentsOf: source))).write(to: file, options: .atomic)
+        try redact(WineLogDigest.shared(try Data(contentsOf: source), from: source)).write(to: file, options: .atomic)
         return file
     }
 }

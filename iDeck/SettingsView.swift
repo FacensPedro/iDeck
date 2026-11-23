@@ -68,8 +68,8 @@ struct SettingsView: View {
                                     value: externalDrives.folders.isEmpty ? nil : "\(externalDrives.folders.count)")
                     }
                     NavigationLink { runtimePage } label: {
-                        SettingsRow(icon: "cpu.fill", color: .green, title: tr("Windows runtime"),
-                                    value: tr(MadeiraBundleIdentity.isNative ? "Madeira-native" : "Interface-only"))
+                        // The runtime kind is shown only on the page, as "IPA runtime".
+                        SettingsRow(icon: "cpu.fill", color: .green, title: tr("Windows runtime"))
                     }
                 }
 
