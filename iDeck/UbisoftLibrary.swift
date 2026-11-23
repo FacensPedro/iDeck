@@ -7,23 +7,33 @@ struct UbisoftGame: Identifiable, Equatable, Sendable {
     let title: String
     /// The game's main program, when installed.
     let executable: URL?
-    /// The game's portrait cover (Steam's library art for the same title), once found.
-    var coverURL: URL? = nil
+    /// The game's portrait cover (Steam's library art for the same title), once found:
+    /// the addresses to try in order (UbisoftCovers.urls).
+    var coverURLs: [URL] = []
 }
 
 /// Covers for Ubisoft games. Ubisoft's account service gives only names, so the cover
 /// is Steam's 600x900 library art of the game with the same title (most Ubisoft games
 /// are also sold on Steam). Answers, including "none", are kept so the search runs once.
 enum UbisoftCovers {
-    private static let storeKey = "ubisoft.coverAppIDs"
+    /// v2 (2.13.2): searched without ®/™, which made Steam answer "none" for titles such
+    /// as "Assassin's Creed® Chronicles: China"; v1 kept those answers for good.
+    private static let storeKey = "ubisoft.coverAppIDs.v2"
 
     static func key(_ title: String) -> String {
         title.lowercased().replacingOccurrences(of: "®", with: "").replacingOccurrences(of: "™", with: "")
             .filter { $0.isLetter || $0.isNumber }
     }
 
-    static func url(appID: Int) -> URL? {
-        appID > 0 ? URL(string: "https://cdn.cloudflare.steamstatic.com/steam/apps/\(appID)/library_600x900.jpg") : nil
+    /// The cover addresses of a Steam app, in order. Steam moved the art of many games
+    /// to store_item_assets (the old path answers 404 for them), and a few games have
+    /// no portrait art at all: their header picture is the last choice.
+    static func urls(appID: Int) -> [URL] {
+        guard appID > 0 else { return [] }
+        return ["https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/\(appID)/library_600x900.jpg",
+                "https://cdn.cloudflare.steamstatic.com/steam/apps/\(appID)/library_600x900.jpg",
+                "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/\(appID)/library_600x900_2x.jpg",
+                "https://cdn.cloudflare.steamstatic.com/steam/apps/\(appID)/header.jpg"].compactMap(URL.init(string:))
     }
 
     /// The cached Steam app id for a title: nil when never searched, 0 when none was found.
@@ -31,20 +41,24 @@ enum UbisoftCovers {
         (UserDefaults.standard.dictionary(forKey: storeKey) as? [String: Int])?[key(title)]
     }
 
-    static func coverURL(for title: String) async -> URL? {
-        if let known = cached(title) { return url(appID: known) }
+    static func cachedURLs(_ title: String) -> [URL] { cached(title).map(urls(appID:)) ?? [] }
+
+    /// The cover addresses for a title, searching Steam once; nil when Steam did not answer.
+    static func coverURLs(for title: String) async -> [URL]? {
+        if let known = cached(title) { return urls(appID: known) }
         guard let appID = await steamAppID(for: title) else { return nil }
         var store = (UserDefaults.standard.dictionary(forKey: storeKey) as? [String: Int]) ?? [:]
         store[key(title)] = appID
         UserDefaults.standard.set(store, forKey: storeKey)
-        return url(appID: appID)
+        return urls(appID: appID)
     }
 
     /// Steam's store search: an exact title match first, then a title that starts with
     /// the Ubisoft name. 0 means Steam answered without a match; nil means no answer.
     private static func steamAppID(for title: String) async -> Int? {
         var components = URLComponents(string: "https://store.steampowered.com/api/storesearch/")!
-        components.queryItems = [URLQueryItem(name: "term", value: title),
+        let term = title.replacingOccurrences(of: "®", with: "").replacingOccurrences(of: "™", with: "")
+        components.queryItems = [URLQueryItem(name: "term", value: term),
                                  URLQueryItem(name: "l", value: "english"),
                                  URLQueryItem(name: "cc", value: "US")]
         guard let url = components.url else { return nil }
@@ -128,6 +142,7 @@ final class UbisoftLibrary: ObservableObject {
             self.publish(installed: installed, owned: owned)
             self.error = failure
             self.refreshing = false
+            Task { await self.findCovers() }
             AppLog.record("[ubisoft-library] installed=\(installed.count) owned=\(owned.count) signed-in=\(session != nil)")
 
             if session != nil {
@@ -146,6 +161,7 @@ final class UbisoftLibrary: ObservableObject {
                 if !products.isEmpty {
                     self.publish(installed: installed, owned: owned)
                     self.error = nil
+                    Task { await self.findCovers() }   // titles only the ownership service named
                 }
             }
             self.task = nil
@@ -154,7 +170,6 @@ final class UbisoftLibrary: ObservableObject {
                 self.refresh()
                 return
             }
-            await self.findCovers()
         }
     }
 
@@ -164,17 +179,37 @@ final class UbisoftLibrary: ObservableObject {
             .map { UbisoftGame(id: "owned:" + Self.key($0), title: $0, executable: nil) }
         games = (installed + missing).map { game in
             var game = game
-            game.coverURL = games.first(where: { $0.id == game.id })?.coverURL
-                ?? UbisoftCovers.cached(game.title).flatMap(UbisoftCovers.url(appID:))
+            let known = games.first(where: { $0.id == game.id })?.coverURLs ?? []
+            game.coverURLs = known.isEmpty ? UbisoftCovers.cachedURLs(game.title) : known
             return game
         }
     }
 
-    /// Looks up the covers not cached yet, one title at a time, and shows each as it arrives.
+    /// Titles whose cover is being looked up.
+    private var coverLookups = Set<String>()
+
+    /// Looks up the covers not cached yet, six titles at a time, and shows each as it
+    /// arrives. Started as soon as the list is shown (2.13.1 waited for the ownership
+    /// service first, so the cards stayed black for up to a minute).
     private func findCovers() async {
-        for game in games where game.coverURL == nil && UbisoftCovers.cached(game.title) == nil {
-            guard let url = await UbisoftCovers.coverURL(for: game.title) else { continue }
-            if let index = games.firstIndex(where: { $0.id == game.id }) { games[index].coverURL = url }
+        var missing = games.filter { $0.coverURLs.isEmpty && UbisoftCovers.cached($0.title) == nil }
+            .map(\.title).filter { coverLookups.insert($0).inserted }
+        guard !missing.isEmpty else { return }
+        await withTaskGroup(of: (String, [URL]?).self) { group in
+            for _ in 0..<6 where !missing.isEmpty {
+                let title = missing.removeFirst()
+                group.addTask { (title, await UbisoftCovers.coverURLs(for: title)) }
+            }
+            while let (title, urls) = await group.next() {
+                coverLookups.remove(title)
+                if let urls {
+                    for index in games.indices where games[index].title == title { games[index].coverURLs = urls }
+                }
+                if !missing.isEmpty {
+                    let next = missing.removeFirst()
+                    group.addTask { (next, await UbisoftCovers.coverURLs(for: next)) }
+                }
+            }
         }
     }
 

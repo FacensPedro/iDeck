@@ -209,6 +209,8 @@ enum Translations {
         "off": ["pt": "Desativado", "es": "Desactivado"],
         "Install .exe": ["pt": "Instalar .exe", "es": "Instalar .exe"],
         "Install": ["pt": "Instalar", "es": "Instalar"],
+        "Install %@?": ["pt": "Instalar %@?", "es": "¿Instalar %@?"],
+        "iDeck downloads it from Ubisoft's servers.": ["pt": "O iDeck baixa o jogo dos servidores da Ubisoft.", "es": "iDeck lo descarga de los servidores de Ubisoft."],
         "Installed": ["pt": "Instalado", "es": "Instalado"],
         "Surface scaling": ["pt": "Escala da imagem", "es": "Escalado de imagen"],
         "fit": ["pt": "Ajustar", "es": "Ajustar"],
