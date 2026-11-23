@@ -289,6 +289,10 @@ enum StikJITHelper {
     /// since (malloc, Metal, IOSurface).
     private static var earlyPoolReleased = false
 
+    /// The part of the executable window above its 128MB that this run reserved
+    /// (exe-window-mb), kept for the next session instead of being asked for again.
+    private static var exeWinExtension: (base: vm_address_t, size: vm_address_t)?
+
     /// The executable window taken by holdExecutableWindowAtLaunch() (0 when the
     /// image-load constructor already held it, or the hold failed).
     private static var appWindowBase: vm_address_t = 0
@@ -728,14 +732,35 @@ enum StikJITHelper {
         // just released, so the run directly above it is free; take the extension
         // before the census and the pool request see it. Fails visibly, never fatally:
         // the window then stays 128MB, as without the setting.
+        // 2.13.3: the extension a previous session of this run reserved is still ours
+        // (nothing frees it), and asking for it again failed with kr=3 ("something
+        // already holds [0x148000000,0x14c000000)"): Dragon Age: Inquisition's second
+        // launch got a 128MB window. It is reused, grown if needed, and released when
+        // this launch does not need it.
+        if let held = exeWinExtension, !(exeWinWantedMB > 0 && windowHeld) {
+            vm_deallocate(mach_task_self_, held.base, vm_size_t(held.size))
+            exeWinExtension = nil
+            LogStore.shared.log(String(format: "[exe-window] released the earlier widening 0x%lx+%luMB: this launch keeps 128MB",
+                                       Int(held.base), Int(held.size >> 20)))
+        }
         if exeWinWantedMB > 0 && windowHeld {
             let wanted = vm_address_t(exeWinWantedMB) << 20
+            let heldSize = exeWinExtension?.size ?? 0
+            if heldSize > 0 {
+                exeWinSize += heldSize
+                LogStore.shared.log(String(format: "[exe-window] kept the widening from the previous session: [0x%lx,0x%lx)",
+                                           Int(exeWinBase), Int(exeWinBase + exeWinSize)))
+            }
             var ext = exeWinBase + exeWinSize
-            let extSize = wanted - exeWinSize
-            let kr = vm_allocate(mach_task_self_, &ext, vm_size_t(extSize), 0 /* VM_FLAGS_FIXED */)
-            if kr == KERN_SUCCESS && ext == exeWinBase + exeWinSize {
-                vm_protect(mach_task_self_, ext, vm_size_t(extSize), 0, VM_PROT_NONE)
-                exeWinSize = wanted
+            let extSize = wanted > exeWinSize ? wanted - exeWinSize : 0
+            let kr = extSize == 0 ? KERN_SUCCESS
+                : vm_allocate(mach_task_self_, &ext, vm_size_t(extSize), 0 /* VM_FLAGS_FIXED */)
+            if kr == KERN_SUCCESS && (extSize == 0 || ext == exeWinBase + exeWinSize) {
+                if extSize > 0 {
+                    exeWinExtension = (base: exeWinBase + 0x8000000, size: heldSize + extSize)
+                }
+                if extSize > 0 { vm_protect(mach_task_self_, ext, vm_size_t(extSize), 0, VM_PROT_NONE) }
+                exeWinSize = max(wanted, exeWinSize)
                 setenv("WINE_IOS_EXE_WINDOW", String(format: "%lx:%lx", Int(exeWinBase), Int(exeWinSize)), 1)
                 LogStore.shared.log(String(format: "[exe-window] widened to [0x%lx,0x%lx) %luMB for a large fixed-base image "
                     + "(exe-window-mb); the pool is placed above it", Int(exeWinBase), Int(exeWinBase + exeWinSize),

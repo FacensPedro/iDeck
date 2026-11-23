@@ -244,7 +244,12 @@ struct WindowsWorkspaceView: View {
     @State private var isSettingsPresented = false
     @State private var searchText = ""
     /// The selected tile of the console-style shelf (a store or a game).
-    @State var shelf: ShelfItem = .store(.steam)
+    /// The selected store or game. Starts on the store chosen last (2.13.3): the
+    /// library view is rebuilt when iDeck comes back from StikDebug, and an EA game's
+    /// launch returned to the Steam tab.
+    @State var shelf: ShelfItem = .store(ShelfItem.savedStore)
+    /// The last store tab chosen, kept across view rebuilds and app restarts.
+    @AppStorage("library.lastStore") private var lastStore = "steam"
     @State private var prefixPath: URL?
     @StateObject private var windowsLibrary = WindowsLibraryStore()
     @State private var isExecutablePickerPresented = false
@@ -269,8 +274,7 @@ struct WindowsWorkspaceView: View {
     private var ubisoftSignedIn: Bool { ubisoftLibrary.signedIn }
     @State private var selectedEpicGame: SelectedEpicGame?
     @State private var selectedEAGame: EAOwnedGame?
-    /// The Ubisoft game whose install is being confirmed.
-    @State private var pendingUbisoftInstall: UbisoftGame?
+    @State private var selectedUbisoftGame: UbisoftGame?
     @State private var selectedGOGGame: GOGGame?
     @AppStorage("library.epicOwnedCollapsed") private var epicOwnedCollapsed = false
     @Environment(\.openURL) private var openURL
@@ -453,6 +457,10 @@ struct WindowsWorkspaceView: View {
             EAGameDetailsSheet(game: game, ea: eaLibrary, library: windowsLibrary,
                                coordinator: coordinator) { installed in launchEAGame(installed) }
         }
+        .sheet(item: $selectedUbisoftGame) { game in
+            UbisoftGameDetailsSheet(gameID: game.id, fallback: game, ubisoft: ubisoftLibrary, library: windowsLibrary,
+                                    coordinator: coordinator)
+        }
         .onAppear {
             epicLibrary.start()
             eaLibrary.start()
@@ -507,12 +515,6 @@ struct WindowsWorkspaceView: View {
 
         .onAppear {
             resolvePrefixPath()
-        }
-        .onChange(of: ubisoftLibrary.downloadError) { _, message in
-            guard let message else { return }
-            installMessage = message
-            isShowingInstallResult = true
-            ubisoftLibrary.downloadError = nil
         }
         // A finished Wine session may have installed a game (a GOG installer,
         // a setup program): look for new installs whenever Wine stops.
@@ -987,21 +989,9 @@ struct WindowsWorkspaceView: View {
     /// An installed Ubisoft game starts its own program directly; one the account owns
     /// but has not installed says where to install it.
     private func ubisoftCard(_ game: UbisoftGame) -> some View {
-        let open = {
-            if let executable = game.executable {
-                let profile = windowsLibrary.profile(for: "ubisoft:\(game.id)", title: game.title)
-                coordinator.launchWindowsProgram(at: executable, profile: profile, detectInstaller: false)
-            } else if let download = ubisoftLibrary.downloads[game.id] {
-                // Tap: pause a running download, resume a paused or failed one.
-                switch download.state {
-                case .active, .queued: ubisoftLibrary.pause(game)
-                case .paused, .failed: ubisoftLibrary.install(game)
-                }
-            } else {
-                // A download is tens of GB: asked first, never started by a stray tap.
-                pendingUbisoftInstall = game
-            }
-        }
+        // Opens the game's page, as for the other stores: install, pause, stop and
+        // errors are there.
+        let open = { selectedUbisoftGame = game }
         return VStack(alignment: .leading, spacing: 6) {
             ZStack {
                 if !game.coverURLs.isEmpty {
@@ -1053,7 +1043,7 @@ struct WindowsWorkspaceView: View {
         switch download.state {
         case .queued: text = tr("Waiting…")
         case .active: text = download.total > 0 ? "\(Int(download.fraction * 100))%" : download.step
-        case .paused: text = tr("Paused") + (download.total > 0 ? " · \(Int(download.fraction * 100))%" : "")
+        case .paused: text = download.total > 0 ? "\(Int(download.fraction * 100))%" : ""   // no "Paused" text
         case .failed: text = tr("Download failed")
         }
         return VStack(spacing: 4) {
@@ -1384,22 +1374,8 @@ private struct WindowsExecutableDetailsView: View {
                     showError = true
                 }
             }
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(tr("Cancel")) { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button {
-                        library.save(profile)
-                        dismiss()
-                    } label: {
-                        Label(tr("Save"), systemImage: "checkmark")
-                            .font(.subheadline.weight(.semibold))
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.blue)
-                }
-            }
+            // Settings are saved as they change (2.13.3): no Save or Done button.
+            .onChange(of: profile) { _, changed in library.save(changed) }
             .alert(tr("Operation failed"), isPresented: $showError) {
                 Button(tr("OK"), role: .cancel) { }
             } message: {
@@ -1466,7 +1442,6 @@ private struct SteamProgramDetailsView: View {
                     .onAppear { steamLibrary.loadOwnedDepots() }
                     if steamLibrary.pausedInstalls.contains(game.appID) {
                         VStack(spacing: 10) {
-                            Text(tr("Download paused")).foregroundColor(.white)
                             HStack(spacing: 10) {
                                 Button {
                                     steamLibrary.resumeInstall(appID: game.appID)
@@ -1584,22 +1559,8 @@ private struct SteamProgramDetailsView: View {
                     }
                 }
             }
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(tr("Done")) { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button {
-                        library.save(profile)
-                        dismiss()
-                    } label: {
-                        Label(tr("Save"), systemImage: "checkmark")
-                            .font(.subheadline.weight(.semibold))
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.blue)
-                }
-            }
+            // Settings are saved as they change (2.13.3): no Save or Done button.
+            .onChange(of: profile) { _, changed in library.save(changed) }
             .alert(tr("Operation failed"), isPresented: $showError) {
                 Button(tr("OK"), role: .cancel) { }
             } message: {
@@ -1827,8 +1788,7 @@ private struct WindowsGameProfileForm: View {
                         .padding(.bottom, 10)
                 }
             }
-            DetailCard(title: tr("Graphics"),
-                       footer: tr("Direct3D 11 and Direct3D 12 are chosen automatically for each game.")) {
+            DetailCard(title: tr("Graphics")) {
                 DetailPickerRow(title: tr("Direct3D 12"), selection: $profile.d3d12Renderer,
                                 choices: WindowsGameProfile.d3d12Renderers,
                                 icon: "cube.transparent.fill", iconColor: .indigo)
@@ -1844,10 +1804,11 @@ private struct WindowsGameProfileForm: View {
                                 showsDivider: false, icon: "gamecontroller.fill", iconColor: .green)
             }
             DetailCard(title: tr("Performance")) {
+                // 0: iDeck decides (every core the device gives the game), shown as Automatic.
                 DetailPickerRow(title: tr("CPU cores"), selection: Binding(
-                                    get: { profile.cpuCount == 0 ? tr("All") : String(profile.cpuCount) },
+                                    get: { profile.cpuCount == 0 ? tr("Automatic") : String(profile.cpuCount) },
                                     set: { profile.cpuCount = Int($0) ?? 0 }),
-                                choices: WindowsGameProfile.cpuCounts.map { $0 == 0 ? tr("All") : String($0) },
+                                choices: WindowsGameProfile.cpuCounts.map { $0 == 0 ? tr("Automatic") : String($0) },
                                 icon: "cpu", iconColor: .blue)
                 DetailPickerRow(title: tr("JIT pool"), selection: Binding(
                                     get: { profile.jitPoolMiB == 0 ? tr("Automatic") : "\(profile.jitPoolMiB) MB" },
@@ -1982,22 +1943,8 @@ private struct StoreGameDetailsView<Extra: View>: View {
             .background(Color.black.ignoresSafeArea())
             .navigationTitle(tr("Game details"))
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(tr("Done")) { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button {
-                        library.save(profile)
-                        dismiss()
-                    } label: {
-                        Label(tr("Save"), systemImage: "checkmark")
-                            .font(.subheadline.weight(.semibold))
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.blue)
-                }
-            }
+            // Settings are saved as they change (2.13.3): no Save or Done button.
+            .onChange(of: profile) { _, changed in library.save(changed) }
             .confirmationDialog(tr("Delete this game's files?"), isPresented: $confirmUninstall, titleVisibility: .visible) {
                 Button(tr("Uninstall"), role: .destructive) {
                     if onUninstall?() == true {
@@ -2227,6 +2174,53 @@ private struct EAGameDetailsSheet: View {
     }
 }
 
+/// Ubisoft Connect game page, as EA's: install, pause, stop, the download's error, and
+/// Play once installed (the game's own program; the launcher is not opened).
+private struct UbisoftGameDetailsSheet: View {
+    let gameID: String
+    /// The game as the card showed it, while the library list is being replaced.
+    let fallback: UbisoftGame
+    @ObservedObject var ubisoft: UbisoftLibrary
+    @ObservedObject var library: WindowsLibraryStore
+    @ObservedObject var coordinator: SystemCoordinator
+
+    var body: some View {
+        let game = ubisoft.game(gameID) ?? fallback
+        let download = ubisoft.downloads[gameID]
+        let failed: String? = { if case .failed(let message)? = download?.state { return message }; return nil }()
+        let paused: Bool = { if case .paused? = download?.state { return true }; return false }()
+        let installed = game.executable != nil
+        let sizeText: String = {
+            guard let total = download?.total, total > 0 else { return tr(installed ? "Installed" : "Size unavailable") }
+            return tr("Download: %@", ByteCountFormatter.string(fromByteCount: Int64(clamping: total), countStyle: .file))
+        }()
+        StoreGameDetailsView(
+            title: game.title, store: .ubisoft, profileID: "ubisoft:\(gameID)",
+            covers: game.coverURLs.filter { $0.lastPathComponent != "header.jpg" },
+            banners: game.coverURLs.filter { $0.lastPathComponent == "header.jpg" },
+            installed: installed && download == nil,
+            progress: (download != nil && failed == nil) ? download?.fraction : nil,
+            installedText: download.flatMap { installedBytesText(done: $0.done, total: $0.total) },
+            paused: paused, sizeText: sizeText, errorText: failed,
+            canInstall: !installed && !AntiCheatPolicy.isBlocked(title: game.title),
+            onLaunch: {
+                guard let executable = game.executable else { return }
+                let profile = library.profile(for: "ubisoft:\(gameID)", title: game.title)
+                coordinator.launchWindowsProgram(at: executable, profile: profile, detectInstaller: false)
+            },
+            onInstall: { ubisoft.install(game) },
+            onPause: { ubisoft.pause(game) },
+            onStop: { ubisoft.cancel(game) },
+            onUninstall: nil,
+            library: library, coordinator: coordinator
+        ) {
+            if let download, case .active = download.state, download.total == 0 {
+                Text(download.step).font(.caption).foregroundColor(.gray)
+            }
+        }
+    }
+}
+
 /// Epic game page.
 private struct EpicGameDetailsSheet: View {
     let appName: String
@@ -2427,6 +2421,20 @@ struct SteamDLCArtworkView: View {
 
 /// One tile of the top shelf: a store, or a game that is installed or installing.
 enum ShelfItem: Hashable {
+    static func storeKey(_ store: GameStore) -> String {
+        switch store { case .steam: "steam"; case .gog: "gog"; case .epic: "epic"; case .ea: "ea"; case .ubisoft: "ubisoft" }
+    }
+    /// The store tab saved in "library.lastStore" (Steam when none).
+    static var savedStore: GameStore {
+        switch UserDefaults.standard.string(forKey: "library.lastStore") {
+        case "gog": .gog
+        case "epic": .epic
+        case "ea": .ea
+        case "ubisoft": .ubisoft
+        default: .steam
+        }
+    }
+
     case store(GameStore)
     case steam(UInt32)
     case gog(Int)
@@ -2463,7 +2471,7 @@ extension WindowsWorkspaceView {
     /// The selected tile, or the Steam store when it no longer exists.
     var currentShelf: ShelfItem {
         if case .store = shelf { return shelf }
-        return shelfGames.contains(shelf) ? shelf : .store(.steam)
+        return shelfGames.contains(shelf) ? shelf : .store(ShelfItem.savedStore)
     }
 
     var consoleShelf: some View {
@@ -2484,6 +2492,7 @@ extension WindowsWorkspaceView {
             }
             .onChange(of: shelf) { _, item in
                 withAnimation(.easeInOut(duration: 0.2)) { proxy.scrollTo(item, anchor: .center) }
+                if case .store(let store) = item { lastStore = ShelfItem.storeKey(store) }
             }
         }
     }
@@ -2661,18 +2670,6 @@ extension WindowsWorkspaceView {
                         // The launcher is installed by the initial setup: what is missing is the sign-in.
                         StoreClientCard(client: .ubisoft, coordinator: coordinator)
                     }
-                }
-                .confirmationDialog(tr("Install %@?", pendingUbisoftInstall?.title ?? ""),
-                                    isPresented: Binding(get: { pendingUbisoftInstall != nil },
-                                                         set: { if !$0 { pendingUbisoftInstall = nil } }),
-                                    titleVisibility: .visible) {
-                    Button(tr("Install")) {
-                        if let game = pendingUbisoftInstall { ubisoftLibrary.install(game) }
-                        pendingUbisoftInstall = nil
-                    }
-                    Button(tr("Cancel"), role: .cancel) { pendingUbisoftInstall = nil }
-                } message: {
-                    Text(tr("iDeck downloads it from Ubisoft's servers."))
                 }
                 .task(id: coordinator.windowsStatus) {
                     let installed = await Task.detached(priority: .utility) {

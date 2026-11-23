@@ -100,7 +100,6 @@ final class UbisoftLibrary: ObservableObject {
         var fraction: Double { total > 0 ? min(1, Double(done) / Double(total)) : 0 }
     }
     @Published private(set) var downloads: [String: Download] = [:]
-    @Published var downloadError: String?
     /// Owned products by title key, from Ubisoft's ownership service (product id and manifest).
     private var products: [String: UbisoftOwnedProduct] = [:]
     private var downloadTask: (id: String, task: Task<Void, Never>)?
@@ -234,11 +233,17 @@ final class UbisoftLibrary: ObservableObject {
 
     func canInstall(_ game: UbisoftGame) -> Bool { game.executable == nil }
 
+    func game(_ id: String) -> UbisoftGame? { games.first { $0.id == id } }
+
     func install(_ game: UbisoftGame) {
         guard game.executable == nil else { return }
-        if AntiCheatPolicy.isBlocked(title: game.title) { downloadError = AntiCheatPolicy.message; return }
+        // Errors stay with the game (its page and card), as for the other stores.
+        if AntiCheatPolicy.isBlocked(title: game.title) {
+            downloads[game.id] = Download(state: .failed(AntiCheatPolicy.message), step: "")
+            return
+        }
         guard UbisoftSavedSession.load() != nil else {
-            downloadError = tr("Sign in to Ubisoft in Settings › Stores & launchers › Ubisoft Connect.")
+            downloads[game.id] = Download(state: .failed(tr("Sign in to Ubisoft in Settings › Stores & launchers › Ubisoft Connect.")), step: "")
             return
         }
         if let current = downloads[game.id], current.state == .active || current.state == .queued { return }
@@ -348,7 +353,11 @@ final class UbisoftLibrary: ObservableObject {
                 DownloadLog.ended(store: "Ubisoft Connect", name: game.title, outcome: "paused")
             } else {
                 downloads[id]?.state = .failed(error.localizedDescription)
-                downloadError = error.localizedDescription
+                // A failed install is removed, as Stop does: no half game is left.
+                let name = EALibrary.safeName(game.title)
+                try? FileManager.default.removeItem(at: MadeiraDock.drive.appendingPathComponent(Self.installRoot, isDirectory: true)
+                    .appendingPathComponent(name, isDirectory: true))
+                try? FileManager.default.removeItem(at: Self.support.appendingPathComponent(name + ".journal"))
                 DownloadLog.ended(store: "Ubisoft Connect", name: game.title, outcome: "failed: " + error.localizedDescription)
                 AppLog.record("[ubisoft-download] failed \(game.title): \(error.localizedDescription)")
             }

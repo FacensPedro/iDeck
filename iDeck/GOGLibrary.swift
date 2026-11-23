@@ -456,6 +456,11 @@ final class GOGLibraryModel: ObservableObject {
                     downloadErrors[game.id] = error.localizedDescription
                     outcome = .failed(error.localizedDescription)
                     AppLog.record("[gog] install failed for game \(game.id): \(error.localizedDescription)")
+                    // What was downloaded is removed, as Stop does: no half game is left.
+                    if let staging = stagingFolders.removeValue(forKey: game.id) {
+                        try? FileManager.default.removeItem(at: staging)
+                        AppLog.record("[gog] game \(game.id): partial files removed")
+                    }
                     completion(.failed)
                 }
             }

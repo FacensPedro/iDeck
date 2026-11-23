@@ -533,11 +533,6 @@ struct SettingsView: View {
                 toggleRow(title: tr("Continue downloads in the background"), isOn: $continueDownloadsInBackground)
                 toggleRow(title: tr("Download notifications"), isOn: $downloadNotifications)
                     .disabled(notificationsDenied)
-                if notificationsDenied {
-                    Text(tr("Notifications are turned off for iDeck in iOS Settings."))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
             } header: {
                 Text(tr("Downloads"))
             }
@@ -628,22 +623,16 @@ struct SettingsView: View {
                     }
                 }
                 .disabled(updater.isChecking)
-            }
-            settingsSection(title: tr("Version")) {
-                LabeledContent(tr("Installed version"), value: "v\(updater.currentVersion)")
+                // The Version section (installed version, releases link, sideloading
+                // note) is gone: the row above already shows the installed version.
                 if updater.availableIDeckUpdate != nil {
                     Button(tr("Install update")) {
                         updater.installIDeckUpdate()
                     }
                 }
-                Button(tr("View iDeck releases")) {
-                    updater.openIDeckReleases()
-                }
                 if let message = updater.installHandoffMessage {
                     Text(message).font(.caption).foregroundStyle(.secondary)
                 }
-                Text(tr("An updated iDeck IPA must be signed and installed by your sideloading app."))
-                    .font(.caption).foregroundStyle(.secondary)
             }
         }
         .navigationTitle(tr("Updates"))

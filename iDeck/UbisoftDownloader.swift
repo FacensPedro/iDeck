@@ -54,34 +54,23 @@ final class UbisoftDemux: @unchecked Sendable {
 
     // MARK: Socket
 
+    /// Opens the TLS connection to the demux, twice at most: the second time over IPv4
+    /// only. Every state the connection passes through goes to iDeck's log
+    /// ([ubisoft-demux]), with the reason when it waits or fails: 2.13.2 only said
+    /// "did not answer (connection)" after 20 s (iPad mini, 2026-11-23).
     func connect() async throws {
-        let tls = NWProtocolTLS.Options()
-        let parameters = NWParameters(tls: tls)
-        let connection = NWConnection(host: NWEndpoint.Host(Self.host), port: 443, using: parameters)
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            var resumed = false
-            connection.stateUpdateHandler = { [weak self] state in
-                switch state {
-                case .ready:
-                    if !resumed { resumed = true; continuation.resume() }
-                case .failed(let error):
-                    if !resumed { resumed = true; continuation.resume(throwing: error) }
-                    self?.queue.async { self?.fail(error) }
-                case .cancelled:
-                    if !resumed { resumed = true; continuation.resume(throwing: UbisoftDemuxError.closed("cancelled")) }
-                default: break
-                }
-            }
-            connection.start(queue: queue)
-            // A connection that never gets ready (no route, a blocked port) stays in
-            // .waiting: without this the library waited on it for good.
-            queue.asyncAfter(deadline: .now() + 20) {
-                guard !resumed else { return }
-                resumed = true
-                connection.cancel()
-                continuation.resume(throwing: UbisoftDemuxError.timeout("connection"))
+        var lastError: Error = UbisoftDemuxError.timeout("connection")
+        var opened: NWConnection?
+        for attempt in 1...2 {
+            do {
+                opened = try await open(ipv4Only: attempt == 2)
+                break
+            } catch {
+                lastError = error
+                AppLog.record("[ubisoft-demux] connection attempt \(attempt) failed: \(error.localizedDescription)")
             }
         }
+        guard let connection = opened else { throw lastError }
         queue.sync { self.connection = connection }
         receive()
         // The client version goes first, as a push.
@@ -89,6 +78,54 @@ final class UbisoftDemux: @unchecked Sendable {
         var push = GalaxyProto.Writer(); push.data(4, version.bytes)
         var upstream = GalaxyProto.Writer(); upstream.data(2, push.bytes)
         send(upstream.bytes)
+    }
+
+    private func open(ipv4Only: Bool) async throws -> NWConnection {
+        let parameters = NWParameters(tls: NWProtocolTLS.Options())
+        if ipv4Only, let ip = parameters.defaultProtocolStack.internetProtocol as? NWProtocolIP.Options {
+            ip.version = .v4
+        }
+        let connection = NWConnection(host: NWEndpoint.Host(Self.host), port: 443, using: parameters)
+        let label = ipv4Only ? "IPv4" : "any"
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            var resumed = false
+            var reason = "no answer"
+            connection.stateUpdateHandler = { [weak self] state in
+                switch state {
+                case .preparing:
+                    AppLog.record("[ubisoft-demux] connecting (\(label))")
+                case .waiting(let error):
+                    // DNS, no route, refused, TLS: why the connection is not ready yet.
+                    reason = "waiting: \(error.localizedDescription)"
+                    AppLog.record("[ubisoft-demux] \(reason) (\(label))")
+                case .ready:
+                    let path = connection.currentPath
+                    let kind = path?.usesInterfaceType(.wifi) == true ? "Wi-Fi"
+                        : path?.usesInterfaceType(.cellular) == true ? "cellular" : "other"
+                    AppLog.record("[ubisoft-demux] connected (\(label), \(kind))")
+                    if !resumed { resumed = true; continuation.resume() }
+                case .failed(let error):
+                    AppLog.record("[ubisoft-demux] failed: \(error.localizedDescription) (\(label))")
+                    // Before .ready only this attempt fails (the next one may succeed);
+                    // after it, every waiting request does.
+                    if !resumed { resumed = true; continuation.resume(throwing: error) }
+                    else { self?.queue.async { self?.fail(error) } }
+                case .cancelled:
+                    if !resumed { resumed = true; continuation.resume(throwing: UbisoftDemuxError.closed("cancelled")) }
+                default: break
+                }
+            }
+            connection.start(queue: queue)
+            // A connection that never gets ready stays in .waiting: give up after 20 s,
+            // with the last reason Network.framework gave.
+            queue.asyncAfter(deadline: .now() + 20) {
+                guard !resumed else { return }
+                resumed = true
+                connection.cancel()
+                continuation.resume(throwing: UbisoftDemuxError.timeout("connection, \(reason)"))
+            }
+        }
+        return connection
     }
 
     private func send(_ message: [UInt8]) {

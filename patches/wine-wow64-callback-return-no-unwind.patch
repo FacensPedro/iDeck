@@ -1,43 +1,37 @@
 diff --git a/dlls/ntdll/signal_arm64ec.c b/dlls/ntdll/signal_arm64ec.c
-index f82eb68..dd558f5 100644
+index f82eb68..b24a174 100644
 --- a/dlls/ntdll/signal_arm64ec.c
 +++ b/dlls/ntdll/signal_arm64ec.c
-@@ -5066,6 +5066,21 @@ void __cdecl NTDLL_longjmp( _JUMP_BUFFER *buf, int retval )
+@@ -5066,6 +5066,32 @@ void __cdecl NTDLL_longjmp( _JUMP_BUFFER *buf, int retval )
      rec.ExceptionAddress = NULL;
      rec.NumberParameters = 1;
      rec.ExceptionInformation[0] = (DWORD_PTR)buf;
 +
-+    /* iDeck: no frame means no unwind, as in the x64 CRT: the saved registers are
-+     * restored directly.  wow64's user-callback return clears Frame (wow64/syscall.c),
-+     * because the frames between it and the callback's setjmp are FEX's translated
-+     * guest code, which has no unwind data: RtlUnwind looped there until the stack
-+     * overflowed (c0000026, then c00000fd; BioShock 2 creating its first window). */
-+    if (!buf->Frame)
++    /* iDeck: wow64's user-callback return (wow64_NtCallbackReturn) longjmps back to
++     * the setjmp in Wow64KiUserCallbackDispatcher.  Between the two are only FEX's
++     * translated guest frames, which have no unwind data: RtlUnwind looped there until
++     * the stack overflowed (c0000026, then c00000fd; BioShock 2 and Assassin's Creed IV
++     * creating their first window).  wow64.dll is a prebuilt binary, so that buffer is
++     * recognised here: it lives in the callback frame that
++     * TlsSlots[WOW64_TLS_USERCALLBACKDATA] points to (struct user_callback_frame, a few
++     * pointers then the jmp_buf).  Such a jump, and any buffer without a frame (as in
++     * the x64 CRT), restores the saved registers directly instead of unwinding. */
 +    {
-+        CONTEXT context;
++        /* Only in a 32-bit program's thread: a 64-bit program may use TLS slot 5 itself. */
++        ULONG_PTR callback = NtCurrentTeb()->WowTebOffset
++            ? (ULONG_PTR)NtCurrentTeb()->TlsSlots[WOW64_TLS_USERCALLBACKDATA] : 0;
++        BOOL wow64_callback = callback && (ULONG_PTR)buf > callback && (ULONG_PTR)buf - callback <= 64;
 +
-+        RtlCaptureContext( &context );
-+        context.Rax = retval;   /* x64 target */
-+        context.Rcx = retval;   /* ARM64EC target (x0) */
-+        RtlRestoreContext( &context, &rec );   /* takes Rip, Rsp and the saved registers from buf */
++        if (wow64_callback || !buf->Frame)
++        {
++            CONTEXT context;
++
++            RtlCaptureContext( &context );
++            context.Rax = retval;   /* x64 target */
++            context.Rcx = retval;   /* ARM64EC target (x0) */
++            RtlRestoreContext( &context, &rec );   /* takes Rip, Rsp and the saved registers from buf */
++        }
 +    }
      RtlUnwind( (void *)buf->Frame, (void *)buf->Rip, &rec, IntToPtr(retval) );
  }
  
-diff --git a/dlls/wow64/syscall.c b/dlls/wow64/syscall.c
-index 2fd5918..e1e29ae 100644
---- a/dlls/wow64/syscall.c
-+++ b/dlls/wow64/syscall.c
-@@ -610,6 +610,12 @@ NTSTATUS WINAPI wow64_NtCallbackReturn( UINT *args )
-     *frame->ret_ptr = ret_ptr;
-     *frame->ret_len = ret_len;
-     frame->status = status;
-+#ifdef __arm64ec__
-+    /* iDeck: return to the callback's setjmp without unwinding (see NTDLL_longjmp).
-+     * Between here and there are only FEX's translated guest frames, which have no
-+     * unwind data and nothing to clean up on the host side. */
-+    ((_JUMP_BUFFER *)frame->jmpbuf)->Frame = 0;
-+#endif
-     longjmp( frame->jmpbuf, 1 );
-     return STATUS_SUCCESS;
- }

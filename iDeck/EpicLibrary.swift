@@ -755,6 +755,8 @@ struct EpicInstalledDLC: Codable, Sendable {
             writeInstalled()
             downloads[app] = nil
             outcome = .completed
+            // Rockstar's games need Rockstar Games Launcher: installed now, in the background.
+            Task { await RockstarLauncher.installIfNeeded(gameFolder: Self.drive.appendingPathComponent(folder, isDirectory: true)) }
             EpicLog.event("[epic-download] done app=\(app) written=\(result.filesWritten) kept=\(result.filesKept) fetched=\(result.bytesFetched)")
           }
         } catch {
@@ -765,6 +767,13 @@ struct EpicInstalledDLC: Codable, Sendable {
                 downloads[app]?.state = .failed(error.localizedDescription)
                 outcome = .failed(error.localizedDescription)
                 handle(error, context: "download app=\(app)", report: false)
+                // A failed first install is removed, as Stop does: no half game is left.
+                if installed[app] == nil, let game = game(app) {
+                    let folder = Self.drive.appendingPathComponent(Self.installRoot).appendingPathComponent(game.folderName)
+                    if !ExternalDrives.removeExternalInstall(at: folder) { try? FileManager.default.removeItem(at: folder) }
+                    try? FileManager.default.removeItem(at: Self.journalURL(app))
+                    EpicLog.event("[epic-download] failed app=\(app): partial files removed")
+                }
             }
         }
         active = nil

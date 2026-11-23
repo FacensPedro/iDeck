@@ -39,7 +39,7 @@ class UbisoftLibraryRefreshTests(unittest.TestCase):
         self.assertIn('ubisoftAccountName = ""; UbisoftLibrary.shared.refresh()', SETTINGS)
 
     def test_demux_connection_has_a_deadline(self):
-        self.assertIn('continuation.resume(throwing: UbisoftDemuxError.timeout("connection"))', DOWNLOADER)
+        self.assertIn('continuation.resume(throwing: UbisoftDemuxError.timeout("connection, \\(reason)"))', DOWNLOADER)
 
     def test_no_safari_sign_in(self):
         self.assertNotIn("account.ubisoft.com", SETTINGS)

@@ -49,12 +49,13 @@ class DigestTests(unittest.TestCase):
 
     def test_utf8_safe_cut_and_compaction(self):
         body = self.body()
-        self.assertIn("line[end] & 0xC0 == 0x80", body)
+        self.assertIn("bytes[end] & 0xC0 == 0x80", body)
         self.assertIn("LogCompactor.compactedData(Data(kept))", body)
 
     def test_copy_and_share_use_it(self):
         self.assertIn("PrivacyRedactor.redact(WineLogDigest.shared(raw, from: source))", CLIP)
-        self.assertIn("try redact(WineLogDigest.shared(try Data(contentsOf: source), from: source))", CLIP)
+        self.assertIn("try Data(contentsOf: source, options: .alwaysMapped)", CLIP)
+        self.assertIn("try redact(WineLogDigest.shared(try Data(contentsOf: source, options: .alwaysMapped), from: source))", CLIP)
         self.assertIn('url.lastPathComponent.hasPrefix("madeira-log")', CLIP)
 
 

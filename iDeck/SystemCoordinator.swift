@@ -2797,3 +2797,102 @@ class SystemCoordinator: ObservableObject {
 
 
 }
+
+/// Rockstar Games Launcher, installed by iDeck when a Rockstar game is installed from
+/// Steam or Epic Games (2.13.3). Rockstar's games start it and will not run without
+/// it; their own first start ran its installer in Wine, whose 32-bit Visual C++
+/// setup failed (GTA IV, 2026-11-23). It is not a store: it has no library page and
+/// no Settings entry. Copied without Wine, as Ubisoft Connect is
+/// (StoreClient.installWithoutWine); an installer iDeck cannot open is logged and
+/// left to the game, as before.
+enum RockstarLauncher {
+    static let installFolder = "Program Files/Rockstar Games/Launcher"
+    static let downloadURL = URL(string: "https://gamedownloads.rockstargames.com/public/installer/Rockstar-Games-Launcher.exe")!
+    static let installerName = "Rockstar-Games-Launcher.exe"
+    /// Programs only Rockstar's games ship (their own launchers).
+    static let gameMarkers: Set<String> = ["playgtav.exe", "playrdr2.exe", "playgtaiv.exe", "launchgtaiv.exe",
+                                           "playmaxpayne3.exe", "playlanoire.exe", "rockstar-games-launcher.exe"]
+
+    static func installed(drive: URL) -> Bool {
+        FileManager.default.fileExists(atPath: drive.appendingPathComponent(installFolder).appendingPathComponent("Launcher.exe").path)
+    }
+
+    /// Whether `folder` holds a Rockstar game, and the launcher installer it ships, if any.
+    static func scan(_ folder: URL) -> (isRockstar: Bool, installer: URL?) {
+        guard let walker = FileManager.default.enumerator(at: folder, includingPropertiesForKeys: nil,
+                                                          options: [.skipsHiddenFiles, .skipsPackageDescendants]) else { return (false, nil) }
+        var found = false
+        var installer: URL?
+        var seen = 0
+        for case let url as URL in walker {
+            seen += 1
+            if seen > 20_000 { break }
+            if walker.level > 3 { walker.skipDescendants(); continue }
+            let name = url.lastPathComponent.lowercased()
+            guard gameMarkers.contains(name) else { continue }
+            found = true
+            if name == installerName.lowercased() { installer = url; break }
+        }
+        return (found, installer)
+    }
+
+    /// Installs the launcher after a game install, when the game is Rockstar's and the
+    /// launcher is missing. Never throws: a failure is logged and the game keeps its own path.
+    static func installIfNeeded(gameFolder: URL, drive: URL = SystemCoordinator.StoreClient.drive) async {
+        let found = await Task.detached(priority: .utility) { scan(gameFolder) }.value
+        guard found.isRockstar, !installed(drive: drive) else { return }
+        let fm = FileManager.default
+        let work = drive.appendingPathComponent("iDeck", isDirectory: true)
+        do {
+            try fm.createDirectory(at: work, withIntermediateDirectories: true)
+            var installer = found.installer
+            if installer == nil {
+                let target = work.appendingPathComponent(installerName)
+                let (temporary, response) = try await URLSession.shared.download(from: downloadURL)
+                guard (response as? HTTPURLResponse)?.statusCode == 200 else {
+                    try? fm.removeItem(at: temporary)
+                    throw CocoaError(.fileReadUnknown)
+                }
+                try? fm.removeItem(at: target)
+                try fm.moveItem(at: temporary, to: target)
+                installer = target
+            }
+            guard let source = installer else { return }
+            let staging = work.appendingPathComponent(".staging-" + UUID().uuidString, isDirectory: true)
+            defer { try? fm.removeItem(at: staging) }
+            let target = staging.appendingPathComponent(installFolder, isDirectory: true)
+            try fm.createDirectory(at: target, withIntermediateDirectories: true)
+            try await Task.detached(priority: .utility) {
+                var message = [CChar](repeating: 0, count: 512)
+                let count = message.withUnsafeMutableBufferPointer {
+                    ideck_nsis_extract(source.path, target.path, $0.baseAddress!, $0.count)
+                }
+                if count < 0 { throw CocoaError(.fileReadCorruptFile, userInfo: [NSLocalizedDescriptionKey: String(cString: message)]) }
+                try SystemCoordinator.StoreClient.merge(staging, into: drive)
+            }.value
+            guard installed(drive: drive) else {
+                AppLog.record("[rockstar-launcher] files copied but Launcher.exe is missing; the game installs it itself")
+                return
+            }
+            writeRegistry()
+            AppLog.record("[rockstar-launcher] installed without Wine for \(gameFolder.lastPathComponent)")
+        } catch {
+            AppLog.record("[rockstar-launcher] not installed (\(error.localizedDescription)); the game installs it itself")
+        }
+    }
+
+    /// Where Rockstar's games look for the launcher. Written while no session runs.
+    static func writeRegistry(prefix: URL = MadeiraDock.prefix) {
+        guard wine_process_is_running() == 0, wineserver_is_running() == 0 else { return }
+        let folder = "C:\\" + installFolder.replacingOccurrences(of: "/", with: "\\")
+        let values = ["Software\\Rockstar Games\\Launcher", "Software\\Wow6432Node\\Rockstar Games\\Launcher"].map {
+            SteamInstallValue(hive: .machine, key: $0, name: "InstallFolder", data: .string(folder), followsInstall: true)
+        }
+        do {
+            let changed = try EARegistry.write(values, prefix: prefix)
+            AppLog.record("[rockstar-launcher] \(changed) registry line(s) written")
+        } catch {
+            AppLog.record("[rockstar-launcher] registry not written: \(error.localizedDescription)")
+        }
+    }
+}
