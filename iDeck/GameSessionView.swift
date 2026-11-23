@@ -302,12 +302,9 @@ struct GameSessionView: View {
                     // The Metal layer sits directly over the SwiftUI content
                     // outside this top strip. Keep first-frame failures and
                     // shutdown progress VISIBLE even when the drawable is black.
-                    if coordinator.isClosingWindowsSession {
-                        Text(tr("Closing Wine and wineserver..."))
-                            .foregroundColor(.white)
-                            .font(.caption.weight(.semibold))
-                            .lineLimit(2)
-                    } else if !metrics.receivedNewFrames && metalFXTurnedOff {
+                    // 2.13.3: no "Closing Wine and wineserver..." next to the settings
+                    // button; the closing box under the strip shows it.
+                    if !coordinator.isClosingWindowsSession && !metrics.receivedNewFrames && metalFXTurnedOff {
                         Text(tr("The game showed no image with MetalFX, so MetalFX is now off for it. Close the game and open it again."))
                             .foregroundColor(.yellow)
                             .font(.caption2.weight(.semibold))

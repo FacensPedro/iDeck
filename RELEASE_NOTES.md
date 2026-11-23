@@ -15,6 +15,7 @@
 - After StikDebug sends you back to iDeck, the library stays on the store you were using (for example the EA app) instead of switching to Steam. iDeck now remembers the last store tab you chose.
 
 ### Game session
+- The "Closing Wine and wineserver..." text next to the settings button in a game is gone. The closing box below it still shows that the game is closing.
 - A game that needs a larger memory area for its program (such as Dragon Age: Inquisition) now gets it on the second launch in the same iDeck run too. iDeck kept that area reserved from the first launch and then failed to reserve it again ("could NOT widen the window to 192MB"); it now reuses it.
 
 ### Steam
