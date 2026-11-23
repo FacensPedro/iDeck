@@ -12,6 +12,9 @@
 - The X button now only closes the game. If the game does not exit, the usual warning appears, with Retry and Close iDeck. Close iDeck now just closes it, without opening StikDebug.
 - Removed the note under the Wine log buttons that said which data is removed from logs. Copied and shared logs still have passwords, account names, e-mail and IP addresses removed.
 
+### 32-bit games
+- Fixed 32-bit games closing a few seconds after they start, such as BioShock 2. When the game created its first window, Wine's return from the window's callback tried to walk back through the translated game code, which it cannot do. It kept trying until it ran out of stack, and the game closed. That return now jumps straight back.
+
 ### Wine log
 - The Wine log is much smaller. A setting iDeck turned on made Wine record every system call and file access, about 16 MB and 220,000 lines for a single session. iDeck now logs Wine's errors and the programs each session starts and loads, which is what Bugs & logs reads.
 - A copied or shared Wine log is now a short version:
