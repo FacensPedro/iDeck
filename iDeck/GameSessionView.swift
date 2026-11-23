@@ -281,17 +281,18 @@ struct GameSessionView: View {
                     }
                     .accessibilityLabel(tr("Minimize the close and settings buttons"))
                     Button(action: coordinator.requestCloseWindowsSession) {
+                        // Same size as the minimize button (2.13.3).
                         Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 30))
+                            .font(.system(size: 18))
                             .foregroundColor(.white.opacity(0.85))
                             .frame(width: 44, height: 44)
-                            .padding(8)
+                            .padding(.vertical, 8)
                     }
                     .disabled(coordinator.isClosingWindowsSession)
                     .accessibilityLabel(tr("Close Wine and return to the library"))
                     Button { showControlsSheet = true } label: {
                         Image(systemName: "gearshape.fill")
-                            .font(.system(size: 22))
+                            .font(.system(size: 18))
                             .foregroundColor(.white.opacity(0.85))
                             .frame(width: 44, height: 44)
                             .padding(.vertical, 8)

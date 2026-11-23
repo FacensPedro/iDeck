@@ -555,6 +555,12 @@ final class SteamOwnedGamesModel: ObservableObject {
             try Task.checkCancellation()
             outcome = .completed
             installedApps.insert(appID)
+            // Rockstar's games need Rockstar Games Launcher: installed now, in the background.
+            if let installFolder {
+                let folder = steamApps.appendingPathComponent("common", isDirectory: true)
+                    .appendingPathComponent(installFolder, isDirectory: true)
+                Task { await RockstarLauncher.installIfNeeded(gameFolder: folder) }
+            }
             if let measuredSize = downloadProgress[appID]?.installedBytes, measuredSize > 0 {
                 installedSizes[appID] = measuredSize
             }

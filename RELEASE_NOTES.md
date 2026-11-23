@@ -15,8 +15,13 @@
 - After StikDebug sends you back to iDeck, the library stays on the store you were using (for example the EA app) instead of switching to Steam. iDeck now remembers the last store tab you chose.
 
 ### Game session
+- In a game, the close and settings buttons are now the same size as the minimize button.
 - The "Closing Wine and wineserver..." text next to the settings button in a game is gone. The closing box below it still shows that the game is closing.
 - A game that needs a larger memory area for its program (such as Dragon Age: Inquisition) now gets it on the second launch in the same iDeck run too. iDeck kept that area reserved from the first launch and then failed to reserve it again ("could NOT widen the window to 192MB"); it now reuses it.
+
+### Rockstar Games Launcher
+- Installing a Rockstar game from Steam or Epic Games (GTA IV, GTA V, Red Dead Redemption 2 and others) now also installs Rockstar Games Launcher, which these games need to start. iDeck installs it in the background, without starting Windows. It is not a store: it does not appear in the library or in Settings.
+- If iDeck cannot open the launcher's installer, it leaves it to the game, which installs the launcher itself at its first start, as before.
 
 ### Steam
 - Fixed BioShock 2 Remastered failing to download with "Steam's download servers would not hand out this game's file list (HTTP 401)". One of its file packs comes from another Steam app, and Steam refused it. iDeck now asks for it as part of the game itself and, if the account does not own it, installs the game without that pack.

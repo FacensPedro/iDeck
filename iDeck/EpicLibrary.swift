@@ -755,6 +755,8 @@ struct EpicInstalledDLC: Codable, Sendable {
             writeInstalled()
             downloads[app] = nil
             outcome = .completed
+            // Rockstar's games need Rockstar Games Launcher: installed now, in the background.
+            Task { await RockstarLauncher.installIfNeeded(gameFolder: Self.drive.appendingPathComponent(folder, isDirectory: true)) }
             EpicLog.event("[epic-download] done app=\(app) written=\(result.filesWritten) kept=\(result.filesKept) fetched=\(result.bytesFetched)")
           }
         } catch {
