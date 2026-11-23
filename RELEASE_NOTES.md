@@ -40,4 +40,4 @@
 - Copying the Wine log is much faster. iDeck now finds the last session from the end of the file and checks each line in place, instead of searching the whole file and converting every line to text.
 
 ### Version
-- Updated the application version to 2.13.3 (build 121).
+- Updated the application version to 2.14.0 (build 121).
