@@ -1038,7 +1038,7 @@ struct WindowsWorkspaceView: View {
         switch download.state {
         case .queued: text = tr("Waiting…")
         case .active: text = download.total > 0 ? "\(Int(download.fraction * 100))%" : download.step
-        case .paused: text = tr("Paused") + (download.total > 0 ? " · \(Int(download.fraction * 100))%" : "")
+        case .paused: text = download.total > 0 ? "\(Int(download.fraction * 100))%" : ""   // no "Paused" text
         case .failed: text = tr("Download failed")
         }
         return VStack(spacing: 4) {
@@ -1369,22 +1369,8 @@ private struct WindowsExecutableDetailsView: View {
                     showError = true
                 }
             }
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(tr("Cancel")) { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button {
-                        library.save(profile)
-                        dismiss()
-                    } label: {
-                        Label(tr("Save"), systemImage: "checkmark")
-                            .font(.subheadline.weight(.semibold))
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.blue)
-                }
-            }
+            // Settings are saved as they change (2.13.3): no Save or Done button.
+            .onChange(of: profile) { _, changed in library.save(changed) }
             .alert(tr("Operation failed"), isPresented: $showError) {
                 Button(tr("OK"), role: .cancel) { }
             } message: {
@@ -1451,7 +1437,6 @@ private struct SteamProgramDetailsView: View {
                     .onAppear { steamLibrary.loadOwnedDepots() }
                     if steamLibrary.pausedInstalls.contains(game.appID) {
                         VStack(spacing: 10) {
-                            Text(tr("Download paused")).foregroundColor(.white)
                             HStack(spacing: 10) {
                                 Button {
                                     steamLibrary.resumeInstall(appID: game.appID)
@@ -1569,22 +1554,8 @@ private struct SteamProgramDetailsView: View {
                     }
                 }
             }
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(tr("Done")) { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button {
-                        library.save(profile)
-                        dismiss()
-                    } label: {
-                        Label(tr("Save"), systemImage: "checkmark")
-                            .font(.subheadline.weight(.semibold))
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.blue)
-                }
-            }
+            // Settings are saved as they change (2.13.3): no Save or Done button.
+            .onChange(of: profile) { _, changed in library.save(changed) }
             .alert(tr("Operation failed"), isPresented: $showError) {
                 Button(tr("OK"), role: .cancel) { }
             } message: {
@@ -1812,8 +1783,7 @@ private struct WindowsGameProfileForm: View {
                         .padding(.bottom, 10)
                 }
             }
-            DetailCard(title: tr("Graphics"),
-                       footer: tr("Direct3D 11 and Direct3D 12 are chosen automatically for each game.")) {
+            DetailCard(title: tr("Graphics")) {
                 DetailPickerRow(title: tr("Direct3D 12"), selection: $profile.d3d12Renderer,
                                 choices: WindowsGameProfile.d3d12Renderers,
                                 icon: "cube.transparent.fill", iconColor: .indigo)
@@ -1829,10 +1799,11 @@ private struct WindowsGameProfileForm: View {
                                 showsDivider: false, icon: "gamecontroller.fill", iconColor: .green)
             }
             DetailCard(title: tr("Performance")) {
+                // 0: iDeck decides (every core the device gives the game), shown as Automatic.
                 DetailPickerRow(title: tr("CPU cores"), selection: Binding(
-                                    get: { profile.cpuCount == 0 ? tr("All") : String(profile.cpuCount) },
+                                    get: { profile.cpuCount == 0 ? tr("Automatic") : String(profile.cpuCount) },
                                     set: { profile.cpuCount = Int($0) ?? 0 }),
-                                choices: WindowsGameProfile.cpuCounts.map { $0 == 0 ? tr("All") : String($0) },
+                                choices: WindowsGameProfile.cpuCounts.map { $0 == 0 ? tr("Automatic") : String($0) },
                                 icon: "cpu", iconColor: .blue)
                 DetailPickerRow(title: tr("JIT pool"), selection: Binding(
                                     get: { profile.jitPoolMiB == 0 ? tr("Automatic") : "\(profile.jitPoolMiB) MB" },
@@ -1967,22 +1938,8 @@ private struct StoreGameDetailsView<Extra: View>: View {
             .background(Color.black.ignoresSafeArea())
             .navigationTitle(tr("Game details"))
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(tr("Done")) { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button {
-                        library.save(profile)
-                        dismiss()
-                    } label: {
-                        Label(tr("Save"), systemImage: "checkmark")
-                            .font(.subheadline.weight(.semibold))
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.blue)
-                }
-            }
+            // Settings are saved as they change (2.13.3): no Save or Done button.
+            .onChange(of: profile) { _, changed in library.save(changed) }
             .confirmationDialog(tr("Delete this game's files?"), isPresented: $confirmUninstall, titleVisibility: .visible) {
                 Button(tr("Uninstall"), role: .destructive) {
                     if onUninstall?() == true {

@@ -573,7 +573,9 @@ final class SteamOwnedGamesModel: ObservableObject {
                 return
             }
             if !cancelled { outcome = .failed(SteamSignIn.message(error)) }
-            if cancelled, !wasInstalled {
+            // Stopped or failed, a first install is removed: no half game is left (2.13.3:
+            // failures too, as in every store).
+            if !wasInstalled {
                 if ownsIncompleteInstall, let installFolder {
                     SteamInstallFiles.delete(appID: Int(appID), folderName: installFolder,
                                              steamApps: steamApps)

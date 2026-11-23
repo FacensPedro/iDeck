@@ -78,7 +78,8 @@ class MadeiraBlackScreenCloseAndLocalizationTests(unittest.TestCase):
         self.assertIn("!coordinator.isJITEnabled", source)
         self.assertNotIn('actionButton(title: tr("Update iDeck %@', source)
         self.assertIn("updater.installIDeckUpdate()", source)
-        self.assertIn("updater.openIDeckReleases()", source)
+        # 2.13.3: the Version section (with View iDeck releases) is removed.
+        self.assertNotIn("updater.openIDeckReleases()", source)
 
     def test_closing_and_child_process_controls_use_translation(self):
         session = repo_text("iDeck/GameSessionView.swift")

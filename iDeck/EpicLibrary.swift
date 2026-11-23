@@ -765,6 +765,13 @@ struct EpicInstalledDLC: Codable, Sendable {
                 downloads[app]?.state = .failed(error.localizedDescription)
                 outcome = .failed(error.localizedDescription)
                 handle(error, context: "download app=\(app)", report: false)
+                // A failed first install is removed, as Stop does: no half game is left.
+                if installed[app] == nil, let game = game(app) {
+                    let folder = Self.drive.appendingPathComponent(Self.installRoot).appendingPathComponent(game.folderName)
+                    if !ExternalDrives.removeExternalInstall(at: folder) { try? FileManager.default.removeItem(at: folder) }
+                    try? FileManager.default.removeItem(at: Self.journalURL(app))
+                    EpicLog.event("[epic-download] failed app=\(app): partial files removed")
+                }
             }
         }
         active = nil

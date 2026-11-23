@@ -39,7 +39,8 @@ class DownloadPauseContractTests(unittest.TestCase):
         self.assertIn("epic.pause(appName)", VIEW)
         self.assertIn("epic.cancel(appName)", VIEW)
         self.assertNotIn("cardActionLabel(", VIEW)
-        self.assertIn('"Download paused": ["pt": "Download pausado"', TRANSLATIONS)
+        # 2.13.3: a paused download no longer says "Download paused".
+        self.assertNotIn('"Download paused"', TRANSLATIONS)
 
 
 if __name__ == "__main__":

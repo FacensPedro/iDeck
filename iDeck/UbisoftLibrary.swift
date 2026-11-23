@@ -353,6 +353,11 @@ final class UbisoftLibrary: ObservableObject {
                 DownloadLog.ended(store: "Ubisoft Connect", name: game.title, outcome: "paused")
             } else {
                 downloads[id]?.state = .failed(error.localizedDescription)
+                // A failed install is removed, as Stop does: no half game is left.
+                let name = EALibrary.safeName(game.title)
+                try? FileManager.default.removeItem(at: MadeiraDock.drive.appendingPathComponent(Self.installRoot, isDirectory: true)
+                    .appendingPathComponent(name, isDirectory: true))
+                try? FileManager.default.removeItem(at: Self.support.appendingPathComponent(name + ".journal"))
                 DownloadLog.ended(store: "Ubisoft Connect", name: game.title, outcome: "failed: " + error.localizedDescription)
                 AppLog.record("[ubisoft-download] failed \(game.title): \(error.localizedDescription)")
             }

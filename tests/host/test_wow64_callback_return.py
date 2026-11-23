@@ -22,20 +22,26 @@ class Wow64CallbackReturnTests(unittest.TestCase):
         self.assertLess(SERIES.index("wine-ios-fault-address.patch"), SERIES.index(line))
         self.assertLess(SERIES.index(line), SERIES.index("# DXMT's iOS cache/sync work"))
 
-    def test_callback_return_clears_the_frame(self):
-        self.assertIn("+++ b/dlls/wow64/syscall.c", PATCH)
-        self.assertIn("+#ifdef __arm64ec__", PATCH)
-        self.assertIn("+    ((_JUMP_BUFFER *)frame->jmpbuf)->Frame = 0;", PATCH)
-        self.assertLess(PATCH.index("->Frame = 0;"), PATCH.index(" longjmp( frame->jmpbuf, 1 );"))
+    def test_only_ntdll_is_patched(self):
+        # 2.13.3: the build recompiles ntdll.dll only; wow64.dll is Madeira's prebuilt
+        # binary, so a wow64/syscall.c hunk (2.13.1) never reached the app.
+        self.assertNotIn("dlls/wow64/", PATCH)
+        self.assertEqual(PATCH.count("+++ b/"), 1)
+        self.assertIn("+++ b/dlls/ntdll/signal_arm64ec.c", PATCH)
+
+    def test_wow64_callback_buffer_recognised(self):
+        self.assertIn("NtCurrentTeb()->WowTebOffset", PATCH)
+        self.assertIn("TlsSlots[WOW64_TLS_USERCALLBACKDATA]", PATCH)
+        self.assertIn("(ULONG_PTR)buf - callback <= 64", PATCH)
+        self.assertIn("if (wow64_callback || !buf->Frame)", PATCH)
 
     def test_longjmp_without_frame_restores_directly(self):
         self.assertIn("+++ b/dlls/ntdll/signal_arm64ec.c", PATCH)
-        self.assertIn("+    if (!buf->Frame)", PATCH)
-        self.assertIn("+        RtlCaptureContext( &context );", PATCH)
-        self.assertIn("+        context.Rcx = retval;", PATCH)
-        self.assertIn("+        RtlRestoreContext( &context, &rec );", PATCH)
+        self.assertIn("+            RtlCaptureContext( &context );", PATCH)
+        self.assertIn("+            context.Rcx = retval;", PATCH)
+        self.assertIn("+            RtlRestoreContext( &context, &rec );", PATCH)
         # Before the unwind, which stays for every buffer that has a frame.
-        self.assertLess(PATCH.index("if (!buf->Frame)"), PATCH.index(" RtlUnwind( (void *)buf->Frame"))
+        self.assertLess(PATCH.index("if (wow64_callback || !buf->Frame)"), PATCH.index(" RtlUnwind( (void *)buf->Frame"))
 
     def test_only_adds_lines(self):
         removed = [l for l in PATCH.splitlines() if l.startswith("-") and not l.startswith("---")]

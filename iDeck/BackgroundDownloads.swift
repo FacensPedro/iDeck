@@ -171,8 +171,7 @@ final class BackgroundDownloads {
             DispatchQueue.main.async {
                 guard let self else { return }
                 self.log("continued processing expired; pausing")
-                self.pause()
-                self.notify(tr("Download paused"), body: tr("Open iDeck to continue downloading."))
+                self.pause()   // no "Download paused" notification (2.13.3)
                 self.finishContinued(success: false)
             }
         }
@@ -195,8 +194,7 @@ final class BackgroundDownloads {
                 guard let self else { return }
                 if self.continued == nil {
                     self.log("background time over; pausing")
-                    self.pause()
-                    self.notify(tr("Download paused"), body: tr("Open iDeck to continue downloading."))
+                    self.pause()   // no "Download paused" notification (2.13.3)
                 }
                 self.endGrace()
             }

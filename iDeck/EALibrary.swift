@@ -325,18 +325,22 @@ struct EAInstalledGame: Codable, Sendable {
         pause(id)
         let kind = downloads[id]?.kind ?? .install
         downloads[id] = nil
-        let journal = Self.journalURL(id)
-        if kind == .install {
-            let sidecar = journal.deletingPathExtension().appendingPathExtension("folder")
-            if let folder = try? String(contentsOf: sidecar, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines), !folder.isEmpty,
-               folder.hasPrefix(Self.installRoot + "/") {
-                try? FileManager.default.removeItem(at: Self.drive.appendingPathComponent(folder, isDirectory: true))
-            }
-            try? FileManager.default.removeItem(at: sidecar)
-            try? FileManager.default.removeItem(at: journal)
-        }
+        if kind == .install { removePartialInstall(id) }
         EALog.event("[ea-download] cancelled id=\(id) kind=\(kind.rawValue)")
         if kind != .install, installed[id] != nil { uninstall(id) }
+    }
+
+    /// A first install's partial files: its folder (named in the journal's sidecar) and
+    /// the journal. Used by Stop and, since 2.13.3, when the download fails.
+    private func removePartialInstall(_ id: String) {
+        let journal = Self.journalURL(id)
+        let sidecar = journal.deletingPathExtension().appendingPathExtension("folder")
+        if let folder = try? String(contentsOf: sidecar, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines), !folder.isEmpty,
+           folder.hasPrefix(Self.installRoot + "/") {
+            try? FileManager.default.removeItem(at: Self.drive.appendingPathComponent(folder, isDirectory: true))
+        }
+        try? FileManager.default.removeItem(at: sidecar)
+        try? FileManager.default.removeItem(at: journal)
     }
 
     /// Deletes the game's files and records; its library entry goes with them.
@@ -426,6 +430,11 @@ struct EAInstalledGame: Codable, Sendable {
                 DownloadLog.ended(store: "EA app", name: game(id)?.title ?? installed[id]?.title ?? id, outcome: stopped ? "stopped" : "paused")
             } else {
                 downloads[id]?.state = .failed(error.localizedDescription)
+                // A failed first install is removed, as Stop does: no half game is left.
+                if downloads[id]?.kind == .install && installed[id] == nil {
+                    removePartialInstall(id)
+                    EALog.event("[ea-download] failed id=\(id): partial files removed")
+                }
                 DownloadLog.ended(store: "EA app", name: game(id)?.title ?? installed[id]?.title ?? id, outcome: "failed: " + error.localizedDescription)
                 handle(error, context: "download id=\(id)", report: false)
             }
