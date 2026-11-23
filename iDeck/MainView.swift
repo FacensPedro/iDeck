@@ -265,7 +265,8 @@ struct WindowsWorkspaceView: View {
     @ObservedObject private var eaLibrary = EALibrary.shared
     @ObservedObject private var ubisoftLibrary = UbisoftLibrary.shared
     @State private var ubisoftClientInstalled = false
-    @State private var ubisoftSignedIn = false
+    /// Follows a sign-in or sign-out in Settings (UbisoftLibrary publishes it).
+    private var ubisoftSignedIn: Bool { ubisoftLibrary.signedIn }
     @State private var selectedEpicGame: SelectedEpicGame?
     @State private var selectedEAGame: EAOwnedGame?
     @State private var selectedGOGGame: GOGGame?
@@ -2652,8 +2653,7 @@ extension WindowsWorkspaceView {
                     }.value
                     guard !Task.isCancelled else { return }
                     ubisoftClientInstalled = installed
-                    ubisoftSignedIn = UbisoftSavedSession.load() != nil
-                    if installed || ubisoftSignedIn { ubisoftLibrary.refresh() }
+                    if installed || UbisoftSavedSession.load() != nil { ubisoftLibrary.refresh() }
                 }
             case .ea:
                 if eaLibrary.signedIn {

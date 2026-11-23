@@ -73,6 +73,14 @@ final class UbisoftDemux: @unchecked Sendable {
                 }
             }
             connection.start(queue: queue)
+            // A connection that never gets ready (no route, a blocked port) stays in
+            // .waiting: without this the library waited on it for good.
+            queue.asyncAfter(deadline: .now() + 20) {
+                guard !resumed else { return }
+                resumed = true
+                connection.cancel()
+                continuation.resume(throwing: UbisoftDemuxError.timeout("connection"))
+            }
         }
         queue.sync { self.connection = connection }
         receive()

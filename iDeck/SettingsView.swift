@@ -295,7 +295,7 @@ struct SettingsView: View {
                     Button(tr("Sign in")) { ubisoftLoginPresented = true }
                 } else {
                     Button(tr("Sign out"), role: .destructive) {
-                        if UbisoftSavedSession.clear() { ubisoftAccountName = "" }
+                        if UbisoftSavedSession.clear() { ubisoftAccountName = ""; UbisoftLibrary.shared.refresh() }
                     }
                 }
             } header: {
@@ -312,7 +312,7 @@ struct SettingsView: View {
     @MainActor private func restoreUbisoftSession() async {
         guard let saved = UbisoftSavedSession.load(), saved.expired else { return }
         guard let remember = saved.remember, !remember.isEmpty else {
-            if UbisoftSavedSession.clear() { ubisoftAccountName = "" }
+            if UbisoftSavedSession.clear() { ubisoftAccountName = ""; UbisoftLibrary.shared.refresh() }
             return
         }
         var request = UbisoftSavedSession.request(appID: saved.appIDUsed ?? UbisoftSavedSession.appIDs[0])
@@ -322,7 +322,7 @@ struct SettingsView: View {
             guard !Task.isCancelled, UbisoftSavedSession.load()?.ticket == saved.ticket,
                   let http = response as? HTTPURLResponse else { return }
             if http.statusCode == 401 {
-                if UbisoftSavedSession.clear() { ubisoftAccountName = "" }
+                if UbisoftSavedSession.clear() { ubisoftAccountName = ""; UbisoftLibrary.shared.refresh() }
             } else if (200..<300).contains(http.statusCode) {
                 let renewed = try UbisoftSavedSession.decode(data, previous: saved)
                 try renewed.save()
@@ -827,10 +827,6 @@ private struct UbisoftLoginView: View {
                 if !error.isEmpty { Text(error).foregroundStyle(.red) }
             }
             .navigationTitle("Ubisoft Connect")
-            .safeAreaInset(edge: .bottom) {
-                Link(tr("Ubisoft account"), destination: URL(string: "https://account.ubisoft.com/")!)
-                    .padding()
-            }
             .toolbar { Button(tr("Cancel")) { dismiss() } }
         }
         .onDisappear { request?.cancel() }
@@ -875,6 +871,7 @@ private struct UbisoftLoginView: View {
             }
             try UbisoftSavedSession.decode(data, appID: usedAppID).save()
             accountName = name
+            UbisoftLibrary.shared.refresh()   // the store page lists the account's games now
             dismiss()
         } catch {
             if !Task.isCancelled { self.error = error.localizedDescription }
