@@ -147,9 +147,17 @@ struct SteamAppInfo {
         var language: String = ""
         /// `config.lowviolence "1"`: regional alternate content.
         var lowViolence: Bool = false
+        /// `config.realm`: "steamchina" for depots only Steam China's client installs,
+        /// "steamglobal" or empty for everyone else's.
+        var realm: String = ""
         /// `depotfromapp`: the depot belongs to another app, and Valve's client
         /// installs it as that app ("required app N").
         var fromApp: UInt32? = nil
+
+        /// Whether the global Steam client installs this depot: not a Steam China one.
+        var isGlobalRealm: Bool {
+            realm.isEmpty || realm.caseInsensitiveCompare("steamglobal") == .orderedSame
+        }
 
         /// Check if depot is for the specified OS
         func supports(os: String) -> Bool {
@@ -193,6 +201,7 @@ struct SteamAppInfo {
             if local.osarch.isEmpty { depots[index].osarch = source.osarch }
             if local.language.isEmpty { depots[index].language = source.language }
             depots[index].lowViolence = local.lowViolence || source.lowViolence
+            if local.realm.isEmpty { depots[index].realm = source.realm }
             changed += 1
         }
         return changed
@@ -237,7 +246,7 @@ struct SteamAppInfo {
             depots.filter { d in
                 d.supports(os: os) && !d.isSharedInstall &&
                 (d.dlcAppID.map { ownedDLC.contains(d.depotID) && !dlcOff.contains($0) } ?? true) &&
-                d.manifestID(branch) != nil && !d.lowViolence &&
+                d.manifestID(branch) != nil && !d.lowViolence && d.isGlobalRealm &&
                 (d.osarch.isEmpty || d.osarch == arch) &&
                 (d.language.isEmpty || d.language.caseInsensitiveCompare(language) == .orderedSame)
             }.sorted { $0.depotID < $1.depotID }
@@ -261,7 +270,7 @@ struct SteamAppInfo {
         let language = language ?? depotLanguage
         return depots.filter { d in
             d.isSharedInstall && d.fromApp != nil && d.fromApp != appID && d.dlcAppID == nil &&
-                d.supports(os: os) && !d.lowViolence &&
+                d.supports(os: os) && !d.lowViolence && d.isGlobalRealm &&
                 (d.language.isEmpty || d.language.caseInsensitiveCompare(language) == .orderedSame)
         }.sorted { $0.depotID < $1.depotID }
     }
@@ -287,6 +296,7 @@ struct SteamAppInfo {
         if d.isSharedInstall { return "shared" }
         if d.manifestID(branch) == nil { return "nomanifest" }
         if d.lowViolence { return "lowviolence" }
+        if !d.isGlobalRealm { return "realm" }
         if !d.language.isEmpty && d.language.caseInsensitiveCompare(language) != .orderedSame { return "lang" }
         return "arch"
     }
@@ -516,6 +526,11 @@ struct SteamAppInfo {
                 di.osarch = config["osarch"] as? String ?? ""
                 di.language = config["language"] as? String ?? ""
                 di.lowViolence = (config["lowviolence"] as? String) == "1"
+                di.realm = config["realm"] as? String ?? ""
+                // `optionaldlc`: content Valve's client adds only for an owner of that DLC.
+                if let optional = (config["optionaldlc"] as? String).flatMap(UInt32.init), optional != 0 {
+                    di.dlcAppID = optional
+                }
             }
             if let maxSizeStr = depot["maxsize"] as? String, let maxSize = UInt64(maxSizeStr) {
                 di.maxSize = maxSize
