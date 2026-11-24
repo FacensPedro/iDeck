@@ -52,6 +52,7 @@ struct MainView: View {
         }
         .task(id: steamLibrary != nil && scenePhase == .active) {
             guard steamLibrary != nil && scenePhase == .active else { return }
+            coordinator.autoEnableBuiltInJIT()
             while !Task.isCancelled {
                 // JIT cannot change under a running game, which needs it: skip
                 // the sysctl/code-signing probe and its UI refresh meanwhile.

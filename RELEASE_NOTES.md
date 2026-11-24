@@ -5,6 +5,9 @@
 
 - iDeck now finds the version of the installed Ubisoft Connect and sends it to Ubisoft's download service. 2.15.1 looked for it in the wrong part of the version number and sent its old built-in one, which the server refuses. The versions it reads are written to the log.
 
+### JIT
+- With the built-in JIT method, iDeck now enables JIT by itself when it opens, once per opening: no tap is needed. It does this only when the device's pairing file is imported and JIT is not already active.
+
 ### Settings
 - After JIT is prepared, Settings › JIT shows "Done: JIT ready" in green instead of "Detached" in orange. iDeck lets the debugger go on purpose once Wine's JIT memory is prepared, with StikDebug or the built-in helper, so this was never a lost connection.
 - Download notifications now shows as off when iDeck is not allowed to send notifications. After "Don't Allow", or a notification prompt that was dismissed, it used to show as on.

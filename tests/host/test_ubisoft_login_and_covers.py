@@ -25,3 +25,11 @@ class UbisoftLoginAndCoverTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class BuiltInJITAutoTests(unittest.TestCase):
+    def test_built_in_jit_starts_by_itself_once(self):
+        coord = (ROOT / "iDeck/SystemCoordinator.swift").read_text()
+        self.assertIn('guard jitMethod == "builtIn", !Self.builtInAutoRequested,', coord)
+        self.assertIn("FileManager.default.fileExists(atPath: pairingFileURL.path)", coord)
+        self.assertIn("coordinator.autoEnableBuiltInJIT()", MAIN)
