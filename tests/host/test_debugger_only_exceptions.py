@@ -1,4 +1,4 @@
-"""Debugger-only exceptions left unhandled in a WoW64 process return to their caller (2.14.1)."""
+"""Debugger-only exceptions left unhandled in a WoW64 process return to their caller (2.15.0)."""
 import pathlib
 import unittest
 

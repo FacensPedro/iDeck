@@ -1,4 +1,4 @@
-"""The minimize button keeps its place and every game starts minimized (2.14.1)."""
+"""The minimize button keeps its place and every game starts minimized (2.15.0)."""
 import pathlib
 import unittest
 

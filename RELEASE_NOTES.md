@@ -56,4 +56,4 @@
 - The Install button is smaller.
 
 ### Version
-- Updated the application version to 2.14.1 (build 122).
+- Updated the application version to 2.15.0 (build 122).
