@@ -1,8 +1,57 @@
 diff --git a/dlls/ntdll/signal_arm64ec.c b/dlls/ntdll/signal_arm64ec.c
-index f82eb68..b24a174 100644
+index f82eb68..f11a64e 100644
 --- a/dlls/ntdll/signal_arm64ec.c
 +++ b/dlls/ntdll/signal_arm64ec.c
-@@ -5066,6 +5066,32 @@ void __cdecl NTDLL_longjmp( _JUMP_BUFFER *buf, int retval )
+@@ -4345,6 +4345,12 @@ int __attribute__((naked)) NTDLL__setjmpex( _JUMP_BUFFER *buf, void *frame )
+          "stp x19, x20, [x0, #0x30]\n\t"   /* jmp_buf->R12,R13 */
+          "stp x21, x22, [x0, #0x40]\n\t"   /* jmp_buf->R14,R15 */
+          "str x30,      [x0, #0x50]\n\t"   /* jmp_buf->Rip */
++         /* iDeck: x23, x24 and x28 have no x64 counterpart, but an ARM64 caller
++          * (wow64.dll's Wow64KiUserCallbackDispatcher) keeps values in them across
++          * setjmp. They go in Xmm6/Xmm7, which this function never filled; only
++          * ios_arm64_longjmp reads them back. */
++         "stp x23, x24, [x0, #0x60]\n\t"   /* jmp_buf->Xmm6 */
++         "str x28,      [x0, #0x70]\n\t"   /* jmp_buf->Xmm7 */
+          "stp d8, d9,   [x0, #0x80]\n\t"   /* jmp_buf->Xmm8,Xmm9 */
+          "stp d10, d11, [x0, #0xa0]\n\t"   /* jmp_buf->Xmm10,Xmm11 */
+          "stp d12, d13, [x0, #0xc0]\n\t"   /* jmp_buf->Xmm12,Xmm13 */
+@@ -5039,6 +5045,35 @@ void __attribute((naked)) RtlRaiseException( EXCEPTION_RECORD *rec )
+ }
+ 
+ 
++/* iDeck: a longjmp to an ARM64 (not ARM64EC) setjmp caller, register for register:
++ * the x64 registers of the buffer as NTDLL__setjmpex stored them, x23/x24/x28 from
++ * Xmm6/Xmm7 and d8-d15, then a branch to the saved return address with retval in x0.
++ * RtlRestoreContext cannot do this: an AMD64 CONTEXT has no x23, x24 or x28, and
++ * wow64.dll uses x28 right after its setjmp returns (str w12, [x27, x28]: the TEB
++ * offset of a TLS value), so a stale x28 wrote into the stack. */
++static void __attribute__((naked,noreturn)) ios_arm64_longjmp( _JUMP_BUFFER *buf, int retval )
++{
++    asm( ".seh_proc \"#ios_arm64_longjmp\"\n\t"
++         ".seh_endprologue\n\t"
++         "ldr x27,      [x0, #0x08]\n\t"   /* Rbx */
++         "ldp x9, x29,  [x0, #0x10]\n\t"   /* Rsp, Rbp */
++         "ldp x25, x26, [x0, #0x20]\n\t"   /* Rsi, Rdi */
++         "ldp x19, x20, [x0, #0x30]\n\t"   /* R12, R13 */
++         "ldp x21, x22, [x0, #0x40]\n\t"   /* R14, R15 */
++         "ldr x30,      [x0, #0x50]\n\t"   /* Rip */
++         "ldp x23, x24, [x0, #0x60]\n\t"   /* Xmm6 */
++         "ldr x28,      [x0, #0x70]\n\t"   /* Xmm7 */
++         "ldp d8, d9,   [x0, #0x80]\n\t"
++         "ldp d10, d11, [x0, #0xa0]\n\t"
++         "ldp d12, d13, [x0, #0xc0]\n\t"
++         "ldp d14, d15, [x0, #0xe0]\n\t"
++         "mov sp, x9\n\t"
++         "cmp w1, #0\n\t"
++         "csinc w0, w1, wzr, ne\n\t"       /* longjmp(buf, 0) returns 1 */
++         "br x30\n\t"
++         ".seh_endproc" );
++}
++
+ /*******************************************************************
+  *		longjmp (NTDLL.@)
+  */
+@@ -5066,6 +5101,35 @@ void __cdecl NTDLL_longjmp( _JUMP_BUFFER *buf, int retval )
      rec.ExceptionAddress = NULL;
      rec.NumberParameters = 1;
      rec.ExceptionInformation[0] = (DWORD_PTR)buf;
@@ -21,6 +70,9 @@ index f82eb68..b24a174 100644
 +        ULONG_PTR callback = NtCurrentTeb()->WowTebOffset
 +            ? (ULONG_PTR)NtCurrentTeb()->TlsSlots[WOW64_TLS_USERCALLBACKDATA] : 0;
 +        BOOL wow64_callback = callback && (ULONG_PTR)buf > callback && (ULONG_PTR)buf - callback <= 64;
++
++        /* wow64.dll is ARM64 code: return to it with every register it saved. */
++        if (wow64_callback && !RtlIsEcCode( (ULONG_PTR)buf->Rip )) ios_arm64_longjmp( buf, retval );
 +
 +        if (wow64_callback || !buf->Frame)
 +        {

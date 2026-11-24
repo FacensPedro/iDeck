@@ -4,6 +4,7 @@
 
 ### 32-bit games
 - The 2.14.0 fix works: Assassin's Creed IV no longer closes on the window-callback error. It now got further and closed on a different signal: a thread-name message (0x406D1388) that games send for debuggers and catch themselves. In iOS's 32-bit mode the game's own catch was not reached, so Wine ended the game. Wine now ignores these debugger-only messages (thread names and debug output) when nothing catches them, as Windows without a debugger effectively does.
+- Duke Nukem 3D: 20th Anniversary World Tour, Overcooked and Max Payne 2 no longer close a few seconds after starting. When a 32-bit game's window returned from a message, three of the Windows runtime's registers were not restored, and one of them was then used to write into memory. That broke the game's window message code (a crash in wow64win.dll, then a stack overflow). All of them are now restored. Other 32-bit games that closed by themselves right after opening their window may be fixed too.
 
 ### Steam
 - Game sizes are right again for games that also have content for Steam China, such as Delta Force (219.65 GB shown before; the game is about 88 GB). Steam China's copies of the game files were counted, and downloaded, with the global ones. They are now left out, as Steam itself does.
