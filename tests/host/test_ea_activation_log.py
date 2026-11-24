@@ -23,3 +23,10 @@ class EAActivationLogTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class EALicenceOriginCacheTests(unittest.TestCase):
+    def test_licence_also_in_origin_cache_and_logged(self):
+        lic = (ROOT / "iDeck/Vendor/Madeira/SwiftEA/EALicense.swift").read_text()
+        self.assertIn('drive.appendingPathComponent("ProgramData/Origin/LicenseCache")', lic)
+        self.assertIn("licence-hash=", lic)

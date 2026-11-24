@@ -5,6 +5,10 @@
 
 - iDeck now finds the version of the installed Ubisoft Connect and sends it to Ubisoft's download service. 2.15.1 looked for it in the wrong part of the version number and sent its old built-in one, which the server refuses. The versions it reads are written to the log.
 
+### EA app
+- The game licence iDeck gets from EA is now also saved where Origin kept it (C:\ProgramData\Origin\LicenseCache), not only in the EA app's folder. Older EA games' activation, such as Dragon Age: Inquisition's, comes from the Origin era.
+- iDeck's log now says, for each licence, whether its machine identity, account and game match what was asked, and when it starts.
+
 ### JIT
 - With the built-in JIT method, iDeck now enables JIT by itself when it opens, once per opening: no tap is needed. It does this only when the device's pairing file is imported and JIT is not already active.
 
