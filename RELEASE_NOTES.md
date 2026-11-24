@@ -26,4 +26,4 @@
 - Download notifications now shows as off when iDeck is not allowed to send notifications. After "Don't Allow", or a notification prompt that was dismissed, it used to show as on.
 
 ### Version
-- Updated the application version to 2.15.2 (build 124).
+- Updated the application version to 2.16.0 (build 124).
