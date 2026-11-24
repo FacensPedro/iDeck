@@ -29,6 +29,10 @@
 - The minimize button for the close and settings buttons now stays in the same place when they are minimized. Before, it moved up.
 - Every game now starts with those buttons minimized. Before, expanding them once kept them expanded in every later game.
 
+### Windows sessions
+- While a game runs, if it shows no new image for 20 seconds after it had started drawing, the bar at the top says the game may be frozen and that it can be closed with X. The message goes away when images arrive again. Both moments are written to iDeck's log.
+- After a game session, Windows' temporary folders (C:\windows\temp and each user's Temp folder) are emptied of what earlier sessions left there. Files from the session that just ended stay until the next cleanup, so an installer that continues later still finds them.
+
 ### Game details
 - Launch and Uninstall are side by side.
 - Uninstalling a game asks first in a pop-up, on every store's page, Steam included.

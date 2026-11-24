@@ -18,6 +18,11 @@ private final class GameRuntimeMetrics: ObservableObject {
     @Published private(set) var presentCounterAvailable = false
     @Published private(set) var receivedNewFrames = false
     @Published private(set) var firstFrameAt: TimeInterval?
+    /// Seconds without a new frame after the game had shown one; 0 while frames
+    /// arrive. Published only from 20 s on (a frozen game, not a loading screen).
+    @Published private(set) var stalledSeconds = 0
+    private var lastFrameChangeAt: TimeInterval?
+    private var stallLogged = false
 
     private var elapsed: TimeInterval = 0
     private let startedAt = ProcessInfo.processInfo.systemUptime
@@ -40,6 +45,8 @@ private final class GameRuntimeMetrics: ObservableObject {
     private static let presentCount: (() -> UInt64)? = mainCount == nil && surfaceCount == nil ? nil : {
         (mainCount?() ?? 0) &+ (surfaceCount?() ?? 0)
     }
+
+    static let stallSeconds = 20
 
     init() {
         // Capture the in-process present counter when the game session view
@@ -93,6 +100,19 @@ private final class GameRuntimeMetrics: ObservableObject {
             if collectPerformance, let oldTime = previousUptime, let oldFrames = previousFrames, uptime > oldTime {
                 let delta = count >= oldFrames ? count - oldFrames : 0
                 update(\.fps, String(format: "%.0f", Double(delta) / (uptime - oldTime)))
+            }
+            if previousFrames != count { lastFrameChangeAt = elapsed }
+            if receivedNewFrames, let last = lastFrameChangeAt {
+                let stalled = Int(elapsed - last)
+                let shown = stalled >= Self.stallSeconds ? stalled : 0
+                if shown != stalledSeconds { stalledSeconds = shown }
+                if shown > 0 && !stallLogged {
+                    stallLogged = true
+                    AppLog.record("[hang] no new frame for \(Self.stallSeconds) s while the game runs")
+                } else if shown == 0 && stallLogged {
+                    stallLogged = false
+                    AppLog.record("[hang] frames arrive again after \(stalled) s")
+                }
             }
             previousFrames = count
         } else {
@@ -308,6 +328,12 @@ struct GameSessionView: View {
                     // shutdown progress VISIBLE even when the drawable is black.
                     // 2.13.3: no "Closing Wine and wineserver..." next to the settings
                     // button; the closing box under the strip shows it.
+                    if !coordinator.isClosingWindowsSession && coordinator.windowsStatus == "Running" && metrics.stalledSeconds > 0 {
+                        Text(tr("No new image for %d s: the game may be frozen. Wait, or close it with X.", metrics.stalledSeconds))
+                            .foregroundColor(.yellow)
+                            .font(.caption2.weight(.semibold))
+                            .lineLimit(2)
+                    }
                     if !coordinator.isClosingWindowsSession && !metrics.receivedNewFrames && metalFXTurnedOff {
                         Text(tr("The game showed no image with MetalFX, so MetalFX is now off for it. Close the game and open it again."))
                             .foregroundColor(.yellow)

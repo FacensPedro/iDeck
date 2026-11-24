@@ -152,6 +152,7 @@ class SystemCoordinator: ObservableObject {
         UserDefaults.standard.set(launcher, forKey: "diagnostics.lastLauncher")
         AppLog.record("[game-session] launcher=\(launcher) game=\(safeTitle)")
         SessionOutcome.began()
+        sessionTempCutoff = Date()
         // The game gets the memory: covers and other caches iDeck rebuilds on demand
         // are dropped before it starts.
         URLCache.shared.removeAllCachedResponses()
@@ -2497,6 +2498,42 @@ class SystemCoordinator: ObservableObject {
     /// Frees what a finished session held and iDeck rebuilds on demand: the GOG
     /// Galaxy service, Madeira Dock's leftovers, cached responses and artwork, and
     /// the Metal caches the governor owns. Safe to call more than once.
+    /// When the session that is ending started: temporary files from before it are stale.
+    private var sessionTempCutoff = Date.distantPast
+
+    /// Windows' temporary folders (C:\\windows\\temp and each user's AppData\\Local\\Temp)
+    /// emptied of what earlier sessions left, once no Windows program runs. Files the
+    /// session that just ended wrote stay until the next cleanup, for an installer
+    /// that continues after a restart. In the background; logged as [session-temp].
+    static func cleanWindowsTemp(before cutoff: Date) {
+        guard cutoff > .distantPast else { return }
+        let drive = MadeiraDock.drive
+        DispatchQueue.global(qos: .utility).async {
+            guard !ideck_wineprocess_running() else { return }
+            let fm = FileManager.default
+            var folders = [drive.appendingPathComponent("windows/temp")]
+            let users = drive.appendingPathComponent("users")
+            for user in (try? fm.contentsOfDirectory(atPath: users.path)) ?? [] {
+                folders.append(users.appendingPathComponent(user).appendingPathComponent("AppData/Local/Temp"))
+                folders.append(users.appendingPathComponent(user).appendingPathComponent("Temp"))
+            }
+            var removed = 0, bytes: Int64 = 0
+            for folder in folders {
+                let resolved = folder.resolvingSymlinksInPath()
+                // Only real folders inside the prefix: a link elsewhere is never emptied.
+                guard resolved.path.hasPrefix(drive.resolvingSymlinksInPath().path + "/"),
+                      let entries = try? fm.contentsOfDirectory(at: resolved, includingPropertiesForKeys: [.contentModificationDateKey, .totalFileAllocatedSizeKey, .isSymbolicLinkKey]) else { continue }
+                for entry in entries {
+                    let values = try? entry.resourceValues(forKeys: [.contentModificationDateKey, .totalFileAllocatedSizeKey, .isSymbolicLinkKey])
+                    guard let modified = values?.contentModificationDate, modified < cutoff else { continue }
+                    let size = Int64(values?.totalFileAllocatedSize ?? 0)
+                    if (try? fm.removeItem(at: entry)) != nil { removed += 1; bytes += size }
+                }
+            }
+            if removed > 0 { AppLog.record("[session-temp] removed \(removed) item(s), \(bytes >> 20) MB, left in Windows' temporary folders by earlier sessions") }
+        }
+    }
+
     private func releaseSessionResources() {
         activeWindowsProfile = nil
         URLCache.shared.removeAllCachedResponses()
@@ -2507,6 +2544,7 @@ class SystemCoordinator: ObservableObject {
                 NotificationCenter.default.post(name: ResourceGovernor.releaseCachesNotification, object: nil)
             }
         }
+        Self.cleanWindowsTemp(before: sessionTempCutoff)
         AppLog.record("[session] resources released after the session "
                       + "(available \(Int(os_proc_available_memory() >> 20)) MiB)")
     }
