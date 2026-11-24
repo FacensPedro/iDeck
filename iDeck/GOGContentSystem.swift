@@ -152,7 +152,11 @@ enum GOGContentSystem {
     }
 
     /// The language codes GOG's depots use, best first ("pt-BR", "pt", "en-US", "en").
-    static func preferredLanguages() -> [String] {
+    static func preferredLanguages(gameID: Int? = nil) -> [String] {
+        // The language chosen on the game's page comes first.
+        if let gameID, let tag = GameLanguage.choice("gog:\(gameID)")?.lowercased() {
+            return [tag, String(tag.prefix(2)), "en-us", "en"]
+        }
         let code = Locale.current.language.languageCode?.identifier ?? "en"
         let region = Locale.current.language.region?.identifier
         var result: [String] = []
@@ -189,10 +193,11 @@ enum GOGContentSystem {
         }
         let base = string(manifest["baseProductId"]) ?? String(gameID)
         let products: Set<String> = [String(gameID), base]
-        let wanted = preferredLanguages()
+        let wanted = preferredLanguages(gameID: gameID)
         var depots = ((manifest["depots"] as? [[String: Any]]) ?? []).filter { products.contains(string($0["productId"]) ?? "") }
         // Language-neutral depots, plus the files of the best language offered.
         let languages = Set(depots.flatMap { ($0["languages"] as? [String] ?? []).map { $0.lowercased() } }).subtracting(["*"])
+        GameLanguage.rememberKnown("gog:\(gameID)", languages.sorted())
         let language = wanted.first(where: languages.contains)
             ?? wanted.compactMap { w in languages.first { $0.hasPrefix(w.prefix(2)) } }.first
             ?? languages.sorted().first

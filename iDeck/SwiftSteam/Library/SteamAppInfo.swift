@@ -38,6 +38,10 @@ struct SteamAppInfo {
     /// Steam API language names the app supports (`common.supported_languages`
     /// or `common.languages`), lowercased. Empty when PICS lists none.
     var languages: Set<String> = []
+    /// Of those, the ones with full audio and the ones with subtitles
+    /// (`supported_languages.<name>.full_audio` / `.subtitles`).
+    var audioLanguages: Set<String> = []
+    var subtitleLanguages: Set<String> = []
     /// Steam Auto-Cloud configuration (`ufs`): which files of the game are its
     /// saves, and where another platform keeps them. Empty for a game that
     /// only uses the Steam Cloud API (its files live in the user's `remote` folder).
@@ -444,6 +448,9 @@ struct SteamAppInfo {
                 for (name, value) in table.prefix(64) where name.utf8.count <= 32 {
                     let flag = ((value as? [String: Any])?["supported"] as? String) ?? (value as? String) ?? ""
                     if !["0", "false"].contains(flag.lowercased()) { info.languages.insert(name.lowercased()) }
+                    let fields = value as? [String: Any]
+                    if ["1", "true"].contains(((fields?["full_audio"] as? String) ?? "").lowercased()) { info.audioLanguages.insert(name.lowercased()) }
+                    if ["1", "true"].contains(((fields?["subtitles"] as? String) ?? "").lowercased()) { info.subtitleLanguages.insert(name.lowercased()) }
                 }
             }
         }

@@ -874,7 +874,7 @@ struct EpicInstalledDLC: Codable, Sendable {
         if let extra = record.additionalCommandLine, !extra.isEmpty { args.append(extra) }
         args += ["-AUTH_LOGIN=unused", "-AUTH_PASSWORD=\(code)", "-AUTH_TYPE=exchangecode", "-epicapp=\(app)", "-epicenv=Prod"]
         if let ownershipFile { args.append(quoted("-epicovt=\(ownershipFile)")) }
-        args += ["-EpicPortal", quoted("-epicusername=\(name)"), "-epicuserid=\(account?.id ?? "")", "-epiclocale=\(AppLanguage.gameLocale(separator: "-"))",
+        args += ["-EpicPortal", quoted("-epicusername=\(name)"), "-epicuserid=\(account?.id ?? "")", "-epiclocale=\(GameLanguage.locale("epic:" + app, separator: "-"))",
                  "-epicsandboxid=\(record.namespace)"]
         EpicLog.event("[epic-launch] app=\(app) online=\(code.isEmpty ? 0 : 1) ovt=\(ownershipFile == nil ? 0 : 1)")
         return args.joined(separator: " ")

@@ -5,6 +5,15 @@
 
 - iDeck now finds the version of the installed Ubisoft Connect and sends it to Ubisoft's download service. 2.15.1 looked for it in the wrong part of the version number and sent its old built-in one, which the server refuses. The versions it reads are written to the log.
 
+### Game language
+- Every game's page, on Steam, Epic Games, GOG, Ubisoft Connect and the EA app, has a Game language choice. Automatic keeps iDeck's language, as before.
+- It lists the languages the game has when the store says so:
+  - Steam lists only the game's languages, and marks which have audio, subtitles or both.
+  - GOG and Ubisoft list them once the game's file list has been read.
+  - Epic and the EA app do not say, so the usual set of languages is offered.
+- Steam, GOG and Ubisoft download that language's files. Epic and EA games receive it when they start.
+- Stores have one language per game, for both voices and subtitles; the game uses it for whichever it has.
+
 ### EA app
 - The game licence iDeck gets from EA is now also saved where Origin kept it (C:\ProgramData\Origin\LicenseCache), not only in the EA app's folder. Older EA games' activation, such as Dragon Age: Inquisition's, comes from the Origin era.
 - iDeck's log now says, for each licence, whether its machine identity, account and game match what was asked, and when it starts.

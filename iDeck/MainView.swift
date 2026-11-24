@@ -1538,6 +1538,11 @@ private struct SteamProgramDetailsView: View {
                             .foregroundColor(.red)
                             .font(.caption)
                     }
+                    GameLanguageCard(profileID: "steam:\(game.appID)",
+                                     available: game.languages.isEmpty ? nil : GameLanguage.all.map(\.steam).filter(game.languages.contains).compactMap(GameLanguage.tag(steam:)),
+                                     audio: Set(game.audioLanguages.compactMap(GameLanguage.tag(steam:))),
+                                     subtitles: Set(game.subtitleLanguages.compactMap(GameLanguage.tag(steam:))),
+                                     footer: tr("Steam downloads this language's files with the game, or at its next update if it is installed."))
                     WindowsGameProfileForm(profile: $profile)
                     DetailCard(title: tr("Steam Cloud saves"),
                                footer: steamLibrary.cloudMessages[game.appID]
@@ -1946,6 +1951,10 @@ private struct StoreGameDetailsView<Extra: View>: View {
                             .foregroundColor(.red)
                             .font(.caption)
                     }
+                    GameLanguageCard(profileID: profileID, available: GameLanguage.known(profileID),
+                                     footer: store == .epic || store == .ea
+                                        ? tr("Passed to the game when it starts; the game uses it if it has this language.")
+                                        : tr("Downloaded with the game; an installed game takes it at its next install or update."))
                     WindowsGameProfileForm(profile: $profile)
                     extra
                 }
