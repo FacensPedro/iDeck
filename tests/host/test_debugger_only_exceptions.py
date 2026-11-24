@@ -33,6 +33,13 @@ class ThreadNameExceptionTests(unittest.TestCase):
         self.assertIn("+    if (rec->ExceptionCode == 0x406d1388)", PATCH)
         self.assertIn("+        return NtContinue( context, FALSE );", PATCH)
 
+    def test_first_chance_returns_without_dispatch(self):
+        # The WoW64 raise carries pc=0: dispatching or NtContinue jumps to 0 (2.16.1).
+        self.assertIn("+    if (rec && rec->ExceptionCode == 0x406d1388 && first_chance)", PATCH)
+        self.assertIn("+        return STATUS_SUCCESS;", PATCH)
+        first = PATCH.index("first_chance)")
+        self.assertLess(first, PATCH.index("+     status = send_debug_event") if "+     status = send_debug_event" in PATCH else PATCH.index(" status = send_debug_event"))
+
     def test_only_adds_lines(self):
         removed = [l for l in PATCH.splitlines() if l.startswith("-") and not l.startswith("---")]
         self.assertEqual(removed, [])

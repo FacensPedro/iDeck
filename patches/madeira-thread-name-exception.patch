@@ -2,7 +2,29 @@ diff --git a/build/ntdll-unix/thread_ios.c b/build/ntdll-unix/thread_ios.c
 index 68dbf43..feb0c76 100644
 --- a/build/ntdll-unix/thread_ios.c
 +++ b/build/ntdll-unix/thread_ios.c
-@@ -2390,6 +2390,21 @@ NTSTATUS WINAPI NtRaiseException( EXCEPTION_RECORD *rec, CONTEXT *context, BOOL
+@@ -2329,6 +2329,21 @@ NTSTATUS WINAPI NtRaiseException( EXCEPTION_RECORD *rec, CONTEXT *context, BOOL
+         }
+     }
+ #endif
++    /* iDeck 2.16.2: the thread-name exception is never dispatched. In an iOS WoW64
++     * process (Assassin's Creed IV's UPC_Net thread, Fallout: New Vegas) the
++     * context of this raise carries pc=0, so neither the program's __except nor
++     * NtContinue at second chance can resume it: continuing jumped to address 0
++     * and the process was torn down ("[fault-stuck] ... abort_process"). With no
++     * debugger the raise names a thread and nothing else, so return at once and
++     * RaiseException returns to its caller as on Windows after the handler. */
++    if (rec && rec->ExceptionCode == 0x406d1388 && first_chance)
++    {
++        static int skipped;
++        if (skipped++ < 8)
++            ERR_(seh)("[thread-name] 0x406d1388 at %p not dispatched -- returning to the caller\n",
++                      rec->ExceptionAddress );
++        return STATUS_SUCCESS;
++    }
+     status = send_debug_event( rec, context, first_chance, !(is_win64 || is_wow64() || is_old_wow64()) );
+ 
+     if (status == DBG_CONTINUE || status == DBG_EXCEPTION_HANDLED)
+@@ -2362,6 +2377,21 @@ NTSTATUS WINAPI NtRaiseException( EXCEPTION_RECORD *rec, CONTEXT *context, BOOL
          return NtContinue( context, FALSE );
      }
  
