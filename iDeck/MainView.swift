@@ -1541,8 +1541,7 @@ private struct SteamProgramDetailsView: View {
                     GameLanguageCard(profileID: "steam:\(game.appID)",
                                      available: game.languages.isEmpty ? nil : GameLanguage.all.map(\.steam).filter(game.languages.contains).compactMap(GameLanguage.tag(steam:)),
                                      audio: Set(game.audioLanguages.compactMap(GameLanguage.tag(steam:))),
-                                     subtitles: Set(game.subtitleLanguages.compactMap(GameLanguage.tag(steam:))),
-                                     footer: tr("Steam downloads this language's files with the game, or at its next update if it is installed."))
+                                     subtitles: Set(game.subtitleLanguages.compactMap(GameLanguage.tag(steam:))))
                     WindowsGameProfileForm(profile: $profile)
                     DetailCard(title: tr("Steam Cloud saves"),
                                footer: steamLibrary.cloudMessages[game.appID]
@@ -1951,10 +1950,7 @@ private struct StoreGameDetailsView<Extra: View>: View {
                             .foregroundColor(.red)
                             .font(.caption)
                     }
-                    GameLanguageCard(profileID: profileID, available: GameLanguage.known(profileID),
-                                     footer: store == .epic || store == .ea
-                                        ? tr("Passed to the game when it starts; the game uses it if it has this language.")
-                                        : tr("Downloaded with the game; an installed game takes it at its next install or update."))
+                    GameLanguageCard(profileID: profileID, available: GameLanguage.known(profileID))
                     WindowsGameProfileForm(profile: $profile)
                     extra
                 }
@@ -2463,7 +2459,6 @@ enum ShelfItem: Hashable {
         case "gog": .gog
         case "epic": .epic
         case "ea": .ea
-        case "ubisoft": .ubisoft
         default: .steam
         }
     }
@@ -2511,7 +2506,8 @@ extension WindowsWorkspaceView {
         ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(alignment: .top, spacing: isCompact ? 8 : 14) {
-                    ForEach([GameStore.steam, .gog, .epic, .ea, .ubisoft], id: \.self) { store in
+                    // No Ubisoft Connect tab: its download service refuses iDeck's connection.
+                    ForEach([GameStore.steam, .gog, .epic, .ea], id: \.self) { store in
                         shelfTile(.store(store))
                     }
                     ForEach(shelfGames, id: \.self) { item in

@@ -26,7 +26,7 @@ class GameLanguageTests(unittest.TestCase):
 
     def test_card_on_every_store_page(self):
         self.assertIn('GameLanguageCard(profileID: "steam:\\(game.appID)",', MAIN)
-        self.assertIn("GameLanguageCard(profileID: profileID, available: GameLanguage.known(profileID),", MAIN)
+        self.assertIn("GameLanguageCard(profileID: profileID, available: GameLanguage.known(profileID))", MAIN)
 
 
 if __name__ == "__main__":

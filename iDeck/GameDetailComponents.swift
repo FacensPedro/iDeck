@@ -286,15 +286,19 @@ struct GameLanguageCard: View {
     let available: [String]?
     var audio: Set<String> = []
     var subtitles: Set<String> = []
-    var footer: String? = nil
     @State private var selection = "automatic"
 
+    /// Portuguese (Brazil), Spanish and English only, those the game has when the store says.
     private var tags: [String] {
-        let list = available.map { listed in
-            listed.compactMap { tag in GameLanguage.all.first { $0.tag.lowercased() == tag.lowercased() }?.tag ?? (tag.contains("-") ? tag : nil) }
-        } ?? GameLanguage.all.map(\.tag)
-        var seen = Set<String>()
-        return list.filter { seen.insert($0.lowercased()).inserted }
+        let offered = GameLanguage.supported
+        guard let available else { return offered }
+        let listed = Set(available.map { $0.lowercased() })
+        let kept = offered.filter { tag in
+            let lower = tag.lowercased()
+            return listed.contains(lower) || listed.contains(String(lower.prefix(2)))
+                || listed.contains { $0.hasPrefix(String(lower.prefix(2)) + "-") }
+        }
+        return kept.isEmpty ? offered : kept
     }
 
     private func label(_ tag: String) -> String {
@@ -312,7 +316,7 @@ struct GameLanguageCard: View {
     }
 
     var body: some View {
-        DetailCard(title: tr("Game language"), footer: footer ?? tr("The store installs or passes this language; the game uses it for voices and subtitles when it has them.")) {
+        DetailCard(title: tr("Game language")) {
             DetailRow(title: tr("Language"), showsDivider: false, icon: "globe", iconColor: .blue) {
                 Picker(tr("Language"), selection: $selection) {
                     Text(tr("Automatic")).tag("automatic")

@@ -592,6 +592,9 @@ enum GameLanguage {
         ("uk-UA", "ukrainian"), ("vi-VN", "vietnamese"),
     ]
 
+    /// The languages the Game language choice offers.
+    static let supported = ["pt-BR", "es-ES", "en-US"]
+
     static func choice(_ profileID: String) -> String? {
         (UserDefaults.standard.dictionary(forKey: key) as? [String: String])?[profileID]
     }
