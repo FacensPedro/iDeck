@@ -664,7 +664,9 @@ struct SettingsView: View {
     private func refreshNotificationPermission() async {
         let status = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
         notificationsDenied = status == .denied
-        if notificationsDenied { downloadNotifications = false }
+        // Only an allowed permission shows the switch on: "Don't Allow" or a prompt
+        // that was dismissed showed it on before.
+        if status != .authorized && status != .provisional && status != .ephemeral { downloadNotifications = false }
     }
 
     private func toggleRow(title: String, isOn: Binding<Bool>) -> some View {
@@ -797,6 +799,45 @@ struct StoreClientCard: View {
 }
 
 
+/// The Ubisoft sign-in typed last, kept in this device's Keychain (never synced, only
+/// after the first unlock) so the form is filled next time. iOS's password AutoFill
+/// does not offer to save it: iDeck has no associated domain with Ubisoft.
+/// Sign out keeps it, so signing in again needs only a tap.
+enum UbisoftSavedLogin {
+    private static let service = "ideck.ubisoft.login"
+
+    private static func query(_ account: String? = nil) -> [String: Any] {
+        var q: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
+                                kSecAttrService as String: service]
+        if let account { q[kSecAttrAccount as String] = account }
+        return q
+    }
+
+    static func load() -> (email: String, password: String)? {
+        var q = query()
+        q[kSecReturnAttributes as String] = true
+        q[kSecReturnData as String] = true
+        q[kSecMatchLimit as String] = kSecMatchLimitOne
+        var item: CFTypeRef?
+        guard SecItemCopyMatching(q as CFDictionary, &item) == errSecSuccess,
+              let fields = item as? [String: Any],
+              let email = fields[kSecAttrAccount as String] as? String,
+              let data = fields[kSecValueData as String] as? Data,
+              let password = String(data: data, encoding: .utf8) else { return nil }
+        return (email, password)
+    }
+
+    static func save(email: String, password: String) {
+        remove()
+        var q = query(email)
+        q[kSecValueData as String] = Data(password.utf8)
+        q[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        SecItemAdd(q as CFDictionary, nil)
+    }
+
+    static func remove() { SecItemDelete(query() as CFDictionary) }
+}
+
 private struct UbisoftLoginView: View {
     @Binding var accountName: String
     @Environment(\.dismiss) private var dismiss
@@ -808,6 +849,8 @@ private struct UbisoftLoginView: View {
     @State private var busy = false
     @State private var error = ""
     @State private var request: Task<Void, Never>?
+    /// Saved once the sign-in succeeds (the password is cleared for a 2FA code).
+    @State private var pendingLogin: (String, String)?
 
     var body: some View {
         NavigationStack {
@@ -831,6 +874,12 @@ private struct UbisoftLoginView: View {
             .navigationTitle("Ubisoft Connect")
             .toolbar { Button(tr("Cancel")) { dismiss() } }
         }
+        .onAppear {
+            if email.isEmpty, let saved = UbisoftSavedLogin.load() {
+                email = saved.email
+                password = saved.password
+            }
+        }
         .onDisappear { request?.cancel() }
     }
 
@@ -849,6 +898,7 @@ private struct UbisoftLoginView: View {
                     login.setValue("ubi_2fa_v1 t=" + challenge, forHTTPHeaderField: "Authorization")
                     login.setValue(code, forHTTPHeaderField: "Ubi-2FACode")
                 } else {
+                    pendingLogin = (email.trimmingCharacters(in: .whitespacesAndNewlines), password)
                     let credentials = Data((email.trimmingCharacters(in: .whitespacesAndNewlines) + ":" + password).utf8)
                     login.setValue("Basic " + credentials.base64EncodedString(), forHTTPHeaderField: "Authorization")
                 }
@@ -872,6 +922,7 @@ private struct UbisoftLoginView: View {
                 return
             }
             try UbisoftSavedSession.decode(data, appID: usedAppID).save()
+            if let pendingLogin { UbisoftSavedLogin.save(email: pendingLogin.0, password: pendingLogin.1) }
             accountName = name
             UbisoftLibrary.shared.refresh()   // the store page lists the account's games now
             dismiss()

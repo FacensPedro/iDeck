@@ -15,7 +15,7 @@ class SettingsAndRamTests(unittest.TestCase):
         self.assertIn('if jitMethod == "builtIn" {', s)
         self.assertIn("UIScreen.main.maximumFramesPerSecond > 60", s)
         self.assertIn(".disabled(notificationsDenied)", s)
-        self.assertIn("if notificationsDenied { downloadNotifications = false }", s)
+        self.assertIn("if status != .authorized && status != .provisional && status != .ephemeral { downloadNotifications = false }", s)
 
     def test_advanced_notes_short(self):
         r = read("iDeck/MadeiraRuntimeSettings.swift")

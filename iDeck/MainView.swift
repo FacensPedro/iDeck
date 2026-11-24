@@ -995,17 +995,16 @@ struct WindowsWorkspaceView: View {
         return VStack(alignment: .leading, spacing: 6) {
             ZStack {
                 if !game.coverURLs.isEmpty {
-                    GOGArtworkView(urls: game.coverURLs, fallbackColor: secondaryColor, fill: true, fallbackTitle: game.title)
+                    // No text over Ubisoft covers: the title is shown under the card.
+                    GOGArtworkView(urls: game.coverURLs, fallbackColor: secondaryColor, fill: true)
                         .id(game.coverURLs)
                 } else if let executable = game.executable {
                     WindowsExecutableArtworkView(executableURL: executable, library: windowsLibrary, fallbackColor: secondaryColor)
                 } else {
                     secondaryColor
-                    Text(game.title)
-                        .font(.headline)
-                        .foregroundColor(textColor)
-                        .multilineTextAlignment(.center)
-                        .padding(10)
+                    Image(systemName: "gamecontroller")
+                        .font(.largeTitle)
+                        .foregroundColor(.gray)
                 }
             }
             .libraryCoverFrame()
