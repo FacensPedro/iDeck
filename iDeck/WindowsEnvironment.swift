@@ -785,7 +785,8 @@ class WindowsEnvironment {
         // (a game's own DXMT_MAX_FRAME_LATENCY, from its config, still wins). The
         // shader cache on disk is capped at 128 MB (its SQLite file is mapped).
         if getenv("DXMT_MAX_FRAME_LATENCY") == nil || Self.lowMemoryFrameLatency {
-            let low = Int(os_proc_available_memory() >> 20) < 3072
+            // Also after iOS stopped iDeck for memory while this game ran (MemoryGuard).
+            let low = Int(os_proc_available_memory() >> 20) < 3072 || MemoryGuard.lighten(profile.id)
             Self.lowMemoryFrameLatency = low
             if low { setenv("DXMT_MAX_FRAME_LATENCY", "1", 1) } else { unsetenv("DXMT_MAX_FRAME_LATENCY") }
             AppLog.record("[memory] DXMT frames in flight: \(low ? 1 : 2) (\(Int(os_proc_available_memory() >> 20)) MiB left)")

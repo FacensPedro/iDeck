@@ -72,6 +72,7 @@ func trStatus(_ status: String) -> String {
 enum Translations {
     static let table: [String: [String: String]] = [
         "Free space": ["pt": "Espaço livre", "es": "Espacio libre"],
+        "Cannot launch: iOS closed iDeck for lack of memory the last %d times this game ran (up to %d MiB). Lower the game's resolution on its page, close other apps, then start it again. Starting it again within 3 minutes goes ahead anyway.": ["pt": "Não é possível iniciar: o iOS fechou o iDeck por falta de memória nas últimas %d vezes em que este jogo rodou (até %d MiB). Diminua a resolução na página do jogo, feche outros apps e inicie de novo. Iniciar de novo em até 3 minutos inicia mesmo assim.", "es": "No se puede iniciar: iOS cerró iDeck por falta de memoria las últimas %d veces que se ejecutó este juego (hasta %d MiB). Baja la resolución en la página del juego, cierra otras apps e inícialo de nuevo. Iniciarlo de nuevo en 3 minutos lo inicia de todos modos."],
         "%@ free of %@": ["pt": "%@ livres de %@", "es": "%@ libres de %@"],
         "Close iDeck": ["pt": "Fechar o iDeck", "es": "Cerrar iDeck"],
         "The Windows game has not exited. Close it from its own menu, retry, or close iDeck: unsaved progress is lost.": ["pt": "O jogo do Windows não fechou. Feche pelo menu do próprio jogo, tente de novo ou feche o iDeck: o progresso não salvo é perdido.", "es": "El juego de Windows no se cerró. Ciérralo desde su propio menú, vuelve a intentarlo o cierra iDeck: se pierde el progreso no guardado."],

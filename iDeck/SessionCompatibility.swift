@@ -148,6 +148,7 @@ enum GameCompatibility {
                 profile.consecutiveCrashes += 1
             } else {
                 profile.consecutiveCrashes = 0
+                MemoryGuard.noteCleanExit(game)
                 if profile.lastPoolMiB > 0 { profile.lastGoodPoolMiB = profile.lastPoolMiB }
             }
         }
@@ -161,5 +162,83 @@ enum GameCompatibility {
         return "\(game): \(p.sessions) session(s), \(p.crashes) crash(es) (\(p.consecutiveCrashes) in a row), "
             + "peak \(p.peakMiB) MiB, lowest available \(p.lowestAvailableMiB) MiB, "
             + "pool \(p.lastPoolMiB) MB (last good \(p.lastGoodPoolMiB) MB)"
+    }
+}
+
+/// Games iOS ended (iDeck stopped while they ran, with little memory left at the last
+/// sample) and what iDeck does about it. The next launch runs DXMT with one frame in
+/// flight; after two such ends in a row a launch is held once with an explanation, and
+/// starting the game again within three minutes goes ahead. A clean exit clears it.
+enum MemoryGuard {
+    static let killsKey = "compatibility.memoryKills.v1"
+    static let overrideKey = "compatibility.memoryOverride.v1"
+    /// What the session sampler keeps while a game runs, read after iDeck restarts.
+    static let sessionGameKey = "diagnostics.sessionGameID"
+    static let lowestAvailableKey = "diagnostics.sessionLowestAvailableMiB"
+    static let peakKey = "diagnostics.sessionPeakMiB"
+    /// Below this, at the last sample before iDeck stopped, the stop counts as iOS's memory limit.
+    static let lowMemoryMiB = 512
+    static let blockAfterKills = 2
+    static let overrideSeconds: TimeInterval = 180
+
+    static func kills(_ game: String) -> Int {
+        (UserDefaults.standard.dictionary(forKey: killsKey) as? [String: Int])?[game] ?? 0
+    }
+
+    private static func setKills(_ game: String, _ count: Int) {
+        var all = (UserDefaults.standard.dictionary(forKey: killsKey) as? [String: Int]) ?? [:]
+        all[game] = count > 0 ? count : nil
+        if all.count > 200, let any = all.keys.first(where: { $0 != game }) { all[any] = nil }
+        UserDefaults.standard.set(all, forKey: killsKey)
+    }
+
+    static func noteCleanExit(_ game: String) {
+        if kills(game) > 0 { setKills(game, 0) }
+    }
+
+    /// Whether the last sample before iDeck stopped leaves memory as the likely cause.
+    static func wasMemoryKill(lowestAvailableMiB: Int) -> Bool {
+        lowestAvailableMiB >= 0 && lowestAvailableMiB < lowMemoryMiB
+    }
+
+    /// At iDeck's start, when the last session ended with the app: record it for the game.
+    static func checkAfterAppRestart(sessionWasRunning: Bool) {
+        let defaults = UserDefaults.standard
+        guard sessionWasRunning, let game = defaults.string(forKey: sessionGameKey), !game.isEmpty else { return }
+        let lowest = defaults.object(forKey: lowestAvailableKey) as? Int ?? -1
+        let peak = defaults.object(forKey: peakKey) as? Int ?? -1
+        let memory = wasMemoryKill(lowestAvailableMiB: lowest)
+        let reason = memory
+            ? "iOS stopped iDeck for lack of memory while the game ran (\(lowest) MiB left at the last sample)"
+            : "iDeck stopped while the game ran (\(lowest) MiB left at the last sample: not memory)"
+        GameCompatibility.noteSessionEnd(game, ntstatus: nil, reason: "Execution Error: " + reason)
+        if peak > 0 { GameCompatibility.noteMemory(game, peakMiB: peak, availableMiB: max(lowest, 0)) }
+        if memory { setKills(game, kills(game) + 1) }
+        AppLog.record("[memory-guard] \(game): \(reason); peak \(peak) MiB; memory stops in a row \(kills(game))")
+        defaults.removeObject(forKey: sessionGameKey)
+    }
+
+    /// Whether this game should run with the lighter memory settings.
+    static func lighten(_ game: String) -> Bool { kills(game) > 0 }
+
+    /// A message when the launch is held, nil to go ahead. A held launch arms the
+    /// override: the same game started again within three minutes goes ahead.
+    static func holdMessage(_ game: String) -> String? {
+        let count = kills(game)
+        guard count >= blockAfterKills else { return nil }
+        var overrides = (UserDefaults.standard.dictionary(forKey: overrideKey) as? [String: Double]) ?? [:]
+        let now = Date().timeIntervalSince1970
+        if let armed = overrides[game], now - armed < overrideSeconds {
+            overrides[game] = nil
+            UserDefaults.standard.set(overrides, forKey: overrideKey)
+            AppLog.record("[memory-guard] \(game): started again within 3 minutes, going ahead")
+            return nil
+        }
+        overrides = overrides.filter { now - $0.value < overrideSeconds }
+        overrides[game] = now
+        UserDefaults.standard.set(overrides, forKey: overrideKey)
+        let peak = GameCompatibility.profile(game)?.peakMiB ?? 0
+        AppLog.record("[memory-guard] \(game): launch held, \(count) memory stops in a row, peak \(peak) MiB")
+        return tr("Cannot launch: iOS closed iDeck for lack of memory the last %d times this game ran (up to %d MiB). Lower the game's resolution on its page, close other apps, then start it again. Starting it again within 3 minutes goes ahead anyway.", count, peak)
     }
 }

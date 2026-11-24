@@ -180,6 +180,12 @@ class SystemCoordinator: ObservableObject {
         let defaults = UserDefaults.standard
         defaults.removeObject(forKey: "diagnostics.sessionPeakMiB")
         defaults.set(false, forKey: "diagnostics.kernelPeak")
+        // MemoryGuard reads these after iDeck restarts: which game ran and the least
+        // memory iOS had left, sampled every 5 s so the last value is close to the end.
+        defaults.set(activeWindowsProfile?.id ?? activeSteamGameID.map { "steam:\($0)" } ?? "", forKey: MemoryGuard.sessionGameKey)
+        defaults.removeObject(forKey: MemoryGuard.lowestAvailableKey)
+        var lowestAvailable = Int.max
+        var tick = 0
         let log = { [weak self] (stage: String, reason: String?, gameID: String?) in
             let footprint = MainActor.assumeIsolated { ResourceGovernor.footprintMiB() }
             let kernelPeak = tracksInterval ? Int(IDSessionPeakMiB()) : -1
@@ -204,8 +210,26 @@ class SystemCoordinator: ObservableObject {
             }
         }
         log("start", nil, nil)
-        finishMemorySample = { reason, game in log("end", reason, game) }
-        let timer = Timer(timeInterval: 30, repeats: true) { _ in log("sample", nil, nil) }
+        finishMemorySample = { reason, game in
+            defaults.removeObject(forKey: MemoryGuard.sessionGameKey)
+            log("end", reason, game)
+        }
+        let timer = Timer(timeInterval: 5, repeats: true) { [weak self] _ in
+            let available = Int(os_proc_available_memory() >> 20)
+            if available < lowestAvailable {
+                lowestAvailable = available
+                defaults.set(available, forKey: MemoryGuard.lowestAvailableKey)
+            }
+            let footprint = MainActor.assumeIsolated { ResourceGovernor.footprintMiB() }
+            if footprint > peakMiB { peakMiB = footprint; defaults.set(footprint, forKey: "diagnostics.sessionPeakMiB") }
+            // The game id is known only once its profile is applied.
+            if let id = MainActor.assumeIsolated({ self?.activeWindowsProfile?.id ?? self?.activeSteamGameID.map { "steam:\($0)" } }),
+               defaults.string(forKey: MemoryGuard.sessionGameKey) != id {
+                defaults.set(id, forKey: MemoryGuard.sessionGameKey)
+            }
+            tick += 1
+            if tick % 6 == 0 { log("sample", nil, nil) }
+        }
         RunLoop.main.add(timer, forMode: .common)
         memorySampler = timer
     }
@@ -1513,6 +1537,10 @@ class SystemCoordinator: ObservableObject {
         sessionStartedAt = Date()
         guard !isClosingWindowsSession else { return }
         guard !previousWineSessionStillFinishing() else { return }
+        if let id = profile?.id, let held = MemoryGuard.holdMessage(id) {
+            setWindowsStatus(held)
+            return
+        }
         isSteamSession = false
         let gameID = profile?.id ?? ""
         // The EA app's environment (EALibrary.prepareLaunch) belongs to EA games only.
@@ -1667,6 +1695,10 @@ class SystemCoordinator: ObservableObject {
     func launchSteamGame(game: SteamAppInfo, profile: WindowsGameProfile, prefixPath: URL, skipSteamClient: Bool = false) {
         let skipSteamClient = skipSteamClient || Self.directSteamLaunchAppIDs.contains(game.appID)
         guard !isClosingWindowsSession else { return }
+        if let held = MemoryGuard.holdMessage("steam:\(game.appID)") {
+            setWindowsStatus(held)
+            return
+        }
         isSteamSession = true
         recordGameContext(game.name, launcher: "Steam")
         var benchmarkSettings = BenchmarkSession.gameSettings(profile)
