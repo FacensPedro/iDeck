@@ -2412,6 +2412,10 @@ class SystemCoordinator: ObservableObject {
         let hostTrap = outcome.ntstatus == 0xC000001D
             && IllegalInstructionOrigin.isHost(logURL: Self.wineLogURL, since: wineLogStartOffset)
         let shaderFailure = Self.sessionLogShowsShaderFailure(logURL: Self.wineLogURL, since: wineLogStartOffset)
+        if let endedGame, Self.sessionLogContains(FullCodeChecksAuto.markers.map { $0.lowercased() },
+                                                  logURL: Self.wineLogURL, since: wineLogStartOffset) {
+            FullCodeChecksAuto.enable(endedGame)
+        }
         EALibrary.noteSessionEnded(activationUI: Self.sessionLogContains(["activationui.exe"], logURL: Self.wineLogURL,
                                                                         since: wineLogStartOffset))
         wineLogStartOffset = nil

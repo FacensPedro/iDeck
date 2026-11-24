@@ -31,6 +31,7 @@ struct iDeckApp: App {
         // an OS termination, force quit, restart or power interruption.
         // Report the interruption, never assume Jetsam or discard game files.
         let diagnostics = UserDefaults.standard
+        FullCodeChecksAuto.checkAfterAppRestart(sessionWasRunning: SystemCoordinator.SessionOutcome.isRunning)
         SystemCoordinator.SessionOutcome.noteAppRestart()
         SystemCoordinator.noteFreshInstanceAfterRelaunch()
         if let inFlight = diagnostics.string(forKey: "diagnostics.installInFlight"), !inFlight.isEmpty {
