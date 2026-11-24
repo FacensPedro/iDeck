@@ -15,7 +15,7 @@ class UbisoftSavedLoginTests(unittest.TestCase):
         calls = [(p.name, m.start()) for p, text in SOURCES.items()
                  for m in re.finditer(r"UbisoftSavedSession\.clear\(\)", text)]
         self.assertEqual(len(calls), 1, calls)
-        sign_out = SETTINGS.index('Button(tr("Sign out"), role: .destructive) {\n                        if UbisoftSavedSession.clear()')
+        sign_out = SETTINGS.index('Button(tr("Sign out"), role: .destructive) {\n                        UbisoftSavedLogin.remove()\n                        if UbisoftSavedSession.clear()')
         self.assertGreater(sign_out, 0)
 
     def test_failed_renewal_keeps_the_account(self):
