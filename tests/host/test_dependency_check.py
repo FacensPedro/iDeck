@@ -25,6 +25,12 @@ class DependencyCheckTests(unittest.TestCase):
         self.assertIn("queue.append(contentsOf: libraryInfo.imports)", CHECK)
         self.assertIn('"api-ms-"', CHECK)
 
+    def test_relative_path_imports_resolve_in_the_game_folder(self):
+        # 2.15.0 reported "missing core/activation64.dll" for Dragon Age: Inquisition,
+        # whose program imports Core\Activation64.dll by a path relative to itself.
+        self.assertIn('if localFile == nil, name.contains("\\\\") || name.contains("/") {', CHECK)
+        self.assertIn(".first(where: { $0.lowercased() == part })", CHECK)
+
     def test_runs_at_launch_and_explains_an_early_end(self):
         self.assertIn("DependencyCheck.run(program: binary, prefix: MadeiraDock.prefix)", ENV)
         self.assertIn('outcome.reason += " DLL check before the start: " + check.summary + "."', COORD)

@@ -8,6 +8,9 @@
 ### Ubisoft Connect
 - 2.15.0's connection retry works: the secure connection now opens with TLS 1.2. Ubisoft's server then ended it at once. That is how it treats a client version it no longer accepts, and iDeck always sent the same fixed version number. iDeck now sends the version of the Ubisoft Connect it installs, when that is newer. The version used is written to the log, and so is whether the server answered anything before ending the connection.
 
+### DLL check
+- The DLL check no longer reports a DLL as missing when the game loads it from one of its own subfolders. EA app games named "core/activation64.dll", which is there, in their error message.
+
 ### Game details
 - Launch and Uninstall are now the same size as the Install button.
 
