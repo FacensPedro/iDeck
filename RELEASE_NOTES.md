@@ -1,7 +1,7 @@
 ## What's Changed
 ### Ubisoft Connect
 - Nothing is written over Ubisoft game covers any more. A game without a cover shows a plain controller icon, and the title stays under the card.
-- The Ubisoft sign-in remembers your email and password: after you sign in, they are kept in this device's Keychain (encrypted, not synced) and filled in next time. Signing out ends the session but keeps them.
+- The Ubisoft sign-in remembers your email and password: after you sign in, they are kept in this device's Keychain (encrypted, not synced) and filled in next time. Signing out ends the session and deletes them.
 
 ### Settings
 - Download notifications now shows as off when iDeck is not allowed to send notifications. After "Don't Allow", or a notification prompt that was dismissed, it used to show as on.

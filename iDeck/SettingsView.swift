@@ -303,6 +303,7 @@ struct SettingsView: View {
                         Button(tr("Sign in again")) { ubisoftLoginPresented = true }
                     }
                     Button(tr("Sign out"), role: .destructive) {
+                        UbisoftSavedLogin.remove()
                         if UbisoftSavedSession.clear() { ubisoftAccountName = ""; UbisoftLibrary.shared.refresh() }
                     }
                 }
@@ -802,7 +803,7 @@ struct StoreClientCard: View {
 /// The Ubisoft sign-in typed last, kept in this device's Keychain (never synced, only
 /// after the first unlock) so the form is filled next time. iOS's password AutoFill
 /// does not offer to save it: iDeck has no associated domain with Ubisoft.
-/// Sign out keeps it, so signing in again needs only a tap.
+/// Sign out removes it with the session.
 enum UbisoftSavedLogin {
     private static let service = "ideck.ubisoft.login"
 
