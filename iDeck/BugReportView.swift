@@ -934,7 +934,12 @@ enum EAPrefixEvidence {
     /// which the game started ActivationUI.exe: they say why the licence was refused.
     /// Addresses, e-mails, long tokens and the account names in `hidden` are removed.
     static func activationReason(drive: URL, hidden: [String], lines count: Int = 60) -> [String] {
-        originLogs(drive: drive, files: 1, linesPerFile: count).map { line in
+        // EA's log is an HTML page: keep its file line and the numbered rows only,
+        // not the page's style sheet (2.15.1 showed 40 lines of CSS).
+        originLogs(drive: drive, files: 1, linesPerFile: count).filter { line in
+            let text = line.trimmingCharacters(in: .whitespaces)
+            return !line.hasPrefix("  ") || text.first?.isNumber == true
+        }.map { line in
             var text = line.replacingOccurrences(of: #"\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b"#, with: "<ip>", options: .regularExpression)
             text = text.replacingOccurrences(of: #"\b[0-9a-fA-F]{1,4}(?::[0-9a-fA-F]{0,4}){4,7}\b"#, with: "<ip>", options: .regularExpression)
             for name in hidden where name.count >= 3 {

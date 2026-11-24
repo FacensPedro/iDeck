@@ -30,3 +30,12 @@ class EALicenceOriginCacheTests(unittest.TestCase):
         lic = (ROOT / "iDeck/Vendor/Madeira/SwiftEA/EALicense.swift").read_text()
         self.assertIn('drive.appendingPathComponent("ProgramData/Origin/LicenseCache")', lic)
         self.assertIn("licence-hash=", lic)
+
+
+class EAActivationTraceTests(unittest.TestCase):
+    def test_one_traced_launch_after_activation_refusal(self):
+        env = (ROOT / "iDeck/WindowsEnvironment.swift").read_text()
+        ea = (ROOT / "iDeck/EALibrary.swift").read_text()
+        self.assertIn('Self.wineDebugChannels + ",trace+file,trace+reg,trace+module"', env)
+        self.assertIn("UserDefaults.standard.removeObject(forKey: traceKey)", env)
+        self.assertIn('"ea.traceActivation.ea:" + (lastPreparedOfferID ?? content)', ea)

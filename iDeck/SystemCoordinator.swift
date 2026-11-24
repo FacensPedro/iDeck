@@ -2230,7 +2230,9 @@ class SystemCoordinator: ObservableObject {
         if let why = Self.restartNeeded() {
             SteamLog.event("[wine-session] launch held, fresh iDeck process needed: \(why)")
             if !reopenWithFreeMemory(reason: "next launch needs a fresh process (\(why))", exitAnyway: false) {
-                setWindowsStatus("Execution Error: \(why). Restart iDeck before starting another game: swipe iDeck away in the app switcher, then open it again through StikDebug.")
+                setWindowsStatus(jitMethod == "builtIn"
+                    ? "Execution Error: \(why). Restart iDeck before starting another game: swipe iDeck away in the app switcher, then open it again; the built-in JIT turns on by itself."
+                    : "Execution Error: \(why). Restart iDeck before starting another game: swipe iDeck away in the app switcher, then open it again through StikDebug.")
             }
             return true
         }

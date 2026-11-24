@@ -18,7 +18,11 @@
 - The game licence iDeck gets from EA is now also saved where Origin kept it (C:\ProgramData\Origin\LicenseCache), not only in the EA app's folder. Older EA games' activation, such as Dragon Age: Inquisition's, comes from the Origin era.
 - iDeck's log now says, for each licence, whether its machine identity, account and game match what was asked, and when it starts.
 
+- iDeck's log now shows only the rows of EA's activation log, without the page's style sheet.
+- After an EA game opens EA's activation window, its next start writes a detailed Wine log of the files, registry keys and modules the game reads. EA's own log stops at "License signature is good" without a reason, so this is where the cause can be found. The start after that is back to the usual log.
+
 ### JIT
+- With the built-in JIT, the message asking to restart iDeck no longer says to open it through StikDebug: opening iDeck is enough, and JIT turns on by itself.
 - With the built-in JIT method, iDeck now enables JIT by itself when it opens, once per opening: no tap is needed. It does this only when the device's pairing file is imported and JIT is not already active.
 
 ### Settings
