@@ -41,18 +41,29 @@ final class UbisoftDemux: @unchecked Sendable {
     static var clientVersion: UInt64 {
         let drive = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("wine/drive_c")
+        var candidates: [URL] = []
         for folder in ["Program Files (x86)/Ubisoft/Ubisoft Game Launcher", "Program Files/Ubisoft/Ubisoft Game Launcher"] {
-            for name in ["upc.exe", "UbisoftConnect.exe"] {
-                let url = drive.appendingPathComponent(folder).appendingPathComponent(name)
-                guard let data = try? Data(contentsOf: url, options: .alwaysMapped),
-                      let version = EAPEVersion.productVersion(data) else { continue }
-                // Ubisoft Connect numbers its builds in the third field (…, 10931, 0).
-                let build = UInt64(version.patch)
+            for name in ["upc.exe", "UbisoftConnect.exe", "uplay_r1_loader64.dll", "UplayService.exe"] {
+                candidates.append(drive.appendingPathComponent(folder).appendingPathComponent(name))
+            }
+        }
+        // The official installer iDeck downloaded carries the same version resource.
+        candidates.append(drive.appendingPathComponent("iDeck/UbisoftConnectInstaller.exe"))
+        var seen: [String] = []
+        for url in candidates {
+            guard let data = try? Data(contentsOf: url, options: .alwaysMapped),
+                  let version = EAPEVersion.productVersion(data) else { continue }
+            seen.append("\(url.lastPathComponent) \(version.major).\(version.minor).\(version.patch).\(version.build)")
+            // The build number is the 3rd or the 4th field, depending on the file.
+            for field in [version.patch, version.build] {
+                let build = UInt64(field)
                 if build > builtInClientVersion && build < 100_000 {
+                    AppLog.record("[ubisoft-demux] version resources: " + seen.joined(separator: ", "))
                     return build
                 }
             }
         }
+        AppLog.record("[ubisoft-demux] version resources: " + (seen.isEmpty ? "none found" : seen.joined(separator: ", ")))
         return builtInClientVersion
     }
 
