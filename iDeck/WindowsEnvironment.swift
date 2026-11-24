@@ -415,6 +415,10 @@ class WindowsEnvironment {
         // The engine's own switch for the game's API preference goes last,
         // after the game's and the user's arguments.
         let engineSwitch = prepareGraphicsAPI(binary: binary)
+        // DLLs the program needs that Wine will not find, or built for another
+        // architecture: logged now, added to the reason if the session ends early.
+        DependencyCheck.last = nil
+        DependencyCheck.run(program: binary, prefix: MadeiraDock.prefix)
         let launchArguments = parsedArguments + engineSwitch.filter { !parsedArguments.contains($0) }
         let architectureTranslator = BoxTranslator()
         // As Madeira's launch: the JIT pool from StikJITHelper, exported, and the

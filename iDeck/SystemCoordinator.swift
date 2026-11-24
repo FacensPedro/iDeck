@@ -2458,6 +2458,13 @@ class SystemCoordinator: ObservableObject {
             outcome.reason = "Execution Error: " + "The game needs Steam's Windows client. It asked for Steam and closed, so iDeck starts it through Steam from now on. Start it again."
         }
         directSteamStartedAt = nil
+        // A program that stopped on a missing DLL (0xC0000135), a DLL of the wrong
+        // architecture (0xC000007B) or a crash, when the check before it found a cause.
+        if let check = DependencyCheck.last, check.problems,
+           outcome.ntstatus == 0xC0000135 || outcome.ntstatus == 0xC000007B || outcome.reason.hasPrefix("Execution Error") {
+            outcome.reason += " DLL check before the start: " + check.summary + "."
+        }
+        DependencyCheck.last = nil
         let hostTrap = outcome.ntstatus == 0xC000001D
             && IllegalInstructionOrigin.isHost(logURL: Self.wineLogURL, since: wineLogStartOffset)
         let shaderFailure = Self.sessionLogShowsShaderFailure(logURL: Self.wineLogURL, since: wineLogStartOffset)

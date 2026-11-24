@@ -496,6 +496,9 @@ final class BugReportModel: ObservableObject {
             "Runtime: \(MadeiraBundleIdentity.isNative ? "native" : "interface-only")",
         ]
         lines += Self.environmentLines
+        if let deps = UserDefaults.standard.string(forKey: DependencyCheck.reportKey) {
+            lines.append("DLL check: " + deps)
+        }
         var evidence: [String] = []
         if Self.lastLauncherIsEA, let facts = UserDefaults.standard.string(forKey: EALibrary.licenceFactsKey) {
             lines.append("EA licence: " + facts)

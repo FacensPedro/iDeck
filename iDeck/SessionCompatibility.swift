@@ -268,3 +268,155 @@ enum SteamClientNeed {
         AppLog.record("[steam-client] app=\(appID) asked for Steam's client when started without it: started through Steam from now on")
     }
 }
+
+/// Before a game starts: the DLLs its program (and the DLLs it ships that the program
+/// loads) import, looked up the way Wine will look: the game's folder first, then the
+/// Windows runtime of the program's architecture (i386-windows for 32-bit programs,
+/// arm64ec-windows for 64-bit ones) and the prefix's system folder. Reports what is
+/// missing and any DLL in the game's folder built for another architecture (Windows
+/// itself refuses those: 0xC000007B). Nothing is changed; the result is logged as
+/// [deps], kept for bug reports, and added to the reason of a session that ends early.
+enum DependencyCheck {
+    struct Result: Equatable {
+        var program: String
+        var machine: UInt16
+        var checked = 0
+        var missing: [String] = []
+        var wrongArchitecture: [String] = []
+
+        var problems: Bool { !missing.isEmpty || !wrongArchitecture.isEmpty }
+
+        var summary: String {
+            var parts: [String] = []
+            if !missing.isEmpty { parts.append("missing " + missing.prefix(8).joined(separator: ", ")) }
+            if !wrongArchitecture.isEmpty { parts.append("wrong architecture " + wrongArchitecture.prefix(8).joined(separator: ", ")) }
+            return parts.joined(separator: "; ")
+        }
+    }
+
+    static let reportKey = "diagnostics.dependencyCheck"
+    nonisolated(unsafe) static var last: Result?
+
+    /// Libraries Wine or iDeck provide at session start, or that are resolved by name
+    /// without a file (API sets): never reported missing.
+    static let providedPrefixes = ["api-ms-", "ext-ms-", "msvcp", "msvcr", "vcruntime", "vcomp", "concrt", "ucrtbase",
+                                   "mfc", "d3dx", "d3dcompiler", "xinput", "xaudio", "x3daudio", "xapofx", "steam_api",
+                                   "openal", "physxloader", "nvcuda", "nvapi", "amd_ags", "galaxy"]
+
+    // MARK: PE reading
+
+    struct PEInfo { var machine: UInt16; var imports: [String] }
+
+    /// The COFF machine and the import table's DLL names (lower-cased), nil when not PE.
+    static func read(_ url: URL) -> PEInfo? {
+        guard let data = try? Data(contentsOf: url, options: .alwaysMapped), data.count > 0x40 else { return nil }
+        func u16(_ o: Int) -> UInt16? { o >= 0 && o + 2 <= data.count ? UInt16(data[o]) | UInt16(data[o + 1]) << 8 : nil }
+        func u32(_ o: Int) -> UInt32? {
+            guard o >= 0, o + 4 <= data.count else { return nil }
+            return UInt32(data[o]) | UInt32(data[o + 1]) << 8 | UInt32(data[o + 2]) << 16 | UInt32(data[o + 3]) << 24
+        }
+        guard data[0] == 0x4D, data[1] == 0x5A, let peOffset = u32(0x3C).map(Int.init),
+              u32(peOffset) == 0x0000_4550, let machine = u16(peOffset + 4),
+              let sectionCount = u16(peOffset + 6).map(Int.init), let optionalSize = u16(peOffset + 20).map(Int.init),
+              let magic = u16(peOffset + 24) else { return nil }
+        let optional = peOffset + 24
+        let directories = optional + (magic == 0x20B ? 112 : 96)
+        let sectionTable = optional + optionalSize
+        var sections: [(va: UInt32, size: UInt32, raw: UInt32)] = []
+        for i in 0..<min(sectionCount, 96) {
+            let s = sectionTable + 40 * i
+            guard let vsize = u32(s + 8), let va = u32(s + 12), let rawSize = u32(s + 16), let raw = u32(s + 20) else { break }
+            sections.append((va, max(vsize, rawSize), raw))
+        }
+        func offset(_ rva: UInt32) -> Int? {
+            for s in sections where rva >= s.va && rva < s.va &+ s.size {
+                return Int(s.raw) + Int(rva - s.va)
+            }
+            return nil
+        }
+        var imports: [String] = []
+        if magic == 0x10B || magic == 0x20B, let importRVA = u32(directories + 8), importRVA != 0, var d = offset(importRVA) {
+            for _ in 0..<512 {
+                guard let nameRVA = u32(d + 12), nameRVA != 0, let nameOffset = offset(nameRVA) else { break }
+                var end = nameOffset
+                while end < data.count, data[end] != 0, end - nameOffset < 256 { end += 1 }
+                let name = String(decoding: data[nameOffset..<end], as: UTF8.self).lowercased()
+                if !name.isEmpty && !imports.contains(name) { imports.append(name) }
+                d += 20
+            }
+        }
+        return PEInfo(machine: machine, imports: imports)
+    }
+
+    // MARK: The check
+
+    /// Whether a library built for `library` loads into a program built for `program`.
+    static func compatible(program: UInt16, library: UInt16) -> Bool {
+        switch program {
+        case 0x014C: return library == 0x014C
+        case 0x8664, 0xA641: return library == 0x8664 || library == 0xA641 || library == 0xAA64
+        default: return true
+        }
+    }
+
+    static func runtimeFolder(for machine: UInt16) -> String? {
+        switch machine {
+        case 0x014C: return "i386-windows"
+        case 0x8664, 0xA641, 0xAA64: return "arm64ec-windows"
+        default: return nil
+        }
+    }
+
+    /// Checks `program`. `systemFolders` are where Wine's own DLLs are, for the
+    /// program's architecture; the game's folder is searched first.
+    static func check(program: URL, systemFolders: [URL]) -> Result? {
+        guard let info = read(program) else { return nil }
+        let gameFolder = program.deletingLastPathComponent()
+        var result = Result(program: program.lastPathComponent, machine: info.machine)
+        let localNames: [String: URL] = Dictionary(
+            ((try? FileManager.default.contentsOfDirectory(at: gameFolder, includingPropertiesForKeys: nil)) ?? [])
+                .filter { $0.pathExtension.lowercased() == "dll" }.map { ($0.lastPathComponent.lowercased(), $0) },
+            uniquingKeysWith: { first, _ in first })
+        var queue = info.imports
+        var seen = Set<String>()
+        var localScanned = 0
+        while let name = queue.first {
+            queue.removeFirst()
+            guard seen.insert(name).inserted, seen.count <= 400 else { continue }
+            result.checked += 1
+            if let local = localNames[name] {
+                guard let libraryInfo = read(local) else { continue }
+                if !compatible(program: info.machine, library: libraryInfo.machine) {
+                    result.wrongArchitecture.append(local.lastPathComponent)
+                } else if localScanned < 64 {
+                    // A DLL the game ships brings its own imports.
+                    localScanned += 1
+                    queue.append(contentsOf: libraryInfo.imports)
+                }
+                continue
+            }
+            if providedPrefixes.contains(where: { name.hasPrefix($0) }) { continue }
+            let found = systemFolders.contains { FileManager.default.fileExists(atPath: $0.appendingPathComponent(name).path) }
+            if !found { result.missing.append(name) }
+        }
+        return result
+    }
+
+    /// The check for a launch: logged, kept for the bug report and for the session's end.
+    @discardableResult
+    static func run(program: URL, prefix: URL) -> Result? {
+        guard let machine = read(program)?.machine, let runtime = runtimeFolder(for: machine) else { return nil }
+        let system = prefix.appendingPathComponent("drive_c/windows")
+            .appendingPathComponent(machine == 0x014C ? "syswow64" : "system32")
+        var folders = [MadeiraRuntime.file(runtime), system]
+        if runtime == "arm64ec-windows" { folders.append(MadeiraRuntime.file("aarch64-windows")) }
+        guard let result = check(program: program, systemFolders: folders) else { return nil }
+        last = result
+        let architecture = machine == 0x014C ? "32-bit" : "64-bit"
+        let line = "\(result.program) (\(architecture)): \(result.checked) DLL(s) checked"
+            + (result.problems ? ", " + result.summary : ", all found")
+        UserDefaults.standard.set(line, forKey: reportKey)
+        AppLog.record("[deps] " + line)
+        return result
+    }
+}

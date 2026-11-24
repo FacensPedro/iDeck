@@ -29,6 +29,11 @@
 - The minimize button for the close and settings buttons now stays in the same place when they are minimized. Before, it moved up.
 - Every game now starts with those buttons minimized. Before, expanding them once kept them expanded in every later game.
 
+### 32-bit and 64-bit games: DLL check before the start
+- Before each game starts, iDeck now reads the DLLs its program needs, and those of the DLLs the game ships with it. It looks for each one the way Wine will: in the game's folder, then in the Windows runtime for the game's architecture (32-bit or 64-bit).
+- Missing DLLs and DLLs built for the other architecture (a 64-bit DLL next to a 32-bit game, for example) are written to iDeck's log and to bug reports.
+- When the game then stops on a missing or incompatible DLL, or crashes, the error message names them.
+
 ### Windows sessions
 - While a game runs, if it shows no new image for 20 seconds after it had started drawing, the bar at the top says the game may be frozen and that it can be closed with X. The message goes away when images arrive again. Both moments are written to iDeck's log.
 - After a game session, Windows' temporary folders (C:\windows\temp and each user's Temp folder) are emptied of what earlier sessions left there. Files from the session that just ended stay until the next cleanup, so an installer that continues later still finds them.
