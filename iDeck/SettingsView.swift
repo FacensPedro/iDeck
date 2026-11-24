@@ -435,7 +435,7 @@ struct SettingsView: View {
                 if coordinator.isStikDebugAttached {
                     Text(tr("Attached")).foregroundStyle(.green)
                 } else if coordinator.isWineJITPrepared {
-                    Text(tr("Done: JIT ready")).foregroundStyle(.green)
+                    Text(tr("Connected")).foregroundStyle(.green)
                 } else {
                     Text(tr("Detached")).foregroundStyle(.orange)
                 }
