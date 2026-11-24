@@ -13,6 +13,7 @@ early     .      madeira-dxil-concurrent-cache.patch
 early     .      madeira-wine-idle-logging.patch
 early     .      madeira-small-map-va-limit.patch
 early     .      madeira-thread-name-exception.patch
+early     .      madeira-fixed-exe-without-relocs.patch
 
 # The Wine submodule
 wine      wine   wine-arm64ec-null-thread-context.patch
