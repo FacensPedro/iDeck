@@ -29,6 +29,14 @@
 - The minimize button for the close and settings buttons now stays in the same place when they are minimized. Before, it moved up.
 - Every game now starts with those buttons minimized. Before, expanding them once kept them expanded in every later game.
 
+### Diagnostics
+- iDeck now keeps a report of every game launch. It records:
+  - how long the game took to show its first image;
+  - how long it ran, and the last stage it reached;
+  - how it ended, and whose failure that was: the game, the Windows runtime, the store or its licence, or iDeck itself (for example, iOS closing it for lack of memory);
+  - its memory peak and any DLL problems.
+- A launch that ended with iDeck itself is recorded at the next start. Each report is one line in iDeck's log, and the last eight are in bug reports.
+
 ### Graphics
 - When the GPU reports errors during a game (a GPU hang, a timeout, or work refused after an earlier error), iDeck records it for that game. MetalFX upscaling and frame generation are turned off for it, its next start uses lighter graphics memory settings, and the session's message says so. A session without GPU errors clears this.
 - The figures at the top of the game now include RAM, next to GPU memory.

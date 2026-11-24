@@ -214,6 +214,7 @@ enum MemoryGuard {
         GameCompatibility.noteSessionEnd(game, ntstatus: nil, reason: "Execution Error: " + reason)
         if peak > 0 { GameCompatibility.noteMemory(game, peakMiB: peak, availableMiB: max(lowest, 0)) }
         if memory { setKills(game, kills(game) + 1) }
+        LaunchReport.finish(game: game, reason: reason, ntstatus: nil, runtimeTrap: false, appStopped: true)
         AppLog.record("[memory-guard] \(game): \(reason); peak \(peak) MiB; memory stops in a row \(kills(game))")
         defaults.removeObject(forKey: sessionGameKey)
     }
@@ -453,4 +454,105 @@ enum GPUFaultGuard {
         AppLog.record("[gpu-fault] \(game): Metal reported GPU errors in this session")
         return true
     }
+}
+
+/// One record per game launch: when it started, how long until its first image, the
+/// stage it reached, how it ended and whose failure that was (the game, the Windows
+/// runtime, the store, or iDeck itself), with its memory peak and the DLL check.
+/// Kept in UserDefaults (the last 20), so a launch that ended with iDeck is recorded
+/// at the next start; logged as [launch-report] and listed in bug reports.
+enum LaunchReport {
+    enum Fault: String, Codable {
+        case none = "no failure"
+        case game = "the game"
+        case runtime = "the Windows runtime"
+        case store = "the store or its licence"
+        case iDeck = "iDeck"
+        case unclear = "unclear"
+    }
+
+    struct Entry: Codable, Equatable {
+        var game: String
+        var started: Date
+        var secondsToFirstImage: Int?
+        var durationSeconds: Int
+        var stage: String
+        var ending: String
+        var fault: Fault
+        var peakMiB: Int
+        var dllCheck: String?
+
+        var line: String {
+            "\(ISOStamp.string(started)) \(game): first image "
+                + (secondsToFirstImage.map { "after \($0) s" } ?? "never")
+                + ", ran \(durationSeconds) s, stage \"\(stage)\", fault: \(fault.rawValue), peak \(peakMiB) MiB"
+                + (dllCheck.map { ", DLLs: \($0)" } ?? "") + " — " + ending
+        }
+    }
+
+    static let key = "diagnostics.launchReports.v1"
+    static let startedKey = "diagnostics.launch.started"
+    static let firstImageKey = "diagnostics.launch.firstImage"
+    static let titleKey = "diagnostics.launch.title"
+    static let limit = 20
+
+    static func begin(title: String) {
+        let defaults = UserDefaults.standard
+        defaults.set(Date().timeIntervalSince1970, forKey: startedKey)
+        defaults.removeObject(forKey: firstImageKey)
+        defaults.set(title, forKey: titleKey)
+    }
+
+    static func firstImage() {
+        let defaults = UserDefaults.standard
+        guard defaults.object(forKey: firstImageKey) == nil,
+              let started = defaults.object(forKey: startedKey) as? Double else { return }
+        let seconds = Int(Date().timeIntervalSince1970 - started)
+        defaults.set(seconds, forKey: firstImageKey)
+        AppLog.record("[launch-report] first image \(seconds) s after the start")
+    }
+
+    /// Whose failure an ending was. Pure, for tests.
+    static func classify(reason: String, ntstatus: UInt32?, sawImage: Bool, appStopped: Bool, runtimeTrap: Bool) -> Fault {
+        let lower = reason.lowercased()
+        if appStopped { return .iDeck }
+        if lower.hasPrefix("steam: ") || lower.contains("licence") || lower.contains("license")
+            || lower.contains("steam's windows client") || lower.contains("anti-cheat") { return .store }
+        if lower.hasPrefix("cannot launch") || lower.contains("jit pool") { return .iDeck }
+        if runtimeTrap || ntstatus == 0xC0000135 || ntstatus == 0xC000007B || lower.contains("dll check before the start")
+            || lower.contains("gpu reported errors") || lower.contains("self-modifying") { return .runtime }
+        let crashed = (ntstatus ?? 0) != 0 || lower.hasPrefix("execution error")
+        if !crashed { return sawImage ? .none : .unclear }
+        // A crash after the game drew is most often the game's own code path under
+        // translation; before any image, the runtime never got the game running.
+        return sawImage ? .game : .runtime
+    }
+
+    static func finish(game: String, reason: String, ntstatus: UInt32?, runtimeTrap: Bool, appStopped: Bool = false) {
+        let defaults = UserDefaults.standard
+        guard let started = defaults.object(forKey: startedKey) as? Double else { return }
+        let first = defaults.object(forKey: firstImageKey) as? Int
+        let title = defaults.string(forKey: titleKey) ?? game
+        let fault = classify(reason: reason, ntstatus: ntstatus, sawImage: first != nil, appStopped: appStopped, runtimeTrap: runtimeTrap)
+        let entry = Entry(game: title, started: Date(timeIntervalSince1970: started), secondsToFirstImage: first,
+                          durationSeconds: max(0, Int(Date().timeIntervalSince1970 - started)),
+                          stage: String((defaults.string(forKey: "diagnostics.session.stage") ?? "unknown").prefix(120)),
+                          ending: String(reason.prefix(300)), fault: fault,
+                          peakMiB: defaults.object(forKey: "diagnostics.sessionPeakMiB") as? Int ?? 0,
+                          dllCheck: (DependencyCheck.last?.problems ?? false) ? DependencyCheck.last?.summary : nil)
+        var list = entries()
+        list.append(entry)
+        if list.count > limit { list.removeFirst(list.count - limit) }
+        if let data = try? JSONEncoder().encode(list) { defaults.set(data, forKey: key) }
+        defaults.removeObject(forKey: startedKey)
+        AppLog.record("[launch-report] " + entry.line)
+    }
+
+    static func entries() -> [Entry] {
+        guard let data = UserDefaults.standard.data(forKey: key),
+              let list = try? JSONDecoder().decode([Entry].self, from: data) else { return [] }
+        return list
+    }
+
+    static var report: String { entries().suffix(8).map(\.line).joined(separator: "\n") }
 }

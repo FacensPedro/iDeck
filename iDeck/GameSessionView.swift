@@ -504,6 +504,7 @@ struct GameSessionView: View {
                 SteamLog.event(coordinator.currentSteamLaunchUsesDock
                     ? "[steam-start] first Metal present after Steam LaunchApp (game-window identity not verified)"
                     : "[steam-start] first Metal frame detected after Wine startup")
+                LaunchReport.firstImage()
                 coordinator.setWindowsStatus("Running")
             }
             disableMetalFXIfNoFrames()

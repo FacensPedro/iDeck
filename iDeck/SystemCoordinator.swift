@@ -152,6 +152,7 @@ class SystemCoordinator: ObservableObject {
         UserDefaults.standard.set(launcher, forKey: "diagnostics.lastLauncher")
         AppLog.record("[game-session] launcher=\(launcher) game=\(safeTitle)")
         SessionOutcome.began()
+        LaunchReport.begin(title: safeTitle)
         sessionTempCutoff = Date()
         // The game gets the memory: covers and other caches iDeck rebuilds on demand
         // are dropped before it starts.
@@ -2431,6 +2432,7 @@ class SystemCoordinator: ObservableObject {
             MainActor.assumeIsolated { MadeiraDock.cleanup() }
             if let failure = report.failure {
                 SteamLog.event("[wine-exit] Steam: \(failure)")
+                LaunchReport.finish(game: endedGame ?? "unknown", reason: "Steam: " + failure, ntstatus: nil, runtimeTrap: false)
                 finishMemorySampling(reason: "Steam: " + failure, game: endedGame)
                 if let endedGame { GameCompatibility.noteSessionEnd(endedGame, ntstatus: nil, reason: "Steam: " + failure) }
                 setWindowsStatus("Steam: " + failure)
@@ -2514,6 +2516,7 @@ class SystemCoordinator: ObservableObject {
             reason += " The game could not compile a shader with Wine's D3DX: Microsoft's D3DX 9 is installed for it at its next start."
         }
         SteamLog.event("[wine-exit] \(reason)")
+        LaunchReport.finish(game: endedGame ?? "unknown", reason: reason, ntstatus: ntstatus, runtimeTrap: hostTrap)
         finishMemorySampling(reason: reason, game: endedGame)
         if let endedGame { GameCompatibility.noteSessionEnd(endedGame, ntstatus: ntstatus, reason: reason) }
         Self.reclaimAfterSession()

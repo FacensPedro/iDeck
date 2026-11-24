@@ -496,6 +496,11 @@ final class BugReportModel: ObservableObject {
             "Runtime: \(MadeiraBundleIdentity.isNative ? "native" : "interface-only")",
         ]
         lines += Self.environmentLines
+        let launches = LaunchReport.report
+        if !launches.isEmpty {
+            lines.append("Recent launches (newest last):")
+            lines += launches.split(separator: "\n").map { "  " + $0 }
+        }
         if let deps = UserDefaults.standard.string(forKey: DependencyCheck.reportKey) {
             lines.append("DLL check: " + deps)
         }
