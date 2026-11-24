@@ -328,21 +328,22 @@ struct GameSessionView: View {
                     if showGamePerformanceOverlay &&
                         coordinator.windowsStatus == "Running" &&
                         metrics.receivedNewFrames {
-                        VStack(alignment: .trailing, spacing: 3) {
+                        // Inside the black strip above the game, one aligned column.
+                        VStack(alignment: .leading, spacing: 1) {
                             Text("FPS: \(metrics.fps)  CPU: \(metrics.cpu)")
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.8)
                             if horizontalSizeClass != .compact {
-                                Text("GPU memory (Metal): \(metrics.gpuMemory)")
+                                Text("GPU memory: \(metrics.gpuMemory)")
                                 // iOS gives apps no GPU utilization counter; the frame
                                 // time is the honest per-frame load figure.
                                 Text("Frame time: \(Int(metrics.fps).map { $0 > 0 ? String(format: "%.1f ms", 1000.0 / Double($0)) : "N/D" } ?? "N/D")")
                             }
                         }
-                        .font(.system(size: 12, design: .monospaced))
+                        .lineLimit(1)
+                        .font(.system(size: 11, design: .monospaced))
                         .foregroundColor(.white)
-                        .padding(8)
-                        .background(.black.opacity(0.75), in: RoundedRectangle(cornerRadius: 8))
+                        .fixedSize()
+                        .frame(maxHeight: 44)
+                        .padding(.trailing, 8)
                     }
                 }
                 if let logCopyMessage {

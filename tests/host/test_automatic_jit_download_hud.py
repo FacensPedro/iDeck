@@ -28,7 +28,7 @@ class AutomaticJITAndDownloadHUDTests(unittest.TestCase):
         self.assertIn("metrics.receivedNewFrames", SESSION)
         self.assertIn("if showGamePerformanceOverlay &&", SESSION)
         self.assertIn('Text("FPS:', SESSION)
-        self.assertIn('Text("GPU memory (Metal):', SESSION)
+        self.assertIn('Text("GPU memory:', SESSION)
         self.assertIn("Frame time: ", SESSION)
         self.assertNotIn("GPU utilization: unavailable on iOS", SESSION)
         self.assertIn("if horizontalSizeClass != .compact {", SESSION)

@@ -18,8 +18,14 @@
 - When an EA game refuses its licence and opens EA's activation window (Dragon Age: Inquisition), iDeck's log now shows the last lines that window wrote about why. Before, the reason was only in a bug report. Addresses, e-mails, tokens and account names are removed from those lines.
 
 ### Game session
+- The FPS, CPU, GPU memory and frame time figures now sit inside the black strip above the game, in one left-aligned column, instead of hanging over the game image. "GPU memory (Metal)" is now "GPU memory".
 - The minimize button for the close and settings buttons now stays in the same place when they are minimized. Before, it moved up.
 - Every game now starts with those buttons minimized. Before, expanding them once kept them expanded in every later game.
+
+### Game details
+- Launch and Uninstall are side by side.
+- Uninstalling a game asks first in a pop-up, on every store's page, Steam included.
+- The Install button is smaller.
 
 ### Version
 - Updated the application version to 2.14.1 (build 122).
