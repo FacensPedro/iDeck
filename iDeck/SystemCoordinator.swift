@@ -2633,10 +2633,51 @@ class SystemCoordinator: ObservableObject {
     static var restartReason: String?
     static let restartMinimumFreeMiB = 1500
 
+    /// A mapping other than iDeck's own PROT_NONE reservation inside the executable
+    /// window [0x140000000, 0x148000000), described for the log; nil when it is free.
+    static func executableWindowUse() -> String? {
+        let start: vm_address_t = 0x1_4000_0000, end: vm_address_t = 0x1_4800_0000
+        var address = start
+        while address < end {
+            var size: vm_size_t = 0
+            var info = vm_region_basic_info_data_64_t()
+            var count = mach_msg_type_number_t(MemoryLayout<vm_region_basic_info_data_64_t>.size / MemoryLayout<Int32>.size)
+            var object: mach_port_t = 0
+            var region = address
+            let kr = withUnsafeMutablePointer(to: &info) {
+                $0.withMemoryRebound(to: Int32.self, capacity: Int(count)) {
+                    vm_region_64(mach_task_self_, &region, &size, VM_REGION_BASIC_INFO_64, $0, &count, &object)
+                }
+            }
+            guard kr == KERN_SUCCESS, region < end else { return nil }
+            if info.protection != 0 {
+                return String(format: "0x%lx+%luKB prot %d", Int(region), Int(size >> 10), Int(info.protection))
+            }
+            address = region + size
+        }
+        return nil
+    }
+
     static func restartNeeded() -> String? {
         if let restartReason { return restartReason }
         if WindowsEnvironment.oneSessionPerRun && WindowsEnvironment.sessionsThisRun > 0 {
             return "this runtime requires a fresh iDeck process for each Windows session"
+        }
+        // A fixed-base program needs [0x140000000, +128MB). iDeck holds it as a PROT_NONE
+        // reservation; a readable or writable mapping there means earlier work in this
+        // process (a long download) took part of it, and the game would stop with
+        // "failed to create main module ... c0000018" (Dragon Age: Inquisition after a
+        // 34 GB download in the same process).
+        if let used = executableWindowUse() {
+            // Once per 3 minutes: a fresh process that still shows it must not reopen forever.
+            let key = "relaunch.exeWindowAt"
+            let last = UserDefaults.standard.double(forKey: key)
+            let now = Date().timeIntervalSince1970
+            if now - last > 180 {
+                UserDefaults.standard.set(now, forKey: key)
+                return "the executable address window is in use (\(used))"
+            }
+            AppLog.record("[exe-window] still in use after a reopen (\(used)); starting anyway")
         }
         // A pool that had to shrink is not a reason: it happens on a fresh launch too
         // (the startup pool keeps a 256 MB exe window free), so reopening changes nothing.
