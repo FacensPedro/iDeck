@@ -20,7 +20,7 @@ class DependencyCheckTests(unittest.TestCase):
         self.assertIn('.appendingPathComponent(machine == 0x014C ? "syswow64" : "system32")', CHECK)
 
     def test_game_folder_first_and_shipped_dlls_followed(self):
-        self.assertIn("if let local = localNames[name] {", CHECK)
+        self.assertIn("var localFile = localNames[name]", CHECK)
         self.assertIn("result.wrongArchitecture.append(local.lastPathComponent)", CHECK)
         self.assertIn("queue.append(contentsOf: libraryInfo.imports)", CHECK)
         self.assertIn('"api-ms-"', CHECK)
