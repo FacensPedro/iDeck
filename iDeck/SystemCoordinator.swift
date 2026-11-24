@@ -1500,6 +1500,8 @@ class SystemCoordinator: ObservableObject {
 
     /// When the current Windows session started (EA games closing by themselves).
     private var sessionStartedAt: Date?
+    /// When a Steam game was last started without Steam's client (SteamClientNeed).
+    private var directSteamStartedAt: Date?
 
     /// Why an EA app game closed by itself, from its part of the Wine log, or nil
     /// for a session that ran long enough to be a normal quit with nothing in the log.
@@ -1693,7 +1695,10 @@ class SystemCoordinator: ObservableObject {
     static let directSteamLaunchAppIDs: Set<UInt32> = [12200]
 
     func launchSteamGame(game: SteamAppInfo, profile: WindowsGameProfile, prefixPath: URL, skipSteamClient: Bool = false) {
-        let skipSteamClient = skipSteamClient || Self.directSteamLaunchAppIDs.contains(game.appID)
+        // A game that asked for Steam's client when started without it (SteamClientNeed)
+        // goes through Madeira Dock, even when it is on the direct list.
+        let needsClient = SteamClientNeed.needs(game.appID)
+        let skipSteamClient = !needsClient && (skipSteamClient || Self.directSteamLaunchAppIDs.contains(game.appID))
         guard !isClosingWindowsSession else { return }
         if let held = MemoryGuard.holdMessage("steam:\(game.appID)") {
             setWindowsStatus(held)
@@ -1821,6 +1826,7 @@ class SystemCoordinator: ObservableObject {
         dockLaunchAccepted = false
         steamDockLaunchStage = nil
         pendingSteamGameID = game.appID
+        directSteamStartedAt = Date()
         setWindowsStatus("Launching Steam game...")
         withPreparedMetalDisplay(expectedStatus: "Launching Steam game...") { [weak self] in
             guard let self, self.pendingSteamGameID == game.appID else { return }
@@ -2441,6 +2447,16 @@ class SystemCoordinator: ObservableObject {
             }
         }
         sessionStartedAt = nil
+        // A Steam game started without Steam's client that asked for it and closed
+        // (SteamAPI_RestartAppIfNecessary: steam://run/<app>, then exit code 0).
+        if let endedGame, endedGame.hasPrefix("steam:"), let started = directSteamStartedAt,
+           let appID = UInt32(endedGame.dropFirst("steam:".count)),
+           Date().timeIntervalSince(started) < SteamClientNeed.quickExitSeconds,
+           Self.sessionLogContains(SteamClientNeed.markers(appID: appID), logURL: Self.wineLogURL, since: wineLogStartOffset) {
+            SteamClientNeed.note(appID)
+            outcome.reason = "Execution Error: " + "The game needs Steam's Windows client. It asked for Steam and closed, so iDeck starts it through Steam from now on. Start it again."
+        }
+        directSteamStartedAt = nil
         let hostTrap = outcome.ntstatus == 0xC000001D
             && IllegalInstructionOrigin.isHost(logURL: Self.wineLogURL, since: wineLogStartOffset)
         let shaderFailure = Self.sessionLogShowsShaderFailure(logURL: Self.wineLogURL, since: wineLogStartOffset)

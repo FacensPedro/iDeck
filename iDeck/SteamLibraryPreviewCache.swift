@@ -12,6 +12,12 @@ struct SteamLibraryCachedGame: Codable, Sendable, Equatable {
     let libraryHero: String?
     let headerImage: String?
     let parentID: UInt32?
+    /// Valve's launch entries (program, arguments, working folder; no authorization).
+    /// iDeck reopens in a fresh process for every Windows session, and the game it
+    /// starts there comes from this snapshot: without them the launch guessed an
+    /// executable from the installed files ("Steam metadata did not resolve").
+    /// Optional, so snapshots from earlier builds still load.
+    var launches: [SteamLaunchOption]? = nil
 }
 
 /// An account-scoped, presentation-only snapshot. This never stores Steam

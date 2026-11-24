@@ -16,6 +16,8 @@
 - Burnout Paradise Remastered did not start: "No safe address range can hold the Wine JIT pool". The largest free memory area was 564 MB for a 560 MB pool, but its safe part was smaller, and iDeck gave up instead of using a slightly smaller pool. It now shrinks the pool to the largest safe area, as it already did when no area was large enough.
 
 ### Steam
+- Steam games start with Steam's own launch settings again (program, arguments and working folder). iDeck reopens in a fresh process for each game, and there the library came from a saved snapshot without those settings, so iDeck guessed the program from the game's files ("Steam metadata did not resolve" in the log). The snapshot now keeps them.
+- A Steam game started without Steam's client that asks for Steam and closes now shows a specific message. iDeck starts it through Steam's Windows client from then on.
 - Game sizes are right again for games that also have content for Steam China, such as Delta Force (219.65 GB shown before; the game is about 88 GB). Steam China's copies of the game files were counted, and downloaded, with the global ones. They are now left out, as Steam itself does.
 - Optional content Steam adds only for owners of a DLC is no longer counted or downloaded without that DLC.
 

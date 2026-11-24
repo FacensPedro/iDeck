@@ -114,6 +114,7 @@ final class SteamOwnedGamesModel: ObservableObject {
                     app.libraryHero = cached.libraryHero
                     app.headerImage = cached.headerImage
                     app.parentID = cached.parentID
+                    app.launches = cached.launches ?? []
                     return app
                 }
                 SteamLog.event("[steam-library] loaded \(games.count) cached game previews")
@@ -146,7 +147,8 @@ final class SteamOwnedGamesModel: ObservableObject {
                     oslist: game.oslist, buildID: game.buildID,
                     libraryCapsule: game.libraryCapsule,
                     libraryHero: game.libraryHero,
-                    headerImage: game.headerImage, parentID: game.parentID
+                    headerImage: game.headerImage, parentID: game.parentID,
+                    launches: game.launches.isEmpty ? nil : game.launches
                 )
             }
             Task.detached(priority: .utility) {

@@ -242,3 +242,29 @@ enum MemoryGuard {
         return tr("Cannot launch: iOS closed iDeck for lack of memory the last %d times this game ran (up to %d MiB). Lower the game's resolution on its page, close other apps, then start it again. Starting it again within 3 minutes goes ahead anyway.", count, peak)
     }
 }
+
+/// Steam games that need Valve's Windows client: started without it, they asked for it
+/// (steamworks' SteamAPI_RestartAppIfNecessary opens steam://run/<app id>; a failed
+/// SteamAPI_Init prints "[S_API FAIL]") and closed within a minute. Their later launches
+/// go through Madeira Dock, Steam's client, whatever the direct list says.
+enum SteamClientNeed {
+    static let key = "steam.needsClient.v1"
+    static let quickExitSeconds: TimeInterval = 60
+
+    /// What the game's part of the Wine log shows, lower-cased.
+    static func markers(appID: UInt32) -> [String] {
+        ["steam://run/\(appID)", "steam://rungameid/\(appID)", "[s_api fail]"]
+    }
+
+    static func needs(_ appID: UInt32) -> Bool {
+        (UserDefaults.standard.array(forKey: key) as? [Int] ?? []).contains(Int(appID))
+    }
+
+    static func note(_ appID: UInt32) {
+        var list = UserDefaults.standard.array(forKey: key) as? [Int] ?? []
+        guard !list.contains(Int(appID)) else { return }
+        list.append(Int(appID))
+        UserDefaults.standard.set(list, forKey: key)
+        AppLog.record("[steam-client] app=\(appID) asked for Steam's client when started without it: started through Steam from now on")
+    }
+}
