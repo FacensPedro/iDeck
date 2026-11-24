@@ -12,6 +12,8 @@ private final class GameRuntimeMetrics: ObservableObject {
     @Published private(set) var fps = "N/D"
     @Published private(set) var cpu = "N/D"
     @Published private(set) var gpuMemory = "N/D"
+    /// iDeck's own footprint (Wine, the game and iDeck: one process), as iOS counts it.
+    @Published private(set) var ram = "N/D"
     /// Published until shortly after the first frame (the loading screen and its
     /// 20-second hint read it); afterwards it is kept without republishing.
     @Published private(set) var secondsSinceLaunch: TimeInterval = 0
@@ -121,6 +123,9 @@ private final class GameRuntimeMetrics: ObservableObject {
         }
         if collectPerformance, let device = metalDevice {
             update(\.gpuMemory, "\(device.currentAllocatedSize / (1024 * 1024)) MB")
+        }
+        if collectPerformance {
+            update(\.ram, "\(MainActor.assumeIsolated { ResourceGovernor.footprintMiB() }) MB")
         }
         previousUptime = uptime
     }
@@ -358,7 +363,7 @@ struct GameSessionView: View {
                         VStack(alignment: .leading, spacing: 1) {
                             Text("FPS: \(metrics.fps)  CPU: \(metrics.cpu)")
                             if horizontalSizeClass != .compact {
-                                Text("GPU memory: \(metrics.gpuMemory)")
+                                Text("GPU memory: \(metrics.gpuMemory)  RAM: \(metrics.ram)")
                                 // iOS gives apps no GPU utilization counter; the frame
                                 // time is the honest per-frame load figure.
                                 Text("Frame time: \(Int(metrics.fps).map { $0 > 0 ? String(format: "%.1f ms", 1000.0 / Double($0)) : "N/D" } ?? "N/D")")

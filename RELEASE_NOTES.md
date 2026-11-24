@@ -29,6 +29,10 @@
 - The minimize button for the close and settings buttons now stays in the same place when they are minimized. Before, it moved up.
 - Every game now starts with those buttons minimized. Before, expanding them once kept them expanded in every later game.
 
+### Graphics
+- When the GPU reports errors during a game (a GPU hang, a timeout, or work refused after an earlier error), iDeck records it for that game. MetalFX upscaling and frame generation are turned off for it, its next start uses lighter graphics memory settings, and the session's message says so. A session without GPU errors clears this.
+- The figures at the top of the game now include RAM, next to GPU memory.
+
 ### 32-bit and 64-bit games: DLL check before the start
 - Before each game starts, iDeck now reads the DLLs its program needs, and those of the DLLs the game ships with it. It looks for each one the way Wine will: in the game's folder, then in the Windows runtime for the game's architecture (32-bit or 64-bit).
 - Missing DLLs and DLLs built for the other architecture (a 64-bit DLL next to a 32-bit game, for example) are written to iDeck's log and to bug reports.

@@ -2465,6 +2465,25 @@ class SystemCoordinator: ObservableObject {
             outcome.reason += " DLL check before the start: " + check.summary + "."
         }
         DependencyCheck.last = nil
+        // Metal GPU faults (hang, timeout, ignored submissions): the heaviest GPU work
+        // iDeck adds goes for this game, and the next launch runs one frame in flight.
+        if let endedGame {
+            let faulted = Self.sessionLogContains(GPUFaultGuard.markers, logURL: Self.wineLogURL, since: wineLogStartOffset)
+            if GPUFaultGuard.note(endedGame, faulted: faulted) {
+                let lightened = MainActor.assumeIsolated { () -> Bool in
+                    let store = WindowsLibraryStore()
+                    guard var profile = store.profiles[endedGame], profile.metalFXEnabled || profile.frameGeneration else { return false }
+                    profile.metalFXEnabled = false
+                    profile.frameGeneration = false
+                    store.save(profile)
+                    return true
+                }
+                if lightened {
+                    outcome.reason += " " + "The GPU reported errors during this session: MetalFX and frame generation are now off for this game."
+                }
+                SteamLog.event("[gpu-fault] \(endedGame): GPU errors in the Wine log; lighter GPU settings from the next launch")
+            }
+        }
         let hostTrap = outcome.ntstatus == 0xC000001D
             && IllegalInstructionOrigin.isHost(logURL: Self.wineLogURL, since: wineLogStartOffset)
         let shaderFailure = Self.sessionLogShowsShaderFailure(logURL: Self.wineLogURL, since: wineLogStartOffset)

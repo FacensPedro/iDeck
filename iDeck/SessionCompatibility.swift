@@ -420,3 +420,37 @@ enum DependencyCheck {
         return result
     }
 }
+
+
+/// Games whose session showed Metal GPU faults (a command buffer that ended in error:
+/// GPU hang, timeout, page fault, or later submissions ignored because of them). The
+/// driver then drops the game's work and the picture freezes or goes black. The
+/// game's MetalFX upscaling and frame generation, the heaviest GPU work iDeck adds,
+/// are turned off in its profile, and the next launch runs one frame in flight.
+enum GPUFaultGuard {
+    static let key = "compatibility.gpuFaults.v1"
+    /// Lower-cased, as Metal's error descriptions and madeira-d3d12's log write them.
+    static let markers = ["command buffer ended in error", "caused gpu hang", "gpu timeout error",
+                          "submissionsignored", "ignored (for causing prior/excessive gpu errors)",
+                          "caused gpu address fault", "kiogpucommandbuffercallbackerrortimeout"]
+
+    static func faulted(_ game: String) -> Bool {
+        (UserDefaults.standard.stringArray(forKey: key) ?? []).contains(game)
+    }
+
+    /// Records the game; true when this is new. A clean session that shows no fault clears it.
+    @discardableResult
+    static func note(_ game: String, faulted: Bool) -> Bool {
+        var games = UserDefaults.standard.stringArray(forKey: key) ?? []
+        if !faulted {
+            if games.contains(game) { games.removeAll { $0 == game }; UserDefaults.standard.set(games, forKey: key) }
+            return false
+        }
+        guard !games.contains(game) else { return false }
+        games.append(game)
+        if games.count > 200 { games.removeFirst(games.count - 200) }
+        UserDefaults.standard.set(games, forKey: key)
+        AppLog.record("[gpu-fault] \(game): Metal reported GPU errors in this session")
+        return true
+    }
+}
