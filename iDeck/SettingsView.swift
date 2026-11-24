@@ -430,8 +430,15 @@ struct SettingsView: View {
         .padding(.vertical, 4)
         if coordinator.isJITEnabled {
             LabeledContent(tr("Debugger connection")) {
-                Text(coordinator.isStikDebugAttached ? tr("Attached") : tr("Detached"))
-                    .foregroundStyle(coordinator.isStikDebugAttached ? .green : .orange)
+                // Once Wine's JIT pool is prepared iDeck lets the debugger go on purpose
+                // (early detach): that is the finished state, not a lost connection.
+                if coordinator.isStikDebugAttached {
+                    Text(tr("Attached")).foregroundStyle(.green)
+                } else if coordinator.isWineJITPrepared {
+                    Text(tr("Done: JIT ready")).foregroundStyle(.green)
+                } else {
+                    Text(tr("Detached")).foregroundStyle(.orange)
+                }
             }
         }
         if coordinator.isJITEnabled && !coordinator.isStikDebugAttached && !coordinator.isWineJITPrepared {

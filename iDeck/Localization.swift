@@ -72,6 +72,7 @@ func trStatus(_ status: String) -> String {
 enum Translations {
     static let table: [String: [String: String]] = [
         "Free space": ["pt": "Espaço livre", "es": "Espacio libre"],
+        "Done: JIT ready": ["pt": "Concluído: JIT pronto", "es": "Listo: JIT preparado"],
         "The GPU reported errors during this session: MetalFX and frame generation are now off for this game.": ["pt": "A GPU informou erros nesta sessão: o MetalFX e a geração de quadros foram desligados para este jogo.", "es": "La GPU informó errores en esta sesión: MetalFX y la generación de fotogramas se desactivaron para este juego."],
         "No new image for %d s: the game may be frozen. Wait, or close it with X.": ["pt": "Sem imagem nova há %d s: o jogo pode ter travado. Aguarde ou feche no X.", "es": "Sin imagen nueva desde hace %d s: el juego puede estar congelado. Espera o ciérralo con la X."],
         "The game needs Steam's Windows client. It asked for Steam and closed, so iDeck starts it through Steam from now on. Start it again.": ["pt": "O jogo precisa do cliente Steam do Windows. Ele pediu a Steam e fechou, então o iDeck passa a iniciá-lo pela Steam. Inicie de novo.", "es": "El juego necesita el cliente de Steam de Windows. Pidió Steam y se cerró, así que iDeck lo inicia con Steam a partir de ahora. Inícialo de nuevo."],
