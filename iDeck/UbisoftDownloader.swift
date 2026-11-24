@@ -31,7 +31,30 @@ enum UbisoftDemuxError: LocalizedError {
 final class UbisoftDemux: @unchecked Sendable {
     static let host = "dmx.upc.ubisoft.com"
     /// The launcher version sent first on every socket (upc.exe's file version build).
-    static let clientVersion: UInt64 = 10931
+    /// The built-in value is the one iDeck was written against; 2.15.0's log shows the
+    /// server ending the connection right after it (TLS 1.2 connected, then "the
+    /// server ended the connection" with no answer), as for a client it no longer
+    /// accepts. The Ubisoft Connect iDeck installs in the prefix carries the current
+    /// number, so that one is sent when it is newer.
+    static let builtInClientVersion: UInt64 = 10931
+
+    static var clientVersion: UInt64 {
+        let drive = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("wine/drive_c")
+        for folder in ["Program Files (x86)/Ubisoft/Ubisoft Game Launcher", "Program Files/Ubisoft/Ubisoft Game Launcher"] {
+            for name in ["upc.exe", "UbisoftConnect.exe"] {
+                let url = drive.appendingPathComponent(folder).appendingPathComponent(name)
+                guard let data = try? Data(contentsOf: url, options: .alwaysMapped),
+                      let version = EAPEVersion.productVersion(data) else { continue }
+                // Ubisoft Connect numbers its builds in the third field (…, 10931, 0).
+                let build = UInt64(version.patch)
+                if build > builtInClientVersion && build < 100_000 {
+                    return build
+                }
+            }
+        }
+        return builtInClientVersion
+    }
 
     private let queue = DispatchQueue(label: "ideck.ubisoft.demux")
     private var connection: NWConnection?
@@ -77,7 +100,10 @@ final class UbisoftDemux: @unchecked Sendable {
         queue.sync { self.connection = connection }
         receive()
         // The client version goes first, as a push.
-        var version = GalaxyProto.Writer(); version.uint(1, Self.clientVersion)
+        let clientVersion = Self.clientVersion
+        AppLog.record("[ubisoft-demux] client version \(clientVersion)"
+                      + (clientVersion == Self.builtInClientVersion ? " (built in)" : " (from the installed Ubisoft Connect)"))
+        var version = GalaxyProto.Writer(); version.uint(1, clientVersion)
         var push = GalaxyProto.Writer(); push.data(4, version.bytes)
         var upstream = GalaxyProto.Writer(); upstream.data(2, push.bytes)
         send(upstream.bytes)
@@ -156,7 +182,12 @@ final class UbisoftDemux: @unchecked Sendable {
                     self.drain()
                 }
                 if let error { self.fail(error); return }
-                if complete { self.fail(UbisoftDemuxError.closed("the server ended the connection")); return }
+                if complete {
+                    // Whether anything came back first tells a refused client (nothing)
+                    // from a session the server ended later.
+                    AppLog.record("[ubisoft-demux] the server ended the connection; frames left unread: \(self.buffer.count) byte(s), requests waiting: \(self.waiting.count + self.serviceWaiting.count)")
+                    self.fail(UbisoftDemuxError.closed("the server ended the connection")); return
+                }
                 self.receive()
             }
         }

@@ -1,0 +1,32 @@
+diff --git a/build/wineserver/mapping_ios.c b/build/wineserver/mapping_ios.c
+index 89cb7d2..b47e249 100644
+--- a/build/wineserver/mapping_ios.c
++++ b/build/wineserver/mapping_ios.c
+@@ -961,10 +961,26 @@ static unsigned int get_image_params( struct mapping *mapping, file_pos_t file_s
+     mapping->image.wine_fakedll  = (mz_size == sizeof(mz) &&
+                                     !memcmp( mz.buffer, fakedll_signature, sizeof(fakedll_signature) ));
+ 
++    /* iDeck: a program (not a DLL) that asks for ASLR but has no relocations to
++     * apply can only run at its preferred base -- Windows loads it there. Dark
++     * Souls Remastered's exe has no .reloc section and sets DYNAMIC_BASE: moved to
++     * an ASLR address it failed with "failed to create main module ... c0000018",
++     * and as a small image it never got the 0x140000000 window. Report it as
++     * RELOCS_STRIPPED and not dynamically relocated, so it maps at its base and
++     * the window's fixed-base rule (MADEIRA_EXE_WINDOW_SMALL_FIXED) applies. */
++    if (!has_relocs && !(nt.FileHeader.Characteristics & IMAGE_FILE_DLL) &&
++        (mapping->image.dll_charact & IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE) && !(clr_va && clr_size))
++    {
++        mapping->image.image_charact |= IMAGE_FILE_RELOCS_STRIPPED;
++        fprintf( stderr, "[fixed-exe] image base %#llx: DYNAMIC_BASE without relocations -- kept at its "
++                 "preferred base\n", (unsigned long long)mapping->image.base );
++    }
++
+     if (mapping->image.alignment & page_mask)
+         mapping->image.image_flags |= IMAGE_FLAGS_ImageMappedFlat;
+     else if ((mapping->image.dll_charact & IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE) &&
+-             (has_relocs || mapping->image.contains_code) && !(clr_va && clr_size))
++             (has_relocs || (mapping->image.contains_code && (nt.FileHeader.Characteristics & IMAGE_FILE_DLL))) &&
++             !(clr_va && clr_size))
+         mapping->image.image_flags |= IMAGE_FLAGS_ImageDynamicallyRelocated;
+     /* ml936: an image whose preferred base is below PE_LOW_BASE_FLOOR can never
+      * be mapped there -- for it the choice is not "preferred base or relocated",

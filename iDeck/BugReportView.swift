@@ -913,8 +913,15 @@ enum EAPrefixEvidence {
     /// A log's text without markup: tags and the common entities removed.
     static func plainText(_ data: Data) -> String {
         // EA's logs are UTF-8 or UTF-16 (a zero in the second byte).
-        let utf16 = data.count >= 2 && data[data.startIndex + 1] == 0
-        var text = utf16 ? (String(data: data, encoding: .utf16LittleEndian) ?? "") : String(decoding: data, as: UTF8.self)
+        // EA's activation logs are UTF-16 with a byte-order mark (FF FE), so the second
+        // byte is not zero: count zero bytes instead (2.15.0 printed "L i c e n s e").
+        var body = data
+        if body.count >= 2, body[body.startIndex] == 0xFF, body[body.startIndex + 1] == 0xFE { body = body.dropFirst(2) }
+        let sample = body.prefix(4096)
+        let zeros = sample.reduce(0) { $0 + ($1 == 0 ? 1 : 0) }
+        let utf16 = sample.count >= 2 && zeros * 4 >= sample.count
+        if utf16 && body.count % 2 == 1 { body = body.dropLast() }
+        var text = utf16 ? (String(data: Data(body), encoding: .utf16LittleEndian) ?? "") : String(decoding: body, as: UTF8.self)
         text = text.replacingOccurrences(of: #"<(br|/tr|/p|/div|/li)[^>]{0,80}>"#, with: "\n", options: [.regularExpression, .caseInsensitive])
         text = text.replacingOccurrences(of: #"<[^>]{0,300}>"#, with: " ", options: .regularExpression)
         for (entity, character) in [("&nbsp;", " "), ("&quot;", "\""), ("&lt;", "<"), ("&gt;", ">"), ("&amp;", "&")] {
@@ -926,7 +933,7 @@ enum EAPrefixEvidence {
     /// The newest lines EA's activation window wrote, for iDeck's own log after a session in
     /// which the game started ActivationUI.exe: they say why the licence was refused.
     /// Addresses, e-mails, long tokens and the account names in `hidden` are removed.
-    static func activationReason(drive: URL, hidden: [String], lines count: Int = 20) -> [String] {
+    static func activationReason(drive: URL, hidden: [String], lines count: Int = 60) -> [String] {
         originLogs(drive: drive, files: 1, linesPerFile: count).map { line in
             var text = line.replacingOccurrences(of: #"\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b"#, with: "<ip>", options: .regularExpression)
             text = text.replacingOccurrences(of: #"\b[0-9a-fA-F]{1,4}(?::[0-9a-fA-F]{0,4}){4,7}\b"#, with: "<ip>", options: .regularExpression)
@@ -954,7 +961,7 @@ enum EAPrefixEvidence {
             guard let handle = try? FileHandle(forReadingFrom: logs.appendingPathComponent(entry.name)) else { continue }
             defer { try? handle.close() }
             let tail: UInt64 = 64 * 1024
-            _ = try? handle.seek(toOffset: UInt64(entry.size) > tail ? UInt64(entry.size) - tail : 0)
+            _ = try? handle.seek(toOffset: UInt64(entry.size) > tail ? (UInt64(entry.size) - tail) & ~1 : 0)
             guard let data = try? handle.readToEnd() else { continue }
             let text = plainText(data).split(whereSeparator: \.isNewline)
                 .map { $0.split(whereSeparator: \.isWhitespace).joined(separator: " ") }.filter { !$0.isEmpty }

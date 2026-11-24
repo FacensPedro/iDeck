@@ -385,7 +385,20 @@ enum DependencyCheck {
             queue.removeFirst()
             guard seen.insert(name).inserted, seen.count <= 400 else { continue }
             result.checked += 1
-            if let local = localNames[name] {
+            // An import may name a path relative to the program ("Core\\Activation64.dll",
+            // EA's activation library): look it up there, by each component's case.
+            var localFile = localNames[name]
+            if localFile == nil, name.contains("\\") || name.contains("/") {
+                var url: URL? = gameFolder
+                for part in name.split(whereSeparator: { $0 == "\\" || $0 == "/" }).map(String.init) where !part.isEmpty {
+                    guard let folder = url, part != "..",
+                          let match = (try? FileManager.default.contentsOfDirectory(atPath: folder.path))?
+                            .first(where: { $0.lowercased() == part }) else { url = nil; break }
+                    url = folder.appendingPathComponent(match)
+                }
+                localFile = url
+            }
+            if let local = localFile {
                 guard let libraryInfo = read(local) else { continue }
                 if !compatible(program: info.machine, library: libraryInfo.machine) {
                     result.wrongArchitecture.append(local.lastPathComponent)

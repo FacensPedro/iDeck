@@ -12,6 +12,8 @@ early     .      madeira-fault-diagnostics.patch
 early     .      madeira-dxil-concurrent-cache.patch
 early     .      madeira-wine-idle-logging.patch
 early     .      madeira-small-map-va-limit.patch
+early     .      madeira-thread-name-exception.patch
+early     .      madeira-fixed-exe-without-relocs.patch
 
 # The Wine submodule
 wine      wine   wine-arm64ec-null-thread-context.patch
@@ -19,7 +21,6 @@ wine      wine   wine-wow64win-atoms.patch
 wine      wine   wine-ios-machine-identity.patch
 wine      wine   wine-ios-fault-address.patch
 wine      wine   wine-wow64-callback-return-no-unwind.patch
-wine      wine   wine-ignore-debugger-only-exceptions.patch
 
 # DXMT's iOS cache/sync work, then the upstream backports (before the VC++ overlay,
 # which edits the same bridge file)
