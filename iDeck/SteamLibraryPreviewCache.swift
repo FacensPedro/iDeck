@@ -17,7 +17,21 @@ struct SteamLibraryCachedGame: Codable, Sendable, Equatable {
     /// starts there comes from this snapshot: without them the launch guessed an
     /// executable from the installed files ("Steam metadata did not resolve").
     /// Optional, so snapshots from earlier builds still load.
-    var launches: [SteamLaunchOption]? = nil
+    var launches: [SteamCachedLaunch]? = nil
+}
+
+/// One launch entry as the snapshot keeps it: the fields of SteamLaunchOption, here
+/// so this file builds on its own (the host test compiles it alone).
+struct SteamCachedLaunch: Codable, Sendable, Equatable {
+    var executable: String
+    var index: UInt32?
+    var requiredDLC: String?
+    var arguments: String
+    var workingDir: String
+    var type: String
+    var oslist: String
+    var osarch: String
+    var betaKey: String
 }
 
 /// An account-scoped, presentation-only snapshot. This never stores Steam

@@ -10,9 +10,10 @@ COMPAT = (ROOT / "iDeck/SessionCompatibility.swift").read_text()
 
 class SteamLaunchOptionsCacheTests(unittest.TestCase):
     def test_launch_options_survive_the_fresh_process(self):
-        self.assertIn("var launches: [SteamLaunchOption]? = nil", CACHE)
-        self.assertIn("launches: game.launches.isEmpty ? nil : game.launches", MANAGER)
-        self.assertIn("app.launches = cached.launches ?? []", MANAGER)
+        self.assertIn("var launches: [SteamCachedLaunch]? = nil", CACHE)
+        self.assertIn("struct SteamCachedLaunch: Codable, Sendable, Equatable", CACHE)
+        self.assertIn("launches: game.launches.isEmpty ? nil : game.launches.map {", MANAGER)
+        self.assertIn("app.launches = (cached.launches ?? []).map {", MANAGER)
 
 
 class SteamClientNeedTests(unittest.TestCase):
