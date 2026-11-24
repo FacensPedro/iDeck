@@ -1,0 +1,26 @@
+diff --git a/build/ntdll-unix/thread_ios.c b/build/ntdll-unix/thread_ios.c
+index 68dbf43..feb0c76 100644
+--- a/build/ntdll-unix/thread_ios.c
++++ b/build/ntdll-unix/thread_ios.c
+@@ -2390,6 +2390,21 @@ NTSTATUS WINAPI NtRaiseException( EXCEPTION_RECORD *rec, CONTEXT *context, BOOL
+         return NtContinue( context, FALSE );
+     }
+ 
++    /* iDeck: the thread-name exception (0x406D1388, SetThreadName) is, like a debug
++     * print, raised only for a debugger and caught by the program's own __except.
++     * In an iOS WoW64 process that 32-bit handler is not reached ("[exc-disp]
++     * dispatch ... pc=0"), and the unhandled raise ended Assassin's Creed IV
++     * (abort_process status=0x406d1388). With no debugger it means nothing:
++     * continue, as for DBG_PRINTEXCEPTION_C above. */
++    if (rec->ExceptionCode == 0x406d1388)
++    {
++        static int names;
++        if (names++ < 8)
++            ERR_(seh)("[thread-name] swallowing 0x406d1388 that reached second chance "
++                      "(addr=%p) -- continuing instead of dying\n", rec->ExceptionAddress );
++        return NtContinue( context, FALSE );
++    }
++
+     if (rec->ExceptionFlags & EXCEPTION_STACK_INVALID)
+         ERR_(seh)("Exception frame is not in stack limits => unable to dispatch exception.\n");
+     else if (rec->ExceptionCode == STATUS_NONCONTINUABLE_EXCEPTION)

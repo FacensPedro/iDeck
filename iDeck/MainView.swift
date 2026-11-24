@@ -1472,14 +1472,16 @@ private struct SteamProgramDetailsView: View {
                             launch(game)
                         } label: {
                             Label(tr("Launch"), systemImage: "play.fill")
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 12)
+                                .font(.subheadline.weight(.semibold))
+                                .frame(maxWidth: 220)
+                                .padding(.vertical, 8)
                         }
                         .buttonStyle(.borderedProminent)
                         Button(role: .destructive) { confirmUninstall = true } label: {
                             Label(tr("Uninstall"), systemImage: "trash")
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 12)
+                                .font(.subheadline.weight(.semibold))
+                                .frame(maxWidth: 220)
+                                .padding(.vertical, 8)
                         }
                         .buttonStyle(.bordered)
                       }
@@ -2019,15 +2021,21 @@ private struct StoreGameDetailsView<Extra: View>: View {
                 onLaunch()
             } label: {
                 Label(tr("Launch"), systemImage: "play.fill")
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .frame(maxWidth: 220)
+                    .frame(height: 36)
             }
             .buttonStyle(.borderedProminent)
             if onUninstall != nil {
                 Button(role: .destructive) { confirmUninstall = true } label: {
                     Label(tr("Uninstall"), systemImage: "trash")
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
+                        .font(.subheadline.weight(.semibold))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                        .frame(maxWidth: 220)
+                        .frame(height: 36)
                 }
                 .buttonStyle(.bordered)
             }

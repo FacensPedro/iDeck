@@ -1,59 +1,12 @@
 ## What's Changed
-### Ubisoft Connect
-- Ubisoft games download again when Ubisoft's download service closes the secure connection right away (the error "server closed session with no notification"). iDeck now tries a second time with the older secure-connection version (TLS 1.2), then a third time over IPv4. Each try is written to iDeck's log.
-
 ### 32-bit games
-- The 2.14.0 fix works: Assassin's Creed IV no longer closes on the window-callback error. It now got further and closed on a different signal: a thread-name message (0x406D1388) that games send for debuggers and catch themselves. In iOS's 32-bit mode the game's own catch was not reached, so Wine ended the game. Wine now ignores these debugger-only messages (thread names and debug output) when nothing catches them, as Windows without a debugger effectively does.
-- Duke Nukem 3D: 20th Anniversary World Tour, Overcooked and Max Payne 2 no longer close a few seconds after starting. When a 32-bit game's window returned from a message, three of the Windows runtime's registers were not restored, and one of them was then used to write into memory. That broke the game's window message code (a crash in wow64win.dll, then a stack overflow). All of them are now restored. Other 32-bit games that closed by themselves right after opening their window may be fixed too.
+- Assassin's Creed IV no longer closes on the thread-name signal (0x406D1388). The fix in 2.15.0 was written for a part of Wine that iDeck does not use on iOS, so it never took effect. It is now in the part iDeck runs, next to the rule that already ignored debug output.
 
-### Memory
-- iDeck now notices when iOS closes it for lack of memory during a game. RAM is checked every 5 seconds while a game runs, and when iDeck opens again with very little memory left at the last check, the stop is recorded for that game.
-- That game's next start uses lighter memory settings (one frame in flight instead of two).
-- After two such stops in a row, iDeck asks before starting the game again: lower its resolution or close other apps. Starting it again within 3 minutes goes ahead anyway. A normal exit clears the count.
-
-### Games that closed iDeck or did not start
-- Overcooked: Gourmet Edition (GOG) closed iDeck a few seconds after starting. The game writes into memory next to its own code, and the x86 translator kept handling the same write again until iDeck stopped. When a game's log shows this, iDeck now turns on the "Compatible" code checks for that game, which avoid the loop, from its next start. A game whose Code checks setting was chosen by hand keeps it.
-- Burnout Paradise Remastered did not start: "No safe address range can hold the Wine JIT pool". The largest free memory area was 564 MB for a 560 MB pool, but its safe part was smaller, and iDeck gave up instead of using a slightly smaller pool. It now shrinks the pool to the largest safe area, as it already did when no area was large enough.
-
-### Steam
-- Steam games start with Steam's own launch settings again (program, arguments and working folder). iDeck reopens in a fresh process for each game, and there the library came from a saved snapshot without those settings, so iDeck guessed the program from the game's files ("Steam metadata did not resolve" in the log). The snapshot now keeps them.
-- A Steam game started without Steam's client that asks for Steam and closes now shows a specific message. iDeck starts it through Steam's Windows client from then on.
-- Game sizes are right again for games that also have content for Steam China, such as Delta Force (219.65 GB shown before; the game is about 88 GB). Steam China's copies of the game files were counted, and downloaded, with the global ones. They are now left out, as Steam itself does.
-- Optional content Steam adds only for owners of a DLC is no longer counted or downloaded without that DLC.
-
-### EA app
-- When an EA game refuses its licence and opens EA's activation window (Dragon Age: Inquisition), iDeck's log now shows the last lines that window wrote about why. Before, the reason was only in a bug report. Addresses, e-mails, tokens and account names are removed from those lines.
-
-### Game session
-- The FPS, CPU, GPU memory and frame time figures now sit inside the black strip above the game, in one left-aligned column, instead of hanging over the game image. "GPU memory (Metal)" is now "GPU memory".
-- The minimize button for the close and settings buttons now stays in the same place when they are minimized. Before, it moved up.
-- Every game now starts with those buttons minimized. Before, expanding them once kept them expanded in every later game.
-
-### Diagnostics
-- iDeck now keeps a report of every game launch. It records:
-  - how long the game took to show its first image;
-  - how long it ran, and the last stage it reached;
-  - how it ended, and whose failure that was: the game, the Windows runtime, the store or its licence, or iDeck itself (for example, iOS closing it for lack of memory);
-  - its memory peak and any DLL problems.
-- A launch that ended with iDeck itself is recorded at the next start. Each report is one line in iDeck's log, and the last eight are in bug reports.
-
-### Graphics
-- When the GPU reports errors during a game (a GPU hang, a timeout, or work refused after an earlier error), iDeck records it for that game. MetalFX upscaling and frame generation are turned off for it, its next start uses lighter graphics memory settings, and the session's message says so. A session without GPU errors clears this.
-- The figures at the top of the game now include RAM, next to GPU memory.
-
-### 32-bit and 64-bit games: DLL check before the start
-- Before each game starts, iDeck now reads the DLLs its program needs, and those of the DLLs the game ships with it. It looks for each one the way Wine will: in the game's folder, then in the Windows runtime for the game's architecture (32-bit or 64-bit).
-- Missing DLLs and DLLs built for the other architecture (a 64-bit DLL next to a 32-bit game, for example) are written to iDeck's log and to bug reports.
-- When the game then stops on a missing or incompatible DLL, or crashes, the error message names them.
-
-### Windows sessions
-- While a game runs, if it shows no new image for 20 seconds after it had started drawing, the bar at the top says the game may be frozen and that it can be closed with X. The message goes away when images arrive again. Both moments are written to iDeck's log.
-- After a game session, Windows' temporary folders (C:\windows\temp and each user's Temp folder) are emptied of what earlier sessions left there. Files from the session that just ended stay until the next cleanup, so an installer that continues later still finds them.
+### Ubisoft Connect
+- 2.15.0's connection retry works: the secure connection now opens with TLS 1.2. Ubisoft's server then ended it at once. That is how it treats a client version it no longer accepts, and iDeck always sent the same fixed version number. iDeck now sends the version of the Ubisoft Connect it installs, when that is newer. The version used is written to the log, and so is whether the server answered anything before ending the connection.
 
 ### Game details
-- Launch and Uninstall are side by side.
-- Uninstalling a game asks first in a pop-up, on every store's page, Steam included.
-- The Install button is smaller.
+- Launch and Uninstall are now the same size as the Install button.
 
 ### Version
-- Updated the application version to 2.15.0 (build 122).
+- Updated the application version to 2.15.1 (build 123).
