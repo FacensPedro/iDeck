@@ -71,7 +71,17 @@ func trStatus(_ status: String) -> String {
 
 enum Translations {
     static let table: [String: [String: String]] = [
-        "Free space": ["pt": "Espaço livre", "es": "Espacio libre"],
+        "Free space": ["pt": "Espaço livre", "es": "Espacio libre"], 
+        "Game language": ["pt": "Idioma do jogo", "es": "Idioma del juego"],
+        "Audio + subtitles": ["pt": "Áudio + legendas", "es": "Audio + subtítulos"],
+        "Audio": ["pt": "Áudio", "es": "Audio"],
+        "Subtitles": ["pt": "Legendas", "es": "Subtítulos"],
+        "Interface": ["pt": "Interface", "es": "Interfaz"],
+        "The store installs or passes this language; the game uses it for voices and subtitles when it has them.": ["pt": "A loja instala ou passa este idioma; o jogo o usa para vozes e legendas quando os tem.", "es": "La tienda instala o pasa este idioma; el juego lo usa para voces y subtítulos cuando los tiene."],
+        "Steam downloads this language's files with the game, or at its next update if it is installed.": ["pt": "A Steam baixa os arquivos deste idioma com o jogo, ou na próxima atualização se ele já estiver instalado.", "es": "Steam descarga los archivos de este idioma con el juego, o en su próxima actualización si ya está instalado."],
+        "Passed to the game when it starts; the game uses it if it has this language.": ["pt": "Passado ao jogo quando ele inicia; o jogo o usa se tiver este idioma.", "es": "Se pasa al juego cuando se inicia; el juego lo usa si tiene este idioma."],
+        "Downloaded with the game; an installed game takes it at its next install or update.": ["pt": "Baixado com o jogo; um jogo já instalado o recebe na próxima instalação ou atualização.", "es": "Se descarga con el juego; un juego instalado lo recibe en su próxima instalación o actualización."],
+        "Done: JIT ready": ["pt": "Concluído: JIT pronto", "es": "Listo: JIT preparado"],
         "The GPU reported errors during this session: MetalFX and frame generation are now off for this game.": ["pt": "A GPU informou erros nesta sessão: o MetalFX e a geração de quadros foram desligados para este jogo.", "es": "La GPU informó errores en esta sesión: MetalFX y la generación de fotogramas se desactivaron para este juego."],
         "No new image for %d s: the game may be frozen. Wait, or close it with X.": ["pt": "Sem imagem nova há %d s: o jogo pode ter travado. Aguarde ou feche no X.", "es": "Sin imagen nueva desde hace %d s: el juego puede estar congelado. Espera o ciérralo con la X."],
         "The game needs Steam's Windows client. It asked for Steam and closed, so iDeck starts it through Steam from now on. Start it again.": ["pt": "O jogo precisa do cliente Steam do Windows. Ele pediu a Steam e fechou, então o iDeck passa a iniciá-lo pela Steam. Inicie de novo.", "es": "El juego necesita el cliente de Steam de Windows. Pidió Steam y se cerró, así que iDeck lo inicia con Steam a partir de ahora. Inícialo de nuevo."],

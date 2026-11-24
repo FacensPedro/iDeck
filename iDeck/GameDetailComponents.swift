@@ -274,3 +274,60 @@ struct SteamAchievementsCard: View {
         }
     }
 }
+
+/// "Game language" on a game's page: Automatic (iDeck's language) or one of the
+/// languages the store lists for the game. Steam says per language whether it has
+/// voices and subtitles, and the choice shows it ("Audio + subtitles"). A store that
+/// lists no languages offers the usual set. The store installs or passes that one
+/// language; the game uses it for voices and subtitles when it has them.
+struct GameLanguageCard: View {
+    let profileID: String
+    /// BCP 47 tags the store lists for the game; nil when it lists none.
+    let available: [String]?
+    var audio: Set<String> = []
+    var subtitles: Set<String> = []
+    var footer: String? = nil
+    @State private var selection = "automatic"
+
+    private var tags: [String] {
+        let list = available.map { listed in
+            listed.compactMap { tag in GameLanguage.all.first { $0.tag.lowercased() == tag.lowercased() }?.tag ?? (tag.contains("-") ? tag : nil) }
+        } ?? GameLanguage.all.map(\.tag)
+        var seen = Set<String>()
+        return list.filter { seen.insert($0.lowercased()).inserted }
+    }
+
+    private func label(_ tag: String) -> String {
+        let name = GameLanguage.name(tag)
+        guard !audio.isEmpty || !subtitles.isEmpty else { return name }
+        let lower = tag.lowercased()
+        let hasAudio = audio.contains { $0.lowercased() == lower }
+        let hasSubtitles = subtitles.contains { $0.lowercased() == lower }
+        switch (hasAudio, hasSubtitles) {
+        case (true, true): return name + " — " + tr("Audio + subtitles")
+        case (true, false): return name + " — " + tr("Audio")
+        case (false, true): return name + " — " + tr("Subtitles")
+        default: return name + " — " + tr("Interface")
+        }
+    }
+
+    var body: some View {
+        DetailCard(title: tr("Game language"), footer: footer ?? tr("The store installs or passes this language; the game uses it for voices and subtitles when it has them.")) {
+            DetailRow(title: tr("Language"), showsDivider: false, icon: "globe", iconColor: .blue) {
+                Picker(tr("Language"), selection: $selection) {
+                    Text(tr("Automatic")).tag("automatic")
+                    ForEach(tags, id: \.self) { Text(label($0)).tag($0) }
+                }
+                .pickerStyle(.menu)
+                .tint(.gray)
+                .labelsHidden()
+            }
+        }
+        .onAppear { selection = GameLanguage.choice(profileID) ?? "automatic" }
+        .onChange(of: selection) { _, chosen in
+            let tag = chosen == "automatic" ? nil : chosen
+            guard tag != GameLanguage.choice(profileID) else { return }
+            GameLanguage.choose(profileID, tag)
+        }
+    }
+}

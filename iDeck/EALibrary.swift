@@ -494,6 +494,8 @@ struct EAInstalledGame: Codable, Sendable {
     /// really computes.
     nonisolated static let hashVariantPrefix = "ea.licenceHashVariant."
     nonisolated(unsafe) static var lastPreparedContentID: String?
+    /// The offer id of that launch, which is the game's profile id after "ea:".
+    nonisolated(unsafe) static var lastPreparedOfferID: String?
 
     nonisolated static func hashVariant(contentID: String) -> Int {
         UserDefaults.standard.integer(forKey: hashVariantPrefix + contentID)
@@ -509,6 +511,7 @@ struct EAInstalledGame: Codable, Sendable {
             EALog.event("[ea-license] content=\(content) accepted its licence (hash variant \(variant))")
             return
         }
+        UserDefaults.standard.set(true, forKey: "ea.traceActivation.ea:" + (lastPreparedOfferID ?? content))
         let next = variant == 0 ? 1 : 0
         UserDefaults.standard.set(next, forKey: hashVariantPrefix + content)
         EALog.event("[ea-license] content=\(content) started ActivationUI.exe with hash variant \(variant) "
@@ -605,6 +608,7 @@ struct EAInstalledGame: Codable, Sendable {
             UserDefaults.standard.set(facts + ", licence not prepared (no content id)", forKey: Self.licenceFactsKey)
         } else if activation.required {
             Self.lastPreparedContentID = record.contentID
+            Self.lastPreparedOfferID = id
             // See hashVariantPrefix: variant 1 is the hash taken before Wine registered the
             // display adapter. The licence and the local service use it; the launch token keeps the device.
             let variant = Self.hashVariant(contentID: record.contentID)
@@ -653,7 +657,7 @@ struct EAInstalledGame: Codable, Sendable {
         let launchID = UUID().uuidString.lowercased()
         let environment: [String: String] = [
             "EAAuthCode": "unavailable", "EAEgsProxyIpcPort": "0", "EAEntitlementSource": "EA", "EAExternalSource": "EA", "EAFreeTrialGame": "false",
-            "EAGameLocale": AppLanguage.gameLocale(separator: "_"), "EAGenericAuthToken": session.accessToken, "EALaunchCode": "unavailable", "EALaunchOwner": "EA",
+            "EAGameLocale": GameLanguage.locale("ea:" + id, separator: "_"), "EAGenericAuthToken": session.accessToken, "EALaunchCode": "unavailable", "EALaunchOwner": "EA",
             "EALaunchEAID": session.displayName, "EALaunchEnv": "production", "EALaunchOfflineMode": "false", "EALsxPort": String(EAService.port),
             "EARtPLaunchCode": String(EALSXCrypto.launchCode()), "EASecureLaunchTokenTemp": session.userID, "EASteamProxyIpcPort": "0",
             "OriginSessionKey": launchID, "ContentId": record.contentID, "EAOnErrorExitRetCode": "1", "EAConnectionId": id, "EALicenseToken": id,

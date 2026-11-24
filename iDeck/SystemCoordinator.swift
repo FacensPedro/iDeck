@@ -817,6 +817,23 @@ class SystemCoordinator: ObservableObject {
         }
     }
 
+    /// Whether this iDeck process already asked the built-in helper by itself.
+    private static var builtInAutoRequested = false
+
+    /// With the built-in JIT method, iDeck enables JIT by itself when it opens: once
+    /// per process, when a pairing file is there, no JIT is active yet and no Windows
+    /// program runs. Nothing to tap and no app switch, as with StikDebug's own opening.
+    func autoEnableBuiltInJIT() {
+        guard jitMethod == "builtIn", !Self.builtInAutoRequested,
+              FileManager.default.fileExists(atPath: pairingFileURL.path),
+              !ideck_wineprocess_running(), MadeiraBundleIdentity.isNative else { return }
+        refreshJITStatus()
+        guard !isJITEnabled, !Self.jitPreparationValidated() else { return }
+        Self.builtInAutoRequested = true
+        AppLog.record("[jit-builtin] enabling JIT by itself at iDeck's start")
+        requestStikDebugJIT()
+    }
+
     /// The wait for the debugger that a built-in request started.
     private var builtInWait: Timer?
 
@@ -2213,7 +2230,9 @@ class SystemCoordinator: ObservableObject {
         if let why = Self.restartNeeded() {
             SteamLog.event("[wine-session] launch held, fresh iDeck process needed: \(why)")
             if !reopenWithFreeMemory(reason: "next launch needs a fresh process (\(why))", exitAnyway: false) {
-                setWindowsStatus("Execution Error: \(why). Restart iDeck before starting another game: swipe iDeck away in the app switcher, then open it again through StikDebug.")
+                setWindowsStatus(jitMethod == "builtIn"
+                    ? "Execution Error: \(why). Restart iDeck before starting another game: swipe iDeck away in the app switcher, then open it again; the built-in JIT turns on by itself."
+                    : "Execution Error: \(why). Restart iDeck before starting another game: swipe iDeck away in the app switcher, then open it again through StikDebug.")
             }
             return true
         }

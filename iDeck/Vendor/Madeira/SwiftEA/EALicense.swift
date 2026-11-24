@@ -78,6 +78,13 @@ enum EALicense {
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         try file.write(to: folder.appendingPathComponent(contentID + ".dlf"), options: .atomic)
         try file.write(to: folder.appendingPathComponent(contentID + "_cached.dlf"), options: .atomic)
+        // Origin-era activation libraries (Activation64 4.x, ActivationUI.exe) look for
+        // the licence in Origin's own cache too, C:\ProgramData\Origin\LicenseCache, as
+        // Origin wrote it; the EA app's folder alone is not where they all read.
+        let origin = drive.appendingPathComponent("ProgramData/Origin/LicenseCache")
+        if (try? FileManager.default.createDirectory(at: origin, withIntermediateDirectories: true)) != nil {
+            try? file.write(to: origin.appendingPathComponent(contentID + ".dlf"), options: .atomic)
+        }
     }
 
     /// Asks EA for the game's licence for this machine and saves it. Returns what was granted.
@@ -87,7 +94,12 @@ enum EALicense {
         let (xml, signature) = try await api.license(contentID: contentID, machineHash: hash)
         guard let info = EALicenseInfo(xml: xml) else { throw EAAPIError.license("unreadable licence") }
         try save(xml: xml, signature: signature, contentID: contentID, decodeSignature: activation.decodeSignature, drive: drive)
-        EALog.event("[ea-license] saved content=\(contentID) token=\(info.gameToken == nil ? 0 : 1)")
+        EALog.event("[ea-license] saved content=\(contentID) token=\(info.gameToken == nil ? 0 : 1)"
+            + " licence-hash=\(info.machineHash == hash ? "matches the request" : "DIFFERS from the request (\(info.machineHash))")"
+            + " user=\(info.userID.isEmpty ? "none" : "present")"
+            + " start=\(info.startTime.map { ISOStamp.string($0) } ?? "none")"
+            + " content-id=\(info.contentID == contentID ? "matches" : "DIFFERS (\(info.contentID))")"
+            + " copies=EA Services/License, Origin/LicenseCache")
         return info
     }
 }

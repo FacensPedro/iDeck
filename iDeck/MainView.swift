@@ -52,6 +52,7 @@ struct MainView: View {
         }
         .task(id: steamLibrary != nil && scenePhase == .active) {
             guard steamLibrary != nil && scenePhase == .active else { return }
+            coordinator.autoEnableBuiltInJIT()
             while !Task.isCancelled {
                 // JIT cannot change under a running game, which needs it: skip
                 // the sysctl/code-signing probe and its UI refresh meanwhile.
@@ -995,17 +996,16 @@ struct WindowsWorkspaceView: View {
         return VStack(alignment: .leading, spacing: 6) {
             ZStack {
                 if !game.coverURLs.isEmpty {
-                    GOGArtworkView(urls: game.coverURLs, fallbackColor: secondaryColor, fill: true, fallbackTitle: game.title)
+                    // No text over Ubisoft covers: the title is shown under the card.
+                    GOGArtworkView(urls: game.coverURLs, fallbackColor: secondaryColor, fill: true)
                         .id(game.coverURLs)
                 } else if let executable = game.executable {
                     WindowsExecutableArtworkView(executableURL: executable, library: windowsLibrary, fallbackColor: secondaryColor)
                 } else {
                     secondaryColor
-                    Text(game.title)
-                        .font(.headline)
-                        .foregroundColor(textColor)
-                        .multilineTextAlignment(.center)
-                        .padding(10)
+                    Image(systemName: "gamecontroller")
+                        .font(.largeTitle)
+                        .foregroundColor(.gray)
                 }
             }
             .libraryCoverFrame()
@@ -1538,6 +1538,11 @@ private struct SteamProgramDetailsView: View {
                             .foregroundColor(.red)
                             .font(.caption)
                     }
+                    GameLanguageCard(profileID: "steam:\(game.appID)",
+                                     available: game.languages.isEmpty ? nil : GameLanguage.all.map(\.steam).filter(game.languages.contains).compactMap(GameLanguage.tag(steam:)),
+                                     audio: Set(game.audioLanguages.compactMap(GameLanguage.tag(steam:))),
+                                     subtitles: Set(game.subtitleLanguages.compactMap(GameLanguage.tag(steam:))),
+                                     footer: tr("Steam downloads this language's files with the game, or at its next update if it is installed."))
                     WindowsGameProfileForm(profile: $profile)
                     DetailCard(title: tr("Steam Cloud saves"),
                                footer: steamLibrary.cloudMessages[game.appID]
@@ -1946,6 +1951,10 @@ private struct StoreGameDetailsView<Extra: View>: View {
                             .foregroundColor(.red)
                             .font(.caption)
                     }
+                    GameLanguageCard(profileID: profileID, available: GameLanguage.known(profileID),
+                                     footer: store == .epic || store == .ea
+                                        ? tr("Passed to the game when it starts; the game uses it if it has this language.")
+                                        : tr("Downloaded with the game; an installed game takes it at its next install or update."))
                     WindowsGameProfileForm(profile: $profile)
                     extra
                 }

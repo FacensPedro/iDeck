@@ -318,7 +318,10 @@ final class UbisoftLibrary: ObservableObject {
                 throw UbisoftDemuxError.refused("manifest HTTP \((manifestResponse as? HTTPURLResponse)?.statusCode ?? 0)")
             }
             var manifest = try UbisoftManifest.parse(manifestData, language: "en-US")
-            let wanted = Self.preferredLanguage(available: manifest.languages)
+            GameLanguage.rememberKnown("ubisoft:\(game.id)", manifest.languages.sorted())
+            let wanted = GameLanguage.choice("ubisoft:\(game.id)").flatMap { tag in
+                manifest.languages.first { $0.lowercased() == tag.lowercased() }
+            } ?? Self.preferredLanguage(available: manifest.languages)
             if wanted.lowercased() != "en-us" { manifest = try UbisoftManifest.parse(manifestData, language: wanted) }
             let name = EALibrary.safeName(game.title)
             let relative = Self.installRoot + "/" + name

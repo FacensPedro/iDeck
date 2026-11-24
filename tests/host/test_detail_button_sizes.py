@@ -15,8 +15,9 @@ class DetailButtonSizeTests(unittest.TestCase):
 class UbisoftClientVersionTests(unittest.TestCase):
     def test_installed_version_is_sent_when_newer(self):
         self.assertIn("static let builtInClientVersion: UInt64 = 10931", UBI)
-        self.assertIn('for name in ["upc.exe", "UbisoftConnect.exe"]', UBI)
+        self.assertIn("UbisoftConnectInstaller.exe", UBI)
         self.assertIn("if build > builtInClientVersion && build < 100_000 {", UBI)
+        self.assertIn("for field in [version.patch, version.build] {", UBI)
         self.assertIn('"[ubisoft-demux] client version', UBI)
 
 

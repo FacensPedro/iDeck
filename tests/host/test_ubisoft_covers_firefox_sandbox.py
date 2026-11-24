@@ -17,7 +17,7 @@ class UbisoftCoverTests(unittest.TestCase):
     def test_card_shows_the_cover(self):
         start = VIEW.index("private func ubisoftCard(")
         card = VIEW[start:VIEW.index("private func launchEAGame", start)]
-        self.assertIn("GOGArtworkView(urls: game.coverURLs, fallbackColor: secondaryColor, fill: true, fallbackTitle: game.title)", card)
+        self.assertIn("GOGArtworkView(urls: game.coverURLs, fallbackColor: secondaryColor, fill: true)", card)
 
 
 class FirefoxSandboxTests(unittest.TestCase):

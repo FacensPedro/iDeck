@@ -569,3 +569,65 @@ enum LaunchReport {
 
     static var report: String { entries().suffix(8).map(\.line).joined(separator: "\n") }
 }
+
+/// The language chosen for one game on its page ("Game language"), by profile id
+/// ("steam:<app>", "epic:<app>", "gog:<id>", "ea:<offer>", "ubisoft:<id>"), as a
+/// BCP 47 tag ("pt-BR"). None means automatic: iDeck's own language, as before.
+/// Stores install or pass one language for both voices and subtitles; the game
+/// uses it for whichever it has. Steam alone says per language which it has.
+enum GameLanguage {
+    static let key = "game-languages.v1"
+    /// Languages the store listed for a game, kept when known (Ubisoft's manifest).
+    static let knownKey = "game-languages.known.v1"
+
+    /// BCP 47 tags with their Steam API names, in Steam's order.
+    static let all: [(tag: String, steam: String)] = [
+        ("ar-SA", "arabic"), ("bg-BG", "bulgarian"), ("zh-CN", "schinese"), ("zh-TW", "tchinese"),
+        ("cs-CZ", "czech"), ("da-DK", "danish"), ("nl-NL", "dutch"), ("en-US", "english"),
+        ("fi-FI", "finnish"), ("fr-FR", "french"), ("de-DE", "german"), ("el-GR", "greek"),
+        ("hu-HU", "hungarian"), ("id-ID", "indonesian"), ("it-IT", "italian"), ("ja-JP", "japanese"),
+        ("ko-KR", "koreana"), ("nb-NO", "norwegian"), ("pl-PL", "polish"), ("pt-PT", "portuguese"),
+        ("pt-BR", "brazilian"), ("ro-RO", "romanian"), ("ru-RU", "russian"), ("es-ES", "spanish"),
+        ("es-MX", "latam"), ("sv-SE", "swedish"), ("th-TH", "thai"), ("tr-TR", "turkish"),
+        ("uk-UA", "ukrainian"), ("vi-VN", "vietnamese"),
+    ]
+
+    static func choice(_ profileID: String) -> String? {
+        (UserDefaults.standard.dictionary(forKey: key) as? [String: String])?[profileID]
+    }
+
+    static func choose(_ profileID: String, _ tag: String?) {
+        var all = UserDefaults.standard.dictionary(forKey: key) as? [String: String] ?? [:]
+        all[profileID] = tag
+        UserDefaults.standard.set(all, forKey: key)
+        AppLog.record("[game-language] \(profileID): \(tag ?? "automatic")")
+        if profileID.hasPrefix("steam:"), let app = UInt32(profileID.dropFirst(6)) {
+            SteamLanguage.chooseForGame(app, tag.flatMap(steamName))
+        }
+    }
+
+    static func steamName(_ tag: String) -> String? { all.first { $0.tag.lowercased() == tag.lowercased() }?.steam }
+    static func tag(steam: String) -> String? { all.first { $0.steam == steam.lowercased() }?.tag }
+
+    /// The game's language for a launch: its choice, else iDeck's own.
+    static func locale(_ profileID: String, separator: String) -> String {
+        if let tag = choice(profileID) { return tag.replacingOccurrences(of: "-", with: separator) }
+        return AppLanguage.gameLocale(separator: separator)
+    }
+
+    /// The language's own name ("Português (Brasil)").
+    static func name(_ tag: String) -> String {
+        let locale = Locale(identifier: tag)
+        return locale.localizedString(forIdentifier: tag).map { $0.prefix(1).uppercased() + $0.dropFirst() } ?? tag
+    }
+
+    static func rememberKnown(_ profileID: String, _ tags: [String]) {
+        var known = UserDefaults.standard.dictionary(forKey: knownKey) as? [String: [String]] ?? [:]
+        known[profileID] = tags
+        UserDefaults.standard.set(known, forKey: knownKey)
+    }
+
+    static func known(_ profileID: String) -> [String]? {
+        (UserDefaults.standard.dictionary(forKey: knownKey) as? [String: [String]])?[profileID]
+    }
+}

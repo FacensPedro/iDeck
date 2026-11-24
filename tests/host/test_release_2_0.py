@@ -23,8 +23,8 @@ class Release20Tests(unittest.TestCase):
 
     def test_game_language_follows_ideck(self):
         self.assertIn("AppLanguage.chosenCode", read("SwiftSteam/Library/SteamAppInfo.swift"))
-        self.assertIn('AppLanguage.gameLocale(separator: "_")', read("EALibrary.swift"))
-        self.assertIn('AppLanguage.gameLocale(separator: "-")', read("EpicLibrary.swift"))
+        self.assertIn('GameLanguage.locale("ea:" + id, separator: "_")', read("EALibrary.swift"))
+        self.assertIn('GameLanguage.locale("epic:" + app, separator: "-")', read("EpicLibrary.swift"))
 
     def test_stores_in_separate_sections(self):
         page = read("SettingsView.swift").split("private var accountsPage")[1].split("private var ubisoftPage")[0]

@@ -821,6 +821,18 @@ class WindowsEnvironment {
                     "MADEIRA_IMAGE_MAP_GUARD", "MADEIRA_DOCK_AUTH_FILE", "MADEIRA_DOCK_OFFLINE"] {
             unsetenv(key)
         }
+        // An EA game whose last session opened EA's activation window: one launch with
+        // Wine's file, registry and module traces, so the log shows what the activation
+        // library reads between "License signature is good" and that window (its own
+        // log names no reason). The next launch is back to the usual channels.
+        let traceKey = "ea.traceActivation." + profile.id
+        if profile.id.hasPrefix("ea:"), UserDefaults.standard.bool(forKey: traceKey) {
+            UserDefaults.standard.removeObject(forKey: traceKey)
+            setenv("WINEDEBUG", Self.wineDebugChannels + ",trace+file,trace+reg,trace+module", 1)
+            SteamLog.event("[ea-license] \(profile.id): this launch traces files, registry and modules for the activation")
+        } else {
+            setenv("WINEDEBUG", Self.wineDebugChannels, 1)
+        }
         sessionUseRecommended = profile.useRecommended
         sessionCodeChecks = profile.codeChecks
         // Full code checks after a session of this game ended in FEX's self-modifying
