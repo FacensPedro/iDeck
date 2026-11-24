@@ -1397,6 +1397,7 @@ private struct SteamProgramDetailsView: View {
     @State private var profile: WindowsGameProfile
     @State private var errorMessage: String?
     @State private var showError = false
+    @State private var confirmUninstall = false
 
     init(game: SteamAppInfo, prefixPath: URL?, library: WindowsLibraryStore,
          steamLibrary: SteamOwnedGamesModel, coordinator: SystemCoordinator,
@@ -1463,6 +1464,8 @@ private struct SteamProgramDetailsView: View {
                     } else if installing {
                         downloadStatus
                     } else if installed {
+                      // Launch and Uninstall side by side; Uninstall asks first.
+                      HStack(spacing: 10) {
                         // Starts the game; without JIT, StikDebug opens first.
                         Button {
                             dismiss()
@@ -1470,10 +1473,19 @@ private struct SteamProgramDetailsView: View {
                         } label: {
                             Label(tr("Launch"), systemImage: "play.fill")
                                 .frame(maxWidth: .infinity)
-                                .padding(.vertical, 14)
+                                .padding(.vertical, 12)
                         }
                         .buttonStyle(.borderedProminent)
-                        Button(role: .destructive) {
+                        Button(role: .destructive) { confirmUninstall = true } label: {
+                            Label(tr("Uninstall"), systemImage: "trash")
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                        }
+                        .buttonStyle(.bordered)
+                      }
+                      .alert(tr("Delete this game's files?"), isPresented: $confirmUninstall) {
+                        Button(tr("Cancel"), role: .cancel) {}
+                        Button(tr("Uninstall"), role: .destructive) {
                             guard let prefixPath else {
                                 presentError(tr("Windows environment is not ready."))
                                 return
@@ -1484,12 +1496,8 @@ private struct SteamProgramDetailsView: View {
                             } else {
                                 presentError(tr("Steam could not safely remove this game's files. Refresh the library and try again."))
                             }
-                        } label: {
-                            Label(tr("Uninstall"), systemImage: "trash")
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 12)
                         }
-                        .buttonStyle(.bordered)
+                      }
                     } else if AntiCheatPolicy.isBlocked(title: game.name, steamAppID: game.appID) {
                         AntiCheatBlockedButton()
                     } else {
@@ -1501,8 +1509,9 @@ private struct SteamProgramDetailsView: View {
                             steamLibrary.startInstall(appID: game.appID, prefixPath: prefixPath)
                         } label: {
                             Label(tr("Install"), systemImage: "arrow.down.circle.fill")
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 14)
+                                .font(.subheadline.weight(.semibold))
+                                .frame(maxWidth: 220)
+                                .padding(.vertical, 8)
                         }
                         .buttonStyle(.borderedProminent)
                         .disabled(prefixPath == nil || !game.installableOnWindows)
@@ -1945,7 +1954,8 @@ private struct StoreGameDetailsView<Extra: View>: View {
             .navigationBarTitleDisplayMode(.inline)
             // Settings are saved as they change (2.13.3): no Save or Done button.
             .onChange(of: profile) { _, changed in library.save(changed) }
-            .confirmationDialog(tr("Delete this game's files?"), isPresented: $confirmUninstall, titleVisibility: .visible) {
+            .alert(tr("Delete this game's files?"), isPresented: $confirmUninstall) {
+                Button(tr("Cancel"), role: .cancel) {}
                 Button(tr("Uninstall"), role: .destructive) {
                     if onUninstall?() == true {
                         library.removeProfile(for: profileID)
@@ -2002,6 +2012,7 @@ private struct StoreGameDetailsView<Extra: View>: View {
                 }
             }
         } else if installed {
+          HStack(spacing: 10) {
             // Starts the game; without JIT, StikDebug opens first.
             Button {
                 dismiss()
@@ -2009,7 +2020,7 @@ private struct StoreGameDetailsView<Extra: View>: View {
             } label: {
                 Label(tr("Launch"), systemImage: "play.fill")
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
+                    .padding(.vertical, 12)
             }
             .buttonStyle(.borderedProminent)
             if onUninstall != nil {
@@ -2020,6 +2031,7 @@ private struct StoreGameDetailsView<Extra: View>: View {
                 }
                 .buttonStyle(.bordered)
             }
+          }
         } else if AntiCheatPolicy.isBlocked(profileID: profileID, title: title) {
             AntiCheatBlockedButton()
         } else if canInstall {
@@ -2028,7 +2040,11 @@ private struct StoreGameDetailsView<Extra: View>: View {
                 Button(action: onInstall) {
                     Label(tr(paused ? "Resume" : "Install"),
                           systemImage: paused ? "play.circle.fill" : "arrow.down.circle.fill")
-                        .downloadControlLabel()
+                        .font(.subheadline.weight(.semibold))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                        .frame(maxWidth: 220)
+                        .frame(height: 36)
                 }
                 .buttonStyle(.borderedProminent)
                 if paused || errorText != nil {

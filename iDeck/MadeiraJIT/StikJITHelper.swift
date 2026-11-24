@@ -923,11 +923,30 @@ enum StikJITHelper {
         // Steer first-fit even when the early window/placeholder could not be
         // reserved. Plug every free prefix below a safe landing site, including
         // short prefixes adjoining it; a size-only filter misses those prefixes.
-        let candidates = freeRuns(vm_address_t(goodLow), 0x180000000, minSize: 0x4000).flatMap { run in
-            [false, true].compactMap { above -> vm_address_t? in
+        let safeRuns = freeRuns(vm_address_t(goodLow), 0x180000000, minSize: 0x4000).flatMap { run in
+            [false, true].map { above -> (base: vm_address_t, size: vm_address_t) in
                 let safe = ideck_jit_pool_run(UInt64(run.base), UInt64(run.size),
                                              UInt64(exeWinBase), UInt64(exeWinSize), above)
-                return safe.size >= UInt64(poolSize) ? vm_address_t(safe.base) : nil
+                return (vm_address_t(safe.base), vm_address_t(safe.size))
+            }
+        }
+        var candidates = safeRuns.filter { $0.size >= vm_address_t(poolSize) }.map(\.base)
+        // The hole census counts a hole's whole size, but a safe run inside it is
+        // smaller (Burnout Paradise Remastered: a 564MB hole for a 560MB pool, so no
+        // shrink, then no safe run of 560MB and no Wine). Shrink to the largest
+        // safe run instead of failing, as the census does for a hole too small.
+        if pairA == nil && candidates.isEmpty, let roomiest = safeRuns.max(by: { $0.size < $1.size }) {
+            let fit = Int(poolRunSize(available: roomiest.size, wanted: vm_address_t(poolSize), pageFit: pageFit))
+            if fit >= 256 << 20 {
+                LogStore.shared.log(String(format: "ml1036: no safe run holds a %luMB pool — SHRINKING to %luMB at 0x%lx",
+                                           poolSize >> 20, fit >> 20, Int(roomiest.base)), level: .error)
+                poolSize = fit
+                candidates = [roomiest.base]
+                if fit < 500 << 20 {
+                    smallPoolMB = fit >> 20
+                    LogStore.shared.log("⚠️ SMALL JIT POOL (\(fit >> 20)MB) on this launch: expect ~1 s freezes in heavy games. "
+                        + "Quit and relaunch the app for a smooth session.", level: .error)
+                }
             }
         }
         guard let target = pairA?.base ?? candidates.first else {

@@ -152,6 +152,8 @@ class SystemCoordinator: ObservableObject {
         UserDefaults.standard.set(launcher, forKey: "diagnostics.lastLauncher")
         AppLog.record("[game-session] launcher=\(launcher) game=\(safeTitle)")
         SessionOutcome.began()
+        LaunchReport.begin(title: safeTitle)
+        sessionTempCutoff = Date()
         // The game gets the memory: covers and other caches iDeck rebuilds on demand
         // are dropped before it starts.
         URLCache.shared.removeAllCachedResponses()
@@ -180,6 +182,12 @@ class SystemCoordinator: ObservableObject {
         let defaults = UserDefaults.standard
         defaults.removeObject(forKey: "diagnostics.sessionPeakMiB")
         defaults.set(false, forKey: "diagnostics.kernelPeak")
+        // MemoryGuard reads these after iDeck restarts: which game ran and the least
+        // memory iOS had left, sampled every 5 s so the last value is close to the end.
+        defaults.set(activeWindowsProfile?.id ?? activeSteamGameID.map { "steam:\($0)" } ?? "", forKey: MemoryGuard.sessionGameKey)
+        defaults.removeObject(forKey: MemoryGuard.lowestAvailableKey)
+        var lowestAvailable = Int.max
+        var tick = 0
         let log = { [weak self] (stage: String, reason: String?, gameID: String?) in
             let footprint = MainActor.assumeIsolated { ResourceGovernor.footprintMiB() }
             let kernelPeak = tracksInterval ? Int(IDSessionPeakMiB()) : -1
@@ -204,8 +212,26 @@ class SystemCoordinator: ObservableObject {
             }
         }
         log("start", nil, nil)
-        finishMemorySample = { reason, game in log("end", reason, game) }
-        let timer = Timer(timeInterval: 30, repeats: true) { _ in log("sample", nil, nil) }
+        finishMemorySample = { reason, game in
+            defaults.removeObject(forKey: MemoryGuard.sessionGameKey)
+            log("end", reason, game)
+        }
+        let timer = Timer(timeInterval: 5, repeats: true) { [weak self] _ in
+            let available = Int(os_proc_available_memory() >> 20)
+            if available < lowestAvailable {
+                lowestAvailable = available
+                defaults.set(available, forKey: MemoryGuard.lowestAvailableKey)
+            }
+            let footprint = MainActor.assumeIsolated { ResourceGovernor.footprintMiB() }
+            if footprint > peakMiB { peakMiB = footprint; defaults.set(footprint, forKey: "diagnostics.sessionPeakMiB") }
+            // The game id is known only once its profile is applied.
+            if let id = MainActor.assumeIsolated({ self?.activeWindowsProfile?.id ?? self?.activeSteamGameID.map { "steam:\($0)" } }),
+               defaults.string(forKey: MemoryGuard.sessionGameKey) != id {
+                defaults.set(id, forKey: MemoryGuard.sessionGameKey)
+            }
+            tick += 1
+            if tick % 6 == 0 { log("sample", nil, nil) }
+        }
         RunLoop.main.add(timer, forMode: .common)
         memorySampler = timer
     }
@@ -1476,6 +1502,8 @@ class SystemCoordinator: ObservableObject {
 
     /// When the current Windows session started (EA games closing by themselves).
     private var sessionStartedAt: Date?
+    /// When a Steam game was last started without Steam's client (SteamClientNeed).
+    private var directSteamStartedAt: Date?
 
     /// Why an EA app game closed by itself, from its part of the Wine log, or nil
     /// for a session that ran long enough to be a normal quit with nothing in the log.
@@ -1513,6 +1541,10 @@ class SystemCoordinator: ObservableObject {
         sessionStartedAt = Date()
         guard !isClosingWindowsSession else { return }
         guard !previousWineSessionStillFinishing() else { return }
+        if let id = profile?.id, let held = MemoryGuard.holdMessage(id) {
+            setWindowsStatus(held)
+            return
+        }
         isSteamSession = false
         let gameID = profile?.id ?? ""
         // The EA app's environment (EALibrary.prepareLaunch) belongs to EA games only.
@@ -1665,8 +1697,15 @@ class SystemCoordinator: ObservableObject {
     static let directSteamLaunchAppIDs: Set<UInt32> = [12200]
 
     func launchSteamGame(game: SteamAppInfo, profile: WindowsGameProfile, prefixPath: URL, skipSteamClient: Bool = false) {
-        let skipSteamClient = skipSteamClient || Self.directSteamLaunchAppIDs.contains(game.appID)
+        // A game that asked for Steam's client when started without it (SteamClientNeed)
+        // goes through Madeira Dock, even when it is on the direct list.
+        let needsClient = SteamClientNeed.needs(game.appID)
+        let skipSteamClient = !needsClient && (skipSteamClient || Self.directSteamLaunchAppIDs.contains(game.appID))
         guard !isClosingWindowsSession else { return }
+        if let held = MemoryGuard.holdMessage("steam:\(game.appID)") {
+            setWindowsStatus(held)
+            return
+        }
         isSteamSession = true
         recordGameContext(game.name, launcher: "Steam")
         var benchmarkSettings = BenchmarkSession.gameSettings(profile)
@@ -1789,6 +1828,7 @@ class SystemCoordinator: ObservableObject {
         dockLaunchAccepted = false
         steamDockLaunchStage = nil
         pendingSteamGameID = game.appID
+        directSteamStartedAt = Date()
         setWindowsStatus("Launching Steam game...")
         withPreparedMetalDisplay(expectedStatus: "Launching Steam game...") { [weak self] in
             guard let self, self.pendingSteamGameID == game.appID else { return }
@@ -2392,6 +2432,7 @@ class SystemCoordinator: ObservableObject {
             MainActor.assumeIsolated { MadeiraDock.cleanup() }
             if let failure = report.failure {
                 SteamLog.event("[wine-exit] Steam: \(failure)")
+                LaunchReport.finish(game: endedGame ?? "unknown", reason: "Steam: " + failure, ntstatus: nil, runtimeTrap: false)
                 finishMemorySampling(reason: "Steam: " + failure, game: endedGame)
                 if let endedGame { GameCompatibility.noteSessionEnd(endedGame, ntstatus: nil, reason: "Steam: " + failure) }
                 setWindowsStatus("Steam: " + failure)
@@ -2409,9 +2450,49 @@ class SystemCoordinator: ObservableObject {
             }
         }
         sessionStartedAt = nil
+        // A Steam game started without Steam's client that asked for it and closed
+        // (SteamAPI_RestartAppIfNecessary: steam://run/<app>, then exit code 0).
+        if let endedGame, endedGame.hasPrefix("steam:"), let started = directSteamStartedAt,
+           let appID = UInt32(endedGame.dropFirst("steam:".count)),
+           Date().timeIntervalSince(started) < SteamClientNeed.quickExitSeconds,
+           Self.sessionLogContains(SteamClientNeed.markers(appID: appID), logURL: Self.wineLogURL, since: wineLogStartOffset) {
+            SteamClientNeed.note(appID)
+            outcome.reason = "Execution Error: " + "The game needs Steam's Windows client. It asked for Steam and closed, so iDeck starts it through Steam from now on. Start it again."
+        }
+        directSteamStartedAt = nil
+        // A program that stopped on a missing DLL (0xC0000135), a DLL of the wrong
+        // architecture (0xC000007B) or a crash, when the check before it found a cause.
+        if let check = DependencyCheck.last, check.problems,
+           outcome.ntstatus == 0xC0000135 || outcome.ntstatus == 0xC000007B || outcome.reason.hasPrefix("Execution Error") {
+            outcome.reason += " DLL check before the start: " + check.summary + "."
+        }
+        DependencyCheck.last = nil
+        // Metal GPU faults (hang, timeout, ignored submissions): the heaviest GPU work
+        // iDeck adds goes for this game, and the next launch runs one frame in flight.
+        if let endedGame {
+            let faulted = Self.sessionLogContains(GPUFaultGuard.markers, logURL: Self.wineLogURL, since: wineLogStartOffset)
+            if GPUFaultGuard.note(endedGame, faulted: faulted) {
+                let lightened = MainActor.assumeIsolated { () -> Bool in
+                    let store = WindowsLibraryStore()
+                    guard var profile = store.profiles[endedGame], profile.metalFXEnabled || profile.frameGeneration else { return false }
+                    profile.metalFXEnabled = false
+                    profile.frameGeneration = false
+                    store.save(profile)
+                    return true
+                }
+                if lightened {
+                    outcome.reason += " " + "The GPU reported errors during this session: MetalFX and frame generation are now off for this game."
+                }
+                SteamLog.event("[gpu-fault] \(endedGame): GPU errors in the Wine log; lighter GPU settings from the next launch")
+            }
+        }
         let hostTrap = outcome.ntstatus == 0xC000001D
             && IllegalInstructionOrigin.isHost(logURL: Self.wineLogURL, since: wineLogStartOffset)
         let shaderFailure = Self.sessionLogShowsShaderFailure(logURL: Self.wineLogURL, since: wineLogStartOffset)
+        if let endedGame, Self.sessionLogContains(FullCodeChecksAuto.markers.map { $0.lowercased() },
+                                                  logURL: Self.wineLogURL, since: wineLogStartOffset) {
+            FullCodeChecksAuto.enable(endedGame)
+        }
         EALibrary.noteSessionEnded(activationUI: Self.sessionLogContains(["activationui.exe"], logURL: Self.wineLogURL,
                                                                         since: wineLogStartOffset))
         wineLogStartOffset = nil
@@ -2435,6 +2516,7 @@ class SystemCoordinator: ObservableObject {
             reason += " The game could not compile a shader with Wine's D3DX: Microsoft's D3DX 9 is installed for it at its next start."
         }
         SteamLog.event("[wine-exit] \(reason)")
+        LaunchReport.finish(game: endedGame ?? "unknown", reason: reason, ntstatus: ntstatus, runtimeTrap: hostTrap)
         finishMemorySampling(reason: reason, game: endedGame)
         if let endedGame { GameCompatibility.noteSessionEnd(endedGame, ntstatus: ntstatus, reason: reason) }
         Self.reclaimAfterSession()
@@ -2445,6 +2527,42 @@ class SystemCoordinator: ObservableObject {
     /// Frees what a finished session held and iDeck rebuilds on demand: the GOG
     /// Galaxy service, Madeira Dock's leftovers, cached responses and artwork, and
     /// the Metal caches the governor owns. Safe to call more than once.
+    /// When the session that is ending started: temporary files from before it are stale.
+    private var sessionTempCutoff = Date.distantPast
+
+    /// Windows' temporary folders (C:\\windows\\temp and each user's AppData\\Local\\Temp)
+    /// emptied of what earlier sessions left, once no Windows program runs. Files the
+    /// session that just ended wrote stay until the next cleanup, for an installer
+    /// that continues after a restart. In the background; logged as [session-temp].
+    static func cleanWindowsTemp(before cutoff: Date) {
+        guard cutoff > .distantPast else { return }
+        let drive = MadeiraDock.drive
+        DispatchQueue.global(qos: .utility).async {
+            guard !ideck_wineprocess_running() else { return }
+            let fm = FileManager.default
+            var folders = [drive.appendingPathComponent("windows/temp")]
+            let users = drive.appendingPathComponent("users")
+            for user in (try? fm.contentsOfDirectory(atPath: users.path)) ?? [] {
+                folders.append(users.appendingPathComponent(user).appendingPathComponent("AppData/Local/Temp"))
+                folders.append(users.appendingPathComponent(user).appendingPathComponent("Temp"))
+            }
+            var removed = 0, bytes: Int64 = 0
+            for folder in folders {
+                let resolved = folder.resolvingSymlinksInPath()
+                // Only real folders inside the prefix: a link elsewhere is never emptied.
+                guard resolved.path.hasPrefix(drive.resolvingSymlinksInPath().path + "/"),
+                      let entries = try? fm.contentsOfDirectory(at: resolved, includingPropertiesForKeys: [.contentModificationDateKey, .totalFileAllocatedSizeKey, .isSymbolicLinkKey]) else { continue }
+                for entry in entries {
+                    let values = try? entry.resourceValues(forKeys: [.contentModificationDateKey, .totalFileAllocatedSizeKey, .isSymbolicLinkKey])
+                    guard let modified = values?.contentModificationDate, modified < cutoff else { continue }
+                    let size = Int64(values?.totalFileAllocatedSize ?? 0)
+                    if (try? fm.removeItem(at: entry)) != nil { removed += 1; bytes += size }
+                }
+            }
+            if removed > 0 { AppLog.record("[session-temp] removed \(removed) item(s), \(bytes >> 20) MB, left in Windows' temporary folders by earlier sessions") }
+        }
+    }
+
     private func releaseSessionResources() {
         activeWindowsProfile = nil
         URLCache.shared.removeAllCachedResponses()
@@ -2455,6 +2573,7 @@ class SystemCoordinator: ObservableObject {
                 NotificationCenter.default.post(name: ResourceGovernor.releaseCachesNotification, object: nil)
             }
         }
+        Self.cleanWindowsTemp(before: sessionTempCutoff)
         AppLog.record("[session] resources released after the session "
                       + "(available \(Int(os_proc_available_memory() >> 20)) MiB)")
     }

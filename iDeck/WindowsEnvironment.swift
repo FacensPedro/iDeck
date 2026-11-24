@@ -415,6 +415,10 @@ class WindowsEnvironment {
         // The engine's own switch for the game's API preference goes last,
         // after the game's and the user's arguments.
         let engineSwitch = prepareGraphicsAPI(binary: binary)
+        // DLLs the program needs that Wine will not find, or built for another
+        // architecture: logged now, added to the reason if the session ends early.
+        DependencyCheck.last = nil
+        DependencyCheck.run(program: binary, prefix: MadeiraDock.prefix)
         let launchArguments = parsedArguments + engineSwitch.filter { !parsedArguments.contains($0) }
         let architectureTranslator = BoxTranslator()
         // As Madeira's launch: the JIT pool from StikJITHelper, exported, and the
@@ -785,7 +789,8 @@ class WindowsEnvironment {
         // (a game's own DXMT_MAX_FRAME_LATENCY, from its config, still wins). The
         // shader cache on disk is capped at 128 MB (its SQLite file is mapped).
         if getenv("DXMT_MAX_FRAME_LATENCY") == nil || Self.lowMemoryFrameLatency {
-            let low = Int(os_proc_available_memory() >> 20) < 3072
+            // Also after iOS stopped iDeck for memory while this game ran (MemoryGuard).
+            let low = Int(os_proc_available_memory() >> 20) < 3072 || MemoryGuard.lighten(profile.id) || GPUFaultGuard.faulted(profile.id)
             Self.lowMemoryFrameLatency = low
             if low { setenv("DXMT_MAX_FRAME_LATENCY", "1", 1) } else { unsetenv("DXMT_MAX_FRAME_LATENCY") }
             AppLog.record("[memory] DXMT frames in flight: \(low ? 1 : 2) (\(Int(os_proc_available_memory() >> 20)) MiB left)")
@@ -818,6 +823,13 @@ class WindowsEnvironment {
         }
         sessionUseRecommended = profile.useRecommended
         sessionCodeChecks = profile.codeChecks
+        // Full code checks after a session of this game ended in FEX's self-modifying
+        // code loop (FullCodeChecksAuto), unless the game's page chose a mode.
+        if sessionCodeChecks == "Automatic", FullCodeChecksAuto.isOn(profile.id) {
+            sessionCodeChecks = "Compatible"
+            SteamLog.event("[wine-launch] full code checks: a session of this game looped on self-modifying code")
+        }
+        UserDefaults.standard.set(profile.id, forKey: FullCodeChecksAuto.lastGameKey)
         sessionJITPoolMiB = profile.jitPoolMiB
         // Detailed logs without the tools that slow a game. MADEIRA_QUIET keeps the
         // PC sampler (it suspends the game thread ~500 times a second) and the
@@ -1091,6 +1103,53 @@ enum IllegalInstructionOrigin {
 
 /// Games that need AVX/AVX2 translation, found when one stops on an illegal
 /// instruction (0xC000001D); kept per game, by its profile ID.
+/// Games whose session ended in FEX's self-modifying-code loop: the game writes into
+/// a page FEX has translated code from, FEX handles the write, and the same write
+/// faults again until the fault is "redelivered" 2000 times and iDeck stops
+/// (Overcooked: Gourmet Edition, GOG, 32-bit Unity). FEX's full code checks
+/// (FEX_SMCCHECKS = full) do not protect pages, so the loop cannot start.
+enum FullCodeChecksAuto {
+    private static let key = "fullCodeChecksAutoGames"
+    static let lastGameKey = "diagnostics.lastProfileID"
+    /// What the Wine log says when the loop ended the session.
+    static let markers = ["unrecoverable host fault misdelivered to guest"]
+
+    static func isOn(_ game: String) -> Bool {
+        (UserDefaults.standard.stringArray(forKey: key) ?? []).contains(game)
+    }
+
+    /// True when it was off before.
+    @discardableResult
+    static func enable(_ game: String) -> Bool {
+        var games = UserDefaults.standard.stringArray(forKey: key) ?? []
+        guard !game.isEmpty, !games.contains(game) else { return false }
+        games.append(game)
+        UserDefaults.standard.set(games, forKey: key)
+        AppLog.record("[code-checks] \(game) looped on self-modifying code: full code checks on for it")
+        return true
+    }
+
+    /// Whether the newest `bytes` of a Wine log show the loop.
+    static func logShowsLoop(_ url: URL, bytes: UInt64 = 8 << 20) -> Bool {
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return false }
+        defer { try? handle.close() }
+        guard let size = try? handle.seekToEnd(),
+              (try? handle.seek(toOffset: size > bytes ? size - bytes : 0)) != nil,
+              let data = try? handle.readToEnd() else { return false }
+        return markers.contains { data.range(of: Data($0.utf8)) != nil }
+    }
+
+    /// At iDeck's start, when the last session ended with the app: the game that ran
+    /// gets full code checks if the Wine log shows the loop.
+    static func checkAfterAppRestart(sessionWasRunning: Bool) {
+        guard sessionWasRunning, let game = UserDefaults.standard.string(forKey: lastGameKey),
+              let log = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?
+                .appendingPathComponent("madeira-log.txt"),
+              logShowsLoop(log) else { return }
+        enable(game)
+    }
+}
+
 enum AVXAuto {
     private static let key = "avxAutoGames"
 

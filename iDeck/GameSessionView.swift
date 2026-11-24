@@ -12,12 +12,19 @@ private final class GameRuntimeMetrics: ObservableObject {
     @Published private(set) var fps = "N/D"
     @Published private(set) var cpu = "N/D"
     @Published private(set) var gpuMemory = "N/D"
+    /// iDeck's own footprint (Wine, the game and iDeck: one process), as iOS counts it.
+    @Published private(set) var ram = "N/D"
     /// Published until shortly after the first frame (the loading screen and its
     /// 20-second hint read it); afterwards it is kept without republishing.
     @Published private(set) var secondsSinceLaunch: TimeInterval = 0
     @Published private(set) var presentCounterAvailable = false
     @Published private(set) var receivedNewFrames = false
     @Published private(set) var firstFrameAt: TimeInterval?
+    /// Seconds without a new frame after the game had shown one; 0 while frames
+    /// arrive. Published only from 20 s on (a frozen game, not a loading screen).
+    @Published private(set) var stalledSeconds = 0
+    private var lastFrameChangeAt: TimeInterval?
+    private var stallLogged = false
 
     private var elapsed: TimeInterval = 0
     private let startedAt = ProcessInfo.processInfo.systemUptime
@@ -40,6 +47,8 @@ private final class GameRuntimeMetrics: ObservableObject {
     private static let presentCount: (() -> UInt64)? = mainCount == nil && surfaceCount == nil ? nil : {
         (mainCount?() ?? 0) &+ (surfaceCount?() ?? 0)
     }
+
+    static let stallSeconds = 20
 
     init() {
         // Capture the in-process present counter when the game session view
@@ -94,6 +103,19 @@ private final class GameRuntimeMetrics: ObservableObject {
                 let delta = count >= oldFrames ? count - oldFrames : 0
                 update(\.fps, String(format: "%.0f", Double(delta) / (uptime - oldTime)))
             }
+            if previousFrames != count { lastFrameChangeAt = elapsed }
+            if receivedNewFrames, let last = lastFrameChangeAt {
+                let stalled = Int(elapsed - last)
+                let shown = stalled >= Self.stallSeconds ? stalled : 0
+                if shown != stalledSeconds { stalledSeconds = shown }
+                if shown > 0 && !stallLogged {
+                    stallLogged = true
+                    AppLog.record("[hang] no new frame for \(Self.stallSeconds) s while the game runs")
+                } else if shown == 0 && stallLogged {
+                    stallLogged = false
+                    AppLog.record("[hang] frames arrive again after \(stalled) s")
+                }
+            }
             previousFrames = count
         } else {
             if presentCounterAvailable { presentCounterAvailable = false }
@@ -101,6 +123,9 @@ private final class GameRuntimeMetrics: ObservableObject {
         }
         if collectPerformance, let device = metalDevice {
             update(\.gpuMemory, "\(device.currentAllocatedSize / (1024 * 1024)) MB")
+        }
+        if collectPerformance {
+            update(\.ram, "\(MainActor.assumeIsolated { ResourceGovernor.footprintMiB() }) MB")
         }
         previousUptime = uptime
     }
@@ -123,7 +148,9 @@ struct GameSessionView: View {
     @State private var isCopyingWineLog = false
     @State private var showControlsSheet = false
     /// The close and settings buttons folded into a small tab, so they cover less of the game.
-    @AppStorage("gameButtonsMinimized") private var gameButtonsMinimized = true
+    /// 2.14.1: every game starts with the buttons minimized (it was remembered, so one
+    /// expand kept them expanded in every later game).
+    @State private var gameButtonsMinimized = true
     @AppStorage("touchMouseEnabled") private var touchMouseEnabled = true
     @State private var metalFXTurnedOff = false
 
@@ -269,6 +296,7 @@ struct GameSessionView: View {
                             .font(.system(size: 18))
                             .foregroundColor(.white.opacity(0.45))
                             .frame(width: 44, height: 44)
+                            .padding(.vertical, 8)   // the same place as when expanded
                     }
                     .accessibilityLabel(tr("Show the close and settings buttons"))
                   } else {
@@ -305,6 +333,12 @@ struct GameSessionView: View {
                     // shutdown progress VISIBLE even when the drawable is black.
                     // 2.13.3: no "Closing Wine and wineserver..." next to the settings
                     // button; the closing box under the strip shows it.
+                    if !coordinator.isClosingWindowsSession && coordinator.windowsStatus == "Running" && metrics.stalledSeconds > 0 {
+                        Text(tr("No new image for %d s: the game may be frozen. Wait, or close it with X.", metrics.stalledSeconds))
+                            .foregroundColor(.yellow)
+                            .font(.caption2.weight(.semibold))
+                            .lineLimit(2)
+                    }
                     if !coordinator.isClosingWindowsSession && !metrics.receivedNewFrames && metalFXTurnedOff {
                         Text(tr("The game showed no image with MetalFX, so MetalFX is now off for it. Close the game and open it again."))
                             .foregroundColor(.yellow)
@@ -325,21 +359,22 @@ struct GameSessionView: View {
                     if showGamePerformanceOverlay &&
                         coordinator.windowsStatus == "Running" &&
                         metrics.receivedNewFrames {
-                        VStack(alignment: .trailing, spacing: 3) {
+                        // Inside the black strip above the game, one aligned column.
+                        VStack(alignment: .leading, spacing: 1) {
                             Text("FPS: \(metrics.fps)  CPU: \(metrics.cpu)")
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.8)
                             if horizontalSizeClass != .compact {
-                                Text("GPU memory (Metal): \(metrics.gpuMemory)")
+                                Text("GPU memory: \(metrics.gpuMemory)  RAM: \(metrics.ram)")
                                 // iOS gives apps no GPU utilization counter; the frame
                                 // time is the honest per-frame load figure.
                                 Text("Frame time: \(Int(metrics.fps).map { $0 > 0 ? String(format: "%.1f ms", 1000.0 / Double($0)) : "N/D" } ?? "N/D")")
                             }
                         }
-                        .font(.system(size: 12, design: .monospaced))
+                        .lineLimit(1)
+                        .font(.system(size: 11, design: .monospaced))
                         .foregroundColor(.white)
-                        .padding(8)
-                        .background(.black.opacity(0.75), in: RoundedRectangle(cornerRadius: 8))
+                        .fixedSize()
+                        .frame(maxHeight: 44)
+                        .padding(.trailing, 8)
                     }
                 }
                 if let logCopyMessage {
@@ -469,6 +504,7 @@ struct GameSessionView: View {
                 SteamLog.event(coordinator.currentSteamLaunchUsesDock
                     ? "[steam-start] first Metal present after Steam LaunchApp (game-window identity not verified)"
                     : "[steam-start] first Metal frame detected after Wine startup")
+                LaunchReport.firstImage()
                 coordinator.setWindowsStatus("Running")
             }
             disableMetalFXIfNoFrames()

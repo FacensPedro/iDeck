@@ -43,6 +43,19 @@ class Wow64CallbackReturnTests(unittest.TestCase):
         # Before the unwind, which stays for every buffer that has a frame.
         self.assertLess(PATCH.index("if (wow64_callback || !buf->Frame)"), PATCH.index(" RtlUnwind( (void *)buf->Frame"))
 
+    def test_arm64_caller_gets_every_saved_register(self):
+        # 2.15.0: Duke Nukem 3D, Overcooked and Max Payne 2 crashed in wow64win.dll
+        # (null + 0xc) after a window callback: wow64.dll uses x28 right after its
+        # setjmp returns, and an AMD64 CONTEXT cannot carry x23, x24 or x28.
+        self.assertIn('+         "stp x23, x24, [x0, #0x60]', PATCH)
+        self.assertIn('+         "str x28,      [x0, #0x70]', PATCH)
+        self.assertIn("+static void __attribute__((naked,noreturn)) ios_arm64_longjmp", PATCH)
+        self.assertIn('+         "ldp x23, x24, [x0, #0x60]', PATCH)
+        self.assertIn('+         "ldr x28,      [x0, #0x70]', PATCH)
+        self.assertIn('+         "csinc w0, w1, wzr, ne', PATCH)
+        self.assertIn("if (wow64_callback && !RtlIsEcCode( (ULONG_PTR)buf->Rip )) ios_arm64_longjmp( buf, retval );", PATCH)
+        self.assertLess(PATCH.index("ios_arm64_longjmp( buf, retval );"), PATCH.index("if (wow64_callback || !buf->Frame)"))
+
     def test_only_adds_lines(self):
         removed = [l for l in PATCH.splitlines() if l.startswith("-") and not l.startswith("---")]
         self.assertEqual(removed, [])
