@@ -42,6 +42,14 @@ class Requests2162(unittest.TestCase):
         self.assertIn('response.message.contains("Timed out connecting")', coord)
         self.assertIn("Self.builtInVPNRetries < 3", coord)
 
+    def test_epic_safari_sign_in_connects_by_itself(self):
+        api = read("iDeck/EpicAPI.swift")
+        self.assertIn('"/account/api/oauth/deviceAuthorization"', api)
+        self.assertIn('"grant_type": "device_code"', api)
+        self.assertIn('"grant_type": "exchange_code"', api)
+        self.assertIn("func signInWithSafari(open:", read("iDeck/EpicLibrary.swift"))
+        self.assertIn("startSafariSignIn()", read("iDeck/EpicGames.swift"))
+
     def test_install_queue(self):
         self.assertIn("@Published private(set) var waitingApps: [UInt32] = []", read("iDeck/SteamManager.swift"))
         self.assertIn('steamLibrary.waitingApps.contains(game.appID) ? tr("Waiting")', read("iDeck/MainView.swift"))

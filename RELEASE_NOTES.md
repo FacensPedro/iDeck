@@ -18,6 +18,9 @@
 ### JIT
 - Built-in JIT: when the device cannot be reached because the loopback VPN is off, iDeck tries again by itself three times and shows "Connect to LocalDevVPN" instead of a connection timeout.
 
+### Epic Games
+- Sign-in happens in Safari and connects to iDeck by itself: sign in on Epic's page and iDeck finishes on its own, with no code to copy and paste.
+
 ### Downloads
 - With more than one game installing, the games after the first show "Waiting" until their turn (Steam, Epic Games, EA app).
 

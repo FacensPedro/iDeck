@@ -13,6 +13,8 @@ struct EpicSignInView: View {
     @State private var pasting = false
     @State private var pasted = ""
     @State private var opened = false
+    /// Epic's sign-in page for this attempt, to open Safari again.
+    @State private var loginURL: URL?
 
     var body: some View {
         NavigationStack {
@@ -23,12 +25,18 @@ struct EpicSignInView: View {
                         Button(tr("Sign out"), role: .destructive) { epic.signOut() }
                     }
                 } else {
-                    SafariPasteSignIn(store: "Epic Games", openURL: EpicAPI.loginURL,
-                                      steps: ["Sign in on Epic's page in Safari.",
-                                              "Epic then shows a short text with \"authorizationCode\": copy all of it.",
-                                              "Come back to iDeck and paste it here."],
-                                      placeholder: "authorizationCode", busy: busy) { submit($0) }
-                        .onAppear { if !opened { opened = true; UIApplication.shared.open(EpicAPI.loginURL) } }
+                    Form {
+                        Section {
+                            HStack(spacing: 12) {
+                                ProgressView()
+                                Text(tr("Sign in on Epic's page in Safari. iDeck connects by itself."))
+                            }
+                            Button(tr("Open Safari again"), systemImage: "safari") {
+                                if let url = loginURL { UIApplication.shared.open(url) } else { startSafariSignIn() }
+                            }
+                        }
+                    }
+                    .task { if !opened { opened = true; startSafariSignIn() } }
                 }
             }
             .navigationTitle(tr("Epic Games")).navigationBarTitleDisplayMode(.inline)
@@ -53,6 +61,21 @@ struct EpicSignInView: View {
             .alert(tr("Epic Games"), isPresented: Binding(get: { failure != nil }, set: { if !$0 { failure = nil } })) {
                 Button(tr("OK"), role: .cancel) { failure = nil }
             } message: { Text(failure ?? "") }
+        }
+    }
+
+    /// Opens Epic's page in Safari and waits there for the sign-in: no code to copy.
+    private func startSafariSignIn() {
+        Task {
+            do {
+                try await epic.signInWithSafari { url in
+                    loginURL = url
+                    UIApplication.shared.open(url)
+                }
+                dismiss()
+            } catch {
+                if !epic.signedIn { failure = error.localizedDescription; opened = false }
+            }
         }
     }
 
