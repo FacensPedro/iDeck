@@ -15,7 +15,7 @@
 - A DualSense or DualShock 4 connected by cable no longer takes the sound: it keeps playing on the iPhone or iPad.
 
 ### JIT
-- Built-in JIT: when the device cannot be reached because the loopback VPN is off, iDeck tries again by itself three times, then asks to turn on the VPN in LocalDevVPN or StosVPN instead of showing a connection timeout.
+- Built-in JIT: when the device cannot be reached because the loopback VPN is off, iDeck tries again by itself three times and shows "Connect to LocalDevVPN" instead of a connection timeout.
 
 ### Downloads
 - With more than one game installing, the games after the first show "Waiting" until their turn (Steam, Epic Games, EA app).

@@ -819,7 +819,7 @@ class SystemCoordinator: ObservableObject {
                             if Self.builtInVPNRetries < 3 {
                                 Self.builtInVPNRetries += 1
                                 AppLog.record("[jit-builtin] the loopback VPN did not answer; retry \(Self.builtInVPNRetries) of 3 in 3 s")
-                                self.setWindowsStatus(tr("Waiting for the VPN to enable JIT..."))
+                                self.setWindowsStatus(tr("Connect to LocalDevVPN"))
                                 self.builtInWait?.invalidate()
                                 self.builtInWait = nil
                                 self.jitRequestStartedAt = nil
@@ -827,7 +827,7 @@ class SystemCoordinator: ObservableObject {
                                 return
                             }
                             Self.builtInVPNRetries = 0
-                            self.builtInFailed(tr("Built-in JIT could not reach the device. Turn on the VPN in LocalDevVPN (or StosVPN) and try again."))
+                            self.builtInFailed(tr("Connect to LocalDevVPN"))
                             return
                         }
                         self.builtInFailed("Built-in JIT: " + response.message)
