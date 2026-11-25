@@ -483,7 +483,9 @@ class SystemCoordinator: ObservableObject {
     /// Benchmark milestones and the end of a game session, from its status.
     private func recordBenchmarkMilestone(_ status: String) {
         switch status {
-        case "Wine started; waiting for game...": BenchmarkSession.mark("wine_started")
+        case "Wine started; waiting for game...":
+            BenchmarkSession.mark("wine_started")
+            ControllerAudioGuard.shared.recheck()
         case "Running", "Steam Running": BenchmarkSession.mark("running")
         case "Windows Ready":
             DispatchQueue.main.async { MainActor.assumeIsolated { ResourceGovernor.closingSession = false } }

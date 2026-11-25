@@ -4,13 +4,30 @@ import UIKit
 /// Phase 1 benchmarks: records game and install sessions with the native
 /// recorder (BenchmarkRecorder.cpp via IDBenchmarkRecorder) and writes one
 /// JSON report per session to Documents/iDeck/Benchmarks, visible in Files.
-/// Off by default (Settings › Bugs & logs › Record benchmarks).
+/// Always on: the newest reports go into the bug report (Bugs & logs).
 /// `scripts/benchmark_report.py` aggregates and compares the reports.
 enum BenchmarkSession {
     static let enabledKey = "benchmarks.enabled"
     static let schema = 1
 
-    static var isEnabled: Bool { UserDefaults.standard.bool(forKey: enabledKey) }
+    /// Always on (2.16.2): the Benchmarks switch was removed and the newest reports are
+    /// part of the bug report.
+    static var isEnabled: Bool { true }
+
+    /// The newest reports, one summary line each, for the bug report.
+    static func summaryLines(limit: Int = 5) -> [String] {
+        reports().prefix(limit).compactMap { url in
+            guard let data = try? Data(contentsOf: url),
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
+            let keys = ["kind", "label", "outcome", "durationSeconds", "fpsAverage", "fpsP1", "frameTimeP99Ms",
+                        "cpuAverage", "memoryPeakMiB", "thermalWorst", "installMBps"]
+            let parts = keys.compactMap { key -> String? in
+                guard let value = json[key] ?? (json["summary"] as? [String: Any])?[key] else { return nil }
+                return "\(key)=\(value)"
+            }
+            return url.deletingPathExtension().lastPathComponent + (parts.isEmpty ? "" : ": " + parts.joined(separator: " "))
+        }
+    }
 
     static var folder: URL {
         FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]

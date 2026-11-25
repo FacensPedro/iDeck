@@ -227,38 +227,56 @@ final class BugReportModel: ObservableObject {
             .appendingPathComponent("madeira-log.txt", isDirectory: false)
     }
 
-    func scan() async {
+    /// Size and date of the logs at the last read: an unchanged set is not read again.
+    private var lastScanStamp: String?
+
+    private static func stamp(_ urls: [URL]) -> String {
+        urls.map { url in
+            let values = try? url.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey])
+            return "\(url.lastPathComponent):\(values?.fileSize ?? -1):\(values?.contentModificationDate?.timeIntervalSince1970 ?? 0)"
+        }.joined(separator: "|")
+    }
+
+    func scan(force: Bool = false) async {
         guard !isScanning else { return }
-        isScanning = true
-        defer { isScanning = false }
         let wineURL = Self.wineLogURL.flatMap { FileManager.default.fileExists(atPath: $0.path) ? $0 : nil }
         let appURLs = [AppLog.rotatedURL, AppLog.fileURL].compactMap { $0 }
             .filter { FileManager.default.fileExists(atPath: $0.path) }
         hasWineLog = wineURL != nil
         hasAppLog = !appURLs.isEmpty
+        let stamp = Self.stamp(appURLs + [wineURL].compactMap { $0 })
+        if !force, stamp == lastScanStamp { return }
+        isScanning = true
+        defer { isScanning = false }
         let steamSession = UserDefaults.standard.bool(forKey: "session.lastWasSteam")
         let eaSession = Self.lastLauncherIsEA
         let generation = scanGeneration
-        let result = await Task.detached(priority: .userInitiated) { () -> ([LogIssue], Int32, String, [String], [String], String?) in
-            var issues: [LogIssue] = []
+        // The reads run side by side: the app log, the Wine log's bugs, the native
+        // diagnosis and the traces each took their turn before (a 15 MB Wine log made
+        // the list wait several seconds).
+        async let appIssues = Task.detached(priority: .userInitiated) { () -> [LogIssue] in
             let appText = appURLs.compactMap { try? WineLogClipboard.read(from: $0).text }.joined(separator: "\n")
-            issues += LogIssueScanner.scan(appText, source: .app, steamSession: steamSession)
-            var diagnosis: Int32 = 0
-            var missing = MissingModuleScanner.summary(nil)
-            if let wineURL {
-                if let text = try? WineLogClipboard.read(from: wineURL).text {
-                    issues += LogIssueScanner.scan(text, source: .wine, steamSession: steamSession)
-                    missing = MissingModuleScanner.summary(text)
-                }
-                diagnosis = wineURL.path.withCString { ideck_wine_log_diagnose($0) }
+            return LogIssueScanner.scan(appText, source: .app, steamSession: steamSession)
+        }.value
+        async let wineIssues = Task.detached(priority: .userInitiated) { () -> ([LogIssue], String) in
+            guard let wineURL, let text = try? WineLogClipboard.read(from: wineURL).text else {
+                return ([], MissingModuleScanner.summary(nil))
             }
+            return (LogIssueScanner.scan(text, source: .wine, steamSession: steamSession), MissingModuleScanner.summary(text))
+        }.value
+        async let diagnosis = Task.detached(priority: .userInitiated) { () -> Int32 in
+            wineURL.map { url in url.path.withCString { ideck_wine_log_diagnose($0) } } ?? 0
+        }.value
+        async let traces = Task.detached(priority: .userInitiated) { () -> ([String], [String], String?) in
             let trace = eaSession ? (wineURL.map { EAActivationTrace.extract(from: $0) } ?? []) : []
             let programs = wineURL.map { SessionProgramsTrace.extract(from: $0) } ?? []
-            let location = wineURL.flatMap { CrashLocation.find(in: $0) }
-            return (issues.sorted { $0.severity > $1.severity }, diagnosis, missing, trace, programs, location)
+            return (trace, programs, wineURL.flatMap { CrashLocation.find(in: $0) })
         }.value
+        let (app, wine, code, extra) = await (appIssues, wineIssues, diagnosis, traces)
+        let result = ((app + wine.0).sorted { $0.severity > $1.severity }, code, wine.1, extra.0, extra.1, extra.2)
         // Clearing logs while a read is in flight must not restore stale bugs.
         guard generation == scanGeneration, !Task.isCancelled else { return }
+        lastScanStamp = stamp
         issues = Self.liveJITIssues() + result.0
         wineFinding = Self.finding(for: result.1)
         missingModules = result.2
@@ -396,11 +414,8 @@ final class BugReportModel: ObservableObject {
     /// Clears every log the bug list reads: iDeck's own log and the last
     /// Wine log. Live JIT state is checked again, not cleared.
     func clearLogs() {
-        guard !Self.downloadsOrTransfersActive else {
-            notice = "Pause or finish the download and transfer before clearing logs."
-            return
-        }
         scanGeneration += 1
+        lastScanStamp = nil
         AppLog.clear()
         if let wine = Self.wineLogURL {
             try? FileManager.default.removeItem(at: wine)
@@ -504,6 +519,11 @@ final class BugReportModel: ObservableObject {
         if let deps = UserDefaults.standard.string(forKey: DependencyCheck.reportKey) {
             lines.append("DLL check: " + deps)
         }
+        let benchmarks = BenchmarkSession.summaryLines()
+        if !benchmarks.isEmpty {
+            lines.append("Benchmarks (newest first):")
+            lines += benchmarks.map { "  " + $0 }
+        }
         var evidence: [String] = []
         if Self.lastLauncherIsEA, let facts = UserDefaults.standard.string(forKey: EALibrary.licenceFactsKey) {
             lines.append("EA licence: " + facts)
@@ -552,8 +572,6 @@ struct BugReportView: View {
     @State private var bugsOpen = false
     @State private var jitOpen = false
     @State private var showClearConfirmation = false
-    @AppStorage(BenchmarkSession.enabledKey) private var recordBenchmarks = false
-    @State private var benchmarkReports: [URL] = []
 
     var body: some View {
         ZStack {
@@ -606,20 +624,6 @@ struct BugReportView: View {
                     }
                     .buttonStyle(.plain)
                 }
-                Section {
-                    Toggle(tr("Record benchmarks"), isOn: $recordBenchmarks)
-                    ForEach(benchmarkReports.prefix(20), id: \.self) { url in
-                        ShareLink(item: url) {
-                            Label(url.deletingPathExtension().lastPathComponent, systemImage: "chart.bar.doc.horizontal")
-                                .font(.caption.monospaced())
-                        }
-                    }
-                } header: {
-                    Text(tr("Benchmarks"))
-                } footer: {
-                    Text(tr("Records each game session and each Steam or Epic install: FPS, frame times, CPU, memory, thermal state and install speed. Reports are saved in Files › iDeck › iDeck › Benchmarks."))
-                }
-                .onAppear { benchmarkReports = BenchmarkSession.reports() }
                 Section(tr("Logs")) {
                     Button { model.copyAll() } label: {
                         Label(tr("Copy all bugs"), systemImage: "doc.on.doc")
@@ -636,7 +640,8 @@ struct BugReportView: View {
                     Button(role: .destructive) { showClearConfirmation = true } label: {
                         Label(tr("Clear logs"), systemImage: "trash")
                     }
-                    .disabled((!model.hasAppLog && !model.hasWineLog) || BugReportModel.downloadsOrTransfersActive)
+                    // Always available: a log written after the last read, or one the
+                    // download guard held, left this button greyed out as if empty.
                 }
             }
             .scrollContentBackground(.hidden)
@@ -654,7 +659,7 @@ struct BugReportView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                Button { Task { await model.scan() } } label: { Image(systemName: "arrow.clockwise") }
+                Button { Task { await model.scan(force: true) } } label: { Image(systemName: "arrow.clockwise") }
                     .disabled(model.isScanning)
             }
         }
@@ -662,7 +667,7 @@ struct BugReportView: View {
             // New errors may be written by Wine after the screen opens.
             // Rescan only while Bugs & logs is visible; cancellation stops
             // polling when the user leaves this page.
-            await model.scan()
+            await model.scan(force: true)
             while !Task.isCancelled {
                 do { try await Task.sleep(nanoseconds: 5_000_000_000) }
                 catch { break }

@@ -14,7 +14,7 @@ def patterns():
 class MissingDllReportTests(unittest.TestCase):
     def test_report_line(self):
         self.assertIn('lines.append("Missing DLLs: " + missingModules)', VIEW)
-        self.assertIn("missing = MissingModuleScanner.summary(text)", VIEW)
+        self.assertIn("MissingModuleScanner.summary(text)", VIEW)
 
     def match(self, line):
         for pattern in patterns():

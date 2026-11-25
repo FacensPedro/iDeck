@@ -864,10 +864,12 @@ class WindowsEnvironment {
             : profile.controllerAPI
         // By controller: a PlayStation pad (DualSense, DualShock 4) is given to the game
         // as a DualSense over HID (touchpad, motion, light, adaptive triggers); an Xbox
-        // One/Series, Xbox 360-style or any other pad as an Xbox controller (XInput).
+        // 360/One/Series pad as an Xbox controller (XInput); Joy-Con and Pro Controllers
+        // (Switch 1 and 2) through XInput too, the API Windows games read for them.
         if controllerMode == "By controller" {
             controllerMode = InputManager.shared.connectedKind.isPlayStation ? "HID" : "XInput"
         }
+        if controllerMode == "Nintendo Switch" { controllerMode = "XInput" }
         switch controllerMode {
         case "HID": setenv("MADEIRA_PAD_MODE", "hid", 1)
         case "DualSense HID": setenv("MADEIRA_PAD_MODE", "dualsense", 1)

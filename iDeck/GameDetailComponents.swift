@@ -83,11 +83,13 @@ struct DetailPickerRow: View {
     var showsDivider = true
     var icon: String? = nil
     var iconColor: Color = .gray
+    /// The shown name of a choice; tr(choice) when nil.
+    var label: ((String) -> String)? = nil
 
     var body: some View {
         DetailRow(title: title, showsDivider: showsDivider, icon: icon, iconColor: iconColor) {
             Picker(title, selection: $selection) {
-                ForEach(choices, id: \.self) { Text(tr($0)).tag($0) }
+                ForEach(choices, id: \.self) { Text(label?($0) ?? tr($0)).tag($0) }
             }
             .pickerStyle(.menu)
             .tint(.gray)
@@ -286,19 +288,29 @@ struct GameLanguageCard: View {
     let available: [String]?
     var audio: Set<String> = []
     var subtitles: Set<String> = []
+    /// Called after a new choice is saved, so the store can fetch that language's files.
+    var onChosen: ((String?) -> Void)? = nil
     @State private var selection = "automatic"
 
-    /// Portuguese (Brazil), Spanish and English only, those the game has when the store says.
+    /// Portuguese (Brazil), Spanish and English only, and only those the game has: a
+    /// language the store does not list is not offered (Fallout: New Vegas has no
+    /// Portuguese). With no list from the store, only English.
     private var tags: [String] {
         let offered = GameLanguage.supported
-        guard let available else { return offered }
+        guard let available, !available.isEmpty else { return ["en-US"] }
         let listed = Set(available.map { $0.lowercased() })
-        let kept = offered.filter { tag in
+        return offered.filter { tag in
             let lower = tag.lowercased()
             return listed.contains(lower) || listed.contains(String(lower.prefix(2)))
                 || listed.contains { $0.hasPrefix(String(lower.prefix(2)) + "-") }
         }
-        return kept.isEmpty ? offered : kept
+    }
+
+    /// The saved choice when it is still offered, else Automatic: a tag the menu does not
+    /// list left the menu with no title.
+    private func savedSelection() -> String {
+        guard let saved = GameLanguage.choice(profileID) else { return "automatic" }
+        return tags.first { $0.lowercased() == saved.lowercased() } ?? "automatic"
     }
 
     private func label(_ tag: String) -> String {
@@ -327,11 +339,12 @@ struct GameLanguageCard: View {
                 .labelsHidden()
             }
         }
-        .onAppear { selection = GameLanguage.choice(profileID) ?? "automatic" }
+        .task(id: profileID + "|" + tags.joined(separator: ",")) { selection = savedSelection() }
         .onChange(of: selection) { _, chosen in
             let tag = chosen == "automatic" ? nil : chosen
             guard tag != GameLanguage.choice(profileID) else { return }
             GameLanguage.choose(profileID, tag)
+            onChosen?(tag)
         }
     }
 }

@@ -293,13 +293,16 @@ struct SettingsView: View {
     private var ubisoftPage: some View {
         Form {
             Section {
+                if !ubisoftAccountName.isEmpty, ubisoftSessionExpired {
+                    Label(tr("Session expired. Sign in again to continue."), systemImage: "exclamationmark.triangle.fill")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.orange)
+                }
                 LabeledContent(tr("Account"), value: ubisoftAccountName.isEmpty ? tr("Not connected") : ubisoftAccountName)
                 if ubisoftAccountName.isEmpty {
                     Button(tr("Sign in")) { ubisoftLoginPresented = true }
                 } else {
                     if ubisoftSessionExpired {
-                        Text(tr("Ubisoft did not renew the session. Sign in again to load your games; the account stays saved until you sign out."))
-                            .font(.footnote).foregroundStyle(.secondary)
                         Button(tr("Sign in again")) { ubisoftLoginPresented = true }
                     }
                     Button(tr("Sign out"), role: .destructive) {
@@ -461,9 +464,9 @@ struct SettingsView: View {
         Form {
             settingsSection(title: tr("Controller")) {
                 Picker(tr("Windows controller API"), selection: $wineControllerAPI) {
-                    ForEach(["By controller", "XInput", "XInput + DirectInput", "HID", "DualSense HID", "Generic HID"], id: \.self) { api in
+                    ForEach(["By controller"] + ControllerAPI.choices, id: \.self) { api in
                         // "By controller" (the stored value) picks the API from the pad itself.
-                        Text(api == "By controller" ? tr("Automatic") : tr(api)).tag(api)
+                        Text(ControllerAPI.label(api)).tag(api)
                     }
                 }
                 LabeledContent(tr("Connected controller")) {
