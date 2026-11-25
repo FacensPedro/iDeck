@@ -13,6 +13,8 @@
 - The controller API list names each family: Xbox (XInput) for Xbox 360, One and Series; PlayStation (HID) for DualSense and DualShock 4; Nintendo Switch 1 and 2 for Joy-Con and Pro Controllers; and a generic HID controller.
 - Joy-Con 2 and the Switch 2 Pro Controller are recognised.
 - A DualSense or DualShock 4 connected by cable no longer takes the sound: it keeps playing on the iPhone or iPad.
+
+### JIT
 - Built-in JIT: when the device cannot be reached because the loopback VPN is off, iDeck tries again by itself three times, then asks to turn on the VPN in LocalDevVPN or StosVPN instead of showing a connection timeout.
 
 ### Downloads
