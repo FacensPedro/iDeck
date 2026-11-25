@@ -603,6 +603,9 @@ class WindowsEnvironment {
             lines += recommendation.config.split(separator: "\n").map(String.init)
                 .filter { !$0.hasPrefix("#") && !$0.trimmingCharacters(in: .whitespaces).isEmpty }
             SteamLog.event("[wine-launch] recommended settings: \(recommendation.id) v\(recommendation.version)")
+            Self.setD3D9OlderNvidia(recommendation.olderNvidia == true)
+        } else {
+            Self.setD3D9OlderNvidia(false)
         }
         let runtime = Self.hasGLVulkanRuntime
         switch sessionVulkanMode {
@@ -957,6 +960,26 @@ class WindowsEnvironment {
             options.append(String(format: "d3d11.metalSpatialUpscaleFactor = %.2f", factor))
         }
         setenv("DXMT_CONFIG", options.joined(separator: ";"), 1)
+    }
+
+    /// The d3d9 options of "Older NVIDIA card (Direct3D 9)" (Madeira's D3D9Identity):
+    /// a GeForce 7900 GS and its driver, for games that check the card. Removed again
+    /// for a game that does not ask for it, since DXMT_CONFIG outlives the session.
+    /// Written without spaces: DXMT reads at most 259 characters of DXMT_CONFIG.
+    static let olderNvidiaD3D9: [String] = [
+        "d3d9.customVendorId=10de", "d3d9.customDeviceId=0292",
+        "d3d9.customDeviceDesc=\"NVIDIA GeForce 7900 GS\"", "d3d9.customDriver=nv4_disp.dll",
+    ]
+
+    static func setD3D9OlderNvidia(_ on: Bool) {
+        let keys: Set<String> = ["d3d9.customVendorId", "d3d9.customDeviceId", "d3d9.customDeviceDesc", "d3d9.customDriver"]
+        let existing = getenv("DXMT_CONFIG").map { String(cString: $0) } ?? ""
+        var options = existing.split(separator: ";").map(String.init).filter {
+            !keys.contains($0.split(separator: "=", maxSplits: 1).first?.trimmingCharacters(in: .whitespaces) ?? "")
+        }
+        if on { options += olderNvidiaD3D9 }
+        setenv("DXMT_CONFIG", options.joined(separator: ";"), 1)
+        if on { SteamLog.event("[wine-launch] d3d9 card: NVIDIA GeForce 7900 GS (10DE:0292)") }
     }
 
     /// DXMT's present mode on iOS (madeira_set_vsync_locked): 1 = 60, 3 = 30,

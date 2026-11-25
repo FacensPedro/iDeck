@@ -9,7 +9,7 @@ class BlackFlagWined3d(unittest.TestCase):
     def test_matched(self):
         self.assertIn("blackFlagAppID = 242050", RECS)
         self.assertIn('case "ac4bfsp.exe":', RECS)
-        self.assertIn("blackFlag, crashBandicootNSane, standard]", RECS)
+        self.assertIn("blackFlag, crashBandicootNSane, bioshock, standard]", RECS)
 
 if __name__ == "__main__":
     unittest.main()
