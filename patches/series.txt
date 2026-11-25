@@ -15,6 +15,7 @@ early     .      madeira-small-map-va-limit.patch
 early     .      madeira-thread-name-exception.patch
 early     .      madeira-fixed-exe-without-relocs.patch
 early     .      madeira-reply-alias-unmapped.patch
+early     .      madeira-d3d12-embedded-root-signature.patch
 
 # The Wine submodule
 wine      wine   wine-arm64ec-null-thread-context.patch
