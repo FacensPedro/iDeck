@@ -811,13 +811,38 @@ class SystemCoordinator: ObservableObject {
                 switch result {
                 case .success(let response):
                     AppLog.record("[jit-builtin] finished: \(response.message)")
-                    if !response.success { self.builtInFailed("Built-in JIT: " + response.message) }
+                    if !response.success {
+                        // "Timed out connecting to <ip>:49152": the device's own lockdown
+                        // port is reached through the loopback VPN, so that VPN is off.
+                        // Try again a few times (it may be coming up), then say so plainly.
+                        if response.message.contains("Timed out connecting") {
+                            if Self.builtInVPNRetries < 3 {
+                                Self.builtInVPNRetries += 1
+                                AppLog.record("[jit-builtin] the loopback VPN did not answer; retry \(Self.builtInVPNRetries) of 3 in 3 s")
+                                self.setWindowsStatus(tr("Waiting for the VPN to enable JIT..."))
+                                self.builtInWait?.invalidate()
+                                self.builtInWait = nil
+                                self.jitRequestStartedAt = nil
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 3) { self.requestStikDebugJIT() }
+                                return
+                            }
+                            Self.builtInVPNRetries = 0
+                            self.builtInFailed(tr("Built-in JIT could not reach the device. Turn on the VPN in LocalDevVPN (or StosVPN) and try again."))
+                            return
+                        }
+                        self.builtInFailed("Built-in JIT: " + response.message)
+                    } else {
+                        Self.builtInVPNRetries = 0
+                    }
                 case .failure(let error):
                     self.builtInFailed("Built-in JIT: " + error.localizedDescription)
                 }
             }
         }
     }
+
+    /// Retries of a built-in request whose loopback VPN did not answer.
+    private static var builtInVPNRetries = 0
 
     /// Whether this iDeck process already asked the built-in helper by itself.
     private static var builtInAutoRequested = false

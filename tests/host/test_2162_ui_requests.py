@@ -37,6 +37,11 @@ class Requests2162(unittest.TestCase):
         self.assertIn("if !force, stamp == lastScanStamp { return }", view)
         self.assertNotIn("Pause or finish the download and transfer before clearing logs.", view)
 
+    def test_builtin_jit_vpn_retry(self):
+        coord = read("iDeck/SystemCoordinator.swift")
+        self.assertIn('response.message.contains("Timed out connecting")', coord)
+        self.assertIn("Self.builtInVPNRetries < 3", coord)
+
     def test_install_queue(self):
         self.assertIn("@Published private(set) var waitingApps: [UInt32] = []", read("iDeck/SteamManager.swift"))
         self.assertIn('steamLibrary.waitingApps.contains(game.appID) ? tr("Waiting")', read("iDeck/MainView.swift"))

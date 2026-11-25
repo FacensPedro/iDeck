@@ -454,6 +454,8 @@ enum Translations {
         "GOG did not accept the sign-in. Try again.": ["pt": "A GOG não aceitou o login. Tente novamente.", "es": "GOG no aceptó el inicio de sesión. Inténtalo de nuevo."],
         "GOG games: %d": ["pt": "Jogos da GOG: %d", "es": "Juegos de GOG: %d"],
         "Session expired. Sign in again to continue.": ["pt": "Sessão expirada. Entre novamente para continuar.", "es": "Sesión caducada. Inicia sesión de nuevo para continuar."],
+        "Waiting for the VPN to enable JIT...": ["pt": "Aguardando a VPN para ativar o JIT...", "es": "Esperando la VPN para activar el JIT..."],
+        "Built-in JIT could not reach the device. Turn on the VPN in LocalDevVPN (or StosVPN) and try again.": ["pt": "O JIT integrado não conseguiu se conectar ao aparelho. Ative a VPN no LocalDevVPN (ou StosVPN) e tente de novo.", "es": "El JIT integrado no pudo conectar con el dispositivo. Activa la VPN en LocalDevVPN (o StosVPN) e inténtalo de nuevo."],
         "Waiting": ["pt": "Aguardando", "es": "En espera"],
         "Automatic (by controller)": ["pt": "Automático (pelo controle)", "es": "Automático (según el mando)"],
         "Xbox (XInput): 360, One, Series": ["pt": "Xbox (XInput): 360, One, Series", "es": "Xbox (XInput): 360, One, Series"],
