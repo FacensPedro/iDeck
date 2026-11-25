@@ -3,6 +3,7 @@
 - Fixed Assassin's Creed IV Black Flag and the Epic Games Fallout: New Vegas closing while they create their first window. After the game answered a window message, the address of that message's data was lost, the read faulted and the error handling ran until the stack ran out. The address is now kept safely across the call.
 - Fixed BioShock, BioShock 2 and their Remastered editions (Steam and GOG) saying the video card does not meet the minimum requirements. These games now see an NVIDIA card they know.
 - Ghostwire Tokyo (and other Direct3D 12 games whose shaders carry their own root signature): compute shaders that the game creates without a separate root signature now use the one inside the shader. Before, they were skipped and the game stopped drawing after its first image.
+- Fixed Bully: Scholarship Edition stopping on "Steam Error: Application load error P:0000065434". The game was started without Steam, and its current version needs Steam to start it; it now starts through Steam like other games.
 
 ### Game language
 - The language no longer appears blank until one is chosen again.
