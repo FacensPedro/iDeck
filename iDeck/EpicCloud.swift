@@ -341,10 +341,6 @@ struct EpicCloudSection: View {
                 }
             } header: {
                 Text(tr("Epic Cloud saves"))
-            } footer: {
-                Text(tr(setting.autoUpload
-                     ? "Sync runs when iDeck starts and when this page opens. Replaced files are kept in Files › iDeck › Epic Cloud Backups. Sync now uploads newer device saves; automatic upload is also on. If both sides changed, choose which saves to keep."
-                     : "Sync runs when iDeck starts and when this page opens. Replaced files are kept in Files › iDeck › Epic Cloud Backups. Sync now uploads newer device saves. If both sides changed, choose which saves to keep."))
             }
             .task { await cloud.check(appName, automatic: true) }
         }

@@ -516,7 +516,7 @@ struct EpicInstalledDLC: Codable, Sendable {
 
     /// Deletes the game's files and its library entry (its per-game settings).
     func uninstall(_ app: String) {
-        guard let record = installed[app], !inSession, !EpicCloud.shared.isBusy else { return }
+        guard let record = installed[app], !inSession else { return }
         pause(app); downloads[app] = nil
         installed[app] = nil
         writeInstalled()

@@ -27,7 +27,8 @@
 - Clear logs always works.
 
 ### Interface
-- Removed the descriptions under Compatibility and Steam Cloud saves.
+- Removed the descriptions under Compatibility, Steam Cloud saves and Epic Cloud saves.
+- Epic Games: the Uninstall button shows again on installed games (a save check running in the background hid it).
 - Ubisoft Connect: an expired session shows a short notice above the account.
 
 ### Stability

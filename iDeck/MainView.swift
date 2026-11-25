@@ -2302,7 +2302,14 @@ private struct EpicGameDetailsSheet: View {
             onInstall: { epic.install(appName) },
             onPause: { epic.pause(appName) },
             onStop: { epic.cancel(appName) },
-            onUninstall: (epic.sessionRunning || EpicCloud.shared.isBusy) ? nil : { epic.uninstall(appName); return epic.installed[appName] == nil },
+            // Always shown: a save check running in the background (it starts when this page
+            // opens) hid the button. While a game runs or a sync writes saves, the removal
+            // waits for it instead.
+            onUninstall: {
+                guard !epic.sessionRunning else { return false }
+                epic.uninstall(appName)
+                return epic.installed[appName] == nil
+            },
             library: library, coordinator: coordinator
         ) {
             if installed != nil {
