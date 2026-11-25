@@ -1,0 +1,26 @@
+diff --git a/build/ntdll-unix/server_ios.c b/build/ntdll-unix/server_ios.c
+index c1a2038..abea3fc 100644
+--- a/build/ntdll-unix/server_ios.c
++++ b/build/ntdll-unix/server_ios.c
+@@ -702,7 +702,10 @@ static BOOL ios_read_reply_paged( uintptr_t dst, size_t size, BOOL *fault )
+ 
+         if (n > size) n = size;
+         if (!read_reply_data( bounce, n )) return FALSE;
+-        if ((rw = ios_reply_rw_alias( dst )))
++        /* iDeck: the alias can point at pool space that is not mapped in this process (a pool
++         * that was shrunk or kept one region of a failed split): writing it killed iDeck while a
++         * new 32-bit process loaded its ntdll (Tor Browser). Use it only when it is writable. */
++        if ((rw = ios_reply_rw_alias( dst )) && ios_reply_host_writable( rw, n ))
+         {
+             memcpy( (void *)rw, bounce, n );
+             ios_jit_anon_alias_note_write( dst );
+@@ -725,7 +728,8 @@ static BOOL ios_read_reply_guest( void *buffer, size_t size, int req, BOOL *faul
+ 
+     for (page = dst & ~(uintptr_t)(IOS_REPLY_PAGE - 1); page < end; page += IOS_REPLY_PAGE)
+     {
+-        if (!ios_reply_rw_alias( page )) continue;
++        uintptr_t alias = ios_reply_rw_alias( page );
++        if (!alias || !ios_reply_host_writable( alias, IOS_REPLY_PAGE )) continue;
+         if (__sync_fetch_and_add( &alias_logs, 1 ) < 8)
+             dprintf( 2, "[reply-alias] tid=%04x req=%d dst=%p size=%#lx: reply data stored through the RW alias "
+                      "of anonymous RWX memory\n", (unsigned int)GetCurrentThreadId(), req, buffer,
