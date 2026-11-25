@@ -18,6 +18,7 @@ early     .      madeira-fixed-exe-without-relocs.patch
 # The Wine submodule
 wine      wine   wine-arm64ec-null-thread-context.patch
 wine      wine   wine-wow64win-atoms.patch
+wine      wine   wine-wow64win-winproc-callback-args.patch
 wine      wine   wine-ios-machine-identity.patch
 wine      wine   wine-ios-fault-address.patch
 wine      wine   wine-wow64-callback-return-no-unwind.patch

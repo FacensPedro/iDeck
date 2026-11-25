@@ -1,0 +1,36 @@
+diff --git a/dlls/wow64win/user.c b/dlls/wow64win/user.c
+index f9d19b0249..a4d708a82b 100644
+--- a/dlls/wow64win/user.c
++++ b/dlls/wow64win/user.c
+@@ -954,6 +954,7 @@ static NTSTATUS WINAPI wow64_NtUserCallWinProc( void *arg, ULONG size )
+ {
+     struct win_proc_params *params = arg;
+     struct win_proc_params32 *params32 = arg;
++    void * volatile saved_arg;
+     size_t lparam_size = 0, offset32 = sizeof(*params32);
+     LRESULT result = 0;
+     void *ret_ptr;
+@@ -971,13 +972,21 @@ static NTSTATUS WINAPI wow64_NtUserCallWinProc( void *arg, ULONG size )
+                                              size - offset64 );
+     }
+ 
++    /* iDeck: the callback comes back through a longjmp from FEX's guest frames, and
++     * on iOS the registers the compiler kept arg in did not always survive it
++     * (Assassin's Creed IV, WM_GETMINMAXINFO in its first CreateWindowEx: params32
++     * read back as NULL, then the fault's unwind overflowed the stack). The frame's
++     * memory does survive (ret_ptr and ret_len are right), so keep the pointer there
++     * and read it back after the call. */
++    saved_arg = arg;
+     status = Wow64KiUserCallbackDispatcher( NtUserCallWinProc, params32,
+                                             offset32 + lparam_size,
+                                             &ret_ptr, &ret_len );
++    params32 = saved_arg;
+ 
+-    if (ret_len >= sizeof(LONG))
++    if (!status && ret_ptr && ret_len >= sizeof(LONG))
+     {
+-        LRESULT *result_ptr = arg;
++        LRESULT *result_ptr = saved_arg;
+         result = *(LONG *)ret_ptr;
+         ret_len = packed_result_32to64( params32->msg, params32->wparam, (LONG *)ret_ptr + 1,
+                                         ret_len - sizeof(LONG), result_ptr + 1 );
