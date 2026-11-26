@@ -17,7 +17,7 @@ case "$ARCH" in
 esac
 CC="${3:-$TRIPLE-clang}"
 mkdir -p "$OUT"
-FLAGS=(-shared -nostdlib -O2 "-Wl,--entry=$ENTRY" -Wl,--subsystem,windows "${EXTRA[@]}")
+FLAGS=(-shared -nostdlib -O2 "-Wl,--entry=$ENTRY" -Wl,--subsystem,windows ${EXTRA[@]+"${EXTRA[@]}"})
 if [[ "$CC" != "$TRIPLE"-* ]]; then FLAGS+=("--target=${TRIPLE%-mingw32}-windows-gnu" -fuse-ld=lld); fi
 build() { "$CC" "${FLAGS[@]}" -o "$OUT/$1.dll" "$ROOT/build/compat-dlls/entry.c" "$SRC/$2.c"; }
 build d3d11on12 d3d11on12
