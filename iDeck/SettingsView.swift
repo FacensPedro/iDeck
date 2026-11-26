@@ -15,6 +15,7 @@ struct SettingsView: View {
     @AppStorage("controllerDeadzone") private var controllerDeadzone = 0.10
     @AppStorage("wineControllerAPI") private var wineControllerAPI = "By controller"
     @AppStorage(VirtualSwap.enabledKey) private var virtualSwap = true
+    @State private var autoDLLNotice: String?
     @AppStorage("wineJITPoolMiB") private var wineJITPoolMiB = 560
     @AppStorage(BackgroundDownloads.continuedKey) private var continueDownloadsInBackground = true
     @AppStorage(BackgroundDownloads.notificationsKey) private var downloadNotifications = true
@@ -558,6 +559,12 @@ struct SettingsView: View {
     private var runtimePage: some View {
         Form {
             settingsSection(title: tr("Windows runtime")) {
+                Button(tr("Undo automatic DLLs")) {
+                    let removed = AutoDLLManager.rollbackAll()
+                    autoDLLNotice = tr("%d DLL(s) removed.", removed)
+                }
+                .disabled(AutoDLLManager.ledger().isEmpty)
+                if let autoDLLNotice { Text(autoDLLNotice).font(.footnote).foregroundStyle(.secondary) }
                 let runtime = MadeiraBundleIdentity.profile
                 LabeledContent(tr("IPA runtime")) {
                     Text(tr(MadeiraBundleIdentity.isNative ? "Madeira-native" : "Interface-only"))

@@ -2514,6 +2514,16 @@ class SystemCoordinator: ObservableObject {
             outcome.reason += " DLL check before the start: " + check.summary + "."
         }
         DependencyCheck.last = nil
+        // iDeck Auto DLL Manager: a DLL the start failed on (c0000135) that an official
+        // component ships is downloaded now and put in place at the next start.
+        if outcome.ntstatus == 0xC0000135 || outcome.reason.hasPrefix("Execution Error"),
+           let program = AutoDLLManager.lastProgram {
+            let dlls = AutoDLLManager.missingInLog(Self.wineLogURL, since: wineLogStartOffset)
+            if !dlls.isEmpty {
+                AutoDLLManager.notePending(dlls, program: program)
+                outcome.reason += " " + "iDeck is getting the missing DLLs (" + dlls.joined(separator: ", ") + ") from Microsoft: start the game again."
+            }
+        }
         // Metal GPU faults (hang, timeout, ignored submissions): the heaviest GPU work
         // iDeck adds goes for this game, and the next launch runs one frame in flight.
         if let endedGame {

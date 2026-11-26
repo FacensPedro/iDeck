@@ -418,7 +418,10 @@ class WindowsEnvironment {
         // DLLs the program needs that Wine will not find, or built for another
         // architecture: logged now, added to the reason if the session ends early.
         DependencyCheck.last = nil
-        DependencyCheck.run(program: binary, prefix: MadeiraDock.prefix)
+        if let check = DependencyCheck.run(program: binary, prefix: MadeiraDock.prefix) {
+            // iDeck Auto DLL Manager: missing DLLs from their official source, cached.
+            AutoDLLManager.resolve(check, program: binary, prefix: MadeiraDock.prefix)
+        }
         let launchArguments = parsedArguments + engineSwitch.filter { !parsedArguments.contains($0) }
         let architectureTranslator = BoxTranslator()
         // As Madeira's launch: the JIT pool from StikJITHelper, exported, and the
