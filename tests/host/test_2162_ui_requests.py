@@ -50,6 +50,13 @@ class Requests2162(unittest.TestCase):
         self.assertIn("func signInWithSafari(open:", read("iDeck/EpicLibrary.swift"))
         self.assertIn("startSafariSignIn()", read("iDeck/EpicGames.swift"))
 
+    def test_shared_runtime_settings(self):
+        rec = read("iDeck/GameRecommendations.swift")
+        for line in ("swap-mb = 2048", "swap-images = 1", "env.MADEIRA_X64_IMAGE_NOCOPY = 1",
+                     "env.MADEIRA_FREE_DELAY_MS = 2000", "env.MADEIRA_SPAWN_BLOCK = CrashReportClient"):
+            self.assertIn(line, rec)
+        self.assertIn('id: "standard", title: "games without a list of their own", version: 4', rec)
+
     def test_install_queue(self):
         self.assertIn("@Published private(set) var waitingApps: [UInt32] = []", read("iDeck/SteamManager.swift"))
         self.assertIn('steamLibrary.waitingApps.contains(game.appID) ? tr("Waiting")', read("iDeck/MainView.swift"))

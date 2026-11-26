@@ -5,6 +5,11 @@
 - Ghostwire Tokyo (and other Direct3D 12 games whose shaders carry their own root signature): compute shaders that the game creates without a separate root signature now use the one inside the shader. Before, they were skipped and the game stopped drawing after its first image.
 - Fixed Bully: Scholarship Edition stopping on "Steam Error: Application load error P:0000065434". The game was started without Steam, and its current version needs Steam to start it; it now starts through Steam like other games.
 
+### Runtime (memory, JIT, processes)
+- Memory: games without their own tuned settings move game data and the read parts of their x64 programs and DLLs to a 2 GB swap file on the device instead of keeping them in RAM, so less of iOS's memory limit is used.
+- JIT: x64 programs and DLLs run from where they are loaded instead of from a second copy in the JIT memory, leaving that memory for compiled code; freed memory blocks are kept for 2 seconds so blocks that come and go are not remapped each time.
+- Processes: crash reporters and error-report helpers that games start in the background are no longer started; each was a full Windows process with its own memory.
+
 ### Game language
 - The language no longer appears blank until one is chosen again.
 - Only languages the game has are offered: a game with no Portuguese or Spanish (Fallout: New Vegas) no longer lists them. When the store gives no list, English only.
