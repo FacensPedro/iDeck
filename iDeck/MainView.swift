@@ -1802,7 +1802,7 @@ private struct WindowsGameProfileForm: View {
                                 icon: "sparkles", iconColor: .purple)
                     .disabled(!WindowsGameProfile.metalFXAllowed)
                 if !WindowsGameProfile.metalFXAllowed {
-                    Text(tr("MetalFX needs a device with 8 GB of RAM or more."))
+                    Text(tr("Incompatible device. MetalFX requires at least 8 GB of RAM."))
                         .font(.caption)
                         .foregroundColor(.gray)
                         .padding(.horizontal, 14)

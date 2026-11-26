@@ -32,6 +32,7 @@
 ### Interface
 - Removed the descriptions under Compatibility, Steam Cloud saves and Epic Cloud saves.
 - Epic Games: the Uninstall button shows again on installed games (a save check running in the background hid it).
+- MetalFX on a device with less than 8 GB of RAM: "Incompatible device. MetalFX requires at least 8 GB of RAM."
 - Ubisoft Connect: an expired session shows a short notice above the account.
 
 ### Stability
