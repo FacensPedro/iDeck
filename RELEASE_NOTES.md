@@ -30,6 +30,7 @@
 - Clear logs always works.
 
 ### Interface
+- Choice lists show "Auto" instead of "Automatic".
 - Removed the descriptions under Compatibility, Steam Cloud saves and Epic Cloud saves.
 - Epic Games: the Uninstall button shows again on installed games (a save check running in the background hid it).
 - MetalFX on a device with less than 8 GB of RAM: "Device not compatible with MetalFX".

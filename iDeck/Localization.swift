@@ -50,7 +50,7 @@ enum AppLanguage: String, CaseIterable, Identifiable {
 /// Translates an English UI string. Unknown strings are returned unchanged.
 func tr(_ key: String) -> String {
     let code = AppLanguage.currentCode
-    if code == "en" { return key }
+    if code == "en" { return Translations.table[key]?["en"] ?? key }
     return Translations.table[key]?[code] ?? key
 }
 
@@ -156,7 +156,8 @@ enum Translations {
         "Debugger connection": ["pt": "Conexão do depurador", "es": "Conexión del depurador"],
         "Attached": ["pt": "Conectado", "es": "Conectado"],
         "Detached": ["pt": "Desconectado", "es": "Desconectado"],
-        "Automatic": ["pt": "Automático", "es": "Automático"],
+        // Choice lists show "Auto" in every language.
+        "Automatic": ["en": "Auto", "pt": "Auto", "es": "Auto"],
         "Restart iDeck before the new Wine JIT pool size can take effect.": ["pt": "Reinicie o iDeck para aplicar o novo tamanho do pool JIT Wine.", "es": "Reinicia iDeck para aplicar el nuevo tamaño del grupo JIT de Wine."],
         "Wine JIT pool": ["pt": "Pool JIT do Wine", "es": "Memoria JIT de Wine"],
         "JIT permission is active, but StikDebug's debugger script is not connected. Use the button below to reconnect before starting Wine.": ["pt": "A permissão JIT está ativa, mas o script de depuração do StikDebug não está conectado. Use o botão abaixo antes de iniciar o Wine.", "es": "El permiso JIT está activo, pero el script de depuración de StikDebug no está conectado. Usa el botón siguiente antes de iniciar Wine."],
@@ -456,7 +457,7 @@ enum Translations {
         "Sign in on Epic's page in Safari. iDeck connects by itself.": ["pt": "Entre na página da Epic no Safari. O iDeck conecta sozinho.", "es": "Inicia sesión en la página de Epic en Safari. iDeck se conecta solo."],
         "Open Safari again": ["pt": "Abrir o Safari de novo", "es": "Abrir Safari de nuevo"],
         "Waiting": ["pt": "Aguardando", "es": "En espera"],
-        "Automatic (by controller)": ["pt": "Automático (pelo controle)", "es": "Automático (según el mando)"],
+        "Automatic (by controller)": ["en": "Auto", "pt": "Auto", "es": "Auto"],
         "Xbox (XInput): 360, One, Series": ["pt": "Xbox (XInput): 360, One, Series", "es": "Xbox (XInput): 360, One, Series"],
         "Xbox (XInput) + DirectInput": ["pt": "Xbox (XInput) + DirectInput", "es": "Xbox (XInput) + DirectInput"],
         "PlayStation (HID): DualSense, DualShock 4": ["pt": "PlayStation (HID): DualSense, DualShock 4", "es": "PlayStation (HID): DualSense, DualShock 4"],
