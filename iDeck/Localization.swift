@@ -183,7 +183,7 @@ enum Translations {
         "Quality": ["pt": "Qualidade", "es": "Calidad"],
         "Quality + frame generation": ["pt": "Qualidade + geração de quadros", "es": "Calidad + generación de fotogramas"],
         "Performance + frame generation": ["pt": "Desempenho + geração de quadros", "es": "Rendimiento + generación de fotogramas"],
-        "Incompatible device. MetalFX requires at least 8 GB of RAM.": ["pt": "Dispositivo incompatível. O mínimo requerido para usar o MetalFX é 8 GB de RAM.", "es": "Dispositivo incompatible. El mínimo requerido para usar MetalFX es 8 GB de RAM."],
+        "Device not compatible with MetalFX": ["pt": "Dispositivo incompatível com o MetalFX", "es": "Dispositivo incompatible con MetalFX"],
         "Stores & launchers": ["pt": "Lojas e launchers", "es": "Tiendas y launchers"],
         "The Ubisoft session expired. Sign in again in Settings.": ["pt": "A sessão da Ubisoft expirou. Entre de novo nos Ajustes.", "es": "La sesión de Ubisoft caducó. Vuelve a iniciar sesión en Ajustes."],
         "Could not load the owned games.": ["pt": "Não foi possível carregar os jogos da conta.", "es": "No se pudieron cargar los juegos de la cuenta."],
