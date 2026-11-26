@@ -14,6 +14,7 @@ struct SettingsView: View {
     @AppStorage("controllerRightSensitivity") private var controllerRightSensitivity = 1.0
     @AppStorage("controllerDeadzone") private var controllerDeadzone = 0.10
     @AppStorage("wineControllerAPI") private var wineControllerAPI = "By controller"
+    @AppStorage(VirtualSwap.enabledKey) private var virtualSwap = true
     @AppStorage("wineJITPoolMiB") private var wineJITPoolMiB = 560
     @AppStorage(BackgroundDownloads.continuedKey) private var continueDownloadsInBackground = true
     @AppStorage(BackgroundDownloads.notificationsKey) private var downloadNotifications = true
@@ -497,6 +498,7 @@ struct SettingsView: View {
                     toggleRow(title: tr("Hold Display at Maximum Rate"), isOn: $coordinator.isMaxRefreshRateEnabled)
                 }
                 toggleRow(title: tr("Pause games in the background"), isOn: $pauseGamesInBackground)
+                toggleRow(title: "iDeck Virtual Swap", isOn: $virtualSwap)
             }
             Section {
                 NavigationLink(tr("Advanced")) {

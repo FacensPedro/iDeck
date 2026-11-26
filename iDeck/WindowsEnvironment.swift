@@ -607,6 +607,7 @@ class WindowsEnvironment {
         } else {
             Self.setD3D9OlderNvidia(false)
         }
+        lines += VirtualSwap.configLines(existing: lines)
         let runtime = Self.hasGLVulkanRuntime
         switch sessionVulkanMode {
         case "Off":

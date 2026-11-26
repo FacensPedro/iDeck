@@ -6,7 +6,7 @@
 - Fixed Bully: Scholarship Edition stopping on "Steam Error: Application load error P:0000065434". The game was started without Steam, and its current version needs Steam to start it; it now starts through Steam like other games.
 
 ### Runtime (memory, JIT, processes)
-- Memory: games without their own tuned settings move game data and the read parts of their x64 programs and DLLs to a 2 GB swap file on the device instead of keeping them in RAM, so less of iOS's memory limit is used.
+- iDeck Virtual Swap (Settings › Graphics & Performance, on by default): game memory and the read parts of x64 programs and DLLs are kept in a file on the device's storage, managed by the Windows runtime's memory manager. Under memory pressure iOS writes those pages to the file and frees the RAM by itself, and reads them back when the game needs them. The file is sized at each launch from the device's RAM and free storage (up to 8 GB, always leaving 4 GB of storage free) and is off when storage is short. Games with their own tuned size keep it.
 - JIT: x64 programs and DLLs run from where they are loaded instead of from a second copy in the JIT memory, leaving that memory for compiled code; freed memory blocks are kept for 2 seconds so blocks that come and go are not remapped each time.
 - Processes: crash reporters and error-report helpers that games start in the background are no longer started; each was a full Windows process with its own memory.
 

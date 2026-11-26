@@ -603,9 +603,8 @@ enum GameRecommendations {
     /// Memory, JIT and process settings every list without its own tuning carries
     /// (the owner's runtime plan, items 5, 6 and 8). All are Madeira switches that
     /// Red Dead Redemption 2's list runs with:
-    /// - memory: game data and the read pages of pure-x64 programs and DLLs go to a
-    ///   2 GB swap file on the device's storage instead of counting against iOS's
-    ///   memory limit (swap-mb, swap-mode 2, swap-images);
+    /// - memory: iDeck Virtual Swap (VirtualSwap.swift) adds the swap tier at launch,
+    ///   sized from the device's RAM and free storage;
     /// - JIT: pure-x64 images run from where they are loaded, without a second copy
     ///   in the JIT pool, which keeps the pool for code buffers and hybrid DLLs
     ///   (MADEIRA_X64_IMAGE_NOCOPY); a released 1-16 MB block stays mapped 2 s, so
@@ -613,9 +612,6 @@ enum GameRecommendations {
     /// - processes: crash reporters and error-report helpers are not started: each
     ///   one was a full Windows process with its own DLL copies and code buffer.
     static let sharedRuntime = """
-        swap-mb = 2048
-        swap-mode = 2
-        swap-images = 1
         env.MADEIRA_X64_IMAGE_NOCOPY = 1
         env.MADEIRA_FREE_DELAY_MS = 2000
         env.MADEIRA_SPAWN_BLOCK = CrashReportClient;UnityCrashHandler;BsSndRpt;CrashSender;CrashReporter;BugSplat

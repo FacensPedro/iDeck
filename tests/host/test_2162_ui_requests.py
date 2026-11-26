@@ -52,10 +52,18 @@ class Requests2162(unittest.TestCase):
 
     def test_shared_runtime_settings(self):
         rec = read("iDeck/GameRecommendations.swift")
-        for line in ("swap-mb = 2048", "swap-images = 1", "env.MADEIRA_X64_IMAGE_NOCOPY = 1",
+        for line in ("env.MADEIRA_X64_IMAGE_NOCOPY = 1",
                      "env.MADEIRA_FREE_DELAY_MS = 2000", "env.MADEIRA_SPAWN_BLOCK = CrashReportClient"):
             self.assertIn(line, rec)
         self.assertIn('id: "standard", title: "games without a list of their own", version: 4', rec)
+
+    def test_virtual_swap(self):
+        vs = read("iDeck/VirtualSwap.swift")
+        self.assertIn('"swap-mode = 2", "swap-images = 1"]', vs)
+        self.assertIn('return ["swap-mb = 0", "swap-images = 0"]', vs)
+        self.assertIn("lines += VirtualSwap.configLines(existing: lines)", read("iDeck/WindowsEnvironment.swift"))
+        self.assertIn('toggleRow(title: "iDeck Virtual Swap", isOn: $virtualSwap)', read("iDeck/SettingsView.swift"))
+        self.assertEqual(read("iDeck.xcodeproj/project.pbxproj").count("VirtualSwap.swift"), 6)
 
     def test_install_queue(self):
         self.assertIn("@Published private(set) var waitingApps: [UInt32] = []", read("iDeck/SteamManager.swift"))
