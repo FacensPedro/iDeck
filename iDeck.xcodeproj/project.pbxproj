@@ -49,6 +49,8 @@
 		999999999999999999999914 /* UpdateChecker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 999999999999999999999906 /* UpdateChecker.swift */; };
 		F30000000000000000000021 /* WineLogClipboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = F40000000000000000000021 /* WineLogClipboard.swift */; };
 		F3A000000000000000000013 /* BenchmarkSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000013 /* BenchmarkSession.swift */; };
+		F3A0000000000000000000FD /* AutoDLLManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A0000000000000000000FD /* AutoDLLManager.swift */; };
+		F3A0000000000000000000FE /* VirtualSwap.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A0000000000000000000FE /* VirtualSwap.swift */; };
 		F3A000000000000000000012 /* DownloadSpeed.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000012 /* DownloadSpeed.swift */; };
 		F3A000000000000000000005 /* GameDetailComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000005 /* GameDetailComponents.swift */; };
 		F3A000000000000000000010 /* JITBuiltInHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000010 /* JITBuiltInHost.swift */; };
@@ -195,6 +197,8 @@
 		999999999999999999999906 /* UpdateChecker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateChecker.swift; sourceTree = "<group>"; };
 		F40000000000000000000021 /* WineLogClipboard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WineLogClipboard.swift; sourceTree = "<group>"; };
 		F4A000000000000000000013 /* BenchmarkSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BenchmarkSession.swift; sourceTree = "<group>"; };
+		F4A0000000000000000000FD /* AutoDLLManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoDLLManager.swift; sourceTree = "<group>"; };
+		F4A0000000000000000000FE /* VirtualSwap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VirtualSwap.swift; sourceTree = "<group>"; };
 		F4A000000000000000000012 /* DownloadSpeed.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadSpeed.swift; sourceTree = "<group>"; };
 		F4A000000000000000000005 /* GameDetailComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameDetailComponents.swift; sourceTree = "<group>"; };
 		F4A000000000000000000010 /* JITBuiltInHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JITBuiltInHost.swift; sourceTree = "<group>"; };
@@ -376,6 +380,8 @@
 				999999999999999999999914 /* UpdateChecker.swift in Sources */,
 				F30000000000000000000021 /* WineLogClipboard.swift in Sources */,
 				F3A000000000000000000013 /* BenchmarkSession.swift in Sources */,
+				F3A0000000000000000000FD /* AutoDLLManager.swift in Sources */,
+				F3A0000000000000000000FE /* VirtualSwap.swift in Sources */,
 				F3A000000000000000000012 /* DownloadSpeed.swift in Sources */,
 				F3A000000000000000000005 /* GameDetailComponents.swift in Sources */,
 				F3A000000000000000000010 /* JITBuiltInHost.swift in Sources */,
@@ -546,6 +552,8 @@
 				999999999999999999999906 /* UpdateChecker.swift */,
 				F40000000000000000000021 /* WineLogClipboard.swift */,
 				F4A000000000000000000013 /* BenchmarkSession.swift */,
+				F4A0000000000000000000FD /* AutoDLLManager.swift */,
+				F4A0000000000000000000FE /* VirtualSwap.swift */,
 				F4A000000000000000000012 /* DownloadSpeed.swift */,
 				F4A000000000000000000005 /* GameDetailComponents.swift */,
 				F4A000000000000000000010 /* JITBuiltInHost.swift */,
@@ -815,7 +823,7 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = VPNExtension/VPNExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 125;
+				CURRENT_PROJECT_VERSION = 126;
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = VPNExtension/Info.plist;
@@ -824,7 +832,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 2.16.1;
+				MARKETING_VERSION = 2.16.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ideck.ideck.VPNExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -840,7 +848,7 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = VPNExtension/VPNExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 125;
+				CURRENT_PROJECT_VERSION = 126;
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = VPNExtension/Info.plist;
@@ -849,7 +857,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 2.16.1;
+				MARKETING_VERSION = 2.16.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ideck.ideck.VPNExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -943,7 +951,7 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = iDeckJITHelper/iDeckJITHelper.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 125;
+				CURRENT_PROJECT_VERSION = 126;
 				DEVELOPMENT_TEAM = "";
 				"FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*]" = "$(SRCROOT)/Frameworks/StikJIT.xcframework/ios-arm64";
 				GENERATE_INFOPLIST_FILE = NO;
@@ -952,7 +960,7 @@
 					"$(inherited)",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 2.16.1;
+				MARKETING_VERSION = 2.16.2;
 				"OTHER_LDFLAGS[sdk=iphoneos*]" = (
 					"$(inherited)",
 					"-framework",
@@ -973,7 +981,7 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = iDeckJITHelper/iDeckJITHelper.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 125;
+				CURRENT_PROJECT_VERSION = 126;
 				DEVELOPMENT_TEAM = "";
 				"FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*]" = "$(SRCROOT)/Frameworks/StikJIT.xcframework/ios-arm64";
 				GENERATE_INFOPLIST_FILE = NO;
@@ -982,7 +990,7 @@
 					"$(inherited)",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 2.16.1;
+				MARKETING_VERSION = 2.16.2;
 				"OTHER_LDFLAGS[sdk=iphoneos*]" = (
 					"$(inherited)",
 					"-framework",
@@ -1064,7 +1072,7 @@
 				OTHER_LDFLAGS = "$(inherited) -lz -llzma $(IDECK_NATIVE_LINK_FLAGS)";
 				OTHER_CFLAGS = "$(inherited) $(IDECK_NATIVE_CFLAGS)";
 				OTHER_CPLUSPLUSFLAGS = "$(inherited) $(IDECK_NATIVE_CFLAGS)";
-				CURRENT_PROJECT_VERSION = 125;
+				CURRENT_PROJECT_VERSION = 126;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -1077,7 +1085,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.16.1;
+				MARKETING_VERSION = 2.16.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ideck.ideck;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -1101,7 +1109,7 @@
 				OTHER_LDFLAGS = "$(inherited) -lz -llzma $(IDECK_NATIVE_LINK_FLAGS)";
 				OTHER_CFLAGS = "$(inherited) $(IDECK_NATIVE_CFLAGS)";
 				OTHER_CPLUSPLUSFLAGS = "$(inherited) $(IDECK_NATIVE_CFLAGS)";
-				CURRENT_PROJECT_VERSION = 125;
+				CURRENT_PROJECT_VERSION = 126;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -1114,7 +1122,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.16.1;
+				MARKETING_VERSION = 2.16.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ideck.ideck;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;

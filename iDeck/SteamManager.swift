@@ -14,6 +14,10 @@ final class SteamOwnedGamesModel: ObservableObject {
     @Published private(set) var isLoading = false
     @Published private(set) var errorMessage: String?
     @Published private(set) var installingApps: Set<UInt32> = []
+    /// Installs waiting for the one downloading now, in the order they were started:
+    /// one game downloads at a time, the others show "Waiting".
+    @Published private(set) var waitingApps: [UInt32] = []
+    private var activeInstall: UInt32?
     @Published private(set) var downloadProgress: [UInt32: SteamDownloadProgress] = [:]
     @Published private(set) var downloadErrors: [UInt32: String] = [:]
     @Published private(set) var installedApps: Set<UInt32> = []
@@ -472,6 +476,22 @@ final class SteamOwnedGamesModel: ObservableObject {
         installingApps.insert(appID)
         downloadErrors[appID] = nil
         downloadProgress[appID] = SteamDownloadProgress()
+        // One download at a time: a second game waits its turn.
+        if activeInstall != nil || !waitingApps.isEmpty {
+            waitingApps.append(appID)
+            AppLog.record("[steam-install] waiting app=\(appID) behind app=\(activeInstall.map(String.init) ?? "-")")
+            while !Task.isCancelled, activeInstall != nil || waitingApps.first != appID {
+                try? await Task.sleep(nanoseconds: 500_000_000)
+            }
+            waitingApps.removeAll { $0 == appID }
+            if Task.isCancelled {
+                installingApps.remove(appID)
+                downloadProgress[appID] = nil
+                return
+            }
+        }
+        activeInstall = appID
+        defer { if activeInstall == appID { activeInstall = nil } }
         let displayName = games.first(where: { $0.appID == appID })?.name ?? "App \(appID)"
         // Record installation context before running Wine or any Windows game.
         // Diagnostic reports must name the Steam title even if iOS stops

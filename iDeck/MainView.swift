@@ -1541,11 +1541,16 @@ private struct SteamProgramDetailsView: View {
                     GameLanguageCard(profileID: "steam:\(game.appID)",
                                      available: game.languages.isEmpty ? nil : GameLanguage.all.map(\.steam).filter(game.languages.contains).compactMap(GameLanguage.tag(steam:)),
                                      audio: Set(game.audioLanguages.compactMap(GameLanguage.tag(steam:))),
-                                     subtitles: Set(game.subtitleLanguages.compactMap(GameLanguage.tag(steam:))))
+                                     subtitles: Set(game.subtitleLanguages.compactMap(GameLanguage.tag(steam:))),
+                                     onChosen: { _ in
+                                         // An installed game fetches the chosen language's depots
+                                         // (dubbing and subtitles) through the update path.
+                                         guard let prefixPath, steamLibrary.installedApps.contains(game.appID) else { return }
+                                         AppLog.record("[game-language] steam:\(game.appID): fetching the language files")
+                                         steamLibrary.startInstall(appID: game.appID, prefixPath: prefixPath)
+                                     })
                     WindowsGameProfileForm(profile: $profile)
-                    DetailCard(title: tr("Steam Cloud saves"),
-                               footer: steamLibrary.cloudMessages[game.appID]
-                                   ?? tr("Automatically sync Steam Cloud saves before playing when available. Conflicting saves are never overwritten.")) {
+                    DetailCard(title: tr("Steam Cloud saves"), footer: steamLibrary.cloudMessages[game.appID]) {
                         steamCloudControls
                     }
                     SteamAchievementsCard(appID: game.appID)
@@ -1634,7 +1639,8 @@ private struct SteamProgramDetailsView: View {
             ProgressView(value: progress?.phase == .checking
                          ? (progress.map { $0.checkTotal > 0 ? min(1, Double($0.checkDone) / Double($0.checkTotal)) : 0 } ?? 0)
                          : (progress?.fraction ?? 0))
-            Text(progress?.phase == .preparing ? tr("Preparing download...") :
+            Text(steamLibrary.waitingApps.contains(game.appID) ? tr("Waiting") :
+                 progress?.phase == .preparing ? tr("Preparing download...") :
                  progress?.phase == .checking ? tr("Checking existing files %d%%", Int(((progress.map { $0.checkTotal > 0 ? min(1, Double($0.checkDone) / Double($0.checkTotal)) : 0 } ?? 0) * 100).rounded())) :
                  progress?.phase == .finishing ? tr("Finishing installation...") :
                  tr("Installing %d%%", Int(((progress?.fraction ?? 0) * 100).rounded())))
@@ -1796,7 +1802,7 @@ private struct WindowsGameProfileForm: View {
                                 icon: "sparkles", iconColor: .purple)
                     .disabled(!WindowsGameProfile.metalFXAllowed)
                 if !WindowsGameProfile.metalFXAllowed {
-                    Text(tr("MetalFX needs a device with 8 GB of RAM or more."))
+                    Text(tr("Device not compatible with MetalFX"))
                         .font(.caption)
                         .foregroundColor(.gray)
                         .padding(.horizontal, 14)
@@ -1815,8 +1821,9 @@ private struct WindowsGameProfileForm: View {
             }
             DetailCard(title: tr("Controls")) {
                 DetailPickerRow(title: tr("Controller API"), selection: $profile.controllerAPI,
-                                choices: ["Automatic", "XInput", "XInput + DirectInput", "HID", "DualSense HID", "Generic HID"],
-                                showsDivider: false, icon: "gamecontroller.fill", iconColor: .green)
+                                choices: ["Automatic"] + ControllerAPI.choices,
+                                showsDivider: false, icon: "gamecontroller.fill", iconColor: .green,
+                                label: ControllerAPI.label)
             }
             DetailCard(title: tr("Performance")) {
                 // 0: iDeck decides (every core the device gives the game), shown as Automatic.
@@ -1833,8 +1840,7 @@ private struct WindowsGameProfileForm: View {
                 DetailToggleRow(title: tr("Fast synchronization"), isOn: $profile.fastSync, showsDivider: false,
                                 icon: "bolt.fill", iconColor: .yellow)
             }
-            DetailCard(title: tr("Compatibility"),
-                       footer: tr("Games iDeck recognises get the settings they were tested with.")) {
+            DetailCard(title: tr("Compatibility")) {
                 DetailToggleRow(title: tr("Use recommended settings"), isOn: $profile.useRecommended,
                                 icon: "checkmark.seal.fill", iconColor: .green)
                 DetailPickerRow(title: tr("Code checks"), selection: $profile.codeChecks,
@@ -1878,6 +1884,8 @@ private struct StoreGameDetailsView<Extra: View>: View {
     /// Bytes on the device so far while installing ("1.2 GB / 4 GB"), as a Steam game's page shows.
     let installedText: String?
     let paused: Bool
+    /// Queued behind another game's download: "Waiting" instead of a percentage.
+    let waiting: Bool
     let sizeText: String?
     let errorText: String?
     let canInstall: Bool
@@ -1896,7 +1904,7 @@ private struct StoreGameDetailsView<Extra: View>: View {
 
     init(title: String, store: GameStore, profileID: String, covers: [URL], banners: [URL],
          installed: Bool, progress: Double?, etaSeconds: Int? = nil, installedText: String? = nil,
-         paused: Bool = false, sizeText: String?, errorText: String?,
+         paused: Bool = false, waiting: Bool = false, sizeText: String?, errorText: String?,
          canInstall: Bool, onLaunch: @escaping () -> Void, onInstall: @escaping () -> Void,
          onPause: (() -> Void)? = nil, onStop: @escaping () -> Void, onUninstall: (() -> Bool)?,
          library: WindowsLibraryStore, coordinator: SystemCoordinator,
@@ -1911,6 +1919,7 @@ private struct StoreGameDetailsView<Extra: View>: View {
         self.etaSeconds = etaSeconds
         self.installedText = installedText
         self.paused = paused
+        self.waiting = waiting
         self.sizeText = sizeText
         self.errorText = errorText
         self.canInstall = canInstall
@@ -1986,8 +1995,8 @@ private struct StoreGameDetailsView<Extra: View>: View {
     @ViewBuilder private var actions: some View {
         if let progress, !paused {
             VStack(spacing: 10) {
-                ProgressView(value: progress)
-                Text(tr("Installing %d%%", Int((progress * 100).rounded())))
+                ProgressView(value: waiting ? 0 : progress)
+                Text(waiting ? tr("Waiting") : tr("Installing %d%%", Int((progress * 100).rounded())))
                     .font(.caption)
                     .foregroundColor(.white)
                 if let etaSeconds, let eta = DownloadETA.label(etaSeconds) {
@@ -2171,7 +2180,7 @@ private struct EAGameDetailsSheet: View {
             etaSeconds: eta,
             installedText: download.flatMap { $0.progress.phase == .downloading
                 ? installedBytesText(done: $0.progress.doneBytes, total: $0.progress.totalBytes, showZero: true) : nil },
-            paused: paused, sizeText: sizeText, errorText: failed,
+            paused: paused, waiting: download?.state == .queued, sizeText: sizeText, errorText: failed,
             canInstall: game.downloadable,
             onLaunch: { if let installed { launch(installed) } },
             onInstall: { ea.install(game.id) },
@@ -2287,13 +2296,20 @@ private struct EpicGameDetailsSheet: View {
             etaSeconds: eta,
             installedText: download.flatMap { $0.progress.phase == .downloading
                 ? installedBytesText(done: $0.progress.doneBytes, total: $0.progress.totalBytes) : nil },
-            paused: paused, sizeText: sizeText, errorText: failed,
+            paused: paused, waiting: download?.state == .queued, sizeText: sizeText, errorText: failed,
             canInstall: true,
             onLaunch: { if let installed { launch(installed) } },
             onInstall: { epic.install(appName) },
             onPause: { epic.pause(appName) },
             onStop: { epic.cancel(appName) },
-            onUninstall: (epic.sessionRunning || EpicCloud.shared.isBusy) ? nil : { epic.uninstall(appName); return epic.installed[appName] == nil },
+            // Always shown: a save check running in the background (it starts when this page
+            // opens) hid the button. While a game runs or a sync writes saves, the removal
+            // waits for it instead.
+            onUninstall: {
+                guard !epic.sessionRunning else { return false }
+                epic.uninstall(appName)
+                return epic.installed[appName] == nil
+            },
             library: library, coordinator: coordinator
         ) {
             if installed != nil {

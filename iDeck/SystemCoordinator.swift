@@ -483,7 +483,9 @@ class SystemCoordinator: ObservableObject {
     /// Benchmark milestones and the end of a game session, from its status.
     private func recordBenchmarkMilestone(_ status: String) {
         switch status {
-        case "Wine started; waiting for game...": BenchmarkSession.mark("wine_started")
+        case "Wine started; waiting for game...":
+            BenchmarkSession.mark("wine_started")
+            ControllerAudioGuard.shared.recheck()
         case "Running", "Steam Running": BenchmarkSession.mark("running")
         case "Windows Ready":
             DispatchQueue.main.async { MainActor.assumeIsolated { ResourceGovernor.closingSession = false } }
@@ -809,13 +811,38 @@ class SystemCoordinator: ObservableObject {
                 switch result {
                 case .success(let response):
                     AppLog.record("[jit-builtin] finished: \(response.message)")
-                    if !response.success { self.builtInFailed("Built-in JIT: " + response.message) }
+                    if !response.success {
+                        // "Timed out connecting to <ip>:49152": the device's own lockdown
+                        // port is reached through the loopback VPN, so that VPN is off.
+                        // Try again a few times (it may be coming up), then say so plainly.
+                        if response.message.contains("Timed out connecting") {
+                            if Self.builtInVPNRetries < 3 {
+                                Self.builtInVPNRetries += 1
+                                AppLog.record("[jit-builtin] the loopback VPN did not answer; retry \(Self.builtInVPNRetries) of 3 in 3 s")
+                                self.setWindowsStatus(tr("Connect to LocalDevVPN"))
+                                self.builtInWait?.invalidate()
+                                self.builtInWait = nil
+                                self.jitRequestStartedAt = nil
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 3) { self.requestStikDebugJIT() }
+                                return
+                            }
+                            Self.builtInVPNRetries = 0
+                            self.builtInFailed(tr("Connect to LocalDevVPN"))
+                            return
+                        }
+                        self.builtInFailed("Built-in JIT: " + response.message)
+                    } else {
+                        Self.builtInVPNRetries = 0
+                    }
                 case .failure(let error):
                     self.builtInFailed("Built-in JIT: " + error.localizedDescription)
                 }
             }
         }
     }
+
+    /// Retries of a built-in request whose loopback VPN did not answer.
+    private static var builtInVPNRetries = 0
 
     /// Whether this iDeck process already asked the built-in helper by itself.
     private static var builtInAutoRequested = false
@@ -1706,12 +1733,13 @@ class SystemCoordinator: ObservableObject {
     /// Launches a Steam game in its original installation directory, preserving
     /// relative DLL and asset paths instead of copying the executable elsewhere.
     /// Steam games that need no Steam client to run and fail when Valve's
-    /// client spawns them: Bully: Scholarship Edition (12200) is a 32-bit
-    /// program, and as a child of the 64-bit Steam client its i386 process
-    /// started without an emulator CPU area (x28 = 0) and stopped at its first
-    /// instruction (0xC000001D). Started directly, it is the session's own
-    /// WoW64 process, set up like any other 32-bit game.
-    static let directSteamLaunchAppIDs: Set<UInt32> = [12200]
+    /// client spawns them. Empty since 2.16.2: Bully: Scholarship Edition (12200)
+    /// was here because a 32-bit child of the Steam client once started without
+    /// an emulator CPU area, which the CPU-area fix ended (Assassin's Creed IV
+    /// runs as one). Its current build carries Steam's DRM, and started directly
+    /// it stopped on "Steam Error: Application load error P:0000065434"
+    /// (2026-11-25), so it goes through Valve's client like the other games.
+    static let directSteamLaunchAppIDs: Set<UInt32> = []
 
     func launchSteamGame(game: SteamAppInfo, profile: WindowsGameProfile, prefixPath: URL, skipSteamClient: Bool = false) {
         // A game that asked for Steam's client when started without it (SteamClientNeed)
@@ -2486,6 +2514,16 @@ class SystemCoordinator: ObservableObject {
             outcome.reason += " DLL check before the start: " + check.summary + "."
         }
         DependencyCheck.last = nil
+        // iDeck Auto DLL Manager: a DLL the start failed on (c0000135) that an official
+        // component ships is downloaded now and put in place at the next start.
+        if outcome.ntstatus == 0xC0000135 || outcome.reason.hasPrefix("Execution Error"),
+           let program = AutoDLLManager.lastProgram {
+            let dlls = AutoDLLManager.missingInLog(Self.wineLogURL, since: wineLogStartOffset)
+            if !dlls.isEmpty {
+                AutoDLLManager.notePending(dlls, program: program)
+                outcome.reason += " " + "iDeck is getting the missing DLLs (" + dlls.joined(separator: ", ") + ") from Microsoft: start the game again."
+            }
+        }
         // Metal GPU faults (hang, timeout, ignored submissions): the heaviest GPU work
         // iDeck adds goes for this game, and the next launch runs one frame in flight.
         if let endedGame {

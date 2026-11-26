@@ -34,7 +34,7 @@ class FPSTouchMetalFXCrashTests(unittest.TestCase):
         self.assertIn("env.DXMT_WSI_MONITOR_IDENTITY = 1", block)
         self.assertIn("steamAppID == crashBandicootNSaneAppID", RECS)
         self.assertIn('case "crashbandicootnsanetrilogy.exe":', RECS)
-        self.assertIn("crashBandicootNSane, standard]", RECS)
+        self.assertIn("crashBandicootNSane, bioshock, standard]", RECS)
 
 
 if __name__ == "__main__":

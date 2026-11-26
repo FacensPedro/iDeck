@@ -39,9 +39,28 @@ final class ControllerAudioGuard {
         check()
     }
 
+    /// Re-applies the speaker route. Wine's audio bridge sets the playback category when a
+    /// session starts, which drops the override without a route change, so a wired
+    /// DualSense took the sound again; iDeck checks again then, and a little later.
+    func recheck() {
+        DispatchQueue.main.async { [weak self] in
+            self?.overriding = false
+            self?.check()
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in self?.check() }
+    }
+
     static func isController(_ port: AVAudioSessionPortDescription) -> Bool {
         let name = port.portName.lowercased()
-        return ["dualsense", "dualshock", "wireless controller", "xbox", "controller"].contains { name.contains($0) }
+        if ["dualsense", "dualshock", "wireless controller", "xbox", "controller", "sony", "joy-con"]
+            .contains(where: { name.contains($0) }) { return true }
+        // A wired DualSense or DualShock 4 is a USB audio device; with a controller
+        // connected, a USB output is the controller's speaker and headset jack.
+        if port.portType == .usbAudio, InputManager.shared.isControllerConnected {
+            let uid = port.uid.lowercased()
+            return uid.contains("054c") || InputManager.shared.connectedKind.isPlayStation
+        }
+        return false
     }
 
     private func check() {

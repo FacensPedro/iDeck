@@ -313,6 +313,25 @@ struct EpicInstalledDLC: Codable, Sendable {
     /// The authorization code from Epic's login page (EpicSignInView).
     func signIn(code: String) async throws {
         let session = try await api.signIn(authorizationCode: code)
+        await signedIn(session)
+    }
+
+    /// Signs in through Epic's page in Safari and connects by itself when the account
+    /// approves there (EpicAPI.beginDeviceLogin). Returns when signed in, or throws.
+    func signInWithSafari(open: @MainActor (URL) -> Void) async throws {
+        let login = try await api.beginDeviceLogin()
+        open(login.url)
+        while Date() < login.expires {
+            try await Task.sleep(nanoseconds: UInt64(login.interval * 1_000_000_000))
+            if let session = try await api.pollDeviceLogin(login) {
+                await signedIn(session)
+                return
+            }
+        }
+        throw EpicAPIError.invalid("sign-in timed out")
+    }
+
+    private func signedIn(_ session: EpicSession) async {
         accountGeneration += 1
         manifestSizes.removeAll()
         manifestSizeBuilds.removeAll()
@@ -516,7 +535,7 @@ struct EpicInstalledDLC: Codable, Sendable {
 
     /// Deletes the game's files and its library entry (its per-game settings).
     func uninstall(_ app: String) {
-        guard let record = installed[app], !inSession, !EpicCloud.shared.isBusy else { return }
+        guard let record = installed[app], !inSession else { return }
         pause(app); downloads[app] = nil
         installed[app] = nil
         writeInstalled()

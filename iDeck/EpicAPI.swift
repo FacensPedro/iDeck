@@ -213,6 +213,73 @@ actor EpicAPI {
         return session
     }
 
+    // MARK: Sign-in through Safari, connected by itself (device authorization)
+
+    /// Epic's device sign-in: Epic's page opens in Safari, the account signs in and
+    /// approves there, and iDeck asks Epic every few seconds until it is done, then
+    /// trades that sign-in for the launcher's own session. Nothing to copy or paste.
+    /// The device flow is only offered to Epic's console client (the public one that
+    /// Legendary and other launchers use for it), hence the exchange at the end.
+    private static let deviceClientID = "98f7e42c2e3a4f86a74eb43fbb41ed39"
+    private static let deviceClientSecret = "0a2449a2-001a-451e-afec-3e812901c4d7"
+
+    struct DeviceLogin: Sendable {
+        let deviceCode: String
+        let url: URL
+        let interval: TimeInterval
+        let expires: Date
+    }
+
+    private func deviceForm(_ path: String, _ form: [String: String], bearer: String? = nil) -> URLRequest {
+        var request = URLRequest(url: URL(string: Self.oauthHost + path)!)
+        request.httpMethod = "POST"
+        if let bearer {
+            request.setValue("bearer \(bearer)", forHTTPHeaderField: "Authorization")
+        } else {
+            let basic = Data("\(Self.deviceClientID):\(Self.deviceClientSecret)".utf8).base64EncodedString()
+            request.setValue("basic \(basic)", forHTTPHeaderField: "Authorization")
+        }
+        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        request.httpBody = Data(form.map { "\($0.key)=\(Self.formEncode($0.value))" }.sorted().joined(separator: "&").utf8)
+        return request
+    }
+
+    func beginDeviceLogin() async throws -> DeviceLogin {
+        let client = try await object(deviceForm("/account/api/oauth/token", ["grant_type": "client_credentials"]),
+                                      method: "device-client")
+        guard let clientToken = client["access_token"] as? String else { throw EpicAPIError.invalid("device-client") }
+        let json = try await object(deviceForm("/account/api/oauth/deviceAuthorization", ["prompt": "login"], bearer: clientToken),
+                                    method: "device-authorization")
+        guard let code = json["device_code"] as? String,
+              let link = (json["verification_uri_complete"] as? String).flatMap(URL.init(string:)) else {
+            throw EpicAPIError.invalid("device-authorization")
+        }
+        EpicLog.event("[epic-signin] device sign-in opened in Safari")
+        return DeviceLogin(deviceCode: code, url: link, interval: max(Self.seconds(json["interval"]) ?? 5, 2),
+                           expires: Date().addingTimeInterval(Self.seconds(json["expires_in"]) ?? 600))
+    }
+
+    /// The session once the account approved in Safari; nil while Epic still waits for it.
+    func pollDeviceLogin(_ login: DeviceLogin) async throws -> EpicSession? {
+        let json: [String: Any]
+        do {
+            json = try await object(deviceForm("/account/api/oauth/token",
+                                               ["grant_type": "device_code", "device_code": login.deviceCode]),
+                                    method: "device-token")
+        } catch let error as EpicAPIError {
+            if case .epic(let code, _) = error, code.contains("authorization_pending") || code.contains("slow_down") { return nil }
+            throw error
+        }
+        guard let deviceToken = json["access_token"] as? String else { throw EpicAPIError.invalid("device-token") }
+        var request = URLRequest(url: URL(string: Self.oauthHost + "/account/api/oauth/exchange")!)
+        request.setValue("bearer \(deviceToken)", forHTTPHeaderField: "Authorization")
+        let exchange = try await object(request, method: "device-exchange")
+        guard let code = exchange["code"] as? String else { throw EpicAPIError.invalid("device-exchange") }
+        let session = try await token(["grant_type": "exchange_code", "exchange_code": code, "token_type": "eg1"])
+        EpicLog.event("[epic-signin] signed in through Safari")
+        return session
+    }
+
     func signOut() {
         refreshing?.cancel(); refreshing = nil
         session = nil; loaded = true

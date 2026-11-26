@@ -1,0 +1,42 @@
+diff --git a/madeira-d3d12/src/pe/madeira_d3d12.c b/madeira-d3d12/src/pe/madeira_d3d12.c
+index bd8746a..5a1bee8 100644
+--- a/madeira-d3d12/src/pe/madeira_d3d12.c
++++ b/madeira-d3d12/src/pe/madeira_d3d12.c
+@@ -18023,6 +18023,23 @@ static int mad_cs_dump_on(void) {
+     return on > 0;
+ }
+ 
++/* iDeck: a pipeline created without a root signature takes the one compiled into its
++ * shader (the RTS0 part of the DXBC container), as D3D12 does. Ghostwire Tokyo creates
++ * its compute pipelines that way: every binding missed ("rsig-miss ... root signature:
++ * none"), the shaders were not converted and their dispatches were skipped. The root
++ * signature made here stays alive with the pipeline. */
++static ID3D12RootSignature *mad_embedded_rootsig(ID3D12Device *This, const void *code, SIZE_T len,
++                                                 const char *stage) {
++    ID3D12RootSignature *rs = NULL;
++    SIZE_T n = 0; const char *why = NULL;
++    static unsigned said;
++    if (!code || !len || !rs_find_chunk(code, len, &n, &why)) return NULL;
++    if (FAILED(device_CreateRootSignature(This, 0, code, len, &IID_ID3D12RootSignature, (void **)&rs))) return NULL;
++    if (said++ < 8) d3d12_log("[madeira-d3d12] %s pipeline without a root signature: using the one in its shader (%u bytes)\n",
++                              stage, (unsigned)n);
++    return rs;
++}
++
+ static HRESULT device_CreateComputePipelineState_impl(ID3D12Device *This,
+         const D3D12_COMPUTE_PIPELINE_STATE_DESC *desc, REFIID riid, void **out);
+ static HRESULT STDMETHODCALLTYPE device_CreateComputePipelineState(ID3D12Device *This,
+@@ -18043,8 +18060,13 @@ static HRESULT device_CreateComputePipelineState_impl(ID3D12Device *This,
+     struct mad_lzkey lzc;   /* madeira-bcd pso-lazy-libs */
+     int lz_on;
+     HRESULT hr;
++    D3D12_COMPUTE_PIPELINE_STATE_DESC with_rs;
+     if (!desc || !out) return E_INVALIDARG;
+     if (!desc->CS.pShaderBytecode) return E_INVALIDARG;
++    if (!desc->pRootSignature) {
++        ID3D12RootSignature *own = mad_embedded_rootsig(This, desc->CS.pShaderBytecode, desc->CS.BytecodeLength, "compute");
++        if (own) { with_rs = *desc; with_rs.pRootSignature = own; desc = &with_rs; }
++    }
+     memset(&lzc, 0, sizeof lzc);
+     lz_on = mad_lzlib_on() && mad_pso_lazy_on();   /* built at its first dispatch */
+     mad_resolve_target(d);

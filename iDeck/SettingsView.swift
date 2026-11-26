@@ -14,6 +14,8 @@ struct SettingsView: View {
     @AppStorage("controllerRightSensitivity") private var controllerRightSensitivity = 1.0
     @AppStorage("controllerDeadzone") private var controllerDeadzone = 0.10
     @AppStorage("wineControllerAPI") private var wineControllerAPI = "By controller"
+    @AppStorage(VirtualSwap.enabledKey) private var virtualSwap = true
+    @State private var autoDLLNotice: String?
     @AppStorage("wineJITPoolMiB") private var wineJITPoolMiB = 560
     @AppStorage(BackgroundDownloads.continuedKey) private var continueDownloadsInBackground = true
     @AppStorage(BackgroundDownloads.notificationsKey) private var downloadNotifications = true
@@ -293,13 +295,16 @@ struct SettingsView: View {
     private var ubisoftPage: some View {
         Form {
             Section {
+                if !ubisoftAccountName.isEmpty, ubisoftSessionExpired {
+                    Label(tr("Session expired. Sign in again to continue."), systemImage: "exclamationmark.triangle.fill")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.orange)
+                }
                 LabeledContent(tr("Account"), value: ubisoftAccountName.isEmpty ? tr("Not connected") : ubisoftAccountName)
                 if ubisoftAccountName.isEmpty {
                     Button(tr("Sign in")) { ubisoftLoginPresented = true }
                 } else {
                     if ubisoftSessionExpired {
-                        Text(tr("Ubisoft did not renew the session. Sign in again to load your games; the account stays saved until you sign out."))
-                            .font(.footnote).foregroundStyle(.secondary)
                         Button(tr("Sign in again")) { ubisoftLoginPresented = true }
                     }
                     Button(tr("Sign out"), role: .destructive) {
@@ -461,9 +466,9 @@ struct SettingsView: View {
         Form {
             settingsSection(title: tr("Controller")) {
                 Picker(tr("Windows controller API"), selection: $wineControllerAPI) {
-                    ForEach(["By controller", "XInput", "XInput + DirectInput", "HID", "DualSense HID", "Generic HID"], id: \.self) { api in
+                    ForEach(["By controller"] + ControllerAPI.choices, id: \.self) { api in
                         // "By controller" (the stored value) picks the API from the pad itself.
-                        Text(api == "By controller" ? tr("Automatic") : tr(api)).tag(api)
+                        Text(ControllerAPI.label(api)).tag(api)
                     }
                 }
                 LabeledContent(tr("Connected controller")) {
@@ -494,6 +499,7 @@ struct SettingsView: View {
                     toggleRow(title: tr("Hold Display at Maximum Rate"), isOn: $coordinator.isMaxRefreshRateEnabled)
                 }
                 toggleRow(title: tr("Pause games in the background"), isOn: $pauseGamesInBackground)
+                toggleRow(title: "iDeck Virtual Swap", isOn: $virtualSwap)
             }
             Section {
                 NavigationLink(tr("Advanced")) {
@@ -553,6 +559,12 @@ struct SettingsView: View {
     private var runtimePage: some View {
         Form {
             settingsSection(title: tr("Windows runtime")) {
+                Button(tr("Undo automatic DLLs")) {
+                    let removed = AutoDLLManager.rollbackAll()
+                    autoDLLNotice = tr("%d DLL(s) removed.", removed)
+                }
+                .disabled(AutoDLLManager.ledger().isEmpty)
+                if let autoDLLNotice { Text(autoDLLNotice).font(.footnote).foregroundStyle(.secondary) }
                 let runtime = MadeiraBundleIdentity.profile
                 LabeledContent(tr("IPA runtime")) {
                     Text(tr(MadeiraBundleIdentity.isNative ? "Madeira-native" : "Interface-only"))

@@ -533,22 +533,24 @@ enum GameRecommendations {
     /// 13), as the d3d9.dll wrapper its players install does. The config is the
     /// standard list, which the game ran with.
     static let falloutNewVegas = GameRecommendation(
-        id: "fallout-new-vegas", title: "Fallout: New Vegas", version: 1,
+        id: "fallout-new-vegas", title: "Fallout: New Vegas", version: 2,
         config: """
         # Madeira's recommended settings for Fallout: New Vegas.
         # Reset to Recommended, at the bottom of the game's settings, brings them back.
         env.MADEIRA_EC_HOOK_TRACE = 0
+        \(sharedRuntime)
         """,
         olderNvidia: true)
 
     /// Fallout 3 and its Game of the Year Edition: New Vegas's engine, which picks
     /// its render path the same way. Not tested on a device yet.
     static let fallout3 = GameRecommendation(
-        id: "fallout-3", title: "Fallout 3", version: 1,
+        id: "fallout-3", title: "Fallout 3", version: 2,
         config: """
         # Madeira's recommended settings for Fallout 3 (not tested yet).
         # Reset to Recommended, at the bottom of the game's settings, brings them back.
         env.MADEIRA_EC_HOOK_TRACE = 0
+        \(sharedRuntime)
         """,
         olderNvidia: true)
 
@@ -596,12 +598,32 @@ enum GameRecommendations {
         """,
         avx: false, resolution: "1280x720", display: "fit")
 
+    // MARK: Shared runtime settings (2.16.2)
+
+    /// Memory, JIT and process settings every list without its own tuning carries
+    /// (the owner's runtime plan, items 5, 6 and 8). All are Madeira switches that
+    /// Red Dead Redemption 2's list runs with:
+    /// - memory: iDeck Virtual Swap (VirtualSwap.swift) adds the swap tier at launch,
+    ///   sized from the device's RAM and free storage;
+    /// - JIT: pure-x64 images run from where they are loaded, without a second copy
+    ///   in the JIT pool, which keeps the pool for code buffers and hybrid DLLs
+    ///   (MADEIRA_X64_IMAGE_NOCOPY); a released 1-16 MB block stays mapped 2 s, so
+    ///   allocations that come and go do not remap memory each time (FREE_DELAY);
+    /// - processes: crash reporters and error-report helpers are not started: each
+    ///   one was a full Windows process with its own DLL copies and code buffer.
+    static let sharedRuntime = """
+        env.MADEIRA_X64_IMAGE_NOCOPY = 1
+        env.MADEIRA_FREE_DELAY_MS = 2000
+        env.MADEIRA_SPAWN_BLOCK = CrashReportClient;UnityCrashHandler;BsSndRpt;CrashSender;CrashReporter;BugSplat
+        """
+
     static let standard = GameRecommendation(
-        id: "standard", title: "games without a list of their own", version: 3,
+        id: "standard", title: "games without a list of their own", version: 4,
         config: """
         # Madeira's recommended settings for a game without a list of its own.
         # Reset to Recommended, at the bottom of the game's settings, brings them back.
         env.MADEIRA_EC_HOOK_TRACE = 0
+        \(sharedRuntime)
         """)
 
     /// Assassin's Creed IV Black Flag (242050), 32-bit (2026-11-16): with d3d9 left on
@@ -609,16 +631,31 @@ enum GameRecommendations {
     /// (40010006) came back through the WoW64 exception path with no context. Wine's
     /// wined3d does not go through that forwarder.
     static let blackFlag = GameRecommendation(
-        id: "ac4-black-flag", title: "Assassin's Creed IV Black Flag", version: 1,
+        id: "ac4-black-flag", title: "Assassin's Creed IV Black Flag", version: 2,
         config: """
         # Madeira's recommended settings for Assassin's Creed IV Black Flag.
         # Reset to Recommended, at the bottom of the game's settings, brings them back.
         d3d9 = wined3d
         env.MADEIRA_EC_HOOK_TRACE = 0
+        \(sharedRuntime)
         """)
 
+    /// BioShock, BioShock 2 and their Remastered editions (Steam or GOG). They read the
+    /// card's vendor and device: Madeira's Apple 106B with device 0 ("Info=1024 0x106B
+    /// 0x0") brought up "The video card in this computer does not meet the minimum video
+    /// requirements" (2026-11-25). "Older NVIDIA card (Direct3D 9)" reports one they know.
+    static let bioshock = GameRecommendation(
+        id: "bioshock", title: "BioShock", version: 2,
+        config: """
+        # Madeira's recommended settings for BioShock and BioShock 2.
+        # Reset to Recommended, at the bottom of the game's settings, brings them back.
+        env.MADEIRA_EC_HOOK_TRACE = 0
+        \(sharedRuntime)
+        """,
+        olderNvidia: true)
+
     static let all = [rdr2Steam, rdr2Other, gta5EnhancedSteam, gta5EnhancedOther, ghostOfTsushima, godOfWar, horizonZeroDawn,
-                      darkSoulsRemastered, darkSoulsIII, dragonAgeInquisition, falloutNewVegas, fallout3, blackOps2, blackFlag, crashBandicootNSane, standard]
+                      darkSoulsRemastered, darkSoulsIII, dragonAgeInquisition, falloutNewVegas, fallout3, blackOps2, blackFlag, crashBandicootNSane, bioshock, standard]
 
     // MARK: Recognising a game
 
@@ -630,6 +667,8 @@ enum GameRecommendations {
     static let blackOps2AppIDs: Set<Int> = [202970, 212910, 202990]
     static let crashBandicootNSaneAppID = 731490
     static let blackFlagAppID = 242050
+    /// BioShock, BioShock Remastered, BioShock 2, BioShock 2 Remastered.
+    static let bioshockAppIDs: Set<Int> = [7670, 409710, 8850, 409720]
 
     /// The recommendation for a game, or nil.
     /// - windowsPath: a program ("C:\Games\GoW\GoW.exe"), or a library Steam
@@ -659,6 +698,8 @@ enum GameRecommendations {
             if blackOps2AppIDs.contains(steamAppID ?? 0) || installFolder == "call of duty black ops ii" { return blackOps2 }
             if steamAppID == crashBandicootNSaneAppID || installFolder == "crash bandicoot - n sane trilogy" { return crashBandicootNSane }
             if steamAppID == blackFlagAppID || installFolder == "assassin's creed iv black flag" { return blackFlag }
+            if bioshockAppIDs.contains(steamAppID ?? 0) || ["bioshock", "bioshock remastered", "bioshock 2",
+                "bioshock 2 remastered"].contains(installFolder ?? "") { return bioshock }
             return nil
         }
         // A program, wherever it was installed: only the game's own programs, so a
@@ -695,6 +736,8 @@ enum GameRecommendations {
             return crashBandicootNSane
         case "ac4bfsp.exe":
             return blackFlag
+        case "bioshock.exe", "bioshockhd.exe", "bioshock2.exe", "bioshock2hd.exe":
+            return bioshock
         default:
             return nil
         }

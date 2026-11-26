@@ -67,7 +67,8 @@ class MadeiraXInputHIDRestartTests(unittest.TestCase):
         self.assertIn('@AppStorage("wineControllerAPI")', SETTINGS)
         for choice in ('"XInput"', '"XInput + DirectInput"', '"HID"',
                        '"DualSense HID"', '"Generic HID"'):
-            self.assertIn(choice, SETTINGS + (ROOT / "iDeck/MainView.swift").read_text())
+            self.assertIn(choice, SETTINGS + (ROOT / "iDeck/MainView.swift").read_text()
+                          + (ROOT / "iDeck/InputManager.swift").read_text())
         self.assertIn('setenv("MADEIRA_DINPUT_PAD", "1", 1)', ENVIRONMENT)
         self.assertIn('setenv("MADEIRA_PAD_MODE", "dualsense", 1)', ENVIRONMENT)
         self.assertIn('setenv("MADEIRA_PAD_MODE", "generic", 1)', ENVIRONMENT)

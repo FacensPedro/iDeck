@@ -6,7 +6,8 @@ from support import repo_text
 class BullyCrashFixesTests(unittest.TestCase):
     def test_bully_starts_directly_not_as_steam_child(self):
         coordinator = repo_text("iDeck/SystemCoordinator.swift")
-        self.assertIn("static let directSteamLaunchAppIDs: Set<UInt32> = [12200]", coordinator)
+        # 2.16.2: Bully goes through Steam's client (its build carries Steam's DRM).
+        self.assertIn("static let directSteamLaunchAppIDs: Set<UInt32> = []", coordinator)
         self.assertIn("(skipSteamClient || Self.directSteamLaunchAppIDs.contains(game.appID))", coordinator)
 
     def test_dxgi_mode_table_matches_user32_for_every_game(self):
