@@ -11,12 +11,28 @@ OUT="$MD/app/Madeira/compat/love"
   echo "ERROR: verified x86_64 LLVM-MinGW toolchain not available" >&2
   exit 2
 }
-if [[ ! -d "$SRC/.git" ]]; then
-  mkdir -p "$(dirname "$SRC")"
-  git clone --filter=blob:none https://github.com/LuaJIT/LuaJIT.git "$SRC"
+# Already built from this revision: nothing to fetch.
+if [[ -f "$OUT/lua51.dll" && "$(cat "$OUT/lua51.dll.version" 2>/dev/null)" == "$REV" ]]; then
+  echo "GC64 LuaJIT compatibility DLL already built: $OUT/lua51.dll"
+  exit 0
 fi
-git -C "$SRC" fetch --depth 1 origin "$REV"
-git -C "$SRC" checkout --detach "$REV"
+# Only the one commit, without a partial clone: a blob:none clone checked out the
+# default branch by fetching its blobs from the promisor remote afterwards, and that
+# second request was refused on CI ("could not read Username", 2026-11-26).
+if [[ ! -d "$SRC/.git" ]] || ! git -C "$SRC" rev-parse --git-dir >/dev/null 2>&1; then
+  rm -rf "$SRC"
+  mkdir -p "$SRC"
+  git -C "$SRC" init -q
+  git -C "$SRC" remote add origin https://github.com/LuaJIT/LuaJIT.git
+fi
+git -C "$SRC" config --unset-all remote.origin.promisor >/dev/null 2>&1 || true
+git -C "$SRC" config --unset-all remote.origin.partialclonefilter >/dev/null 2>&1 || true
+for attempt in 1 2 3 4; do
+  if GIT_TERMINAL_PROMPT=0 git -C "$SRC" -c credential.helper= fetch --depth 1 origin "$REV"; then break; fi
+  [[ "$attempt" == 4 ]] && { echo "ERROR: could not fetch LuaJIT $REV" >&2; exit 2; }
+  sleep $((attempt * 5))
+done
+git -C "$SRC" checkout -q --detach FETCH_HEAD
 [[ "$(git -C "$SRC" rev-parse HEAD)" == "$REV" ]] || {
   echo "ERROR: LuaJIT source revision mismatch" >&2
   exit 2
