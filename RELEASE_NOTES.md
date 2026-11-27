@@ -42,7 +42,16 @@
   - real use is measured: how many identifiers of each framework iDeck's code names, with the most used;
   - frameworks that could be removed (imported but unused) are listed: none today;
   - coverage is given both for iDeck's own code and with Madeira's frameworks.
-- AuthenticationServices (store sign-ins) and QuickLook (log previews) are the two candidates to adopt. IOKit is marked as not public: only the existing uses remain.
+- IOKit is marked as not public: only the existing uses remain.
+
+### Sign-in and Bugs & logs (AuthenticationServices and QuickLook)
+- EA app and Epic Games sign-ins open in Safari's sign-in sheet over iDeck (AuthenticationServices) instead of switching to the Safari app. It shares Safari's cookies, so an account already signed in on the web goes straight through.
+  - EA app: the sheet receives EA's end-of-login address itself and closes; iDeck signs in.
+  - Epic Games: iDeck sees the approval and closes the sheet by itself.
+  - If the sheet cannot open, Safari is used as before; pasting a code or address still works.
+  - GOG keeps Safari: its login ends on an address of its own site that no other app can receive.
+- Bugs & logs › Preview before sharing (QuickLook): the bug report, the last Wine log, the failed launch's Wine log and the iDeck log, shown exactly as Copy shares them, compacted and with personal data removed.
+- The library audit now counts both frameworks as in use: 29 of 58 public frameworks (50%).
 
 ### Graphics
 - MetalFX: the upscale factor now fits both sides of the screen. A 4:3 game on an iPhone was enlarged by its long side only, beyond the screen's height, so MetalFX drew pixels that were then thrown away.

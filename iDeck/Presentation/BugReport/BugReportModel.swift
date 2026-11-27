@@ -8,6 +8,8 @@ import Darwin
 @MainActor
 final class BugReportModel: ObservableObject {
     @Published private(set) var issues: [LogIssue] = []
+    /// The file QuickLook shows (`.quickLookPreview`): what would be shared, as it would be.
+    @Published var previewURL: URL?
     @Published private(set) var wineFinding: String?
     /// The "Missing DLLs:" line of the report, from the last Wine log.
     @Published private(set) var missingModules: String?
@@ -187,6 +189,27 @@ final class BugReportModel: ObservableObject {
             } catch {
                 notice = tr("Could not copy Wine log.")
             }
+        }
+    }
+
+    /// QuickLook previews (3.0.1): the bug report or a log exactly as Copy shares it,
+    /// compacted and with personal data removed, before it leaves the device.
+    func previewReport() {
+        do {
+            previewURL = try WineLogClipboard.redactedTextFile(report(for: issues), named: "iDeck-bug-report.txt")
+        } catch {
+            notice = tr("Could not copy the bug report.")
+        }
+    }
+
+    func previewLog(_ url: URL?, name: String) {
+        guard let url, FileManager.default.fileExists(atPath: url.path) else {
+            notice = tr("That log is empty.")
+            return
+        }
+        Task {
+            do { previewURL = try await WineLogClipboard.redactedSnapshot(from: url, name: name) }
+            catch { notice = tr("That log is empty.") }
         }
     }
 

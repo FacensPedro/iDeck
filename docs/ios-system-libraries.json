@@ -1,9 +1,6 @@
 {
   "audit": {
-    "candidates": [
-      "QuickLook",
-      "AuthenticationServices"
-    ],
+    "candidates": [],
     "evaluated_by_name": {
       "CoreLocation": {
         "decision": "not applicable",
@@ -467,19 +464,23 @@
       "used_via": "none"
     },
     {
-      "api_symbols": 0,
-      "audit": "candidate",
-      "audit_note": "Previewing logs and bug reports before they are shared.",
-      "examples": [],
-      "files": 0,
+      "api_symbols": 1,
+      "audit": "direct",
+      "audit_note": "Bugs & logs previews the bug report and the logs as they would be shared (3.0.1).",
+      "examples": [
+        "iDeck/Presentation/BugReport/BugReportScreen.swift"
+      ],
+      "files": 1,
       "framework": "QuickLook",
       "group": "Files & storage",
       "linked_by_madeira": false,
       "minimum_ios": "4.0",
       "status": "public",
-      "top_api": [],
-      "used": false,
-      "used_via": "none"
+      "top_api": [
+        "quickLookPreview"
+      ],
+      "used": true,
+      "used_via": "iDeck"
     },
     {
       "api_symbols": 1,
@@ -783,7 +784,7 @@
         "iDeck/Application/SystemCoordinator+JIT.swift",
         "iDeck/Application/SystemCoordinator+Launch.swift"
       ],
-      "files": 34,
+      "files": 35,
       "framework": "UIKit",
       "group": "Interface",
       "linked_by_madeira": false,
@@ -884,19 +885,26 @@
       "used_via": "none"
     },
     {
-      "api_symbols": 0,
-      "audit": "candidate",
-      "audit_note": "ASWebAuthenticationSession for store sign-ins that now open Safari.",
-      "examples": [],
-      "files": 0,
+      "api_symbols": 4,
+      "audit": "direct",
+      "audit_note": "Safari's sign-in sheet (ASWebAuthenticationSession) for the EA app and Epic Games sign-ins (3.0.1).",
+      "examples": [
+        "iDeck/Stores/WebSignIn.swift"
+      ],
+      "files": 1,
       "framework": "AuthenticationServices",
       "group": "Security",
       "linked_by_madeira": false,
       "minimum_ios": "12.0",
       "status": "public",
-      "top_api": [],
-      "used": false,
-      "used_via": "none"
+      "top_api": [
+        "ASWebAuthenticationSession",
+        "ASPresentationAnchor",
+        "ASWebAuthenticationPresentationContextProviding",
+        "ASWebAuthenticationSessionError"
+      ],
+      "used": true,
+      "used_via": "iDeck"
     },
     {
       "api_symbols": 9,
@@ -1176,10 +1184,10 @@
   "module": "iDeckSystemLibraries",
   "summary": {
     "catalogued": 59,
-    "coverage_percent": 46.6,
-    "coverage_with_madeira_percent": 62.1,
+    "coverage_percent": 50.0,
+    "coverage_with_madeira_percent": 65.5,
     "public": 58,
-    "used": 27,
-    "used_with_madeira": 36
+    "used": 29,
+    "used_with_madeira": 38
   }
 }

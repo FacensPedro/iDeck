@@ -177,3 +177,31 @@ class GraphicsImprovements(unittest.TestCase):
         self.assertIn("D3D12Fallback.note(program, loadedD3D12:", end)
         env = read("iDeck/WindowsEnvironment.swift")
         self.assertIn('setenv("DXMT_SHADER_CACHE_MAX_MB", small ? "64" : "128", 1)', env)
+
+
+class AuthenticationServicesAdoption(unittest.TestCase):
+    def test_sign_in_sheet_for_ea_and_epic(self):
+        web = read("iDeck/Stores/WebSignIn.swift")
+        self.assertIn("import AuthenticationServices", web)
+        self.assertIn("ASWebAuthenticationSession(url: url, callback: .customScheme(scheme))", web)
+        self.assertIn("session.prefersEphemeralWebBrowserSession = false", web)
+        self.assertIn("func finish()", web)
+        self.assertIn('try await WebSignIn.shared.start(url: url, scheme: "qrc")', read("iDeck/EASignIn.swift"))
+        epic = read("iDeck/EpicGames.swift")
+        self.assertIn("WebSignIn.shared.finish()", epic)
+        self.assertIn('WebSignIn.shared.start(url: url, scheme: "ideck-epic-signin")', epic)
+        self.assertEqual(read("iDeck.xcodeproj/project.pbxproj").count("WebSignIn.swift"), 6)
+
+
+class QuickLookAdoption(unittest.TestCase):
+    def test_preview_before_sharing(self):
+        screen = read("iDeck/Presentation/BugReport/BugReportScreen.swift")
+        self.assertIn("import QuickLook", screen)
+        self.assertIn(".quickLookPreview($model.previewURL)", screen)
+        self.assertIn('tr("Preview before sharing")', screen)
+        model = read("iDeck/Presentation/BugReport/BugReportModel.swift")
+        self.assertIn("func previewReport()", model)
+        self.assertIn("try await WineLogClipboard.redactedSnapshot(from: url, name: name)", model)
+        clip = read("iDeck/WineLogClipboard.swift")
+        self.assertIn("static func redactedSnapshot(from source: URL, name: String) async throws -> URL", clip)
+        self.assertIn("PrivacyRedactor.redact(", clip)

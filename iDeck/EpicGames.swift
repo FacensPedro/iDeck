@@ -29,10 +29,10 @@ struct EpicSignInView: View {
                         Section {
                             HStack(spacing: 12) {
                                 ProgressView()
-                                Text(tr("Sign in on Epic's page in Safari. iDeck connects by itself."))
+                                Text(tr("Sign in on Epic's page. iDeck connects by itself and closes it."))
                             }
                             Button(tr("Open Safari again"), systemImage: "safari") {
-                                if let url = loginURL { UIApplication.shared.open(url) } else { startSafariSignIn() }
+                                if let url = loginURL { openSheet(url) } else { startSafariSignIn() }
                             }
                         }
                     }
@@ -70,12 +70,26 @@ struct EpicSignInView: View {
             do {
                 try await epic.signInWithSafari { url in
                     loginURL = url
-                    UIApplication.shared.open(url)
+                    openSheet(url)
                 }
+                // Approved: the sheet closes by itself, then this page.
+                WebSignIn.shared.finish()
                 dismiss()
             } catch {
+                WebSignIn.shared.finish()
                 if !epic.signedIn { failure = error.localizedDescription; opened = false }
             }
+        }
+    }
+
+    /// Epic's device page in Safari's sign-in sheet over iDeck (AuthenticationServices).
+    /// The page never redirects: iDeck polls for the approval and closes the sheet
+    /// itself. Safari is used when the sheet cannot open.
+    private func openSheet(_ url: URL) {
+        Task {
+            do { _ = try await WebSignIn.shared.start(url: url, scheme: "ideck-epic-signin") }
+            catch WebSignIn.Failure.cancelled {}
+            catch { UIApplication.shared.open(url) }
         }
     }
 
