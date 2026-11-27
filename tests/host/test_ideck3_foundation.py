@@ -30,6 +30,13 @@ class IDeck3Foundation(unittest.TestCase):
             self.assertEqual((ROOT / "iDeck.xcodeproj/project.pbxproj").read_text().count(path.name) >= 4, True, part)
         self.assertLess(len((ROOT / "iDeck/SystemCoordinator.swift").read_bytes().splitlines()), 800)
 
+    def test_project_paths_are_valid_plist_strings(self):
+        # An unquoted pbxproj string may hold only [A-Za-z0-9_$/:.-]; "+" made the project unreadable.
+        import re
+        project = (ROOT / "iDeck.xcodeproj/project.pbxproj").read_text()
+        for value in re.findall(r'path = ([^";\n]+);', project):
+            self.assertRegex(value, r"^[A-Za-z0-9_$/:.\-]+$")
+
     def test_short_ipa_name(self):
         wf = (ROOT / ".github/workflows/ios.yml").read_text()
         self.assertIn('LABEL="$(sed -E \'s/(\\.0)+$//\' <<<"$VERSION")"', wf)
