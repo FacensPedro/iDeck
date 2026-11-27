@@ -22,6 +22,30 @@ extension SystemCoordinator {
         }
     }
 
+    /// The Wine log of the last launch that failed, kept on its own: madeira-log.txt is
+    /// rotated once it passes 8 MB, so after a few more sessions the failed one was gone
+    /// (3.0: Dragon Age: Inquisition's crash, reported after four other sessions).
+    static var failedWineLogURL: URL? {
+        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?
+            .appendingPathComponent("madeira-log.failed.txt", isDirectory: false)
+    }
+
+    /// Copies what the failed session wrote to madeira-log.txt (its last 12 MB at most).
+    static func keepFailedSessionLog(game: String, since offset: Int64?) {
+        guard let offset, offset >= 0, let url = wineLogURL, let out = failedWineLogURL,
+              let handle = try? FileHandle(forReadingFrom: url) else { return }
+        defer { try? handle.close() }
+        guard let size = try? handle.seekToEnd(), size > UInt64(offset) else { return }
+        let cap: UInt64 = 12 << 20
+        let start = max(UInt64(offset), size > cap ? size - cap : 0)
+        guard (try? handle.seek(toOffset: start)) != nil, let data = try? handle.readToEnd() else { return }
+        var text = Data("[iDeck] Wine log of the failed launch of \(game), \(ISO8601DateFormatter().string(from: Date()))\n".utf8)
+        text.append(data)
+        if (try? text.write(to: out, options: .atomic)) != nil {
+            AppLog.record("[wine-log] the failed launch's Wine log is kept as madeira-log.failed.txt (\(data.count >> 10) KB)")
+        }
+    }
+
     func captureWineLogStart() {
         guard let url = Self.wineLogURL else {
             wineLogStartOffset = nil

@@ -30,7 +30,7 @@ class DoomVulkanBuild(unittest.TestCase):
         self.assertIn('guard vulkanMode != "Off", runtime,', graphics)
         env = (ROOT / "iDeck/WindowsEnvironment.swift").read_text()
         self.assertIn("func execute(binary requestedBinary: URL,", env)
-        self.assertIn("let binary = vulkanBuild ?? requestedBinary", env)
+        self.assertIn("let vulkanOrRequested = vulkanBuild ?? requestedBinary", env)
 
 
 class GOGPublisherLauncher(unittest.TestCase):
@@ -50,3 +50,59 @@ class EAActivationRows(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class BethesdaDirectLaunch(unittest.TestCase):
+    def test_launchers_map_to_games(self):
+        env = (ROOT / "iDeck/WindowsEnvironment.swift").read_text()
+        for pair in ('"falloutnvlauncher.exe": "FalloutNV.exe"', '"fallout4launcher.exe": "Fallout4.exe"',
+                     '"skyrimselauncher.exe": "SkyrimSE.exe"', '"oblivionlauncher.exe": "Oblivion.exe"',
+                     '"falloutlauncher.exe": "Fallout3.exe"', '"skyrimlauncher.exe": "TESV.exe"'):
+            self.assertIn(pair, env)
+        self.assertIn("let binary = bethesdaGame ?? vulkanOrRequested", env)
+
+
+class FailedSessionWineLog(unittest.TestCase):
+    def test_failed_launch_log_kept_and_copyable(self):
+        diag = read("iDeck/Application/SystemCoordinator+Diagnostics.swift")
+        self.assertIn('appendingPathComponent("madeira-log.failed.txt", isDirectory: false)', diag)
+        end = read("iDeck/Application/SystemCoordinator+SessionEnd.swift")
+        self.assertIn("Self.keepFailedSessionLog(game: endedGame ?? \"unknown\", since: wineLogStartOffset)", end)
+        screen = read("iDeck/Presentation/BugReport/BugReportScreen.swift")
+        self.assertIn('tr("Copy Wine log of the last failed launch")', screen)
+        loc = read("iDeck/Localization.swift")
+        self.assertIn('"Copy Wine log of the last failed launch": ["pt":', loc)
+
+
+class UbisoftIntegrity(unittest.TestCase):
+    def test_slices_and_files_checked(self):
+        inst = read("iDeck/Stores/Ubisoft/UbisoftInstaller.swift")
+        self.assertIn("Insecure.SHA1.hash(data: bytes)", inst)
+        self.assertIn('throw UbisoftDemuxError.refused("slice SHA-1 mismatch")', inst)
+        self.assertIn("if size == file.size { finished.insert(file.name) } else { broken += 1 }", inst)
+        self.assertIn('throw UbisoftDemuxError.malformed("file \\(file.name) incomplete")', inst)
+
+
+class AutoDLLValidation(unittest.TestCase):
+    def test_extracted_and_copied_dlls_validated(self):
+        cache = read("iDeck/Runtime/AutoDLL/AutoDLLCache.swift")
+        self.assertIn("static func isValidDLL(_ file: URL, machine: UInt16) -> Bool", cache)
+        self.assertIn("guard count > 0, valid > 0 else", cache)
+        inst = read("iDeck/Runtime/AutoDLL/AutoDLLInstaller.swift")
+        self.assertIn("guard isValidDLL(source, machine: machine) else", inst)
+        self.assertIn('(line.contains("library ") && line.contains("not found"))', inst)
+
+    def test_detection_reads_delay_imports_and_checks_d3dx(self):
+        dep = read("iDeck/SessionCompatibility.swift")
+        self.assertIn("directories + 13 * 8", dep)
+        self.assertIn('static let checkedDirectXPrefixes = ["d3dx9_", "d3dx10_", "d3dx11_", "d3dcompiler_", "d3dcsx_"]', dep)
+        self.assertIn("if isProvided(name) { continue }", dep)
+
+
+class SessionLifecycleMonitor(unittest.TestCase):
+    def test_durations_monitor_and_recovering_from_idle(self):
+        life = read("iDeck/Application/SessionLifecycle.swift")
+        self.assertIn(".idle: [.preparing, .launching, .failed, .recovering],", life)
+        self.assertIn("static let stallSeconds: [State: TimeInterval]", life)
+        self.assertIn('"[session] stalled: ', life)
+        self.assertIn("func observe(_ observer: @escaping (State, State) -> Void)", life)

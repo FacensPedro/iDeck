@@ -362,6 +362,9 @@ extension SystemCoordinator {
                                                   logURL: Self.wineLogURL, since: wineLogStartOffset) {
             FullCodeChecksAuto.enable(endedGame)
         }
+        if outcome.reason.hasPrefix("Execution Error") {
+            Self.keepFailedSessionLog(game: endedGame ?? "unknown", since: wineLogStartOffset)
+        }
         EALibrary.noteSessionEnded(activationUI: Self.sessionLogContains(["activationui.exe"], logURL: Self.wineLogURL,
                                                                         since: wineLogStartOffset))
         wineLogStartOffset = nil

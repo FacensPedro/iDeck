@@ -71,6 +71,10 @@ struct BugReportView: View {
                         Label(tr("Copy last Wine log"), systemImage: "terminal")
                     }
                     .disabled(!model.hasWineLog)
+                    Button { model.copyFailedWineLog() } label: {
+                        Label(tr("Copy Wine log of the last failed launch"), systemImage: "exclamationmark.triangle")
+                    }
+                    .disabled(!model.hasFailedWineLog)
                     Button { model.copyLog(AppLog.fileURL) } label: {
                         Label(tr("Copy iDeck log"), systemImage: "list.bullet.rectangle")
                     }

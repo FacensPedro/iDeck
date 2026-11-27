@@ -41,6 +41,34 @@ class WindowsEnvironment {
     static let sessionAlreadyRan = Int32(EALREADY)
     static var oneSessionPerRun: Bool { MadeiraConfig.flag("MADEIRA_ONE_SESSION_PER_RUN") }
 
+    /// Bethesda's launchers and the game each one starts. The launcher only detects the
+    /// video hardware, writes the graphics INI and then starts the game; under Wine it
+    /// stopped at "Detecting Video Hardware" or closed on Play (Fallout: New Vegas from
+    /// Epic). The games write their default INI themselves when it is missing.
+    static let bethesdaLaunchers: [String: String] = [
+        "falloutnvlauncher.exe": "FalloutNV.exe",
+        "falloutlauncher.exe": "Fallout3.exe",
+        "fallout3launcher.exe": "Fallout3.exe",
+        "fallout4launcher.exe": "Fallout4.exe",
+        "skyrimlauncher.exe": "TESV.exe",
+        "skyrimselauncher.exe": "SkyrimSE.exe",
+        "skyrimvrlauncher.exe": "SkyrimVR.exe",
+        "oblivionlauncher.exe": "Oblivion.exe",
+        "morrowind launcher.exe": "Morrowind.exe",
+    ]
+
+    /// The game's own executable next to a Bethesda launcher, or nil.
+    static func bethesdaGameExecutable(for launcher: URL) -> URL? {
+        guard let name = bethesdaLaunchers[launcher.lastPathComponent.lowercased()] else { return nil }
+        let folder = launcher.deletingLastPathComponent()
+        let exact = folder.appendingPathComponent(name)
+        if FileManager.default.fileExists(atPath: exact.path) { return exact }
+        // Windows names are case-insensitive; the files on APFS may differ in case.
+        let match = (try? FileManager.default.contentsOfDirectory(atPath: folder.path))?
+            .first { $0.lowercased() == name.lowercased() }
+        return match.map { folder.appendingPathComponent($0) }
+    }
+
     func execute(binary requestedBinary: URL, arguments: String = "", is32Bit: Bool = false, isSteam: Bool = false,
                  steamAppID: UInt32? = nil, steamInstallDirectory: URL? = nil,
                  steamWorkingDirectory: URL? = nil,
@@ -49,7 +77,12 @@ class WindowsEnvironment {
         if let vulkanBuild {
             SteamLog.event("[graphics] \(requestedBinary.lastPathComponent) needs OpenGL 4.5 core, past this runtime: launching its Vulkan build \(vulkanBuild.lastPathComponent)")
         }
-        let binary = vulkanBuild ?? requestedBinary
+        let vulkanOrRequested = vulkanBuild ?? requestedBinary
+        let bethesdaGame = Self.bethesdaGameExecutable(for: vulkanOrRequested)
+        if let bethesdaGame {
+            SteamLog.event("[launch] Bethesda launcher \(vulkanOrRequested.lastPathComponent) skipped: starting \(bethesdaGame.lastPathComponent) directly")
+        }
+        let binary = bethesdaGame ?? vulkanOrRequested
         guard Self.sessionsThisRun == 0 || !Self.oneSessionPerRun else {
             SteamLog.event("[session-once] launch held: \(Self.sessionsThisRun) session(s) already ran in this app run")
             completion(Int(EALREADY))

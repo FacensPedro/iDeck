@@ -468,7 +468,7 @@
         "iDeck/EpicAPI.swift",
         "iDeck/EpicDownloader.swift"
       ],
-      "files": 14,
+      "files": 15,
       "framework": "CryptoKit",
       "group": "Security",
       "minimum_ios": "13.0",

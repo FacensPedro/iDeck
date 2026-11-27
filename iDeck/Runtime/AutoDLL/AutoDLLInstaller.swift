@@ -53,8 +53,20 @@ extension AutoDLLManager {
             guard isCached(component) else { prefetch(component); waiting.append(file); continue }
             let source = cacheFolder(component, machine: machine).appendingPathComponent(file)
             let target = folder.appendingPathComponent(file)
-            guard fm.fileExists(atPath: source.path), !fm.fileExists(atPath: target.path) else { continue }
-            if (try? fm.copyItem(at: source, to: target)) != nil { copied.append(file) }
+            guard !fm.fileExists(atPath: target.path) else { continue }
+            guard fm.fileExists(atPath: source.path) else { unknown.append(file); continue }
+            // The cached copy is checked before it goes next to the game.
+            guard isValidDLL(source, machine: machine) else {
+                invalidate(component, reason: "\(file) is not a valid \(machine == 0x014C ? "x86" : "x64") DLL")
+                prefetch(component)
+                waiting.append(file)
+                continue
+            }
+            if (try? fm.copyItem(at: source, to: target)) != nil, isValidDLL(target, machine: machine) {
+                copied.append(file)
+            } else {
+                try? fm.removeItem(at: target)
+            }
         }
         // Verify: a copy that the program still cannot use is taken back.
         if !copied.isEmpty {
@@ -97,12 +109,16 @@ extension AutoDLLManager {
         let end = (try? handle.seekToEnd()) ?? 0
         let start = max(UInt64(max(offset ?? 0, 0)), end > 16 << 20 ? end - (16 << 20) : 0)
         try? handle.seek(toOffset: start)
-        let marker = Data("c0000135".utf8)
+        let marker = Data("c0000135".utf8), notFound = Data("not found".utf8)
         var found = Set<String>()
         let names = catalog.flatMap(\.dlls).map { $0 + ".dll" }
         while let chunk = try? handle.read(upToCount: 1 << 20), !chunk.isEmpty {
-            guard chunk.range(of: marker) != nil, let text = String(data: chunk, encoding: .utf8)?.lowercased() else { continue }
-            for line in text.split(separator: "\n") where line.contains("c0000135") {
+            guard chunk.range(of: marker) != nil || chunk.range(of: notFound) != nil,
+                  let text = String(data: chunk, encoding: .utf8)?.lowercased() else { continue }
+            // Madeira's "[dll-missing] ... status=c0000135" and Wine's own "Library X (which
+            // is needed by Y) not found", which a start that goes on without the DLL writes.
+            for line in text.split(separator: "\n")
+            where line.contains("c0000135") || (line.contains("library ") && line.contains("not found")) {
                 for name in names where line.contains(name) { found.insert(name) }
             }
         }

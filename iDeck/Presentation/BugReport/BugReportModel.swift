@@ -190,6 +190,22 @@ final class BugReportModel: ObservableObject {
         }
     }
 
+    var hasFailedWineLog: Bool {
+        SystemCoordinator.failedWineLogURL.map { FileManager.default.fileExists(atPath: $0.path) } ?? false
+    }
+
+    func copyFailedWineLog() {
+        guard let url = SystemCoordinator.failedWineLogURL else { return }
+        Task {
+            do {
+                try await WineLogClipboard.copyFile(from: url, name: "Wine-log-failed-launch")
+                notice = tr("Wine log of the failed launch copied as a .txt file.")
+            } catch {
+                notice = tr("Could not copy Wine log.")
+            }
+        }
+    }
+
     func copyLog(_ url: URL?) {
         guard let url, let content = try? WineLogClipboard.read(from: url) else {
             notice = tr("That log is empty.")
@@ -223,6 +239,9 @@ final class BugReportModel: ObservableObject {
         AppLog.clear()
         if let wine = Self.wineLogURL {
             try? FileManager.default.removeItem(at: wine)
+        }
+        if let failed = SystemCoordinator.failedWineLogURL {
+            try? FileManager.default.removeItem(at: failed)
         }
         hasAppLog = false
         hasWineLog = false
