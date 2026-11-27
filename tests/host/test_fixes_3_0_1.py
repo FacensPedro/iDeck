@@ -291,3 +291,15 @@ class DLCScreensUseProviders(unittest.TestCase):
         self.assertIn("epicStore.installDLC(dlc.id, of: appName, prefix: nil)", epic)
         for old in ("epic.dlcs[", "epic.installDLC(", "epic.uninstallDLC(", "epic.installedDLC["):
             self.assertNotIn(old, epic)
+
+
+class EpicPacksThroughProvider(unittest.TestCase):
+    def test_optional_packs(self):
+        sp = read("iDeck/Stores/StoreProvider.swift")
+        self.assertIn("struct StoreOptionalPack: Hashable, Sendable", sp)
+        self.assertIn("model.installPack(gameID, tag: packID)", sp)
+        page = split_sources._original_read_text(ROOT / "iDeck/Presentation/GameDetails/EpicGameDetailsSheet.swift")
+        self.assertIn("StoreProviders.of(.epic).optionalPacks(of: appName)", page)
+        self.assertIn("epicStore.installPack(pack.id, of: appName)", page)
+        for old in ("epic.installPack(", "epic.uninstallPack(", "epic.packInstalled(", "epic.optionalPacks[", "epic.loadOptionalPacks("):
+            self.assertNotIn(old, page)

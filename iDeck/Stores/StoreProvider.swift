@@ -73,6 +73,14 @@ struct StoreDLC: Hashable, Sendable {
     var sizeBytes: UInt64?
 }
 
+/// Optional content inside a game's own build (Epic's install tags: voice languages,
+/// high-resolution textures, some DLC), added and removed one by one.
+struct StoreOptionalPack: Hashable, Sendable {
+    let id: String
+    let title: String
+    var sizeBytes: Int64
+}
+
 /// What every store offers iDeck. Each store keeps its own model (sign-in, manifests,
 /// downloader); the provider is the common face that the library, the bug report and
 /// the resource governor use instead of asking each store in its own words.
@@ -120,6 +128,14 @@ protocol StoreProvider: AnyObject {
     func refreshInstalledDLC(of gameID: String, prefix: URL)
     /// The DLC being installed for the game now, if any.
     func installingDLC(of gameID: String) -> String?
+
+    // Optional content packs (3.0.1): only Epic Games has them in iDeck.
+    func optionalPacks(of gameID: String) -> [StoreOptionalPack]
+    func isPackInstalled(_ packID: String, of gameID: String) -> Bool
+    func installPack(_ packID: String, of gameID: String)
+    func uninstallPack(_ packID: String, of gameID: String)
+    /// Reads the game's packs (from its installed manifest).
+    func loadOptionalPacks(of gameID: String) async
 }
 
 extension StoreProvider {
@@ -132,6 +148,11 @@ extension StoreProvider {
     @discardableResult func uninstallDLC(_ dlcID: String, of gameID: String, prefix: URL?) -> Bool { false }
     func loadDLC(of gameID: String, prefix: URL?) async {}
     func refreshInstalledDLC(of gameID: String, prefix: URL) {}
+    func optionalPacks(of gameID: String) -> [StoreOptionalPack] { [] }
+    func isPackInstalled(_ packID: String, of gameID: String) -> Bool { false }
+    func installPack(_ packID: String, of gameID: String) {}
+    func uninstallPack(_ packID: String, of gameID: String) {}
+    func loadOptionalPacks(of gameID: String) async {}
     func installingDLC(of gameID: String) -> String? {
         dlcs(of: gameID).first { dlcDownloadStatus($0.id, of: gameID) != nil }?.id
     }
@@ -478,6 +499,17 @@ final class EpicStoreProvider: StoreProvider {
 
     /// Epic lists a game's DLC with the library, so a refresh brings them.
     func loadDLC(of gameID: String, prefix: URL?) async {}
+
+    // MARK: Optional content
+
+    func optionalPacks(of gameID: String) -> [StoreOptionalPack] {
+        (model.optionalPacks[gameID] ?? []).map { StoreOptionalPack(id: $0.tag, title: $0.tag, sizeBytes: $0.bytes) }
+    }
+
+    func isPackInstalled(_ packID: String, of gameID: String) -> Bool { model.packInstalled(gameID, tag: packID) }
+    func installPack(_ packID: String, of gameID: String) { model.installPack(gameID, tag: packID) }
+    func uninstallPack(_ packID: String, of gameID: String) { model.uninstallPack(gameID, tag: packID) }
+    func loadOptionalPacks(of gameID: String) async { await model.loadOptionalPacks(gameID) }
 }
 
 // MARK: - EA app

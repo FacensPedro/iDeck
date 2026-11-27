@@ -66,7 +66,8 @@ struct EpicGameDetailsSheet: View {
                 if !dlcs.isEmpty {
                     DetailCard(title: tr("DLCs")) { epicDLCList(dlcs) }
                 }
-                if let packs = epic.optionalPacks[appName], !packs.isEmpty {
+                let packs = StoreProviders.of(.epic).optionalPacks(of: appName)
+                if !packs.isEmpty {
                     DetailCard(title: tr("Optional content")) { epicPackList(packs) }
                 }
                 VStack(alignment: .leading, spacing: 10) {
@@ -80,30 +81,32 @@ struct EpicGameDetailsSheet: View {
         }
         .task(id: appName) {
             await epic.loadSize(appName)
-            await epic.loadOptionalPacks(appName)
+            await StoreProviders.of(.epic).loadOptionalPacks(of: appName)
         }
     }
 
     /// Optional content inside the game's own build, installed and removed one by one
     /// like a DLC: Epic ships some DLC, textures and voice languages this way.
-    private func epicPackList(_ packs: [EpicOptionalPack]) -> some View {
-        VStack(spacing: 0) {
-            ForEach(packs) { pack in
-                let installedPack = epic.packInstalled(appName, tag: pack.tag)
+    /// Through the StoreProvider (3.0.1).
+    private func epicPackList(_ packs: [StoreOptionalPack]) -> some View {
+        let epicStore = StoreProviders.of(.epic)
+        return VStack(spacing: 0) {
+            ForEach(packs, id: \.id) { pack in
+                let installedPack = epicStore.isPackInstalled(pack.id, of: appName)
                 HStack(spacing: 12) {
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(pack.tag).font(.subheadline).foregroundColor(.white).lineLimit(2)
-                        Text(ByteCountFormatter.string(fromByteCount: pack.bytes, countStyle: .file))
+                        Text(pack.title).font(.subheadline).foregroundColor(.white).lineLimit(2)
+                        Text(ByteCountFormatter.string(fromByteCount: pack.sizeBytes, countStyle: .file))
                             .font(.caption2).foregroundColor(.gray)
                     }
                     Spacer(minLength: 6)
                     if installedPack {
-                        Button(role: .destructive) { epic.uninstallPack(appName, tag: pack.tag) } label: {
+                        Button(role: .destructive) { epicStore.uninstallPack(pack.id, of: appName) } label: {
                             Label(tr("Uninstall"), systemImage: "trash").font(.caption.weight(.semibold))
                         }
                         .buttonStyle(.bordered)
                     } else {
-                        Button { epic.installPack(appName, tag: pack.tag) } label: {
+                        Button { epicStore.installPack(pack.id, of: appName) } label: {
                             Text(tr("Install")).font(.caption.weight(.semibold))
                         }
                         .buttonStyle(.borderedProminent)
