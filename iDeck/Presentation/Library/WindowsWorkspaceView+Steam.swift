@@ -75,7 +75,7 @@ extension WindowsWorkspaceView {
             let root = URL(fileURLWithPath: mountedPath, isDirectory: true)
             Task { @MainActor in
                 prefixPath = root
-                steamLibrary.startInstall(appID: game.appID, prefixPath: root)
+                StoreProviders.of(.steam).install(String(game.appID), prefix: root)
             }
         }
     }

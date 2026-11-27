@@ -133,7 +133,7 @@ extension WindowsWorkspaceView {
     /// straight from GOG's content system. No offline installer.
     func downloadGOGInstaller(_ game: GOGGame) {
         guard let prefixPath else { return }
-        gogLibrary.install(game, prefixPath: prefixPath) { _ in
+        StoreProviders.of(.gog).install(String(game.id), prefix: prefixPath) {
             windowsLibrary.refresh(prefixPath: prefixPath)
         }
     }

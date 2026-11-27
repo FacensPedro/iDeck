@@ -43,16 +43,15 @@ struct EpicGameDetailsSheet: View {
             paused: paused, waiting: download?.state == .queued, sizeText: sizeText, errorText: failed,
             canInstall: true,
             onLaunch: { if let installed { launch(installed) } },
-            onInstall: { epic.install(appName) },
-            onPause: { epic.pause(appName) },
-            onStop: { epic.cancel(appName) },
+            onInstall: { StoreProviders.of(.epic).install(appName, prefix: nil) },
+            onPause: { StoreProviders.of(.epic).pause(appName) },
+            onStop: { StoreProviders.of(.epic).cancel(appName) },
             // Always shown: a save check running in the background (it starts when this page
             // opens) hid the button. While a game runs or a sync writes saves, the removal
             // waits for it instead.
             onUninstall: {
                 guard !epic.sessionRunning else { return false }
-                epic.uninstall(appName)
-                return epic.installed[appName] == nil
+                return StoreProviders.of(.epic).uninstall(appName, prefix: nil)
             },
             library: library, coordinator: coordinator
         ) {
@@ -61,7 +60,7 @@ struct EpicGameDetailsSheet: View {
                     DetailValueRow(title: tr("Version"), value: installed?.buildVersion ?? "",
                                    icon: "number", iconColor: .gray)
                     if epic.updateAvailable(appName) {
-                        DetailButtonRow(title: tr("Update"), systemImage: "arrow.down.circle") { epic.install(appName) }
+                        DetailButtonRow(title: tr("Update"), systemImage: "arrow.down.circle") { StoreProviders.of(.epic).install(appName, prefix: nil) }
                     }
                     DetailButtonRow(title: tr("Repair"), systemImage: "wrench.and.screwdriver", showsDivider: false) {
                         epic.repair(appName)

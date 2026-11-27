@@ -32,12 +32,13 @@ struct GOGGameDetailsSheet: View {
             canInstall: game.worksOnWindows && prefixPath != nil,
             onLaunch: { if let installed { launch(installed) } },
             onInstall: {
-                if gog.pausedDownloads.contains(game.id) { gog.resumeDownload(game) }
+                let gogStore = StoreProviders.of(.gog)
+                if gogStore.downloadState(String(game.id)) == .paused { gogStore.resume(String(game.id), prefix: prefixPath) }
                 else { install(game) }
             },
-            onPause: { gog.pauseDownload(game) },
-            onStop: { gog.cancelDownload(game) },
-            onUninstall: prefixPath.map { prefix in { gog.uninstall(game.id, prefixPath: prefix) } },
+            onPause: { StoreProviders.of(.gog).pause(String(game.id)) },
+            onStop: { StoreProviders.of(.gog).cancel(String(game.id)) },
+            onUninstall: prefixPath.map { prefix in { StoreProviders.of(.gog).uninstall(String(game.id), prefix: prefix) } },
             library: library, coordinator: coordinator
         ) { EmptyView() }
         .task(id: game.id) { await gog.loadSize(for: game) }

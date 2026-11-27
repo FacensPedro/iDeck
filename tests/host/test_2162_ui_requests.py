@@ -13,7 +13,7 @@ class Requests2162(unittest.TestCase):
         self.assertIn("private func savedSelection() -> String", card)
         self.assertIn('guard let available, !available.isEmpty else { return ["en-US"] }', card)
         self.assertNotIn("kept.isEmpty ? offered : kept", card)
-        self.assertIn("steamLibrary.startInstall(appID: game.appID, prefixPath: prefixPath)", read("iDeck/MainView.swift"))
+        self.assertIn("StoreProviders.of(.steam).install(String(game.appID), prefix: prefixPath)", read("iDeck/MainView.swift"))
 
     def test_controllers(self):
         im = read("iDeck/InputManager.swift")

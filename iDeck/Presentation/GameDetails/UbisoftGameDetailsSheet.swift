@@ -37,9 +37,9 @@ struct UbisoftGameDetailsSheet: View {
                 let profile = library.profile(for: "ubisoft:\(gameID)", title: game.title)
                 coordinator.launchWindowsProgram(at: executable, profile: profile, detectInstaller: false)
             },
-            onInstall: { ubisoft.install(game) },
-            onPause: { ubisoft.pause(game) },
-            onStop: { ubisoft.cancel(game) },
+            onInstall: { StoreProviders.of(.ubisoft).install(game.id, prefix: nil) },
+            onPause: { StoreProviders.of(.ubisoft).pause(game.id) },
+            onStop: { StoreProviders.of(.ubisoft).cancel(game.id) },
             onUninstall: nil,
             library: library, coordinator: coordinator
         ) {

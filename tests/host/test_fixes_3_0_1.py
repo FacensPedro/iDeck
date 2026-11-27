@@ -205,3 +205,29 @@ class QuickLookAdoption(unittest.TestCase):
         clip = read("iDeck/WineLogClipboard.swift")
         self.assertIn("static func redactedSnapshot(from source: URL, name: String) async throws -> URL", clip)
         self.assertIn("PrivacyRedactor.redact(", clip)
+
+
+class StoreScreensUseProviders(unittest.TestCase):
+    def test_pages_and_library_call_the_providers(self):
+        pages = {
+            "iDeck/Presentation/GameDetails/SteamProgramDetailsView.swift": ["StoreProviders.of(.steam).install(", "StoreProviders.of(.steam).uninstall("],
+            "iDeck/Presentation/GameDetails/SteamProgramDetailsView+Sections.swift": ["StoreProviders.of(.steam).pause(", "StoreProviders.of(.steam).cancel("],
+            "iDeck/Presentation/GameDetails/GOGGameDetailsSheet.swift": ["StoreProviders.of(.gog).pause(", "StoreProviders.of(.gog).uninstall("],
+            "iDeck/Presentation/GameDetails/EpicGameDetailsSheet.swift": ["StoreProviders.of(.epic).install(", "StoreProviders.of(.epic).uninstall("],
+            "iDeck/Presentation/GameDetails/EAGameDetailsSheet.swift": ["StoreProviders.of(.ea).install(", "StoreProviders.of(.ea).uninstall("],
+            "iDeck/Presentation/GameDetails/UbisoftGameDetailsSheet.swift": ["StoreProviders.of(.ubisoft).install("],
+            "iDeck/Presentation/Library/WindowsWorkspaceView+Steam.swift": ["StoreProviders.of(.steam).install("],
+            "iDeck/Presentation/Library/WindowsWorkspaceView+GOG.swift": ["StoreProviders.of(.gog).install("],
+        }
+        for path, calls in pages.items():
+            text = split_sources._original_read_text(ROOT / path)
+            for call in calls:
+                self.assertIn(call, text, path)
+        for path in pages:
+            text = split_sources._original_read_text(ROOT / path)
+            for old in ("steamLibrary.startInstall(", "steamLibrary.pauseInstall(", "steamLibrary.cancelInstall(",
+                        "gog.pauseDownload(", "gog.cancelDownload(", "ea.install(", "ubisoft.install(game)"):
+                self.assertNotIn(old, text, path)
+        sp = read("iDeck/Stores/StoreProvider.swift")
+        self.assertIn("static func of(_ store: GameStore) -> any StoreProvider", sp)
+        self.assertIn("onFinish: (@MainActor () -> Void)?) -> Bool", sp)

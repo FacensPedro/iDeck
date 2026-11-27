@@ -40,9 +40,11 @@ protocol StoreProvider: AnyObject {
     var ownedGames: [StoreGameRef] { get }
     func isInstalled(_ id: String, prefix: URL?) -> Bool
     func downloadState(_ id: String) -> StoreDownloadState?
-    /// Starts or queues the install; false when the store cannot do it now (no prefix,
-    /// unknown game, already installed).
-    @discardableResult func install(_ id: String, prefix: URL?) -> Bool
+    /// Starts or queues the install, or the update of an installed game (a language's
+    /// files, a new build); false when the store cannot do it now (no prefix, unknown
+    /// game). `onFinish` runs when the store reports the end of the install (GOG); the
+    /// other stores publish it through their own state, which the screens observe.
+    @discardableResult func install(_ id: String, prefix: URL?, onFinish: (@MainActor () -> Void)?) -> Bool
     func pause(_ id: String)
     func resume(_ id: String, prefix: URL?)
     /// Stops the download and removes what it wrote.
@@ -53,6 +55,13 @@ protocol StoreProvider: AnyObject {
 }
 
 extension StoreProvider {
+    @discardableResult func install(_ id: String, prefix: URL?) -> Bool { install(id, prefix: prefix, onFinish: nil) }
+
+    /// Install, or resume a paused download: what a page's Install button does.
+    func installOrResume(_ id: String, prefix: URL?, onFinish: (@MainActor () -> Void)? = nil) {
+        if downloadState(id) == .paused { resume(id, prefix: prefix) } else { install(id, prefix: prefix, onFinish: onFinish) }
+    }
+
     /// Every download of this store that has a state, with its game.
     var downloads: [(game: StoreGameRef, state: StoreDownloadState)] {
         ownedGames.compactMap { game in downloadState(game.id).map { (game, $0) } }
@@ -66,6 +75,12 @@ enum StoreProviders {
                                            EAStoreProvider(), UbisoftStoreProvider()]
 
     static func provider(_ store: GameStore) -> (any StoreProvider)? { all.first { $0.store == store } }
+
+    /// The provider of a store; every store has one.
+    static func of(_ store: GameStore) -> any StoreProvider {
+        guard let provider = provider(store) else { preconditionFailure("no StoreProvider for \(store)") }
+        return provider
+    }
 
     /// Downloads that are running or queued, in every store.
     static var runningDownloads: [(game: StoreGameRef, state: StoreDownloadState)] {
@@ -129,8 +144,8 @@ final class SteamStoreProvider: StoreProvider {
         return nil
     }
 
-    func install(_ id: String, prefix: URL?) -> Bool {
-        guard let app = UInt32(id), let prefix, !model.isInstalled(appID: app, prefixPath: prefix) else { return false }
+    func install(_ id: String, prefix: URL?, onFinish: (@MainActor () -> Void)?) -> Bool {
+        guard let app = UInt32(id), let prefix else { return false }
         model.startInstall(appID: app, prefixPath: prefix)
         return true
     }
@@ -169,9 +184,9 @@ final class GOGStoreProvider: StoreProvider {
         return nil
     }
 
-    func install(_ id: String, prefix: URL?) -> Bool {
-        guard let game = game(id), let prefix, model.installed[game.id] == nil else { return false }
-        model.install(game, prefixPath: prefix) { _ in }
+    func install(_ id: String, prefix: URL?, onFinish: (@MainActor () -> Void)?) -> Bool {
+        guard let game = game(id), let prefix else { return false }
+        model.install(game, prefixPath: prefix) { _ in onFinish?() }
         return true
     }
 
@@ -209,8 +224,7 @@ final class EpicStoreProvider: StoreProvider {
         }
     }
 
-    func install(_ id: String, prefix: URL?) -> Bool {
-        guard model.owned.contains(where: { $0.appName == id }) else { return false }
+    func install(_ id: String, prefix: URL?, onFinish: (@MainActor () -> Void)?) -> Bool {
         model.install(id)
         return true
     }
@@ -222,7 +236,7 @@ final class EpicStoreProvider: StoreProvider {
     func uninstall(_ id: String, prefix: URL?) -> Bool {
         guard model.installed[id] != nil else { return false }
         model.uninstall(id)
-        return true
+        return model.installed[id] == nil
     }
 
     func refresh() async { await model.refreshLibrary(interactive: false) }
@@ -250,8 +264,7 @@ final class EAStoreProvider: StoreProvider {
         }
     }
 
-    func install(_ id: String, prefix: URL?) -> Bool {
-        guard model.owned.contains(where: { $0.id == id }) else { return false }
+    func install(_ id: String, prefix: URL?, onFinish: (@MainActor () -> Void)?) -> Bool {
         model.install(id)
         return true
     }
@@ -263,7 +276,7 @@ final class EAStoreProvider: StoreProvider {
     func uninstall(_ id: String, prefix: URL?) -> Bool {
         guard model.installed[id] != nil else { return false }
         model.uninstall(id)
-        return true
+        return model.installed[id] == nil
     }
 
     func refresh() async { await model.refreshLibrary(interactive: false) }
@@ -291,7 +304,7 @@ final class UbisoftStoreProvider: StoreProvider {
         }
     }
 
-    func install(_ id: String, prefix: URL?) -> Bool {
+    func install(_ id: String, prefix: URL?, onFinish: (@MainActor () -> Void)?) -> Bool {
         guard let game = model.game(id), model.canInstall(game) else { return false }
         model.install(game)
         return true

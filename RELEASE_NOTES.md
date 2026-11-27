@@ -30,6 +30,7 @@
 
 ### Stores
 - A shared StoreProvider for Steam, GOG, Epic Games, the EA app and Ubisoft Connect: one interface for sign-in, owned games, install state, downloads (queued, running, paused, failed), install, pause, resume, stop, uninstall and refresh. The Resource Governor, the memory log and Bugs & logs use it. "Clear logs" now also waits for the EA app's and Ubisoft's downloads, which it did not count before. The bug report lists each store's sign-in, games and downloads (counts only).
+- The store screens use it too: install, update, pause, resume, stop and uninstall on the Steam, GOG, Epic Games, EA app and Ubisoft Connect pages and in the library go through each store's provider instead of calling each store in its own way. Behaviour is the same; DLC and language packs stay on their store's own controls.
 
 ### Madeira, FEX, ARM64EC and WoW64
 - A fault inside a system call that is guarded on the Unix side (`__TRY`, as in the buffer checks and NtReadVirtualMemory) now resumes at the guard on iOS, as it does on Linux. Such faults arrive as Mach exceptions and were delivered on the game's own stack instead, so the system call never returned properly and the game ended with 0xC000001D. This is the general fix behind the Fallout: New Vegas one above.

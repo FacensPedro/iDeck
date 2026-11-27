@@ -52,10 +52,10 @@ struct EAGameDetailsSheet: View {
             paused: paused, waiting: download?.state == .queued, sizeText: sizeText, errorText: failed,
             canInstall: game.downloadable,
             onLaunch: { if let installed { launch(installed) } },
-            onInstall: { ea.install(game.id) },
-            onPause: { ea.pause(game.id) },
-            onStop: { ea.cancel(game.id) },
-            onUninstall: (download == nil || paused) ? { ea.uninstall(game.id); return ea.installed[game.id] == nil } : nil,
+            onInstall: { StoreProviders.of(.ea).install(game.id, prefix: nil) },
+            onPause: { StoreProviders.of(.ea).pause(game.id) },
+            onStop: { StoreProviders.of(.ea).cancel(game.id) },
+            onUninstall: (download == nil || paused) ? { StoreProviders.of(.ea).uninstall(game.id, prefix: nil) } : nil,
             library: library, coordinator: coordinator
         ) {
             if let installed {
@@ -64,7 +64,7 @@ struct EAGameDetailsSheet: View {
                                    icon: "number", iconColor: .gray)
                     if ea.updateAvailable(game.id) {
                         DetailButtonRow(title: tr("Update"), systemImage: "arrow.down.circle") {
-                            ea.install(game.id)
+                            StoreProviders.of(.ea).install(game.id, prefix: nil)
                         }
                     }
                     DetailButtonRow(title: tr("Repair"), systemImage: "wrench.and.screwdriver",

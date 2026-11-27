@@ -42,7 +42,7 @@ extension WindowsWorkspaceView {
             .onTapGesture(perform: open)
             .contextMenu {
                 if ubisoftLibrary.downloads[game.id] != nil {
-                    Button(role: .destructive) { ubisoftLibrary.cancel(game) } label: {
+                    Button(role: .destructive) { StoreProviders.of(.ubisoft).cancel(game.id) } label: {
                         Label(tr("Stop download"), systemImage: "xmark.circle")
                     }
                 }

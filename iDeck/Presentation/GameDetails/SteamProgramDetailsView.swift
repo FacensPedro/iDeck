@@ -62,14 +62,14 @@ struct SteamProgramDetailsView: View {
                         VStack(spacing: 10) {
                             HStack(spacing: 10) {
                                 Button {
-                                    steamLibrary.resumeInstall(appID: game.appID)
+                                    StoreProviders.of(.steam).resume(String(game.appID), prefix: prefixPath)
                                 } label: {
                                     Label(tr("Resume"), systemImage: "play.fill")
                                         .downloadControlLabel()
                                 }
                                 .buttonStyle(.borderedProminent)
                                 Button(role: .destructive) {
-                                    steamLibrary.cancelInstall(appID: game.appID)
+                                    StoreProviders.of(.steam).cancel(String(game.appID))
                                 } label: {
                                     Label(tr("Stop"), systemImage: "stop.fill")
                                         .downloadControlLabel()
@@ -109,7 +109,7 @@ struct SteamProgramDetailsView: View {
                                 presentError(tr("Windows environment is not ready."))
                                 return
                             }
-                            if steamLibrary.uninstall(appID: game.appID, prefixPath: prefixPath) {
+                            if StoreProviders.of(.steam).uninstall(String(game.appID), prefix: prefixPath) {
                                 library.removeProfile(for: "steam:\(game.appID)")
                                 dismiss()
                             } else {
@@ -125,7 +125,7 @@ struct SteamProgramDetailsView: View {
                                 presentError(tr("Windows environment is not ready."))
                                 return
                             }
-                            steamLibrary.startInstall(appID: game.appID, prefixPath: prefixPath)
+                            StoreProviders.of(.steam).install(String(game.appID), prefix: prefixPath)
                         } label: {
                             Label(tr("Install"), systemImage: "arrow.down.circle.fill")
                                 .font(.subheadline.weight(.semibold))
@@ -164,7 +164,7 @@ struct SteamProgramDetailsView: View {
                                          // (dubbing and subtitles) through the update path.
                                          guard let prefixPath, steamLibrary.installedApps.contains(game.appID) else { return }
                                          AppLog.record("[game-language] steam:\(game.appID): fetching the language files")
-                                         steamLibrary.startInstall(appID: game.appID, prefixPath: prefixPath)
+                                         StoreProviders.of(.steam).install(String(game.appID), prefix: prefixPath)
                                      })
                     WindowsGameProfileForm(profile: $profile)
                     DetailCard(title: tr("Steam Cloud saves"), footer: steamLibrary.cloudMessages[game.appID]) {

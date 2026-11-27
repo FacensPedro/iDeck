@@ -77,7 +77,7 @@ extension SteamProgramDetailsView {
                 // Pause keeps the files; Stop uninstalls the game.
                 HStack(spacing: 10) {
                     Button {
-                        steamLibrary.pauseInstall(appID: game.appID)
+                        StoreProviders.of(.steam).pause(String(game.appID))
                     } label: {
                         Label(tr("Pause"), systemImage: "pause.fill")
                             .downloadControlLabel()
@@ -86,7 +86,7 @@ extension SteamProgramDetailsView {
                     .buttonStyle(.plain)
                     .foregroundColor(.white)
                     Button(role: .destructive) {
-                        steamLibrary.cancelInstall(appID: game.appID)
+                        StoreProviders.of(.steam).cancel(String(game.appID))
                     } label: {
                         Label(stopping ? tr("Stopping...") : tr("Stop"), systemImage: "stop.fill")
                             .downloadControlLabel()
