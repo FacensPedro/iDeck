@@ -606,7 +606,24 @@ enum GameLanguage {
         AppLog.record("[game-language] \(profileID): \(tag ?? "automatic")")
         if profileID.hasPrefix("steam:"), let app = UInt32(profileID.dropFirst(6)) {
             SteamLanguage.chooseForGame(app, tag.flatMap(steamName))
+            setSteamManifestLanguage(appID: app, steam: SteamLanguage.download(for: app))
         }
+    }
+
+    /// Valve's client reports the game's language from its install record (UserConfig and
+    /// MountedConfig "language"); the record is rewritten at once, so text the game already
+    /// has (subtitles in its common files) follows the choice at the next start. Dubbing
+    /// in a language depot comes with the download the game page starts.
+    static func setSteamManifestLanguage(appID: UInt32, steam: String) {
+        let manifest = SteamInstallPaths.steamApps(drive: MadeiraDock.prefix.appendingPathComponent("drive_c"))
+            .appendingPathComponent("appmanifest_\(appID).acf")
+        guard let text = try? String(contentsOf: manifest, encoding: .utf8),
+              let regex = try? NSRegularExpression(pattern: #"("language"\s*")[^"]*(")"#) else { return }
+        let range = NSRange(text.startIndex..., in: text)
+        let updated = regex.stringByReplacingMatches(in: text, range: range, withTemplate: "$1\(steam)$2")
+        guard updated != text else { return }
+        try? updated.write(to: manifest, atomically: true, encoding: .utf8)
+        AppLog.record("[game-language] steam:\(appID): install record language \(steam)")
     }
 
     static func steamName(_ tag: String) -> String? { all.first { $0.tag.lowercased() == tag.lowercased() }?.steam }

@@ -819,6 +819,7 @@ class WindowsEnvironment {
 
     func applyGameProfile(_ profile: WindowsGameProfile) {
         applyMadeiraLaunchEnvironment(profile)
+        Self.applyGameLanguage(profileID: profile.id)
         // A previous Madeira Dock launch leaves its host switches in the
         // process environment; only a new Dock launch sets them again.
         for key in ["MADEIRA_STEAM_HOST_PROBE", "MADEIRA_STEAM_HOST_SESSION", "MADEIRA_STEAM_HOST_LOGIN",
@@ -966,6 +967,23 @@ class WindowsEnvironment {
             options.append(String(format: "d3d11.metalSpatialUpscaleFactor = %.2f", factor))
         }
         setenv("DXMT_CONFIG", options.joined(separator: ";"), 1)
+    }
+
+    /// The game's language (Game language on its page) as Windows' own language for this
+    /// session. Wine takes the user and system locale from LC_ALL/LANG
+    /// (build/ntdll-unix/env_ios.c init_locale) and, without them, from iOS's preferred
+    /// language, so a game that picks its dubbing and subtitles from Windows' language
+    /// (GetUserDefaultUILanguage, the locale) never saw the choice made in iDeck. With no
+    /// choice, Wine follows the device as before.
+    static func applyGameLanguage(profileID: String) {
+        guard let tag = GameLanguage.choice(profileID) else {
+            unsetenv("LC_ALL"); unsetenv("LANG")
+            return
+        }
+        let unix = tag.replacingOccurrences(of: "-", with: "_") + ".UTF-8"
+        setenv("LC_ALL", unix, 1)
+        setenv("LANG", unix, 1)
+        SteamLog.event("[game-language] \(profileID): Windows language \(unix) for this session")
     }
 
     /// The d3d9 options of "Older NVIDIA card (Direct3D 9)" (Madeira's D3D9Identity):
