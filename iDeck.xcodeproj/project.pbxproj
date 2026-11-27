@@ -49,6 +49,11 @@
 		999999999999999999999914 /* UpdateChecker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 999999999999999999999906 /* UpdateChecker.swift */; };
 		F30000000000000000000021 /* WineLogClipboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = F40000000000000000000021 /* WineLogClipboard.swift */; };
 		F3A000000000000000000013 /* BenchmarkSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000013 /* BenchmarkSession.swift */; };
+		F3B0000000000000673FB646 /* ResourceGovernor+Background.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B0000000000000673FB646 /* ResourceGovernor+Background.swift */; };
+		F3B0000000000000070E270A /* ResourceGovernor+Memory.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B0000000000000070E270A /* ResourceGovernor+Memory.swift */; };
+		F3B0000000000000771DD981 /* AutoDLLInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B0000000000000771DD981 /* AutoDLLInstaller.swift */; };
+		F3B0000000000000D2AB5326 /* AutoDLLCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B0000000000000D2AB5326 /* AutoDLLCache.swift */; };
+		F3B00000000000003EAAA85A /* AutoDLLCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B00000000000003EAAA85A /* AutoDLLCatalog.swift */; };
 		F3B0000000000000A59DB5BC /* WindowsWorkspaceView+Shelves.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B0000000000000A59DB5BC /* WindowsWorkspaceView+Shelves.swift */; };
 		F3B0000000000000D7C37019 /* EALibrary+Launch.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B0000000000000D7C37019 /* EALibrary+Launch.swift */; };
 		F3B0000000000000D00F593A /* EALibrary+Downloads.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B0000000000000D00F593A /* EALibrary+Downloads.swift */; };
@@ -226,6 +231,11 @@
 		999999999999999999999906 /* UpdateChecker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateChecker.swift; sourceTree = "<group>"; };
 		F40000000000000000000021 /* WineLogClipboard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WineLogClipboard.swift; sourceTree = "<group>"; };
 		F4A000000000000000000013 /* BenchmarkSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BenchmarkSession.swift; sourceTree = "<group>"; };
+		F4B0000000000000673FB646 /* ResourceGovernor+Background.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Runtime/Resources/ResourceGovernor+Background.swift"; sourceTree = "<group>"; };
+		F4B0000000000000070E270A /* ResourceGovernor+Memory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Runtime/Resources/ResourceGovernor+Memory.swift"; sourceTree = "<group>"; };
+		F4B0000000000000771DD981 /* AutoDLLInstaller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runtime/AutoDLL/AutoDLLInstaller.swift; sourceTree = "<group>"; };
+		F4B0000000000000D2AB5326 /* AutoDLLCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runtime/AutoDLL/AutoDLLCache.swift; sourceTree = "<group>"; };
+		F4B00000000000003EAAA85A /* AutoDLLCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runtime/AutoDLL/AutoDLLCatalog.swift; sourceTree = "<group>"; };
 		F4B0000000000000A59DB5BC /* WindowsWorkspaceView+Shelves.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Presentation/Library/WindowsWorkspaceView+Shelves.swift"; sourceTree = "<group>"; };
 		F4B0000000000000D7C37019 /* EALibrary+Launch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Stores/EA/EALibrary+Launch.swift"; sourceTree = "<group>"; };
 		F4B0000000000000D00F593A /* EALibrary+Downloads.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Stores/EA/EALibrary+Downloads.swift"; sourceTree = "<group>"; };
@@ -438,6 +448,11 @@
 				999999999999999999999914 /* UpdateChecker.swift in Sources */,
 				F30000000000000000000021 /* WineLogClipboard.swift in Sources */,
 				F3A000000000000000000013 /* BenchmarkSession.swift in Sources */,
+				F3B0000000000000673FB646 /* ResourceGovernor+Background.swift in Sources */,
+				F3B0000000000000070E270A /* ResourceGovernor+Memory.swift in Sources */,
+				F3B0000000000000771DD981 /* AutoDLLInstaller.swift in Sources */,
+				F3B0000000000000D2AB5326 /* AutoDLLCache.swift in Sources */,
+				F3B00000000000003EAAA85A /* AutoDLLCatalog.swift in Sources */,
 				F3B0000000000000A59DB5BC /* WindowsWorkspaceView+Shelves.swift in Sources */,
 				F3B0000000000000D7C37019 /* EALibrary+Launch.swift in Sources */,
 				F3B0000000000000D00F593A /* EALibrary+Downloads.swift in Sources */,
@@ -639,6 +654,11 @@
 				999999999999999999999906 /* UpdateChecker.swift */,
 				F40000000000000000000021 /* WineLogClipboard.swift */,
 				F4A000000000000000000013 /* BenchmarkSession.swift */,
+				F4B0000000000000673FB646 /* ResourceGovernor+Background.swift */,
+				F4B0000000000000070E270A /* ResourceGovernor+Memory.swift */,
+				F4B0000000000000771DD981 /* AutoDLLInstaller.swift */,
+				F4B0000000000000D2AB5326 /* AutoDLLCache.swift */,
+				F4B00000000000003EAAA85A /* AutoDLLCatalog.swift */,
 				F4B0000000000000A59DB5BC /* WindowsWorkspaceView+Shelves.swift */,
 				F4B0000000000000D7C37019 /* EALibrary+Launch.swift */,
 				F4B0000000000000D00F593A /* EALibrary+Downloads.swift */,

@@ -41,8 +41,10 @@ Each part starts with `// Split from <file> (iDeck 3.0 architecture).`; the host
 an original file name as the original plus its parts (`tests/host/split_sources.py`).
 Members that another part uses lost `private`; the others kept it. Behaviour is unchanged.
 
-Next: `AutoDLLManager` and `ResourceGovernor` into catalog/cache/install and
-memory/background parts, then view models out of the SwiftUI views.
+| `AutoDLLManager.swift` | the overview in `AutoDLLManager.swift`; `Runtime/AutoDLL/AutoDLLCatalog`, `AutoDLLCache`, `AutoDLLInstaller` |
+| `ResourceGovernor.swift` | state and start in `ResourceGovernor.swift`; `Runtime/Resources/ResourceGovernor+Memory`, `+Background` |
+
+Next: view models out of the SwiftUI views.
 
 ## iOS system libraries
 

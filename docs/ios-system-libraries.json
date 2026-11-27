@@ -3,9 +3,10 @@
     {
       "examples": [
         "iDeck/AudioManager.swift",
-        "iDeck/ResourceGovernor.swift"
+        "iDeck/ResourceGovernor.swift",
+        "iDeck/Runtime/Resources/ResourceGovernor+Background.swift"
       ],
-      "files": 2,
+      "files": 4,
       "framework": "AVFoundation",
       "group": "Audio & video",
       "minimum_ios": "2.2",
@@ -120,7 +121,7 @@
         "iDeck/Application/SessionLifecycle.swift",
         "iDeck/Application/SystemCoordinator+Diagnostics.swift"
       ],
-      "files": 127,
+      "files": 132,
       "framework": "Foundation",
       "group": "Core System",
       "minimum_ios": "2.0",
@@ -384,7 +385,7 @@
         "iDeck/Application/SystemCoordinator+JIT.swift",
         "iDeck/Application/SystemCoordinator+Launch.swift"
       ],
-      "files": 32,
+      "files": 33,
       "framework": "UIKit",
       "group": "Interface",
       "minimum_ios": "2.0",
