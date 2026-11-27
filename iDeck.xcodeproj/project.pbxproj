@@ -49,6 +49,12 @@
 		999999999999999999999914 /* UpdateChecker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 999999999999999999999906 /* UpdateChecker.swift */; };
 		F30000000000000000000021 /* WineLogClipboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = F40000000000000000000021 /* WineLogClipboard.swift */; };
 		F3A000000000000000000013 /* BenchmarkSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000013 /* BenchmarkSession.swift */; };
+		F3B0000000000000EFBF0063 /* GOGSignInView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B0000000000000EFBF0063 /* GOGSignInView.swift */; };
+		F3B00000000000005C6F578F /* GOGLibraryModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B00000000000005C6F578F /* GOGLibraryModel.swift */; };
+		F3B0000000000000E8396D36 /* ExternalDrivesSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B0000000000000E8396D36 /* ExternalDrivesSettingsView.swift */; };
+		F3B0000000000000FCBBEF1F /* EpicCloudViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B0000000000000FCBBEF1F /* EpicCloudViews.swift */; };
+		F3B0000000000000CBA42A8D /* BugReportScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B0000000000000CBA42A8D /* BugReportScreen.swift */; };
+		F3B000000000000088C7EC8D /* BugReportModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B000000000000088C7EC8D /* BugReportModel.swift */; };
 		F3B0000000000000673FB646 /* ResourceGovernor+Background.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B0000000000000673FB646 /* ResourceGovernor+Background.swift */; };
 		F3B0000000000000070E270A /* ResourceGovernor+Memory.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B0000000000000070E270A /* ResourceGovernor+Memory.swift */; };
 		F3B0000000000000771DD981 /* AutoDLLInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B0000000000000771DD981 /* AutoDLLInstaller.swift */; };
@@ -231,6 +237,12 @@
 		999999999999999999999906 /* UpdateChecker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateChecker.swift; sourceTree = "<group>"; };
 		F40000000000000000000021 /* WineLogClipboard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WineLogClipboard.swift; sourceTree = "<group>"; };
 		F4A000000000000000000013 /* BenchmarkSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BenchmarkSession.swift; sourceTree = "<group>"; };
+		F4B0000000000000EFBF0063 /* GOGSignInView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presentation/GOG/GOGSignInView.swift; sourceTree = "<group>"; };
+		F4B00000000000005C6F578F /* GOGLibraryModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Stores/GOG/GOGLibraryModel.swift; sourceTree = "<group>"; };
+		F4B0000000000000E8396D36 /* ExternalDrivesSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presentation/Settings/ExternalDrivesSettingsView.swift; sourceTree = "<group>"; };
+		F4B0000000000000FCBBEF1F /* EpicCloudViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presentation/Epic/EpicCloudViews.swift; sourceTree = "<group>"; };
+		F4B0000000000000CBA42A8D /* BugReportScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presentation/BugReport/BugReportScreen.swift; sourceTree = "<group>"; };
+		F4B000000000000088C7EC8D /* BugReportModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presentation/BugReport/BugReportModel.swift; sourceTree = "<group>"; };
 		F4B0000000000000673FB646 /* ResourceGovernor+Background.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Runtime/Resources/ResourceGovernor+Background.swift"; sourceTree = "<group>"; };
 		F4B0000000000000070E270A /* ResourceGovernor+Memory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Runtime/Resources/ResourceGovernor+Memory.swift"; sourceTree = "<group>"; };
 		F4B0000000000000771DD981 /* AutoDLLInstaller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runtime/AutoDLL/AutoDLLInstaller.swift; sourceTree = "<group>"; };
@@ -448,6 +460,12 @@
 				999999999999999999999914 /* UpdateChecker.swift in Sources */,
 				F30000000000000000000021 /* WineLogClipboard.swift in Sources */,
 				F3A000000000000000000013 /* BenchmarkSession.swift in Sources */,
+				F3B0000000000000EFBF0063 /* GOGSignInView.swift in Sources */,
+				F3B00000000000005C6F578F /* GOGLibraryModel.swift in Sources */,
+				F3B0000000000000E8396D36 /* ExternalDrivesSettingsView.swift in Sources */,
+				F3B0000000000000FCBBEF1F /* EpicCloudViews.swift in Sources */,
+				F3B0000000000000CBA42A8D /* BugReportScreen.swift in Sources */,
+				F3B000000000000088C7EC8D /* BugReportModel.swift in Sources */,
 				F3B0000000000000673FB646 /* ResourceGovernor+Background.swift in Sources */,
 				F3B0000000000000070E270A /* ResourceGovernor+Memory.swift in Sources */,
 				F3B0000000000000771DD981 /* AutoDLLInstaller.swift in Sources */,
@@ -654,6 +672,12 @@
 				999999999999999999999906 /* UpdateChecker.swift */,
 				F40000000000000000000021 /* WineLogClipboard.swift */,
 				F4A000000000000000000013 /* BenchmarkSession.swift */,
+				F4B0000000000000EFBF0063 /* GOGSignInView.swift */,
+				F4B00000000000005C6F578F /* GOGLibraryModel.swift */,
+				F4B0000000000000E8396D36 /* ExternalDrivesSettingsView.swift */,
+				F4B0000000000000FCBBEF1F /* EpicCloudViews.swift */,
+				F4B0000000000000CBA42A8D /* BugReportScreen.swift */,
+				F4B000000000000088C7EC8D /* BugReportModel.swift */,
 				F4B0000000000000673FB646 /* ResourceGovernor+Background.swift */,
 				F4B0000000000000070E270A /* ResourceGovernor+Memory.swift */,
 				F4B0000000000000771DD981 /* AutoDLLInstaller.swift */,

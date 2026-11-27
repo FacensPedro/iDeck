@@ -95,7 +95,7 @@
         "iDeck/Application/SystemCoordinator+Diagnostics.swift",
         "iDeck/Application/SystemCoordinator+Dock.swift"
       ],
-      "files": 35,
+      "files": 36,
       "framework": "Darwin",
       "group": "Core System",
       "minimum_ios": "2.0",
@@ -121,7 +121,7 @@
         "iDeck/Application/SessionLifecycle.swift",
         "iDeck/Application/SystemCoordinator+Diagnostics.swift"
       ],
-      "files": 132,
+      "files": 135,
       "framework": "Foundation",
       "group": "Core System",
       "minimum_ios": "2.0",
@@ -372,7 +372,7 @@
         "iDeck/BugReportView.swift",
         "iDeck/EASignIn.swift"
       ],
-      "files": 29,
+      "files": 35,
       "framework": "SwiftUI",
       "group": "Interface",
       "minimum_ios": "13.0",
@@ -385,7 +385,7 @@
         "iDeck/Application/SystemCoordinator+JIT.swift",
         "iDeck/Application/SystemCoordinator+Launch.swift"
       ],
-      "files": 33,
+      "files": 34,
       "framework": "UIKit",
       "group": "Interface",
       "minimum_ios": "2.0",

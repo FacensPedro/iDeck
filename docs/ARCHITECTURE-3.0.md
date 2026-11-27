@@ -44,7 +44,22 @@ Members that another part uses lost `private`; the others kept it. Behaviour is 
 | `AutoDLLManager.swift` | the overview in `AutoDLLManager.swift`; `Runtime/AutoDLL/AutoDLLCatalog`, `AutoDLLCache`, `AutoDLLInstaller` |
 | `ResourceGovernor.swift` | state and start in `ResourceGovernor.swift`; `Runtime/Resources/ResourceGovernor+Memory`, `+Background` |
 
-Next: view models out of the SwiftUI views.
+## Views and view models (3.0)
+
+Files that held both a screen and the object behind it now hold one of them:
+
+| File | View (Presentation/) | Model |
+|---|---|---|
+| `BugReportView.swift` (logs, scanners) | `BugReport/BugReportScreen.swift` (`BugReportView`) | `BugReport/BugReportModel.swift` |
+| `EpicCloud.swift` (`EpicCloud`, `EpicCloudSetting`) | `Epic/EpicCloudViews.swift` | stays in `EpicCloud.swift` |
+| `ExternalDrives.swift` (`ExternalDrives`) | `Settings/ExternalDrivesSettingsView.swift` | stays in `ExternalDrives.swift` |
+| `GOGLibrary.swift` (API, tokens, scanner) | `GOG/GOGSignInView.swift` | `Stores/GOG/GOGLibraryModel.swift` |
+
+The store libraries (`SteamOwnedGamesModel`, `EpicLibrary`, `EALibrary`, `UbisoftLibrary`,
+`GOGLibraryModel`) are the views' models: views observe them and call their methods, and
+keep only presentation state (`@State`) themselves.
+
+Next: the settings screen's state into a `SettingsModel`, then the game pages'.
 
 ## iOS system libraries
 
