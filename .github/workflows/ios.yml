@@ -293,12 +293,12 @@ jobs:
       - name: Test Steam native C crypto and bounded existing-file verification
         run: |
           xcrun clang -std=c11 -D_DARWIN_C_SOURCE -O2 -Wall -Wextra -Werror \
-            tests/host/SteamNativeCoreTests.c iDeck/SteamNativeCore.c iDeck/PipelineCounters.c \
+            tests/host/SteamNativeCoreTests.c iDeck/NativeRuntime/Bridges/SteamNativeCore.c iDeck/NativeRuntime/Bridges/PipelineCounters.c \
             -o /tmp/ideck-steam-native-tests
           /tmp/ideck-steam-native-tests
-          xcrun clang -std=c11 -D_DARWIN_C_SOURCE -O2 -c iDeck/SteamNativeCore.c \
+          xcrun clang -std=c11 -D_DARWIN_C_SOURCE -O2 -c iDeck/NativeRuntime/Bridges/SteamNativeCore.c \
             -o /tmp/ideck-steam-native-core.o
-          xcrun clang -std=c11 -D_DARWIN_C_SOURCE -O2 -c iDeck/PipelineCounters.c \
+          xcrun clang -std=c11 -D_DARWIN_C_SOURCE -O2 -c iDeck/NativeRuntime/Bridges/PipelineCounters.c \
             -o /tmp/ideck-pipeline-counters.o
 
       - name: Test bounded native Madeira Wine log diagnostics

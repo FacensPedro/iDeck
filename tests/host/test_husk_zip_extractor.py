@@ -98,13 +98,13 @@ class HuskIPAExtractionTests(unittest.TestCase):
             binary = root / "test-ipa-extractor"
             native = root / "ZipNative.o"
             subprocess.run(
-                ["xcrun", "clang", "-O2", "-c", str(ROOT / "iDeck/ZipNative.c"), "-o", str(native)],
+                ["xcrun", "clang", "-O2", "-c", str(ROOT / "iDeck/NativeRuntime/Bridges/ZipNative.c"), "-o", str(native)],
                 check=True, timeout=120,
             )
             subprocess.run(
                 [
                     "xcrun", "swiftc",
-                    "-import-objc-header", str(ROOT / "iDeck/ZipNative.h"),
+                    "-import-objc-header", str(ROOT / "iDeck/NativeRuntime/Bridges/ZipNative.h"),
                     str(ROOT / "iDeck/IPAArchivePath.swift"),
                     str(actual_extractor),
                     str(runner), str(native), "-lz", "-o", str(binary),

@@ -21,8 +21,10 @@ The Swift side of the Madeira native runtime is in `iDeck/NativeRuntime/` (3.0):
 `AddressSpaceCheck`, the JIT helpers (`JITEnabler`, `JITBuiltInHost`, `JITBuiltInMessages`),
 `WineInputBridge`, `WindowsRendererView`, `WineMono`, `WineGeckoRuntime` and
 `IOSCrashDiagnostics`. The native code itself (Wine ARM64EC, WoW64, FEX, wineserver, DXMT,
-madeira-d3d12) stays in `vendor/Madeira`, and the C/Objective-C bridges in `iDeck/` stay
-where the bridging header finds them.
+madeira-d3d12) stays in `vendor/Madeira`. The C, Objective-C and C++ bridges are in
+`iDeck/NativeRuntime/Bridges/` (benchmark recorder, Epic chunk codec, LZHAM codec, graphics
+API scan, native runtime diagnostics, pipeline counters, Steam native core, ZIP reader);
+the bridging header imports them by that path.
 
 Swift reaches the native runtime only through the C functions declared in the bridging
 header (`ideck_*`, `wine_*`, `madeira_*`); no Swift type crosses into C++.

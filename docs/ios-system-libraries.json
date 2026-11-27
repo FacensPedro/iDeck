@@ -307,9 +307,9 @@
     },
     {
       "examples": [
-        "iDeck/BenchmarkBridge.mm",
         "iDeck/GameSessionView.swift",
-        "iDeck/NativeRuntime/MadeiraPlatform.mm"
+        "iDeck/NativeRuntime/Bridges/BenchmarkBridge.mm",
+        "iDeck/NativeRuntime/Bridges/NativeRuntimeDiagnostics.mm"
       ],
       "files": 6,
       "framework": "Metal",
@@ -451,8 +451,8 @@
     },
     {
       "examples": [
-        "iDeck/EpicChunkCodec.cpp",
-        "iDeck/SteamNativeCore.c",
+        "iDeck/NativeRuntime/Bridges/EpicChunkCodec.cpp",
+        "iDeck/NativeRuntime/Bridges/SteamNativeCore.c",
         "iDeck/SwiftSteam/Content/ContentDecryptor.swift"
       ],
       "files": 4,

@@ -69,15 +69,15 @@ class BenchmarkReportTests(unittest.TestCase):
 
 class BenchmarkInstrumentationTests(unittest.TestCase):
     def test_recorder_is_cpp_behind_objective_cpp(self):
-        self.assertIn('#include "BenchmarkRecorder.hpp"', (ROOT / "iDeck/BenchmarkBridge.mm").read_text())
-        self.assertIn('#import "BenchmarkBridge.h"', (ROOT / "iDeck/iDeck-Bridging-Header.h").read_text())
-        self.assertIn("constexpr uint64_t kFramePollNs = 4'000'000;", (ROOT / "iDeck/BenchmarkRecorder.cpp").read_text())
+        self.assertIn('#include "BenchmarkRecorder.hpp"', (ROOT / "iDeck/NativeRuntime/Bridges/BenchmarkBridge.mm").read_text())
+        self.assertIn('#import "NativeRuntime/Bridges/BenchmarkBridge.h"', (ROOT / "iDeck/iDeck-Bridging-Header.h").read_text())
+        self.assertIn("constexpr uint64_t kFramePollNs = 4'000'000;", (ROOT / "iDeck/NativeRuntime/Bridges/BenchmarkRecorder.cpp").read_text())
 
     def test_pipeline_stages_are_timed(self):
         # Steam chunk codecs are Madeira's (iDeck/SwiftSteam, verbatim).
         self.assertTrue((ROOT / "iDeck/SwiftSteam/lzma_shim.c").exists())
-        self.assertIn("IDECK_STAGE_DECRYPT", (ROOT / "iDeck/SteamNativeCore.c").read_text())
-        self.assertIn("IDECK_STAGE_DECOMPRESS", (ROOT / "iDeck/EpicChunkCodec.cpp").read_text())
+        self.assertIn("IDECK_STAGE_DECRYPT", (ROOT / "iDeck/NativeRuntime/Bridges/SteamNativeCore.c").read_text())
+        self.assertIn("IDECK_STAGE_DECOMPRESS", (ROOT / "iDeck/NativeRuntime/Bridges/EpicChunkCodec.cpp").read_text())
 
     def test_sessions_are_recorded_from_launch_and_install(self):
         coordinator = (ROOT / "iDeck/SystemCoordinator.swift").read_text()

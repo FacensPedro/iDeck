@@ -77,8 +77,8 @@ class LzhamCodecTests(unittest.TestCase):
             tmp = pathlib.Path(cls.tmp.name)
             (tmp / "main.cpp").write_text(MAIN)
             cls.binary = tmp / "lzham_check"
-            subprocess.run([cls.compiler, "-std=gnu++17", "-O1", "-w", "-I", str(APP),
-                            str(APP / "LzhamCodec.cpp"), str(tmp / "main.cpp"), "-o", str(cls.binary)],
+            subprocess.run([cls.compiler, "-std=gnu++17", "-O1", "-w", "-I", str(APP / "NativeRuntime" / "Bridges"),
+                            str(APP / "NativeRuntime" / "Bridges" / "LzhamCodec.cpp"), str(tmp / "main.cpp"), "-o", str(cls.binary)],
                            check=True)
 
     @classmethod
@@ -121,11 +121,11 @@ class LzhamWiringTests(unittest.TestCase):
     def test_vendored_decoder_is_complete(self):
         vendor = APP / "Vendor" / "LZHAM"
         self.assertIn("PUBLIC DOMAIN", (vendor / "LICENSE").read_text())
-        unit = (APP / "LzhamCodec.cpp").read_text()
-        for name in re.findall(r'#include "Vendor/LZHAM/([^"]+)"', unit):
+        unit = (APP / "NativeRuntime" / "Bridges" / "LzhamCodec.cpp").read_text()
+        for name in re.findall(r'#include "../../Vendor/LZHAM/([^"]+)"', unit):
             self.assertTrue((vendor / name).exists(), name)
         cpp = sorted(p.name for p in vendor.glob("*.cpp"))
-        self.assertEqual(cpp, sorted(re.findall(r'#include "Vendor/LZHAM/([^"]+\.cpp)"', unit)))
+        self.assertEqual(cpp, sorted(re.findall(r'#include "../../Vendor/LZHAM/([^"]+\.cpp)"', unit)))
         self.assertIn('extern "C"', unit)
 
     def test_libcxx_pod_fix(self):
@@ -138,7 +138,7 @@ class LzhamWiringTests(unittest.TestCase):
         self.assertIn("LzhamCodec.cpp in Sources */,", project)
         self.assertEqual(project.count("LzhamCodec.cpp"), 6)   # build file (2), file reference (2), group, sources
         self.assertNotIn("Vendor/LZHAM", project)   # compiled through LzhamCodec.cpp only
-        self.assertIn('#import "LzhamCodec.h"', (APP / "iDeck-Bridging-Header.h").read_text())
+        self.assertIn('#import "NativeRuntime/Bridges/LzhamCodec.h"', (APP / "iDeck-Bridging-Header.h").read_text())
 
     def test_ubisoft_slices_use_it(self):
         swift = (APP / "UbisoftDownloader.swift").read_text()

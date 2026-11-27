@@ -4,17 +4,17 @@
 // so the project lists a single source file for it.
 #include "LzhamCodec.h"
 
-#include "Vendor/LZHAM/lzham_assert.cpp"
-#include "Vendor/LZHAM/lzham_checksum.cpp"
-#include "Vendor/LZHAM/lzham_huffman_codes.cpp"
-#include "Vendor/LZHAM/lzham_lzdecompbase.cpp"
-#include "Vendor/LZHAM/lzham_lzdecomp.cpp"
-#include "Vendor/LZHAM/lzham_mem.cpp"
-#include "Vendor/LZHAM/lzham_platform.cpp"
-#include "Vendor/LZHAM/lzham_prefix_coding.cpp"
-#include "Vendor/LZHAM/lzham_symbol_codec.cpp"
-#include "Vendor/LZHAM/lzham_timer.cpp"
-#include "Vendor/LZHAM/lzham_vector.cpp"
+#include "../../Vendor/LZHAM/lzham_assert.cpp"
+#include "../../Vendor/LZHAM/lzham_checksum.cpp"
+#include "../../Vendor/LZHAM/lzham_huffman_codes.cpp"
+#include "../../Vendor/LZHAM/lzham_lzdecompbase.cpp"
+#include "../../Vendor/LZHAM/lzham_lzdecomp.cpp"
+#include "../../Vendor/LZHAM/lzham_mem.cpp"
+#include "../../Vendor/LZHAM/lzham_platform.cpp"
+#include "../../Vendor/LZHAM/lzham_prefix_coding.cpp"
+#include "../../Vendor/LZHAM/lzham_symbol_codec.cpp"
+#include "../../Vendor/LZHAM/lzham_timer.cpp"
+#include "../../Vendor/LZHAM/lzham_vector.cpp"
 
 extern "C" int64_t ideck_lzham_decompress(const uint8_t *src, size_t src_len,
                                           uint8_t *dst, size_t dst_capacity,

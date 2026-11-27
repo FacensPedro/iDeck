@@ -1,4 +1,4 @@
-#include "../../iDeck/SteamNativeCore.h"
+#include "../../iDeck/NativeRuntime/Bridges/SteamNativeCore.h"
 #include <CommonCrypto/CommonCryptor.h>
 #include <CommonCrypto/CommonDigest.h>
 #include <assert.h>
