@@ -519,6 +519,11 @@ final class BugReportModel: ObservableObject {
         if let deps = UserDefaults.standard.string(forKey: DependencyCheck.reportKey) {
             lines.append("DLL check: " + deps)
         }
+        let transitions = SessionLifecycle.shared.recent
+        if !transitions.isEmpty {
+            lines.append("Session states (oldest first):")
+            lines += transitions.map { "  " + $0 }
+        }
         let benchmarks = BenchmarkSession.summaryLines()
         if !benchmarks.isEmpty {
             lines.append("Benchmarks (newest first):")

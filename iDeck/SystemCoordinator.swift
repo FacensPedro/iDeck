@@ -482,6 +482,7 @@ class SystemCoordinator: ObservableObject {
 
     /// Benchmark milestones and the end of a game session, from its status.
     private func recordBenchmarkMilestone(_ status: String) {
+        SessionLifecycle.shared.report(status: status)
         switch status {
         case "Wine started; waiting for game...":
             BenchmarkSession.mark("wine_started")
