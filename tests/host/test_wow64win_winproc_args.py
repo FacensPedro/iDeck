@@ -21,6 +21,10 @@ class WinProcCallbackArgs(unittest.TestCase):
         self.assertIn("+    params32 = saved_arg;", PATCH)
         self.assertIn("+    if (!status && ret_ptr && ret_len >= sizeof(LONG))", PATCH)
 
+    def test_hook_callback_rereads_result(self):
+        self.assertIn("+    LRESULT * volatile saved_result = arg;", PATCH)
+        self.assertIn("+    result_ptr = saved_result;", PATCH)
+
 
 if __name__ == "__main__":
     unittest.main()
