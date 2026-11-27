@@ -119,6 +119,12 @@ extension SettingsView {
                 toggleRow(title: tr("Pause games in the background"), isOn: $pauseGamesInBackground)
                 toggleRow(title: "iDeck Virtual Swap", isOn: $virtualSwap)
             }
+            // Each part of a session on its own level; a game's page still wins.
+            settingsSection(title: "Resource Governor") {
+                ForEach(ResourceDomain.allCases, id: \.self) { domain in
+                    ResourceLevelPicker(domain: domain)
+                }
+            }
             Section {
                 NavigationLink(tr("Advanced")) {
                     Form {

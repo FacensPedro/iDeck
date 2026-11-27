@@ -49,6 +49,8 @@
 		999999999999999999999914 /* UpdateChecker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 999999999999999999999906 /* UpdateChecker.swift */; };
 		F30000000000000000000021 /* WineLogClipboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = F40000000000000000000021 /* WineLogClipboard.swift */; };
 		F3A000000000000000000013 /* BenchmarkSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000013 /* BenchmarkSession.swift */; };
+		F3B000000000000004425BB7 /* ResourceDomains.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B000000000000004425BB7 /* ResourceDomains.swift */; };
+		F3B000000000000087ED578E /* StoreProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B000000000000087ED578E /* StoreProvider.swift */; };
 		F3B00000000000005F50DD7E /* WindowsWorkspaceView+Ubisoft.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B00000000000005F50DD7E /* WindowsWorkspaceView+Ubisoft.swift */; };
 		F3B000000000000044CEF550 /* WindowsWorkspaceView+EA.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B000000000000044CEF550 /* WindowsWorkspaceView+EA.swift */; };
 		F3B00000000000004B36434B /* WindowsWorkspaceView+Epic.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B00000000000004B36434B /* WindowsWorkspaceView+Epic.swift */; };
@@ -252,6 +254,8 @@
 		999999999999999999999906 /* UpdateChecker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateChecker.swift; sourceTree = "<group>"; };
 		F40000000000000000000021 /* WineLogClipboard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WineLogClipboard.swift; sourceTree = "<group>"; };
 		F4A000000000000000000013 /* BenchmarkSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BenchmarkSession.swift; sourceTree = "<group>"; };
+		F4B000000000000004425BB7 /* ResourceDomains.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runtime/Resources/ResourceDomains.swift; sourceTree = "<group>"; };
+		F4B000000000000087ED578E /* StoreProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Stores/StoreProvider.swift; sourceTree = "<group>"; };
 		F4B00000000000005F50DD7E /* WindowsWorkspaceView+Ubisoft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Presentation/Library/WindowsWorkspaceView+Ubisoft.swift"; sourceTree = "<group>"; };
 		F4B000000000000044CEF550 /* WindowsWorkspaceView+EA.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Presentation/Library/WindowsWorkspaceView+EA.swift"; sourceTree = "<group>"; };
 		F4B00000000000004B36434B /* WindowsWorkspaceView+Epic.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Presentation/Library/WindowsWorkspaceView+Epic.swift"; sourceTree = "<group>"; };
@@ -490,6 +494,8 @@
 				999999999999999999999914 /* UpdateChecker.swift in Sources */,
 				F30000000000000000000021 /* WineLogClipboard.swift in Sources */,
 				F3A000000000000000000013 /* BenchmarkSession.swift in Sources */,
+				F3B000000000000004425BB7 /* ResourceDomains.swift in Sources */,
+				F3B000000000000087ED578E /* StoreProvider.swift in Sources */,
 				F3B00000000000005F50DD7E /* WindowsWorkspaceView+Ubisoft.swift in Sources */,
 				F3B000000000000044CEF550 /* WindowsWorkspaceView+EA.swift in Sources */,
 				F3B00000000000004B36434B /* WindowsWorkspaceView+Epic.swift in Sources */,
@@ -717,6 +723,8 @@
 				999999999999999999999906 /* UpdateChecker.swift */,
 				F40000000000000000000021 /* WineLogClipboard.swift */,
 				F4A000000000000000000013 /* BenchmarkSession.swift */,
+				F4B000000000000004425BB7 /* ResourceDomains.swift */,
+				F4B000000000000087ED578E /* StoreProvider.swift */,
 				F4B00000000000005F50DD7E /* WindowsWorkspaceView+Ubisoft.swift */,
 				F4B000000000000044CEF550 /* WindowsWorkspaceView+EA.swift */,
 				F4B00000000000004B36434B /* WindowsWorkspaceView+Epic.swift */,

@@ -156,6 +156,10 @@ extension WindowsEnvironment {
             options.append(String(format: "d3d11.metalSpatialUpscaleFactor = %.2f", factor))
         }
         setenv("DXMT_CONFIG", options.joined(separator: ";"), 1)
+        // The Resource Governor's domains (FEX, JIT, GPU, sessions), after the game's own
+        // choices, which they never override.
+        let plan = ResourceDomains.apply(profile: profile)
+        if sessionJITPoolMiB == 0, let pool = plan.jitPoolMiB { sessionJITPoolMiB = pool }
     }
 
     /// The game's language (Game language on its page) as Windows' own language for this

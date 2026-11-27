@@ -106,3 +106,39 @@ class SessionLifecycleMonitor(unittest.TestCase):
         self.assertIn("static let stallSeconds: [State: TimeInterval]", life)
         self.assertIn('"[session] stalled: ', life)
         self.assertIn("func observe(_ observer: @escaping (State, State) -> Void)", life)
+
+
+class StoreProviderLayer(unittest.TestCase):
+    def test_five_providers_and_shared_uses(self):
+        sp = read("iDeck/Stores/StoreProvider.swift")
+        self.assertIn("protocol StoreProvider: AnyObject", sp)
+        for name in ("SteamStoreProvider()", "GOGStoreProvider()", "EpicStoreProvider()", "EAStoreProvider()",
+                     "UbisoftStoreProvider()"):
+            self.assertIn(name, sp)
+        self.assertIn("static func pauseAll() -> [StoreGameRef]", sp)
+        pbx = read("iDeck.xcodeproj/project.pbxproj")
+        self.assertEqual(pbx.count("StoreProvider.swift"), 6)
+        self.assertIn("path = Stores/StoreProvider.swift;", pbx)
+        bugs = read("iDeck/Presentation/BugReport/BugReportModel.swift")
+        self.assertIn("lines += StoreProviders.summary.map", bugs)
+
+
+class ResourceGovernorDomains(unittest.TestCase):
+    def test_four_domains_with_levels(self):
+        rd = read("iDeck/Runtime/Resources/ResourceDomains.swift")
+        self.assertIn("case fex, jit, gpu, sessions", rd)
+        self.assertIn('case automatic = "Automatic", economy = "Economy", performance = "Performance"', rd)
+        self.assertIn("if profile.cpuCount == 0 { plan.cpuCount = min(4, cores) }", rd)
+        self.assertIn("case .economy: plan.jitPoolMiB = 384", rd)
+        self.assertIn("WindowsEnvironment.lowMemoryFrameLatency = true", rd)
+        pbx = read("iDeck.xcodeproj/project.pbxproj")
+        self.assertEqual(pbx.count("ResourceDomains.swift"), 6)
+
+    def test_wired_into_launch_settings_and_background(self):
+        prof = read("iDeck/Runtime/WindowsEnvironment+Profile.swift")
+        self.assertIn("let plan = ResourceDomains.apply(profile: profile)", prof)
+        self.assertIn("if sessionJITPoolMiB == 0, let pool = plan.jitPoolMiB { sessionJITPoolMiB = pool }", prof)
+        self.assertIn("ResourceDomains.current.pauseInBackground ?? Self.pauseInBackground",
+                      read("iDeck/Runtime/Resources/ResourceGovernor+Background.swift"))
+        self.assertIn("ResourceDomains.sessionEnded()", read("iDeck/ResourceGovernor.swift"))
+        self.assertIn("ResourceLevelPicker(domain: domain)", read("iDeck/Presentation/Settings/SettingsView+System.swift"))

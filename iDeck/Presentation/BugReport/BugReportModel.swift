@@ -217,18 +217,10 @@ final class BugReportModel: ObservableObject {
 
     /// Logging evidence must remain available throughout active downloads
     /// and transfers; paused jobs do not count as an active transfer.
+    /// Every store through its StoreProvider: the EA app's and Ubisoft's downloads
+    /// were not counted before.
     static var downloadsOrTransfersActive: Bool {
-        let steam = SteamOwnedGamesModel.shared
-        if steam.installingApps.contains(where: { !steam.pausedInstalls.contains($0) }) { return true }
-        let gog = GOGLibraryModel.shared
-        if gog.downloadProgress.keys.contains(where: { !gog.pausedDownloads.contains($0) }) { return true }
-        let epic = EpicLibrary.shared
-        if epic.downloads.values.contains(where: { download in
-            if case .paused = download.state { return false }
-            if case .failed = download.state { return false }
-            return true
-        }) { return true }
-        return false
+        StoreProviders.anyDownloadRunning
     }
 
     /// Clears every log the bug list reads: iDeck's own log and the last
@@ -342,6 +334,9 @@ final class BugReportModel: ObservableObject {
         if let deps = UserDefaults.standard.string(forKey: DependencyCheck.reportKey) {
             lines.append("DLL check: " + deps)
         }
+        lines.append("Stores:")
+        lines += StoreProviders.summary.map { "  " + $0 }
+        lines.append("Resource Governor: " + ResourceDomains.describe(ResourceDomains.current))
         let transitions = SessionLifecycle.shared.recent
         if !transitions.isEmpty {
             lines.append("Session states (oldest first):")

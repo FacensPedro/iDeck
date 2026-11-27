@@ -25,7 +25,9 @@ extension ResourceGovernor {
             AppLog.record("[resources] left iDeck while the game closes: finishing the close first")
             return
         }
-        guard Self.pauseInBackground, Self.gameRunning else { return }
+        // The Sessions domain's level decides first (Economy pauses, Performance keeps the
+        // game running); Automatic follows Settings.
+        guard ResourceDomains.current.pauseInBackground ?? Self.pauseInBackground, Self.gameRunning else { return }
         do {
             try AVAudioSession.sharedInstance().setActive(false, options: [.notifyOthersOnDeactivation])
             pausedForBackground = true

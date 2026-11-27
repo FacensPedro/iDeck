@@ -49,6 +49,11 @@ final class ResourceGovernor {
 
     func start() {
         guard pressure == nil else { return }
+        // Downloads the Sessions domain paused for a game go on once it ends.
+        SessionLifecycle.shared.observe { _, next in
+            guard next == .idle || next == .failed else { return }
+            DispatchQueue.main.async { MainActor.assumeIsolated { ResourceDomains.sessionEnded() } }
+        }
         let source = DispatchSource.makeMemoryPressureSource(eventMask: [.warning, .critical], queue: .main)
         source.setEventHandler { [weak self] in
             MainActor.assumeIsolated { self?.memoryPressure(source.data) }

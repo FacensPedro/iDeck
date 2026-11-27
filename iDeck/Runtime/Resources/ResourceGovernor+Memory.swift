@@ -51,9 +51,10 @@ extension ResourceGovernor {
         // so a later restart report can distinguish game execution and USB
         // transfer activity from an actual process termination record.
         let steamInstalls = SteamOwnedGamesModel.shared.installingApps.count
+        let storeDownloads = StoreProviders.runningDownloads.count
         AppLog.record("[memory] pressure \(level): footprint \(before) MiB -> \(Self.footprintMiB()) MiB after releasing caches, " +
                       "\(Self.availableMiB()) MiB left before the system limit, game running: \(Self.gameRunning), " +
-                      "app active: \(Self.appActive), Steam installs: \(steamInstalls)")
+                      "app active: \(Self.appActive), Steam installs: \(steamInstalls), downloads in all stores: \(storeDownloads)")
         BenchmarkSession.mark("memory_pressure_" + level)
     }
 }

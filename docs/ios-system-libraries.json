@@ -95,7 +95,7 @@
         "iDeck/Application/SystemCoordinator+Dock.swift",
         "iDeck/Application/SystemCoordinator+JIT.swift"
       ],
-      "files": 36,
+      "files": 37,
       "framework": "Darwin",
       "group": "Core System",
       "minimum_ios": "2.0",
@@ -121,7 +121,7 @@
         "iDeck/Application/SystemCoordinator+Diagnostics.swift",
         "iDeck/Application/SystemCoordinator+Dock.swift"
       ],
-      "files": 135,
+      "files": 137,
       "framework": "Foundation",
       "group": "Core System",
       "minimum_ios": "2.0",

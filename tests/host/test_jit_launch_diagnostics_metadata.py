@@ -31,7 +31,7 @@ class LauncherJITAndDiagnosticsTests(unittest.TestCase):
 
     def test_clear_logs_is_blocked_during_downloads(self):
         self.assertIn("downloadsOrTransfersActive", BUGS)
-        self.assertIn("downloadProgress.keys.contains", BUGS)
+        self.assertIn("StoreProviders.anyDownloadRunning", BUGS)
         self.assertIn("showClearConfirmation", BUGS)
 
     def test_clean_release_and_centered_jit_status(self):

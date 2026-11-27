@@ -447,6 +447,8 @@ enum Translations {
         "Copy bug": ["pt": "Copiar bug", "es": "Copiar error"],
         "Copy iDeck log": ["pt": "Copiar log do iDeck", "es": "Copiar registro de iDeck"],
         "Copy last Wine log": ["pt": "Copiar último log do Wine", "es": "Copiar último registro de Wine"],
+        "Sessions": ["pt": "Sessões", "es": "Sesiones"],
+        "Economy": ["pt": "Economia", "es": "Ahorro"],
         "Copy Wine log of the last failed launch": ["pt": "Copiar log do Wine da última falha", "es": "Copiar registro de Wine del último fallo"],
         "Wine log of the failed launch copied as a .txt file.": ["pt": "Log do Wine da falha copiado como arquivo .txt.", "es": "Registro de Wine del fallo copiado como archivo .txt."],
         "Diagnosis": ["pt": "Diagnóstico", "es": "Diagnóstico"],

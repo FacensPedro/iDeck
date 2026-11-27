@@ -20,5 +20,16 @@
 ### Session lifecycle
 - Each state change records how long the previous state lasted, in the log and the bug report. A session stuck in preparing (3 min), launching (2 min), closing (45 s) or recovering (1 min) is noted once in the log. "Freeing memory" before a launch (iDeck reopening through StikDebug) is now a state change instead of being ignored.
 
+### Resource Governor
+- The governor now controls four domains on their own, each Auto, Economy or Performance (Settings › Graphics & Performance › Resource Governor). A game's own page always wins.
+  - FEX: Economy shows the game at most 4 cores and uses the faster x87 maths; Performance uses the faster x87 maths with every core.
+  - JIT: Economy asks for a 384 MB pool, Performance for 560 MB, for games whose page leaves the size to iDeck.
+  - GPU: Economy runs one frame in flight and turns frame generation off; Performance keeps two frames in flight unless less than 2 GB is free.
+  - Sessions: Economy hands memory back before the launch, pauses every store's downloads while the game runs (they go on when it ends) and pauses the game in the background; Performance keeps the game running in the background.
+- Auto acts as Economy in Low Power Mode or when the device is hot, and for JIT and GPU when less than 3 GB is free. Each launch logs its plan, and the bug report shows it.
+
+### Stores
+- A shared StoreProvider for Steam, GOG, Epic Games, the EA app and Ubisoft Connect: one interface for sign-in, owned games, install state, downloads (queued, running, paused, failed), install, pause, resume, stop, uninstall and refresh. The Resource Governor, the memory log and Bugs & logs use it. "Clear logs" now also waits for the EA app's and Ubisoft's downloads, which it did not count before. The bug report lists each store's sign-in, games and downloads (counts only).
+
 ### Version
 - Updated the application version to 3.0.1 (build 130).
