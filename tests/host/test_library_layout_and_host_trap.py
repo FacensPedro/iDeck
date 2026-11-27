@@ -11,7 +11,7 @@ ENVIRONMENT = (ROOT / "iDeck/WindowsEnvironment.swift").read_text()
 
 class LibraryLayoutTests(unittest.TestCase):
     def test_card_titles_are_centered(self):
-        start = VIEW.index("    private func cardTitle(_ title: String)")
+        start = VIEW.index("    func cardTitle(_ title: String)")
         card = VIEW[start:VIEW.index("\n    }\n", start)]
         self.assertIn(".multilineTextAlignment(.center)", card)
         self.assertIn(".frame(maxWidth: .infinity, alignment: .top)", card)

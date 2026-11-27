@@ -40,7 +40,7 @@ class UbisoftPageTests(unittest.TestCase):
 
     def card(self) -> str:
         start = VIEW.index("func ubisoftCard(")
-        return VIEW[start:VIEW.index("private func ubisoftDownloadBadge", start)]
+        return VIEW[start:VIEW.index("func ubisoftDownloadBadge", start)]
 
     def page(self) -> str:
         start = VIEW.index("struct UbisoftGameDetailsSheet: View {")

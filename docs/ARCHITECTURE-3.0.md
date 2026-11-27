@@ -72,6 +72,11 @@ Steam page as `SteamProgramDetailsView` (header, actions, settings) plus
 `SteamProgramDetailsView+Sections` (size, Steam Cloud saves, download status, DLCs).
 Each page observes its store's library as its model.
 
+Library (3.0): `WindowsWorkspaceView` (in `MainView.swift`) keeps the library's state,
+filters and layout; `Presentation/Library/WindowsWorkspaceView+Header` (top bar, Steam
+sign-in, the all-stores list), `+Steam`, `+GOG`, `+Epic`, `+EA`, `+Ubisoft` (each store's
+list, cards and launch) and `+Shelves` (the console-style home) hold the rest.
+
 ## iOS system libraries
 
 `scripts/ios_system_libraries.py` keeps the catalog of public iOS frameworks iDeck uses

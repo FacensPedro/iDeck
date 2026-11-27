@@ -54,7 +54,7 @@ class UbisoftInstallFlowTests(unittest.TestCase):
         self.assertIn("onInstall: { ubisoft.install(game) }", page)
         self.assertIn("onPause: { ubisoft.pause(game) }", page)
         self.assertIn("onStop: { ubisoft.cancel(game) }", page)
-        card = VIEW[VIEW.index("func ubisoftCard("):VIEW.index("private func launchEAGame")]
+        card = VIEW[VIEW.index("func ubisoftCard("):VIEW.index("\n    }\n", VIEW.index("func ubisoftCard("))]
         self.assertIn("let open = { selectedUbisoftGame = game }", card)
         self.assertNotIn("Install it in Ubisoft Connect", card)
 

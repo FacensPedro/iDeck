@@ -30,21 +30,21 @@ class ReleaseInterfaceCDNTests(unittest.TestCase):
         self.assertIn(f"Updated the application version to {versions[0]} (build {builds[0]}).", NOTES)
 
     def test_store_badges_no_longer_appear_with_game_titles(self):
-        self.assertIn("private func cardTitle(_ title: String)", VIEW)
+        self.assertIn("func cardTitle(_ title: String)", VIEW)
         self.assertNotIn("cardTitle(game.title, store:", VIEW)
         self.assertNotIn("StoreBadge(store: store).fixedSize()", VIEW)
         self.assertIn(".multilineTextAlignment(.center)", VIEW)
         self.assertIn(".frame(maxWidth: .infinity, alignment: .center)", VIEW)
 
     def test_long_game_titles_are_truncated_and_header_is_ideck(self):
-        start = VIEW.index("    private func cardTitle(_ title: String)")
-        end = VIEW.index("    private var antiCheatCoverBadge", start)
+        start = VIEW.index("    func cardTitle(_ title: String)")
+        end = VIEW.index("    var antiCheatCoverBadge", start)
         card = VIEW[start:end]
         # Long names wrap to a second line; every title reserves two lines.
         self.assertIn(".lineLimit(2, reservesSpace: true)", card)
         self.assertNotIn(".truncationMode(.tail)", card)
         self.assertIn(".accessibilityLabel(title)", card)
-        top = VIEW.split("private var topBar: some View", 1)[1].split("enum MixedLibraryEntry", 1)[0]
+        top = VIEW.split("var topBar: some View", 1)[1].split("enum MixedLibraryEntry", 1)[0]
         self.assertIn('Text("iDeck")', top)
         self.assertNotIn('Image("IDeckLogo")', top)
         self.assertNotIn('Text(tr("Madeira"))', top)

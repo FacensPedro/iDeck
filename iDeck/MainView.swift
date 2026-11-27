@@ -114,7 +114,7 @@ struct WindowsWorkspaceView: View {
     @ObservedObject var steamLibrary: SteamOwnedGamesModel
 
     @State private var pendingStore: SystemCoordinator.StoreClient?
-    @State private var isSettingsPresented = false
+    @State var isSettingsPresented = false
     @State var searchText = ""
     /// The selected tile of the console-style shelf (a store or a game).
     /// The selected store or game. Starts on the store chosen last (2.13.3): the
@@ -123,23 +123,23 @@ struct WindowsWorkspaceView: View {
     @State var shelf: ShelfItem = .store(ShelfItem.savedStore)
     /// The last store tab chosen, kept across view rebuilds and app restarts.
     @AppStorage("library.lastStore") var lastStore = "steam"
-    @State private var prefixPath: URL?
+    @State var prefixPath: URL?
     @StateObject var windowsLibrary = WindowsLibraryStore()
-    @State private var isExecutablePickerPresented = false
-    @State private var isExecutableMenuPresented = false
+    @State var isExecutablePickerPresented = false
+    @State var isExecutableMenuPresented = false
     @State var selectedExecutable: SelectedLibraryURL?
     @State var selectedSteamGame: SelectedSteamGame?
-    @State private var installMessage: String?
-    @State private var isShowingInstallResult = false
-    @State private var pendingSteamCompatibilityLaunch: (game: SteamAppInfo, profile: WindowsGameProfile, prefixPath: URL)?
-    @State private var steamCompatibilityMessage = ""
-    @State private var showingSteamCompatibilityWarning = false
+    @State var installMessage: String?
+    @State var isShowingInstallResult = false
+    @State var pendingSteamCompatibilityLaunch: (game: SteamAppInfo, profile: WindowsGameProfile, prefixPath: URL)?
+    @State var steamCompatibilityMessage = ""
+    @State var showingSteamCompatibilityWarning = false
     @ObservedObject var gogLibrary = GOGLibraryModel.shared
-    @State private var isGOGSignInPresented = false
-    @AppStorage("library.gogOwnedCollapsed") private var gogOwnedCollapsed = false
+    @State var isGOGSignInPresented = false
+    @AppStorage("library.gogOwnedCollapsed") var gogOwnedCollapsed = false
     @ObservedObject var epicLibrary = EpicLibrary.shared
-    @State private var isEpicSignInPresented = false
-    @State private var isEASignInPresented = false
+    @State var isEpicSignInPresented = false
+    @State var isEASignInPresented = false
     @ObservedObject var eaLibrary = EALibrary.shared
     @ObservedObject var ubisoftLibrary = UbisoftLibrary.shared
     @State var ubisoftClientInstalled = false
@@ -147,16 +147,16 @@ struct WindowsWorkspaceView: View {
     var ubisoftSignedIn: Bool { ubisoftLibrary.signedIn }
     @State var selectedEpicGame: SelectedEpicGame?
     @State var selectedEAGame: EAOwnedGame?
-    @State private var selectedUbisoftGame: UbisoftGame?
+    @State var selectedUbisoftGame: UbisoftGame?
     @State var selectedGOGGame: GOGGame?
-    @AppStorage("library.epicOwnedCollapsed") private var epicOwnedCollapsed = false
+    @AppStorage("library.epicOwnedCollapsed") var epicOwnedCollapsed = false
     @Environment(\.openURL) private var openURL
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     // Palette: panel #0b0b0d, card #111114, line #1f1f24.
     let panelColor = Color(red: 0x0b/255, green: 0x0b/255, blue: 0x0d/255)
-    private let secondaryColor = Color(red: 0x11/255, green: 0x11/255, blue: 0x14/255)
+    let secondaryColor = Color(red: 0x11/255, green: 0x11/255, blue: 0x14/255)
     let lineColor = Color(red: 0x1f/255, green: 0x1f/255, blue: 0x24/255)
     private let accentColor = Color(red: 0x3b/255, green: 0x82/255, blue: 0xf6/255)
     let textColor = Color(red: 0xf4/255, green: 0xf4/255, blue: 0xf5/255)
@@ -210,14 +210,14 @@ struct WindowsWorkspaceView: View {
     var isCompact: Bool { horizontalSizeClass == .compact }
 
     /// Blur of the cover of a game that cannot be installed (Easy Anti-Cheat).
-    private static let uninstalledCoverBlur: CGFloat = 1.5
+    static let uninstalledCoverBlur: CGFloat = 1.5
 
     /// Madeira's library lattice: 20 pt between columns, 18 pt between rows.
     var columns: [GridItem] {
         [GridItem(.adaptive(minimum: isCompact ? 110 : 154, maximum: 220), spacing: 20)]
     }
 
-    private func cardTitle(_ title: String) -> some View {
+    func cardTitle(_ title: String) -> some View {
         Text(title)
             .font(.subheadline.weight(.semibold))
             .foregroundColor(textColor)
@@ -232,7 +232,7 @@ struct WindowsWorkspaceView: View {
 
     /// In place of the Install button on a game that needs Easy Anti-Cheat: only the
     /// struck-through symbol, in the middle of the cover, not tappable.
-    private var antiCheatCoverBadge: some View {
+    var antiCheatCoverBadge: some View {
         Image(systemName: "arrow.down")
             .font(.system(size: 20, weight: .bold))
             .foregroundColor(.white.opacity(0.75))
@@ -253,7 +253,7 @@ struct WindowsWorkspaceView: View {
     }
 
     /// A collapsible "owned games" header (store, count, chevron).
-    private func ownedHeader(_ title: String, collapsed: Binding<Bool>) -> some View {
+    func ownedHeader(_ title: String, collapsed: Binding<Bool>) -> some View {
         Button {
             withAnimation(.easeInOut(duration: 0.2)) { collapsed.wrappedValue.toggle() }
         } label: {
@@ -410,526 +410,7 @@ struct WindowsWorkspaceView: View {
         .preferredColorScheme(.dark)
     }
 
-    private var steamConnectButton: some View {
-        HStack(spacing: 10) {
-            Button {
-                isExecutableMenuPresented = true
-            } label: {
-                Image(systemName: "plus")
-                    .font(.headline)
-                    .foregroundColor(.white)
-                    .frame(width: 44, height: 44)
-                    .background(secondaryColor)
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-            }
-            .accessibilityLabel(tr("Install .exe"))
-            .confirmationDialog(tr("Add Windows app"), isPresented: $isExecutableMenuPresented) {
-                Button(tr("Install .exe")) { isExecutablePickerPresented = true }
-            }
-        }
-    }
-
-    private var topBar: some View {
-        HStack(spacing: 12) {
-            Text("iDeck")
-                .font(.system(size: 24, weight: .bold, design: .rounded))
-                .tracking(-0.5)
-                .foregroundColor(.white)
-                .accessibilityAddTraits(.isHeader)
-            Spacer(minLength: 0)
-            HStack(spacing: 6) {
-                Circle()
-                    .fill(coordinator.isJITEnabled ? Color.green : Color.orange)
-                    .frame(width: 7, height: 7)
-                Text(coordinator.isJITEnabled ? tr("JIT active") : tr("JIT off"))
-                    .font(.subheadline.weight(.medium))
-                    .foregroundColor(.white)
-            }
-            .frame(maxWidth: .infinity)
-            .accessibilityElement(children: .combine)
-            Spacer(minLength: 0)
-            Button { isSettingsPresented = true } label: {
-                Image(systemName: "gearshape.fill")
-                    .font(.title3)
-                    .foregroundColor(.white)
-                    .frame(width: 42, height: 42)
-                    .background(panelColor)
-                    .overlay(RoundedRectangle(cornerRadius: 9).stroke(lineColor, lineWidth: 1))
-                    .clipShape(RoundedRectangle(cornerRadius: 9))
-            }
-            .accessibilityLabel(tr("Settings"))
-        }
-        .padding(.horizontal, isCompact ? 14 : 24)
-        .padding(.vertical, 10)
-        .background(Color.black)
-        .overlay(alignment: .bottom) { lineColor.frame(height: 1) }
-    }
-
-    /// One game in the combined library, from whichever store owns it.
-    enum MixedLibraryEntry: Identifiable {
-        case steam(SteamAppInfo)
-        case gog(GOGGame)
-        case epic(EpicOwnedGame)
-        case ea(EAOwnedGame)
-        case ubisoft(UbisoftGame)
-
-        var id: String {
-            switch self {
-            case .steam(let game): return "steam:\(game.appID)"
-            case .gog(let game): return "gog:\(game.id)"
-            case .epic(let game): return "epic:\(game.id)"
-            case .ea(let game): return "ea:\(game.id)"
-            case .ubisoft(let game): return "ubisoft:\(game.id)"
-            }
-        }
-
-        var title: String {
-            switch self {
-            case .steam(let game): return game.name
-            case .gog(let game): return game.title
-            case .epic(let game): return game.title
-            case .ea(let game): return game.title
-            case .ubisoft(let game): return game.title
-            }
-        }
-    }
-
-    /// Steam, GOG and Epic games of every connected account, in one list
-    /// sorted by name.
-    private var mixedLibraryEntries: [MixedLibraryEntry] {
-        var entries: [MixedLibraryEntry] = []
-        if coordinator.isSteamConnected { entries += filteredSteamGames.map { .steam($0) } }
-        if gogLibrary.isSignedIn { entries += filteredGOGGames.map { .gog($0) } }
-        if epicLibrary.signedIn { entries += filteredEpicGames.map { .epic($0) } }
-        if eaLibrary.signedIn { entries += filteredEAGames.map { .ea($0) } }
-        return entries.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
-    }
-
-    private var mixedLibraryCount: Int {
-        (coordinator.isSteamConnected ? steamLibrary.games.count : 0) +
-        (gogLibrary.isSignedIn ? gogLibrary.games.count : 0) +
-        (epicLibrary.signedIn ? epicLibrary.owned.count : 0) +
-        (eaLibrary.signedIn ? eaLibrary.owned.count : 0)
-    }
-
-    var mixedLibraryLoading: Bool {
-        (coordinator.isSteamConnected && steamLibrary.isLoading) ||
-        (gogLibrary.isSignedIn && gogLibrary.isLoading) ||
-        (epicLibrary.signedIn && epicLibrary.refreshing) ||
-        (eaLibrary.signedIn && eaLibrary.refreshing)
-    }
-
-    /// Short status lines for stores that are loading or failed to load.
-    private var mixedLibraryNotices: [(text: String, isError: Bool)] {
-        var notices: [(text: String, isError: Bool)] = []
-        if coordinator.isSteamConnected {
-            if steamLibrary.isLoading { notices.append((tr("Loading Steam library..."), false)) }
-            else if let error = steamLibrary.errorMessage { notices.append(("Steam: " + tr(error), true)) }
-        }
-        if gogLibrary.isSignedIn {
-            if gogLibrary.isLoading { notices.append((tr("Loading GOG library..."), false)) }
-            else if let error = gogLibrary.errorMessage { notices.append(("GOG: " + tr(error), true)) }
-        }
-        if epicLibrary.signedIn {
-            if epicLibrary.refreshing { notices.append((tr("Loading Epic Games library..."), false)) }
-            else if let error = epicLibrary.error { notices.append(("Epic Games: " + error, true)) }
-        }
-        if eaLibrary.signedIn {
-            if eaLibrary.refreshing { notices.append((tr("Loading EA app library..."), false)) }
-            else if let error = eaLibrary.error { notices.append(("EA app: " + error, true)) }
-        }
-        return notices
-    }
-
-    /// Libraries › reload: Steam, GOG and Epic Games lists and what is installed.
-    func refreshAllLibraries() {
-        reloadInstalledGames()
-        if coordinator.isSteamConnected { Task { await steamLibrary.refresh(force: true) } }
-        if gogLibrary.isSignedIn { Task { await gogLibrary.refresh() } }
-        if epicLibrary.signedIn { Task { await epicLibrary.refreshLibrary() } }
-        if eaLibrary.signedIn { Task { await eaLibrary.refreshLibrary() } }
-        if ubisoftClientInstalled || ubisoftSignedIn { ubisoftLibrary.refresh() }
-    }
-
-    func gameCard(_ game: SteamAppInfo) -> some View {
-        let installed = steamLibrary.installedApps.contains(game.appID)
-
-        return VStack(alignment: .leading, spacing: 6) {
-            VStack(alignment: .leading, spacing: 6) {
-                ZStack {
-                    Button { selectedSteamGame = SelectedSteamGame(game: game) } label: {
-                        SteamGameArtworkView(game: game)
-                            .libraryCoverFrame()
-                            .blur(radius: !installed && AntiCheatPolicy.isBlocked(title: game.name, steamAppID: game.appID) ? Self.uninstalledCoverBlur : 0)
-                    }
-                    .buttonStyle(.plain)
-                    if !installed && AntiCheatPolicy.isBlocked(title: game.name, steamAppID: game.appID) {
-                        antiCheatCoverBadge
-                    }
-                }
-                .libraryCoverFrame()
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .clipped()
-                Button { selectedSteamGame = SelectedSteamGame(game: game) } label: {
-                    cardTitle(game.name.isEmpty ? tr("Untitled Steam app") : game.name)
-                }
-                .buttonStyle(.plain)
-            }
-
-            if !installed, let error = steamLibrary.downloadErrors[game.appID] {
-                Text(tr(error))
-                    .font(.caption2)
-                    .foregroundColor(.red)
-                    .lineLimit(3)
-            } else if !installed && !game.installableOnWindows {
-                Text(tr("Not available for Windows"))
-                    .font(.caption)
-                    .foregroundColor(.gray)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-        }
-        .padding(4)
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    @ViewBuilder
-    var gogContent: some View {
-        if gogLibrary.isSignedIn {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(spacing: 10) {
-                    ownedHeader(tr("GOG games: %d", gogLibrary.games.count), collapsed: $gogOwnedCollapsed)
-                    Button {
-                        Task { await gogLibrary.refresh() }
-                    } label: {
-                        Image(systemName: "arrow.clockwise")
-                            .font(.headline)
-                            .frame(width: 32, height: 32)
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(gogLibrary.isLoading)
-                }
-                if !gogOwnedCollapsed {
-                    if gogLibrary.isLoading && gogLibrary.games.isEmpty {
-                        HStack(spacing: 10) {
-                            ProgressView().tint(.white)
-                            Text(tr("Loading GOG library...")).foregroundColor(.gray)
-                        }
-                        .frame(maxWidth: .infinity, minHeight: 120)
-                    } else if let error = gogLibrary.errorMessage, gogLibrary.games.isEmpty {
-                        Text(tr(error))
-                            .font(.subheadline)
-                            .foregroundColor(.orange)
-                            .frame(maxWidth: .infinity, minHeight: 80)
-                    } else if filteredGOGGames.isEmpty {
-                        Text(gogLibrary.games.isEmpty ? tr("No GOG games found yet.") : tr("No games match this search"))
-                            .font(.subheadline)
-                            .foregroundColor(.gray)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 24)
-                    } else {
-                        LazyVGrid(columns: columns, spacing: 18) {
-                            ForEach(filteredGOGGames) { game in gogCard(game) }
-                        }
-                    }
-                }
-            }
-        } else {
-            HStack(spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(tr("GOG"))
-                        .font(.headline)
-                        .foregroundColor(.white)
-                    Text(tr("Sign in on GOG's own page to see your GOG games. iDeck keeps only the sign-in token, in this device's Keychain."))
-                        .font(.caption)
-                        .foregroundColor(.gray)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer(minLength: 8)
-                Button(tr("Connect GOG")) { isGOGSignInPresented = true }
-                    .buttonStyle(.borderedProminent)
-            }
-            .padding(16)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(panelColor)
-            .overlay(RoundedRectangle(cornerRadius: 10).stroke(lineColor, lineWidth: 1))
-            .clipShape(RoundedRectangle(cornerRadius: 10))
-        }
-    }
-
-    func gogCard(_ game: GOGGame) -> some View {
-        let installed = gogLibrary.installed[game.id]
-        return VStack(alignment: .leading, spacing: 6) {
-            VStack(alignment: .leading, spacing: 6) {
-                ZStack {
-                    Button { selectedGOGGame = game } label: {
-                        GOGArtworkView(urls: game.artworkCandidates, fallbackColor: secondaryColor, fill: true)
-                            .libraryCoverFrame()
-                            .blur(radius: installed == nil && AntiCheatPolicy.isBlocked(title: game.title) ? Self.uninstalledCoverBlur : 0)
-                    }
-                    .buttonStyle(.plain)
-                    if installed == nil && AntiCheatPolicy.isBlocked(title: game.title) {
-                        antiCheatCoverBadge
-                    }
-                }
-                .libraryCoverFrame()
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .clipped()
-                Button { selectedGOGGame = game } label: { cardTitle(game.title) }
-                    .buttonStyle(.plain)
-            }
-            if let error = gogLibrary.downloadErrors[game.id] {
-                Text(tr(error))
-                    .font(.caption2)
-                    .foregroundColor(.red)
-                    .lineLimit(2)
-            }
-            if installed == nil && !game.worksOnWindows {
-                Text(tr("Not available for Windows"))
-                    .font(.caption)
-                    .foregroundColor(.gray)
-            }
-        }
-        .padding(4)
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    @ViewBuilder
-    var epicContent: some View {
-        if epicLibrary.signedIn {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(spacing: 10) {
-                    ownedHeader(tr("Epic games: %d", epicLibrary.owned.count), collapsed: $epicOwnedCollapsed)
-                    Button {
-                        Task { await epicLibrary.refreshLibrary() }
-                    } label: {
-                        Image(systemName: "arrow.clockwise")
-                            .font(.headline)
-                            .frame(width: 32, height: 32)
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(epicLibrary.refreshing)
-                }
-                if !epicOwnedCollapsed {
-                    if epicLibrary.refreshing && epicLibrary.owned.isEmpty {
-                        HStack(spacing: 10) {
-                            ProgressView().tint(.white)
-                            Text(tr("Loading Epic Games library...")).foregroundColor(.gray)
-                        }
-                        .frame(maxWidth: .infinity, minHeight: 120)
-                    } else if let error = epicLibrary.error, epicLibrary.owned.isEmpty {
-                        Text(error)
-                            .font(.subheadline)
-                            .foregroundColor(.orange)
-                            .frame(maxWidth: .infinity, minHeight: 80)
-                    } else if filteredEpicGames.isEmpty {
-                        Text(epicLibrary.owned.isEmpty ? tr("No Epic games found yet.") : tr("No games match this search"))
-                            .font(.subheadline)
-                            .foregroundColor(.gray)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 24)
-                    } else {
-                        LazyVGrid(columns: columns, spacing: 18) {
-                            ForEach(filteredEpicGames) { game in epicCard(game) }
-                        }
-                    }
-                }
-            }
-        } else {
-            HStack(spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Epic Games")
-                        .font(.headline)
-                        .foregroundColor(.white)
-                    Text(tr("Sign in on Epic's own page to see your Epic games. iDeck keeps only the sign-in token, in this device's Keychain."))
-                        .font(.caption)
-                        .foregroundColor(.gray)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer(minLength: 8)
-                Button(tr("Connect Epic")) { isEpicSignInPresented = true }
-                    .buttonStyle(.borderedProminent)
-            }
-            .padding(16)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(panelColor)
-            .overlay(RoundedRectangle(cornerRadius: 10).stroke(lineColor, lineWidth: 1))
-            .clipShape(RoundedRectangle(cornerRadius: 10))
-        }
-    }
-
-    func epicCard(_ game: EpicOwnedGame) -> some View {
-        let installed = epicLibrary.installed[game.appName]
-        let download = epicLibrary.downloads[game.appName]
-        return VStack(alignment: .leading, spacing: 6) {
-            VStack(alignment: .leading, spacing: 6) {
-                ZStack {
-                    Button { selectedEpicGame = SelectedEpicGame(id: game.appName) } label: {
-                        GOGArtworkView(urls: [game.cover].compactMap { $0 }, fallbackColor: secondaryColor, fill: true)
-                            .libraryCoverFrame()
-                            .blur(radius: installed == nil && AntiCheatPolicy.isBlocked(title: game.title, epicAppName: game.appName) ? Self.uninstalledCoverBlur : 0)
-                    }
-                    .buttonStyle(.plain)
-                    if installed == nil && AntiCheatPolicy.isBlocked(title: game.title, epicAppName: game.appName) {
-                        antiCheatCoverBadge
-                    }
-                }
-                .libraryCoverFrame()
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .clipped()
-                Button { selectedEpicGame = SelectedEpicGame(id: game.appName) } label: { cardTitle(game.title) }
-                    .buttonStyle(.plain)
-            }
-            if case .failed(let message)? = download?.state {
-                Text(message)
-                    .font(.caption2)
-                    .foregroundColor(.red)
-                    .lineLimit(2)
-            }
-        }
-        .padding(4)
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
     // MARK: EA app (Madeira's EA support: no EA app is installed)
-
-    var filteredEAGames: [EAOwnedGame] {
-        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        let games = eaLibrary.owned.filter(\.downloadable)
-        guard !query.isEmpty else { return games }
-        return games.filter { $0.title.localizedCaseInsensitiveContains(query) }
-    }
-
-    var eaContent: some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("EA app")
-                    .font(.headline)
-                    .foregroundColor(.white)
-                Text(tr("Sign in to EA to see your games. iDeck keeps the sign-in token in this device's Keychain."))
-                    .font(.caption)
-                    .foregroundColor(.gray)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            Spacer(minLength: 8)
-            Button(tr("Connect EA")) { isEASignInPresented = true }
-                .buttonStyle(.borderedProminent)
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(panelColor)
-        .overlay(RoundedRectangle(cornerRadius: 10).stroke(lineColor, lineWidth: 1))
-        .clipShape(RoundedRectangle(cornerRadius: 10))
-    }
-
-    func eaCard(_ game: EAOwnedGame) -> some View {
-        let installed = eaLibrary.installed[game.id]
-        let download = eaLibrary.downloads[game.id]
-        return VStack(alignment: .leading, spacing: 6) {
-            VStack(alignment: .leading, spacing: 6) {
-                ZStack {
-                    GOGArtworkView(urls: [game.cover].compactMap { $0 }, fallbackColor: secondaryColor, fill: true)
-                        .libraryCoverFrame()
-                        .contentShape(Rectangle())
-                        .onTapGesture { selectedEAGame = game }
-                        .blur(radius: installed == nil && AntiCheatPolicy.isBlocked(title: game.title) ? Self.uninstalledCoverBlur : 0)
-                    if installed == nil && AntiCheatPolicy.isBlocked(title: game.title) {
-                        antiCheatCoverBadge
-                    }
-                }
-                .libraryCoverFrame()
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .clipped()
-                Button { selectedEAGame = game } label: { cardTitle(game.title) }
-                    .buttonStyle(.plain)
-            }
-            if case .failed(let message)? = download?.state {
-                Text(message)
-                    .font(.caption2)
-                    .foregroundColor(.red)
-                    .lineLimit(2)
-            }
-        }
-        .padding(4)
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    var filteredUbisoftGames: [UbisoftGame] {
-        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty else { return ubisoftLibrary.games }
-        return ubisoftLibrary.games.filter { $0.title.localizedCaseInsensitiveContains(query) }
-    }
-
-    /// An installed Ubisoft game starts its own program directly; one the account owns
-    /// but has not installed says where to install it.
-    func ubisoftCard(_ game: UbisoftGame) -> some View {
-        // Opens the game's page, as for the other stores: install, pause, stop and
-        // errors are there.
-        let open = { selectedUbisoftGame = game }
-        return VStack(alignment: .leading, spacing: 6) {
-            ZStack {
-                if !game.coverURLs.isEmpty {
-                    // No text over Ubisoft covers: the title is shown under the card.
-                    GOGArtworkView(urls: game.coverURLs, fallbackColor: secondaryColor, fill: true)
-                        .id(game.coverURLs)
-                } else if let executable = game.executable {
-                    WindowsExecutableArtworkView(executableURL: executable, library: windowsLibrary, fallbackColor: secondaryColor)
-                } else {
-                    secondaryColor
-                    Image(systemName: "gamecontroller")
-                        .font(.largeTitle)
-                        .foregroundColor(.gray)
-                }
-            }
-            .libraryCoverFrame()
-            .blur(radius: game.executable == nil && AntiCheatPolicy.isBlocked(title: game.title) ? Self.uninstalledCoverBlur : 0)
-            .overlay(alignment: .bottom) {
-                if let download = ubisoftLibrary.downloads[game.id] { ubisoftDownloadBadge(download) }
-            }
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .clipped()
-            .contentShape(Rectangle())
-            .onTapGesture(perform: open)
-            .contextMenu {
-                if ubisoftLibrary.downloads[game.id] != nil {
-                    Button(role: .destructive) { ubisoftLibrary.cancel(game) } label: {
-                        Label(tr("Stop download"), systemImage: "xmark.circle")
-                    }
-                }
-            }
-            Button(action: open) { cardTitle(game.title) }
-                .buttonStyle(.plain)
-            if case .failed(let message)? = ubisoftLibrary.downloads[game.id]?.state {
-                Text(message)
-                    .font(.caption2)
-                    .foregroundColor(.red)
-                    .lineLimit(2)
-            }
-        }
-        .padding(4)
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    /// A Ubisoft download's state over its cover: the step or the percentage, and a bar.
-    private func ubisoftDownloadBadge(_ download: UbisoftLibrary.Download) -> some View {
-        let text: String
-        switch download.state {
-        case .queued: text = tr("Waiting…")
-        case .active: text = download.total > 0 ? "\(Int(download.fraction * 100))%" : download.step
-        case .paused: text = download.total > 0 ? "\(Int(download.fraction * 100))%" : ""   // no "Paused" text
-        case .failed: text = tr("Download failed")
-        }
-        return VStack(spacing: 4) {
-            Text(text)
-                .font(.caption.weight(.semibold))
-                .foregroundColor(.white)
-                .lineLimit(1)
-            ProgressView(value: download.fraction)
-                .tint(.white)
-        }
-        .padding(8)
-        .frame(maxWidth: .infinity)
-        .background(Color.black.opacity(0.6))
-    }
 
     /// Licence, registry, the EA app's environment and local service, then Wine.
     private func launchEAGame(_ game: EAInstalledGame) {
@@ -941,25 +422,6 @@ struct WindowsWorkspaceView: View {
             do {
                 try await eaLibrary.prepareLaunch(offerID: game.offerID, nvidiaGPU: profile.reportNVIDIA, avx: profile.avxEnabled)
                 profile.arguments = [profile.arguments, game.arguments].filter { !$0.isEmpty }.joined(separator: " ")
-                coordinator.launchWindowsProgram(at: executable, profile: profile, detectInstaller: false)
-            } catch {
-                installMessage = error.localizedDescription
-                isShowingInstallResult = true
-            }
-        }
-    }
-
-    private func launchEpicGame(_ game: EpicInstalledGame) {
-        let executable = game.launchURL(in: EpicLibrary.drive)
-        let savedProfile = windowsLibrary.profile(for: "epic:\(game.appName)", title: game.title)
-        // StikDebug opens on the tap, while Epic's launch token is being fetched
-        // (that request took seconds and JIT activation only started after it).
-        coordinator.prewarmJITForLaunch()
-        Task { @MainActor in
-            do {
-                let epicArguments = try await epicLibrary.launchArguments(appName: game.appName)
-                var profile = savedProfile
-                profile.arguments = [profile.arguments, epicArguments].filter { !$0.isEmpty }.joined(separator: " ")
                 coordinator.launchWindowsProgram(at: executable, profile: profile, detectInstaller: false)
             } catch {
                 installMessage = error.localizedDescription
@@ -991,7 +453,7 @@ struct WindowsWorkspaceView: View {
     }
 
     /// Looks again for installed games of every store and Windows programs.
-    private func reloadInstalledGames() {
+    func reloadInstalledGames() {
         resolvePrefixPath()
         guard let prefixPath else { return }
         steamLibrary.refreshInstalledApps(prefixPath: prefixPath)
@@ -1005,73 +467,6 @@ struct WindowsWorkspaceView: View {
     // Do not block GOG/Epic here: launchWindowsExecutable automatically opens
     // StikDebug and resumes only after live debugger/JIT readiness is proven.
 
-    private func launchGOGGame(_ game: GOGInstalledGame) {
-        var profile = windowsLibrary.profile(for: "gog:\(game.gameID)", title: game.name)
-        if profile.arguments.isEmpty { profile.arguments = game.arguments }
-        // GOG Galaxy's game services (sign-in, achievements, stats) for this game,
-        // with a token minted for its own client, before Wine starts.
-        Task { @MainActor in
-            await GOGGalaxy.shared.prepare(gameID: game.gameID, drive: EpicLibrary.drive)
-            // What GOG Galaxy does after an install, done before the start (as Madeira):
-            // the install script's registry values, then the redistributables' installers.
-            let drive = EpicLibrary.drive
-            let folder = GOGLibraryModel.installFolder(containing: game.executable.deletingLastPathComponent())
-            GOGLaunchServices.applyInstallScripts(folder: folder, drive: drive)
-            if let batch = GOGLaunchServices.setupBatch(gameID: game.gameID, folder: folder, executable: game.executable,
-                                                        arguments: profile.arguments, drive: drive),
-               let shell = MadeiraDock.stageCommandShell() {
-                var setup = profile
-                setup.arguments = "/c \"\(batch)\""
-                coordinator.launchWindowsExecutable(at: shell, profile: setup)
-                return
-            }
-            coordinator.launchWindowsProgram(at: game.executable, profile: profile, detectInstaller: false)
-        }
-    }
-
-    /// Installs a GOG game the way GOG Galaxy does: the game's Galaxy build,
-    /// straight from GOG's content system. No offline installer.
-    private func downloadGOGInstaller(_ game: GOGGame) {
-        guard let prefixPath else { return }
-        gogLibrary.install(game, prefixPath: prefixPath) { _ in
-            windowsLibrary.refresh(prefixPath: prefixPath)
-        }
-    }
-
-    private func launchSteamGame(_ game: SteamAppInfo) {
-        guard let prefixPath else {
-            installMessage = tr("Windows environment is not ready.")
-            isShowingInstallResult = true
-            return
-        }
-        let profile = windowsLibrary.profile(for: "steam:\(game.appID)", title: game.name)
-        if MadeiraBundleIdentity.isNative,
-           let warning = coordinator.steamLaunchWarning(game: game, prefixPath: prefixPath) {
-            steamCompatibilityMessage = warning
-            pendingSteamCompatibilityLaunch = (game: game, profile: profile, prefixPath: prefixPath)
-            showingSteamCompatibilityWarning = true
-            return
-        }
-        coordinator.launchSteamGame(game: game, profile: profile, prefixPath: prefixPath)
-        if coordinator.windowsStatus.hasPrefix("Cannot launch") || coordinator.windowsStatus.hasPrefix("Madeira runtime missing") {
-            installMessage = trStatus(coordinator.windowsStatus)
-            isShowingInstallResult = true
-        }
-    }
-
-    func install(_ game: SteamAppInfo) {
-        coordinator.prefixHost.mountEnvironment { mountedPath in
-            guard let mountedPath else {
-                coordinator.setWindowsStatus("Container initialization failed")
-                return
-            }
-            let root = URL(fileURLWithPath: mountedPath, isDirectory: true)
-            Task { @MainActor in
-                prefixPath = root
-                steamLibrary.startInstall(appID: game.appID, prefixPath: root)
-            }
-        }
-    }
 }
 
 // MARK: First-run setup
