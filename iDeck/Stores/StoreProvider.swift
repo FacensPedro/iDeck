@@ -417,6 +417,7 @@ final class GOGStoreProvider: StoreProvider {
     }
 
     func refresh() async { await model.refresh() }
+    func refreshInstalled(prefix: URL) { model.refreshInstalled(prefixPath: prefix) }
 }
 
 // MARK: - Epic Games

@@ -315,3 +315,12 @@ class MainViewSteamThroughProvider(unittest.TestCase):
             self.assertNotIn(old, main)
         self.assertIn("func refreshInstalled(prefix: URL) { model.refreshInstalledApps(prefixPath: prefix) }",
                       read("iDeck/Stores/StoreProvider.swift"))
+
+
+class GOGInstalledScanThroughProvider(unittest.TestCase):
+    def test_gog_refresh_installed(self):
+        main = split_sources._original_read_text(ROOT / "iDeck/MainView.swift")
+        self.assertEqual(main.count("StoreProviders.of(.gog).refreshInstalled(prefix:"), 3)
+        self.assertNotIn("gogLibrary.refreshInstalled(", main)
+        self.assertIn("func refreshInstalled(prefix: URL) { model.refreshInstalled(prefixPath: prefix) }",
+                      read("iDeck/Stores/StoreProvider.swift"))

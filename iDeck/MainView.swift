@@ -410,7 +410,7 @@ struct WindowsWorkspaceView: View {
                     waited += 1
                 }
                 guard !ideck_wineprocess_running() else { return }
-                gogLibrary.refreshInstalled(prefixPath: prefixPath)
+                StoreProviders.of(.gog).refreshInstalled(prefix: prefixPath)
                 windowsLibrary.refresh(prefixPath: prefixPath)
             }
         }
@@ -452,7 +452,7 @@ struct WindowsWorkspaceView: View {
                     }
                 }
                 StoreProviders.of(.steam).refreshInstalled(prefix: root)
-                gogLibrary.refreshInstalled(prefixPath: root)
+                StoreProviders.of(.gog).refreshInstalled(prefix: root)
                 // Keep the first Wine prefix initialization architecture-only.
                 // Steam client components are installed from the explicit Madeira Dock step.
                 }
@@ -464,7 +464,7 @@ struct WindowsWorkspaceView: View {
         resolvePrefixPath()
         guard let prefixPath else { return }
         StoreProviders.of(.steam).refreshInstalled(prefix: prefixPath)
-        gogLibrary.refreshInstalled(prefixPath: prefixPath)
+        StoreProviders.of(.gog).refreshInstalled(prefix: prefixPath)
         epicLibrary.reloadInstalled()
         windowsLibrary.refresh(prefixPath: prefixPath)
     }
