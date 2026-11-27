@@ -30,7 +30,8 @@
 
 ### Stores
 - A shared StoreProvider for Steam, GOG, Epic Games, the EA app and Ubisoft Connect: one interface for sign-in, owned games, install state, downloads (queued, running, paused, failed), install, pause, resume, stop, uninstall and refresh. The Resource Governor, the memory log and Bugs & logs use it. "Clear logs" now also waits for the EA app's and Ubisoft's downloads, which it did not count before. The bug report lists each store's sign-in, games and downloads (counts only).
-- The store screens use it too: install, update, pause, resume, stop and uninstall on the Steam, GOG, Epic Games, EA app and Ubisoft Connect pages and in the library go through each store's provider instead of calling each store in its own way. Behaviour is the same; DLC and language packs stay on their store's own controls.
+- The store screens use it too: install, update, pause, resume, stop and uninstall on the Steam, GOG, Epic Games, EA app and Ubisoft Connect pages and in the library go through each store's provider instead of calling each store in its own way. Behaviour is the same.
+- DLC too: the DLC lists of Steam and Epic Games game pages (titles, sizes, progress, install, cancel, uninstall, and loading the list and what is installed) go through the provider. GOG, the EA app and Ubisoft Connect answer with no DLC, as iDeck installs none for them yet. Epic's optional language packs stay on Epic's own controls.
 - The screens also read what they show through it: installed or not, queued, downloading, paused, stopping, failed and why, progress, bytes downloaded and written, the phase (preparing, checking files, downloading, finishing) and the time left, on the game pages, the library cards, the Installed list and the EA shelf. Each store's own data (versions, sizes, DLC, cloud saves) stays with the store.
 
 ### Madeira, FEX, ARM64EC and WoW64

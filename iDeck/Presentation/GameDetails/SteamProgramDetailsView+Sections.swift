@@ -96,38 +96,34 @@ extension SteamProgramDetailsView {
         }
     }
 
-    /// A DLC's size: its own depots in the game's app info (where Steam lists
-    /// DLC content), else the DLC app's own download size.
-    func dlcSize(_ id: UInt32) -> String? {
-        var bytes = game.depots.filter { $0.dlcAppID == id }.reduce(UInt64(0)) { $0 + max($1.maxSize, $1.publicSizeBytes) }
-        if bytes == 0 { bytes = steamLibrary.dlcMetadata[id]?.downloadSize(for: "windows") ?? 0 }
-        guard bytes > 0 else { return nil }
-        return ByteCountFormatter.string(fromByteCount: Int64(clamping: bytes), countStyle: .file)
-    }
-
+    /// The game's DLC, through the StoreProvider (3.0.1): list, size, progress,
+    /// install, cancel and uninstall.
     var dlcList: some View {
-        VStack(spacing: 0) {
-            let ids = steamLibrary.availableDLC[game.appID] ?? []
-            if ids.isEmpty {
+        let steamStore = StoreProviders.of(.steam)
+        let gameID = String(game.appID)
+        let dlcs = steamStore.dlcs(of: gameID)
+        return VStack(spacing: 0) {
+            if dlcs.isEmpty {
                 DetailRow(title: tr("No DLC found for this game"), showsDivider: false) { EmptyView() }
             }
-            ForEach(ids, id: \.self) { id in
+            ForEach(dlcs, id: \.id) { dlc in
+                let status = steamStore.dlcDownloadStatus(dlc.id, of: gameID)
                 HStack(spacing: 12) {
-                    SteamDLCArtworkView(appID: id)
+                    SteamDLCArtworkView(appID: UInt32(dlc.id) ?? 0)
                         .frame(width: 92, height: 43)
                         .clipShape(RoundedRectangle(cornerRadius: 6))
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(steamLibrary.dlcMetadata[id]?.name ?? "DLC \(id)")
+                        Text(dlc.title)
                             .font(.subheadline)
                             .foregroundColor(.white)
                             .lineLimit(2)
-                        if let size = dlcSize(id) {
-                            Text(size)
+                        if let bytes = dlc.sizeBytes {
+                            Text(ByteCountFormatter.string(fromByteCount: Int64(clamping: bytes), countStyle: .file))
                                 .font(.caption2)
                                 .foregroundColor(.gray)
                         }
-                        if steamLibrary.installingDLC[game.appID] == id {
-                            let fraction = steamLibrary.downloadProgress[game.appID]?.fraction ?? 0
+                        if let status {
+                            let fraction = status.progress ?? 0
                             ProgressView(value: fraction)
                                 .tint(.blue)
                             Text(tr("Installing %d%%", Int((fraction * 100).rounded())))
@@ -136,20 +132,19 @@ extension SteamProgramDetailsView {
                         }
                     }
                     Spacer(minLength: 6)
-                    if steamLibrary.installingDLC[game.appID] == id {
+                    if let status {
                         Button(role: .destructive) {
-                            steamLibrary.cancelDLCInstall(appID: game.appID, dlcAppID: id)
+                            steamStore.cancelDLC(dlc.id, of: gameID)
                         } label: {
                             Label(tr("Cancel"), systemImage: "xmark.circle.fill")
                                 .font(.caption.weight(.semibold))
                         }
                         .buttonStyle(.bordered)
-                        .disabled(steamLibrary.cancellingDLC.contains(id))
-                    } else if steamLibrary.installedDLC[game.appID]?.contains(id) == true {
+                        .disabled(status.stopping)
+                    } else if steamStore.isDLCInstalled(dlc.id, of: gameID) {
                         Button(role: .destructive) {
                             guard let prefixPath,
-                                  steamLibrary.uninstallDLC(appID: game.appID,
-                                                            dlcAppID: id, prefixPath: prefixPath) else {
+                                  steamStore.uninstallDLC(dlc.id, of: gameID, prefix: prefixPath) else {
                                 presentError(tr("Could not uninstall DLC safely."))
                                 return
                             }
@@ -164,8 +159,7 @@ extension SteamProgramDetailsView {
                                 presentError(tr("Windows environment is not ready."))
                                 return
                             }
-                            steamLibrary.startDLCInstall(appID: game.appID,
-                                                        dlcAppID: id, prefixPath: prefixPath)
+                            steamStore.installDLC(dlc.id, of: gameID, prefix: prefixPath)
                         } label: {
                             Text(tr("Install"))
                                 .font(.caption.weight(.semibold))
@@ -176,7 +170,7 @@ extension SteamProgramDetailsView {
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
-                if id != ids.last {
+                if dlc.id != dlcs.last?.id {
                     Divider().background(Color.white.opacity(0.08)).padding(.leading, 68)
                 }
             }

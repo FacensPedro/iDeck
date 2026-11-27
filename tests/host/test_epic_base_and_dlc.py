@@ -28,8 +28,10 @@ class EpicBaseAndDLCTests(unittest.TestCase):
                        "if let entry = dlcEntry(app) {"):
             self.assertIn(needle, lib)
         view = read("MainView.swift")
-        self.assertIn('DetailCard(title: tr("DLCs")) { epicDLCList(list) }', view)
-        self.assertIn("epic.uninstallDLC(dlc.appName)", view)
+        # 3.0.1: through the StoreProvider.
+        self.assertIn('DetailCard(title: tr("DLCs")) { epicDLCList(dlcs) }', view)
+        self.assertIn("epicStore.uninstallDLC(dlc.id, of: appName, prefix: nil)", view)
+        self.assertIn("model.uninstallDLC(dlcID)", (ROOT / "iDeck/Stores/StoreProvider.swift").read_text())
 
 
 if __name__ == "__main__":

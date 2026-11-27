@@ -187,15 +187,16 @@ struct SteamProgramDetailsView: View {
             .background(Color.black.ignoresSafeArea())
             .navigationTitle(tr("Game details"))
             .navigationBarTitleDisplayMode(.inline)
-            .onChange(of: steamLibrary.installingDLC[game.appID]) { _, now in
-                if now == nil, let prefixPath { steamLibrary.refreshInstalledDLC(appID: game.appID, prefixPath: prefixPath) }
+            .onChange(of: StoreProviders.of(.steam).installingDLC(of: String(game.appID))) { _, now in
+                if now == nil, let prefixPath {
+                    StoreProviders.of(.steam).refreshInstalledDLC(of: String(game.appID), prefix: prefixPath)
+                }
             }
             .task(id: game.appID) {
-                await steamLibrary.loadDLC(appID: game.appID)
+                // The DLC list and which are installed, through the StoreProvider (3.0.1).
+                await StoreProviders.of(.steam).loadDLC(of: String(game.appID), prefix: prefixPath)
                 guard !Task.isCancelled else { return }
                 if let prefixPath {
-                    steamLibrary.refreshInstalledDLC(appID: game.appID, prefixPath: prefixPath)
-                    guard !Task.isCancelled else { return }
                     if autoSaveEnabled {
                         await steamLibrary.syncCloud(appID: game.appID, prefixPath: prefixPath)
                     }

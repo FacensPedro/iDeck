@@ -264,3 +264,30 @@ class StoreScreensReadProviders(unittest.TestCase):
             text = split_sources._original_read_text(ROOT / path)
             for old in old_reads:
                 self.assertNotIn(old, text, path)
+
+
+class DLCScreensUseProviders(unittest.TestCase):
+    def test_dlc_through_providers(self):
+        sp = read("iDeck/Stores/StoreProvider.swift")
+        self.assertIn("struct StoreDLC: Hashable, Sendable", sp)
+        for requirement in ("func dlcs(of gameID: String) -> [StoreDLC]",
+                            "func dlcDownloadStatus(_ dlcID: String, of gameID: String) -> StoreDownloadStatus?",
+                            "@discardableResult func installDLC(_ dlcID: String, of gameID: String, prefix: URL?) -> Bool",
+                            "func cancelDLC(_ dlcID: String, of gameID: String)",
+                            "@discardableResult func uninstallDLC(_ dlcID: String, of gameID: String, prefix: URL?) -> Bool",
+                            "func loadDLC(of gameID: String, prefix: URL?) async"):
+            self.assertIn(requirement, sp)
+        self.assertIn("model.startDLCInstall(appID: app, dlcAppID: dlc, prefixPath: prefix)", sp)
+        self.assertIn("model.installDLC(dlcID)", sp)
+        steam = split_sources._original_read_text(ROOT / "iDeck/Presentation/GameDetails/SteamProgramDetailsView+Sections.swift")
+        self.assertIn("let dlcs = steamStore.dlcs(of: gameID)", steam)
+        self.assertIn("steamStore.installDLC(dlc.id, of: gameID, prefix: prefixPath)", steam)
+        for old in ("steamLibrary.availableDLC", "steamLibrary.installingDLC", "steamLibrary.cancelDLCInstall",
+                    "steamLibrary.uninstallDLC", "steamLibrary.startDLCInstall", "steamLibrary.dlcMetadata"):
+            self.assertNotIn(old, steam)
+        page = split_sources._original_read_text(ROOT / "iDeck/Presentation/GameDetails/SteamProgramDetailsView.swift")
+        self.assertIn("StoreProviders.of(.steam).installingDLC(of: String(game.appID))", page)
+        epic = split_sources._original_read_text(ROOT / "iDeck/Presentation/GameDetails/EpicGameDetailsSheet.swift")
+        self.assertIn("epicStore.installDLC(dlc.id, of: appName, prefix: nil)", epic)
+        for old in ("epic.dlcs[", "epic.installDLC(", "epic.uninstallDLC(", "epic.installedDLC["):
+            self.assertNotIn(old, epic)

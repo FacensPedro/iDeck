@@ -64,6 +64,15 @@ struct StoreDownloadStatus: Equatable, Sendable {
     }
 }
 
+/// A DLC of a game, whatever the store: its id in the store (Steam DLC app id, Epic
+/// DLC app name), its title, its picture when the store gives one, and its size.
+struct StoreDLC: Hashable, Sendable {
+    let id: String
+    let title: String
+    var image: URL?
+    var sizeBytes: UInt64?
+}
+
 /// What every store offers iDeck. Each store keeps its own model (sign-in, manifests,
 /// downloader); the provider is the common face that the library, the bug report and
 /// the resource governor use instead of asking each store in its own words.
@@ -94,9 +103,39 @@ protocol StoreProvider: AnyObject {
     /// Removes an installed game; false when the store cannot (or it is not installed).
     @discardableResult func uninstall(_ id: String, prefix: URL?) -> Bool
     func refresh() async
+
+    // DLC (3.0.1). Stores without DLC in iDeck (GOG, the EA app, Ubisoft Connect) keep
+    // the empty answers of the extension below.
+    var supportsDLC: Bool { get }
+    /// The game's DLC the account can install, in the store's order.
+    func dlcs(of gameID: String) -> [StoreDLC]
+    func isDLCInstalled(_ dlcID: String, of gameID: String) -> Bool
+    func dlcDownloadStatus(_ dlcID: String, of gameID: String) -> StoreDownloadStatus?
+    @discardableResult func installDLC(_ dlcID: String, of gameID: String, prefix: URL?) -> Bool
+    func cancelDLC(_ dlcID: String, of gameID: String)
+    @discardableResult func uninstallDLC(_ dlcID: String, of gameID: String, prefix: URL?) -> Bool
+    /// Asks the store for the game's DLC list and which of them are installed.
+    func loadDLC(of gameID: String, prefix: URL?) async
+    /// Reads which DLC are installed again (after a DLC install ended), without the list.
+    func refreshInstalledDLC(of gameID: String, prefix: URL)
+    /// The DLC being installed for the game now, if any.
+    func installingDLC(of gameID: String) -> String?
 }
 
 extension StoreProvider {
+    var supportsDLC: Bool { false }
+    func dlcs(of gameID: String) -> [StoreDLC] { [] }
+    func isDLCInstalled(_ dlcID: String, of gameID: String) -> Bool { false }
+    func dlcDownloadStatus(_ dlcID: String, of gameID: String) -> StoreDownloadStatus? { nil }
+    @discardableResult func installDLC(_ dlcID: String, of gameID: String, prefix: URL?) -> Bool { false }
+    func cancelDLC(_ dlcID: String, of gameID: String) {}
+    @discardableResult func uninstallDLC(_ dlcID: String, of gameID: String, prefix: URL?) -> Bool { false }
+    func loadDLC(of gameID: String, prefix: URL?) async {}
+    func refreshInstalledDLC(of gameID: String, prefix: URL) {}
+    func installingDLC(of gameID: String) -> String? {
+        dlcs(of: gameID).first { dlcDownloadStatus($0.id, of: gameID) != nil }?.id
+    }
+
     @discardableResult func install(_ id: String, prefix: URL?) -> Bool { install(id, prefix: prefix, onFinish: nil) }
 
     func downloadState(_ id: String) -> StoreDownloadState? { downloadStatus(id)?.state }
@@ -241,6 +280,68 @@ final class SteamStoreProvider: StoreProvider {
     }
 
     func refresh() async { await model.refresh() }
+
+    // MARK: DLC
+
+    var supportsDLC: Bool { true }
+
+    func dlcs(of gameID: String) -> [StoreDLC] {
+        guard let app = UInt32(gameID) else { return [] }
+        let game = model.games.first { $0.appID == app }
+        return (model.availableDLC[app] ?? []).map { id in
+            // Its own depots in the game's app info (where Steam lists DLC content), else
+            // the DLC app's own download size.
+            var bytes = game?.depots.filter { $0.dlcAppID == id }.reduce(UInt64(0)) { $0 + max($1.maxSize, $1.publicSizeBytes) } ?? 0
+            if bytes == 0 { bytes = model.dlcMetadata[id]?.downloadSize(for: "windows") ?? 0 }
+            return StoreDLC(id: String(id), title: model.dlcMetadata[id]?.name ?? "DLC \(id)", image: nil,
+                            sizeBytes: bytes > 0 ? bytes : nil)
+        }
+    }
+
+    func isDLCInstalled(_ dlcID: String, of gameID: String) -> Bool {
+        guard let app = UInt32(gameID), let dlc = UInt32(dlcID) else { return false }
+        return model.installedDLC[app]?.contains(dlc) == true
+    }
+
+    func dlcDownloadStatus(_ dlcID: String, of gameID: String) -> StoreDownloadStatus? {
+        guard let app = UInt32(gameID), let dlc = UInt32(dlcID), model.installingDLC[app] == dlc else { return nil }
+        let progress = model.downloadProgress[app]
+        return StoreDownloadStatus(state: .active(progress?.fraction ?? 0), doneBytes: progress?.doneBytes ?? 0,
+                                   totalBytes: progress?.totalBytes ?? 0, stopping: model.cancellingDLC.contains(dlc),
+                                   cancellable: !model.cancellingDLC.contains(dlc))
+    }
+
+    func installDLC(_ dlcID: String, of gameID: String, prefix: URL?) -> Bool {
+        guard let app = UInt32(gameID), let dlc = UInt32(dlcID), let prefix else { return false }
+        model.startDLCInstall(appID: app, dlcAppID: dlc, prefixPath: prefix)
+        return true
+    }
+
+    func cancelDLC(_ dlcID: String, of gameID: String) {
+        guard let app = UInt32(gameID), let dlc = UInt32(dlcID) else { return }
+        model.cancelDLCInstall(appID: app, dlcAppID: dlc)
+    }
+
+    func uninstallDLC(_ dlcID: String, of gameID: String, prefix: URL?) -> Bool {
+        guard let app = UInt32(gameID), let dlc = UInt32(dlcID), let prefix else { return false }
+        return model.uninstallDLC(appID: app, dlcAppID: dlc, prefixPath: prefix)
+    }
+
+    func loadDLC(of gameID: String, prefix: URL?) async {
+        guard let app = UInt32(gameID) else { return }
+        await model.loadDLC(appID: app)
+        if let prefix { model.refreshInstalledDLC(appID: app, prefixPath: prefix) }
+    }
+
+    /// The installed DLC list again, after a DLC install ended.
+    func refreshInstalledDLC(of gameID: String, prefix: URL) {
+        if let app = UInt32(gameID) { model.refreshInstalledDLC(appID: app, prefixPath: prefix) }
+    }
+
+    /// The DLC being installed for a game now, if any (Steam installs one at a time).
+    func installingDLC(of gameID: String) -> String? {
+        UInt32(gameID).flatMap { model.installingDLC[$0] }.map { String($0) }
+    }
 }
 
 // MARK: - GOG
@@ -348,6 +449,35 @@ final class EpicStoreProvider: StoreProvider {
     }
 
     func refresh() async { await model.refreshLibrary(interactive: false) }
+
+    // MARK: DLC
+
+    var supportsDLC: Bool { true }
+
+    func dlcs(of gameID: String) -> [StoreDLC] {
+        (model.dlcs[gameID] ?? []).map { StoreDLC(id: $0.appName, title: $0.title, image: $0.image) }
+    }
+
+    func isDLCInstalled(_ dlcID: String, of gameID: String) -> Bool { model.installedDLC[dlcID] != nil }
+
+    /// Epic downloads a DLC as its own app: the same status as a game's.
+    func dlcDownloadStatus(_ dlcID: String, of gameID: String) -> StoreDownloadStatus? { downloadStatus(dlcID) }
+
+    func installDLC(_ dlcID: String, of gameID: String, prefix: URL?) -> Bool {
+        model.installDLC(dlcID)
+        return true
+    }
+
+    func cancelDLC(_ dlcID: String, of gameID: String) { model.cancel(dlcID) }
+
+    func uninstallDLC(_ dlcID: String, of gameID: String, prefix: URL?) -> Bool {
+        guard model.installedDLC[dlcID] != nil else { return false }
+        model.uninstallDLC(dlcID)
+        return model.installedDLC[dlcID] == nil
+    }
+
+    /// Epic lists a game's DLC with the library, so a refresh brings them.
+    func loadDLC(of gameID: String, prefix: URL?) async {}
 }
 
 // MARK: - EA app

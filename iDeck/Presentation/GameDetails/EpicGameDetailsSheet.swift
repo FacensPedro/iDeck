@@ -62,8 +62,9 @@ struct EpicGameDetailsSheet: View {
                         epic.repair(appName)
                     }
                 }
-                if let list = epic.dlcs[appName], !list.isEmpty {
-                    DetailCard(title: tr("DLCs")) { epicDLCList(list) }
+                let dlcs = StoreProviders.of(.epic).dlcs(of: appName)
+                if !dlcs.isEmpty {
+                    DetailCard(title: tr("DLCs")) { epicDLCList(dlcs) }
                 }
                 if let packs = epic.optionalPacks[appName], !packs.isEmpty {
                     DetailCard(title: tr("Optional content")) { epicPackList(packs) }
@@ -119,12 +120,14 @@ struct EpicGameDetailsSheet: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    /// The game's DLC, as the Steam page lists them: install, progress, uninstall.
-    private func epicDLCList(_ list: [EpicOwnedDLC]) -> some View {
-        VStack(spacing: 0) {
-            ForEach(list) { dlc in
-                let download = epic.downloads[dlc.appName]
-                let failed: String? = { if case .failed(let message) = download?.state { return message }; return nil }()
+    /// The game's DLC, as the Steam page lists them: install, progress, uninstall,
+    /// through the StoreProvider (3.0.1).
+    private func epicDLCList(_ list: [StoreDLC]) -> some View {
+        let epicStore = StoreProviders.of(.epic)
+        return VStack(spacing: 0) {
+            ForEach(list, id: \.id) { dlc in
+                let download = epicStore.dlcDownloadStatus(dlc.id, of: appName)
+                let failed = download?.failure
                 HStack(spacing: 12) {
                     AsyncImage(url: dlc.image) { image in
                         image.resizable().scaledToFill()
@@ -137,8 +140,9 @@ struct EpicGameDetailsSheet: View {
                             .foregroundColor(.white)
                             .lineLimit(2)
                         if let download, failed == nil {
-                            ProgressView(value: download.progress.fraction).tint(.blue)
-                            Text(tr("Installing %d%%", Int((download.progress.fraction * 100).rounded())))
+                            let fraction = download.progress ?? 0
+                            ProgressView(value: fraction).tint(.blue)
+                            Text(tr("Installing %d%%", Int((fraction * 100).rounded())))
                                 .font(.caption2)
                                 .foregroundColor(.white)
                         } else if let failed {
@@ -147,18 +151,18 @@ struct EpicGameDetailsSheet: View {
                     }
                     Spacer(minLength: 6)
                     if download != nil && failed == nil {
-                        Button(role: .destructive) { epic.cancel(dlc.appName) } label: {
+                        Button(role: .destructive) { epicStore.cancelDLC(dlc.id, of: appName) } label: {
                             Label(tr("Cancel"), systemImage: "xmark.circle.fill").font(.caption.weight(.semibold))
                         }
                         .buttonStyle(.bordered)
-                    } else if epic.installedDLC[dlc.appName] != nil {
-                        Button(role: .destructive) { epic.uninstallDLC(dlc.appName) } label: {
+                    } else if epicStore.isDLCInstalled(dlc.id, of: appName) {
+                        Button(role: .destructive) { epicStore.uninstallDLC(dlc.id, of: appName, prefix: nil) } label: {
                             Label(tr("Uninstall"), systemImage: "trash").font(.caption.weight(.semibold))
                         }
                         .buttonStyle(.bordered)
                         .disabled(epic.sessionRunning)
                     } else {
-                        Button { epic.installDLC(dlc.appName) } label: {
+                        Button { epicStore.installDLC(dlc.id, of: appName, prefix: nil) } label: {
                             Text(tr("Install")).font(.caption.weight(.semibold))
                         }
                         .buttonStyle(.borderedProminent)
