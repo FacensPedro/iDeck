@@ -23,7 +23,7 @@ class EpicOptionalContentTests(unittest.TestCase):
 
     def test_listed_on_the_game_page(self):
         self.assertIn('DetailCard(title: tr("Optional content")) { epicPackList(packs) }', VIEW)
-        self.assertIn("await epic.loadOptionalPacks(appName)", VIEW)
+        self.assertIn("await StoreProviders.of(.epic).loadOptionalPacks(of: appName)", VIEW)
 
 
 if __name__ == "__main__":
