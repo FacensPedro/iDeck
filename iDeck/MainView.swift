@@ -64,7 +64,7 @@ struct MainView: View {
         .task(id: steamLibrary != nil && coordinator.isSteamConnected) {
             guard let steamLibrary else { return }
             if coordinator.isSteamConnected {
-                await steamLibrary.refresh()
+                await StoreProviders.of(.steam).refresh()
             } else {
                 steamLibrary.disconnect()
             }
@@ -451,7 +451,7 @@ struct WindowsWorkspaceView: View {
                         await windowsLibrary.importEmbeddedIcon(for: executable)
                     }
                 }
-                steamLibrary.refreshInstalledApps(prefixPath: root)
+                StoreProviders.of(.steam).refreshInstalled(prefix: root)
                 gogLibrary.refreshInstalled(prefixPath: root)
                 // Keep the first Wine prefix initialization architecture-only.
                 // Steam client components are installed from the explicit Madeira Dock step.
@@ -463,7 +463,7 @@ struct WindowsWorkspaceView: View {
     func reloadInstalledGames() {
         resolvePrefixPath()
         guard let prefixPath else { return }
-        steamLibrary.refreshInstalledApps(prefixPath: prefixPath)
+        StoreProviders.of(.steam).refreshInstalled(prefix: prefixPath)
         gogLibrary.refreshInstalled(prefixPath: prefixPath)
         epicLibrary.reloadInstalled()
         windowsLibrary.refresh(prefixPath: prefixPath)

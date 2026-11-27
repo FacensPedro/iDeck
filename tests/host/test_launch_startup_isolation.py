@@ -40,7 +40,7 @@ class LaunchStartupIsolationTests(unittest.TestCase):
         self.assertNotIn("private struct WorkspaceHostView: View", MAIN)
         self.assertIn("steamLibrary != nil && scenePhase == .active", main)
         self.assertIn("steamLibrary != nil && coordinator.isSteamConnected", main)
-        self.assertIn("await steamLibrary.refresh()", main)
+        self.assertIn("await StoreProviders.of(.steam).refresh()", main)
         self.assertIn('NSLog("[iDeck startup] Madeira library is the root view")', main)
 
     def test_madeira_loads_library_without_requesting_jit(self):

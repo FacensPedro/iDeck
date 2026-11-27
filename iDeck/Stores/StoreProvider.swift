@@ -111,6 +111,8 @@ protocol StoreProvider: AnyObject {
     /// Removes an installed game; false when the store cannot (or it is not installed).
     @discardableResult func uninstall(_ id: String, prefix: URL?) -> Bool
     func refresh() async
+    /// Looks again on disk for the store's installed games (Steam and GOG read the prefix).
+    func refreshInstalled(prefix: URL)
 
     // DLC (3.0.1). Stores without DLC in iDeck (GOG, the EA app, Ubisoft Connect) keep
     // the empty answers of the extension below.
@@ -140,6 +142,7 @@ protocol StoreProvider: AnyObject {
 
 extension StoreProvider {
     var supportsDLC: Bool { false }
+    func refreshInstalled(prefix: URL) {}
     func dlcs(of gameID: String) -> [StoreDLC] { [] }
     func isDLCInstalled(_ dlcID: String, of gameID: String) -> Bool { false }
     func dlcDownloadStatus(_ dlcID: String, of gameID: String) -> StoreDownloadStatus? { nil }
@@ -301,6 +304,7 @@ final class SteamStoreProvider: StoreProvider {
     }
 
     func refresh() async { await model.refresh() }
+    func refreshInstalled(prefix: URL) { model.refreshInstalledApps(prefixPath: prefix) }
 
     // MARK: DLC
 

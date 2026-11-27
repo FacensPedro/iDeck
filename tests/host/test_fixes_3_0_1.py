@@ -303,3 +303,15 @@ class EpicPacksThroughProvider(unittest.TestCase):
         self.assertIn("epicStore.installPack(pack.id, of: appName)", page)
         for old in ("epic.installPack(", "epic.uninstallPack(", "epic.packInstalled(", "epic.optionalPacks[", "epic.loadOptionalPacks("):
             self.assertNotIn(old, page)
+
+
+class MainViewSteamThroughProvider(unittest.TestCase):
+    def test_main_view_steam_state(self):
+        main = split_sources._original_read_text(ROOT / "iDeck/MainView.swift")
+        self.assertIn("await StoreProviders.of(.steam).refresh()", main)
+        self.assertIn("StoreProviders.of(.steam).refreshInstalled(prefix: prefixPath)", main)
+        self.assertIn("steamStore.downloadState(id)?.isRunning == true", main)
+        for old in ("steamLibrary.refreshInstalledApps(", "steamLibrary.installingApps", "steamLibrary.installedApps", "await steamLibrary.refresh()"):
+            self.assertNotIn(old, main)
+        self.assertIn("func refreshInstalled(prefix: URL) { model.refreshInstalledApps(prefixPath: prefix) }",
+                      read("iDeck/Stores/StoreProvider.swift"))

@@ -31,7 +31,7 @@ struct SteamProgramDetailsView: View {
 
     var installed: Bool {
         guard let prefixPath else { return false }
-        return steamLibrary.isInstalled(appID: game.appID, prefixPath: prefixPath)
+        return StoreProviders.of(.steam).isInstalled(String(game.appID), prefix: prefixPath)
     }
 
     /// The download state, through the StoreProvider (3.0.1).
