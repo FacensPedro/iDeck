@@ -27,6 +27,43 @@ enum StoreDownloadState: Equatable, Sendable {
     }
 }
 
+/// Everything a screen shows about a download, whatever the store.
+struct StoreDownloadStatus: Equatable, Sendable {
+    /// Where an install is inside its download, as every store's downloader names it.
+    enum Phase: Equatable, Sendable { case preparing, verifying, downloading, finishing }
+
+    var state: StoreDownloadState
+    var doneBytes: UInt64 = 0
+    var totalBytes: UInt64 = 0
+    var phase: Phase = .downloading
+    /// Bytes are moving (the downloading phase, not preparing, verifying or finishing).
+    var transferring: Bool { phase == .downloading }
+    /// How far the check of files already on disk is (verifying), when the store says.
+    var verifyFraction: Double?
+    /// Bytes of the game written so far (Steam counts them apart from the download).
+    var writtenBytes: UInt64 = 0
+    var etaSeconds: Int?
+    /// Queued behind another download of the same store.
+    var waiting = false
+    /// A stop is removing the files.
+    var stopping = false
+    /// Pause and Stop apply now.
+    var cancellable = false
+    /// What the store is doing before bytes move ("Reading the manifest…"), when it says.
+    var step: String?
+
+    var failure: String? { if case .failed(let message) = state { return message }; return nil }
+    var isPaused: Bool { state == .paused }
+    /// The bar's value: nil once the download failed.
+    var progress: Double? {
+        switch state {
+        case .active(let fraction): return fraction
+        case .queued, .paused: return totalBytes > 0 ? min(1, Double(doneBytes) / Double(totalBytes)) : 0
+        case .failed: return nil
+        }
+    }
+}
+
 /// What every store offers iDeck. Each store keeps its own model (sign-in, manifests,
 /// downloader); the provider is the common face that the library, the bug report and
 /// the resource governor use instead of asking each store in its own words.
@@ -39,7 +76,12 @@ protocol StoreProvider: AnyObject {
     var isSignedIn: Bool { get }
     var ownedGames: [StoreGameRef] { get }
     func isInstalled(_ id: String, prefix: URL?) -> Bool
-    func downloadState(_ id: String) -> StoreDownloadState?
+    /// The installed games' ids, from the store's published state (no disk check).
+    var installedIDs: Set<String> { get }
+    /// The ids of every game with a download state (running, paused or failed), owned
+    /// list or not.
+    var downloadIDs: Set<String> { get }
+    func downloadStatus(_ id: String) -> StoreDownloadStatus?
     /// Starts or queues the install, or the update of an installed game (a language's
     /// files, a new build); false when the store cannot do it now (no prefix, unknown
     /// game). `onFinish` runs when the store reports the end of the install (GOG); the
@@ -57,6 +99,21 @@ protocol StoreProvider: AnyObject {
 extension StoreProvider {
     @discardableResult func install(_ id: String, prefix: URL?) -> Bool { install(id, prefix: prefix, onFinish: nil) }
 
+    func downloadState(_ id: String) -> StoreDownloadState? { downloadStatus(id)?.state }
+
+    /// A download is under way or paused (not only failed).
+    func hasDownload(_ id: String) -> Bool {
+        guard let state = downloadState(id) else { return false }
+        if case .failed = state { return false }
+        return true
+    }
+
+    /// The games of this store with a download under way or paused, in the store's order.
+    var gamesWithDownloads: [StoreGameRef] { ownedGames.filter { hasDownload($0.id) } }
+
+    /// Installed games and games with a download, owned list or not.
+    var installedOrDownloadingIDs: Set<String> { installedIDs.union(downloadIDs) }
+
     /// Install, or resume a paused download: what a page's Install button does.
     func installOrResume(_ id: String, prefix: URL?, onFinish: (@MainActor () -> Void)? = nil) {
         if downloadState(id) == .paused { resume(id, prefix: prefix) } else { install(id, prefix: prefix, onFinish: onFinish) }
@@ -64,7 +121,10 @@ extension StoreProvider {
 
     /// Every download of this store that has a state, with its game.
     var downloads: [(game: StoreGameRef, state: StoreDownloadState)] {
-        ownedGames.compactMap { game in downloadState(game.id).map { (game, $0) } }
+        let titles = Dictionary(ownedGames.map { ($0.id, $0.title) }, uniquingKeysWith: { first, _ in first })
+        return downloadIDs.sorted().compactMap { id in
+            downloadState(id).map { (StoreGameRef(store: store, id: id, title: titles[id] ?? id), $0) }
+        }
     }
 }
 
@@ -133,15 +193,36 @@ final class SteamStoreProvider: StoreProvider {
         return model.installedApps.contains(app)
     }
 
-    func downloadState(_ id: String) -> StoreDownloadState? {
+    var installedIDs: Set<String> { Set(model.installedApps.map { String($0) }) }
+    var downloadIDs: Set<String> {
+        Set(model.installingApps.union(model.pausedInstalls).union(model.downloadErrors.keys).map { String($0) })
+    }
+
+    func downloadStatus(_ id: String) -> StoreDownloadStatus? {
         guard let app = UInt32(id) else { return nil }
-        if model.pausedInstalls.contains(app) { return .paused }
-        if let error = model.downloadErrors[app] { return .failed(error) }
-        if model.installingApps.contains(app) {
-            guard let progress = model.downloadProgress[app] else { return .queued }
-            return .active(progress.totalBytes > 0 ? min(1, Double(progress.doneBytes) / Double(progress.totalBytes)) : 0)
+        let progress = model.downloadProgress[app]
+        let waiting = model.waitingApps.contains(app)
+        let state: StoreDownloadState
+        if model.pausedInstalls.contains(app) { state = .paused }
+        else if model.installingApps.contains(app) { state = (waiting || progress == nil) ? .queued : .active(progress?.fraction ?? 0) }
+        else if let error = model.downloadErrors[app] { state = .failed(error) }
+        else { return nil }
+        let phase: StoreDownloadStatus.Phase
+        switch progress?.phase {
+        case .checking: phase = .verifying
+        case .downloading: phase = .downloading
+        case .finishing: phase = .finishing
+        default: phase = .preparing
         }
-        return nil
+        let eta = progress.flatMap { p in
+            phase == .downloading ? DownloadETA.seconds(done: p.doneBytes, total: p.totalBytes, bytesPerSecond: p.bytesPerSecond) : nil
+        }
+        return StoreDownloadStatus(state: state, doneBytes: progress?.doneBytes ?? 0, totalBytes: progress?.totalBytes ?? 0,
+                                   phase: phase,
+                                   verifyFraction: progress.map { $0.checkTotal > 0 ? min(1, Double($0.checkDone) / Double($0.checkTotal)) : 0 },
+                                   writtenBytes: progress?.installedBytes ?? 0,
+                                   etaSeconds: eta, waiting: waiting,
+                                   stopping: model.cancellingApps.contains(app), cancellable: model.canCancelInstall(appID: app))
     }
 
     func install(_ id: String, prefix: URL?, onFinish: (@MainActor () -> Void)?) -> Bool {
@@ -176,12 +257,22 @@ final class GOGStoreProvider: StoreProvider {
 
     func isInstalled(_ id: String, prefix: URL?) -> Bool { Int(id).map { model.installed[$0] != nil } ?? false }
 
-    func downloadState(_ id: String) -> StoreDownloadState? {
+    var installedIDs: Set<String> { Set(model.installed.keys.map { String($0) }) }
+    var downloadIDs: Set<String> {
+        Set(Set(model.downloadProgress.keys).union(model.pausedDownloads).union(model.downloadErrors.keys).map { String($0) })
+    }
+
+    func downloadStatus(_ id: String) -> StoreDownloadStatus? {
         guard let number = Int(id) else { return nil }
-        if model.pausedDownloads.contains(number) { return .paused }
-        if let error = model.downloadErrors[number] { return .failed(error) }
-        if let fraction = model.downloadProgress[number] { return .active(fraction) }
-        return nil
+        let bytes = model.downloadedBytes[number]
+        let state: StoreDownloadState
+        if model.pausedDownloads.contains(number) { state = .paused }
+        else if let fraction = model.downloadProgress[number] { state = .active(fraction) }
+        else if let error = model.downloadErrors[number] { state = .failed(error) }
+        else { return nil }
+        return StoreDownloadStatus(state: state, doneBytes: bytes?.done ?? 0, totalBytes: bytes?.total ?? 0,
+                                   phase: bytes != nil ? .downloading : .preparing, etaSeconds: model.downloadETASeconds[number],
+                                   cancellable: state != .paused)
     }
 
     func install(_ id: String, prefix: URL?, onFinish: (@MainActor () -> Void)?) -> Bool {
@@ -214,14 +305,31 @@ final class EpicStoreProvider: StoreProvider {
 
     func isInstalled(_ id: String, prefix: URL?) -> Bool { model.installed[id] != nil }
 
-    func downloadState(_ id: String) -> StoreDownloadState? {
+    var installedIDs: Set<String> { Set(model.installed.keys) }
+    var downloadIDs: Set<String> { Set(model.downloads.keys) }
+
+    func downloadStatus(_ id: String) -> StoreDownloadStatus? {
         guard let download = model.downloads[id] else { return nil }
+        let progress = download.progress
+        let state: StoreDownloadState
         switch download.state {
-        case .queued: return .queued
-        case .active: return .active(download.progress.fraction)
-        case .paused: return .paused
-        case .failed(let message): return .failed(message)
+        case .queued: state = .queued
+        case .active: state = .active(progress.fraction)
+        case .paused: state = .paused
+        case .failed(let message): state = .failed(message)
         }
+        let phase: StoreDownloadStatus.Phase
+        switch progress.phase {
+        case .preparing: phase = .preparing
+        case .verifying: phase = .verifying
+        case .downloading: phase = .downloading
+        case .finishing: phase = .finishing
+        }
+        return StoreDownloadStatus(state: state, doneBytes: progress.doneBytes, totalBytes: progress.totalBytes,
+                                   phase: phase,
+                                   etaSeconds: phase == .downloading ? DownloadETA.seconds(done: progress.doneBytes, total: progress.totalBytes,
+                                                                                           bytesPerSecond: progress.bytesPerSecond) : nil,
+                                   waiting: download.state == .queued, cancellable: true)
     }
 
     func install(_ id: String, prefix: URL?, onFinish: (@MainActor () -> Void)?) -> Bool {
@@ -254,14 +362,31 @@ final class EAStoreProvider: StoreProvider {
 
     func isInstalled(_ id: String, prefix: URL?) -> Bool { model.installed[id] != nil }
 
-    func downloadState(_ id: String) -> StoreDownloadState? {
+    var installedIDs: Set<String> { Set(model.installed.keys) }
+    var downloadIDs: Set<String> { Set(model.downloads.keys) }
+
+    func downloadStatus(_ id: String) -> StoreDownloadStatus? {
         guard let download = model.downloads[id] else { return nil }
+        let progress = download.progress
+        let state: StoreDownloadState
         switch download.state {
-        case .queued: return .queued
-        case .active: return .active(download.progress.fraction)
-        case .paused: return .paused
-        case .failed(let message): return .failed(message)
+        case .queued: state = .queued
+        case .active: state = .active(progress.fraction)
+        case .paused: state = .paused
+        case .failed(let message): state = .failed(message)
         }
+        let phase: StoreDownloadStatus.Phase
+        switch progress.phase {
+        case .preparing: phase = .preparing
+        case .verifying: phase = .verifying
+        case .downloading: phase = .downloading
+        case .finishing: phase = .finishing
+        }
+        return StoreDownloadStatus(state: state, doneBytes: progress.doneBytes, totalBytes: progress.totalBytes,
+                                   phase: phase,
+                                   etaSeconds: phase == .downloading ? DownloadETA.seconds(done: progress.doneBytes, total: progress.totalBytes,
+                                                                                           bytesPerSecond: progress.bytesPerSecond) : nil,
+                                   waiting: download.state == .queued, cancellable: true)
     }
 
     func install(_ id: String, prefix: URL?, onFinish: (@MainActor () -> Void)?) -> Bool {
@@ -294,14 +419,22 @@ final class UbisoftStoreProvider: StoreProvider {
 
     func isInstalled(_ id: String, prefix: URL?) -> Bool { model.game(id)?.executable != nil }
 
-    func downloadState(_ id: String) -> StoreDownloadState? {
+    var installedIDs: Set<String> { Set(model.games.filter { $0.executable != nil }.map(\.id)) }
+    var downloadIDs: Set<String> { Set(model.downloads.keys) }
+
+    func downloadStatus(_ id: String) -> StoreDownloadStatus? {
         guard let download = model.downloads[id] else { return nil }
+        let state: StoreDownloadState
         switch download.state {
-        case .queued: return .queued
-        case .active: return .active(download.fraction)
-        case .paused: return .paused
-        case .failed(let message): return .failed(message)
+        case .queued: state = .queued
+        case .active: state = .active(download.fraction)
+        case .paused: state = .paused
+        case .failed(let message): state = .failed(message)
         }
+        return StoreDownloadStatus(state: state, doneBytes: download.done, totalBytes: download.total,
+                                   phase: download.total > 0 ? .downloading : .preparing,
+                                   waiting: download.state == .queued, cancellable: true,
+                                   step: download.step.isEmpty ? nil : download.step)
     }
 
     func install(_ id: String, prefix: URL?, onFinish: (@MainActor () -> Void)?) -> Bool {

@@ -231,3 +231,36 @@ class StoreScreensUseProviders(unittest.TestCase):
         sp = read("iDeck/Stores/StoreProvider.swift")
         self.assertIn("static func of(_ store: GameStore) -> any StoreProvider", sp)
         self.assertIn("onFinish: (@MainActor () -> Void)?) -> Bool", sp)
+
+
+class StoreScreensReadProviders(unittest.TestCase):
+    def test_pages_and_cards_read_state_from_providers(self):
+        sp = read("iDeck/Stores/StoreProvider.swift")
+        self.assertIn("struct StoreDownloadStatus: Equatable, Sendable", sp)
+        self.assertIn("func downloadStatus(_ id: String) -> StoreDownloadStatus?", sp)
+        self.assertIn("var installedIDs: Set<String> { get }", sp)
+        self.assertIn("var downloadIDs: Set<String> { get }", sp)
+        reads = {
+            "iDeck/Presentation/GameDetails/GOGGameDetailsSheet.swift": "StoreProviders.of(.gog).downloadStatus(",
+            "iDeck/Presentation/GameDetails/EAGameDetailsSheet.swift": "StoreProviders.of(.ea).downloadStatus(",
+            "iDeck/Presentation/GameDetails/EpicGameDetailsSheet.swift": "StoreProviders.of(.epic).downloadStatus(",
+            "iDeck/Presentation/GameDetails/UbisoftGameDetailsSheet.swift": "StoreProviders.of(.ubisoft).downloadStatus(",
+            "iDeck/Presentation/GameDetails/SteamProgramDetailsView.swift": "StoreProviders.of(.steam).downloadStatus(",
+            "iDeck/Presentation/GameDetails/SteamProgramDetailsView+Sections.swift": "StoreProviders.of(.steam).downloadStatus(",
+            "iDeck/Presentation/Library/WindowsWorkspaceView+Steam.swift": "steamStore.installedIDs",
+            "iDeck/Presentation/Library/WindowsWorkspaceView+Epic.swift": "StoreProviders.of(.epic).downloadStatus(",
+            "iDeck/Presentation/Library/WindowsWorkspaceView+EA.swift": "StoreProviders.of(.ea).downloadStatus(",
+            "iDeck/Presentation/Library/WindowsWorkspaceView+Ubisoft.swift": "StoreProviders.of(.ubisoft).downloadStatus(",
+            "iDeck/Presentation/Library/WindowsWorkspaceView+Shelves.swift": "StoreProviders.of(.ea).installedOrDownloadingIDs",
+            "iDeck/MainView.swift": "StoreProviders.of(.gog)",
+        }
+        for path, call in reads.items():
+            self.assertIn(call, split_sources._original_read_text(ROOT / path), path)
+        old_reads = ("steamLibrary.pausedInstalls", "steamLibrary.downloadErrors", "steamLibrary.waitingApps",
+                     "steamLibrary.cancellingApps", "gog.pausedDownloads", "gog.downloadETASeconds",
+                     "gog.downloadedBytes", "ea.downloads[", "ubisoft.downloads[", "ubisoftLibrary.downloads[",
+                     "eaLibrary.downloads[", "epicLibrary.downloads[")
+        for path in reads:
+            text = split_sources._original_read_text(ROOT / path)
+            for old in old_reads:
+                self.assertNotIn(old, text, path)

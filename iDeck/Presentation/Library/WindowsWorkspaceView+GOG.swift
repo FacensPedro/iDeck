@@ -89,7 +89,7 @@ extension WindowsWorkspaceView {
                 Button { selectedGOGGame = game } label: { cardTitle(game.title) }
                     .buttonStyle(.plain)
             }
-            if let error = gogLibrary.downloadErrors[game.id] {
+            if let error = StoreProviders.of(.gog).downloadStatus(String(game.id))?.failure {
                 Text(tr(error))
                     .font(.caption2)
                     .foregroundColor(.red)

@@ -68,7 +68,7 @@ class Requests2162(unittest.TestCase):
 
     def test_install_queue(self):
         self.assertIn("@Published private(set) var waitingApps: [UInt32] = []", read("iDeck/SteamManager.swift"))
-        self.assertIn('steamLibrary.waitingApps.contains(game.appID) ? tr("Waiting")', read("iDeck/MainView.swift"))
+        self.assertIn('status?.waiting == true ? tr("Waiting")', read("iDeck/MainView.swift"))
 
 
 if __name__ == "__main__":

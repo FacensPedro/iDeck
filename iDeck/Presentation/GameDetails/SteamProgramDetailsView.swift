@@ -34,8 +34,13 @@ struct SteamProgramDetailsView: View {
         return steamLibrary.isInstalled(appID: game.appID, prefixPath: prefixPath)
     }
 
+    /// The download state, through the StoreProvider (3.0.1).
+    var status: StoreDownloadStatus? { StoreProviders.of(.steam).downloadStatus(String(game.appID)) }
+
     var installing: Bool {
-        steamLibrary.installingApps.contains(game.appID)
+        guard let status else { return false }
+        if case .failed = status.state { return false }
+        return status.state != .paused
     }
 
     var body: some View {
@@ -58,7 +63,7 @@ struct SteamProgramDetailsView: View {
                         }
                     }
                     .onAppear { steamLibrary.loadOwnedDepots() }
-                    if steamLibrary.pausedInstalls.contains(game.appID) {
+                    if status?.isPaused == true {
                         VStack(spacing: 10) {
                             HStack(spacing: 10) {
                                 Button {
@@ -150,7 +155,7 @@ struct SteamProgramDetailsView: View {
                         }
                     }
 
-                    if let error = steamLibrary.downloadErrors[game.appID] {
+                    if let error = status?.failure {
                         Text(error)
                             .foregroundColor(.red)
                             .font(.caption)
@@ -162,7 +167,7 @@ struct SteamProgramDetailsView: View {
                                      onChosen: { _ in
                                          // An installed game fetches the chosen language's depots
                                          // (dubbing and subtitles) through the update path.
-                                         guard let prefixPath, steamLibrary.installedApps.contains(game.appID) else { return }
+                                         guard let prefixPath, StoreProviders.of(.steam).installedIDs.contains(String(game.appID)) else { return }
                                          AppLog.record("[game-language] steam:\(game.appID): fetching the language files")
                                          StoreProviders.of(.steam).install(String(game.appID), prefix: prefixPath)
                                      })

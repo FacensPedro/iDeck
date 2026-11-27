@@ -22,25 +22,21 @@ struct EpicGameDetailsSheet: View {
 
     var body: some View {
         let installed = epic.installed[appName]
-        let download = epic.downloads[appName]
-        let failed: String? = { if case .failed(let message) = download?.state { return message }; return nil }()
-        let paused: Bool = { if case .paused = download?.state { return true }; return false }()
-        let eta: Int? = {
-            guard let download, download.progress.phase == .downloading else { return nil }
-            return DownloadETA.seconds(done: download.progress.doneBytes,
-                                       total: download.progress.totalBytes,
-                                       bytesPerSecond: download.progress.bytesPerSecond)
-        }()
+        // Download state through the StoreProvider (3.0.1); the game's record stays Epic's.
+        let download = StoreProviders.of(.epic).downloadStatus(appName)
+        let failed = download?.failure
+        let paused = download?.isPaused ?? false
+        let eta = download?.etaSeconds
         StoreGameDetailsView(
             title: title, store: .epic, profileID: "epic:\(appName)",
             covers: [epic.game(appName)?.cover].compactMap { $0 },
             banners: [epic.game(appName)?.wide].compactMap { $0 },
             installed: installed != nil && download == nil,
-            progress: (download != nil && failed == nil) ? download?.progress.fraction : nil,
+            progress: download?.progress,
             etaSeconds: eta,
-            installedText: download.flatMap { $0.progress.phase == .downloading
-                ? installedBytesText(done: $0.progress.doneBytes, total: $0.progress.totalBytes) : nil },
-            paused: paused, waiting: download?.state == .queued, sizeText: sizeText, errorText: failed,
+            installedText: download.flatMap { $0.transferring
+                ? installedBytesText(done: $0.doneBytes, total: $0.totalBytes) : nil },
+            paused: paused, waiting: download?.waiting ?? false, sizeText: sizeText, errorText: failed,
             canInstall: true,
             onLaunch: { if let installed { launch(installed) } },
             onInstall: { StoreProviders.of(.epic).install(appName, prefix: nil) },
@@ -112,7 +108,7 @@ struct EpicGameDetailsSheet: View {
                         .buttonStyle(.borderedProminent)
                     }
                 }
-                .disabled(epic.downloads[appName] != nil || epic.sessionRunning)
+                .disabled(StoreProviders.of(.epic).downloadStatus(appName) != nil || epic.sessionRunning)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
                 if pack.id != packs.last?.id {
@@ -166,7 +162,7 @@ struct EpicGameDetailsSheet: View {
                             Text(tr("Install")).font(.caption.weight(.semibold))
                         }
                         .buttonStyle(.borderedProminent)
-                        .disabled(epic.downloads[appName] != nil)
+                        .disabled(StoreProviders.of(.epic).downloadStatus(appName) != nil)
                     }
                 }
                 .padding(.horizontal, 16)

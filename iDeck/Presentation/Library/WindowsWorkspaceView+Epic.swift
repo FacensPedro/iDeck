@@ -70,7 +70,7 @@ extension WindowsWorkspaceView {
 
     func epicCard(_ game: EpicOwnedGame) -> some View {
         let installed = epicLibrary.installed[game.appName]
-        let download = epicLibrary.downloads[game.appName]
+        let download = StoreProviders.of(.epic).downloadStatus(game.appName)
         return VStack(alignment: .leading, spacing: 6) {
             VStack(alignment: .leading, spacing: 6) {
                 ZStack {
@@ -90,7 +90,7 @@ extension WindowsWorkspaceView {
                 Button { selectedEpicGame = SelectedEpicGame(id: game.appName) } label: { cardTitle(game.title) }
                     .buttonStyle(.plain)
             }
-            if case .failed(let message)? = download?.state {
+            if let message = download?.failure {
                 Text(message)
                     .font(.caption2)
                     .foregroundColor(.red)

@@ -35,7 +35,7 @@ class EAShelfTests(unittest.TestCase):
     def test_ea_games_join_the_shelf(self):
         self.assertIn("case ea(String)", VIEW)
         self.assertIn("+ eaShelfIDs.map { .ea($0) }", VIEW)
-        self.assertIn("Set(eaLibrary.installed.keys).union(eaLibrary.downloads.keys)", VIEW)
+        self.assertIn("StoreProviders.of(.ea).installedOrDownloadingIDs", VIEW)
         self.assertIn("selectedEAGame = eaLibrary.game(id)", VIEW)
 
 

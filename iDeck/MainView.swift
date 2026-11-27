@@ -171,9 +171,12 @@ struct WindowsWorkspaceView: View {
     }
 
     var installedSteamGames: [SteamAppInfo] {
-        steamLibrary.games.filter { game in
-            steamLibrary.installingApps.contains(game.appID) ||
-            steamLibrary.installedApps.contains(game.appID)
+        // Through the StoreProvider (3.0.1): installed, or downloading now.
+        let steamStore = StoreProviders.of(.steam)
+        let installed = steamStore.installedIDs
+        return steamLibrary.games.filter { game in
+            let id = String(game.appID)
+            return installed.contains(id) || steamStore.downloadState(id)?.isRunning == true
         }
     }
 
@@ -200,11 +203,15 @@ struct WindowsWorkspaceView: View {
     /// GOG and Epic games being installed: listed under Installed games with
     /// their progress, as Steam games are while they download.
     var installingGOGGames: [GOGGame] {
-        gogLibrary.games.filter { gogLibrary.downloadProgress[$0.id] != nil && gogLibrary.installed[$0.id] == nil }
+        let gogStore = StoreProviders.of(.gog)
+        let installed = gogStore.installedIDs
+        return gogLibrary.games.filter { gogStore.hasDownload(String($0.id)) && !installed.contains(String($0.id)) }
     }
 
     var installingEpicGames: [EpicOwnedGame] {
-        epicLibrary.owned.filter { epicLibrary.downloads[$0.appName] != nil && epicLibrary.installed[$0.appName] == nil }
+        let epicStore = StoreProviders.of(.epic)
+        let installed = epicStore.installedIDs
+        return epicLibrary.owned.filter { epicStore.downloadStatus($0.appName) != nil && !installed.contains($0.appName) }
     }
 
     var isCompact: Bool { horizontalSizeClass == .compact }

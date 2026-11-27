@@ -44,36 +44,33 @@ extension SteamProgramDetailsView {
         }
     }
 
+    /// The download's state comes through the StoreProvider (3.0.1).
     var downloadStatus: some View {
-        let progress = steamLibrary.downloadProgress[game.appID]
-        let stopping = steamLibrary.cancellingApps.contains(game.appID)
+        let status = StoreProviders.of(.steam).downloadStatus(String(game.appID))
+        let stopping = status?.stopping ?? false
+        let fraction = status?.progress ?? 0
+        let verify = status?.verifyFraction ?? 0
         return VStack(spacing: 10) {
-            ProgressView(value: progress?.phase == .checking
-                         ? (progress.map { $0.checkTotal > 0 ? min(1, Double($0.checkDone) / Double($0.checkTotal)) : 0 } ?? 0)
-                         : (progress?.fraction ?? 0))
-            Text(steamLibrary.waitingApps.contains(game.appID) ? tr("Waiting") :
-                 progress?.phase == .preparing ? tr("Preparing download...") :
-                 progress?.phase == .checking ? tr("Checking existing files %d%%", Int(((progress.map { $0.checkTotal > 0 ? min(1, Double($0.checkDone) / Double($0.checkTotal)) : 0 } ?? 0) * 100).rounded())) :
-                 progress?.phase == .finishing ? tr("Finishing installation...") :
-                 tr("Installing %d%%", Int(((progress?.fraction ?? 0) * 100).rounded())))
+            ProgressView(value: status?.phase == .verifying ? verify : fraction)
+            Text(status?.waiting == true ? tr("Waiting") :
+                 status == nil || status?.phase == .preparing ? tr("Preparing download...") :
+                 status?.phase == .verifying ? tr("Checking existing files %d%%", Int((verify * 100).rounded())) :
+                 status?.phase == .finishing ? tr("Finishing installation...") :
+                 tr("Installing %d%%", Int((fraction * 100).rounded())))
                 .font(.caption)
                 .foregroundColor(.white)
-            if let progress, progress.phase == .downloading,
-               let eta = DownloadETA.seconds(done: progress.doneBytes,
-                                             total: progress.totalBytes,
-                                             bytesPerSecond: progress.bytesPerSecond),
-               let remaining = DownloadETA.label(eta) {
+            if let remaining = DownloadETA.label(status?.etaSeconds) {
                 Label(tr("Time left") + ": " + remaining, systemImage: "clock")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            if let progress, progress.installedBytes > 0 {
+            if let written = status?.writtenBytes, written > 0 {
                 Text(tr("Installed: %@", ByteCountFormatter.string(
-                    fromByteCount: Int64(clamping: progress.installedBytes), countStyle: .file)))
+                    fromByteCount: Int64(clamping: written), countStyle: .file)))
                     .font(.caption2)
                     .foregroundColor(.green)
             }
-            if steamLibrary.canCancelInstall(appID: game.appID) {
+            if status?.cancellable == true {
                 // Pause keeps the files; Stop uninstalls the game.
                 HStack(spacing: 10) {
                     Button {
@@ -174,7 +171,7 @@ extension SteamProgramDetailsView {
                                 .font(.caption.weight(.semibold))
                         }
                         .buttonStyle(.borderedProminent)
-                        .disabled(steamLibrary.installingApps.contains(game.appID))
+                        .disabled(StoreProviders.of(.steam).hasDownload(String(game.appID)))
                     }
                 }
                 .padding(.horizontal, 16)

@@ -5,7 +5,9 @@ import SwiftUI
 
 extension WindowsWorkspaceView {
     func gameCard(_ game: SteamAppInfo) -> some View {
-        let installed = steamLibrary.installedApps.contains(game.appID)
+        // Install and download state through the StoreProvider (3.0.1).
+        let steamStore = StoreProviders.of(.steam)
+        let installed = steamStore.installedIDs.contains(String(game.appID))
 
         return VStack(alignment: .leading, spacing: 6) {
             VStack(alignment: .leading, spacing: 6) {
@@ -29,7 +31,7 @@ extension WindowsWorkspaceView {
                 .buttonStyle(.plain)
             }
 
-            if !installed, let error = steamLibrary.downloadErrors[game.appID] {
+            if !installed, let error = steamStore.downloadStatus(String(game.appID))?.failure {
                 Text(tr(error))
                     .font(.caption2)
                     .foregroundColor(.red)
