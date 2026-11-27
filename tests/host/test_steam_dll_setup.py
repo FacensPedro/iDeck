@@ -1,4 +1,5 @@
 """The Madeira Dock step finishes and shows progress while it downloads."""
+import split_sources  # noqa: F401  (iDeck 3.0 split files)
 import unittest
 from pathlib import Path
 

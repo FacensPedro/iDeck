@@ -1,4 +1,5 @@
 """Epic optional content (install tags in a game's own build) installs separately."""
+import split_sources  # noqa: F401  (iDeck 3.0 split files)
 import unittest
 from pathlib import Path
 

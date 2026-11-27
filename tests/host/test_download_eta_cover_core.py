@@ -1,3 +1,4 @@
+import split_sources  # noqa: F401  (iDeck 3.0 split files)
 import unittest
 from pathlib import Path
 
@@ -34,7 +35,7 @@ class DownloadETACoreContract(unittest.TestCase):
         view = source("iDeck/MainView.swift")
         # The setup prepares the x64 + x86 prefix in the Visual C++ step, installs
         # Visual C++ and Wine Mono, and the Steam client only in the Madeira Dock step.
-        self.assertIn('private func installVisualCpp()', view)
+        self.assertIn('func installVisualCpp()', view)
         self.assertIn('coordinator.installMadeiraDock()', view)
         self.assertIn('case visualCpp, wineMono, dock, launchers, jit, summary', view)
         self.assertIn('coordinator.openMadeiraWorkspace()', view)

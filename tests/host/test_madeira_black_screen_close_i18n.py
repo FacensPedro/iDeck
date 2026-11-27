@@ -32,7 +32,7 @@ class MadeiraBlackScreenCloseAndLocalizationTests(unittest.TestCase):
 
     def test_close_retries_are_bounded_and_safe(self):
         coordinator = repo_text("iDeck/SystemCoordinator.swift")
-        self.assertIn("private var windowsCloseAttempts = 0", coordinator)
+        self.assertIn("var windowsCloseAttempts = 0", coordinator)
         self.assertIn("windowsCloseAttempts < 3", coordinator)
         self.assertIn("seconds >= Double((windowsCloseAttempts + 1) * 4)", coordinator)
         self.assertIn("ideck_wineprocess_request_close()", coordinator)

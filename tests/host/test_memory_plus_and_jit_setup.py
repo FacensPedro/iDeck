@@ -1,4 +1,5 @@
 """Memory+ status with GetMoreRam, the JIT method step and the child environment patch."""
+import split_sources  # noqa: F401  (iDeck 3.0 split files)
 import importlib.util
 import tempfile
 import unittest
@@ -37,7 +38,7 @@ class MemoryPlusTests(unittest.TestCase):
 class JITSetupStepTests(unittest.TestCase):
     def step(self) -> str:
         view = text("iDeck/MainView.swift")
-        return view[view.index("    private var jitStep: some View {"):view.index("    // MARK: - Summary")]
+        return view[view.index("    var jitStep: some View {"):view.index("    // MARK: - Summary")]
 
     def test_the_step_only_chooses_the_method(self):
         step = self.step()

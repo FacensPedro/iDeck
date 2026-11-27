@@ -1,4 +1,5 @@
 """Library layout fixes and the runtime-raised illegal instruction."""
+import split_sources  # noqa: F401  (iDeck 3.0 split files)
 import unittest
 from pathlib import Path
 

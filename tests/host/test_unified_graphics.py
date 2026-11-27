@@ -1,4 +1,5 @@
 """Unified D3D11 + D3D12 IPA: profile plumbing and the PE graphics-API scanner."""
+import split_sources  # noqa: F401  (iDeck 3.0 split files)
 import pathlib
 import shutil
 import subprocess

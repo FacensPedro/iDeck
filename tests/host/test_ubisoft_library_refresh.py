@@ -1,6 +1,7 @@
 """The Ubisoft library loads after signing in (2.13.1)."""
 from __future__ import annotations
 
+import split_sources  # noqa: F401  (iDeck 3.0 split files)
 import pathlib
 import unittest
 
@@ -33,7 +34,7 @@ class UbisoftLibraryRefreshTests(unittest.TestCase):
 
     def test_store_page_follows_sign_in(self):
         self.assertIn("@Published private(set) var signedIn", LIBRARY)
-        self.assertIn("private var ubisoftSignedIn: Bool { ubisoftLibrary.signedIn }", MAIN)
+        self.assertIn("var ubisoftSignedIn: Bool { ubisoftLibrary.signedIn }", MAIN)
         self.assertNotIn("ubisoftSignedIn = ", MAIN)
         self.assertIn("UbisoftLibrary.shared.refresh()   // the store page lists the account's games now", SETTINGS)
         self.assertIn('ubisoftAccountName = ""; UbisoftLibrary.shared.refresh()', SETTINGS)

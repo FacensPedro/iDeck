@@ -43,7 +43,7 @@ class StabilityJITLifecycleTests(unittest.TestCase):
 
     def test_session_cleanup_is_awaited_and_pool_defaults_to_560(self):
         coordinator = repo_text("iDeck/SystemCoordinator.swift")
-        self.assertIn("private func waitForSessionCleanup(timeout: TimeInterval = 5) -> Bool", coordinator)
+        self.assertIn("func waitForSessionCleanup(timeout: TimeInterval = 5) -> Bool", coordinator)
         self.assertIn('"wineJITPool560Migrated"', coordinator)
         self.assertIn("return automaticSizeMB(default: 560)", repo_text("iDeck/MadeiraJIT/MadeiraWinePool.swift"))
         jit = repo_text("iDeck/MadeiraJIT/StikJITHelper.swift")

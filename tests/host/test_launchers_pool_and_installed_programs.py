@@ -1,6 +1,7 @@
 """Launchers install only from their button; the JIT pool is freed after each
 session; programs an installer put in the prefix carry its shortcut's name and
 icon, and the installer leaves the list once Wine has stopped."""
+import split_sources  # noqa: F401  (iDeck 3.0 split files)
 import unittest
 from pathlib import Path
 
@@ -14,7 +15,7 @@ def text(path):
 class LaunchersPoolAndInstalledProgramsTests(unittest.TestCase):
     def test_launchers_step_does_not_install_by_itself(self):
         view = text("iDeck/MainView.swift")
-        step = view[view.index("private var launchersStep: some View"):view.index("// MARK: - JIT")]
+        step = view[view.index("var launchersStep: some View"):view.index("// MARK: - JIT")]
         self.assertEqual(step.count("coordinator.installDefaultStoreClients()"), 1)
         self.assertNotIn("launchersRequested", view)
         self.assertNotIn("automatically, so their games can start", view)
@@ -29,8 +30,8 @@ class LaunchersPoolAndInstalledProgramsTests(unittest.TestCase):
         self.assertIn("prepared = pool", pool)
         coordinator = text("iDeck/SystemCoordinator.swift")
         self.assertIn("self.releaseJITPoolAfterSession()", coordinator)
-        body = coordinator[coordinator.index("private func releaseJITPoolAfterSession("):]
-        body = body[:body.index("private func previousWineSessionStillFinishing")]
+        body = coordinator[coordinator.index("func releaseJITPoolAfterSession("):]
+        body = body[:body.index("func previousWineSessionStillFinishing")]
         self.assertIn("guard WindowsEnvironment.sessionsThisRun > 0", body)
         self.assertLess(body.index("ideck_runtime_complete_session()"), body.index("MadeiraWinePool.release()"))
 

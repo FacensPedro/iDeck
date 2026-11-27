@@ -59,7 +59,7 @@ jobs:
           if len(versions) != 1:
               raise SystemExit(f"::error::Project contains inconsistent MARKETING_VERSION values: {sorted(versions)}")
           version = versions.pop().strip()
-          if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version):
+          if not re.fullmatch(r"[0-9]+\.[0-9]+(\.[0-9]+)?", version):
               raise SystemExit(f"::error::Project has invalid marketing version: {version!r}")
           tag = os.environ["REQUESTED_RELEASE_TAG"].strip()
           if tag not in (version, f"v{version}"):
@@ -481,7 +481,7 @@ jobs:
           if len(versions) != 1:
               raise SystemExit(f"::error::Project contains inconsistent MARKETING_VERSION values: {sorted(versions)}")
           version = versions.pop().strip()
-          if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version):
+          if not re.fullmatch(r"[0-9]+\.[0-9]+(\.[0-9]+)?", version):
               raise SystemExit(f"::error::Project has invalid marketing version: {version!r}")
           tag = os.environ["REQUESTED_RELEASE_TAG"].strip()
           if tag not in (version, f"v{version}"):
@@ -977,7 +977,7 @@ jobs:
               print(plistlib.loads(archive.read('Payload/iDeck.app/Info.plist'))['CFBundleShortVersionString'])
           PY
           )"
-          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || exit 2
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]] || exit 2
           # The file carries the short version: 3.0.0 -> iDeck-3.ipa, 3.1.0 -> iDeck-3.1.ipa.
           LABEL="$(sed -E 's/(\.0)+$//' <<<"$VERSION")"
           cp iDeck.ipa "iDeck-${LABEL}.ipa"
@@ -1039,7 +1039,7 @@ jobs:
           import re
           from pathlib import Path
           project = Path("iDeck.xcodeproj/project.pbxproj").read_text(encoding="utf-8")
-          versions = set(re.findall(r"MARKETING_VERSION\s*=\s*([0-9]+\.[0-9]+\.[0-9]+);", project))
+          versions = set(re.findall(r"MARKETING_VERSION\s*=\s*([0-9]+\.[0-9]+(?:\.[0-9]+)?);", project))
           if len(versions) != 1:
               raise SystemExit(f"Expected exactly one iDeck marketing version, found {sorted(versions)}")
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
@@ -1168,7 +1168,7 @@ jobs:
           print(info.get("CFBundleShortVersionString", ""))
           PY
           )"
-          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]] || {
             echo "::error::Verified IPA has no valid semantic version."; exit 2;
           }
           if [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
@@ -1187,7 +1187,7 @@ jobs:
           elif [[ "$TAG" == "auto" ]]; then
             TAG="v$VERSION"
           fi
-          [[ "$TAG" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ && "${TAG#v}" == "$VERSION" ]] || {
+          [[ "$TAG" =~ ^v?[0-9]+\.[0-9]+(\.[0-9]+)?$ && "${TAG#v}" == "$VERSION" ]] || {
             echo "::error::Release tag '$TAG' does not match the IPA version v$VERSION."; exit 2;
           }
 

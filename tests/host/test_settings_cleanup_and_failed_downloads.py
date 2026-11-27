@@ -1,6 +1,7 @@
 """2.13.3: game settings save themselves, a few notes go, failed downloads are removed."""
 from __future__ import annotations
 
+import split_sources  # noqa: F401  (iDeck 3.0 split files)
 import pathlib
 import unittest
 

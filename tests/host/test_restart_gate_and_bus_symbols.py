@@ -1,3 +1,4 @@
+import split_sources  # noqa: F401  (iDeck 3.0 split files)
 import subprocess
 import sys
 import tempfile
@@ -10,7 +11,7 @@ COORD = (ROOT / "iDeck/SystemCoordinator.swift").read_text()
 
 class RestartGateTests(unittest.TestCase):
     def test_launch_refused_when_restart_needed(self):
-        gate = COORD[COORD.index("private func previousWineSessionStillFinishing"):]
+        gate = COORD[COORD.index("func previousWineSessionStillFinishing"):]
         gate = gate[:gate.index("// A Windows guest runs as a thread")]
         self.assertIn("if let why = Self.restartNeeded()", gate)
 

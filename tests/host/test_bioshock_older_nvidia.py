@@ -1,4 +1,5 @@
 """BioShock games get the older NVIDIA Direct3D 9 card (2.16.2)."""
+import split_sources  # noqa: F401  (iDeck 3.0 split files)
 import unittest
 from pathlib import Path
 

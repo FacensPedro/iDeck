@@ -91,10 +91,10 @@
     {
       "examples": [
         "iDeck/AddressSpaceCheck.swift",
-        "iDeck/BenchmarkBridge.mm",
-        "iDeck/BenchmarkRecorder.cpp"
+        "iDeck/Application/SystemCoordinator+Diagnostics.swift",
+        "iDeck/Application/SystemCoordinator+Dock.swift"
       ],
-      "files": 27,
+      "files": 35,
       "framework": "Darwin",
       "group": "Core System",
       "minimum_ios": "2.0",
@@ -118,9 +118,9 @@
       "examples": [
         "iDeck/AddressSpaceCheck.swift",
         "iDeck/Application/SessionLifecycle.swift",
-        "iDeck/AudioManager.swift"
+        "iDeck/Application/SystemCoordinator+Diagnostics.swift"
       ],
-      "files": 108,
+      "files": 127,
       "framework": "Foundation",
       "group": "Core System",
       "minimum_ios": "2.0",
@@ -371,7 +371,7 @@
         "iDeck/BugReportView.swift",
         "iDeck/EASignIn.swift"
       ],
-      "files": 20,
+      "files": 29,
       "framework": "SwiftUI",
       "group": "Interface",
       "minimum_ios": "13.0",
@@ -380,11 +380,11 @@
     },
     {
       "examples": [
-        "iDeck/ArtworkLoader.swift",
-        "iDeck/BackgroundDownloads.swift",
-        "iDeck/BenchmarkSession.swift"
+        "iDeck/Application/SystemCoordinator+Diagnostics.swift",
+        "iDeck/Application/SystemCoordinator+JIT.swift",
+        "iDeck/Application/SystemCoordinator+Launch.swift"
       ],
-      "files": 22,
+      "files": 32,
       "framework": "UIKit",
       "group": "Interface",
       "minimum_ios": "2.0",

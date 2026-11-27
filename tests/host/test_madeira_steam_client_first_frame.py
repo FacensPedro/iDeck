@@ -1,3 +1,4 @@
+import split_sources  # noqa: F401  (iDeck 3.0 split files)
 import pathlib
 import unittest
 
@@ -10,7 +11,7 @@ SESSION = (ROOT / "iDeck/GameSessionView.swift").read_text()
 class MadeiraSteamClientFirstFrameTests(unittest.TestCase):
     def test_steam_client_loader_does_not_claim_running_without_first_frame(self):
         start = COORDINATOR.index('self.withPreparedMetalDisplay(expectedStatus: "Launching Steam client...")')
-        end = COORDINATOR.index('private func withPreparedMetalDisplay(', start)
+        end = COORDINATOR.index('func withPreparedMetalDisplay(', start)
         launch = COORDINATOR[start:end]
         self.assertIn('let loaderAlive = result && ideck_wineprocess_running()', launch)
         self.assertIn('"Wine started; waiting for game..."', launch)

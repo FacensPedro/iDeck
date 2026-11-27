@@ -1,3 +1,4 @@
+import split_sources  # noqa: F401  (iDeck 3.0 split files)
 import unittest
 from pathlib import Path
 
@@ -23,7 +24,7 @@ class EpicBaseAndDLCTests(unittest.TestCase):
         self.assertIn('mainGameID: (item["mainGameItem"] as? [String: Any])?["id"] as? String', api)
         lib = read("EpicLibrary.swift")
         for needle in ("@Published private(set) var dlcs: [String: [EpicOwnedDLC]]", "func installDLC(_ dlcApp: String)",
-                       "func uninstallDLC(_ dlcApp: String)", "private func installDLCFiles(", "epic-installed-dlc.json",
+                       "func uninstallDLC(_ dlcApp: String)", "func installDLCFiles(", "epic-installed-dlc.json",
                        "if let entry = dlcEntry(app) {"):
             self.assertIn(needle, lib)
         view = read("MainView.swift")

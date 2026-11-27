@@ -18,7 +18,7 @@ class ReleaseInterfaceCDNTests(unittest.TestCase):
         import re
 
         requested = repo_text(".github/release-request.txt").strip()
-        versions = re.findall(r"MARKETING_VERSION = ([0-9]+\.[0-9]+\.[0-9]+);", PROJECT)
+        versions = re.findall(r"MARKETING_VERSION = ([0-9]+\.[0-9]+(?:\.[0-9]+)?);", PROJECT)
         builds = re.findall(r"CURRENT_PROJECT_VERSION = ([0-9]+);", PROJECT)
         self.assertEqual(len(versions), 6)
         self.assertEqual(len(set(versions)), 1)
@@ -44,7 +44,7 @@ class ReleaseInterfaceCDNTests(unittest.TestCase):
         self.assertIn(".lineLimit(2, reservesSpace: true)", card)
         self.assertNotIn(".truncationMode(.tail)", card)
         self.assertIn(".accessibilityLabel(title)", card)
-        top = VIEW.split("private var topBar: some View", 1)[1].split("private enum MixedLibraryEntry", 1)[0]
+        top = VIEW.split("private var topBar: some View", 1)[1].split("enum MixedLibraryEntry", 1)[0]
         self.assertIn('Text("iDeck")', top)
         self.assertNotIn('Image("IDeckLogo")', top)
         self.assertNotIn('Text(tr("Madeira"))', top)
@@ -59,7 +59,7 @@ class ReleaseInterfaceCDNTests(unittest.TestCase):
 
     def test_auto_save_default_remains_off(self):
         self.assertIn('@AppStorage(SteamCloudAutoSave.key) private var autoSave = false', SAVE)
-        self.assertIn('@AppStorage(SteamCloudAutoSave.key) private var autoSaveEnabled = false', VIEW)
+        self.assertIn('@AppStorage(SteamCloudAutoSave.key) var autoSaveEnabled = false', VIEW)
 
     def test_download_speed_acceleration_is_removed_from_ideck(self):
         self.assertNotIn("Unlimited download speed", SETTINGS)

@@ -1,4 +1,5 @@
 """iDeck 3.0 foundation: session lifecycle, system libraries report, IPA name."""
+import split_sources  # noqa: F401  (iDeck 3.0 split files)
 import subprocess
 import sys
 import unittest
@@ -18,6 +19,16 @@ class IDeck3Foundation(unittest.TestCase):
     def test_system_libraries_report_current(self):
         result = subprocess.run([sys.executable, str(ROOT / "scripts/ios_system_libraries.py"), "--check"])
         self.assertEqual(result.returncode, 0)
+
+    def test_large_files_split(self):
+        for part in ("Application/SystemCoordinator+Launch.swift", "Application/SystemCoordinator+JIT.swift",
+                     "Presentation/GameDetails/StoreGameDetailsView.swift", "Runtime/WindowsEnvironment+Profile.swift",
+                     "Stores/EA/EALibrary+Launch.swift", "Stores/Ubisoft/UbisoftInstaller.swift"):
+            path = ROOT / "iDeck" / part
+            self.assertTrue(path.exists(), part)
+            self.assertIn("// Split from ", path.read_text()[:300])
+            self.assertEqual((ROOT / "iDeck.xcodeproj/project.pbxproj").read_text().count(path.name) >= 4, True, part)
+        self.assertLess(len((ROOT / "iDeck/SystemCoordinator.swift").read_bytes().splitlines()), 800)
 
     def test_short_ipa_name(self):
         wf = (ROOT / ".github/workflows/ios.yml").read_text()

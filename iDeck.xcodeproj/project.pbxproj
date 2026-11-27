@@ -49,6 +49,34 @@
 		999999999999999999999914 /* UpdateChecker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 999999999999999999999906 /* UpdateChecker.swift */; };
 		F30000000000000000000021 /* WineLogClipboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = F40000000000000000000021 /* WineLogClipboard.swift */; };
 		F3A000000000000000000013 /* BenchmarkSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000013 /* BenchmarkSession.swift */; };
+		F3B0000000000000A59DB5BC /* WindowsWorkspaceView+Shelves.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B0000000000000A59DB5BC /* WindowsWorkspaceView+Shelves.swift */; };
+		F3B0000000000000D7C37019 /* EALibrary+Launch.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B0000000000000D7C37019 /* EALibrary+Launch.swift */; };
+		F3B0000000000000D00F593A /* EALibrary+Downloads.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B0000000000000D00F593A /* EALibrary+Downloads.swift */; };
+		F3B0000000000000C7243485 /* EALibrary+Account.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B0000000000000C7243485 /* EALibrary+Account.swift */; };
+		F3B0000000000000E84A2EED /* WindowsEnvironment+Profile.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B0000000000000E84A2EED /* WindowsEnvironment+Profile.swift */; };
+		F3B0000000000000BDD9276E /* WindowsEnvironment+Graphics.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B0000000000000BDD9276E /* WindowsEnvironment+Graphics.swift */; };
+		F3B00000000000009388E576 /* WindowsEnvironment+Runtime.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B00000000000009388E576 /* WindowsEnvironment+Runtime.swift */; };
+		F3B0000000000000433380F8 /* SystemCoordinator+SessionEnd.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B0000000000000433380F8 /* SystemCoordinator+SessionEnd.swift */; };
+		F3B0000000000000A82BCC08 /* SystemCoordinator+Dock.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B0000000000000A82BCC08 /* SystemCoordinator+Dock.swift */; };
+		F3B00000000000008123C368 /* SystemCoordinator+Launch.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B00000000000008123C368 /* SystemCoordinator+Launch.swift */; };
+		F3B00000000000009C6F772E /* SystemCoordinator+StoreClients.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B00000000000009C6F772E /* SystemCoordinator+StoreClients.swift */; };
+		F3B0000000000000DDB33C4D /* SystemCoordinator+JIT.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B0000000000000DDB33C4D /* SystemCoordinator+JIT.swift */; };
+		F3B000000000000099B7AB28 /* SystemCoordinator+Diagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B000000000000099B7AB28 /* SystemCoordinator+Diagnostics.swift */; };
+		F3B000000000000027C9BBFA /* IDeckFirstRunSetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B000000000000027C9BBFA /* IDeckFirstRunSetupView.swift */; };
+		F3B0000000000000EF19D2FF /* StoreGameDetailsSheets.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B0000000000000EF19D2FF /* StoreGameDetailsSheets.swift */; };
+		F3B0000000000000BA1EDD1F /* StoreGameDetailsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B0000000000000BA1EDD1F /* StoreGameDetailsView.swift */; };
+		F3B0000000000000DB7A8BAE /* WindowsGameProfileForm.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B0000000000000DB7A8BAE /* WindowsGameProfileForm.swift */; };
+		F3B000000000000084D2A0B8 /* SteamProgramDetailsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B000000000000084D2A0B8 /* SteamProgramDetailsView.swift */; };
+		F3B0000000000000DDDA09D9 /* WindowsExecutableDetailsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B0000000000000DDDA09D9 /* WindowsExecutableDetailsView.swift */; };
+		F3B0000000000000F907F378 /* LibraryViewModifiers.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B0000000000000F907F378 /* LibraryViewModifiers.swift */; };
+		F3B0000000000000B00FE8BB /* LibraryArtworkViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B0000000000000B00FE8BB /* LibraryArtworkViews.swift */; };
+		F3B0000000000000FB55759F /* CompatibilityAuto.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B0000000000000FB55759F /* CompatibilityAuto.swift */; };
+		F3B0000000000000FF52C385 /* MadeiraBundleIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B0000000000000FF52C385 /* MadeiraBundleIdentity.swift */; };
+		F3B0000000000000C9DCFA78 /* EAHashCheck.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B0000000000000C9DCFA78 /* EAHashCheck.swift */; };
+		F3B0000000000000B1603882 /* EAInstalledGame.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B0000000000000B1603882 /* EAInstalledGame.swift */; };
+		F3B00000000000008ABA700E /* UbisoftInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B00000000000008ABA700E /* UbisoftInstaller.swift */; };
+		F3B000000000000021CE70C0 /* UbisoftManifest.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B000000000000021CE70C0 /* UbisoftManifest.swift */; };
+		F3B00000000000004C380188 /* UbisoftContentClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B00000000000004C380188 /* UbisoftContentClient.swift */; };
 		F3A0000000000000000000FC /* SessionLifecycle.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A0000000000000000000FC /* SessionLifecycle.swift */; };
 		F3A0000000000000000000FD /* AutoDLLManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A0000000000000000000FD /* AutoDLLManager.swift */; };
 		F3A0000000000000000000FE /* VirtualSwap.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A0000000000000000000FE /* VirtualSwap.swift */; };
@@ -198,6 +226,34 @@
 		999999999999999999999906 /* UpdateChecker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateChecker.swift; sourceTree = "<group>"; };
 		F40000000000000000000021 /* WineLogClipboard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WineLogClipboard.swift; sourceTree = "<group>"; };
 		F4A000000000000000000013 /* BenchmarkSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BenchmarkSession.swift; sourceTree = "<group>"; };
+		F4B0000000000000A59DB5BC /* WindowsWorkspaceView+Shelves.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presentation/Library/WindowsWorkspaceView+Shelves.swift; sourceTree = "<group>"; };
+		F4B0000000000000D7C37019 /* EALibrary+Launch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Stores/EA/EALibrary+Launch.swift; sourceTree = "<group>"; };
+		F4B0000000000000D00F593A /* EALibrary+Downloads.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Stores/EA/EALibrary+Downloads.swift; sourceTree = "<group>"; };
+		F4B0000000000000C7243485 /* EALibrary+Account.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Stores/EA/EALibrary+Account.swift; sourceTree = "<group>"; };
+		F4B0000000000000E84A2EED /* WindowsEnvironment+Profile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runtime/WindowsEnvironment+Profile.swift; sourceTree = "<group>"; };
+		F4B0000000000000BDD9276E /* WindowsEnvironment+Graphics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runtime/WindowsEnvironment+Graphics.swift; sourceTree = "<group>"; };
+		F4B00000000000009388E576 /* WindowsEnvironment+Runtime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runtime/WindowsEnvironment+Runtime.swift; sourceTree = "<group>"; };
+		F4B0000000000000433380F8 /* SystemCoordinator+SessionEnd.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/SystemCoordinator+SessionEnd.swift; sourceTree = "<group>"; };
+		F4B0000000000000A82BCC08 /* SystemCoordinator+Dock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/SystemCoordinator+Dock.swift; sourceTree = "<group>"; };
+		F4B00000000000008123C368 /* SystemCoordinator+Launch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/SystemCoordinator+Launch.swift; sourceTree = "<group>"; };
+		F4B00000000000009C6F772E /* SystemCoordinator+StoreClients.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/SystemCoordinator+StoreClients.swift; sourceTree = "<group>"; };
+		F4B0000000000000DDB33C4D /* SystemCoordinator+JIT.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/SystemCoordinator+JIT.swift; sourceTree = "<group>"; };
+		F4B000000000000099B7AB28 /* SystemCoordinator+Diagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/SystemCoordinator+Diagnostics.swift; sourceTree = "<group>"; };
+		F4B000000000000027C9BBFA /* IDeckFirstRunSetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presentation/Setup/IDeckFirstRunSetupView.swift; sourceTree = "<group>"; };
+		F4B0000000000000EF19D2FF /* StoreGameDetailsSheets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presentation/GameDetails/StoreGameDetailsSheets.swift; sourceTree = "<group>"; };
+		F4B0000000000000BA1EDD1F /* StoreGameDetailsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presentation/GameDetails/StoreGameDetailsView.swift; sourceTree = "<group>"; };
+		F4B0000000000000DB7A8BAE /* WindowsGameProfileForm.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presentation/GameDetails/WindowsGameProfileForm.swift; sourceTree = "<group>"; };
+		F4B000000000000084D2A0B8 /* SteamProgramDetailsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presentation/GameDetails/SteamProgramDetailsView.swift; sourceTree = "<group>"; };
+		F4B0000000000000DDDA09D9 /* WindowsExecutableDetailsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presentation/GameDetails/WindowsExecutableDetailsView.swift; sourceTree = "<group>"; };
+		F4B0000000000000F907F378 /* LibraryViewModifiers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presentation/Library/LibraryViewModifiers.swift; sourceTree = "<group>"; };
+		F4B0000000000000B00FE8BB /* LibraryArtworkViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presentation/Library/LibraryArtworkViews.swift; sourceTree = "<group>"; };
+		F4B0000000000000FB55759F /* CompatibilityAuto.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runtime/CompatibilityAuto.swift; sourceTree = "<group>"; };
+		F4B0000000000000FF52C385 /* MadeiraBundleIdentity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Runtime/MadeiraBundleIdentity.swift; sourceTree = "<group>"; };
+		F4B0000000000000C9DCFA78 /* EAHashCheck.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Stores/EA/EAHashCheck.swift; sourceTree = "<group>"; };
+		F4B0000000000000B1603882 /* EAInstalledGame.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Stores/EA/EAInstalledGame.swift; sourceTree = "<group>"; };
+		F4B00000000000008ABA700E /* UbisoftInstaller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Stores/Ubisoft/UbisoftInstaller.swift; sourceTree = "<group>"; };
+		F4B000000000000021CE70C0 /* UbisoftManifest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Stores/Ubisoft/UbisoftManifest.swift; sourceTree = "<group>"; };
+		F4B00000000000004C380188 /* UbisoftContentClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Stores/Ubisoft/UbisoftContentClient.swift; sourceTree = "<group>"; };
 		F4A0000000000000000000FC /* SessionLifecycle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Application/SessionLifecycle.swift; sourceTree = "<group>"; };
 		F4A0000000000000000000FD /* AutoDLLManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoDLLManager.swift; sourceTree = "<group>"; };
 		F4A0000000000000000000FE /* VirtualSwap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VirtualSwap.swift; sourceTree = "<group>"; };
@@ -382,6 +438,34 @@
 				999999999999999999999914 /* UpdateChecker.swift in Sources */,
 				F30000000000000000000021 /* WineLogClipboard.swift in Sources */,
 				F3A000000000000000000013 /* BenchmarkSession.swift in Sources */,
+				F3B0000000000000A59DB5BC /* WindowsWorkspaceView+Shelves.swift in Sources */,
+				F3B0000000000000D7C37019 /* EALibrary+Launch.swift in Sources */,
+				F3B0000000000000D00F593A /* EALibrary+Downloads.swift in Sources */,
+				F3B0000000000000C7243485 /* EALibrary+Account.swift in Sources */,
+				F3B0000000000000E84A2EED /* WindowsEnvironment+Profile.swift in Sources */,
+				F3B0000000000000BDD9276E /* WindowsEnvironment+Graphics.swift in Sources */,
+				F3B00000000000009388E576 /* WindowsEnvironment+Runtime.swift in Sources */,
+				F3B0000000000000433380F8 /* SystemCoordinator+SessionEnd.swift in Sources */,
+				F3B0000000000000A82BCC08 /* SystemCoordinator+Dock.swift in Sources */,
+				F3B00000000000008123C368 /* SystemCoordinator+Launch.swift in Sources */,
+				F3B00000000000009C6F772E /* SystemCoordinator+StoreClients.swift in Sources */,
+				F3B0000000000000DDB33C4D /* SystemCoordinator+JIT.swift in Sources */,
+				F3B000000000000099B7AB28 /* SystemCoordinator+Diagnostics.swift in Sources */,
+				F3B000000000000027C9BBFA /* IDeckFirstRunSetupView.swift in Sources */,
+				F3B0000000000000EF19D2FF /* StoreGameDetailsSheets.swift in Sources */,
+				F3B0000000000000BA1EDD1F /* StoreGameDetailsView.swift in Sources */,
+				F3B0000000000000DB7A8BAE /* WindowsGameProfileForm.swift in Sources */,
+				F3B000000000000084D2A0B8 /* SteamProgramDetailsView.swift in Sources */,
+				F3B0000000000000DDDA09D9 /* WindowsExecutableDetailsView.swift in Sources */,
+				F3B0000000000000F907F378 /* LibraryViewModifiers.swift in Sources */,
+				F3B0000000000000B00FE8BB /* LibraryArtworkViews.swift in Sources */,
+				F3B0000000000000FB55759F /* CompatibilityAuto.swift in Sources */,
+				F3B0000000000000FF52C385 /* MadeiraBundleIdentity.swift in Sources */,
+				F3B0000000000000C9DCFA78 /* EAHashCheck.swift in Sources */,
+				F3B0000000000000B1603882 /* EAInstalledGame.swift in Sources */,
+				F3B00000000000008ABA700E /* UbisoftInstaller.swift in Sources */,
+				F3B000000000000021CE70C0 /* UbisoftManifest.swift in Sources */,
+				F3B00000000000004C380188 /* UbisoftContentClient.swift in Sources */,
 				F3A0000000000000000000FC /* SessionLifecycle.swift in Sources */,
 				F3A0000000000000000000FD /* AutoDLLManager.swift in Sources */,
 				F3A0000000000000000000FE /* VirtualSwap.swift in Sources */,
@@ -555,6 +639,34 @@
 				999999999999999999999906 /* UpdateChecker.swift */,
 				F40000000000000000000021 /* WineLogClipboard.swift */,
 				F4A000000000000000000013 /* BenchmarkSession.swift */,
+				F4B0000000000000A59DB5BC /* WindowsWorkspaceView+Shelves.swift */,
+				F4B0000000000000D7C37019 /* EALibrary+Launch.swift */,
+				F4B0000000000000D00F593A /* EALibrary+Downloads.swift */,
+				F4B0000000000000C7243485 /* EALibrary+Account.swift */,
+				F4B0000000000000E84A2EED /* WindowsEnvironment+Profile.swift */,
+				F4B0000000000000BDD9276E /* WindowsEnvironment+Graphics.swift */,
+				F4B00000000000009388E576 /* WindowsEnvironment+Runtime.swift */,
+				F4B0000000000000433380F8 /* SystemCoordinator+SessionEnd.swift */,
+				F4B0000000000000A82BCC08 /* SystemCoordinator+Dock.swift */,
+				F4B00000000000008123C368 /* SystemCoordinator+Launch.swift */,
+				F4B00000000000009C6F772E /* SystemCoordinator+StoreClients.swift */,
+				F4B0000000000000DDB33C4D /* SystemCoordinator+JIT.swift */,
+				F4B000000000000099B7AB28 /* SystemCoordinator+Diagnostics.swift */,
+				F4B000000000000027C9BBFA /* IDeckFirstRunSetupView.swift */,
+				F4B0000000000000EF19D2FF /* StoreGameDetailsSheets.swift */,
+				F4B0000000000000BA1EDD1F /* StoreGameDetailsView.swift */,
+				F4B0000000000000DB7A8BAE /* WindowsGameProfileForm.swift */,
+				F4B000000000000084D2A0B8 /* SteamProgramDetailsView.swift */,
+				F4B0000000000000DDDA09D9 /* WindowsExecutableDetailsView.swift */,
+				F4B0000000000000F907F378 /* LibraryViewModifiers.swift */,
+				F4B0000000000000B00FE8BB /* LibraryArtworkViews.swift */,
+				F4B0000000000000FB55759F /* CompatibilityAuto.swift */,
+				F4B0000000000000FF52C385 /* MadeiraBundleIdentity.swift */,
+				F4B0000000000000C9DCFA78 /* EAHashCheck.swift */,
+				F4B0000000000000B1603882 /* EAInstalledGame.swift */,
+				F4B00000000000008ABA700E /* UbisoftInstaller.swift */,
+				F4B000000000000021CE70C0 /* UbisoftManifest.swift */,
+				F4B00000000000004C380188 /* UbisoftContentClient.swift */,
 				F4A0000000000000000000FC /* SessionLifecycle.swift */,
 				F4A0000000000000000000FD /* AutoDLLManager.swift */,
 				F4A0000000000000000000FE /* VirtualSwap.swift */,
@@ -836,7 +948,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 3.0.0;
+				MARKETING_VERSION = 3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ideck.ideck.VPNExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -861,7 +973,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 3.0.0;
+				MARKETING_VERSION = 3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ideck.ideck.VPNExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -964,7 +1076,7 @@
 					"$(inherited)",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 3.0.0;
+				MARKETING_VERSION = 3.0;
 				"OTHER_LDFLAGS[sdk=iphoneos*]" = (
 					"$(inherited)",
 					"-framework",
@@ -994,7 +1106,7 @@
 					"$(inherited)",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 3.0.0;
+				MARKETING_VERSION = 3.0;
 				"OTHER_LDFLAGS[sdk=iphoneos*]" = (
 					"$(inherited)",
 					"-framework",
@@ -1089,7 +1201,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 3.0.0;
+				MARKETING_VERSION = 3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ideck.ideck;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -1126,7 +1238,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 3.0.0;
+				MARKETING_VERSION = 3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ideck.ideck;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;

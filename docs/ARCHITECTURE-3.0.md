@@ -27,14 +27,22 @@ header (`ideck_*`, `wine_*`, `madeira_*`); no Swift type crosses into C++.
 reports every status to it; transitions it does not allow are logged and ignored, and
 the last ones go into the bug report.
 
-## Order of the split (from 3.0 on)
+## The split (done in 3.0)
 
-1. `SystemCoordinator.swift`: JIT preparation, Steam launch, Dock launch, session end
-   (one file each, as extensions).
-2. `MainView.swift`: one file per store's game page, the library shelves, the session screen.
-3. `WindowsEnvironment.swift`: graphics config, game profile environment, launch.
-4. `EALibrary.swift`, `UbisoftDownloader.swift`: sign-in, library, download, licence.
-5. `AutoDLLManager`, `ResourceGovernor`: catalog/cache/install and memory/background parts.
+| Original file | Now |
+|---|---|
+| `SystemCoordinator.swift` (3116 lines) | stored state and status in `SystemCoordinator.swift`; `Application/SystemCoordinator+Diagnostics`, `+JIT`, `+StoreClients`, `+Launch`, `+Dock`, `+SessionEnd` |
+| `MainView.swift` (3445 lines) | `MainView` and `WindowsWorkspaceView`; `Presentation/Library/` (artwork, modifiers, home shelves), `Presentation/GameDetails/` (store pages, Steam page, executable page, profile form), `Presentation/Setup/` |
+| `WindowsEnvironment.swift` (1231 lines) | launch in `WindowsEnvironment.swift`; `Runtime/WindowsEnvironment+Runtime`, `+Graphics`, `+Profile`, `MadeiraBundleIdentity`, `CompatibilityAuto` |
+| `EALibrary.swift` (874 lines) | state in `EALibrary.swift`; `Stores/EA/EALibrary+Account`, `+Downloads`, `+Launch`, `EAInstalledGame`, `EAHashCheck` |
+| `UbisoftDownloader.swift` (752 lines) | demux in `UbisoftDownloader.swift`; `Stores/Ubisoft/UbisoftContentClient`, `UbisoftManifest`, `UbisoftInstaller` |
+
+Each part starts with `// Split from <file> (iDeck 3.0 architecture).`; the host tests read
+an original file name as the original plus its parts (`tests/host/split_sources.py`).
+Members that another part uses lost `private`; the others kept it. Behaviour is unchanged.
+
+Next: `AutoDLLManager` and `ResourceGovernor` into catalog/cache/install and
+memory/background parts, then view models out of the SwiftUI views.
 
 ## iOS system libraries
 
@@ -47,4 +55,4 @@ copied into the IPA; IOKit is not public on iOS and is listed only to be avoided
 
 The project's `MARKETING_VERSION` is the only version: the workflow reads it, the
 release request must match it, and the IPA file carries its short form
-(`3.0.0` → `iDeck-3.ipa`).
+(`3.0` → `iDeck-3.ipa`).

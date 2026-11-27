@@ -1,3 +1,4 @@
+import split_sources  # noqa: F401  (iDeck 3.0 split files)
 import pathlib
 import unittest
 
@@ -8,7 +9,7 @@ class WineJITPoolSettingsTests(unittest.TestCase):
     def test_ui_and_coordinator_only_accept_supported_sizes(self):
         coordinator = (ROOT / "iDeck/SystemCoordinator.swift").read_text()
         ui = (ROOT / "iDeck/SettingsView.swift").read_text()
-        self.assertIn("private static let supportedWineJITPoolMiB: Set<Int> = [64, 96, 128, 192, 256, 384, 512, 560, 624, 640, 768, 896, 1152]", coordinator)
+        self.assertIn("static let supportedWineJITPoolMiB: Set<Int> = [64, 96, 128, 192, 256, 384, 512, 560, 624, 640, 768, 896, 1152]", coordinator)
         self.assertIn('setenv("IDECK_WINE_JIT_MIB", String(sizeMiB), 1)', coordinator)
         self.assertIn('unsetenv("IDECK_WINE_JIT_MIB")', coordinator)
         self.assertIn('UserDefaults.standard.object(forKey: "wineJITPoolMiB") as? Int ?? 560', coordinator)

@@ -1,3 +1,4 @@
+import split_sources  # noqa: F401  (iDeck 3.0 split files)
 import pathlib, unittest
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 SRC = (ROOT / "iDeck/WineLogClipboard.swift").read_text()
