@@ -13,7 +13,7 @@ class WineJITPoolSettingsTests(unittest.TestCase):
         self.assertIn('setenv("IDECK_WINE_JIT_MIB", String(sizeMiB), 1)', coordinator)
         self.assertIn('unsetenv("IDECK_WINE_JIT_MIB")', coordinator)
         self.assertIn('UserDefaults.standard.object(forKey: "wineJITPoolMiB") as? Int ?? 560', coordinator)
-        self.assertIn('private var wineJITPoolMiB = 560', ui)
+        self.assertIn('var wineJITPoolMiB = 560', ui)
         self.assertIn("guard !wineJITPreparationInFlight && !ideck_wine_jit_pool_ready()", coordinator)
         self.assertIn("@AppStorage(\"wineJITPoolMiB\")", ui)
         self.assertIn("ForEach([384, 512, 560, 624, 640, 768, 896, 1152]", ui)

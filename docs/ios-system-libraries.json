@@ -372,7 +372,7 @@
         "iDeck/BugReportView.swift",
         "iDeck/EASignIn.swift"
       ],
-      "files": 35,
+      "files": 40,
       "framework": "SwiftUI",
       "group": "Interface",
       "minimum_ios": "13.0",
@@ -490,7 +490,7 @@
         "iDeck/GOGLibrary.swift",
         "iDeck/MadeiraJIT/EntitlementChecker.swift"
       ],
-      "files": 7,
+      "files": 8,
       "framework": "Security",
       "group": "Security",
       "minimum_ios": "2.0",
@@ -571,9 +571,10 @@
     {
       "examples": [
         "iDeck/BackgroundDownloads.swift",
+        "iDeck/Presentation/Settings/SettingsView+General.swift",
         "iDeck/SettingsView.swift"
       ],
-      "files": 2,
+      "files": 3,
       "framework": "UserNotifications",
       "group": "System & devices",
       "minimum_ios": "10.0",

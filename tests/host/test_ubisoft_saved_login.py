@@ -1,13 +1,14 @@
 """The Ubisoft sign-in stays saved until Sign out, as for the other stores (2.13.1)."""
 from __future__ import annotations
 
+import split_sources  # noqa: F401  (iDeck 3.0 split files)
 import pathlib
 import re
 import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 SETTINGS = (ROOT / "iDeck" / "SettingsView.swift").read_text()
-SOURCES = {p: p.read_text() for p in (ROOT / "iDeck").rglob("*.swift")}
+SOURCES = {p: split_sources._original_read_text(p) for p in (ROOT / "iDeck").rglob("*.swift")}  # each file once
 
 
 class UbisoftSavedLoginTests(unittest.TestCase):
@@ -19,7 +20,7 @@ class UbisoftSavedLoginTests(unittest.TestCase):
         self.assertGreater(sign_out, 0)
 
     def test_failed_renewal_keeps_the_account(self):
-        start = SETTINGS.index("@MainActor private func restoreUbisoftSession() async {")
+        start = SETTINGS.index("@MainActor func restoreUbisoftSession() async {")
         body = SETTINGS[start:SETTINGS.index("private var eaPage", start)]
         self.assertNotIn("clear()", body)
         self.assertIn("await UbisoftSavedSession.current()", body)

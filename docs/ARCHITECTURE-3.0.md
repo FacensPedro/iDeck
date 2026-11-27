@@ -59,7 +59,13 @@ The store libraries (`SteamOwnedGamesModel`, `EpicLibrary`, `EALibrary`, `Ubisof
 `GOGLibraryModel`) are the views' models: views observe them and call their methods, and
 keep only presentation state (`@State`) themselves.
 
-Next: the settings screen's state into a `SettingsModel`, then the game pages'.
+Settings (3.0): `SettingsView.swift` keeps the screen's state and its overview; the pages
+are in `Presentation/Settings/SettingsView+Stores` (Steam, GOG, Epic, EA, Ubisoft),
+`+System` (JIT, controls, graphics, storage, runtime, memory) and `+General` (language,
+updates, shared rows); the shared rows in `SettingsComponents.swift`; the Ubisoft account
+(saved login, sign-in web view, session) in `Stores/Ubisoft/UbisoftAccount.swift`.
+
+Next: the game pages' state into their own models.
 
 ## iOS system libraries
 

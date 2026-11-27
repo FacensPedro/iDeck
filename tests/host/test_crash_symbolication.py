@@ -1,4 +1,5 @@
 """MetricKit crash stacks are named on the device before they reach the bug report."""
+import split_sources  # noqa: F401  (iDeck 3.0 split files)
 import unittest
 from pathlib import Path
 
