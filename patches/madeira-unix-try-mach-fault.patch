@@ -1,0 +1,64 @@
+diff --git a/build/ntdll-unix/signal_arm64_ios.c b/build/ntdll-unix/signal_arm64_ios.c
+index cc4aac6..359ecd5 100644
+--- a/build/ntdll-unix/signal_arm64_ios.c
++++ b/build/ntdll-unix/signal_arm64_ios.c
+@@ -8638,6 +8638,59 @@ static int ios_mach_deliver_guest_exception_inner( thread_t thread, arm_thread_s
+      * transient-retry debounce and the redelivery terminal below. */
+     int is_align = 0;
+ 
++    /* iDeck: a fault in HOST code inside a system call, while that call's unix-side
++     * __TRY is active (ntdll_thread_data.jmp_buf set): resume at its __EXCEPT, as
++     * handle_syscall_fault does on the signal path. Without this the fault, which
++     * arrives here and never as a BSD signal, was delivered on the guest stack
++     * ("no TEB owns sp ... BEST-EFFORT"), the syscall never returned properly and
++     * the thread ended on BRK #0x5a5a in syscall_dispatcher_return_slowpath
++     * (c000001D: Fallout: New Vegas, NtReadVirtualMemory on a freed buffer). Every
++     * __TRY in ntdll's unix code (buffer checks, NtRead/WriteVirtualMemory, ...)
++     * now behaves as it does on Linux. TEB and thread data are read through
++     * mach_vm_read_overwrite: this runs on the exception thread. */
++    if (exception == EXC_BAD_ACCESS
++        && !(rxb && pc >= rxb && pc < rxb + ios_jit_pool_size_global)
++        && !ios_jit_low_contains( pc ))
++    {
++        static int try_logs;
++        uint64_t cands[2] = { (uint64_t)thread_teb, state->__x[18] };
++        uint64_t fsp = arm_thread_state64_get_sp( *state );
++        int k;
++
++        for (k = 0; k < 2; k++)
++        {
++            uint64_t self = 0, kstack = 0, jmp = 0;
++            mach_vm_size_t got = 0;
++            struct ntdll_thread_data *td;
++
++            if (cands[k] < 0x10000 || (cands[k] & 0xfff)) continue;
++            if (mach_vm_read_overwrite( mach_task_self(), (mach_vm_address_t)(cands[k] + 0x30), 8,
++                                        (mach_vm_address_t)&self, &got ) != KERN_SUCCESS
++                || got != 8 || self != cands[k])
++                continue;
++            td = (struct ntdll_thread_data *)&((TEB *)(uintptr_t)cands[k])->GdiTebBatch;
++            if (mach_vm_read_overwrite( mach_task_self(), (mach_vm_address_t)(uintptr_t)&td->kernel_stack, 8,
++                                        (mach_vm_address_t)&kstack, &got ) != KERN_SUCCESS || got != 8)
++                continue;
++            if (mach_vm_read_overwrite( mach_task_self(), (mach_vm_address_t)(uintptr_t)&td->jmp_buf, 8,
++                                        (mach_vm_address_t)&jmp, &got ) != KERN_SUCCESS || got != 8)
++                continue;
++            if (!jmp || !kstack || fsp < kstack || fsp >= kstack + kernel_stack_size) break;
++            td->jmp_buf = NULL;
++            state->__x[0] = jmp;
++            state->__x[1] = 1;
++            __darwin_arm_thread_state64_set_pc_fptr( state, (void *)longjmp );
++            if (try_logs < 16)
++            {
++                try_logs++;
++                dprintf( 2, "[unix-try] fault pc=0x%llx addr=0x%llx in a system call's __TRY: "
++                            "resumed at its __EXCEPT (teb=0x%llx)\n",
++                         (unsigned long long)pc, (unsigned long long)fault_addr, (unsigned long long)cands[k] );
++            }
++            return 1;
++        }
++    }
++
+     /* Pick the faulting thread's TEB by STACK CONTAINMENT, not by
+      * self-consistency alone.
+      *

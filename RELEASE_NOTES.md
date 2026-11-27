@@ -31,5 +31,23 @@
 ### Stores
 - A shared StoreProvider for Steam, GOG, Epic Games, the EA app and Ubisoft Connect: one interface for sign-in, owned games, install state, downloads (queued, running, paused, failed), install, pause, resume, stop, uninstall and refresh. The Resource Governor, the memory log and Bugs & logs use it. "Clear logs" now also waits for the EA app's and Ubisoft's downloads, which it did not count before. The bug report lists each store's sign-in, games and downloads (counts only).
 
+### Madeira, FEX, ARM64EC and WoW64
+- A fault inside a system call that is guarded on the Unix side (`__TRY`, as in the buffer checks and NtReadVirtualMemory) now resumes at the guard on iOS, as it does on Linux. Such faults arrive as Mach exceptions and were delivered on the game's own stack instead, so the system call never returned properly and the game ended with 0xC000001D. This is the general fix behind the Fallout: New Vegas one above.
+
+### iOS System Libraries
+- Full audit in docs/ios-system-libraries.md:
+  - every framework iDeck does not import has a decision and a reason (used through Madeira, worth adopting, or not applicable);
+  - CoreLocation, StoreKit and JavaScriptCore were evaluated by name and are not needed;
+  - Madeira's link line is audited: its frameworks, system libraries and the static archives it is built from;
+  - real use is measured: how many identifiers of each framework iDeck's code names, with the most used;
+  - frameworks that could be removed (imported but unused) are listed: none today;
+  - coverage is given both for iDeck's own code and with Madeira's frameworks.
+- AuthenticationServices (store sign-ins) and QuickLook (log previews) are the two candidates to adopt. IOKit is marked as not public: only the existing uses remain.
+
+### Graphics
+- MetalFX: the upscale factor now fits both sides of the screen. A 4:3 game on an iPhone was enlarged by its long side only, beyond the screen's height, so MetalFX drew pixels that were then thrown away.
+- Direct3D: a game able to use Direct3D 11 and 12 (Unity and Unreal engines) whose Direct3D 12 session crashed or caused GPU errors starts on Direct3D 11 (DXMT) from the next launch. The session's message says so.
+- Shaders: the shader cache is capped at 64 MB instead of 128 MB when less than 4 GB of storage is free or the GPU domain is on Economy.
+
 ### Version
 - Updated the application version to 3.0.1 (build 130).

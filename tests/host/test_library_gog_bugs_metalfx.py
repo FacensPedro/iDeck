@@ -107,7 +107,7 @@ class MetalFXTests(unittest.TestCase):
 
     def test_metalfx_factor_matches_dxmt_range(self):
         env = read("iDeck/WindowsEnvironment.swift")
-        self.assertIn("let factor = min(Double(screenLongSide) / max(width, height), 2.0)", env)
+        self.assertIn("var factor = min(Double(screenLongSide) / max(width, height), 2.0)", env)
         self.assertIn("return factor >= 1.1 ?", env)
 
 

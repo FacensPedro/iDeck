@@ -142,3 +142,38 @@ class ResourceGovernorDomains(unittest.TestCase):
                       read("iDeck/Runtime/Resources/ResourceGovernor+Background.swift"))
         self.assertIn("ResourceDomains.sessionEnded()", read("iDeck/ResourceGovernor.swift"))
         self.assertIn("ResourceLevelPicker(domain: domain)", read("iDeck/Presentation/Settings/SettingsView+System.swift"))
+
+
+class UnixTryThroughMach(unittest.TestCase):
+    def test_patch_resumes_at_except(self):
+        self.assertIn("early     .      madeira-unix-try-mach-fault.patch", read("patches/series.txt"))
+        patch = read("patches/madeira-unix-try-mach-fault.patch")
+        self.assertIn("+++ b/build/ntdll-unix/signal_arm64_ios.c", patch)
+        self.assertIn("+            __darwin_arm_thread_state64_set_pc_fptr( state, (void *)longjmp );", patch)
+        self.assertIn("+            td->jmp_buf = NULL;", patch)
+        self.assertIn("fsp >= kstack + kernel_stack_size", patch)
+
+
+class SystemLibrariesAudit(unittest.TestCase):
+    def test_audit_sections(self):
+        import json
+        data = json.loads(read("docs/ios-system-libraries.json"))
+        self.assertEqual(set(data["audit"]["evaluated_by_name"]), {"CoreLocation", "StoreKit", "JavaScriptCore"})
+        self.assertIn("IOKit", data["audit"]["madeira_link"]["frameworks"])
+        self.assertIn("libFEXCore.a", data["audit"]["madeira_link"]["static_archives"])
+        self.assertEqual(data["audit"]["unreviewed"], [])
+        self.assertIn("coverage_with_madeira_percent", data["summary"])
+        self.assertTrue(all("api_symbols" in row for row in data["frameworks"]))
+
+
+class GraphicsImprovements(unittest.TestCase):
+    def test_metalfx_short_side_and_d3d12_fallback_and_cache(self):
+        prof = read("iDeck/Runtime/WindowsEnvironment+Profile.swift")
+        self.assertIn("if screenShortSide > 0 { factor = min(factor, Double(screenShortSide) / min(width, height)) }", prof)
+        gfx = read("iDeck/Runtime/WindowsEnvironment+Graphics.swift")
+        self.assertIn("enum D3D12Fallback", gfx)
+        self.assertIn("if D3D12Fallback.isOn(binary), let argument = Self.engineAPIArgument(binary: binary, preferD3D12: false)", gfx)
+        end = read("iDeck/Application/SystemCoordinator+SessionEnd.swift")
+        self.assertIn("D3D12Fallback.note(program, loadedD3D12:", end)
+        env = read("iDeck/WindowsEnvironment.swift")
+        self.assertIn('setenv("DXMT_SHADER_CACHE_MAX_MB", small ? "64" : "128", 1)', env)

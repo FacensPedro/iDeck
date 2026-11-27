@@ -120,7 +120,8 @@ extension WindowsEnvironment {
         }
 
         sessionMetalFXFactor = metalFXOn
-            ? Self.metalFXFactor(resolution: resolution, screenLongSide: max(screen.width, screen.height))
+            ? Self.metalFXFactor(resolution: resolution, screenLongSide: max(screen.width, screen.height),
+                                 screenShortSide: min(screen.width, screen.height))
             : nil
         if let factor = sessionMetalFXFactor {
             // DXMT only builds its MetalFX swapchain when this is set.
@@ -242,11 +243,15 @@ extension WindowsEnvironment {
     /// a screen whose long side is `screenLongSide` pixels. DXMT and
     /// madeira-d3d12 accept 1 to 2; below 1.1 upscaling only costs GPU time,
     /// so it is off (nil), as it is for "Device native".
-    static func metalFXFactor(resolution: String, screenLongSide: CGFloat) -> Double? {
+    /// 3.0.1: the short sides are compared too. A 4:3 game (1024x768) on a 19.5:9
+    /// iPhone was enlarged by its long side alone, 2x to 2048x1536, taller than the
+    /// 1179-pixel screen: MetalFX drew pixels the screen then shrank away again.
+    static func metalFXFactor(resolution: String, screenLongSide: CGFloat, screenShortSide: CGFloat = 0) -> Double? {
         let parts = resolution.split(separator: "x")
         guard parts.count == 2, let width = Double(parts[0]), let height = Double(parts[1]),
               width > 0, height > 0, screenLongSide > 0 else { return nil }
-        let factor = min(Double(screenLongSide) / max(width, height), 2.0)
+        var factor = min(Double(screenLongSide) / max(width, height), 2.0)
+        if screenShortSide > 0 { factor = min(factor, Double(screenShortSide) / min(width, height)) }
         return factor >= 1.1 ? (factor * 100).rounded(.down) / 100 : nil
     }
 }

@@ -70,6 +70,12 @@ extension WindowsEnvironment {
             return []
         }
         guard !d3d12Available else {
+            // A game whose Direct3D 12 session failed (a crash, GPU errors) and that has
+            // an engine switch runs on Direct3D 11 (DXMT) from then on.
+            if D3D12Fallback.isOn(binary), let argument = Self.engineAPIArgument(binary: binary, preferD3D12: false) {
+                SteamLog.event("[graphics] automatic: Direct3D 11 (DXMT), passing \(argument): its Direct3D 12 session failed before")
+                return [argument]
+            }
             SteamLog.event("[graphics] automatic: the game chooses between Direct3D 11 and 12; both are available")
             return []
         }
@@ -275,5 +281,33 @@ extension WindowsEnvironment {
                 SteamLog.event("[firefox] could not write user.js: \(error.localizedDescription)")
             }
         }
+    }
+}
+
+/// Games able to use Direct3D 11 and 12 whose Direct3D 12 session (madeira-d3d12)
+/// failed: their engine switch selects Direct3D 11 (DXMT) at every later launch. Kept by
+/// program path (the last 64), in UserDefaults under `key`.
+enum D3D12Fallback {
+    static let key = "graphics.d3d12Fallback.v1"
+    /// The Wine log line of a session that loaded Direct3D 12 (trace+loaddll), lower-cased.
+    static let loadedMarker = "d3d12.dll\" at"
+
+    static func isOn(_ binary: URL) -> Bool {
+        (UserDefaults.standard.stringArray(forKey: key) ?? []).contains(binary.path)
+    }
+
+    /// After a failed session: records the program when it can use both APIs, ran on
+    /// Direct3D 12 and has a switch to leave it. Returns whether it was recorded now.
+    @discardableResult
+    static func note(_ binary: URL, loadedD3D12: Bool) -> Bool {
+        guard loadedD3D12, !isOn(binary) else { return false }
+        let bits = WindowsEnvironment.graphicsAPIs(of: binary)
+        guard bits & UInt32(IDECK_API_D3D11) != 0, bits & UInt32(IDECK_API_D3D12) != 0,
+              WindowsEnvironment.engineAPIArgument(binary: binary, preferD3D12: false) != nil else { return false }
+        var list = UserDefaults.standard.stringArray(forKey: key) ?? []
+        list.append(binary.path)
+        UserDefaults.standard.set(Array(list.suffix(64)), forKey: key)
+        SteamLog.event("[graphics] \(binary.lastPathComponent): its Direct3D 12 session failed; Direct3D 11 (DXMT) from the next launch")
+        return true
     }
 }

@@ -1,6 +1,82 @@
 {
+  "audit": {
+    "candidates": [
+      "QuickLook",
+      "AuthenticationServices"
+    ],
+    "evaluated_by_name": {
+      "CoreLocation": {
+        "decision": "not applicable",
+        "reason": "Nothing in iDeck has a place; asking for location only to stay awake would be rejected and drains the battery."
+      },
+      "JavaScriptCore": {
+        "decision": "not applicable",
+        "reason": "Store sign-ins run in Safari; without JIT a script engine would only slow the few pages iDeck reads, which are parsed as JSON."
+      },
+      "StoreKit": {
+        "decision": "not applicable",
+        "reason": "iDeck sells nothing and is installed outside the App Store: no purchases, no review prompt."
+      }
+    },
+    "madeira_link": {
+      "frameworks": [
+        "AVFoundation",
+        "AudioToolbox",
+        "CoreFoundation",
+        "CoreHaptics",
+        "CoreMedia",
+        "CoreVideo",
+        "GameController",
+        "IOKit",
+        "IOSurface",
+        "ImageIO",
+        "Metal",
+        "MetalFX",
+        "OpenGLES",
+        "QuartzCore",
+        "VideoToolbox"
+      ],
+      "frameworks_not_catalogued": [],
+      "static_archives": [
+        "libFEXCore.a",
+        "libFEXCore_Base.a",
+        "libJemallocLibs.a",
+        "libavcodec.a",
+        "libavformat.a",
+        "libavutil.a",
+        "libcephes_128bit.a",
+        "libdxmt_combined.a",
+        "libfmt.a",
+        "libgmp.a",
+        "libgnutls.a",
+        "libhogweed.a",
+        "libideck_madeira_upstream_bridges.a",
+        "libnettle.a",
+        "libntdll_unix.a",
+        "libsoftfloat_3e.a",
+        "libswresample.a",
+        "libwin32u_unix.a",
+        "libwineserver.a",
+        "libwineserver_ideck_link.a",
+        "libxxhash.a"
+      ],
+      "system_libraries": [
+        "c++",
+        "curses",
+        "lzma",
+        "sqlite3",
+        "xml2",
+        "z"
+      ]
+    },
+    "removable": [],
+    "unreviewed": []
+  },
   "frameworks": [
     {
+      "api_symbols": 3,
+      "audit": "direct",
+      "audit_note": "",
       "examples": [
         "iDeck/AudioManager.swift",
         "iDeck/ResourceGovernor.swift",
@@ -9,56 +85,96 @@
       "files": 4,
       "framework": "AVFoundation",
       "group": "Audio & video",
+      "linked_by_madeira": true,
       "minimum_ios": "2.2",
       "status": "public",
-      "used": true
+      "top_api": [
+        "AVAudioSession",
+        "AVFoundation",
+        "AVAudioSessionPortDescription"
+      ],
+      "used": true,
+      "used_via": "iDeck + Madeira"
     },
     {
+      "api_symbols": 0,
+      "audit": "not applicable",
+      "audit_note": "iDeck plays no video of its own; games' video goes through Wine and FFmpeg.",
       "examples": [],
       "files": 0,
       "framework": "AVKit",
       "group": "Audio & video",
+      "linked_by_madeira": false,
       "minimum_ios": "8.0",
       "status": "public",
-      "used": false
+      "top_api": [],
+      "used": false,
+      "used_via": "none"
     },
     {
+      "api_symbols": 0,
+      "audit": "indirect",
+      "audit_note": "Madeira's audio driver (Audio Units) for Wine's sound.",
       "examples": [],
       "files": 0,
       "framework": "AudioToolbox",
       "group": "Audio & video",
+      "linked_by_madeira": true,
       "minimum_ios": "2.0",
       "status": "public",
-      "used": false
+      "top_api": [],
+      "used": false,
+      "used_via": "Madeira"
     },
     {
+      "api_symbols": 0,
+      "audit": "indirect",
+      "audit_note": "Audio types under AudioToolbox, through Madeira.",
       "examples": [],
       "files": 0,
       "framework": "CoreAudio",
       "group": "Audio & video",
+      "linked_by_madeira": false,
       "minimum_ios": "2.0",
       "status": "public",
-      "used": false
+      "top_api": [],
+      "used": false,
+      "used_via": "none"
     },
     {
+      "api_symbols": 0,
+      "audit": "indirect",
+      "audit_note": "Madeira's video decoding path (sample buffers).",
       "examples": [],
       "files": 0,
       "framework": "CoreMedia",
       "group": "Audio & video",
+      "linked_by_madeira": true,
       "minimum_ios": "4.0",
       "status": "public",
-      "used": false
+      "top_api": [],
+      "used": false,
+      "used_via": "Madeira"
     },
     {
+      "api_symbols": 0,
+      "audit": "indirect",
+      "audit_note": "Hardware video decoding for games' cutscenes, through Madeira.",
       "examples": [],
       "files": 0,
       "framework": "VideoToolbox",
       "group": "Audio & video",
+      "linked_by_madeira": true,
       "minimum_ios": "8.0",
       "status": "public",
-      "used": false
+      "top_api": [],
+      "used": false,
+      "used_via": "Madeira"
     },
     {
+      "api_symbols": 3,
+      "audit": "direct",
+      "audit_note": "",
       "examples": [
         "iDeck/GameSessionView.swift",
         "iDeck/NativeRuntime/WineMono.swift",
@@ -67,29 +183,51 @@
       "files": 4,
       "framework": "Combine",
       "group": "Core System",
+      "linked_by_madeira": false,
       "minimum_ios": "13.0",
       "status": "public",
-      "used": true
+      "top_api": [
+        "Published",
+        "sink",
+        "ObservableObject"
+      ],
+      "used": true,
+      "used_via": "iDeck"
     },
     {
+      "api_symbols": 0,
+      "audit": "indirect",
+      "audit_note": "Bridged everywhere through Foundation; linked by Madeira.",
       "examples": [],
       "files": 0,
       "framework": "CoreFoundation",
       "group": "Core System",
+      "linked_by_madeira": true,
       "minimum_ios": "2.0",
       "status": "public",
-      "used": false
+      "top_api": [],
+      "used": false,
+      "used_via": "Madeira"
     },
     {
+      "api_symbols": 0,
+      "audit": "not applicable",
+      "audit_note": "UniformTypeIdentifiers replaces its type functions.",
       "examples": [],
       "files": 0,
       "framework": "CoreServices",
       "group": "Core System",
+      "linked_by_madeira": false,
       "minimum_ios": "12.0",
       "status": "public (MobileCoreServices on older)",
-      "used": false
+      "top_api": [],
+      "used": false,
+      "used_via": "none"
     },
     {
+      "api_symbols": 44,
+      "audit": "direct",
+      "audit_note": "",
       "examples": [
         "iDeck/Application/SystemCoordinator+Diagnostics.swift",
         "iDeck/Application/SystemCoordinator+Dock.swift",
@@ -98,11 +236,23 @@
       "files": 37,
       "framework": "Darwin",
       "group": "Core System",
+      "linked_by_madeira": false,
       "minimum_ios": "2.0",
       "status": "public (libSystem)",
-      "used": true
+      "top_api": [
+        "vm_address_t",
+        "setenv",
+        "mach_task_self_",
+        "vm_size_t",
+        "unsetenv"
+      ],
+      "used": true,
+      "used_via": "iDeck"
     },
     {
+      "api_symbols": 21,
+      "audit": "direct",
+      "audit_note": "",
       "examples": [
         "iDeck/NativeRuntime/DirectInputBridge.mm",
         "iDeck/NativeRuntime/MadeiraRuntimeBridge.mm",
@@ -111,11 +261,40 @@
       "files": 3,
       "framework": "Dispatch",
       "group": "Core System",
+      "linked_by_madeira": false,
       "minimum_ios": "4.0",
       "status": "public",
-      "used": true
+      "top_api": [
+        "DispatchQueue",
+        "dispatch_get_main_queue",
+        "dispatch_async",
+        "DispatchSource",
+        "DispatchSemaphore"
+      ],
+      "used": true,
+      "used_via": "iDeck"
     },
     {
+      "api_symbols": 0,
+      "audit": "direct (dlopen)",
+      "audit_note": "The built-in JIT host's extension, loaded by name.",
+      "examples": [
+        "iDeck/NativeRuntime/JITBuiltInHost.swift"
+      ],
+      "files": 1,
+      "framework": "ExtensionFoundation",
+      "group": "Core System",
+      "linked_by_madeira": false,
+      "minimum_ios": "26.0",
+      "status": "public (app extensions)",
+      "top_api": [],
+      "used": true,
+      "used_via": "iDeck"
+    },
+    {
+      "api_symbols": 69,
+      "audit": "direct",
+      "audit_note": "",
       "examples": [
         "iDeck/Application/SessionLifecycle.swift",
         "iDeck/Application/SystemCoordinator+Diagnostics.swift",
@@ -124,31 +303,75 @@
       "files": 137,
       "framework": "Foundation",
       "group": "Core System",
+      "linked_by_madeira": false,
       "minimum_ios": "2.0",
       "status": "public",
-      "used": true
+      "top_api": [
+        "URL",
+        "Data",
+        "FileManager",
+        "Date",
+        "UserDefaults"
+      ],
+      "used": true,
+      "used_via": "iDeck"
     },
     {
+      "api_symbols": 0,
+      "audit": "not applicable",
+      "audit_note": "Store sign-ins run in Safari; without JIT a script engine would only slow the few pages iDeck reads, which are parsed as JSON.",
+      "examples": [],
+      "files": 0,
+      "framework": "JavaScriptCore",
+      "group": "Core System",
+      "linked_by_madeira": false,
+      "minimum_ios": "7.0",
+      "status": "public (no JIT in third-party apps)",
+      "top_api": [],
+      "used": false,
+      "used_via": "none"
+    },
+    {
+      "api_symbols": 4,
+      "audit": "direct",
+      "audit_note": "",
       "examples": [
         "iDeck/NativeRuntime/IOSCrashDiagnostics.swift"
       ],
       "files": 1,
       "framework": "MachO",
       "group": "Core System",
+      "linked_by_madeira": false,
       "minimum_ios": "2.0",
       "status": "public (libSystem)",
-      "used": true
+      "top_api": [
+        "mach_header",
+        "_dyld_get_image_header",
+        "_dyld_image_count",
+        "mach_header_64"
+      ],
+      "used": true,
+      "used_via": "iDeck"
     },
     {
+      "api_symbols": 0,
+      "audit": "not applicable",
+      "audit_note": "Network reachability is watched with Network (NWPathMonitor).",
       "examples": [],
       "files": 0,
       "framework": "SystemConfiguration",
       "group": "Core System",
+      "linked_by_madeira": false,
       "minimum_ios": "2.0",
       "status": "public",
-      "used": false
+      "top_api": [],
+      "used": false,
+      "used_via": "none"
     },
     {
+      "api_symbols": 2,
+      "audit": "direct",
+      "audit_note": "",
       "examples": [
         "iDeck/MadeiraJIT/MadeiraWinePool.swift",
         "iDeck/NativeRuntime/InterfaceOnlyStubs.c",
@@ -157,11 +380,20 @@
       "files": 3,
       "framework": "os",
       "group": "Core System",
+      "linked_by_madeira": false,
       "minimum_ios": "10.0",
       "status": "public",
-      "used": true
+      "top_api": [
+        "os_proc_available_memory",
+        "os_log_with_type"
+      ],
+      "used": true,
+      "used_via": "iDeck"
     },
     {
+      "api_symbols": 5,
+      "audit": "direct",
+      "audit_note": "",
       "examples": [
         "iDeck/NativeRuntime/WineMono.swift",
         "iDeck/PrefixInstaller.swift",
@@ -170,60 +402,108 @@
       "files": 6,
       "framework": "Compression",
       "group": "Files & storage",
+      "linked_by_madeira": false,
       "minimum_ios": "9.0",
       "status": "public",
-      "used": true
+      "top_api": [
+        "compression_stream",
+        "compression_decode_buffer",
+        "compression_stream_destroy",
+        "compression_stream_init",
+        "compression_stream_process"
+      ],
+      "used": true,
+      "used_via": "iDeck"
     },
     {
+      "api_symbols": 0,
+      "audit": "not applicable",
+      "audit_note": "Libraries and settings are JSON and UserDefaults; logs and caches use SQLite directly.",
       "examples": [],
       "files": 0,
       "framework": "CoreData",
       "group": "Files & storage",
+      "linked_by_madeira": false,
       "minimum_ios": "3.0",
       "status": "public",
-      "used": false
+      "top_api": [],
+      "used": false,
+      "used_via": "none"
     },
     {
+      "api_symbols": 3,
+      "audit": "direct",
+      "audit_note": "",
       "examples": [
         "iDeck/WineLogClipboard.swift"
       ],
       "files": 1,
       "framework": "CoreTransferable",
       "group": "Files & storage",
+      "linked_by_madeira": false,
       "minimum_ios": "16.0",
       "status": "public",
-      "used": true
+      "top_api": [
+        "FileRepresentation",
+        "TransferRepresentation",
+        "Transferable"
+      ],
+      "used": true,
+      "used_via": "iDeck"
     },
     {
+      "api_symbols": 0,
+      "audit": "not applicable",
+      "audit_note": "Files reach iDeck through the Files app's folder and the document picker.",
       "examples": [],
       "files": 0,
       "framework": "FileProvider",
       "group": "Files & storage",
+      "linked_by_madeira": false,
       "minimum_ios": "11.0",
       "status": "public",
-      "used": false
+      "top_api": [],
+      "used": false,
+      "used_via": "none"
     },
     {
+      "api_symbols": 0,
+      "audit": "candidate",
+      "audit_note": "Previewing logs and bug reports before they are shared.",
       "examples": [],
       "files": 0,
       "framework": "QuickLook",
       "group": "Files & storage",
+      "linked_by_madeira": false,
       "minimum_ios": "4.0",
       "status": "public",
-      "used": false
+      "top_api": [],
+      "used": false,
+      "used_via": "none"
     },
     {
+      "api_symbols": 1,
+      "audit": "direct",
+      "audit_note": "",
       "examples": [
         "iDeck/iDeckApp.swift"
       ],
       "files": 1,
       "framework": "SQLite",
       "group": "Files & storage",
+      "linked_by_madeira": false,
       "minimum_ios": "2.0",
       "status": "public (libsqlite3)",
-      "used": true
+      "top_api": [
+        "sqlite3_soft_heap_limit64"
+      ],
+      "used": true,
+      "used_via": "iDeck"
     },
     {
+      "api_symbols": 1,
+      "audit": "direct",
+      "audit_note": "",
       "examples": [
         "iDeck/ExternalDrives.swift",
         "iDeck/MainView.swift",
@@ -232,80 +512,142 @@
       "files": 4,
       "framework": "UniformTypeIdentifiers",
       "group": "Files & storage",
+      "linked_by_madeira": false,
       "minimum_ios": "14.0",
       "status": "public",
-      "used": true
+      "top_api": [
+        "UTType"
+      ],
+      "used": true,
+      "used_via": "iDeck"
     },
     {
+      "api_symbols": 0,
+      "audit": "not applicable",
+      "audit_note": "No signal or image maths on the CPU; the GPU does it.",
       "examples": [],
       "files": 0,
       "framework": "Accelerate",
       "group": "Graphics",
+      "linked_by_madeira": false,
       "minimum_ios": "4.0",
       "status": "public",
-      "used": false
+      "top_api": [],
+      "used": false,
+      "used_via": "none"
     },
     {
+      "api_symbols": 3,
+      "audit": "direct",
+      "audit_note": "",
       "examples": [
         "iDeck/RuntimeConfiguration.swift"
       ],
       "files": 1,
       "framework": "CoreGraphics",
       "group": "Graphics",
+      "linked_by_madeira": false,
       "minimum_ios": "2.0",
       "status": "public",
-      "used": true
+      "top_api": [
+        "CGSize",
+        "CGPoint",
+        "CGRect"
+      ],
+      "used": true,
+      "used_via": "iDeck"
     },
     {
+      "api_symbols": 4,
+      "audit": "direct",
+      "audit_note": "",
       "examples": [
         "iDeck/SwiftSteam/Auth/SteamQRAuth.swift"
       ],
       "files": 1,
       "framework": "CoreImage",
       "group": "Graphics",
+      "linked_by_madeira": false,
       "minimum_ios": "5.0",
       "status": "public",
-      "used": true
+      "top_api": [
+        "CIContext",
+        "CIFilter",
+        "CIImage",
+        "CIQRCodeGenerator"
+      ],
+      "used": true,
+      "used_via": "iDeck"
     },
     {
+      "api_symbols": 0,
+      "audit": "not applicable",
+      "audit_note": "Wine draws its fonts with FreeType; SwiftUI draws iDeck's text.",
       "examples": [],
       "files": 0,
       "framework": "CoreText",
       "group": "Graphics",
+      "linked_by_madeira": false,
       "minimum_ios": "3.2",
       "status": "public",
-      "used": false
+      "top_api": [],
+      "used": false,
+      "used_via": "none"
     },
     {
+      "api_symbols": 0,
+      "audit": "indirect",
+      "audit_note": "Pixel buffers between Madeira's video decode and Metal.",
       "examples": [],
       "files": 0,
       "framework": "CoreVideo",
       "group": "Graphics",
+      "linked_by_madeira": true,
       "minimum_ios": "4.0",
       "status": "public",
-      "used": false
+      "top_api": [],
+      "used": false,
+      "used_via": "Madeira"
     },
     {
+      "api_symbols": 0,
+      "audit": "indirect",
+      "audit_note": "The OpenGL (Zink) runtime's frame surfaces, through Madeira.",
       "examples": [],
       "files": 0,
       "framework": "IOSurface",
       "group": "Graphics",
+      "linked_by_madeira": true,
       "minimum_ios": "11.0",
       "status": "public",
-      "used": false
+      "top_api": [],
+      "used": false,
+      "used_via": "Madeira"
     },
     {
+      "api_symbols": 2,
+      "audit": "direct",
+      "audit_note": "",
       "examples": [
         "iDeck/WindowsLibraryModels.swift"
       ],
       "files": 1,
       "framework": "ImageIO",
       "group": "Graphics",
+      "linked_by_madeira": true,
       "minimum_ios": "4.0",
       "status": "public",
-      "used": true
+      "top_api": [
+        "CGImageSourceCreateImageAtIndex",
+        "CGImageSourceCreateWithData"
+      ],
+      "used": true,
+      "used_via": "iDeck + Madeira"
     },
     {
+      "api_symbols": 3,
+      "audit": "direct",
+      "audit_note": "",
       "examples": [
         "iDeck/GameSessionView.swift",
         "iDeck/NativeRuntime/Bridges/BenchmarkBridge.mm",
@@ -314,47 +656,81 @@
       "files": 6,
       "framework": "Metal",
       "group": "Graphics",
+      "linked_by_madeira": true,
       "minimum_ios": "8.0",
       "status": "public",
-      "used": true
+      "top_api": [
+        "MTLCreateSystemDefaultDevice",
+        "MTLDevice",
+        "MTLGPUFamilyApple7"
+      ],
+      "used": true,
+      "used_via": "iDeck + Madeira"
     },
     {
+      "api_symbols": 0,
+      "audit": "indirect",
+      "audit_note": "DXMT's and madeira-d3d12's spatial upscaler and frame generation.",
       "examples": [],
       "files": 0,
       "framework": "MetalFX",
       "group": "Graphics",
+      "linked_by_madeira": true,
       "minimum_ios": "16.0",
       "status": "public",
-      "used": false
+      "top_api": [],
+      "used": false,
+      "used_via": "Madeira"
     },
     {
+      "api_symbols": 0,
+      "audit": "not applicable",
+      "audit_note": "Madeira presents through CAMetalLayer directly.",
       "examples": [],
       "files": 0,
       "framework": "MetalKit",
       "group": "Graphics",
+      "linked_by_madeira": false,
       "minimum_ios": "9.0",
       "status": "public",
-      "used": false
+      "top_api": [],
+      "used": false,
+      "used_via": "none"
     },
     {
+      "api_symbols": 0,
+      "audit": "not applicable",
+      "audit_note": "No compute kernels outside the games' own shaders.",
       "examples": [],
       "files": 0,
       "framework": "MetalPerformanceShaders",
       "group": "Graphics",
+      "linked_by_madeira": false,
       "minimum_ios": "9.0",
       "status": "public",
-      "used": false
+      "top_api": [],
+      "used": false,
+      "used_via": "none"
     },
     {
+      "api_symbols": 0,
+      "audit": "indirect",
+      "audit_note": "Madeira's GLES fallback for OpenGL games without Zink (deprecated by Apple).",
       "examples": [],
       "files": 0,
       "framework": "OpenGLES",
       "group": "Graphics",
+      "linked_by_madeira": true,
       "minimum_ios": "2.0",
       "status": "public, deprecated",
-      "used": false
+      "top_api": [],
+      "used": false,
+      "used_via": "Madeira"
     },
     {
+      "api_symbols": 3,
+      "audit": "direct",
+      "audit_note": "",
       "examples": [
         "iDeck/NativeRuntime/WindowsRendererView.swift",
         "iDeck/SystemCoordinator.swift"
@@ -362,11 +738,21 @@
       "files": 2,
       "framework": "QuartzCore",
       "group": "Graphics",
+      "linked_by_madeira": true,
       "minimum_ios": "2.0",
       "status": "public (Core Animation)",
-      "used": true
+      "top_api": [
+        "CAMetalLayer",
+        "CADisplayLink",
+        "CAFrameRateRange"
+      ],
+      "used": true,
+      "used_via": "iDeck + Madeira"
     },
     {
+      "api_symbols": 20,
+      "audit": "direct",
+      "audit_note": "",
       "examples": [
         "iDeck/ArtworkLoader.swift",
         "iDeck/BugReportView.swift",
@@ -375,11 +761,23 @@
       "files": 50,
       "framework": "SwiftUI",
       "group": "Interface",
+      "linked_by_madeira": false,
       "minimum_ios": "13.0",
       "status": "public",
-      "used": true
+      "top_api": [
+        "Text",
+        "View",
+        "Button",
+        "State",
+        "VStack"
+      ],
+      "used": true,
+      "used_via": "iDeck"
     },
     {
+      "api_symbols": 17,
+      "audit": "direct",
+      "audit_note": "",
       "examples": [
         "iDeck/Application/SystemCoordinator+Diagnostics.swift",
         "iDeck/Application/SystemCoordinator+JIT.swift",
@@ -388,38 +786,68 @@
       "files": 34,
       "framework": "UIKit",
       "group": "Interface",
+      "linked_by_madeira": false,
       "minimum_ios": "2.0",
       "status": "public",
-      "used": true
+      "top_api": [
+        "UIKit",
+        "UIApplication",
+        "UIImage",
+        "UIView",
+        "UITouch"
+      ],
+      "used": true,
+      "used_via": "iDeck"
     },
     {
+      "api_symbols": 0,
+      "audit": "not applicable",
+      "audit_note": "URLSession (Foundation) covers every download.",
       "examples": [],
       "files": 0,
       "framework": "CFNetwork",
       "group": "Network",
+      "linked_by_madeira": false,
       "minimum_ios": "2.0",
       "status": "public",
-      "used": false
+      "top_api": [],
+      "used": false,
+      "used_via": "none"
     },
     {
+      "api_symbols": 0,
+      "audit": "not applicable",
+      "audit_note": "Store achievements are kept by the stores, not Game Center.",
       "examples": [],
       "files": 0,
       "framework": "GameKit",
       "group": "Network",
+      "linked_by_madeira": false,
       "minimum_ios": "3.0",
       "status": "public",
-      "used": false
+      "top_api": [],
+      "used": false,
+      "used_via": "none"
     },
     {
+      "api_symbols": 0,
+      "audit": "not applicable",
+      "audit_note": "Steam's LAN transfers use the network directly.",
       "examples": [],
       "files": 0,
       "framework": "MultipeerConnectivity",
       "group": "Network",
+      "linked_by_madeira": false,
       "minimum_ios": "7.0",
       "status": "public",
-      "used": false
+      "top_api": [],
+      "used": false,
+      "used_via": "none"
     },
     {
+      "api_symbols": 6,
+      "audit": "direct",
+      "audit_note": "",
       "examples": [
         "iDeck/UbisoftDownloader.swift",
         "iDeck/Vendor/Madeira/MadeiraDock.swift"
@@ -427,29 +855,53 @@
       "files": 2,
       "framework": "Network",
       "group": "Network",
+      "linked_by_madeira": false,
       "minimum_ios": "12.0",
       "status": "public",
-      "used": true
+      "top_api": [
+        "NWConnection",
+        "NWEndpoint",
+        "NWParameters",
+        "NWPathMonitor",
+        "NWProtocolIP"
+      ],
+      "used": true,
+      "used_via": "iDeck"
     },
     {
+      "api_symbols": 0,
+      "audit": "not applicable",
+      "audit_note": "LocalDevVPN is a separate app; iDeck only checks the tunnel.",
       "examples": [],
       "files": 0,
       "framework": "NetworkExtension",
       "group": "Network",
+      "linked_by_madeira": false,
       "minimum_ios": "8.0",
       "status": "public, entitlement",
-      "used": false
+      "top_api": [],
+      "used": false,
+      "used_via": "none"
     },
     {
+      "api_symbols": 0,
+      "audit": "candidate",
+      "audit_note": "ASWebAuthenticationSession for store sign-ins that now open Safari.",
       "examples": [],
       "files": 0,
       "framework": "AuthenticationServices",
       "group": "Security",
+      "linked_by_madeira": false,
       "minimum_ios": "12.0",
       "status": "public",
-      "used": false
+      "top_api": [],
+      "used": false,
+      "used_via": "none"
     },
     {
+      "api_symbols": 9,
+      "audit": "direct",
+      "audit_note": "",
       "examples": [
         "iDeck/NativeRuntime/Bridges/EpicChunkCodec.cpp",
         "iDeck/NativeRuntime/Bridges/SteamNativeCore.c",
@@ -458,11 +910,23 @@
       "files": 4,
       "framework": "CommonCrypto",
       "group": "Security",
+      "linked_by_madeira": false,
       "minimum_ios": "2.0",
       "status": "public (libSystem)",
-      "used": true
+      "top_api": [
+        "CC_LONG",
+        "CC_SHA1_DIGEST_LENGTH",
+        "CCCrypt",
+        "CC_SHA1",
+        "CC_SHA1_CTX"
+      ],
+      "used": true,
+      "used_via": "iDeck"
     },
     {
+      "api_symbols": 5,
+      "audit": "direct",
+      "audit_note": "",
       "examples": [
         "iDeck/EALibrary.swift",
         "iDeck/EpicAPI.swift",
@@ -471,20 +935,38 @@
       "files": 15,
       "framework": "CryptoKit",
       "group": "Security",
+      "linked_by_madeira": false,
       "minimum_ios": "13.0",
       "status": "public",
-      "used": true
+      "top_api": [
+        "SHA256",
+        "AES",
+        "Insecure",
+        "HMAC",
+        "SymmetricKey"
+      ],
+      "used": true,
+      "used_via": "iDeck"
     },
     {
+      "api_symbols": 0,
+      "audit": "not applicable",
+      "audit_note": "Store tokens stay in the Keychain without a biometric gate.",
       "examples": [],
       "files": 0,
       "framework": "LocalAuthentication",
       "group": "Security",
+      "linked_by_madeira": false,
       "minimum_ios": "8.0",
       "status": "public",
-      "used": false
+      "top_api": [],
+      "used": false,
+      "used_via": "none"
     },
     {
+      "api_symbols": 27,
+      "audit": "direct",
+      "audit_note": "",
       "examples": [
         "iDeck/EpicAPI.swift",
         "iDeck/GOGLibrary.swift",
@@ -493,49 +975,105 @@
       "files": 8,
       "framework": "Security",
       "group": "Security",
+      "linked_by_madeira": false,
       "minimum_ios": "2.0",
       "status": "public",
-      "used": true
+      "top_api": [
+        "kSecAttrAccount",
+        "kSecAttrService",
+        "kSecClass",
+        "kSecClassGenericPassword",
+        "kSecValueData"
+      ],
+      "used": true,
+      "used_via": "iDeck"
     },
     {
+      "api_symbols": 4,
+      "audit": "direct",
+      "audit_note": "",
       "examples": [
         "iDeck/BackgroundDownloads.swift"
       ],
       "files": 1,
       "framework": "BackgroundTasks",
       "group": "System & devices",
+      "linked_by_madeira": false,
       "minimum_ios": "13.0",
       "status": "public",
-      "used": true
+      "top_api": [
+        "BGContinuedProcessingTask",
+        "BGTaskScheduler",
+        "BGContinuedProcessingTaskRequest",
+        "BGTaskSchedulerPermittedIdentifiers"
+      ],
+      "used": true,
+      "used_via": "iDeck"
     },
     {
+      "api_symbols": 0,
+      "audit": "indirect",
+      "audit_note": "Controller rumble and DualSense haptics, through Madeira.",
       "examples": [],
       "files": 0,
       "framework": "CoreHaptics",
       "group": "System & devices",
+      "linked_by_madeira": true,
       "minimum_ios": "13.0",
       "status": "public",
-      "used": false
+      "top_api": [],
+      "used": false,
+      "used_via": "Madeira"
     },
     {
+      "api_symbols": 0,
+      "audit": "not applicable",
+      "audit_note": "Nothing in iDeck has a place; asking for location only to stay awake would be rejected and drains the battery.",
+      "examples": [],
+      "files": 0,
+      "framework": "CoreLocation",
+      "group": "System & devices",
+      "linked_by_madeira": false,
+      "minimum_ios": "2.0",
+      "status": "public, permission",
+      "top_api": [],
+      "used": false,
+      "used_via": "none"
+    },
+    {
+      "api_symbols": 0,
+      "audit": "not applicable",
+      "audit_note": "Motion comes from controllers (GameController), not the device.",
       "examples": [],
       "files": 0,
       "framework": "CoreMotion",
       "group": "System & devices",
+      "linked_by_madeira": false,
       "minimum_ios": "4.0",
       "status": "public",
-      "used": false
+      "top_api": [],
+      "used": false,
+      "used_via": "none"
     },
     {
+      "api_symbols": 0,
+      "audit": "not applicable",
+      "audit_note": "MFi accessories are reached through GameController.",
       "examples": [],
       "files": 0,
       "framework": "ExternalAccessory",
       "group": "System & devices",
+      "linked_by_madeira": false,
       "minimum_ios": "3.0",
       "status": "public, MFi",
-      "used": false
+      "top_api": [],
+      "used": false,
+      "used_via": "none"
     },
     {
+      "api_symbols": 23,
+      "audit": "direct",
+      "audit_note": "",
       "examples": [
         "iDeck/InputManager.swift",
         "iDeck/NativeRuntime/DirectInputBridge.mm",
@@ -544,31 +1082,77 @@
       "files": 3,
       "framework": "GameController",
       "group": "System & devices",
+      "linked_by_madeira": true,
       "minimum_ios": "7.0",
       "status": "public",
-      "used": true
+      "top_api": [
+        "GCController",
+        "GCDualShockGamepad",
+        "GCDualSenseGamepad",
+        "GCControllerDirectionPad",
+        "GCControllerButtonInput"
+      ],
+      "used": true,
+      "used_via": "iDeck + Madeira"
     },
     {
-      "examples": [],
-      "files": 0,
+      "api_symbols": 0,
+      "audit": "indirect",
+      "audit_note": "Not public on iOS. Madeira links it for HID; iDeck dlopens it once (EA machine identity). Not to be extended.",
+      "examples": [
+        "iDeck/Vendor/Madeira/SwiftEA/EAAPI.swift"
+      ],
+      "files": 1,
       "framework": "IOKit",
       "group": "System & devices",
+      "linked_by_madeira": true,
       "minimum_ios": "-",
       "status": "not public on iOS: not to be used",
-      "used": false
+      "top_api": [],
+      "used": true,
+      "used_via": "iDeck + Madeira"
     },
     {
+      "api_symbols": 4,
+      "audit": "direct",
+      "audit_note": "",
       "examples": [
         "iDeck/NativeRuntime/IOSCrashDiagnostics.swift"
       ],
       "files": 1,
       "framework": "MetricKit",
       "group": "System & devices",
+      "linked_by_madeira": false,
       "minimum_ios": "13.0",
       "status": "public",
-      "used": true
+      "top_api": [
+        "MXDiagnosticPayload",
+        "MXCrashDiagnostic",
+        "MXMetricManager",
+        "MXMetricManagerSubscriber"
+      ],
+      "used": true,
+      "used_via": "iDeck"
     },
     {
+      "api_symbols": 0,
+      "audit": "not applicable",
+      "audit_note": "iDeck sells nothing and is installed outside the App Store: no purchases, no review prompt.",
+      "examples": [],
+      "files": 0,
+      "framework": "StoreKit",
+      "group": "System & devices",
+      "linked_by_madeira": false,
+      "minimum_ios": "3.0",
+      "status": "public",
+      "top_api": [],
+      "used": false,
+      "used_via": "none"
+    },
+    {
+      "api_symbols": 3,
+      "audit": "direct",
+      "audit_note": "",
       "examples": [
         "iDeck/BackgroundDownloads.swift",
         "iDeck/Presentation/Settings/SettingsView+General.swift",
@@ -577,16 +1161,25 @@
       "files": 3,
       "framework": "UserNotifications",
       "group": "System & devices",
+      "linked_by_madeira": false,
       "minimum_ios": "10.0",
       "status": "public",
-      "used": true
+      "top_api": [
+        "UNUserNotificationCenter",
+        "UNMutableNotificationContent",
+        "UNNotificationRequest"
+      ],
+      "used": true,
+      "used_via": "iDeck"
     }
   ],
   "module": "iDeckSystemLibraries",
   "summary": {
-    "catalogued": 55,
-    "coverage_percent": 48.1,
-    "public": 54,
-    "used": 26
+    "catalogued": 59,
+    "coverage_percent": 46.6,
+    "coverage_with_madeira_percent": 62.1,
+    "public": 58,
+    "used": 27,
+    "used_with_madeira": 36
   }
 }

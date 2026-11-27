@@ -13,7 +13,7 @@ class RamTests(unittest.TestCase):
     def test_dxmt_low_memory_and_cache_cap(self):
         env = read("WindowsEnvironment.swift")
         self.assertIn('setenv("DXMT_MAX_FRAME_LATENCY", "1", 1)', env)
-        self.assertIn('setenv("DXMT_SHADER_CACHE_MAX_MB", "128", 0)', env)
+        self.assertIn('setenv("DXMT_SHADER_CACHE_MAX_MB", small ? "64" : "128", 1)', env)
 
     def test_sqlite_soft_heap_limit(self):
         app = read("iDeckApp.swift")

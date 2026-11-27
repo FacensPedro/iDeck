@@ -276,7 +276,16 @@ class WindowsEnvironment {
         if MadeiraConfig.get("env.DXMT_PIPELINE_ARCHIVE") == nil {
             setenv("DXMT_PIPELINE_ARCHIVE", os_proc_available_memory() >= 4096 * 1024 * 1024 ? "1" : "0", 1)
         }
-        setenv("DXMT_SHADER_CACHE_MAX_MB", "128", 0)
+        // The cap shrinks to 64 MB when storage is short (under 4 GB free) or the GPU
+        // domain is on Economy: the cache only saves compile time, the space is the game's.
+        if MadeiraConfig.get("env.DXMT_SHADER_CACHE_MAX_MB") == nil {
+            let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            let free = (try? docs.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey]))?
+                .volumeAvailableCapacityForImportantUsage ?? Int64.max
+            let small = free < 4 << 30 || ResourceDomains.effective(.gpu) == .economy
+            setenv("DXMT_SHADER_CACHE_MAX_MB", small ? "64" : "128", 1)
+            if small { AppLog.record("[shaders] shader cache capped at 64 MB for this launch") }
+        }
         // Fastsync's per-game switches, only when Settings chose Fastsync.
         if MadeiraSyncEngine.current == .fastsync {
             let mode = MadeiraConfig.get("env.MADEIRA_FASTSYNC") ?? "auto"

@@ -50,7 +50,85 @@ CATALOG = {
     "CoreHaptics": ("System & devices", "13.0", "public"), "BackgroundTasks": ("System & devices", "13.0", "public"),
     "IOKit": ("System & devices", "-", "not public on iOS: not to be used"), "MetricKit": ("System & devices", "13.0", "public"),
     "GameController": ("System & devices", "7.0", "public"), "UserNotifications": ("System & devices", "10.0", "public"),
+    "CoreLocation": ("System & devices", "2.0", "public, permission"), "StoreKit": ("System & devices", "3.0", "public"),
+    "JavaScriptCore": ("Core System", "7.0", "public (no JIT in third-party apps)"),
+    "ExtensionFoundation": ("Core System", "26.0", "public (app extensions)"),
 }
+
+# The audit (3.0.1): what each framework that is not imported directly is to iDeck, and
+# the three asked about by name. "candidate" = worth adopting, "indirect" = used through
+# Madeira's native archives, "not applicable" = nothing in iDeck needs it.
+AUDIT_NOTES = {
+    "AVKit": ("not applicable", "iDeck plays no video of its own; games' video goes through Wine and FFmpeg."),
+    "AudioToolbox": ("indirect", "Madeira's audio driver (Audio Units) for Wine's sound."),
+    "CoreAudio": ("indirect", "Audio types under AudioToolbox, through Madeira."),
+    "CoreMedia": ("indirect", "Madeira's video decoding path (sample buffers)."),
+    "VideoToolbox": ("indirect", "Hardware video decoding for games' cutscenes, through Madeira."),
+    "CoreFoundation": ("indirect", "Bridged everywhere through Foundation; linked by Madeira."),
+    "CoreServices": ("not applicable", "UniformTypeIdentifiers replaces its type functions."),
+    "SystemConfiguration": ("not applicable", "Network reachability is watched with Network (NWPathMonitor)."),
+    "CoreData": ("not applicable", "Libraries and settings are JSON and UserDefaults; logs and caches use SQLite directly."),
+    "FileProvider": ("not applicable", "Files reach iDeck through the Files app's folder and the document picker."),
+    "QuickLook": ("candidate", "Previewing logs and bug reports before they are shared."),
+    "Accelerate": ("not applicable", "No signal or image maths on the CPU; the GPU does it."),
+    "CoreText": ("not applicable", "Wine draws its fonts with FreeType; SwiftUI draws iDeck's text."),
+    "CoreVideo": ("indirect", "Pixel buffers between Madeira's video decode and Metal."),
+    "IOSurface": ("indirect", "The OpenGL (Zink) runtime's frame surfaces, through Madeira."),
+    "MetalFX": ("indirect", "DXMT's and madeira-d3d12's spatial upscaler and frame generation."),
+    "MetalKit": ("not applicable", "Madeira presents through CAMetalLayer directly."),
+    "MetalPerformanceShaders": ("not applicable", "No compute kernels outside the games' own shaders."),
+    "OpenGLES": ("indirect", "Madeira's GLES fallback for OpenGL games without Zink (deprecated by Apple)."),
+    "CFNetwork": ("not applicable", "URLSession (Foundation) covers every download."),
+    "GameKit": ("not applicable", "Store achievements are kept by the stores, not Game Center."),
+    "MultipeerConnectivity": ("not applicable", "Steam's LAN transfers use the network directly."),
+    "NetworkExtension": ("not applicable", "LocalDevVPN is a separate app; iDeck only checks the tunnel."),
+    "AuthenticationServices": ("candidate", "ASWebAuthenticationSession for store sign-ins that now open Safari."),
+    "LocalAuthentication": ("not applicable", "Store tokens stay in the Keychain without a biometric gate."),
+    "CoreHaptics": ("indirect", "Controller rumble and DualSense haptics, through Madeira."),
+    "CoreMotion": ("not applicable", "Motion comes from controllers (GameController), not the device."),
+    "ExternalAccessory": ("not applicable", "MFi accessories are reached through GameController."),
+    "IOKit": ("indirect", "Not public on iOS. Madeira links it for HID; iDeck dlopens it once (EA machine identity). Not to be extended."),
+    "CoreLocation": ("not applicable", "Nothing in iDeck has a place; asking for location only to stay awake would be rejected and drains the battery."),
+    "StoreKit": ("not applicable", "iDeck sells nothing and is installed outside the App Store: no purchases, no review prompt."),
+    "JavaScriptCore": ("not applicable", "Store sign-ins run in Safari; without JIT a script engine would only slow the few pages iDeck reads, which are parsed as JSON."),
+    "ExtensionFoundation": ("direct (dlopen)", "The built-in JIT host's extension, loaded by name."),
+}
+EXPLICITLY_EVALUATED = ["CoreLocation", "StoreKit", "JavaScriptCore"]
+
+# How iDeck's code is measured per framework: the identifiers that belong to it.
+API_PATTERNS = {
+    "Foundation": r"\b(?:URLSession|URLRequest|FileManager|JSONDecoder|JSONEncoder|UserDefaults|ProcessInfo|NotificationCenter|Data|Date|URL|NS[A-Z]\w+)\b",
+    "Darwin": r"\b(?:mach_\w+|task_\w+|vm_\w+|pthread_\w+|dlopen|dlsym|sysctlbyname|setenv|unsetenv|getenv|malloc_\w+|os_proc_available_memory)\b",
+    "Dispatch": r"\b(?:DispatchQueue|DispatchSource\w*|DispatchGroup|DispatchSemaphore|DispatchTime|dispatch_\w+)\b",
+    "os": r"\b(?:Logger|OSLog|OSAllocatedUnfairLock|os_\w+)\b",
+    "Combine": r"\b(?:AnyCancellable|PassthroughSubject|CurrentValueSubject|Published|ObservableObject|sink)\b",
+    "MachO": r"\b(?:_dyld_\w+|mach_header\w*|getsectiondata|getsegmentdata)\b",
+    "UIKit": r"\bUI[A-Z]\w+",
+    "SwiftUI": r"\b(?:View|Text|Button|Toggle|Picker|Form|Section|NavigationStack|NavigationLink|List|VStack|HStack|ZStack|Image|Sheet|Alert|AppStorage|State|Binding|ObservedObject|StateObject|EnvironmentObject)\b",
+    "CoreGraphics": r"\bCG[A-Z]\w+",
+    "QuartzCore": r"\bCA[A-Z]\w+",
+    "CoreImage": r"\bCI[A-Z]\w+",
+    "ImageIO": r"\bCGImage(?:Source|Destination)\w*",
+    "Metal": r"\bMTL[A-Z]\w+",
+    "AVFoundation": r"\bAV[A-Z]\w+",
+    "Network": r"\bNW[A-Z]\w+",
+    "Security": r"\bSec[A-Z]\w+|\bkSec\w+",
+    "CryptoKit": r"\b(?:SHA256|SHA384|SHA512|Insecure|HMAC|SymmetricKey|AES|ChaChaPoly|P256|Curve25519|HKDF)\b",
+    "CommonCrypto": r"\bCC_\w+|\bCCCrypt\w*|\bCCHmac\w*",
+    "Compression": r"\bcompression_\w+|\.lzfse\b|\.zlib\b|\.lzma\b|\.lz4\b",
+    "SQLite": r"\bsqlite3_\w+",
+    "UniformTypeIdentifiers": r"\bUTType\b",
+    "CoreTransferable": r"\b(?:Transferable|TransferRepresentation|FileRepresentation|DataRepresentation)\b",
+    "BackgroundTasks": r"\bBG[A-Z]\w+",
+    "GameController": r"\bGC[A-Z]\w+",
+    "MetricKit": r"\bMX[A-Z]\w+",
+    "UserNotifications": r"\bUN[A-Z]\w+",
+}
+
+# Madeira's link line (scripts/link_madeira_native.sh): frameworks, system libraries
+# and the static archives the native runtime is built from.
+LINK_SCRIPT = ROOT / "scripts" / "link_madeira_native.sh"
+DLOPEN = re.compile(r'"/System/Library/Frameworks/([A-Za-z]+)\.framework')
 NOT_IOS = {"AppKit", "Glibc", "FoundationNetworking", "FoundationXML", "zlib"}   # other platforms / non-framework
 C_ALIASES = {"dispatch": "Dispatch", "mach": "Darwin", "sys": "Darwin", "libkern": "Darwin", "objc": "Darwin"}
 
@@ -58,18 +136,52 @@ SWIFT = re.compile(r"^\s*(?:@\w+\s+)*import\s+(?:(?:struct|class|enum|func|proto
 OBJC = re.compile(r"#\s*(?:import|include)\s*<([A-Za-z_]+)/")
 
 
-def scan():
-    uses = {}
+def source_files():
     for base in SOURCES:
         if not base.exists():
             continue
-        for path in base.rglob("*"):
+        for path in sorted(base.rglob("*")):
             if not path.is_file() or path.suffix not in {".swift", ".m", ".mm", ".h", ".c", ".cpp"}:
                 continue
             if SKIP_PARTS & set(path.relative_to(ROOT).parts):
                 continue
+            yield path
+
+
+def madeira_link():
+    """Frameworks, system libraries and static archives on Madeira's link line."""
+    text = LINK_SCRIPT.read_text() if LINK_SCRIPT.exists() else ""
+    frameworks = sorted(set(re.findall(r"-framework\s+([A-Za-z]+)", text)))
+    libraries = sorted(set(re.findall(r"(?<![\w-])-l([a-z0-9+]+)", text)))
+    archives = sorted(set(re.findall(r"/(lib[A-Za-z0-9_+.-]+\.a)\"", text)))
+    return frameworks, libraries, archives
+
+
+def measure(uses):
+    """Distinct identifiers of each framework that iDeck's code names, in the files
+    that import it (all files for the C-level ones)."""
+    counts = {}
+    texts = {str(p.relative_to(ROOT)): p.read_text(errors="ignore") for p in source_files()}
+    for name, pattern in API_PATTERNS.items():
+        files = uses.get(name, set())
+        if name in {"Darwin", "Dispatch", "SQLite", "CommonCrypto", "MachO"}:
+            files = set(texts)
+        found = {}
+        regex = re.compile(pattern)
+        for rel in files:
+            for symbol in regex.findall(texts.get(rel, "")):
+                found[symbol] = found.get(symbol, 0) + 1
+        counts[name] = found
+    return counts
+
+
+def scan():
+    uses = {}
+    for path in source_files():
+        if True:
             text = path.read_text(errors="ignore")
             names = SWIFT.findall(text) if path.suffix == ".swift" else OBJC.findall(text)
+            names = names + DLOPEN.findall(text)
             for name in names:
                 name = C_ALIASES.get(name, name)
                 if name in CATALOG:
@@ -79,23 +191,73 @@ def scan():
 
 def report():
     uses = scan()
+    link_frameworks, link_libraries, link_archives = madeira_link()
+    api = measure(uses)
     rows = []
     for name, (group, minimum, status) in sorted(CATALOG.items(), key=lambda kv: (kv[1][0], kv[0])):
         files = sorted(uses.get(name, []))
+        symbols = api.get(name, {})
+        via = ("iDeck" if files else "") + (" + Madeira" if files and name in link_frameworks else
+                                             "Madeira" if name in link_frameworks else "")
+        note = AUDIT_NOTES.get(name)
         rows.append({"framework": name, "group": group, "minimum_ios": minimum, "status": status,
-                     "used": bool(files), "files": len(files), "examples": files[:3]})
+                     "used": bool(files), "files": len(files), "examples": files[:3],
+                     "linked_by_madeira": name in link_frameworks, "used_via": via or "none",
+                     "api_symbols": len(symbols),
+                     "top_api": [k for k, _ in sorted(symbols.items(), key=lambda kv: (-kv[1], kv[0]))[:5]],
+                     "audit": note[0] if note else ("direct" if files else "unreviewed"),
+                     "audit_note": note[1] if note else ""})
     usable = [r for r in rows if not r["status"].startswith("not public")]
     used = [r for r in usable if r["used"]]
+    in_app = [r for r in usable if r["used"] or r["linked_by_madeira"]]
+    imported_unused = [r["framework"] for r in rows if r["used"] and r["framework"] in API_PATTERNS and r["api_symbols"] == 0]
+    linked_not_catalogued = [f for f in link_frameworks if f not in CATALOG]
+    candidates = [r["framework"] for r in rows if r["audit"] == "candidate"]
     summary = {"catalogued": len(rows), "public": len(usable), "used": len(used),
-               "coverage_percent": round(100 * len(used) / max(len(usable), 1), 1)}
-    data = {"module": "iDeckSystemLibraries", "summary": summary, "frameworks": rows}
+               "coverage_percent": round(100 * len(used) / max(len(usable), 1), 1),
+               "used_with_madeira": len(in_app),
+               "coverage_with_madeira_percent": round(100 * len(in_app) / max(len(usable), 1), 1)}
+    audit = {"evaluated_by_name": {n: {"decision": AUDIT_NOTES[n][0], "reason": AUDIT_NOTES[n][1]} for n in EXPLICITLY_EVALUATED},
+             "candidates": candidates,
+             "removable": imported_unused,
+             "madeira_link": {"frameworks": link_frameworks, "system_libraries": link_libraries,
+                              "static_archives": link_archives, "frameworks_not_catalogued": linked_not_catalogued},
+             "unreviewed": [r["framework"] for r in rows if r["audit"] == "unreviewed"]}
+    data = {"module": "iDeckSystemLibraries", "summary": summary, "frameworks": rows, "audit": audit}
     md = ["# iDeck System Libraries", "",
           "Public iOS frameworks iDeck uses or may use. They ship with iOS; nothing is copied into the IPA.",
           "Generated by `scripts/ios_system_libraries.py` from the source code; CI fails when it is out of date.", "",
           f"**Coverage: {summary['used']} of {summary['public']} public frameworks in use ({summary['coverage_percent']}%).**", "",
-          "| Group | Framework | Min. iOS | Status | In use | Files |", "|---|---|---|---|---|---|"]
+          f"With the frameworks Madeira's native runtime links: {summary['used_with_madeira']} of {summary['public']} "
+          f"({summary['coverage_with_madeira_percent']}%). The first figure counts iDeck's own imports and dlopen calls only.", "",
+          "| Group | Framework | Min. iOS | Status | In use | Files | Via | API symbols | Audit |",
+          "|---|---|---|---|---|---|---|---|---|"]
     for r in rows:
-        md.append(f"| {r['group']} | {r['framework']} | {r['minimum_ios']} | {r['status']} | {'yes' if r['used'] else 'no'} | {r['files']} |")
+        md.append(f"| {r['group']} | {r['framework']} | {r['minimum_ios']} | {r['status']} | {'yes' if r['used'] else 'no'} "
+                  f"| {r['files']} | {r['used_via']} | {r['api_symbols'] if r['framework'] in API_PATTERNS else '-'} | {r['audit']} |")
+    md += ["", "## Audit", "",
+           "### Evaluated by name", ""]
+    for name in EXPLICITLY_EVALUATED:
+        md.append(f"- **{name}**: {AUDIT_NOTES[name][0]}. {AUDIT_NOTES[name][1]}")
+    md += ["", "### Frameworks not imported by iDeck", "",
+           "| Framework | Audit | Why |", "|---|---|---|"]
+    for r in rows:
+        if not r["used"] and r["audit_note"] and r["framework"] not in EXPLICITLY_EVALUATED:
+            md.append(f"| {r['framework']} | {r['audit']} | {r['audit_note']} |")
+    md += ["", "### Measured use (distinct identifiers iDeck's code names)", "",
+           "| Framework | Symbols | Most used |", "|---|---|---|"]
+    for r in rows:
+        if r["used"] and r["framework"] in API_PATTERNS:
+            md.append(f"| {r['framework']} | {r['api_symbols']} | {', '.join(r['top_api']) or '-'} |")
+    md += ["", "### Madeira's link line (scripts/link_madeira_native.sh)", "",
+           "- Frameworks: " + ", ".join(link_frameworks),
+           "- System libraries: " + ", ".join("lib" + l for l in link_libraries),
+           "- Static archives: " + ", ".join(link_archives),
+           "- Frameworks linked but not in the catalog: " + (", ".join(linked_not_catalogued) or "none"),
+           "", "### Removable", "",
+           "- Imported with no identifier of the framework in use: " + (", ".join(imported_unused) or "none"),
+           "- Candidates to adopt: " + (", ".join(candidates) or "none"),
+           "- Not yet reviewed: " + (", ".join(audit["unreviewed"]) or "none")]
     return json.dumps(data, indent=2, sort_keys=True) + "\n", "\n".join(md) + "\n"
 
 
