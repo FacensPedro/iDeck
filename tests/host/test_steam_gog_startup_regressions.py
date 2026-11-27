@@ -1,4 +1,5 @@
 """Host checks for GOG signed CDN retries and Steam runtime preparation races."""
+import split_sources  # noqa: F401  (iDeck 3.0 split files)
 import pathlib
 import re
 import shutil

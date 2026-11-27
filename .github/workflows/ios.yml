@@ -19,7 +19,7 @@ on:
         required: false
         default: false
       release_tag:
-        description: "Use auto for the verified IPA version (currently 1.0.10), a matching version tag, or leave blank to build without publishing"
+        description: "Use auto for the verified IPA version (read from MARKETING_VERSION), a matching version tag, or leave blank to build without publishing"
         required: false
         default: ""
   push:
@@ -59,7 +59,7 @@ jobs:
           if len(versions) != 1:
               raise SystemExit(f"::error::Project contains inconsistent MARKETING_VERSION values: {sorted(versions)}")
           version = versions.pop().strip()
-          if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version):
+          if not re.fullmatch(r"[0-9]+\.[0-9]+(\.[0-9]+)?", version):
               raise SystemExit(f"::error::Project has invalid marketing version: {version!r}")
           tag = os.environ["REQUESTED_RELEASE_TAG"].strip()
           if tag not in (version, f"v{version}"):
@@ -293,12 +293,12 @@ jobs:
       - name: Test Steam native C crypto and bounded existing-file verification
         run: |
           xcrun clang -std=c11 -D_DARWIN_C_SOURCE -O2 -Wall -Wextra -Werror \
-            tests/host/SteamNativeCoreTests.c iDeck/SteamNativeCore.c iDeck/PipelineCounters.c \
+            tests/host/SteamNativeCoreTests.c iDeck/NativeRuntime/Bridges/SteamNativeCore.c iDeck/NativeRuntime/Bridges/PipelineCounters.c \
             -o /tmp/ideck-steam-native-tests
           /tmp/ideck-steam-native-tests
-          xcrun clang -std=c11 -D_DARWIN_C_SOURCE -O2 -c iDeck/SteamNativeCore.c \
+          xcrun clang -std=c11 -D_DARWIN_C_SOURCE -O2 -c iDeck/NativeRuntime/Bridges/SteamNativeCore.c \
             -o /tmp/ideck-steam-native-core.o
-          xcrun clang -std=c11 -D_DARWIN_C_SOURCE -O2 -c iDeck/PipelineCounters.c \
+          xcrun clang -std=c11 -D_DARWIN_C_SOURCE -O2 -c iDeck/NativeRuntime/Bridges/PipelineCounters.c \
             -o /tmp/ideck-pipeline-counters.o
 
       - name: Test bounded native Madeira Wine log diagnostics
@@ -481,7 +481,7 @@ jobs:
           if len(versions) != 1:
               raise SystemExit(f"::error::Project contains inconsistent MARKETING_VERSION values: {sorted(versions)}")
           version = versions.pop().strip()
-          if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version):
+          if not re.fullmatch(r"[0-9]+\.[0-9]+(\.[0-9]+)?", version):
               raise SystemExit(f"::error::Project has invalid marketing version: {version!r}")
           tag = os.environ["REQUESTED_RELEASE_TAG"].strip()
           if tag not in (version, f"v{version}"):
@@ -977,8 +977,10 @@ jobs:
               print(plistlib.loads(archive.read('Payload/iDeck.app/Info.plist'))['CFBundleShortVersionString'])
           PY
           )"
-          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || exit 2
-          cp iDeck.ipa "iDeck-${VERSION}.ipa"
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]] || exit 2
+          # The file carries the project version as it is: 3.0 -> iDeck-3.0.ipa.
+          LABEL="$VERSION"
+          cp iDeck.ipa "iDeck-${LABEL}.ipa"
 
       - name: Upload IPA directly (no outer ZIP)
         id: ipa_artifact
@@ -1037,11 +1039,12 @@ jobs:
           import re
           from pathlib import Path
           project = Path("iDeck.xcodeproj/project.pbxproj").read_text(encoding="utf-8")
-          versions = set(re.findall(r"MARKETING_VERSION\s*=\s*([0-9]+\.[0-9]+\.[0-9]+);", project))
+          versions = set(re.findall(r"MARKETING_VERSION\s*=\s*([0-9]+\.[0-9]+(?:\.[0-9]+)?);", project))
           if len(versions) != 1:
               raise SystemExit(f"Expected exactly one iDeck marketing version, found {sorted(versions)}")
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
-              output.write(f"name=iDeck-{versions.pop()}.ipa\n")
+              label = versions.pop()   # 3.0 -> iDeck-3.0.ipa
+              output.write(f"name=iDeck-{label}.ipa\n")
           PY
 
       - name: Download verified iDeck IPA directly
@@ -1165,7 +1168,7 @@ jobs:
           print(info.get("CFBundleShortVersionString", ""))
           PY
           )"
-          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]] || {
             echo "::error::Verified IPA has no valid semantic version."; exit 2;
           }
           if [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
@@ -1184,7 +1187,7 @@ jobs:
           elif [[ "$TAG" == "auto" ]]; then
             TAG="v$VERSION"
           fi
-          [[ "$TAG" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ && "${TAG#v}" == "$VERSION" ]] || {
+          [[ "$TAG" =~ ^v?[0-9]+\.[0-9]+(\.[0-9]+)?$ && "${TAG#v}" == "$VERSION" ]] || {
             echo "::error::Release tag '$TAG' does not match the IPA version v$VERSION."; exit 2;
           }
 
@@ -1220,13 +1223,15 @@ jobs:
               echo "::error::Refusing to overwrite an existing versioned release with an interface-only IPA."
               exit 2
             fi
-            cp iDeck.ipa "iDeck-${VERSION}.ipa"
-            gh release upload "$TAG" "iDeck-${VERSION}.ipa" iDeck.ipa.sha256 iDeck-distribution-audit.json --clobber
+            LABEL="$VERSION"
+            cp iDeck.ipa "iDeck-${LABEL}.ipa"
+            gh release upload "$TAG" "iDeck-${LABEL}.ipa" iDeck.ipa.sha256 iDeck-distribution-audit.json --clobber
             gh release edit "$TAG" --title "$TITLE" --notes-file RELEASE_NOTES.md
           else
             OPTIONS=(--target "$GITHUB_SHA" --title "$TITLE" --notes-file RELEASE_NOTES.md)
-            cp iDeck.ipa "iDeck-${VERSION}.ipa"
-            gh release create "$TAG" "iDeck-${VERSION}.ipa" iDeck.ipa.sha256 iDeck-distribution-audit.json "${OPTIONS[@]}"
+            LABEL="$VERSION"
+            cp iDeck.ipa "iDeck-${LABEL}.ipa"
+            gh release create "$TAG" "iDeck-${LABEL}.ipa" iDeck.ipa.sha256 iDeck-distribution-audit.json "${OPTIONS[@]}"
           fi
           echo "Published $KIND IPA under GitHub Release $TAG" >> "$GITHUB_STEP_SUMMARY"
           echo 'Published `iDeck.ipa.sha256` and `iDeck-distribution-audit.json` for independent integrity verification.' >> "$GITHUB_STEP_SUMMARY"

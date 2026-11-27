@@ -3,7 +3,7 @@ import unittest
 from support import repo_text
 
 ENV = repo_text("iDeck/WindowsEnvironment.swift")
-RENDERER = repo_text("iDeck/WindowsRendererView.swift")
+RENDERER = repo_text("iDeck/NativeRuntime/WindowsRendererView.swift")
 CONFIG = repo_text("iDeck/RuntimeConfiguration.swift")
 SHEET = repo_text("iDeck/SessionControlsSheet.swift")
 RECS = repo_text("iDeck/GameRecommendations.swift")

@@ -1,4 +1,5 @@
 """The machine hash uses the values the game itself reads under Madeira."""
+import split_sources  # noqa: F401  (iDeck 3.0 split files)
 import unittest
 from pathlib import Path
 

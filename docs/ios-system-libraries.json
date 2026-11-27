@@ -1,0 +1,592 @@
+{
+  "frameworks": [
+    {
+      "examples": [
+        "iDeck/AudioManager.swift",
+        "iDeck/ResourceGovernor.swift",
+        "iDeck/Runtime/Resources/ResourceGovernor+Background.swift"
+      ],
+      "files": 4,
+      "framework": "AVFoundation",
+      "group": "Audio & video",
+      "minimum_ios": "2.2",
+      "status": "public",
+      "used": true
+    },
+    {
+      "examples": [],
+      "files": 0,
+      "framework": "AVKit",
+      "group": "Audio & video",
+      "minimum_ios": "8.0",
+      "status": "public",
+      "used": false
+    },
+    {
+      "examples": [],
+      "files": 0,
+      "framework": "AudioToolbox",
+      "group": "Audio & video",
+      "minimum_ios": "2.0",
+      "status": "public",
+      "used": false
+    },
+    {
+      "examples": [],
+      "files": 0,
+      "framework": "CoreAudio",
+      "group": "Audio & video",
+      "minimum_ios": "2.0",
+      "status": "public",
+      "used": false
+    },
+    {
+      "examples": [],
+      "files": 0,
+      "framework": "CoreMedia",
+      "group": "Audio & video",
+      "minimum_ios": "4.0",
+      "status": "public",
+      "used": false
+    },
+    {
+      "examples": [],
+      "files": 0,
+      "framework": "VideoToolbox",
+      "group": "Audio & video",
+      "minimum_ios": "8.0",
+      "status": "public",
+      "used": false
+    },
+    {
+      "examples": [
+        "iDeck/GameSessionView.swift",
+        "iDeck/NativeRuntime/WineMono.swift",
+        "iDeck/SystemCoordinator.swift"
+      ],
+      "files": 4,
+      "framework": "Combine",
+      "group": "Core System",
+      "minimum_ios": "13.0",
+      "status": "public",
+      "used": true
+    },
+    {
+      "examples": [],
+      "files": 0,
+      "framework": "CoreFoundation",
+      "group": "Core System",
+      "minimum_ios": "2.0",
+      "status": "public",
+      "used": false
+    },
+    {
+      "examples": [],
+      "files": 0,
+      "framework": "CoreServices",
+      "group": "Core System",
+      "minimum_ios": "12.0",
+      "status": "public (MobileCoreServices on older)",
+      "used": false
+    },
+    {
+      "examples": [
+        "iDeck/Application/SystemCoordinator+Diagnostics.swift",
+        "iDeck/Application/SystemCoordinator+Dock.swift",
+        "iDeck/Application/SystemCoordinator+JIT.swift"
+      ],
+      "files": 36,
+      "framework": "Darwin",
+      "group": "Core System",
+      "minimum_ios": "2.0",
+      "status": "public (libSystem)",
+      "used": true
+    },
+    {
+      "examples": [
+        "iDeck/NativeRuntime/DirectInputBridge.mm",
+        "iDeck/NativeRuntime/MadeiraRuntimeBridge.mm",
+        "iDeck/NativeRuntime/WineBridge.mm"
+      ],
+      "files": 3,
+      "framework": "Dispatch",
+      "group": "Core System",
+      "minimum_ios": "4.0",
+      "status": "public",
+      "used": true
+    },
+    {
+      "examples": [
+        "iDeck/Application/SessionLifecycle.swift",
+        "iDeck/Application/SystemCoordinator+Diagnostics.swift",
+        "iDeck/Application/SystemCoordinator+Dock.swift"
+      ],
+      "files": 135,
+      "framework": "Foundation",
+      "group": "Core System",
+      "minimum_ios": "2.0",
+      "status": "public",
+      "used": true
+    },
+    {
+      "examples": [
+        "iDeck/NativeRuntime/IOSCrashDiagnostics.swift"
+      ],
+      "files": 1,
+      "framework": "MachO",
+      "group": "Core System",
+      "minimum_ios": "2.0",
+      "status": "public (libSystem)",
+      "used": true
+    },
+    {
+      "examples": [],
+      "files": 0,
+      "framework": "SystemConfiguration",
+      "group": "Core System",
+      "minimum_ios": "2.0",
+      "status": "public",
+      "used": false
+    },
+    {
+      "examples": [
+        "iDeck/MadeiraJIT/MadeiraWinePool.swift",
+        "iDeck/NativeRuntime/InterfaceOnlyStubs.c",
+        "iDeck/NativeRuntime/MadeiraHostCallbacks.m"
+      ],
+      "files": 3,
+      "framework": "os",
+      "group": "Core System",
+      "minimum_ios": "10.0",
+      "status": "public",
+      "used": true
+    },
+    {
+      "examples": [
+        "iDeck/NativeRuntime/WineMono.swift",
+        "iDeck/PrefixInstaller.swift",
+        "iDeck/SteamCloud.swift"
+      ],
+      "files": 6,
+      "framework": "Compression",
+      "group": "Files & storage",
+      "minimum_ios": "9.0",
+      "status": "public",
+      "used": true
+    },
+    {
+      "examples": [],
+      "files": 0,
+      "framework": "CoreData",
+      "group": "Files & storage",
+      "minimum_ios": "3.0",
+      "status": "public",
+      "used": false
+    },
+    {
+      "examples": [
+        "iDeck/WineLogClipboard.swift"
+      ],
+      "files": 1,
+      "framework": "CoreTransferable",
+      "group": "Files & storage",
+      "minimum_ios": "16.0",
+      "status": "public",
+      "used": true
+    },
+    {
+      "examples": [],
+      "files": 0,
+      "framework": "FileProvider",
+      "group": "Files & storage",
+      "minimum_ios": "11.0",
+      "status": "public",
+      "used": false
+    },
+    {
+      "examples": [],
+      "files": 0,
+      "framework": "QuickLook",
+      "group": "Files & storage",
+      "minimum_ios": "4.0",
+      "status": "public",
+      "used": false
+    },
+    {
+      "examples": [
+        "iDeck/iDeckApp.swift"
+      ],
+      "files": 1,
+      "framework": "SQLite",
+      "group": "Files & storage",
+      "minimum_ios": "2.0",
+      "status": "public (libsqlite3)",
+      "used": true
+    },
+    {
+      "examples": [
+        "iDeck/ExternalDrives.swift",
+        "iDeck/MainView.swift",
+        "iDeck/SettingsView.swift"
+      ],
+      "files": 4,
+      "framework": "UniformTypeIdentifiers",
+      "group": "Files & storage",
+      "minimum_ios": "14.0",
+      "status": "public",
+      "used": true
+    },
+    {
+      "examples": [],
+      "files": 0,
+      "framework": "Accelerate",
+      "group": "Graphics",
+      "minimum_ios": "4.0",
+      "status": "public",
+      "used": false
+    },
+    {
+      "examples": [
+        "iDeck/RuntimeConfiguration.swift"
+      ],
+      "files": 1,
+      "framework": "CoreGraphics",
+      "group": "Graphics",
+      "minimum_ios": "2.0",
+      "status": "public",
+      "used": true
+    },
+    {
+      "examples": [
+        "iDeck/SwiftSteam/Auth/SteamQRAuth.swift"
+      ],
+      "files": 1,
+      "framework": "CoreImage",
+      "group": "Graphics",
+      "minimum_ios": "5.0",
+      "status": "public",
+      "used": true
+    },
+    {
+      "examples": [],
+      "files": 0,
+      "framework": "CoreText",
+      "group": "Graphics",
+      "minimum_ios": "3.2",
+      "status": "public",
+      "used": false
+    },
+    {
+      "examples": [],
+      "files": 0,
+      "framework": "CoreVideo",
+      "group": "Graphics",
+      "minimum_ios": "4.0",
+      "status": "public",
+      "used": false
+    },
+    {
+      "examples": [],
+      "files": 0,
+      "framework": "IOSurface",
+      "group": "Graphics",
+      "minimum_ios": "11.0",
+      "status": "public",
+      "used": false
+    },
+    {
+      "examples": [
+        "iDeck/WindowsLibraryModels.swift"
+      ],
+      "files": 1,
+      "framework": "ImageIO",
+      "group": "Graphics",
+      "minimum_ios": "4.0",
+      "status": "public",
+      "used": true
+    },
+    {
+      "examples": [
+        "iDeck/GameSessionView.swift",
+        "iDeck/NativeRuntime/Bridges/BenchmarkBridge.mm",
+        "iDeck/NativeRuntime/Bridges/NativeRuntimeDiagnostics.mm"
+      ],
+      "files": 6,
+      "framework": "Metal",
+      "group": "Graphics",
+      "minimum_ios": "8.0",
+      "status": "public",
+      "used": true
+    },
+    {
+      "examples": [],
+      "files": 0,
+      "framework": "MetalFX",
+      "group": "Graphics",
+      "minimum_ios": "16.0",
+      "status": "public",
+      "used": false
+    },
+    {
+      "examples": [],
+      "files": 0,
+      "framework": "MetalKit",
+      "group": "Graphics",
+      "minimum_ios": "9.0",
+      "status": "public",
+      "used": false
+    },
+    {
+      "examples": [],
+      "files": 0,
+      "framework": "MetalPerformanceShaders",
+      "group": "Graphics",
+      "minimum_ios": "9.0",
+      "status": "public",
+      "used": false
+    },
+    {
+      "examples": [],
+      "files": 0,
+      "framework": "OpenGLES",
+      "group": "Graphics",
+      "minimum_ios": "2.0",
+      "status": "public, deprecated",
+      "used": false
+    },
+    {
+      "examples": [
+        "iDeck/NativeRuntime/WindowsRendererView.swift",
+        "iDeck/SystemCoordinator.swift"
+      ],
+      "files": 2,
+      "framework": "QuartzCore",
+      "group": "Graphics",
+      "minimum_ios": "2.0",
+      "status": "public (Core Animation)",
+      "used": true
+    },
+    {
+      "examples": [
+        "iDeck/ArtworkLoader.swift",
+        "iDeck/BugReportView.swift",
+        "iDeck/EASignIn.swift"
+      ],
+      "files": 50,
+      "framework": "SwiftUI",
+      "group": "Interface",
+      "minimum_ios": "13.0",
+      "status": "public",
+      "used": true
+    },
+    {
+      "examples": [
+        "iDeck/Application/SystemCoordinator+Diagnostics.swift",
+        "iDeck/Application/SystemCoordinator+JIT.swift",
+        "iDeck/Application/SystemCoordinator+Launch.swift"
+      ],
+      "files": 34,
+      "framework": "UIKit",
+      "group": "Interface",
+      "minimum_ios": "2.0",
+      "status": "public",
+      "used": true
+    },
+    {
+      "examples": [],
+      "files": 0,
+      "framework": "CFNetwork",
+      "group": "Network",
+      "minimum_ios": "2.0",
+      "status": "public",
+      "used": false
+    },
+    {
+      "examples": [],
+      "files": 0,
+      "framework": "GameKit",
+      "group": "Network",
+      "minimum_ios": "3.0",
+      "status": "public",
+      "used": false
+    },
+    {
+      "examples": [],
+      "files": 0,
+      "framework": "MultipeerConnectivity",
+      "group": "Network",
+      "minimum_ios": "7.0",
+      "status": "public",
+      "used": false
+    },
+    {
+      "examples": [
+        "iDeck/UbisoftDownloader.swift",
+        "iDeck/Vendor/Madeira/MadeiraDock.swift"
+      ],
+      "files": 2,
+      "framework": "Network",
+      "group": "Network",
+      "minimum_ios": "12.0",
+      "status": "public",
+      "used": true
+    },
+    {
+      "examples": [],
+      "files": 0,
+      "framework": "NetworkExtension",
+      "group": "Network",
+      "minimum_ios": "8.0",
+      "status": "public, entitlement",
+      "used": false
+    },
+    {
+      "examples": [],
+      "files": 0,
+      "framework": "AuthenticationServices",
+      "group": "Security",
+      "minimum_ios": "12.0",
+      "status": "public",
+      "used": false
+    },
+    {
+      "examples": [
+        "iDeck/NativeRuntime/Bridges/EpicChunkCodec.cpp",
+        "iDeck/NativeRuntime/Bridges/SteamNativeCore.c",
+        "iDeck/SwiftSteam/Content/ContentDecryptor.swift"
+      ],
+      "files": 4,
+      "framework": "CommonCrypto",
+      "group": "Security",
+      "minimum_ios": "2.0",
+      "status": "public (libSystem)",
+      "used": true
+    },
+    {
+      "examples": [
+        "iDeck/EALibrary.swift",
+        "iDeck/EpicAPI.swift",
+        "iDeck/EpicDownloader.swift"
+      ],
+      "files": 14,
+      "framework": "CryptoKit",
+      "group": "Security",
+      "minimum_ios": "13.0",
+      "status": "public",
+      "used": true
+    },
+    {
+      "examples": [],
+      "files": 0,
+      "framework": "LocalAuthentication",
+      "group": "Security",
+      "minimum_ios": "8.0",
+      "status": "public",
+      "used": false
+    },
+    {
+      "examples": [
+        "iDeck/EpicAPI.swift",
+        "iDeck/GOGLibrary.swift",
+        "iDeck/MadeiraJIT/EntitlementChecker.swift"
+      ],
+      "files": 8,
+      "framework": "Security",
+      "group": "Security",
+      "minimum_ios": "2.0",
+      "status": "public",
+      "used": true
+    },
+    {
+      "examples": [
+        "iDeck/BackgroundDownloads.swift"
+      ],
+      "files": 1,
+      "framework": "BackgroundTasks",
+      "group": "System & devices",
+      "minimum_ios": "13.0",
+      "status": "public",
+      "used": true
+    },
+    {
+      "examples": [],
+      "files": 0,
+      "framework": "CoreHaptics",
+      "group": "System & devices",
+      "minimum_ios": "13.0",
+      "status": "public",
+      "used": false
+    },
+    {
+      "examples": [],
+      "files": 0,
+      "framework": "CoreMotion",
+      "group": "System & devices",
+      "minimum_ios": "4.0",
+      "status": "public",
+      "used": false
+    },
+    {
+      "examples": [],
+      "files": 0,
+      "framework": "ExternalAccessory",
+      "group": "System & devices",
+      "minimum_ios": "3.0",
+      "status": "public, MFi",
+      "used": false
+    },
+    {
+      "examples": [
+        "iDeck/InputManager.swift",
+        "iDeck/NativeRuntime/DirectInputBridge.mm",
+        "iDeck/NativeRuntime/WineInputBridge.swift"
+      ],
+      "files": 3,
+      "framework": "GameController",
+      "group": "System & devices",
+      "minimum_ios": "7.0",
+      "status": "public",
+      "used": true
+    },
+    {
+      "examples": [],
+      "files": 0,
+      "framework": "IOKit",
+      "group": "System & devices",
+      "minimum_ios": "-",
+      "status": "not public on iOS: not to be used",
+      "used": false
+    },
+    {
+      "examples": [
+        "iDeck/NativeRuntime/IOSCrashDiagnostics.swift"
+      ],
+      "files": 1,
+      "framework": "MetricKit",
+      "group": "System & devices",
+      "minimum_ios": "13.0",
+      "status": "public",
+      "used": true
+    },
+    {
+      "examples": [
+        "iDeck/BackgroundDownloads.swift",
+        "iDeck/Presentation/Settings/SettingsView+General.swift",
+        "iDeck/SettingsView.swift"
+      ],
+      "files": 3,
+      "framework": "UserNotifications",
+      "group": "System & devices",
+      "minimum_ios": "10.0",
+      "status": "public",
+      "used": true
+    }
+  ],
+  "module": "iDeckSystemLibraries",
+  "summary": {
+    "catalogued": 55,
+    "coverage_percent": 48.1,
+    "public": 54,
+    "used": 26
+  }
+}

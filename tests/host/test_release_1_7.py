@@ -26,7 +26,7 @@ class Release17Tests(unittest.TestCase):
 
     def test_library_and_shelf_presentation(self):
         view = repo_text("iDeck/MainView.swift")
-        self.assertIn("private static let uninstalledCoverBlur: CGFloat = 1.5", view)
+        self.assertIn("static let uninstalledCoverBlur: CGFloat = 1.5", view)
         for gone in ("libraryHeading", "shelfProgress(", 'tr("Game Library")', "progressAction("):
             self.assertNotIn(gone, view)
         tile = view.split("private func shelfTile(_ item: ShelfItem)", 1)[1].split("private func shelfArtwork", 1)[0]

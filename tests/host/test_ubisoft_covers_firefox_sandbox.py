@@ -15,8 +15,8 @@ class UbisoftCoverTests(unittest.TestCase):
         self.assertIn("await self.findCovers()", UBI)
 
     def test_card_shows_the_cover(self):
-        start = VIEW.index("private func ubisoftCard(")
-        card = VIEW[start:VIEW.index("private func launchEAGame", start)]
+        start = VIEW.index("func ubisoftCard(")
+        card = VIEW[start:VIEW.index("\n    }\n", start)]
         self.assertIn("GOGArtworkView(urls: game.coverURLs, fallbackColor: secondaryColor, fill: true)", card)
 
 

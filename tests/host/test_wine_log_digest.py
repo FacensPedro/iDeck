@@ -7,6 +7,7 @@
 """
 from __future__ import annotations
 
+import split_sources  # noqa: F401  (iDeck 3.0 split files)
 import pathlib
 import unittest
 

@@ -39,7 +39,7 @@ int main(void) {
 
     @unittest.skipUnless(shutil.which('swiftc'), 'Swift compiler required (runs on macOS CI)')
     def test_compiled_runtime_repair_rollback_and_resume(self):
-        source = (ROOT / 'iDeck/MadeiraRuntime.swift').read_text().replace('import CryptoKit', '')
+        source = (ROOT / 'iDeck/NativeRuntime/MadeiraRuntime.swift').read_text().replace('import CryptoKit', '')
         start = source.index('    static var root: URL {')
         end = source.index('\n    }', start) + len('\n    }')
         source = source[:start] + '    static var root: URL = URL(fileURLWithPath: "/unused")' + source[end:]

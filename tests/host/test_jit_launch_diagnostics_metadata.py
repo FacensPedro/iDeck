@@ -35,7 +35,7 @@ class LauncherJITAndDiagnosticsTests(unittest.TestCase):
         self.assertIn("showClearConfirmation", BUGS)
 
     def test_clean_release_and_centered_jit_status(self):
-        top = MAIN.split("private var topBar: some View")[1].split("private enum MixedLibraryEntry")[0]
+        top = MAIN.split("var topBar: some View")[1].split("enum MixedLibraryEntry")[0]
         self.assertIn('Text("iDeck")', top)
         self.assertNotIn('Image("IDeckLogo")', top)
         self.assertIn(".frame(maxWidth: .infinity)", top)

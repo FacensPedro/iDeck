@@ -1,9 +1,10 @@
 """MetricKit crash stacks are named on the device before they reach the bug report."""
+import split_sources  # noqa: F401  (iDeck 3.0 split files)
 import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-CRASH = (ROOT / "iDeck/IOSCrashDiagnostics.swift").read_text()
+CRASH = (ROOT / "iDeck/NativeRuntime/IOSCrashDiagnostics.swift").read_text()
 REPORT = (ROOT / "iDeck/BugReportView.swift").read_text()
 
 

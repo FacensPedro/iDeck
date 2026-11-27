@@ -1,6 +1,7 @@
 """iDeck's JIT is Madeira's: StikJITHelper, EntitlementChecker and JITAllocator.h
 copied verbatim into iDeck/MadeiraJIT; the pool comes from StikJITHelper at
 launch, followed by Madeira's early detach."""
+import split_sources  # noqa: F401  (iDeck 3.0 split files)
 import pathlib
 import unittest
 

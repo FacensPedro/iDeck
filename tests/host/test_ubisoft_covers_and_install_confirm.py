@@ -1,6 +1,7 @@
 """Ubisoft covers load fast, with fallbacks, and a tap never starts a download (2.13.2)."""
 from __future__ import annotations
 
+import split_sources  # noqa: F401  (iDeck 3.0 split files)
 import pathlib
 import unittest
 
@@ -38,12 +39,12 @@ class UbisoftPageTests(unittest.TestCase):
     """2.13.3: a tap opens the game's page (as EA, Epic and GOG), where installing starts."""
 
     def card(self) -> str:
-        start = VIEW.index("private func ubisoftCard(")
-        return VIEW[start:VIEW.index("private func ubisoftDownloadBadge", start)]
+        start = VIEW.index("func ubisoftCard(")
+        return VIEW[start:VIEW.index("func ubisoftDownloadBadge", start)]
 
     def page(self) -> str:
-        start = VIEW.index("private struct UbisoftGameDetailsSheet: View {")
-        return VIEW[start:VIEW.index("/// Epic game page.", start)]
+        start = VIEW.index("struct UbisoftGameDetailsSheet: View {")
+        return VIEW[start:VIEW.index("\n}\n", start)]
 
     def test_tap_opens_the_page(self):
         card = self.card()

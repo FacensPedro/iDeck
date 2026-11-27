@@ -1,3 +1,4 @@
+import split_sources  # noqa: F401  (iDeck 3.0 split files)
 import pathlib
 import re
 import unittest
@@ -18,7 +19,7 @@ class SteamWebSocketBackpressureTests(unittest.TestCase):
 
     def test_metal_surface_required_before_wine_launch(self):
         coordinator = COORDINATOR
-        renderer = (ROOT / "iDeck/WindowsRendererView.swift").read_text(encoding="utf-8")
+        renderer = (ROOT / "iDeck/NativeRuntime/WindowsRendererView.swift").read_text(encoding="utf-8")
         main = (ROOT / "iDeck/MainView.swift").read_text(encoding="utf-8")
         self.assertIn('withPreparedMetalDisplay(expectedStatus: "Launching Steam game...")', coordinator)
         self.assertIn('withPreparedMetalDisplay(expectedStatus: "Launching Steam client...")', coordinator)

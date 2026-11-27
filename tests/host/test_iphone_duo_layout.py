@@ -4,7 +4,7 @@ from pathlib import Path
 from support import ROOT, repo_text
 class IPhoneDuoAdaptiveLayoutTests(unittest.TestCase):
     def test_metal_uses_attached_window_not_global_screen(self):
-        renderer = repo_text("iDeck/WindowsRendererView.swift")
+        renderer = repo_text("iDeck/NativeRuntime/WindowsRendererView.swift")
         self.assertNotIn("contentScaleFactor = UIScreen.main.scale", renderer)
         self.assertIn("let sceneScale = window.screen.scale", renderer)
         self.assertIn("host.contentScaleFactor = sceneScale", renderer)
@@ -13,7 +13,7 @@ class IPhoneDuoAdaptiveLayoutTests(unittest.TestCase):
         self.assertIn("if host.frame != positioned", renderer)
 
     def test_native_drawable_size_is_seeded_only_before_madeira_takes_ownership(self):
-        renderer = repo_text("iDeck/WindowsRendererView.swift")
+        renderer = repo_text("iDeck/NativeRuntime/WindowsRendererView.swift")
         self.assertIn("if !layerRegistered {", renderer)
         self.assertIn("host.metalLayer.drawableSize = CGSize(", renderer)
         self.assertIn("(host.bounds.width * scale).rounded()", renderer)

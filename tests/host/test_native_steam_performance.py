@@ -16,7 +16,7 @@ class SteamNativeMigrationTests(unittest.TestCase):
                 self.assertEqual(project.count(f"/* {name} in Sources */,"), 1)
                 self.assertIn(f"/* {name} */ = {{isa = PBXFileReference;", project)
         bridge = read("iDeck/iDeck-Bridging-Header.h")
-        self.assertIn('#import "SteamNativeCore.h"', bridge)
+        self.assertIn('#import "NativeRuntime/Bridges/SteamNativeCore.h"', bridge)
         self.assertIn('#import "NativeRuntime/WineLogTriage.h"', bridge)
 
     def test_madeira_style_diagnostics_do_not_parse_large_logs_on_refresh(self):

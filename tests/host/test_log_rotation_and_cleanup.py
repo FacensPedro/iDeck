@@ -1,4 +1,5 @@
 """The Wine log is rotated between sessions; a stuck cleanup asks for a restart."""
+import split_sources  # noqa: F401  (iDeck 3.0 split files)
 import unittest
 from pathlib import Path
 
@@ -8,7 +9,7 @@ COORDINATOR = (ROOT / "iDeck/SystemCoordinator.swift").read_text()
 
 class WineLogRotationTests(unittest.TestCase):
     def test_rotated_before_the_session_offset_is_taken(self):
-        body = COORDINATOR[COORDINATOR.index("private func captureWineLogStart()"):]
+        body = COORDINATOR[COORDINATOR.index("func captureWineLogStart()"):]
         body = body[:body.index("\n    }\n")]
         self.assertLess(body.index("Self.rotateWineLogIfLarge(url)"), body.index("attributesOfItem"))
 
@@ -22,7 +23,7 @@ class WineLogRotationTests(unittest.TestCase):
 
 class SessionCleanupTests(unittest.TestCase):
     def test_waits_twenty_seconds_with_a_status_then_asks_for_a_restart(self):
-        body = COORDINATOR[COORDINATOR.index("private func previousWineSessionStillFinishing()"):]
+        body = COORDINATOR[COORDINATOR.index("func previousWineSessionStillFinishing()"):]
         body = body[:body.index("\n    }\n")]
         self.assertIn('setWindowsStatus("Waiting for the previous Windows session to finish…")', body)
         self.assertIn("waitForSessionCleanup(timeout: 20)", body)

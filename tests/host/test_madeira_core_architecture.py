@@ -4,7 +4,7 @@ from pathlib import Path
 from support import ROOT, repo_text
 class MadeiraCoreArchitectureTests(unittest.TestCase):
     def test_config_settings_use_single_snapshot(self):
-        config = repo_text("iDeck/MadeiraConfig.swift")
+        config = repo_text("iDeck/NativeRuntime/MadeiraConfig.swift")
         self.assertIn("private static func snapshot() -> (exists: Bool, values: [String: String])", config)
         self.assertIn("static func all() -> [String: String] { snapshot().values }", config)
         get_body = config.split("static func get(_ key: String) -> String? {", 1)[1].split("\n    }", 1)[0]

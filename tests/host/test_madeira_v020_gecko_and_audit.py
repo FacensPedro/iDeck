@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 
 from support import ROOT, repo_text
-GECKO = repo_text("iDeck/WineGeckoRuntime.swift")
+GECKO = repo_text("iDeck/NativeRuntime/WineGeckoRuntime.swift")
 COORDINATOR = repo_text("iDeck/SystemCoordinator.swift")
 PROJECT = repo_text("iDeck.xcodeproj/project.pbxproj")
 AUDITOR = ROOT / "scripts/audit_madeira_v020_pe.py"

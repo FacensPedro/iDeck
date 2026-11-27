@@ -17,9 +17,9 @@ class LanguageLayerTests(unittest.TestCase):
         self.assertIn("IDEpicChunkCodec.inflate(data, size:", swift)
         self.assertIn("IDEpicChunkCodec.sha1(data)", swift)
         self.assertNotIn("compression_decode_buffer", swift)
-        self.assertIn('#include "EpicChunkCodec.hpp"', (ROOT / "iDeck/EpicChunkBridge.mm").read_text())
-        self.assertIn('#import "EpicChunkBridge.h"', (ROOT / "iDeck/iDeck-Bridging-Header.h").read_text())
-        self.assertFalse(layers.has_cxx((ROOT / "iDeck/EpicChunkBridge.h").read_text()))
+        self.assertIn('#include "EpicChunkCodec.hpp"', (ROOT / "iDeck/NativeRuntime/Bridges/EpicChunkBridge.mm").read_text())
+        self.assertIn('#import "NativeRuntime/Bridges/EpicChunkBridge.h"', (ROOT / "iDeck/iDeck-Bridging-Header.h").read_text())
+        self.assertFalse(layers.has_cxx((ROOT / "iDeck/NativeRuntime/Bridges/EpicChunkBridge.h").read_text()))
 
     def test_detector_flags_cpp_in_a_swift_visible_header(self):
         self.assertTrue(layers.has_cxx("namespace ideck { int x; }"))

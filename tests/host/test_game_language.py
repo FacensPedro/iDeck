@@ -1,3 +1,4 @@
+import split_sources  # noqa: F401  (iDeck 3.0 split files)
 import unittest
 from pathlib import Path
 
@@ -27,6 +28,15 @@ class GameLanguageTests(unittest.TestCase):
     def test_card_on_every_store_page(self):
         self.assertIn('GameLanguageCard(profileID: "steam:\\(game.appID)",', MAIN)
         self.assertIn("GameLanguageCard(profileID: profileID, available: GameLanguage.known(profileID))", MAIN)
+
+
+class GameLanguageWindowsLocale(unittest.TestCase):
+    def test_windows_language_and_steam_record(self):
+        env = (Path(__file__).resolve().parents[2] / "iDeck/WindowsEnvironment.swift").read_text()
+        self.assertIn("Self.applyGameLanguage(profileID: profile.id)", env)
+        self.assertIn('setenv("LC_ALL", unix, 1)', env)
+        sc = (Path(__file__).resolve().parents[2] / "iDeck/SessionCompatibility.swift").read_text()
+        self.assertIn("setSteamManifestLanguage(appID: app, steam: SteamLanguage.download(for: app))", sc)
 
 
 if __name__ == "__main__":

@@ -1,4 +1,5 @@
 """An EA game's bug report says what its licence was prepared for."""
+import split_sources  # noqa: F401  (iDeck 3.0 split files)
 import unittest
 from pathlib import Path
 

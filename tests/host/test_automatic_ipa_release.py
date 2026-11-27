@@ -13,7 +13,7 @@ VERSIONS = set(re.findall(r"\bMARKETING_VERSION\s*=\s*([^;]+);", PROJECT))
 if len(VERSIONS) != 1:
     raise AssertionError(f"Inconsistent iDeck project versions: {sorted(VERSIONS)}")
 PROJECT_VERSION = VERSIONS.pop().strip()
-if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", PROJECT_VERSION):
+if not re.fullmatch(r"[0-9]+\.[0-9]+(\.[0-9]+)?", PROJECT_VERSION):
     raise AssertionError(f"Invalid iDeck project version: {PROJECT_VERSION!r}")
 
 
@@ -79,8 +79,8 @@ class AutomaticIPAReleaseTests(unittest.TestCase):
         self.assertNotIn("AUTO_TAG:", release)
         self.assertNotIn("format('ideck-ci-{0}-{1}', github.run_id, github.run_attempt)", release)
         self.assertIn('if [[ "$KIND" != "native" ]]; then', release)
-        self.assertIn('gh release upload "$TAG" "iDeck-${VERSION}.ipa" iDeck.ipa.sha256 iDeck-distribution-audit.json --clobber', release)
-        self.assertIn('gh release create "$TAG" "iDeck-${VERSION}.ipa" iDeck.ipa.sha256 iDeck-distribution-audit.json', release)
+        self.assertIn('gh release upload "$TAG" "iDeck-${LABEL}.ipa" iDeck.ipa.sha256 iDeck-distribution-audit.json --clobber', release)
+        self.assertIn('gh release create "$TAG" "iDeck-${LABEL}.ipa" iDeck.ipa.sha256 iDeck-distribution-audit.json', release)
         self.assertIn("sha256sum --check iDeck.ipa.sha256", release)
 
     def test_release_checks_out_notes_and_updates_existing_version(self):
@@ -90,7 +90,7 @@ class AutomaticIPAReleaseTests(unittest.TestCase):
         self.assertIn("persist-credentials: false", release)
         self.assertIn("test -s RELEASE_NOTES.md", release)
         self.assertIn('gh release edit "$TAG" --title "$TITLE" --notes-file RELEASE_NOTES.md', release)
-        self.assertIn('gh release create "$TAG" "iDeck-${VERSION}.ipa" iDeck.ipa.sha256 iDeck-distribution-audit.json', release)
+        self.assertIn('gh release create "$TAG" "iDeck-${LABEL}.ipa" iDeck.ipa.sha256 iDeck-distribution-audit.json', release)
         notes = (ROOT / "RELEASE_NOTES.md").read_text(encoding="utf-8")
         self.assertNotIn("# iDeck 1.0.0", notes)
         self.assertTrue(notes.startswith("## What's Changed\n"))
@@ -123,7 +123,7 @@ class AutomaticIPAReleaseTests(unittest.TestCase):
         self.assertIn("REQUESTED_RELEASE_TAG:", guard)
         script = textwrap.dedent(guard.split("python3 - <<'PY'\n", 1)[1].split("\n          PY", 1)[0])
 
-        major, minor, patch = (int(x) for x in PROJECT_VERSION.split("."))
+        major, minor, patch = ([int(x) for x in PROJECT_VERSION.split(".")] + [0])[:3]
         previous_version = f"{major}.{minor}.{patch - 1}" if patch else f"{major}.{minor}.{patch + 1}"
         for tag, expected_ok in (
             (PROJECT_VERSION, True),

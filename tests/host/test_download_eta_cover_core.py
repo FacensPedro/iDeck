@@ -1,3 +1,4 @@
+import split_sources  # noqa: F401  (iDeck 3.0 split files)
 import unittest
 from pathlib import Path
 
@@ -34,7 +35,7 @@ class DownloadETACoreContract(unittest.TestCase):
         view = source("iDeck/MainView.swift")
         # The setup prepares the x64 + x86 prefix in the Visual C++ step, installs
         # Visual C++ and Wine Mono, and the Steam client only in the Madeira Dock step.
-        self.assertIn('private func installVisualCpp()', view)
+        self.assertIn('func installVisualCpp()', view)
         self.assertIn('coordinator.installMadeiraDock()', view)
         self.assertIn('case visualCpp, wineMono, dock, launchers, jit, summary', view)
         self.assertIn('coordinator.openMadeiraWorkspace()', view)
@@ -47,7 +48,7 @@ class DownloadETACoreContract(unittest.TestCase):
 
     def test_jit_defaults_to_624_and_hot_path_avoids_lock(self):
         settings = source("iDeck/SettingsView.swift")
-        self.assertIn('private var wineJITPoolMiB = 560', settings)
+        self.assertIn('var wineJITPoolMiB = 560', settings)
         coordinator = source("iDeck/SystemCoordinator.swift")
         self.assertIn('as? Int ?? 560', coordinator)
         core = source("iDeck/NativeRuntime/FEXRuntime.cpp")
@@ -55,7 +56,7 @@ class DownloadETACoreContract(unittest.TestCase):
         self.assertIn('std::memory_order_acquire', core)
 
     def test_madeira_game_config_is_cached_and_invalidated(self):
-        config = source("iDeck/MadeiraConfig.swift")
+        config = source("iDeck/NativeRuntime/MadeiraConfig.swift")
         self.assertIn('private static let gameCache', config)
         self.assertIn('invalidateGameCache()', config)
         self.assertIn('info.st_ino', config)

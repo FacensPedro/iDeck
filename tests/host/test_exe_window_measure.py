@@ -1,4 +1,5 @@
 """A game's fixed-base exe is measured before the JIT pool is placed."""
+import split_sources  # noqa: F401  (iDeck 3.0 split files)
 import unittest
 from pathlib import Path
 

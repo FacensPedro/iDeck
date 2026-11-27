@@ -1,4 +1,5 @@
 """Unified D3D11 + D3D12 IPA: profile plumbing and the PE graphics-API scanner."""
+import split_sources  # noqa: F401  (iDeck 3.0 split files)
 import pathlib
 import shutil
 import subprocess
@@ -38,8 +39,8 @@ class GraphicsAPIScanTests(unittest.TestCase):
                            check=True, capture_output=True)
         (d / "main.c").write_text('#include <stdio.h>\n#include "GraphicsAPIScan.h"\n'
                                   'int main(int c,char**v){for(int i=1;i<c;i++)printf("%u\\n",ideck_pe_graphics_apis(v[i]));}')
-        subprocess.run(["cc", "-std=gnu11", "-Wall", "-Wextra", "-Werror", f"-I{ROOT}/iDeck", f"{d}/main.c",
-                        f"{ROOT}/iDeck/GraphicsAPIScan.c", "-o", f"{d}/scan"], check=True)
+        subprocess.run(["cc", "-std=gnu11", "-Wall", "-Wextra", "-Werror", f"-I{ROOT}/iDeck/NativeRuntime/Bridges", f"{d}/main.c",
+                        f"{ROOT}/iDeck/NativeRuntime/Bridges/GraphicsAPIScan.c", "-o", f"{d}/scan"], check=True)
 
     def scan(self, name):
         out = subprocess.run([f"{self.dir}/scan", f"{self.dir}/{name}"], check=True, capture_output=True, text=True)

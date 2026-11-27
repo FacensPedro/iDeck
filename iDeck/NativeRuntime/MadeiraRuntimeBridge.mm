@@ -1,6 +1,6 @@
 #import "MadeiraRuntimeBridge.h"
 #import "RuntimeSupport.h"
-#import "../NativeRuntimeDiagnostics.h"
+#import "Bridges/NativeRuntimeDiagnostics.h"
 #import <Foundation/Foundation.h>
 #include <cerrno>
 #include <sys/stat.h>

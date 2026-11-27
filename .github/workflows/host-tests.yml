@@ -28,5 +28,7 @@ jobs:
           done
       - name: Run host tests
         run: python3 -m unittest discover -s tests/host -v
+      - name: iDeck System Libraries report is up to date
+        run: python3 scripts/ios_system_libraries.py --check
       - name: Check language layers
         run: python3 scripts/check_language_layers.py .

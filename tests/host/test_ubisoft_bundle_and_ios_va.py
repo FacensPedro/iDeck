@@ -1,3 +1,4 @@
+import split_sources  # noqa: F401  (iDeck 3.0 split files)
 import pathlib
 import unittest
 
@@ -23,7 +24,7 @@ class UbisoftConnectBundleTests(unittest.TestCase):
 
     def test_store_setup_installs_launchers_in_initial_setup(self):
         view = text("iDeck/MainView.swift")
-        step = view[view.index("private var launchersStep: some View"):view.index("// MARK: - JIT")]
+        step = view[view.index("var launchersStep: some View"):view.index("// MARK: - JIT")]
         self.assertIn("coordinator.installDefaultStoreClients()", step)
         coordinator = text("iDeck/SystemCoordinator.swift")
         # No Windows program runs: no silent switches, no cmd.exe, no services.exe.

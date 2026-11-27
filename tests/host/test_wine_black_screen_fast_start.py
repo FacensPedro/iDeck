@@ -1,8 +1,9 @@
+import split_sources  # noqa: F401  (iDeck 3.0 split files)
 import pathlib
 import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-RENDERER = (ROOT / "iDeck/WindowsRendererView.swift").read_text(encoding="utf-8")
+RENDERER = (ROOT / "iDeck/NativeRuntime/WindowsRendererView.swift").read_text(encoding="utf-8")
 COORDINATOR = (ROOT / "iDeck/SystemCoordinator.swift").read_text(encoding="utf-8")
 SERVER = (ROOT / "iDeck/NativeRuntime/WineBridge.mm").read_text(encoding="utf-8")
 PREFIX = (ROOT / "iDeck/PrefixInstaller.swift").read_text(encoding="utf-8")

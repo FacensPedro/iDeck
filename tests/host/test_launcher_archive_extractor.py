@@ -3,6 +3,7 @@ opened by LauncherArchiveExtractor.c. The extractor is built here when a C
 compiler is present (IDECK_LAUNCHER_EXTRACTOR names an already built one). With
 IDECK_LAUNCHER_INSTALLERS naming a folder holding UbisoftConnectInstaller.exe,
 EAappInstaller.exe and the EA app's .msi, the real installers are extracted too."""
+import split_sources  # noqa: F401  (iDeck 3.0 split files)
 import os
 import shutil
 import subprocess
@@ -92,7 +93,7 @@ class SwiftUsesTheExtractorTests(unittest.TestCase):
     def test_store_clients_install_without_wine(self):
         coordinator = (ROOT / "iDeck/SystemCoordinator.swift").read_text()
         install = coordinator[coordinator.index("func installDefaultStoreClients("):]
-        install = install[:install.index("/// Starts any Windows program or installer")]
+        install = install[:install.index("\n    }\n")]
         self.assertIn("StoreClient.installWithoutWine(client)", install)
         self.assertNotIn("launchWindowsExecutable", install)
         self.assertNotIn("ideck:store-setup", coordinator)

@@ -2,6 +2,8 @@
 from functools import lru_cache
 from pathlib import Path
 
+import split_sources  # noqa: F401  (iDeck 3.0: original file names include their split parts)
+
 ROOT = Path(__file__).resolve().parents[2]
 
 

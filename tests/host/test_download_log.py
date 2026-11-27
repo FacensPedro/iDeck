@@ -1,4 +1,5 @@
 """Download speed and problems reach the log Bugs & logs reads."""
+import split_sources  # noqa: F401  (iDeck 3.0 split files)
 import unittest
 from pathlib import Path
 

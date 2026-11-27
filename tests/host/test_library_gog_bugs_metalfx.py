@@ -1,3 +1,4 @@
+import split_sources  # noqa: F401  (iDeck 3.0 split files)
 import pathlib
 import unittest
 
@@ -43,7 +44,7 @@ class GOGIntegrationTests(unittest.TestCase):
 class LibraryPresentationTests(unittest.TestCase):
     def test_game_names_are_centered_without_store_badges(self):
         view = read("iDeck/MainView.swift")
-        self.assertIn("private func cardTitle(_ title: String)", view)
+        self.assertIn("func cardTitle(_ title: String)", view)
         self.assertIn("cardTitle(game.title)", view)
         self.assertIn('cardTitle(game.name.isEmpty ? tr("Untitled Steam app") : game.name)', view)
         self.assertIn(".multilineTextAlignment(.center)", view)

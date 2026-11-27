@@ -1,3 +1,4 @@
+import split_sources  # noqa: F401  (iDeck 3.0 split files)
 import pathlib
 import unittest
 
@@ -11,7 +12,7 @@ BRIDGE = (ROOT / "iDeck/NativeRuntime/WineBridge.mm").read_text()
 class MadeiraSecondLaunchCloseContractTests(unittest.TestCase):
     def test_every_launch_checks_previous_guest_completion_before_preparing_runtime(self):
         for method, next_method in (
-            ("func launchSteam()", "private func withPreparedMetalDisplay("),
+            ("func launchSteam()", "func withPreparedMetalDisplay("),
             ("func launchWindowsExecutable(", "/// Launches a Steam game"),
             ("func launchSteamGame(", "// A Windows guest runs as a thread"),
         ):
@@ -49,7 +50,7 @@ class MadeiraSecondLaunchCloseContractTests(unittest.TestCase):
             self.assertNotIn(forbidden, COORDINATOR)
 
     def test_session_does_not_leave_steam_game_or_guest_active_after_clean_close(self):
-        close = COORDINATOR.split("private func finishWindowsSessionCloseIfPossible()", 1)[1]
+        close = COORDINATOR.split("func finishWindowsSessionCloseIfPossible()", 1)[1]
         self.assertIn("guard !ideck_wineprocess_running(), !ideck_wineserver_running()", close)
         self.assertIn("ideck_wineprocess_thread_finished()", close)
         self.assertIn("ideck_runtime_complete_session()", close)

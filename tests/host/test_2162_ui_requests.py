@@ -1,4 +1,5 @@
 """2.16.2 requests: language card, controllers, controller audio, texts, bug log, install queue."""
+import split_sources  # noqa: F401  (iDeck 3.0 split files)
 import unittest
 from pathlib import Path
 

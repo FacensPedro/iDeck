@@ -1,4 +1,5 @@
 """Bug report additions: .txt export, session outcome, prerequisites, crash location."""
+import split_sources  # noqa: F401  (iDeck 3.0 split files)
 import re
 import unittest
 from pathlib import Path

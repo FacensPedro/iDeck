@@ -15,47 +15,23 @@ import UIKit
 // (its licence, the EA app's environment and the local service the game talks
 // to). EA's protocol work follows Maxima (GPL-3.0); no Maxima code is included.
 
-/// An installed EA game, as recorded by Madeira.
-struct EAInstalledGame: Codable, Sendable {
-    var offerID: String
-    var title: String
-    /// Relative to drive_c, forward slashes: "Program Files/EA Games/Mass Effect".
-    var folder: String
-    var buildID: String
-    var version: String
-    /// The id a licence names; empty when neither the catalog nor the build said.
-    var contentID: String
-    var multiplayerID: String
-    /// The program, relative to `folder`, forward slashes.
-    var launchExe: String
-    var arguments: String
-    var installBytes: Int64
-    /// The registry key (under HKLM, backslashes) and value the game's manifest named for
-    /// its install folder, which Madeira writes so the game finds its files.
-    var registryKey: String?
-    var registryValue: String?
-
-    var programPath: String { folder + "/" + launchExe }
-    var windowsInstallPath: String { "C:\\" + folder.replacingOccurrences(of: "/", with: "\\") }
-}
-
 @MainActor final class EALibrary: ObservableObject {
     static let shared = EALibrary()
 
     /// Off with `env.MADEIRA_EA = 0`.
     static var enabled: Bool { SteamSignIn.flag("MADEIRA_EA", default: true) }
 
-    @Published private(set) var signedIn = false
-    @Published private(set) var accountName: String? { didSet { PrivacyRedactor.register(accountName) } }
-    @Published private(set) var owned: [EAOwnedGame] = []
-    @Published private(set) var installed: [String: EAInstalledGame] = [:]
-    @Published private(set) var refreshing = false
-    @Published private(set) var libraryUpdated: Date?
+    @Published var signedIn = false
+    @Published var accountName: String? { didSet { PrivacyRedactor.register(accountName) } }
+    @Published var owned: [EAOwnedGame] = []
+    @Published var installed: [String: EAInstalledGame] = [:]
+    @Published var refreshing = false
+    @Published var libraryUpdated: Date?
     /// The newest build id seen for each installed game (checked when its page opens).
-    @Published private(set) var latestBuild: [String: String] = [:]
+    @Published var latestBuild: [String: String] = [:]
     /// A game's download and installed size (the live build's archive), or why EA gave none.
     enum Size: Equatable { case known(download: Int64, install: Int64), unavailable(String) }
-    @Published private(set) var sizes: [String: Size] = [:]
+    @Published var sizes: [String: Size] = [:]
     @Published var error: String?
 
     struct Download: Equatable {
@@ -65,19 +41,19 @@ struct EAInstalledGame: Codable, Sendable {
         var state: State
         var progress = EADownloadProgress()
     }
-    @Published private(set) var downloads: [String: Download] = [:]
-    private var queue: [String] = []
-    private var active: (id: String, task: Task<Void, Never>)?
-    private var inSession = false
-    private var resumeAfterSession = Set<String>()
-    private var resumeAfterBackground = Set<String>()
-    private var started = false
-    private var timer: Timer?
-    private var grace: UIBackgroundTaskIdentifier = .invalid
-    private let api = EAAPI.shared
-    private let downloader = EADownloader()
+    @Published var downloads: [String: Download] = [:]
+    var queue: [String] = []
+    var active: (id: String, task: Task<Void, Never>)?
+    var inSession = false
+    var resumeAfterSession = Set<String>()
+    var resumeAfterBackground = Set<String>()
+    var started = false
+    var timer: Timer?
+    var grace: UIBackgroundTaskIdentifier = .invalid
+    let api = EAAPI.shared
+    let downloader = EADownloader()
     /// The game whose launch Madeira prepared (its environment and service), until the session ends.
-    private var launched: String?
+    var launched: String?
 
     private init() { loadInstalled() }
 
@@ -88,17 +64,17 @@ struct EAInstalledGame: Codable, Sendable {
 
     static var drive: URL { EpicLibrary.drive }
     static let installRoot = "Program Files/EA Games"
-    private static var support: URL {
+    static var support: URL {
         FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("Madeira", isDirectory: true)
     }
-    private static var cacheURL: URL { support.appendingPathComponent("ea-library.json") }
-    private static var installedURL: URL { support.appendingPathComponent("ea-installed.json") }
+    static var cacheURL: URL { support.appendingPathComponent("ea-library.json") }
+    static var installedURL: URL { support.appendingPathComponent("ea-installed.json") }
     /// The installed build's file list, so an update keeps unchanged files without reading them.
-    private static func filesURL(_ id: String) -> URL {
+    static func filesURL(_ id: String) -> URL {
         support.appendingPathComponent("ea-manifests", isDirectory: true).appendingPathComponent(safeName(id) + ".json")
     }
-    private static func journalURL(_ id: String) -> URL {
+    static func journalURL(_ id: String) -> URL {
         support.appendingPathComponent("ea-downloads", isDirectory: true).appendingPathComponent(safeName(id) + ".journal")
     }
     /// A file or folder name made from EA's text: no separators, no dots at the ends.
@@ -108,8 +84,8 @@ struct EAInstalledGame: Codable, Sendable {
             .trimmingCharacters(in: CharacterSet(charactersIn: ". ").union(.whitespaces))
         return cleaned.isEmpty ? "game" : String(cleaned.prefix(120))
     }
-    private struct Cache: Codable { var version: Int; var updated: Date; var account: String; var games: [EAOwnedGame] }
-    private static func accountKey(_ id: String) -> String {
+    struct Cache: Codable { var version: Int; var updated: Date; var account: String; var games: [EAOwnedGame] }
+    static func accountKey(_ id: String) -> String {
         SHA256.hash(data: Data(id.utf8)).map { String(format: "%02x", $0) }.joined()
     }
 
@@ -133,349 +109,18 @@ struct EAInstalledGame: Codable, Sendable {
         if signedIn, owned.isEmpty { Task { await refreshLibrary(interactive: false) } }
     }
 
-    private func loadCache(account: String) {
-        guard let data = try? Data(contentsOf: Self.cacheURL), let cache = try? JSONDecoder().decode(Cache.self, from: data),
-              cache.version == 1, cache.account == Self.accountKey(account) else { return }
-        owned = cache.games
-        libraryUpdated = cache.updated
-    }
-
-    private func writeCache(account: String) {
-        let cache = Cache(version: 1, updated: libraryUpdated ?? Date(), account: Self.accountKey(account), games: owned)
-        try? FileManager.default.createDirectory(at: Self.support, withIntermediateDirectories: true)
-        try? JSONEncoder().encode(cache).write(to: Self.cacheURL, options: .atomic)
-    }
-
-    private func loadInstalled() {
-        guard let data = try? Data(contentsOf: Self.installedURL),
-              let records = try? JSONDecoder().decode([EAInstalledGame].self, from: data) else { return }
-        installed = Dictionary(records.map { ($0.offerID, $0) }, uniquingKeysWith: { a, _ in a })
-    }
-
-    private func writeInstalled() {
-        try? FileManager.default.createDirectory(at: Self.support, withIntermediateDirectories: true)
-        try? JSONEncoder().encode(installed.values.sorted { $0.offerID < $1.offerID }).write(to: Self.installedURL, options: .atomic)
-    }
-
     // MARK: Account
 
     /// PCI vendor ids of the GPUs Madeira's Wine reports.
-    private static let appleVendor: UInt16 = 0x106b, nvidiaVendor: UInt16 = 0x10de
-
-    /// The machine as the sign-in describes it (the device's own GPU, no AVX).
-    private func signInProfile() -> EAHardwareProfile {
-        EAHardware.profile(drive: Self.drive, gpuVendor: Self.appleVendor, gpuDevice: 0x0001, avx: false)
-    }
-
-    /// EA's login page for this device (a fresh challenge each time).
-    func loginURL() -> URL { api.loginURL(profile: signInProfile()) }
-
-    /// The code from EA's login page (EASignInView).
-    func signIn(code: String) async throws {
-        let session = try await api.signIn(authorizationCode: code)
-        signedIn = true
-        accountName = session.displayName.isEmpty ? nil : session.displayName
-        owned = []; libraryUpdated = nil
-        await refreshLibrary(interactive: true)
-    }
-
-    /// Removes the tokens and the cached list. Installed games stay, but an EA game needs
-    /// the sign-in to start: its licence and the EA app's environment come from the account.
-    func signOut() {
-        for id in Array(downloads.keys) { pause(id) }
-        api.signOut()
-        try? FileManager.default.removeItem(at: Self.cacheURL)
-        signedIn = false; accountName = nil; owned = []; libraryUpdated = nil
-    }
-
-    private func handle(_ error: Error, context: String, report: Bool) {
-        if case EAAPIError.signedOut = error {
-            signedIn = false; accountName = nil
-        }
-        let reason = (error as? EAAPIError)?.reason ?? (error as? URLError).map { "url-\($0.code.rawValue)" } ?? String(describing: type(of: error))
-        EALog.event("[ea-library] \(context) failed reason=\(reason)")
-        if report { self.error = error.localizedDescription }
-    }
+    static let appleVendor: UInt16 = 0x106b, nvidiaVendor: UInt16 = 0x10de
 
     // MARK: Library
 
-    func refreshLibrary(interactive: Bool = true) async {
-        guard Self.enabled, signedIn, !refreshing else { return }
-        refreshing = true
-        defer { refreshing = false }
-        do {
-            var games = try await api.ownedGames()
-            let known = Dictionary(owned.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
-            // Artwork for games not seen before; at most eight lookups at once.
-            let wanted = games.indices.filter { known[games[$0].id]?.cover == nil }
-            var art: [String: (URL?, URL?)] = [:]
-            await withTaskGroup(of: (String, (URL?, URL?)).self) { group in
-                var next = 0
-                func add() {
-                    guard next < wanted.count else { return }
-                    let game = games[wanted[next]]; next += 1
-                    group.addTask { [api] in (game.id, await api.images(slug: game.slug)) }
-                }
-                for _ in 0..<8 { add() }
-                while let (id, images) = await group.next() {
-                    art[id] = images
-                    add()
-                }
-            }
-            for index in games.indices {
-                let id = games[index].id
-                games[index].cover = art[id]?.0 ?? known[id]?.cover
-                games[index].wide = art[id]?.1 ?? known[id]?.wide
-            }
-            owned = games.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
-            libraryUpdated = Date()
-            if let account = api.account() {
-                writeCache(account: account.userID)
-                if accountName == nil, !account.displayName.isEmpty { accountName = account.displayName }
-            }
-            EALog.event("[ea-library] owned games=\(owned.count)")
-        } catch {
-            handle(error, context: "library", report: interactive)
-        }
-    }
-
-    /// A game's sizes from its live build's archive (the download sheet); once per app run.
-    /// The request runs in its own task: the view that asks (a card's .task) is often
-    /// redrawn or scrolled away, and its cancellation used to end the request with
-    /// CancellationError / URLError -999, which was then stored as "unavailable" for
-    /// the rest of the run. A cancelled request now stores nothing, so it is asked again.
-    func loadSize(_ id: String) async {
-        guard signedIn, sizes[id] == nil else { return }
-        if let running = sizeRequests[id] { await running.value; return }
-        let request = Task { () -> Void in
-            do {
-                let build = try await self.api.liveBuild(offerID: id)
-                let url = try await self.api.downloadURL(offerID: id, buildID: build.buildID)
-                let archive = try await self.downloader.archive(url)
-                self.sizes[id] = .known(download: archive.compressedBytes, install: archive.installBytes)
-            } catch {
-                let cancelled = error is CancellationError || (error as? URLError)?.code == .cancelled
-                if !cancelled {
-                    self.sizes[id] = .unavailable((error as? EAAPIError)?.errorDescription ?? "EA did not say how large this game is.")
-                }
-                self.handle(error, context: "size id=\(id)\(cancelled ? " (cancelled, will retry)" : "")", report: false)
-            }
-        }
-        sizeRequests[id] = request
-        await request.value
-        sizeRequests[id] = nil
-    }
-    private var sizeRequests: [String: Task<Void, Never>] = [:]
-
-    /// Notes the newest build (the Game details page shows Update when it differs).
-    func checkForUpdate(_ id: String) async {
-        guard signedIn, installed[id] != nil, latestBuild[id] == nil else { return }
-        if let build = try? await api.liveBuild(offerID: id) { latestBuild[id] = build.buildID }
-    }
-
-    func updateAvailable(_ id: String) -> Bool {
-        guard let record = installed[id], let latest = latestBuild[id] else { return false }
-        return latest != record.buildID
-    }
-
-    /// A first install was paused or failed: its journal is on disk.
-    func hasPartialDownload(_ id: String) -> Bool {
-        let journal = Self.journalURL(id)
-        return FileManager.default.fileExists(atPath: journal.path)
-            || FileManager.default.fileExists(atPath: journal.deletingPathExtension().appendingPathExtension("folder").path)
-    }
+    var sizeRequests: [String: Task<Void, Never>] = [:]
 
     // MARK: Downloads
 
-    func install(_ id: String) { enqueue(id, kind: installed[id] == nil ? .install : .update) }
-    func repair(_ id: String) { enqueue(id, kind: .repair) }
-
-    private func enqueue(_ id: String, kind: Download.Kind) {
-        guard signedIn || installed[id] != nil else { error = "Sign in to EA to download games."; return }
-        if kind == .install, let client = SystemCoordinator.StoreClient.required(for: ["Electronic Arts"], title: game(id)?.title ?? ""),
-           client.installedURL == nil { error = client.installInstruction; return }
-        if kind == .install, AntiCheatPolicy.isBlocked(title: game(id)?.title ?? "") { error = AntiCheatPolicy.message; return }
-        guard signedIn else { error = EAAPIError.signedOut.localizedDescription; return }
-        if let current = downloads[id], current.state == .active || current.state == .queued { return }
-        // A resumed download keeps what it showed when it was paused.
-        var download = Download(kind: kind, state: .queued)
-        if let previous = downloads[id], previous.kind == kind, previous.state == .paused { download.progress = previous.progress }
-        downloads[id] = download
-        if !queue.contains(id) { queue.append(id) }
-        startTimer()
-        pump()
-    }
-
-    /// Stops a download, keeping its finished files; Resume continues from them.
-    func pause(_ id: String) {
-        if let current = active, current.id == id {
-            current.task.cancel()
-            // Shown as paused at once: the task stops at its next chunk.
-            downloads[id]?.state = .paused
-        } else if let index = queue.firstIndex(of: id) {
-            queue.remove(at: index)
-            downloads[id]?.state = .paused
-        }
-        resumeAfterSession.remove(id); resumeAfterBackground.remove(id)
-    }
-
-    /// Stop download: removes a first install's partial files and uninstalls an
-    /// installed game whose update or repair is stopped.
-    func cancel(_ id: String) {
-        pause(id)
-        let kind = downloads[id]?.kind ?? .install
-        downloads[id] = nil
-        if kind == .install { removePartialInstall(id) }
-        EALog.event("[ea-download] cancelled id=\(id) kind=\(kind.rawValue)")
-        if kind != .install, installed[id] != nil { uninstall(id) }
-    }
-
-    /// A first install's partial files: its folder (named in the journal's sidecar) and
-    /// the journal. Used by Stop and, since 2.13.3, when the download fails.
-    private func removePartialInstall(_ id: String) {
-        let journal = Self.journalURL(id)
-        let sidecar = journal.deletingPathExtension().appendingPathExtension("folder")
-        if let folder = try? String(contentsOf: sidecar, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines), !folder.isEmpty,
-           folder.hasPrefix(Self.installRoot + "/") {
-            try? FileManager.default.removeItem(at: Self.drive.appendingPathComponent(folder, isDirectory: true))
-        }
-        try? FileManager.default.removeItem(at: sidecar)
-        try? FileManager.default.removeItem(at: journal)
-    }
-
-    /// Deletes the game's files and records; its library entry goes with them.
-    func uninstall(_ id: String) {
-        pause(id)
-        downloads[id] = nil
-        guard let record = installed[id] else { return }
-        if record.folder.hasPrefix(Self.installRoot + "/") {
-            try? FileManager.default.removeItem(at: Self.drive.appendingPathComponent(record.folder, isDirectory: true))
-        }
-        try? FileManager.default.removeItem(at: Self.filesURL(id))
-        try? FileManager.default.removeItem(at: Self.journalURL(id))
-        installed[id] = nil
-        writeInstalled()
-        EALog.event("[ea-library] uninstalled id=\(id)")
-    }
-
-    private func pump() {
-        guard active == nil, !inSession, !queue.isEmpty else { return }
-        let id = queue.removeFirst()
-        downloads[id]?.state = .active
-        let task = Task { @MainActor [weak self] in
-            guard let self else { return }
-            await self.run(id)
-        }
-        active = (id, task)
-    }
-
-    private func run(_ id: String) async {
-        let kind = downloads[id]?.kind ?? .install
-        do {
-            let game = self.game(id)
-            guard let title = game?.title ?? installed[id]?.title else { throw EAAPIError.invalid("unknown-game") }
-            func step(_ text: String) {
-                downloads[id]?.progress.step = text
-                EALog.event("[ea-download] prepare id=\(id) step=\"\(text)\"")
-            }
-            step("Finding the newest build")
-            let build = try await api.liveBuild(offerID: id)
-            step("Getting the download address")
-            let url = try await api.downloadURL(offerID: id, buildID: build.buildID)
-            step("Reading the build's file list")
-            var archive = try await downloader.archive(url)
-            // The game page shows the size as soon as the file list is read.
-            sizes[id] = .known(download: archive.compressedBytes, install: archive.installBytes)
-            step("Choosing the fastest server")
-            archive = await downloader.fastestMirror(archive)
-            let record = installed[id]
-            let folder = record?.folder ?? (Self.installRoot + "/" + Self.safeName(game?.installFolder ?? title))
-            try? FileManager.default.createDirectory(at: Self.journalURL(id).deletingLastPathComponent(), withIntermediateDirectories: true)
-            try? folder.write(to: Self.journalURL(id).deletingPathExtension().appendingPathExtension("folder"), atomically: true, encoding: .utf8)
-            let previousData = try? Data(contentsOf: Self.filesURL(id))
-            let previous = previousData.flatMap { try? JSONDecoder().decode([EAZipEntry].self, from: $0) }
-            EALog.event("[ea-download] start id=\(id) kind=\(kind.rawValue) build=\(build.buildID) files=\(archive.files.count) bytes=\(archive.compressedBytes)")
-            let result = try await downloader.install(
-                archive: archive, folder: Self.drive.appendingPathComponent(folder, isDirectory: true),
-                previous: kind == .repair ? nil : previous, verifyAll: kind == .repair, journal: Self.journalURL(id)) { progress in
-                    guard ProgressThrottle.allow("ea:" + id, state: "\(progress.phase)\(progress.step ?? "")",
-                                                 done: progress.doneBytes, total: progress.totalBytes) else { return }
-                    Task { @MainActor in EALibrary.shared.downloads[id]?.progress = progress }
-                    if progress.phase == .downloading {
-                        DownloadLog.progress(store: "EA app", name: title, done: progress.doneBytes, total: progress.totalBytes)
-                    }
-                }
-            try? FileManager.default.createDirectory(at: Self.filesURL(id).deletingLastPathComponent(), withIntermediateDirectories: true)
-            try? JSONEncoder().encode(archive.entries).write(to: Self.filesURL(id), options: .atomic)
-            try? FileManager.default.removeItem(at: Self.journalURL(id).deletingPathExtension().appendingPathExtension("folder"))
-            let launch = try Self.launch(folder: Self.drive.appendingPathComponent(folder, isDirectory: true), catalogPath: game?.executePath)
-            let finished = EAInstalledGame(
-                offerID: id, title: title, folder: folder, buildID: build.buildID, version: launch.version ?? build.version,
-                contentID: game?.contentID ?? launch.contentID ?? record?.contentID ?? "", multiplayerID: game?.multiplayerID ?? record?.multiplayerID ?? "",
-                launchExe: launch.exe, arguments: launch.arguments, installBytes: result.installBytes,
-                registryKey: launch.registryKey, registryValue: launch.registryValue)
-            if finished.contentID.isEmpty { EALog.event("[ea-download] id=\(id): no content id (licence requests will not work)") }
-            installed[id] = finished
-            latestBuild[id] = build.buildID
-            writeInstalled()
-            downloads[id] = nil
-            Self.writeRegistry(finished)
-            EALog.event("[ea-download] done id=\(id) written=\(result.filesWritten) kept=\(result.filesKept) fetched=\(result.bytesFetched)")
-            DownloadLog.ended(store: "EA app", name: title, outcome: "finished")
-        } catch {
-            if Task.isCancelled || error is CancellationError || (error as? URLError)?.code == .cancelled {
-                let stopped = downloads[id] == nil
-                if downloads[id]?.state != .queued { downloads[id]?.state = .paused }
-                EALog.event("[ea-download] \(stopped ? "stopped" : "paused") id=\(id)")
-                DownloadLog.ended(store: "EA app", name: game(id)?.title ?? installed[id]?.title ?? id, outcome: stopped ? "stopped" : "paused")
-            } else {
-                downloads[id]?.state = .failed(error.localizedDescription)
-                // A failed first install is removed, as Stop does: no half game is left.
-                if downloads[id]?.kind == .install && installed[id] == nil {
-                    removePartialInstall(id)
-                    EALog.event("[ea-download] failed id=\(id): partial files removed")
-                }
-                DownloadLog.ended(store: "EA app", name: game(id)?.title ?? installed[id]?.title ?? id, outcome: "failed: " + error.localizedDescription)
-                handle(error, context: "download id=\(id)", report: false)
-            }
-        }
-        active = nil
-        pump()
-        if !hasActiveDownload { ResourceGovernor.shared.releaseAfterDownload() }
-    }
-
     // MARK: What starts the game
-
-    struct Launch: Equatable {
-        var exe: String          // relative to the game's folder, forward slashes
-        var arguments: String
-        var version: String?
-        var contentID: String?
-        var registryKey: String?
-        var registryValue: String?
-    }
-
-    /// How the EA app starts the game: the launcher of `__Installer/installerdata.xml`,
-    /// else the catalog's program. A path behind a registry key is taken relative to the
-    /// game's folder, and the key is remembered for the registry.
-    nonisolated static func launch(folder: URL, catalogPath: String?) throws -> Launch {
-        var data: EAInstallerData?
-        if let installer = EALicense.child(of: folder, named: "__Installer"), let file = EALicense.child(of: installer, named: "installerdata.xml"),
-           let bytes = try? Data(contentsOf: file) {
-            data = EAInstallerData.parse(bytes)
-        }
-        guard let text = data?.launcher?.filePath ?? catalogPath else { throw EAAPIError.noLauncher }
-        let path = EARegistryPath(text)
-        let relative = path.relative.replacingOccurrences(of: "\\", with: "/")
-        guard let parts = EAZipDirectory.safeComponents(relative), !parts.isEmpty else { throw EAAPIError.noLauncher }
-        let exe = parts.joined(separator: "/")
-        guard EALicense.child(of: parts.dropLast().reduce(folder) { $0.appendingPathComponent($1) }, named: parts.last!) != nil else {
-            EALog.event("[ea-library] launcher not found: \(exe)")
-            throw EAAPIError.noLauncher
-        }
-        return Launch(exe: exe, arguments: data?.launcher?.parameters ?? "", version: data?.gameVersion, contentID: data?.contentIDs.first,
-                      registryKey: path.key, registryValue: path.valueName)
-    }
 
     nonisolated static let licenceFactsKey = "diagnostics.eaLicence"
     nonisolated static let hashCheckKey = "diagnostics.eaHashCheck"
@@ -497,76 +142,6 @@ struct EAInstalledGame: Codable, Sendable {
     /// The offer id of that launch, which is the game's profile id after "ea:".
     nonisolated(unsafe) static var lastPreparedOfferID: String?
 
-    nonisolated static func hashVariant(contentID: String) -> Int {
-        UserDefaults.standard.integer(forKey: hashVariantPrefix + contentID)
-    }
-
-    /// The session of the last prepared EA game ended; `activationUI` says whether its
-    /// Wine log shows ActivationUI.exe, EA's activation window, being started.
-    nonisolated static func noteSessionEnded(activationUI: Bool) {
-        guard let content = lastPreparedContentID else { return }
-        lastPreparedContentID = nil
-        let variant = hashVariant(contentID: content)
-        guard activationUI else {
-            EALog.event("[ea-license] content=\(content) accepted its licence (hash variant \(variant))")
-            return
-        }
-        UserDefaults.standard.set(true, forKey: "ea.traceActivation.ea:" + (lastPreparedOfferID ?? content))
-        let next = variant == 0 ? 1 : 0
-        UserDefaults.standard.set(next, forKey: hashVariantPrefix + content)
-        EALog.event("[ea-license] content=\(content) started ActivationUI.exe with hash variant \(variant) "
-            + "(\(variant == 0 ? "display adapter hashed" : "no display adapter")): the next launch asks for a licence with variant \(next)")
-        // EA's activation window writes why it opened in C:\ProgramData\Origin\Logs; the
-        // game itself says nothing, so those lines go in iDeck's log.
-        let account = EAAPI.shared.account()
-        let hidden = [account?.displayName, account?.userID, account?.personaID].compactMap { $0 }
-        let reason = EAPrefixEvidence.activationReason(
-            drive: FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("wine/drive_c", isDirectory: true),
-            hidden: hidden)
-        if reason.isEmpty {
-            EALog.event("[ea-activation-log] EA's activation window left no log in C:\\ProgramData\\Origin\\Logs")
-        }
-        for line in reason { EALog.event("[ea-activation-log] " + line.trimmingCharacters(in: .whitespaces)) }
-    }
-
-    /// The activation library the game ships and what the licence is built for.
-    nonisolated static func activationFacts(_ activation: EALicense.Activation, gameFolder: URL) -> String {
-        guard activation.required else { return "no Core folder: the game checks no licence" }
-        let core = EALicense.child(of: gameFolder, named: "Core")
-        let names = (core.flatMap { try? FileManager.default.contentsOfDirectory(atPath: $0.path) } ?? []).sorted()
-        let version = activation.libraryVersion.map { "\($0.major).\($0.minor).\($0.patch)" } ?? "unreadable"
-        // A 64-bit game loads Activation64.dll; the hash version is read from Activation.dll,
-        // as the EA app does. Both versions are named so a difference shows.
-        var wide = ""
-        if let core, let library = EALicense.child(of: core, named: "Activation64.dll"),
-           let data = try? Data(contentsOf: library, options: .mappedIfSafe) {
-            wide = " (Activation64.dll " + (EAPEVersion.productVersion(data).map { "\($0.major).\($0.minor).\($0.patch)" } ?? "unreadable") + ")"
-        }
-        return "library \(version)\(wide), hash version \(activation.hashVersion), signature as \(activation.decodeSignature ? "bytes" : "base64 text"), "
-            + "Core: \(names.prefix(16).joined(separator: " "))"
-    }
-
-    /// The registry keys an EA game expects: the EA app's install marker and, when the
-    /// game's manifest named one, its own install folder. Only while no session runs.
-    nonisolated static func writeRegistry(_ record: EAInstalledGame) {
-        guard wine_process_is_running() == 0, wineserver_is_running() == 0 else { return }
-        var values = [
-            SteamInstallValue(hive: .machine, key: "Software\\Electronic Arts\\EA Desktop", name: "InstallSuccessful", data: .string("true"), followsInstall: false),
-            SteamInstallValue(hive: .machine, key: "Software\\Electronic Arts\\Origin", name: "InstallSuccessful", data: .string("true"), followsInstall: false),
-            SteamInstallValue(hive: .machine, key: "Software\\Electronic Arts\\Origin", name: "ClientPath",
-                              data: .string("C:\\Windows\\System32\\conhost.exe"), followsInstall: false),
-        ]
-        if let key = record.registryKey, let name = record.registryValue, !key.isEmpty {
-            values.append(SteamInstallValue(hive: .machine, key: key, name: name, data: .string(record.windowsInstallPath + "\\"), followsInstall: true))
-        }
-        do {
-            let changed = try EARegistry.write(values, prefix: MadeiraDock.prefix)
-            EALog.event("[ea-library] registry values=\(values.count) written=\(changed) game-key=\(record.registryKey == nil ? 0 : 1)")
-        } catch {
-            EALog.event("[ea-library] registry write failed: \(error.localizedDescription)")
-        }
-    }
-
     // MARK: Starting a game
 
     /// The environment the EA app gives a game; cleared before every other launch.
@@ -575,300 +150,11 @@ struct EAInstalledGame: Codable, Sendable {
                                    "EALsxPort", "EARtPLaunchCode", "EASecureLaunchTokenTemp", "EASteamProxyIpcPort", "OriginSessionKey", "ContentId",
                                    "EAOnErrorExitRetCode", "EAConnectionId", "EALicenseToken", "EALaunchUserAuthToken", "EAAccessTokenJWS"]
 
-    nonisolated static func clearEnvironment() {
-        for name in environmentNames { unsetenv(name) }
-    }
-
-    /// Everything an EA game needs before its session starts: a valid sign-in, its
-    /// licence for this machine, the registry keys, the EA app's environment and the
-    /// local service. Throws with a message for the player when something is missing.
-    func prepareLaunch(offerID id: String, nvidiaGPU nvidia: Bool = false, avx: Bool = false) async throws {
-        guard let record = installed[id] else { throw EAAPIError.invalid("not-installed") }
-        let session: EASession
-        do { session = try await api.validSession() } catch {
-            handle(error, context: "launch id=\(id)", report: false)
-            throw error
-        }
-        // The GPU Madeira's Wine reports (build/win32u-unix/sysparams_ios.c): the NVIDIA
-        // card the game's setting picks, otherwise the device's own.
-        let profile = EAHardware.profile(drive: Self.drive, gpuVendor: nvidia ? Self.nvidiaVendor : Self.appleVendor,
-                                         gpuDevice: nvidia ? 0x2544 : 0x0001, avx: avx)
-        let folder = Self.drive.appendingPathComponent(record.folder, isDirectory: true)
-        let activation = EALicense.activation(gameFolder: folder)
-        var licenceProfile = profile
-        // What the licence was prepared for, kept for the bug report: a game that does
-        // not accept it starts EA's activation window, and only these facts say why.
-        let facts = Self.activationFacts(activation, gameFolder: folder)
-        UserDefaults.standard.set(facts + ", licence not prepared", forKey: Self.licenceFactsKey)
-        // As a GOG game runs offline when iDeck cannot answer as GOG Galaxy, a licence
-        // iDeck cannot prepare no longer stops the launch: the game starts and its own
-        // activation decides (EA's activation window, or the game runs).
-        if activation.required && record.contentID.isEmpty {
-            EALog.event("[ea-license] id=\(id): no content id; starting without a prepared licence")
-            UserDefaults.standard.set(facts + ", licence not prepared (no content id)", forKey: Self.licenceFactsKey)
-        } else if activation.required {
-            Self.lastPreparedContentID = record.contentID
-            Self.lastPreparedOfferID = id
-            // See hashVariantPrefix: variant 1 is the hash taken before Wine registered the
-            // display adapter. The licence and the local service use it; the launch token keeps the device.
-            let variant = Self.hashVariant(contentID: record.contentID)
-            if variant == 1 { licenceProfile.gpuPNPDeviceID = "" }
-            EALog.event("[ea-license] content=\(record.contentID) hash variant \(variant)")
-            let (hash, _) = licenceProfile.machineHash(version: activation.hashVersion)
-            UserDefaults.standard.set(EAHashCheck.report(profile: licenceProfile, hashVersion: activation.hashVersion, drive: Self.drive),
-                                      forKey: Self.hashCheckKey)
-            let current = EALicense.current(contentID: record.contentID, drive: Self.drive)
-            // Every launch asks EA for a fresh licence. A licence kept from an earlier
-            // launch (same machine hash, still recent) was refused by Dragon Age:
-            // Inquisition, which then started ActivationUI.exe; the same game accepted a
-            // renewed one. A kept licence is used only when the renewal fails.
-            let stale = EALicense.needsRenewal(current, machineHash: hash, userID: session.userID)
-            var renewal: EALicenseInfo?
-            UserDefaults.standard.set(facts + ", licence request failed", forKey: Self.licenceFactsKey)
-            do {
-                renewal = try await EALicense.renew(api: api, contentID: record.contentID, profile: licenceProfile, activation: activation, drive: Self.drive)
-            } catch {
-                EALog.event("[ea-license] renewal failed content=\(record.contentID) stale=\(stale ? 1 : 0): \(error.localizedDescription)"
-                            + (stale ? "; starting with the kept licence, the game's activation decides" : ""))
-            }
-            if let renewed = renewal {
-                UserDefaults.standard.set(facts + ", licence renewed, game token \(renewed.gameToken == nil ? "absent" : "present")",
-                                          forKey: Self.licenceFactsKey)
-            } else {
-                UserDefaults.standard.set(facts + ", licence kept (renewal failed), game token \(current?.gameToken == nil ? "absent" : "present")",
-                                          forKey: Self.licenceFactsKey)
-                EALog.event("[ea-license] kept content=\(record.contentID) hash-version=\(activation.hashVersion)")
-            }
-        } else {
-            UserDefaults.standard.set(facts, forKey: Self.licenceFactsKey)
-        }
-        Self.writeRegistry(record)
-        // The short-lived token the EA app hands a game (EALaunchUserAuthToken); a game
-        // that never reads it still starts, so a failure here is logged, not fatal.
-        var opaque = ""
-        do {
-            opaque = try await api.exchange(clientID: EAAPI.clientID, responseType: "token",
-                                            scopes: ["basic.commerce.cartv2", "service.atom", "dp.client.default", "signin", "social_recommendation_user",
-                                                     "basic.optin.write", "basic.commerce.cartv2.write", "basic.billing", "external.social_information_ups_admin"],
-                                            tokenFormat: "OPAQUE", expiresIn: 550, profile: profile)
-        } catch {
-            handle(error, context: "launch token id=\(id)", report: false)
-        }
-        let launchID = UUID().uuidString.lowercased()
-        let environment: [String: String] = [
-            "EAAuthCode": "unavailable", "EAEgsProxyIpcPort": "0", "EAEntitlementSource": "EA", "EAExternalSource": "EA", "EAFreeTrialGame": "false",
-            "EAGameLocale": GameLanguage.locale("ea:" + id, separator: "_"), "EAGenericAuthToken": session.accessToken, "EALaunchCode": "unavailable", "EALaunchOwner": "EA",
-            "EALaunchEAID": session.displayName, "EALaunchEnv": "production", "EALaunchOfflineMode": "false", "EALsxPort": String(EAService.port),
-            "EARtPLaunchCode": String(EALSXCrypto.launchCode()), "EASecureLaunchTokenTemp": session.userID, "EASteamProxyIpcPort": "0",
-            "OriginSessionKey": launchID, "ContentId": record.contentID, "EAOnErrorExitRetCode": "1", "EAConnectionId": id, "EALicenseToken": id,
-            "EALaunchUserAuthToken": opaque, "EAAccessTokenJWS": session.accessToken,
-        ]
-        Self.clearEnvironment()
-        for (name, value) in environment { setenv(name, value, 1) }
-        try EAService.shared.start(EAServiceContext(
-            offerID: id, contentID: record.contentID, title: record.title, version: record.version, multiplayerID: record.multiplayerID,
-            userID: session.userID, personaID: session.personaID, displayName: session.displayName, profile: licenceProfile, hashVersion: activation.hashVersion))
-        launched = id
-        startTimer()
-        let hasUserToken = !opaque.isEmpty
-        EALog.event("[ea-launch] id=\(id) content=\(record.contentID) licence=\(activation.required ? "checked" : "none") token=\(hasUserToken ? 1 : 0)")
-    }
-
-    /// The session ended: the service stops and the EA app's environment goes.
-    func launchEnded() {
-        guard launched != nil else { return }
-        launched = nil
-        EAService.shared.stop()
-        Self.clearEnvironment()
-    }
-
     // MARK: Sessions
-
-    /// A game session is starting or ended: downloads pause for it and continue afterwards. Idempotent.
-    func sessionChanged(active running: Bool) {
-        guard running != inSession else { return }
-        if !running { launchEnded() }
-        inSession = running
-        if running {
-            if let current = active { resumeAfterSession.insert(current.id); current.task.cancel() }
-            for id in queue { resumeAfterSession.insert(id); downloads[id]?.state = .paused }
-            queue.removeAll()
-            if !resumeAfterSession.isEmpty { EALog.event("[ea-download] paused for a game session count=\(resumeAfterSession.count)") }
-        } else {
-            let resume = resumeAfterSession.sorted()
-            resumeAfterSession.removeAll()
-            for id in resume { enqueue(id, kind: downloads[id]?.kind ?? .install) }
-        }
-    }
 
     var sessionRunning: Bool {
         wine_process_is_running() != 0 || wineserver_is_running() != 0
     }
 
-    func reconcileSession() { sessionChanged(active: sessionRunning) }
-
-    private func startTimer() {
-        guard timer == nil else { return }
-        timer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated {
-                guard let self else { return }
-                self.reconcileSession()
-                if !self.hasActiveDownload, self.launched == nil { self.timer?.invalidate(); self.timer = nil }
-            }
-        }
-    }
-
-    private func beginGrace() {
-        guard hasActiveDownload, grace == .invalid else { return }
-        grace = UIApplication.shared.beginBackgroundTask(withName: "EA download") { [weak self] in
-            MainActor.assumeIsolated {
-                self?.pauseForBackground()
-                self?.endGrace()
-            }
-        }
-    }
-
-    private func endGrace() {
-        guard grace != .invalid else { return }
-        UIApplication.shared.endBackgroundTask(grace)
-        grace = .invalid
-    }
-
-    private func pauseForBackground() {
-        if let current = active { resumeAfterBackground.insert(current.id); current.task.cancel() }
-        for id in queue { resumeAfterBackground.insert(id); downloads[id]?.state = .paused }
-        queue.removeAll()
-        EALog.event("[ea-download] paused for the background count=\(resumeAfterBackground.count)")
-    }
-
-    private func resumeFromBackground() {
-        let ids = resumeAfterBackground.sorted()
-        resumeAfterBackground.removeAll()
-        for id in ids { enqueue(id, kind: downloads[id]?.kind ?? .install) }
-    }
 }
 
-
-/// What the licence's machine hash was built from (EAHardwareProfile), next to what the
-/// prefix's own files say the game will read: Windows' ProductId and the display
-/// adapters in the registry (system.reg), and the volume serial kept in the prefix. A
-/// licence whose hash input differs from the game's is refused, and the game opens EA's
-/// activation window.
-enum EAHashCheck {
-    /// The fields of each hash version the prefix's files can confirm. The board and
-    /// BIOS (IOKit) and the processor (FEX's CPUID) are not in them: Wine keeps
-    /// Hardware\Description volatile, so the hashed text itself records what the
-    /// licence was asked for.
-    static func usedFields(version: Int) -> Set<String> {
-        switch version {
-        case 0, 1: return ["osSerial"]
-        case 2: return ["osSerial", "volume", "gpu"]
-        default: return ["volume", "gpu"]
-        }
-    }
-
-    static func report(profile: EAHardwareProfile, hashVersion: Int, drive: URL) -> String {
-        var notes = ["hashed \"" + profile.shownHashInput(version: hashVersion) + "\""]
-        let prefix = drive.deletingLastPathComponent()
-        let used = usedFields(version: hashVersion)
-        if used.contains("volume") {
-            let letter = EAHardware.driveLetter(prefix: prefix, drive: drive)
-            let stored = FileManager.default.fileExists(atPath: prefix.appendingPathComponent(EAVolumeSerial.fileName).path)
-            notes.append("volume serial: " + (stored ? "the prefix's" : "none stored in the prefix") + ", drive "
-                         + (letter == 0 ? "not among dosdevices" : String(UnicodeScalar(letter)) + ":"))
-        }
-        let registry = (try? String(contentsOf: prefix.appendingPathComponent("system.reg"), encoding: .utf8)) ?? ""
-        guard !registry.isEmpty else { return (notes + ["no system.reg in the prefix to compare with"]).joined(separator: " | ") }
-        if used.contains("osSerial") {
-            let mine = profile.osSerial.trimmingCharacters(in: .whitespaces)
-            if let wine = registryValue(registry, key: "Software\\Microsoft\\Windows NT\\CurrentVersion", name: "ProductId")?
-                .trimmingCharacters(in: .whitespaces) {
-                notes.append(wine == mine ? "ProductId agrees" : "differs: osSerial iDeck=\"\(mine)\" wine=\"\(wine)\"")
-            } else {
-                notes.append("ProductId not in system.reg")
-            }
-        }
-        if used.contains("gpu") {
-            let devices = displayDevices(registry)
-            notes.append(devices.isEmpty ? "no display adapter in system.reg yet"
-                         : "display adapters in system.reg: \(devices.count), first \(devices[0])")
-        }
-        return notes.joined(separator: " | ")
-    }
-
-    /// The display adapters in a prefix registry (Enum keys of the Display class), in key
-    /// order, each as its first HardwareID. Wine's wbemprox answers Win32_VideoController
-    /// from these, and the licence hash takes the first one's PNPDeviceID.
-    static func displayDevices(_ text: String) -> [String] {
-        let enumPrefix = "[system\\\\currentcontrolset\\\\enum\\\\"
-        let displayClass = "{4d36e968-e325-11ce-bfc1-08002be10318}"
-        var found: [(key: String, id: String)] = []
-        var key: String?
-        var isDisplay = false
-        var hardwareID: String?
-        func close() {
-            if let key, isDisplay { found.append((key, hardwareID ?? "(no HardwareID)")) }
-            key = nil
-            isDisplay = false
-            hardwareID = nil
-        }
-        for raw in text.split(separator: "\n", omittingEmptySubsequences: false) {
-            if raw.hasPrefix("[") {
-                close()
-                let lower = raw.lowercased()
-                if lower.hasPrefix(enumPrefix), let end = lower.firstIndex(of: "]") {
-                    key = String(lower[lower.index(after: lower.startIndex)..<end])
-                }
-                continue
-            }
-            guard key != nil, raw.hasPrefix("\"") else { continue }
-            let lower = raw.lowercased()
-            if lower.hasPrefix("\"classguid\"=\""), lower.contains(displayClass) { isDisplay = true }
-            if lower.hasPrefix("\"hardwareid\"="), let open = raw.range(of: ":\"") ?? raw.range(of: "=\"") {
-                hardwareID = firstString(raw[open.upperBound...])
-            }
-        }
-        close()
-        return found.sorted { $0.key < $1.key }.map(\.id)
-    }
-
-    /// The first string of a .reg value's quoted text: up to its closing quote or the
-    /// \0 that separates the strings of a multi-string.
-    static func firstString(_ quoted: Substring) -> String {
-        var out = ""
-        var escaped = false
-        for character in quoted {
-            if escaped {
-                if character == "0" { break }
-                out.append(character)
-                escaped = false
-            } else if character == "\\" {
-                escaped = true
-            } else if character == "\"" {
-                break
-            } else {
-                out.append(character)
-            }
-        }
-        return out
-    }
-
-    /// A string value from a Wine .reg file: the key's section, then `"name"="value"`.
-    static func registryValue(_ text: String, key: String, name: String) -> String? {
-        // Section headers double their backslashes: [Software\\Microsoft\\Windows NT\\CurrentVersion] 1700000000
-        let header = "[" + key.lowercased().replacingOccurrences(of: "\\", with: "\\\\") + "]"
-        var inside = false
-        for raw in text.split(separator: "\n", omittingEmptySubsequences: false) {
-            let line = raw.trimmingCharacters(in: .whitespaces)
-            if line.hasPrefix("[") {
-                inside = line.lowercased().hasPrefix(header)
-                continue
-            }
-            guard inside, line.hasPrefix("\"\(name)\"=\"") else { continue }
-            var value = String(line.dropFirst(name.count + 4))
-            if value.hasSuffix("\"") { value.removeLast() }
-            return value.replacingOccurrences(of: "\\\\", with: "\\")
-        }
-        return nil
-    }
-}

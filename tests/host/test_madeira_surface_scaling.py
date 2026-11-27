@@ -1,3 +1,4 @@
+import split_sources  # noqa: F401  (iDeck 3.0 split files)
 import pathlib
 import unittest
 
@@ -18,7 +19,7 @@ class MadeiraSurfaceScalingTests(unittest.TestCase):
         self.assertIn("$profile.controllerAPI", view)
 
     def test_guest_virtual_mode_read_dynamically_from_madeira(self):
-        renderer = (ROOT / "iDeck/WindowsRendererView.swift").read_text()
+        renderer = (ROOT / "iDeck/NativeRuntime/WindowsRendererView.swift").read_text()
         self.assertIn('"winios_screen_size"', renderer)
         self.assertIn("read(&width, &height)", renderer)
         self.assertIn("currentGuestSize", renderer)
@@ -28,7 +29,7 @@ class MadeiraSurfaceScalingTests(unittest.TestCase):
         self.assertIn("profile.surfaceScaling", env)
 
     def test_native_metal_drawable_is_only_seeded_before_registration(self):
-        renderer = (ROOT / "iDeck/WindowsRendererView.swift").read_text()
+        renderer = (ROOT / "iDeck/NativeRuntime/WindowsRendererView.swift").read_text()
         self.assertIn("if !layerRegistered {", renderer)
         self.assertIn("host.metalLayer.drawableSize = CGSize(", renderer)
         self.assertIn("Do NOT write host.metalLayer.drawableSize here", renderer)
@@ -36,7 +37,7 @@ class MadeiraSurfaceScalingTests(unittest.TestCase):
         self.assertIn("DispatchQueue.main.async { refreshNativeDisplay() }", renderer)
 
     def test_metal_compositor_and_touch_share_exact_rect(self):
-        renderer = (ROOT / "iDeck/WindowsRendererView.swift").read_text()
+        renderer = (ROOT / "iDeck/NativeRuntime/WindowsRendererView.swift").read_text()
         geometry = (ROOT / "iDeck/RuntimeConfiguration.swift").read_text()
         self.assertIn("RuntimeConfiguration.surfaceRect(", renderer)
         self.assertIn("RuntimeConfiguration.guestPoint(point, guest: surface.guest", renderer)

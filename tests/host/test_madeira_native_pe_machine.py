@@ -7,7 +7,7 @@ from pathlib import Path
 
 from support import ROOT, repo_text
 HEADER = ROOT / "iDeck/NativeRuntime/WindowsPEMachine.h"
-NATIVE = ROOT / "iDeck/NativeRuntimeDiagnostics.mm"
+NATIVE = ROOT / "iDeck/NativeRuntime/Bridges/NativeRuntimeDiagnostics.mm"
 BRIDGE = ROOT / "iDeck/NativeRuntime/MadeiraRuntimeBridge.mm"
 SWIFT = ROOT / "iDeck/WindowsEnvironment.swift"
 

@@ -1,5 +1,5 @@
 #import "NativeRuntimeDiagnostics.h"
-#include "NativeRuntime/WindowsPEMachine.h"
+#include "../WindowsPEMachine.h"
 #import <Foundation/Foundation.h>
 #import <Metal/Metal.h>
 #include <dlfcn.h>

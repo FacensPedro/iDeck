@@ -12,7 +12,7 @@ class BullyCrashFixesTests(unittest.TestCase):
 
     def test_dxgi_mode_table_matches_user32_for_every_game(self):
         env = repo_text("iDeck/WindowsEnvironment.swift")
-        launch = env.split("private func applyMadeiraLaunchEnvironment", 1)[1].split("\n    }\n", 1)[0]
+        launch = env.split("func applyMadeiraLaunchEnvironment", 1)[1].split("\n    }\n", 1)[0]
         self.assertIn('setenv("DXMT_WSI_MODE_TABLE", "1", 1)', launch)
         self.assertNotIn('unsetenv("DXMT_WSI_MODE_TABLE")', launch)
 

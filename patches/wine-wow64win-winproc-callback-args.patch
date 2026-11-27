@@ -1,5 +1,5 @@
 diff --git a/dlls/wow64win/user.c b/dlls/wow64win/user.c
-index f9d19b0249..a4d708a82b 100644
+index f9d19b0249..6cefc7b2fd 100644
 --- a/dlls/wow64win/user.c
 +++ b/dlls/wow64win/user.c
 @@ -954,6 +954,7 @@ static NTSTATUS WINAPI wow64_NtUserCallWinProc( void *arg, ULONG size )
@@ -34,3 +34,28 @@ index f9d19b0249..a4d708a82b 100644
          result = *(LONG *)ret_ptr;
          ret_len = packed_result_32to64( params32->msg, params32->wparam, (LONG *)ret_ptr + 1,
                                          ret_len - sizeof(LONG), result_ptr + 1 );
+@@ -1121,6 +1130,8 @@ static NTSTATUS WINAPI wow64_NtUserCallWindowsHook( void *arg, ULONG size )
+     UINT module_len, size32, offset;
+     void *ret_ptr;
+     LRESULT *result_ptr = arg;
++    LRESULT * volatile saved_result = arg;   /* iDeck: read back after the callback, as in wow64_NtUserCallWinProc */
++    volatile UINT saved_id;
+     ULONG ret_len, ret_size = 0;
+     NTSTATUS status;
+ 
+@@ -1150,8 +1161,14 @@ static NTSTATUS WINAPI wow64_NtUserCallWindowsHook( void *arg, ULONG size )
+                                       size - offset, (char *)arg + size32 );
+     }
+ 
++    saved_id = params32.id;
+     status = Wow64KiUserCallbackDispatcher( NtUserCallWindowsHook, arg, size32, &ret_ptr, &ret_len );
+-    if (status || ret_len < sizeof(LONG)) return status;
++    /* iDeck: the registers holding result_ptr did not survive the callback's return on
++     * iOS (Fallout: New Vegas' launcher from Epic, a message hook in NtUserCallMsgFilter:
++     * a store to 0x8, then the stack overflowed in the fault's unwind). */
++    result_ptr = saved_result;
++    params32.id = saved_id;
++    if (status || !ret_ptr || ret_len < sizeof(LONG)) return status;
+ 
+     switch (params32.id)
+     {

@@ -1,3 +1,4 @@
+import split_sources  # noqa: F401  (iDeck 3.0 split files)
 import unittest
 from pathlib import Path
 
@@ -10,7 +11,7 @@ class SetupTests(unittest.TestCase):
         self.assertNotIn('statusRow("x64 Wine environment"', VIEW)
 
     def test_visual_cpp_installs_everything(self):
-        block = VIEW[VIEW.index("private func installVisualCpp()"):VIEW.index("// MARK: - Madeira Dock")]
+        block = VIEW[VIEW.index("func installVisualCpp()"):VIEW.index("// MARK: - Madeira Dock")]
         self.assertIn("VisualCRuntimeBootstrap.download(in: MadeiraDock.prefix)", block)
         self.assertIn("VisualCRuntimeLegacy.installAll(documents: docs)", block)
         self.assertIn("coordinator.openMadeiraWorkspace()", block)

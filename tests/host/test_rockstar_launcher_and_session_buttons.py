@@ -1,4 +1,5 @@
 """Rockstar Games Launcher installed after a Rockstar game; session buttons share one size (2.13.3)."""
+import split_sources  # noqa: F401  (iDeck 3.0 split files)
 import pathlib
 import unittest
 

@@ -1,4 +1,5 @@
 """Microsoft's D3DX 9 for games whose shaders Wine's D3DX cannot compile."""
+import split_sources  # noqa: F401  (iDeck 3.0 split files)
 import unittest
 from pathlib import Path
 
