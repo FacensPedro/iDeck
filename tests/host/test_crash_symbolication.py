@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-CRASH = (ROOT / "iDeck/IOSCrashDiagnostics.swift").read_text()
+CRASH = (ROOT / "iDeck/NativeRuntime/IOSCrashDiagnostics.swift").read_text()
 REPORT = (ROOT / "iDeck/BugReportView.swift").read_text()
 
 

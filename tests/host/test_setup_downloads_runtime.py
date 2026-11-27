@@ -62,8 +62,8 @@ class SetupDownloadsRuntimeTests(unittest.TestCase):
         observed = repo_text("iDeck/ObservedDownload.swift")
         self.assertIn("URLSession(configuration: configuration, delegate: download, delegateQueue: nil)", observed)
         self.assertIn("didWriteData", observed)
-        self.assertIn("ObservedDownload.run(", repo_text("iDeck/MadeiraRuntime.swift"))
-        self.assertNotIn("URLSession.shared.download(from:", repo_text("iDeck/MadeiraRuntime.swift"))
+        self.assertIn("ObservedDownload.run(", repo_text("iDeck/NativeRuntime/MadeiraRuntime.swift"))
+        self.assertNotIn("URLSession.shared.download(from:", repo_text("iDeck/NativeRuntime/MadeiraRuntime.swift"))
         project = repo_text("iDeck.xcodeproj/project.pbxproj")
         self.assertEqual(project.count("/* ObservedDownload.swift in Sources */"), 2)
 

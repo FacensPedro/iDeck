@@ -277,18 +277,20 @@ struct IDeckFirstRunSetupView: View {
             .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(hairline, lineWidth: 1))
     }
 
-    private func statusRow(_ title: String, _ ready: Bool, detail: String? = nil) -> some View {
+    private func statusRow(_ title: String, _ ready: Bool, detail: String? = nil, badge: Bool = true) -> some View {
         HStack(spacing: 12) {
             Image(systemName: ready ? "checkmark.circle.fill" : "circle.dashed")
                 .font(.system(size: 17))
                 .foregroundStyle(ready ? Color.green : Color.secondary)
             Text(title).font(.body).foregroundStyle(.white)
             Spacer(minLength: 8)
-            Text(detail ?? (ready ? "Installed" : "Not installed"))
-                .font(.caption.weight(.medium))
-                .foregroundStyle(ready ? Color.green : Color.secondary)
-                .padding(.horizontal, 8).padding(.vertical, 3)
-                .background((ready ? Color.green : Color.white).opacity(0.1), in: Capsule())
+            if badge {
+                Text(detail ?? (ready ? "Installed" : "Not installed"))
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(ready ? Color.green : Color.secondary)
+                    .padding(.horizontal, 8).padding(.vertical, 3)
+                    .background((ready ? Color.green : Color.white).opacity(0.1), in: Capsule())
+            }
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
@@ -345,7 +347,7 @@ struct IDeckFirstRunSetupView: View {
         VStack(alignment: .leading, spacing: 18) {
             stepHeader(.wineMono, "Installs Wine Mono, the .NET Framework that programs and launchers built with .NET need.")
             componentList {
-                statusRow("Wine Mono \(WineMonoPin.version)", wineMono.installed, detail: wineMono.busy ? wineMono.status : nil)
+                statusRow("Wine Mono \(WineMonoPin.version)", wineMono.installed, badge: false)
             }
             primaryButton(wineMono.installed ? "Installed" : (wineMono.busy ? "Installing…" : "Install"),
                           systemImage: wineMono.installed ? "checkmark" : "arrow.down.circle",
@@ -543,7 +545,7 @@ struct IDeckFirstRunSetupView: View {
             componentList {
                 statusRow("Visual C++", prefixReady && vcReady)
                 Divider().overlay(hairline).padding(.leading, 43)
-                statusRow("Wine Mono", wineMono.installed)
+                statusRow("Wine Mono", wineMono.installed, badge: false)
                 Divider().overlay(hairline).padding(.leading, 43)
                 statusRow("Madeira Dock", MadeiraDock.clientInstalled)
                 Divider().overlay(hairline).padding(.leading, 43)

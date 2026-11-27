@@ -978,8 +978,8 @@ jobs:
           PY
           )"
           [[ "$VERSION" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]] || exit 2
-          # The file carries the short version: 3.0.0 -> iDeck-3.ipa, 3.1.0 -> iDeck-3.1.ipa.
-          LABEL="$(sed -E 's/(\.0)+$//' <<<"$VERSION")"
+          # The file carries the project version as it is: 3.0 -> iDeck-3.0.ipa.
+          LABEL="$VERSION"
           cp iDeck.ipa "iDeck-${LABEL}.ipa"
 
       - name: Upload IPA directly (no outer ZIP)
@@ -1043,7 +1043,7 @@ jobs:
           if len(versions) != 1:
               raise SystemExit(f"Expected exactly one iDeck marketing version, found {sorted(versions)}")
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
-              label = re.sub(r"(\.0)+$", "", versions.pop())   # 3.0.0 -> iDeck-3.ipa
+              label = versions.pop()   # 3.0 -> iDeck-3.0.ipa
               output.write(f"name=iDeck-{label}.ipa\n")
           PY
 
@@ -1223,13 +1223,13 @@ jobs:
               echo "::error::Refusing to overwrite an existing versioned release with an interface-only IPA."
               exit 2
             fi
-            LABEL="$(sed -E 's/(\.0)+$//' <<<"$VERSION")"
+            LABEL="$VERSION"
             cp iDeck.ipa "iDeck-${LABEL}.ipa"
             gh release upload "$TAG" "iDeck-${LABEL}.ipa" iDeck.ipa.sha256 iDeck-distribution-audit.json --clobber
             gh release edit "$TAG" --title "$TITLE" --notes-file RELEASE_NOTES.md
           else
             OPTIONS=(--target "$GITHUB_SHA" --title "$TITLE" --notes-file RELEASE_NOTES.md)
-            LABEL="$(sed -E 's/(\.0)+$//' <<<"$VERSION")"
+            LABEL="$VERSION"
             cp iDeck.ipa "iDeck-${LABEL}.ipa"
             gh release create "$TAG" "iDeck-${LABEL}.ipa" iDeck.ipa.sha256 iDeck-distribution-audit.json "${OPTIONS[@]}"
           fi

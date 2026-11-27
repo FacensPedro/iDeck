@@ -61,8 +61,8 @@
     {
       "examples": [
         "iDeck/GameSessionView.swift",
-        "iDeck/SystemCoordinator.swift",
-        "iDeck/WindowsLibraryModels.swift"
+        "iDeck/NativeRuntime/WineMono.swift",
+        "iDeck/SystemCoordinator.swift"
       ],
       "files": 4,
       "framework": "Combine",
@@ -91,9 +91,9 @@
     },
     {
       "examples": [
-        "iDeck/AddressSpaceCheck.swift",
         "iDeck/Application/SystemCoordinator+Diagnostics.swift",
-        "iDeck/Application/SystemCoordinator+Dock.swift"
+        "iDeck/Application/SystemCoordinator+Dock.swift",
+        "iDeck/Application/SystemCoordinator+JIT.swift"
       ],
       "files": 36,
       "framework": "Darwin",
@@ -117,9 +117,9 @@
     },
     {
       "examples": [
-        "iDeck/AddressSpaceCheck.swift",
         "iDeck/Application/SessionLifecycle.swift",
-        "iDeck/Application/SystemCoordinator+Diagnostics.swift"
+        "iDeck/Application/SystemCoordinator+Diagnostics.swift",
+        "iDeck/Application/SystemCoordinator+Dock.swift"
       ],
       "files": 135,
       "framework": "Foundation",
@@ -130,7 +130,7 @@
     },
     {
       "examples": [
-        "iDeck/IOSCrashDiagnostics.swift"
+        "iDeck/NativeRuntime/IOSCrashDiagnostics.swift"
       ],
       "files": 1,
       "framework": "MachO",
@@ -163,9 +163,9 @@
     },
     {
       "examples": [
+        "iDeck/NativeRuntime/WineMono.swift",
         "iDeck/PrefixInstaller.swift",
-        "iDeck/SteamCloud.swift",
-        "iDeck/SwiftSteam/Content/ContentDecryptor.swift"
+        "iDeck/SteamCloud.swift"
       ],
       "files": 6,
       "framework": "Compression",
@@ -309,7 +309,7 @@
       "examples": [
         "iDeck/BenchmarkBridge.mm",
         "iDeck/GameSessionView.swift",
-        "iDeck/MadeiraRuntimeSettings.swift"
+        "iDeck/NativeRuntime/MadeiraPlatform.mm"
       ],
       "files": 6,
       "framework": "Metal",
@@ -356,8 +356,8 @@
     },
     {
       "examples": [
-        "iDeck/SystemCoordinator.swift",
-        "iDeck/WindowsRendererView.swift"
+        "iDeck/NativeRuntime/WindowsRendererView.swift",
+        "iDeck/SystemCoordinator.swift"
       ],
       "files": 2,
       "framework": "QuartzCore",
@@ -539,7 +539,7 @@
       "examples": [
         "iDeck/InputManager.swift",
         "iDeck/NativeRuntime/DirectInputBridge.mm",
-        "iDeck/WineInputBridge.swift"
+        "iDeck/NativeRuntime/WineInputBridge.swift"
       ],
       "files": 3,
       "framework": "GameController",
@@ -559,7 +559,7 @@
     },
     {
       "examples": [
-        "iDeck/IOSCrashDiagnostics.swift"
+        "iDeck/NativeRuntime/IOSCrashDiagnostics.swift"
       ],
       "files": 1,
       "framework": "MetricKit",

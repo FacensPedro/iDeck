@@ -7,9 +7,9 @@ class RuntimeEfficiencyTests(unittest.TestCase):
     """Work iDeck itself does while a game runs (the UI and runtime layers)."""
 
     def test_native_symbols_are_resolved_once(self):
-        symbol = repo_text("iDeck/NativeSymbol.swift")
+        symbol = repo_text("iDeck/NativeRuntime/NativeSymbol.swift")
         self.assertIn("if let known = cache[name] { return known }", symbol)
-        for path in ("iDeck/WindowsRendererView.swift", "iDeck/GameSessionView.swift",
+        for path in ("iDeck/NativeRuntime/WindowsRendererView.swift", "iDeck/GameSessionView.swift",
                      "iDeck/WindowsEnvironment.swift", "iDeck/TouchMouseView.swift"):
             with self.subTest(path=path):
                 self.assertNotIn("dlsym(", repo_text(path))

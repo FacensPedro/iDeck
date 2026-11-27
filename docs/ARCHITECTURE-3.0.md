@@ -16,6 +16,14 @@ one change.
 | Runtime | Wine prefix, environment, Virtual Swap, Auto DLL Manager, JIT preparation (Swift) | NativeRuntime |
 | NativeRuntime | Madeira: Wine ARM64EC, WoW64, FEX, wineserver, DXMT, madeira-d3d12 (C/C++/ObjC) | iOS |
 
+The Swift side of the Madeira native runtime is in `iDeck/NativeRuntime/` (3.0):
+`MadeiraRuntime`, `MadeiraRuntimeSettings`, `MadeiraConfig`, `NativeSymbol`,
+`AddressSpaceCheck`, the JIT helpers (`JITEnabler`, `JITBuiltInHost`, `JITBuiltInMessages`),
+`WineInputBridge`, `WindowsRendererView`, `WineMono`, `WineGeckoRuntime` and
+`IOSCrashDiagnostics`. The native code itself (Wine ARM64EC, WoW64, FEX, wineserver, DXMT,
+madeira-d3d12) stays in `vendor/Madeira`, and the C/Objective-C bridges in `iDeck/` stay
+where the bridging header finds them.
+
 Swift reaches the native runtime only through the C functions declared in the bridging
 header (`ideck_*`, `wine_*`, `madeira_*`); no Swift type crosses into C++.
 
@@ -88,4 +96,4 @@ copied into the IPA; IOKit is not public on iOS and is listed only to be avoided
 
 The project's `MARKETING_VERSION` is the only version: the workflow reads it, the
 release request must match it, and the IPA file carries its short form
-(`3.0` → `iDeck-3.ipa`).
+(`3.0` → `iDeck-3.0.ipa`).

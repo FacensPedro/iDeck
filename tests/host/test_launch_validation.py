@@ -5,7 +5,7 @@ from support import repo_text
 
 class LaunchValidationTests(unittest.TestCase):
     def test_runtime_packages_are_verified(self):
-        runtime = repo_text("iDeck/MadeiraRuntime.swift")
+        runtime = repo_text("iDeck/NativeRuntime/MadeiraRuntime.swift")
         for marker in ('"nls/locale.nls", "nls/l_intl.nls", "nls/normnfc.nls"', "static func peMachine(_ url: URL) -> UInt16",
                        '"xtajit64"', '"winemetal"', '"d3d10core"', "manifestName(id)", "failed verification"):
             self.assertIn(marker, runtime)
@@ -24,7 +24,7 @@ class LaunchValidationTests(unittest.TestCase):
         self.assertIn("if ([attributes fileSize] <= 0x1000) return ENOENT;", bridge)
 
     def test_ios_crash_diagnostics(self):
-        diagnostics = repo_text("iDeck/IOSCrashDiagnostics.swift")
+        diagnostics = repo_text("iDeck/NativeRuntime/IOSCrashDiagnostics.swift")
         self.assertIn("MXMetricManager.shared.add(self)", diagnostics)
         self.assertIn("crashDiagnostics", diagnostics)
         self.assertIn("IOSCrashDiagnostics.shared.start()", repo_text("iDeck/iDeckApp.swift"))

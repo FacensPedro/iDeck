@@ -3,7 +3,7 @@ import re
 import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-INPUT = (ROOT / "iDeck/WineInputBridge.swift").read_text()
+INPUT = (ROOT / "iDeck/NativeRuntime/WineInputBridge.swift").read_text()
 PAD = (ROOT / "iDeck/NativeRuntime/DirectInputBridge.mm").read_text()
 NATIVE = (ROOT / "iDeck/NativeRuntime/MadeiraRuntimeBridge.mm").read_text()
 SESSION = (ROOT / "iDeck/GameSessionView.swift").read_text()

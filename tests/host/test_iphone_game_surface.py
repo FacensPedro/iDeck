@@ -11,7 +11,7 @@ class IPhoneGameSurfaceTests(unittest.TestCase):
         self.assertIn('NativeSymbol.address("winios_surface_present_count")', src)
 
     def test_iphone_uses_full_height_after_first_frame(self):
-        view = (ROOT / "iDeck/WindowsRendererView.swift").read_text()
+        view = (ROOT / "iDeck/NativeRuntime/WindowsRendererView.swift").read_text()
         self.assertIn("let bounds = frame", view)
         session = (ROOT / "iDeck/GameSessionView.swift").read_text()
         self.assertIn("SessionWindowOverlay(interactive: true,", session)

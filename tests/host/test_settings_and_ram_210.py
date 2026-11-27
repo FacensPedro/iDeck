@@ -19,7 +19,7 @@ class SettingsAndRamTests(unittest.TestCase):
         self.assertIn("if status != .authorized && status != .provisional && status != .ephemeral { downloadNotifications = false }", s)
 
     def test_advanced_notes_short(self):
-        r = read("iDeck/MadeiraRuntimeSettings.swift")
+        r = read("iDeck/NativeRuntime/MadeiraRuntimeSettings.swift")
         self.assertIn("private var d3d9Note: String?", r)
         self.assertNotIn("DXMT draws Direct3D 9 on Metal", r)
 

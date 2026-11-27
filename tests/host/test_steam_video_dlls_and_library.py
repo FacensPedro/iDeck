@@ -22,7 +22,7 @@ class SteamVideoDLLsAndLibraryTests(unittest.TestCase):
         self.assertIn("SteamVideoLibraries.fetch", coordinator)
 
     def test_wine_mono_installer_matches_pinned_madeira(self):
-        mono = source("iDeck/WineMono.swift")
+        mono = source("iDeck/NativeRuntime/WineMono.swift")
         self.assertIn('static let tarSHA256 = "0cd723aa28897f7d7d2702eed6c72e4262255980e212bc2b3c94bfa234abe5fd"', mono)
         self.assertIn('appendingPathComponent("WineMono", isDirectory: true)', mono)
         self.assertIn("WineMono.swift in Sources", source("iDeck.xcodeproj/project.pbxproj"))

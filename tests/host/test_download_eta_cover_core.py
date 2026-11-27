@@ -56,7 +56,7 @@ class DownloadETACoreContract(unittest.TestCase):
         self.assertIn('std::memory_order_acquire', core)
 
     def test_madeira_game_config_is_cached_and_invalidated(self):
-        config = source("iDeck/MadeiraConfig.swift")
+        config = source("iDeck/NativeRuntime/MadeiraConfig.swift")
         self.assertIn('private static let gameCache', config)
         self.assertIn('invalidateGameCache()', config)
         self.assertIn('info.st_ino', config)

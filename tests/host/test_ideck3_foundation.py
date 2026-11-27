@@ -39,7 +39,7 @@ class IDeck3Foundation(unittest.TestCase):
 
     def test_short_ipa_name(self):
         wf = (ROOT / ".github/workflows/ios.yml").read_text()
-        self.assertIn('LABEL="$(sed -E \'s/(\\.0)+$//\' <<<"$VERSION")"', wf)
+        self.assertIn('LABEL="$VERSION"', wf)   # 3.0 -> iDeck-3.0.ipa
         self.assertNotIn("currently 1.0.10", wf)
 
 

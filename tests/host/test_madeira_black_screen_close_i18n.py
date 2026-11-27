@@ -4,7 +4,7 @@ from pathlib import Path
 from support import ROOT, repo_text
 class MadeiraBlackScreenCloseAndLocalizationTests(unittest.TestCase):
     def test_compositor_sync_is_not_gated_on_window_resizing(self):
-        renderer = repo_text("iDeck/WindowsRendererView.swift")
+        renderer = repo_text("iDeck/NativeRuntime/WindowsRendererView.swift")
         start = renderer.index("fileprivate static func layoutViewport(")
         end = renderer.index("fileprivate static func detachViewport(", start)
         code = renderer[start:end]

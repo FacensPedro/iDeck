@@ -14,7 +14,7 @@ def text(path: str) -> str:
 
 class MemoryPlusTests(unittest.TestCase):
     def test_status_comes_from_the_signing_profile_and_the_address_space(self):
-        source = text("iDeck/AddressSpaceCheck.swift")
+        source = text("iDeck/NativeRuntime/AddressSpaceCheck.swift")
         self.assertIn("enum MemoryPlus", source)
         self.assertIn('"com.apple.developer.kernel.increased-memory-limit"', source)
         self.assertIn('forResource: "embedded", withExtension: "mobileprovision"', source)

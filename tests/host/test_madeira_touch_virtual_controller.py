@@ -41,7 +41,7 @@ class MadeiraTouchVirtualControllerTests(unittest.TestCase):
         self.assertIn("g_touchEnabled && g_appActive", native)
 
     def test_metal_does_not_steal_on_screen_controller_touches(self):
-        renderer = (ROOT / "iDeck/WindowsRendererView.swift").read_text()
+        renderer = (ROOT / "iDeck/NativeRuntime/WindowsRendererView.swift").read_text()
         # No on-screen controller band: the surface fills all below the toolbar.
         self.assertNotIn("IDECK_TOUCH_CONTROLS_ACTIVE", renderer)
         self.assertIn("let bounds = frame", renderer)

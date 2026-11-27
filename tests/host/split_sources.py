@@ -21,7 +21,23 @@ def parts(name):
     return found
 
 
+# iDeck 3.0 moved the Swift side of the Madeira native runtime into iDeck/NativeRuntime/.
+MOVED_FOLDERS = ["NativeRuntime"]
+
+
+def _moved(path):
+    """iDeck/<name> that now lives in one of MOVED_FOLDERS, else the path itself."""
+    if path.exists() or path.parent != ROOT / "iDeck":
+        return path
+    for folder in MOVED_FOLDERS:
+        candidate = ROOT / "iDeck" / folder / path.name
+        if candidate.exists():
+            return candidate
+    return path
+
+
 def _read_text(self, *args, **kwargs):
+    self = _moved(self)
     text = _original_read_text(self, *args, **kwargs)
     try:
         resolved = self.resolve()

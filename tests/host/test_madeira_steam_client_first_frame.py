@@ -4,7 +4,7 @@ import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 COORDINATOR = (ROOT / "iDeck/SystemCoordinator.swift").read_text()
-RENDERER = (ROOT / "iDeck/WindowsRendererView.swift").read_text()
+RENDERER = (ROOT / "iDeck/NativeRuntime/WindowsRendererView.swift").read_text()
 SESSION = (ROOT / "iDeck/GameSessionView.swift").read_text()
 
 
