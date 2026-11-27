@@ -1,0 +1,46 @@
+diff --git a/build/ntdll-unix/virtual_ios.c b/build/ntdll-unix/virtual_ios.c
+index def1962..4d7cc78 100644
+--- a/build/ntdll-unix/virtual_ios.c
++++ b/build/ntdll-unix/virtual_ios.c
+@@ -34986,17 +34986,36 @@ NTSTATUS WINAPI NtReadVirtualMemory( HANDLE process, const void *addr, void *buf
+     }
+     else if (process == GetCurrentProcess())
+     {
+-        __TRY
++        /* iDeck: read through the kernel instead of memmove under __TRY. On iOS a fault
++         * inside this syscall arrives as a Mach exception on the host stack; it is then
++         * delivered on the guest stack, which wrecks the syscall return (BRK 0x5a5a in
++         * syscall_dispatcher_return_slowpath, c000001D). mach_vm_read_overwrite returns
++         * an error for an unmapped or unreadable source instead of faulting. Seen with
++         * Fallout: New Vegas (Epic) reading a freed OutputDebugString buffer. */
++        mach_vm_size_t got = 0;
++        SIZE_T done = 0;
++
++        if (!size || mach_vm_read_overwrite( mach_task_self(), (mach_vm_address_t)addr, size,
++                                             (mach_vm_address_t)buffer, &got ) == KERN_SUCCESS)
+         {
+-            memmove( buffer, addr, size );
+             status = STATUS_SUCCESS;
+         }
+-        __EXCEPT
++        else
+         {
++            /* copy what is readable, page by page, as Windows does */
++            while (done < size)
++            {
++                SIZE_T chunk = host_page_size - (((UINT_PTR)addr + done) & host_page_mask);
++                if (chunk > size - done) chunk = size - done;
++                got = 0;
++                if (mach_vm_read_overwrite( mach_task_self(), (mach_vm_address_t)addr + done, chunk,
++                                            (mach_vm_address_t)buffer + done, &got ) != KERN_SUCCESS)
++                    break;
++                done += chunk;
++            }
+             status = STATUS_PARTIAL_COPY;
+-            size = 0;
++            size = done;
+         }
+-        __ENDTRY
+     }
+     else
+     {

@@ -277,8 +277,19 @@ enum GOGInstallScanner {
         let idValue = json["gameId"] as? String ?? (json["gameId"] as? Int).map(String.init)
         guard let idValue, let gameID = Int(idValue) else { return nil }
         let tasks = (json["playTasks"] as? [[String: Any]]) ?? []
-        guard let task = tasks.first(where: { ($0["isPrimary"] as? Bool) == true && ($0["type"] as? String) != "URLTask" })
-                ?? tasks.first(where: { $0["path"] is String }),
+        let primary = tasks.first(where: { ($0["isPrimary"] as? Bool) == true && ($0["type"] as? String) != "URLTask" })
+                ?? tasks.first(where: { $0["path"] is String })
+        // A publisher launcher in front of the game (2K's launcher.exe for Mafia:
+        // Definitive Edition) exits with code 1 under Wine before the game starts:
+        // the game's own executable is launched instead when it is there.
+        if let primary, isPublisherLauncher(primary["path"] as? String),
+           let direct = directExecutable(gameID: gameID, tasks: tasks, folder: folder) {
+            let rootValue = json["rootGameId"] as? String ?? (json["rootGameId"] as? Int).map(String.init)
+            return GOGInstalledGame(gameID: gameID, name: json["name"] as? String ?? folder.lastPathComponent,
+                                    executable: direct, arguments: "",
+                                    isRoot: rootValue == nil || rootValue == idValue)
+        }
+        guard let task = primary,
               let relative = (task["path"] as? String)?.replacingOccurrences(of: "\\", with: "/"),
               !relative.contains("..") else { return nil }
         var executable = folder.appendingPathComponent(relative)
@@ -293,6 +304,39 @@ enum GOGInstallScanner {
         return GOGInstalledGame(gameID: gameID, name: json["name"] as? String ?? folder.lastPathComponent,
                                 executable: executable, arguments: task["arguments"] as? String ?? "",
                                 isRoot: rootValue == nil || rootValue == idValue)
+    }
+
+    /// Publisher launchers that sit in front of GOG games and do not get past their
+    /// own start under Wine.
+    static let publisherLaunchers: Set<String> = ["launcher.exe", "launcherpatcher.exe", "2klauncher.exe"]
+
+    /// The games' own executables, by GOG game id, for launchers whose play tasks
+    /// name only the launcher.
+    static let directExecutables: [Int: String] = [1993581340: "mafiadefinitiveedition.exe"]
+
+    static func isPublisherLauncher(_ path: String?) -> Bool {
+        guard let path else { return false }
+        let name = path.replacingOccurrences(of: "\\", with: "/").split(separator: "/").last.map(String.init) ?? path
+        return publisherLaunchers.contains(name.lowercased())
+    }
+
+    /// Another play task that is not a launcher, or the game's known executable.
+    static func directExecutable(gameID: Int, tasks: [[String: Any]], folder: URL) -> URL? {
+        func existing(_ path: String) -> URL? {
+            let relative = path.replacingOccurrences(of: "\\", with: "/")
+            guard !relative.contains(".."), relative.lowercased().hasSuffix(".exe") else { return nil }
+            let url = folder.appendingPathComponent(relative)
+            if FileManager.default.fileExists(atPath: url.path) { return url }
+            return SteamInstallFiles.resolveLaunchPath(relative, root: folder, executable: true)
+        }
+        if let name = directExecutables[gameID], let url = existing(name) { return url }
+        for task in tasks where (task["type"] as? String) != "URLTask" {
+            guard let path = task["path"] as? String, !isPublisherLauncher(path),
+                  !["setup", "config", "setting", "tool", "editor", "unins"].contains(where: path.lowercased().contains)
+            else { continue }
+            if let url = existing(path) { return url }
+        }
+        return nil
     }
 }
 

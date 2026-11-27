@@ -430,9 +430,16 @@ enum EAPrefixEvidence {
     static func activationReason(drive: URL, hidden: [String], lines count: Int = 60) -> [String] {
         // EA's log is an HTML page: keep its file line and the numbered rows only,
         // not the page's style sheet (2.15.1 showed 40 lines of CSS).
+        // Rows whose cells end up on lines of their own (the reason a licence was refused
+        // follows the row number) are kept too: only style rules are dropped. 3.0 showed
+        // rows 1 and 2 only, the file's oldest, whatever the activation window wrote after.
         originLogs(drive: drive, files: 1, linesPerFile: count).filter { line in
             let text = line.trimmingCharacters(in: .whitespaces)
-            return !line.hasPrefix("  ") || text.first?.isNumber == true
+            guard line.hasPrefix("  ") else { return true }
+            if text.first?.isNumber == true { return true }
+            let style = text.contains("{") || text.contains("}")
+                || text.range(of: #"^[A-Za-z-]+\s*:\s*[^ ]+;$"#, options: .regularExpression) != nil
+            return !style
         }.map { line in
             var text = line.replacingOccurrences(of: #"\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b"#, with: "<ip>", options: .regularExpression)
             text = text.replacingOccurrences(of: #"\b[0-9a-fA-F]{1,4}(?::[0-9a-fA-F]{0,4}){4,7}\b"#, with: "<ip>", options: .regularExpression)

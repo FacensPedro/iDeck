@@ -19,6 +19,20 @@ extension WindowsEnvironment {
         return found.isEmpty ? "none found" : found.joined(separator: ", ")
     }
 
+    /// OpenGL games whose renderer needs a desktop OpenGL version this runtime does not
+    /// offer (Zink on MoltenVK stops short of OpenGL 4.5 core) and that ship their own
+    /// Vulkan build next to the OpenGL one. DOOM (2016) asks for a 4.5 core context and
+    /// stops with "wglCreateContextAttribsARB failed"; DOOMx64vk.exe runs on MoltenVK.
+    static let vulkanBuilds: [String: String] = ["doomx64.exe": "DOOMx64vk.exe"]
+
+    /// The game's Vulkan executable to launch instead of `binary`, or nil.
+    static func vulkanBuild(of binary: URL, vulkanMode: String, runtime: Bool) -> URL? {
+        guard vulkanMode != "Off", runtime,
+              let name = vulkanBuilds[binary.lastPathComponent.lowercased()] else { return nil }
+        let candidate = binary.deletingLastPathComponent().appendingPathComponent(name)
+        return FileManager.default.fileExists(atPath: candidate.path) ? candidate : nil
+    }
+
     /// The game engine's own switch for a Direct3D version, if it has one:
     /// Unity (UnityPlayer.dll next to the game) and Unreal (Win64 shipping
     /// builds). Other games choose their API themselves.

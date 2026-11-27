@@ -41,10 +41,15 @@ class WindowsEnvironment {
     static let sessionAlreadyRan = Int32(EALREADY)
     static var oneSessionPerRun: Bool { MadeiraConfig.flag("MADEIRA_ONE_SESSION_PER_RUN") }
 
-    func execute(binary: URL, arguments: String = "", is32Bit: Bool = false, isSteam: Bool = false,
+    func execute(binary requestedBinary: URL, arguments: String = "", is32Bit: Bool = false, isSteam: Bool = false,
                  steamAppID: UInt32? = nil, steamInstallDirectory: URL? = nil,
                  steamWorkingDirectory: URL? = nil,
                  jitEnabler: JITEnabler, completion: @escaping (Int) -> Void) {
+        let vulkanBuild = Self.vulkanBuild(of: requestedBinary, vulkanMode: sessionVulkanMode, runtime: Self.hasGLVulkanRuntime)
+        if let vulkanBuild {
+            SteamLog.event("[graphics] \(requestedBinary.lastPathComponent) needs OpenGL 4.5 core, past this runtime: launching its Vulkan build \(vulkanBuild.lastPathComponent)")
+        }
+        let binary = vulkanBuild ?? requestedBinary
         guard Self.sessionsThisRun == 0 || !Self.oneSessionPerRun else {
             SteamLog.event("[session-once] launch held: \(Self.sessionsThisRun) session(s) already ran in this app run")
             completion(Int(EALREADY))
