@@ -49,6 +49,10 @@
 		999999999999999999999914 /* UpdateChecker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 999999999999999999999906 /* UpdateChecker.swift */; };
 		F30000000000000000000021 /* WineLogClipboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = F40000000000000000000021 /* WineLogClipboard.swift */; };
 		F3A000000000000000000013 /* BenchmarkSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A000000000000000000013 /* BenchmarkSession.swift */; };
+		F3B00000000000001341F299 /* SteamProgramDetailsView+Sections.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B00000000000001341F299 /* SteamProgramDetailsView+Sections.swift */; };
+		F3B00000000000002EE63963 /* UbisoftGameDetailsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B00000000000002EE63963 /* UbisoftGameDetailsSheet.swift */; };
+		F3B0000000000000DEE86B5D /* EAGameDetailsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B0000000000000DEE86B5D /* EAGameDetailsSheet.swift */; };
+		F3B00000000000000D5565AD /* GOGGameDetailsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B00000000000000D5565AD /* GOGGameDetailsSheet.swift */; };
 		F3B0000000000000DFE0B86A /* SettingsView+General.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B0000000000000DFE0B86A /* SettingsView+General.swift */; };
 		F3B0000000000000CC5C324E /* SettingsView+System.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B0000000000000CC5C324E /* SettingsView+System.swift */; };
 		F3B0000000000000CA8986BE /* SettingsView+Stores.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B0000000000000CA8986BE /* SettingsView+Stores.swift */; };
@@ -79,7 +83,7 @@
 		F3B0000000000000DDB33C4D /* SystemCoordinator+JIT.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B0000000000000DDB33C4D /* SystemCoordinator+JIT.swift */; };
 		F3B000000000000099B7AB28 /* SystemCoordinator+Diagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B000000000000099B7AB28 /* SystemCoordinator+Diagnostics.swift */; };
 		F3B000000000000027C9BBFA /* IDeckFirstRunSetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B000000000000027C9BBFA /* IDeckFirstRunSetupView.swift */; };
-		F3B0000000000000EF19D2FF /* StoreGameDetailsSheets.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B0000000000000EF19D2FF /* StoreGameDetailsSheets.swift */; };
+		F3B0000000000000EF19D2FF /* EpicGameDetailsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B0000000000000EF19D2FF /* EpicGameDetailsSheet.swift */; };
 		F3B0000000000000BA1EDD1F /* StoreGameDetailsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B0000000000000BA1EDD1F /* StoreGameDetailsView.swift */; };
 		F3B0000000000000DB7A8BAE /* WindowsGameProfileForm.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B0000000000000DB7A8BAE /* WindowsGameProfileForm.swift */; };
 		F3B000000000000084D2A0B8 /* SteamProgramDetailsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B000000000000084D2A0B8 /* SteamProgramDetailsView.swift */; };
@@ -242,6 +246,10 @@
 		999999999999999999999906 /* UpdateChecker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateChecker.swift; sourceTree = "<group>"; };
 		F40000000000000000000021 /* WineLogClipboard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WineLogClipboard.swift; sourceTree = "<group>"; };
 		F4A000000000000000000013 /* BenchmarkSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BenchmarkSession.swift; sourceTree = "<group>"; };
+		F4B00000000000001341F299 /* SteamProgramDetailsView+Sections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Presentation/GameDetails/SteamProgramDetailsView+Sections.swift"; sourceTree = "<group>"; };
+		F4B00000000000002EE63963 /* UbisoftGameDetailsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presentation/GameDetails/UbisoftGameDetailsSheet.swift; sourceTree = "<group>"; };
+		F4B0000000000000DEE86B5D /* EAGameDetailsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presentation/GameDetails/EAGameDetailsSheet.swift; sourceTree = "<group>"; };
+		F4B00000000000000D5565AD /* GOGGameDetailsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presentation/GameDetails/GOGGameDetailsSheet.swift; sourceTree = "<group>"; };
 		F4B0000000000000DFE0B86A /* SettingsView+General.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Presentation/Settings/SettingsView+General.swift"; sourceTree = "<group>"; };
 		F4B0000000000000CC5C324E /* SettingsView+System.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Presentation/Settings/SettingsView+System.swift"; sourceTree = "<group>"; };
 		F4B0000000000000CA8986BE /* SettingsView+Stores.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Presentation/Settings/SettingsView+Stores.swift"; sourceTree = "<group>"; };
@@ -272,7 +280,7 @@
 		F4B0000000000000DDB33C4D /* SystemCoordinator+JIT.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Application/SystemCoordinator+JIT.swift"; sourceTree = "<group>"; };
 		F4B000000000000099B7AB28 /* SystemCoordinator+Diagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Application/SystemCoordinator+Diagnostics.swift"; sourceTree = "<group>"; };
 		F4B000000000000027C9BBFA /* IDeckFirstRunSetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presentation/Setup/IDeckFirstRunSetupView.swift; sourceTree = "<group>"; };
-		F4B0000000000000EF19D2FF /* StoreGameDetailsSheets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presentation/GameDetails/StoreGameDetailsSheets.swift; sourceTree = "<group>"; };
+		F4B0000000000000EF19D2FF /* EpicGameDetailsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presentation/GameDetails/EpicGameDetailsSheet.swift; sourceTree = "<group>"; };
 		F4B0000000000000BA1EDD1F /* StoreGameDetailsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presentation/GameDetails/StoreGameDetailsView.swift; sourceTree = "<group>"; };
 		F4B0000000000000DB7A8BAE /* WindowsGameProfileForm.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presentation/GameDetails/WindowsGameProfileForm.swift; sourceTree = "<group>"; };
 		F4B000000000000084D2A0B8 /* SteamProgramDetailsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presentation/GameDetails/SteamProgramDetailsView.swift; sourceTree = "<group>"; };
@@ -470,6 +478,10 @@
 				999999999999999999999914 /* UpdateChecker.swift in Sources */,
 				F30000000000000000000021 /* WineLogClipboard.swift in Sources */,
 				F3A000000000000000000013 /* BenchmarkSession.swift in Sources */,
+				F3B00000000000001341F299 /* SteamProgramDetailsView+Sections.swift in Sources */,
+				F3B00000000000002EE63963 /* UbisoftGameDetailsSheet.swift in Sources */,
+				F3B0000000000000DEE86B5D /* EAGameDetailsSheet.swift in Sources */,
+				F3B00000000000000D5565AD /* GOGGameDetailsSheet.swift in Sources */,
 				F3B0000000000000DFE0B86A /* SettingsView+General.swift in Sources */,
 				F3B0000000000000CC5C324E /* SettingsView+System.swift in Sources */,
 				F3B0000000000000CA8986BE /* SettingsView+Stores.swift in Sources */,
@@ -500,7 +512,7 @@
 				F3B0000000000000DDB33C4D /* SystemCoordinator+JIT.swift in Sources */,
 				F3B000000000000099B7AB28 /* SystemCoordinator+Diagnostics.swift in Sources */,
 				F3B000000000000027C9BBFA /* IDeckFirstRunSetupView.swift in Sources */,
-				F3B0000000000000EF19D2FF /* StoreGameDetailsSheets.swift in Sources */,
+				F3B0000000000000EF19D2FF /* EpicGameDetailsSheet.swift in Sources */,
 				F3B0000000000000BA1EDD1F /* StoreGameDetailsView.swift in Sources */,
 				F3B0000000000000DB7A8BAE /* WindowsGameProfileForm.swift in Sources */,
 				F3B000000000000084D2A0B8 /* SteamProgramDetailsView.swift in Sources */,
@@ -687,6 +699,10 @@
 				999999999999999999999906 /* UpdateChecker.swift */,
 				F40000000000000000000021 /* WineLogClipboard.swift */,
 				F4A000000000000000000013 /* BenchmarkSession.swift */,
+				F4B00000000000001341F299 /* SteamProgramDetailsView+Sections.swift */,
+				F4B00000000000002EE63963 /* UbisoftGameDetailsSheet.swift */,
+				F4B0000000000000DEE86B5D /* EAGameDetailsSheet.swift */,
+				F4B00000000000000D5565AD /* GOGGameDetailsSheet.swift */,
 				F4B0000000000000DFE0B86A /* SettingsView+General.swift */,
 				F4B0000000000000CC5C324E /* SettingsView+System.swift */,
 				F4B0000000000000CA8986BE /* SettingsView+Stores.swift */,
@@ -717,7 +733,7 @@
 				F4B0000000000000DDB33C4D /* SystemCoordinator+JIT.swift */,
 				F4B000000000000099B7AB28 /* SystemCoordinator+Diagnostics.swift */,
 				F4B000000000000027C9BBFA /* IDeckFirstRunSetupView.swift */,
-				F4B0000000000000EF19D2FF /* StoreGameDetailsSheets.swift */,
+				F4B0000000000000EF19D2FF /* EpicGameDetailsSheet.swift */,
 				F4B0000000000000BA1EDD1F /* StoreGameDetailsView.swift */,
 				F4B0000000000000DB7A8BAE /* WindowsGameProfileForm.swift */,
 				F4B000000000000084D2A0B8 /* SteamProgramDetailsView.swift */,

@@ -65,7 +65,12 @@ are in `Presentation/Settings/SettingsView+Stores` (Steam, GOG, Epic, EA, Ubisof
 updates, shared rows); the shared rows in `SettingsComponents.swift`; the Ubisoft account
 (saved login, sign-in web view, session) in `Stores/Ubisoft/UbisoftAccount.swift`.
 
-Next: the game pages' state into their own models.
+Game pages (3.0): one file per page in `Presentation/GameDetails/`: the shared
+`StoreGameDetailsView`, `GOGGameDetailsSheet`, `EAGameDetailsSheet`,
+`UbisoftGameDetailsSheet`, `EpicGameDetailsSheet`, `WindowsExecutableDetailsView`, and the
+Steam page as `SteamProgramDetailsView` (header, actions, settings) plus
+`SteamProgramDetailsView+Sections` (size, Steam Cloud saves, download status, DLCs).
+Each page observes its store's library as its model.
 
 ## iOS system libraries
 

@@ -44,7 +44,7 @@ class UbisoftPageTests(unittest.TestCase):
 
     def page(self) -> str:
         start = VIEW.index("struct UbisoftGameDetailsSheet: View {")
-        return VIEW[start:VIEW.index("/// Epic game page.", start)]
+        return VIEW[start:VIEW.index("\n}\n", start)]
 
     def test_tap_opens_the_page(self):
         card = self.card()

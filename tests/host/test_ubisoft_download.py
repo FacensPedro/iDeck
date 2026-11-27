@@ -50,7 +50,7 @@ class UbisoftInstallFlowTests(unittest.TestCase):
     def test_page_installs_instead_of_pointing_to_settings(self):
         # 2.13.3: the card opens the game's page, which installs, pauses and stops.
         start = VIEW.index("struct UbisoftGameDetailsSheet: View {")
-        page = VIEW[start:VIEW.index("/// Epic game page.", start)]
+        page = VIEW[start:VIEW.index("\n}\n", start)]
         self.assertIn("onInstall: { ubisoft.install(game) }", page)
         self.assertIn("onPause: { ubisoft.pause(game) }", page)
         self.assertIn("onStop: { ubisoft.cancel(game) }", page)
