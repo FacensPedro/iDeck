@@ -149,7 +149,7 @@ class UnixTryThroughMach(unittest.TestCase):
         self.assertIn("early     .      madeira-unix-try-mach-fault.patch", read("patches/series.txt"))
         patch = read("patches/madeira-unix-try-mach-fault.patch")
         self.assertIn("+++ b/build/ntdll-unix/signal_arm64_ios.c", patch)
-        self.assertIn("+            __darwin_arm_thread_state64_set_pc_fptr( state, (void *)longjmp );", patch)
+        self.assertIn("+            __darwin_arm_thread_state64_set_pc_fptr( *state, (void *)longjmp );", patch)
         self.assertIn("+            td->jmp_buf = NULL;", patch)
         self.assertIn("fsp >= kstack + kernel_stack_size", patch)
 

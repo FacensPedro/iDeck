@@ -47,7 +47,7 @@ index cc4aac6..359ecd5 100644
 +            td->jmp_buf = NULL;
 +            state->__x[0] = jmp;
 +            state->__x[1] = 1;
-+            __darwin_arm_thread_state64_set_pc_fptr( state, (void *)longjmp );
++            __darwin_arm_thread_state64_set_pc_fptr( *state, (void *)longjmp );
 +            if (try_logs < 16)
 +            {
 +                try_logs++;
