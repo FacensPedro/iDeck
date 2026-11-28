@@ -552,8 +552,8 @@
       "status": "public",
       "top_api": [
         "CGSize",
-        "CGPoint",
-        "CGRect"
+        "CGRect",
+        "CGPoint"
       ],
       "used": true,
       "used_via": "iDeck"

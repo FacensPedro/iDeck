@@ -324,3 +324,10 @@ class GOGInstalledScanThroughProvider(unittest.TestCase):
         self.assertNotIn("gogLibrary.refreshInstalled(", main)
         self.assertIn("func refreshInstalled(prefix: URL) { model.refreshInstalled(prefixPath: prefix) }",
                       read("iDeck/Stores/StoreProvider.swift"))
+
+
+class NoSideBars(unittest.TestCase):
+    def test_picture_spans_the_width_bar_only_on_top(self):
+        rc = read("iDeck/RuntimeConfiguration.swift")
+        self.assertIn("let height = min(bounds.width * shape.height / shape.width, bounds.height)", rc)
+        self.assertIn("return CGRect(x: bounds.minX, y: bounds.maxY - height, width: bounds.width, height: height)", rc)

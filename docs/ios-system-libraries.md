@@ -124,7 +124,7 @@ With the frameworks Madeira's native runtime links: 38 of 58 (65.5%). The first 
 | QuickLook | 1 | quickLookPreview |
 | SQLite | 1 | sqlite3_soft_heap_limit64 |
 | UniformTypeIdentifiers | 1 | UTType |
-| CoreGraphics | 3 | CGSize, CGPoint, CGRect |
+| CoreGraphics | 3 | CGSize, CGRect, CGPoint |
 | CoreImage | 4 | CIContext, CIFilter, CIImage, CIQRCodeGenerator |
 | ImageIO | 2 | CGImageSourceCreateImageAtIndex, CGImageSourceCreateWithData |
 | Metal | 3 | MTLCreateSystemDefaultDevice, MTLDevice, MTLGPUFamilyApple7 |

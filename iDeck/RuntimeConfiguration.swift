@@ -30,6 +30,15 @@ enum RuntimeConfiguration {
         let useDrawable = mode == .aspect && drawable.width.isFinite &&
             drawable.height.isFinite && drawable.width > 0 && drawable.height > 0
         let shape = useDrawable ? drawable : guest
+        // 3.1: no bars at the sides, in every game (Fit, the default, and Aspect).
+        // The picture spans the screen's whole width; a picture shorter than the
+        // screen leaves its spare height only at the top (the strip the performance
+        // figures use), and one taller than the screen is fitted to its height.
+        // Fill still crops, Stretch still fills both ways.
+        if mode != .fill {
+            let height = min(bounds.width * shape.height / shape.width, bounds.height)
+            return CGRect(x: bounds.minX, y: bounds.maxY - height, width: bounds.width, height: height)
+        }
         let sx = bounds.width / shape.width
         let sy = bounds.height / shape.height
         let scale = mode == .fill ? max(sx, sy) : min(sx, sy)
