@@ -4,4 +4,4 @@
 - The EA app and Epic Games sign-ins wait for Safari to open when Safari's sign-in sheet cannot be shown (a Swift build error in 3.1).
 
 ### Version
-- iDeck 3.1 (build 131).
+- Updated the application version to 3.1 (build 131).
