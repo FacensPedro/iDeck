@@ -76,7 +76,9 @@ struct EpicInstalledGame: Codable, Sendable {
         case (let name, "launcher.exe") where name.contains("mafia") && name.contains("definitive"):
             relativePath = "mafiadefinitiveedition.exe"
         default:
-            return manifestURL
+            // Bethesda's launchers (FalloutNVLauncher.exe and the others): the game's
+            // own executable beside them, as for every store (WindowsEnvironment).
+            return WindowsEnvironment.bethesdaGameExecutable(for: manifestURL) ?? manifestURL
         }
         let binary = drive.appendingPathComponent(folder).appendingPathComponent(relativePath)
         return (try? binary.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true

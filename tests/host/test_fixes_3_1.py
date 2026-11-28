@@ -331,3 +331,9 @@ class NoSideBars(unittest.TestCase):
         rc = read("iDeck/RuntimeConfiguration.swift")
         self.assertIn("let height = min(bounds.width * shape.height / shape.width, bounds.height)", rc)
         self.assertIn("return CGRect(x: bounds.minX, y: bounds.maxY - height, width: bounds.width, height: height)", rc)
+
+
+class EpicBethesdaLauncher(unittest.TestCase):
+    def test_epic_launch_url_skips_bethesda_launcher(self):
+        self.assertIn("return WindowsEnvironment.bethesdaGameExecutable(for: manifestURL) ?? manifestURL",
+                      read("iDeck/EpicLibrary.swift"))
