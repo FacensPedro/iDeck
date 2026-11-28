@@ -1,5 +1,5 @@
 // ResourceDomains.swift
-// iDeck 3.0.1: the Resource Governor's four domains, each with its own level.
+// iDeck 3.1: the Resource Governor's four domains, each with its own level.
 
 import Foundation
 import Darwin

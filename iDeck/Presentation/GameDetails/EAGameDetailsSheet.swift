@@ -25,7 +25,7 @@ struct EAGameDetailsSheet: View {
 
     var body: some View {
         let installed = ea.installed[game.id]
-        // Download state through the StoreProvider (3.0.1); the game's record stays the EA app's.
+        // Download state through the StoreProvider (3.1); the game's record stays the EA app's.
         let download = StoreProviders.of(.ea).downloadStatus(game.id)
         let failed = download?.failure
         let paused = download?.isPaused ?? false

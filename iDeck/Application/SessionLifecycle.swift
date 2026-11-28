@@ -9,7 +9,7 @@ import Foundation
 ///   idle -> preparing -> launching -> running -> closing -> idle
 ///                 \-----------\----------\---> failed -> recovering -> idle
 ///
-/// 3.0.1: each transition records how long the previous state lasted; a monitor
+/// 3.1: each transition records how long the previous state lasted; a monitor
 /// notes a session that stays too long in preparing, launching or closing (once per
 /// state entered); observers hear every transition; and "Freeing memory" before a
 /// launch (iDeck reopening through StikDebug from idle) is a transition, not ignored.

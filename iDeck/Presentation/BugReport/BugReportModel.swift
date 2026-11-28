@@ -192,7 +192,7 @@ final class BugReportModel: ObservableObject {
         }
     }
 
-    /// QuickLook previews (3.0.1): the bug report or a log exactly as Copy shares it,
+    /// QuickLook previews (3.1): the bug report or a log exactly as Copy shares it,
     /// compacted and with personal data removed, before it leaves the device.
     func previewReport() {
         do {

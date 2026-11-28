@@ -44,7 +44,7 @@ extension SteamProgramDetailsView {
         }
     }
 
-    /// The download's state comes through the StoreProvider (3.0.1).
+    /// The download's state comes through the StoreProvider (3.1).
     var downloadStatus: some View {
         let status = StoreProviders.of(.steam).downloadStatus(String(game.appID))
         let stopping = status?.stopping ?? false
@@ -96,7 +96,7 @@ extension SteamProgramDetailsView {
         }
     }
 
-    /// The game's DLC, through the StoreProvider (3.0.1): list, size, progress,
+    /// The game's DLC, through the StoreProvider (3.1): list, size, progress,
     /// install, cancel and uninstall.
     var dlcList: some View {
         let steamStore = StoreProviders.of(.steam)

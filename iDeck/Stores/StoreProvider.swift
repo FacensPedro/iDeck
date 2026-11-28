@@ -1,5 +1,5 @@
 // StoreProvider.swift
-// iDeck 3.0.1: one interface over Steam, GOG, Epic Games, the EA app and Ubisoft Connect.
+// iDeck 3.1: one interface over Steam, GOG, Epic Games, the EA app and Ubisoft Connect.
 
 import Foundation
 
@@ -114,7 +114,7 @@ protocol StoreProvider: AnyObject {
     /// Looks again on disk for the store's installed games (Steam and GOG read the prefix).
     func refreshInstalled(prefix: URL)
 
-    // DLC (3.0.1). Stores without DLC in iDeck (GOG, the EA app, Ubisoft Connect) keep
+    // DLC (3.1). Stores without DLC in iDeck (GOG, the EA app, Ubisoft Connect) keep
     // the empty answers of the extension below.
     var supportsDLC: Bool { get }
     /// The game's DLC the account can install, in the store's order.
@@ -131,7 +131,7 @@ protocol StoreProvider: AnyObject {
     /// The DLC being installed for the game now, if any.
     func installingDLC(of gameID: String) -> String?
 
-    // Optional content packs (3.0.1): only Epic Games has them in iDeck.
+    // Optional content packs (3.1): only Epic Games has them in iDeck.
     func optionalPacks(of gameID: String) -> [StoreOptionalPack]
     func isPackInstalled(_ packID: String, of gameID: String) -> Bool
     func installPack(_ packID: String, of gameID: String)

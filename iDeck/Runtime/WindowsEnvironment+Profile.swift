@@ -243,7 +243,7 @@ extension WindowsEnvironment {
     /// a screen whose long side is `screenLongSide` pixels. DXMT and
     /// madeira-d3d12 accept 1 to 2; below 1.1 upscaling only costs GPU time,
     /// so it is off (nil), as it is for "Device native".
-    /// 3.0.1: the short sides are compared too. A 4:3 game (1024x768) on a 19.5:9
+    /// 3.1: the short sides are compared too. A 4:3 game (1024x768) on a 19.5:9
     /// iPhone was enlarged by its long side alone, 2x to 2048x1536, taller than the
     /// 1179-pixel screen: MetalFX drew pixels the screen then shrank away again.
     static func metalFXFactor(resolution: String, screenLongSide: CGFloat, screenShortSide: CGFloat = 0) -> Double? {

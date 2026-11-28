@@ -1,5 +1,5 @@
 // WebSignIn.swift
-// iDeck 3.0.1: store sign-ins in Safari's sign-in sheet (AuthenticationServices).
+// iDeck 3.1: store sign-ins in Safari's sign-in sheet (AuthenticationServices).
 
 import AuthenticationServices
 import UIKit

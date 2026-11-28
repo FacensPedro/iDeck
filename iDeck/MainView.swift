@@ -171,7 +171,7 @@ struct WindowsWorkspaceView: View {
     }
 
     var installedSteamGames: [SteamAppInfo] {
-        // Through the StoreProvider (3.0.1): installed, or downloading now.
+        // Through the StoreProvider (3.1): installed, or downloading now.
         let steamStore = StoreProviders.of(.steam)
         let installed = steamStore.installedIDs
         return steamLibrary.games.filter { game in

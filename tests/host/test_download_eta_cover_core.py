@@ -16,7 +16,7 @@ class DownloadETACoreContract(unittest.TestCase):
         self.assertIn("bytesPerSecond.isFinite", eta)
         self.assertIn("bytesPerSecond > 1_024", eta)
         view = source("iDeck/MainView.swift")
-        # 3.0.1: pages read the time left through the StoreProvider's status.
+        # 3.1: pages read the time left through the StoreProvider's status.
         self.assertIn("etaSeconds: status?.etaSeconds", view)
         self.assertIn("downloadETASeconds[number]", source("iDeck/Stores/StoreProvider.swift"))
         self.assertIn('if let remaining = DownloadETA.label(status?.etaSeconds)', view)

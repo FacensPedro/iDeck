@@ -1,4 +1,4 @@
-"""iDeck 3.0.1: FNV in-game c000001D, DOOM (2016) on Vulkan, Mafia DE without 2K's launcher,
+"""iDeck 3.1: FNV in-game c000001D, DOOM (2016) on Vulkan, Mafia DE without 2K's launcher,
 the whole EA activation log."""
 import split_sources  # noqa: F401  (iDeck 3.0 split files)
 import unittest

@@ -466,7 +466,7 @@
     {
       "api_symbols": 1,
       "audit": "direct",
-      "audit_note": "Bugs & logs previews the bug report and the logs as they would be shared (3.0.1).",
+      "audit_note": "Bugs & logs previews the bug report and the logs as they would be shared (3.1).",
       "examples": [
         "iDeck/Presentation/BugReport/BugReportScreen.swift"
       ],
@@ -887,7 +887,7 @@
     {
       "api_symbols": 4,
       "audit": "direct",
-      "audit_note": "Safari's sign-in sheet (ASWebAuthenticationSession) for the EA app and Epic Games sign-ins (3.0.1).",
+      "audit_note": "Safari's sign-in sheet (ASWebAuthenticationSession) for the EA app and Epic Games sign-ins (3.1).",
       "examples": [
         "iDeck/Stores/WebSignIn.swift"
       ],

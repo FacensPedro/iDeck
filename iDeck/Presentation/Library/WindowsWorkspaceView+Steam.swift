@@ -5,7 +5,7 @@ import SwiftUI
 
 extension WindowsWorkspaceView {
     func gameCard(_ game: SteamAppInfo) -> some View {
-        // Install and download state through the StoreProvider (3.0.1).
+        // Install and download state through the StoreProvider (3.1).
         let steamStore = StoreProviders.of(.steam)
         let installed = steamStore.installedIDs.contains(String(game.appID))
 

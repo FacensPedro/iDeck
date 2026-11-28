@@ -34,7 +34,7 @@ class DownloadPauseContractTests(unittest.TestCase):
     def test_interface_distinguishes_pause_stop_and_resume(self):
         self.assertIn('tr("Pause")', VIEW)
         # The controls are on each game's page, not under its library card.
-        # 3.0.1: through each store's StoreProvider.
+        # 3.1: through each store's StoreProvider.
         self.assertIn("StoreProviders.of(.steam).pause(String(game.appID))", VIEW)
         self.assertIn("gogStore.resume(String(game.id), prefix: prefixPath)", VIEW)
         self.assertIn("StoreProviders.of(.epic).pause(appName)", VIEW)

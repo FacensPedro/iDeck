@@ -21,7 +21,7 @@ struct GOGGameDetailsSheet: View {
 
     var body: some View {
         let installed = gog.installed[game.id]
-        // Download state through the StoreProvider (3.0.1); the game's record stays GOG's.
+        // Download state through the StoreProvider (3.1); the game's record stays GOG's.
         let status = StoreProviders.of(.gog).downloadStatus(String(game.id))
         StoreGameDetailsView(
             title: game.title, store: .gog, profileID: "gog:\(game.id)",

@@ -15,7 +15,7 @@ struct UbisoftGameDetailsSheet: View {
 
     var body: some View {
         let game = ubisoft.game(gameID) ?? fallback
-        // Download state through the StoreProvider (3.0.1).
+        // Download state through the StoreProvider (3.1).
         let download = StoreProviders.of(.ubisoft).downloadStatus(gameID)
         let failed = download?.failure
         let paused = download?.isPaused ?? false

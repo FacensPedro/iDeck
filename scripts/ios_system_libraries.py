@@ -55,7 +55,7 @@ CATALOG = {
     "ExtensionFoundation": ("Core System", "26.0", "public (app extensions)"),
 }
 
-# The audit (3.0.1): what each framework that is not imported directly is to iDeck, and
+# The audit (3.1): what each framework that is not imported directly is to iDeck, and
 # the three asked about by name. "candidate" = worth adopting, "indirect" = used through
 # Madeira's native archives, "not applicable" = nothing in iDeck needs it.
 AUDIT_NOTES = {
@@ -69,7 +69,7 @@ AUDIT_NOTES = {
     "SystemConfiguration": ("not applicable", "Network reachability is watched with Network (NWPathMonitor)."),
     "CoreData": ("not applicable", "Libraries and settings are JSON and UserDefaults; logs and caches use SQLite directly."),
     "FileProvider": ("not applicable", "Files reach iDeck through the Files app's folder and the document picker."),
-    "QuickLook": ("direct", "Bugs & logs previews the bug report and the logs as they would be shared (3.0.1)."),
+    "QuickLook": ("direct", "Bugs & logs previews the bug report and the logs as they would be shared (3.1)."),
     "Accelerate": ("not applicable", "No signal or image maths on the CPU; the GPU does it."),
     "CoreText": ("not applicable", "Wine draws its fonts with FreeType; SwiftUI draws iDeck's text."),
     "CoreVideo": ("indirect", "Pixel buffers between Madeira's video decode and Metal."),
@@ -82,7 +82,7 @@ AUDIT_NOTES = {
     "GameKit": ("not applicable", "Store achievements are kept by the stores, not Game Center."),
     "MultipeerConnectivity": ("not applicable", "Steam's LAN transfers use the network directly."),
     "NetworkExtension": ("not applicable", "LocalDevVPN is a separate app; iDeck only checks the tunnel."),
-    "AuthenticationServices": ("direct", "Safari's sign-in sheet (ASWebAuthenticationSession) for the EA app and Epic Games sign-ins (3.0.1)."),
+    "AuthenticationServices": ("direct", "Safari's sign-in sheet (ASWebAuthenticationSession) for the EA app and Epic Games sign-ins (3.1)."),
     "LocalAuthentication": ("not applicable", "Store tokens stay in the Keychain without a biometric gate."),
     "CoreHaptics": ("indirect", "Controller rumble and DualSense haptics, through Madeira."),
     "CoreMotion": ("not applicable", "Motion comes from controllers (GameController), not the device."),

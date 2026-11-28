@@ -34,7 +34,7 @@ struct SteamProgramDetailsView: View {
         return StoreProviders.of(.steam).isInstalled(String(game.appID), prefix: prefixPath)
     }
 
-    /// The download state, through the StoreProvider (3.0.1).
+    /// The download state, through the StoreProvider (3.1).
     var status: StoreDownloadStatus? { StoreProviders.of(.steam).downloadStatus(String(game.appID)) }
 
     var installing: Bool {
@@ -193,7 +193,7 @@ struct SteamProgramDetailsView: View {
                 }
             }
             .task(id: game.appID) {
-                // The DLC list and which are installed, through the StoreProvider (3.0.1).
+                // The DLC list and which are installed, through the StoreProvider (3.1).
                 await StoreProviders.of(.steam).loadDLC(of: String(game.appID), prefix: prefixPath)
                 guard !Task.isCancelled else { return }
                 if let prefixPath {

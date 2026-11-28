@@ -22,7 +22,7 @@ struct EpicGameDetailsSheet: View {
 
     var body: some View {
         let installed = epic.installed[appName]
-        // Download state through the StoreProvider (3.0.1); the game's record stays Epic's.
+        // Download state through the StoreProvider (3.1); the game's record stays Epic's.
         let download = StoreProviders.of(.epic).downloadStatus(appName)
         let failed = download?.failure
         let paused = download?.isPaused ?? false
@@ -87,7 +87,7 @@ struct EpicGameDetailsSheet: View {
 
     /// Optional content inside the game's own build, installed and removed one by one
     /// like a DLC: Epic ships some DLC, textures and voice languages this way.
-    /// Through the StoreProvider (3.0.1).
+    /// Through the StoreProvider (3.1).
     private func epicPackList(_ packs: [StoreOptionalPack]) -> some View {
         let epicStore = StoreProviders.of(.epic)
         return VStack(spacing: 0) {
@@ -124,7 +124,7 @@ struct EpicGameDetailsSheet: View {
     }
 
     /// The game's DLC, as the Steam page lists them: install, progress, uninstall,
-    /// through the StoreProvider (3.0.1).
+    /// through the StoreProvider (3.1).
     private func epicDLCList(_ list: [StoreDLC]) -> some View {
         let epicStore = StoreProviders.of(.epic)
         return VStack(spacing: 0) {

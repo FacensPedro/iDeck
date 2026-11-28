@@ -62,4 +62,4 @@
 - Shaders: the shader cache is capped at 64 MB instead of 128 MB when less than 4 GB of storage is free or the GPU domain is on Economy.
 
 ### Version
-- Updated the application version to 3.0.1 (build 130).
+- Updated the application version to 3.1 (build 130).
