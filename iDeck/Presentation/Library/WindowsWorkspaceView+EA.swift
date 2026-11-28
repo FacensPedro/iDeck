@@ -35,7 +35,7 @@ extension WindowsWorkspaceView {
 
     func eaCard(_ game: EAOwnedGame) -> some View {
         let installed = eaLibrary.installed[game.id]
-        let download = eaLibrary.downloads[game.id]
+        let download = StoreProviders.of(.ea).downloadStatus(game.id)
         return VStack(alignment: .leading, spacing: 6) {
             VStack(alignment: .leading, spacing: 6) {
                 ZStack {
@@ -54,7 +54,7 @@ extension WindowsWorkspaceView {
                 Button { selectedEAGame = game } label: { cardTitle(game.title) }
                     .buttonStyle(.plain)
             }
-            if case .failed(let message)? = download?.state {
+            if let message = download?.failure {
                 Text(message)
                     .font(.caption2)
                     .foregroundColor(.red)

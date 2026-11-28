@@ -304,6 +304,17 @@ enum DependencyCheck {
                                    "mfc", "d3dx", "d3dcompiler", "xinput", "xaudio", "x3daudio", "xapofx", "steam_api",
                                    "openal", "physxloader", "nvcuda", "nvapi", "amd_ags", "galaxy"]
 
+    /// Plain DirectX libraries (no COM registration, no device access) that Wine may or
+    /// may not carry under every name: looked up in the system folders like any other
+    /// DLL, so the Auto DLL Manager hears of the ones that are really missing. XInput
+    /// and XAudio stay Wine's own (Microsoft's need the XUSB driver and COM classes).
+    static let checkedDirectXPrefixes = ["d3dx9_", "d3dx10_", "d3dx11_", "d3dcompiler_", "d3dcsx_"]
+
+    static func isProvided(_ name: String) -> Bool {
+        if checkedDirectXPrefixes.contains(where: { name.hasPrefix($0) }) { return false }
+        return providedPrefixes.contains(where: { name.hasPrefix($0) })
+    }
+
     // MARK: PE reading
 
     struct PEInfo { var machine: UInt16; var imports: [String] }
@@ -336,14 +347,33 @@ enum DependencyCheck {
             return nil
         }
         var imports: [String] = []
+        func addName(at nameOffset: Int) {
+            var end = nameOffset
+            while end < data.count, data[end] != 0, end - nameOffset < 256 { end += 1 }
+            let name = String(decoding: data[nameOffset..<end], as: UTF8.self).lowercased()
+            if !name.isEmpty && !imports.contains(name) { imports.append(name) }
+        }
         if magic == 0x10B || magic == 0x20B, let importRVA = u32(directories + 8), importRVA != 0, var d = offset(importRVA) {
             for _ in 0..<512 {
                 guard let nameRVA = u32(d + 12), nameRVA != 0, let nameOffset = offset(nameRVA) else { break }
-                var end = nameOffset
-                while end < data.count, data[end] != 0, end - nameOffset < 256 { end += 1 }
-                let name = String(decoding: data[nameOffset..<end], as: UTF8.self).lowercased()
-                if !name.isEmpty && !imports.contains(name) { imports.append(name) }
+                addName(at: nameOffset)
                 d += 20
+            }
+        }
+        // Delay-loaded imports (directory 13): games often load D3DX and the HLSL
+        // compiler this way, so the check never saw them before the start failed.
+        if magic == 0x10B || magic == 0x20B, let delayRVA = u32(directories + 13 * 8), delayRVA != 0,
+           var d = offset(delayRVA) {
+            let imageBase: UInt64 = magic == 0x20B
+                ? UInt64(u32(optional + 24) ?? 0) | UInt64(u32(optional + 28) ?? 0) << 32
+                : UInt64(u32(optional + 28) ?? 0)
+            for _ in 0..<256 {
+                guard let attributes = u32(d), let nameField = u32(d + 4), nameField != 0 else { break }
+                // Attribute bit 0 set: the fields are RVAs; clear (old linkers): addresses.
+                let nameRVA = attributes & 1 != 0 ? nameField
+                    : UInt32(truncatingIfNeeded: UInt64(nameField) &- imageBase)
+                if let nameOffset = offset(nameRVA) { addName(at: nameOffset) }
+                d += 32
             }
         }
         return PEInfo(machine: machine, imports: imports)
@@ -409,7 +439,7 @@ enum DependencyCheck {
                 }
                 continue
             }
-            if providedPrefixes.contains(where: { name.hasPrefix($0) }) { continue }
+            if isProvided(name) { continue }
             let found = systemFolders.contains { FileManager.default.fileExists(atPath: $0.appendingPathComponent(name).path) }
             if !found { result.missing.append(name) }
         }

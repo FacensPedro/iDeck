@@ -19,7 +19,7 @@ extension WindowsWorkspaceView {
 
     /// EA games installed or installing, by title.
     private var eaShelfIDs: [String] {
-        Set(eaLibrary.installed.keys).union(eaLibrary.downloads.keys)
+        StoreProviders.of(.ea).installedOrDownloadingIDs
             .sorted { eaTitle($0).localizedCaseInsensitiveCompare(eaTitle($1)) == .orderedAscending }
     }
 

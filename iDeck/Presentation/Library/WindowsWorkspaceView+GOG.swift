@@ -89,7 +89,7 @@ extension WindowsWorkspaceView {
                 Button { selectedGOGGame = game } label: { cardTitle(game.title) }
                     .buttonStyle(.plain)
             }
-            if let error = gogLibrary.downloadErrors[game.id] {
+            if let error = StoreProviders.of(.gog).downloadStatus(String(game.id))?.failure {
                 Text(tr(error))
                     .font(.caption2)
                     .foregroundColor(.red)
@@ -133,7 +133,7 @@ extension WindowsWorkspaceView {
     /// straight from GOG's content system. No offline installer.
     func downloadGOGInstaller(_ game: GOGGame) {
         guard let prefixPath else { return }
-        gogLibrary.install(game, prefixPath: prefixPath) { _ in
+        StoreProviders.of(.gog).install(String(game.id), prefix: prefixPath) {
             windowsLibrary.refresh(prefixPath: prefixPath)
         }
     }

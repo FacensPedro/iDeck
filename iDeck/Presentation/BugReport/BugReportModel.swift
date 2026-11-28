@@ -8,6 +8,8 @@ import Darwin
 @MainActor
 final class BugReportModel: ObservableObject {
     @Published private(set) var issues: [LogIssue] = []
+    /// The file QuickLook shows (`.quickLookPreview`): what would be shared, as it would be.
+    @Published var previewURL: URL?
     @Published private(set) var wineFinding: String?
     /// The "Missing DLLs:" line of the report, from the last Wine log.
     @Published private(set) var missingModules: String?
@@ -190,6 +192,43 @@ final class BugReportModel: ObservableObject {
         }
     }
 
+    /// QuickLook previews (3.1): the bug report or a log exactly as Copy shares it,
+    /// compacted and with personal data removed, before it leaves the device.
+    func previewReport() {
+        do {
+            previewURL = try WineLogClipboard.redactedTextFile(report(for: issues), named: "iDeck-bug-report.txt")
+        } catch {
+            notice = tr("Could not copy the bug report.")
+        }
+    }
+
+    func previewLog(_ url: URL?, name: String) {
+        guard let url, FileManager.default.fileExists(atPath: url.path) else {
+            notice = tr("That log is empty.")
+            return
+        }
+        Task {
+            do { previewURL = try await WineLogClipboard.redactedSnapshot(from: url, name: name) }
+            catch { notice = tr("That log is empty.") }
+        }
+    }
+
+    var hasFailedWineLog: Bool {
+        SystemCoordinator.failedWineLogURL.map { FileManager.default.fileExists(atPath: $0.path) } ?? false
+    }
+
+    func copyFailedWineLog() {
+        guard let url = SystemCoordinator.failedWineLogURL else { return }
+        Task {
+            do {
+                try await WineLogClipboard.copyFile(from: url, name: "Wine-log-failed-launch")
+                notice = tr("Wine log of the failed launch copied as a .txt file.")
+            } catch {
+                notice = tr("Could not copy Wine log.")
+            }
+        }
+    }
+
     func copyLog(_ url: URL?) {
         guard let url, let content = try? WineLogClipboard.read(from: url) else {
             notice = tr("That log is empty.")
@@ -201,18 +240,10 @@ final class BugReportModel: ObservableObject {
 
     /// Logging evidence must remain available throughout active downloads
     /// and transfers; paused jobs do not count as an active transfer.
+    /// Every store through its StoreProvider: the EA app's and Ubisoft's downloads
+    /// were not counted before.
     static var downloadsOrTransfersActive: Bool {
-        let steam = SteamOwnedGamesModel.shared
-        if steam.installingApps.contains(where: { !steam.pausedInstalls.contains($0) }) { return true }
-        let gog = GOGLibraryModel.shared
-        if gog.downloadProgress.keys.contains(where: { !gog.pausedDownloads.contains($0) }) { return true }
-        let epic = EpicLibrary.shared
-        if epic.downloads.values.contains(where: { download in
-            if case .paused = download.state { return false }
-            if case .failed = download.state { return false }
-            return true
-        }) { return true }
-        return false
+        StoreProviders.anyDownloadRunning
     }
 
     /// Clears every log the bug list reads: iDeck's own log and the last
@@ -223,6 +254,9 @@ final class BugReportModel: ObservableObject {
         AppLog.clear()
         if let wine = Self.wineLogURL {
             try? FileManager.default.removeItem(at: wine)
+        }
+        if let failed = SystemCoordinator.failedWineLogURL {
+            try? FileManager.default.removeItem(at: failed)
         }
         hasAppLog = false
         hasWineLog = false
@@ -323,6 +357,9 @@ final class BugReportModel: ObservableObject {
         if let deps = UserDefaults.standard.string(forKey: DependencyCheck.reportKey) {
             lines.append("DLL check: " + deps)
         }
+        lines.append("Stores:")
+        lines += StoreProviders.summary.map { "  " + $0 }
+        lines.append("Resource Governor: " + ResourceDomains.describe(ResourceDomains.current))
         let transitions = SessionLifecycle.shared.recent
         if !transitions.isEmpty {
             lines.append("Session states (oldest first):")

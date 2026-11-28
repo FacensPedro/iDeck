@@ -22,37 +22,32 @@ struct EpicGameDetailsSheet: View {
 
     var body: some View {
         let installed = epic.installed[appName]
-        let download = epic.downloads[appName]
-        let failed: String? = { if case .failed(let message) = download?.state { return message }; return nil }()
-        let paused: Bool = { if case .paused = download?.state { return true }; return false }()
-        let eta: Int? = {
-            guard let download, download.progress.phase == .downloading else { return nil }
-            return DownloadETA.seconds(done: download.progress.doneBytes,
-                                       total: download.progress.totalBytes,
-                                       bytesPerSecond: download.progress.bytesPerSecond)
-        }()
+        // Download state through the StoreProvider (3.1); the game's record stays Epic's.
+        let download = StoreProviders.of(.epic).downloadStatus(appName)
+        let failed = download?.failure
+        let paused = download?.isPaused ?? false
+        let eta = download?.etaSeconds
         StoreGameDetailsView(
             title: title, store: .epic, profileID: "epic:\(appName)",
             covers: [epic.game(appName)?.cover].compactMap { $0 },
             banners: [epic.game(appName)?.wide].compactMap { $0 },
             installed: installed != nil && download == nil,
-            progress: (download != nil && failed == nil) ? download?.progress.fraction : nil,
+            progress: download?.progress,
             etaSeconds: eta,
-            installedText: download.flatMap { $0.progress.phase == .downloading
-                ? installedBytesText(done: $0.progress.doneBytes, total: $0.progress.totalBytes) : nil },
-            paused: paused, waiting: download?.state == .queued, sizeText: sizeText, errorText: failed,
+            installedText: download.flatMap { $0.transferring
+                ? installedBytesText(done: $0.doneBytes, total: $0.totalBytes) : nil },
+            paused: paused, waiting: download?.waiting ?? false, sizeText: sizeText, errorText: failed,
             canInstall: true,
             onLaunch: { if let installed { launch(installed) } },
-            onInstall: { epic.install(appName) },
-            onPause: { epic.pause(appName) },
-            onStop: { epic.cancel(appName) },
+            onInstall: { StoreProviders.of(.epic).install(appName, prefix: nil) },
+            onPause: { StoreProviders.of(.epic).pause(appName) },
+            onStop: { StoreProviders.of(.epic).cancel(appName) },
             // Always shown: a save check running in the background (it starts when this page
             // opens) hid the button. While a game runs or a sync writes saves, the removal
             // waits for it instead.
             onUninstall: {
                 guard !epic.sessionRunning else { return false }
-                epic.uninstall(appName)
-                return epic.installed[appName] == nil
+                return StoreProviders.of(.epic).uninstall(appName, prefix: nil)
             },
             library: library, coordinator: coordinator
         ) {
@@ -61,16 +56,18 @@ struct EpicGameDetailsSheet: View {
                     DetailValueRow(title: tr("Version"), value: installed?.buildVersion ?? "",
                                    icon: "number", iconColor: .gray)
                     if epic.updateAvailable(appName) {
-                        DetailButtonRow(title: tr("Update"), systemImage: "arrow.down.circle") { epic.install(appName) }
+                        DetailButtonRow(title: tr("Update"), systemImage: "arrow.down.circle") { StoreProviders.of(.epic).install(appName, prefix: nil) }
                     }
                     DetailButtonRow(title: tr("Repair"), systemImage: "wrench.and.screwdriver", showsDivider: false) {
                         epic.repair(appName)
                     }
                 }
-                if let list = epic.dlcs[appName], !list.isEmpty {
-                    DetailCard(title: tr("DLCs")) { epicDLCList(list) }
+                let dlcs = StoreProviders.of(.epic).dlcs(of: appName)
+                if !dlcs.isEmpty {
+                    DetailCard(title: tr("DLCs")) { epicDLCList(dlcs) }
                 }
-                if let packs = epic.optionalPacks[appName], !packs.isEmpty {
+                let packs = StoreProviders.of(.epic).optionalPacks(of: appName)
+                if !packs.isEmpty {
                     DetailCard(title: tr("Optional content")) { epicPackList(packs) }
                 }
                 VStack(alignment: .leading, spacing: 10) {
@@ -84,36 +81,38 @@ struct EpicGameDetailsSheet: View {
         }
         .task(id: appName) {
             await epic.loadSize(appName)
-            await epic.loadOptionalPacks(appName)
+            await StoreProviders.of(.epic).loadOptionalPacks(of: appName)
         }
     }
 
     /// Optional content inside the game's own build, installed and removed one by one
     /// like a DLC: Epic ships some DLC, textures and voice languages this way.
-    private func epicPackList(_ packs: [EpicOptionalPack]) -> some View {
-        VStack(spacing: 0) {
-            ForEach(packs) { pack in
-                let installedPack = epic.packInstalled(appName, tag: pack.tag)
+    /// Through the StoreProvider (3.1).
+    private func epicPackList(_ packs: [StoreOptionalPack]) -> some View {
+        let epicStore = StoreProviders.of(.epic)
+        return VStack(spacing: 0) {
+            ForEach(packs, id: \.id) { pack in
+                let installedPack = epicStore.isPackInstalled(pack.id, of: appName)
                 HStack(spacing: 12) {
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(pack.tag).font(.subheadline).foregroundColor(.white).lineLimit(2)
-                        Text(ByteCountFormatter.string(fromByteCount: pack.bytes, countStyle: .file))
+                        Text(pack.title).font(.subheadline).foregroundColor(.white).lineLimit(2)
+                        Text(ByteCountFormatter.string(fromByteCount: pack.sizeBytes, countStyle: .file))
                             .font(.caption2).foregroundColor(.gray)
                     }
                     Spacer(minLength: 6)
                     if installedPack {
-                        Button(role: .destructive) { epic.uninstallPack(appName, tag: pack.tag) } label: {
+                        Button(role: .destructive) { epicStore.uninstallPack(pack.id, of: appName) } label: {
                             Label(tr("Uninstall"), systemImage: "trash").font(.caption.weight(.semibold))
                         }
                         .buttonStyle(.bordered)
                     } else {
-                        Button { epic.installPack(appName, tag: pack.tag) } label: {
+                        Button { epicStore.installPack(pack.id, of: appName) } label: {
                             Text(tr("Install")).font(.caption.weight(.semibold))
                         }
                         .buttonStyle(.borderedProminent)
                     }
                 }
-                .disabled(epic.downloads[appName] != nil || epic.sessionRunning)
+                .disabled(StoreProviders.of(.epic).downloadStatus(appName) != nil || epic.sessionRunning)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
                 if pack.id != packs.last?.id {
@@ -124,12 +123,14 @@ struct EpicGameDetailsSheet: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    /// The game's DLC, as the Steam page lists them: install, progress, uninstall.
-    private func epicDLCList(_ list: [EpicOwnedDLC]) -> some View {
-        VStack(spacing: 0) {
-            ForEach(list) { dlc in
-                let download = epic.downloads[dlc.appName]
-                let failed: String? = { if case .failed(let message) = download?.state { return message }; return nil }()
+    /// The game's DLC, as the Steam page lists them: install, progress, uninstall,
+    /// through the StoreProvider (3.1).
+    private func epicDLCList(_ list: [StoreDLC]) -> some View {
+        let epicStore = StoreProviders.of(.epic)
+        return VStack(spacing: 0) {
+            ForEach(list, id: \.id) { dlc in
+                let download = epicStore.dlcDownloadStatus(dlc.id, of: appName)
+                let failed = download?.failure
                 HStack(spacing: 12) {
                     AsyncImage(url: dlc.image) { image in
                         image.resizable().scaledToFill()
@@ -142,8 +143,9 @@ struct EpicGameDetailsSheet: View {
                             .foregroundColor(.white)
                             .lineLimit(2)
                         if let download, failed == nil {
-                            ProgressView(value: download.progress.fraction).tint(.blue)
-                            Text(tr("Installing %d%%", Int((download.progress.fraction * 100).rounded())))
+                            let fraction = download.progress ?? 0
+                            ProgressView(value: fraction).tint(.blue)
+                            Text(tr("Installing %d%%", Int((fraction * 100).rounded())))
                                 .font(.caption2)
                                 .foregroundColor(.white)
                         } else if let failed {
@@ -152,22 +154,22 @@ struct EpicGameDetailsSheet: View {
                     }
                     Spacer(minLength: 6)
                     if download != nil && failed == nil {
-                        Button(role: .destructive) { epic.cancel(dlc.appName) } label: {
+                        Button(role: .destructive) { epicStore.cancelDLC(dlc.id, of: appName) } label: {
                             Label(tr("Cancel"), systemImage: "xmark.circle.fill").font(.caption.weight(.semibold))
                         }
                         .buttonStyle(.bordered)
-                    } else if epic.installedDLC[dlc.appName] != nil {
-                        Button(role: .destructive) { epic.uninstallDLC(dlc.appName) } label: {
+                    } else if epicStore.isDLCInstalled(dlc.id, of: appName) {
+                        Button(role: .destructive) { epicStore.uninstallDLC(dlc.id, of: appName, prefix: nil) } label: {
                             Label(tr("Uninstall"), systemImage: "trash").font(.caption.weight(.semibold))
                         }
                         .buttonStyle(.bordered)
                         .disabled(epic.sessionRunning)
                     } else {
-                        Button { epic.installDLC(dlc.appName) } label: {
+                        Button { epicStore.installDLC(dlc.id, of: appName, prefix: nil) } label: {
                             Text(tr("Install")).font(.caption.weight(.semibold))
                         }
                         .buttonStyle(.borderedProminent)
-                        .disabled(epic.downloads[appName] != nil)
+                        .disabled(StoreProviders.of(.epic).downloadStatus(appName) != nil)
                     }
                 }
                 .padding(.horizontal, 16)

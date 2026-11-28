@@ -62,7 +62,9 @@ class SteamWebSocketBackpressureTests(unittest.TestCase):
 
     def test_dlc_requests_stop_after_details_close(self):
         self.assertIn("guard !Task.isCancelled else { return }", STEAM)
-        self.assertIn("await steamLibrary.loadDLC(appID: game.appID)", (ROOT / "iDeck/MainView.swift").read_text(encoding="utf-8"))
+        self.assertIn("await StoreProviders.of(.steam).loadDLC(of: String(game.appID), prefix: prefixPath)",
+                      (ROOT / "iDeck/MainView.swift").read_text(encoding="utf-8"))
+        self.assertIn("await model.loadDLC(appID: app)", (ROOT / "iDeck/Stores/StoreProvider.swift").read_text())
 
     def test_graphics_diagnostic_requires_elapsed_time(self):
         self.assertIn("metrics.secondsSinceLaunch >= 20 && !metrics.receivedNewFrames", GAME)

@@ -340,6 +340,13 @@ extension SystemCoordinator {
         // iDeck adds goes for this game, and the next launch runs one frame in flight.
         if let endedGame {
             let faulted = Self.sessionLogContains(GPUFaultGuard.markers, logURL: Self.wineLogURL, since: wineLogStartOffset)
+            // A Direct3D 12 session that crashed or faulted the GPU: Direct3D 11 next time,
+            // for games that can use both and have an engine switch.
+            if faulted || outcome.reason.hasPrefix("Execution Error"), let program = AutoDLLManager.lastProgram,
+               D3D12Fallback.note(program, loadedD3D12: Self.sessionLogContains([D3D12Fallback.loadedMarker],
+                                                                               logURL: Self.wineLogURL, since: wineLogStartOffset)) {
+                outcome.reason += " " + "It ran on Direct3D 12: iDeck starts it on Direct3D 11 from the next launch."
+            }
             if GPUFaultGuard.note(endedGame, faulted: faulted) {
                 let lightened = MainActor.assumeIsolated { () -> Bool in
                     let store = WindowsLibraryStore()
@@ -361,6 +368,9 @@ extension SystemCoordinator {
         if let endedGame, Self.sessionLogContains(FullCodeChecksAuto.markers.map { $0.lowercased() },
                                                   logURL: Self.wineLogURL, since: wineLogStartOffset) {
             FullCodeChecksAuto.enable(endedGame)
+        }
+        if outcome.reason.hasPrefix("Execution Error") {
+            Self.keepFailedSessionLog(game: endedGame ?? "unknown", since: wineLogStartOffset)
         }
         EALibrary.noteSessionEnded(activationUI: Self.sessionLogContains(["activationui.exe"], logURL: Self.wineLogURL,
                                                                         since: wineLogStartOffset))

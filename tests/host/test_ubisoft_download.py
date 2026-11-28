@@ -51,9 +51,9 @@ class UbisoftInstallFlowTests(unittest.TestCase):
         # 2.13.3: the card opens the game's page, which installs, pauses and stops.
         start = VIEW.index("struct UbisoftGameDetailsSheet: View {")
         page = VIEW[start:VIEW.index("\n}\n", start)]
-        self.assertIn("onInstall: { ubisoft.install(game) }", page)
-        self.assertIn("onPause: { ubisoft.pause(game) }", page)
-        self.assertIn("onStop: { ubisoft.cancel(game) }", page)
+        self.assertIn("onInstall: { StoreProviders.of(.ubisoft).install(game.id, prefix: nil) }", page)
+        self.assertIn("onPause: { StoreProviders.of(.ubisoft).pause(game.id) }", page)
+        self.assertIn("onStop: { StoreProviders.of(.ubisoft).cancel(game.id) }", page)
         card = VIEW[VIEW.index("func ubisoftCard("):VIEW.index("\n    }\n", VIEW.index("func ubisoftCard("))]
         self.assertIn("let open = { selectedUbisoftGame = game }", card)
         self.assertNotIn("Install it in Ubisoft Connect", card)

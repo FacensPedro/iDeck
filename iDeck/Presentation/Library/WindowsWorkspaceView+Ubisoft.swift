@@ -34,22 +34,22 @@ extension WindowsWorkspaceView {
             .libraryCoverFrame()
             .blur(radius: game.executable == nil && AntiCheatPolicy.isBlocked(title: game.title) ? Self.uninstalledCoverBlur : 0)
             .overlay(alignment: .bottom) {
-                if let download = ubisoftLibrary.downloads[game.id] { ubisoftDownloadBadge(download) }
+                if let download = StoreProviders.of(.ubisoft).downloadStatus(game.id) { ubisoftDownloadBadge(download) }
             }
             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             .clipped()
             .contentShape(Rectangle())
             .onTapGesture(perform: open)
             .contextMenu {
-                if ubisoftLibrary.downloads[game.id] != nil {
-                    Button(role: .destructive) { ubisoftLibrary.cancel(game) } label: {
+                if StoreProviders.of(.ubisoft).downloadStatus(game.id) != nil {
+                    Button(role: .destructive) { StoreProviders.of(.ubisoft).cancel(game.id) } label: {
                         Label(tr("Stop download"), systemImage: "xmark.circle")
                     }
                 }
             }
             Button(action: open) { cardTitle(game.title) }
                 .buttonStyle(.plain)
-            if case .failed(let message)? = ubisoftLibrary.downloads[game.id]?.state {
+            if let message = StoreProviders.of(.ubisoft).downloadStatus(game.id)?.failure {
                 Text(message)
                     .font(.caption2)
                     .foregroundColor(.red)
@@ -61,12 +61,13 @@ extension WindowsWorkspaceView {
     }
 
     /// A Ubisoft download's state over its cover: the step or the percentage, and a bar.
-    private func ubisoftDownloadBadge(_ download: UbisoftLibrary.Download) -> some View {
+    private func ubisoftDownloadBadge(_ download: StoreDownloadStatus) -> some View {
         let text: String
+        let fraction = download.progress ?? 0
         switch download.state {
         case .queued: text = tr("Waiting…")
-        case .active: text = download.total > 0 ? "\(Int(download.fraction * 100))%" : download.step
-        case .paused: text = download.total > 0 ? "\(Int(download.fraction * 100))%" : ""   // no "Paused" text
+        case .active: text = download.totalBytes > 0 ? "\(Int(fraction * 100))%" : (download.step ?? "")
+        case .paused: text = download.totalBytes > 0 ? "\(Int(fraction * 100))%" : ""   // no "Paused" text
         case .failed: text = tr("Download failed")
         }
         return VStack(spacing: 4) {
@@ -74,7 +75,7 @@ extension WindowsWorkspaceView {
                 .font(.caption.weight(.semibold))
                 .foregroundColor(.white)
                 .lineLimit(1)
-            ProgressView(value: download.fraction)
+            ProgressView(value: fraction)
                 .tint(.white)
         }
         .padding(8)

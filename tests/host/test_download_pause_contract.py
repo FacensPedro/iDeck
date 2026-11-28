@@ -34,10 +34,11 @@ class DownloadPauseContractTests(unittest.TestCase):
     def test_interface_distinguishes_pause_stop_and_resume(self):
         self.assertIn('tr("Pause")', VIEW)
         # The controls are on each game's page, not under its library card.
-        self.assertIn("steamLibrary.pauseInstall(appID: game.appID)", VIEW)
-        self.assertIn("gog.resumeDownload(game)", VIEW)
-        self.assertIn("epic.pause(appName)", VIEW)
-        self.assertIn("epic.cancel(appName)", VIEW)
+        # 3.1: through each store's StoreProvider.
+        self.assertIn("StoreProviders.of(.steam).pause(String(game.appID))", VIEW)
+        self.assertIn("gogStore.resume(String(game.id), prefix: prefixPath)", VIEW)
+        self.assertIn("StoreProviders.of(.epic).pause(appName)", VIEW)
+        self.assertIn("StoreProviders.of(.epic).cancel(appName)", VIEW)
         self.assertNotIn("cardActionLabel(", VIEW)
         # 2.13.3: a paused download no longer says "Download paused".
         self.assertNotIn('"Download paused"', TRANSLATIONS)

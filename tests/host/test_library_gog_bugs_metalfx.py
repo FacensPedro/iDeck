@@ -107,7 +107,7 @@ class MetalFXTests(unittest.TestCase):
 
     def test_metalfx_factor_matches_dxmt_range(self):
         env = read("iDeck/WindowsEnvironment.swift")
-        self.assertIn("let factor = min(Double(screenLongSide) / max(width, height), 2.0)", env)
+        self.assertIn("var factor = min(Double(screenLongSide) / max(width, height), 2.0)", env)
         self.assertIn("return factor >= 1.1 ?", env)
 
 
@@ -129,7 +129,7 @@ class GOGContentSystemTests(unittest.TestCase):
         self.assertIn("catch GOGContentError.noBuild", gog)
         self.assertIn("try await installer.install(plan, into: staging)", gog)
         main = read("iDeck/MainView.swift")
-        self.assertIn("gogLibrary.install(game, prefixPath: prefixPath)", main)
+        self.assertIn("StoreProviders.of(.gog).install(String(game.id), prefix: prefixPath)", main)
 
     def test_gog_installs_only_through_galaxy(self):
         gog = read("iDeck/GOGLibrary.swift")

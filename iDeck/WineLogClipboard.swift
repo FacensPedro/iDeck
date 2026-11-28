@@ -19,20 +19,36 @@ enum WineLogClipboard {
     }
 
     #if canImport(UIKit)
-    @MainActor
-    static func copyFile(from source: URL, name: String = "Wine-log") async throws {
-        let snapshot = try await Task.detached(priority: .utility) {
+    /// The log as it is shared: compacted and with personal data removed, in a
+    /// temporary .txt file (also what Bugs & logs previews with QuickLook).
+    static func redactedSnapshot(from source: URL, name: String) async throws -> URL {
+        try await Task.detached(priority: .utility) {
             let values = try source.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey])
             guard values.isRegularFile == true, values.isSymbolicLink != true else { throw ReadError.invalidFile }
             guard (values.fileSize ?? 0) > 0 else { throw ReadError.empty }
-            let destination = FileManager.default.temporaryDirectory
-                .appendingPathComponent(name + "-" + UUID().uuidString + ".txt")
+            let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            let destination = folder.appendingPathComponent(name + ".txt")
             // The copy is compacted: repeated lines are folded, so it is much smaller.
             // Compacted byte by byte: no String of the whole log, no Character per line.
             let raw = try Data(contentsOf: source, options: .alwaysMapped)   // read in place, not copied whole
             try PrivacyRedactor.redact(WineLogDigest.shared(raw, from: source)).write(to: destination, options: .atomic)
             return destination
         }.value
+    }
+
+    /// `text` as it is shared (compacted, personal data removed) in a temporary .txt file.
+    static func redactedTextFile(_ text: String, named name: String) throws -> URL {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let destination = folder.appendingPathComponent(name)
+        try Data(PrivacyRedactor.redact(LogCompactor.compact(text)).utf8).write(to: destination, options: .atomic)
+        return destination
+    }
+
+    @MainActor
+    static func copyFile(from source: URL, name: String = "Wine-log") async throws {
+        let snapshot = try await redactedSnapshot(from: source, name: name)
         let provider = NSItemProvider()
         provider.suggestedName = name + ".txt"
         provider.registerFileRepresentation(forTypeIdentifier: UTType.plainText.identifier,
@@ -45,8 +61,7 @@ enum WineLogClipboard {
 
     /// Puts `text` on the pasteboard as a .txt file named `name`.
     static func copyText(_ text: String, named name: String) throws {
-        let destination = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + "-" + name)
-        try Data(PrivacyRedactor.redact(LogCompactor.compact(text)).utf8).write(to: destination, options: .atomic)
+        let destination = try redactedTextFile(text, named: name)
         let provider = NSItemProvider()
         provider.suggestedName = name
         provider.registerFileRepresentation(forTypeIdentifier: UTType.plainText.identifier,

@@ -66,7 +66,7 @@ class UbisoftPageTests(unittest.TestCase):
         self.assertIn("downloads[game.id] = Download(state: .failed(AntiCheatPolicy.message), step: \"\")", UBI)
 
     def test_failure_reason_under_the_card(self):
-        self.assertIn("if case .failed(let message)? = ubisoftLibrary.downloads[game.id]?.state {", self.card())
+        self.assertIn("if let message = StoreProviders.of(.ubisoft).downloadStatus(game.id)?.failure {", self.card())
 
 
 if __name__ == "__main__":

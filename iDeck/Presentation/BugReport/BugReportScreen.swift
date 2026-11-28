@@ -2,6 +2,7 @@
 // Split from BugReportView.swift (iDeck 3.0 architecture).
 
 import SwiftUI
+import QuickLook
 
 struct BugReportView: View {
     @StateObject private var model = BugReportModel()
@@ -66,11 +67,29 @@ struct BugReportView: View {
                     Button { model.copyAll() } label: {
                         Label(tr("Copy all bugs"), systemImage: "doc.on.doc")
                     }
+                    // QuickLook: see the report and the logs as they would be shared.
+                    Menu {
+                        Button(tr("Bug report")) { model.previewReport() }
+                        Button(tr("Last Wine log")) { model.previewLog(BugReportModel.wineLogURL, name: "Wine-log") }
+                            .disabled(!model.hasWineLog)
+                        Button(tr("Wine log of the last failed launch")) {
+                            model.previewLog(SystemCoordinator.failedWineLogURL, name: "Wine-log-failed-launch")
+                        }
+                        .disabled(!model.hasFailedWineLog)
+                        Button(tr("iDeck log")) { model.previewLog(AppLog.fileURL, name: "iDeck-log") }
+                            .disabled(!model.hasAppLog)
+                    } label: {
+                        Label(tr("Preview before sharing"), systemImage: "eye")
+                    }
                     .disabled(model.issues.isEmpty)
                     Button { model.copyWineLog() } label: {
                         Label(tr("Copy last Wine log"), systemImage: "terminal")
                     }
                     .disabled(!model.hasWineLog)
+                    Button { model.copyFailedWineLog() } label: {
+                        Label(tr("Copy Wine log of the last failed launch"), systemImage: "exclamationmark.triangle")
+                    }
+                    .disabled(!model.hasFailedWineLog)
                     Button { model.copyLog(AppLog.fileURL) } label: {
                         Label(tr("Copy iDeck log"), systemImage: "list.bullet.rectangle")
                     }
@@ -93,6 +112,7 @@ struct BugReportView: View {
                 Text(tr("This action cannot be undone. Games and settings will not be changed."))
             }
         }
+        .quickLookPreview($model.previewURL)
         .navigationTitle(tr("Bugs & logs"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {

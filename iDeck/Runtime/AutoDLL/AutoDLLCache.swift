@@ -21,6 +21,21 @@ extension AutoDLLManager {
         }
     }
 
+    /// Whether `file` is a Windows DLL built for `machine` (x64 copies also serve
+    /// ARM64EC programs). A truncated or foreign file in the cache is not one.
+    static func isValidDLL(_ file: URL, machine: UInt16) -> Bool {
+        guard let info = DependencyCheck.read(file) else { return false }
+        return machine == 0x014C ? info.machine == 0x014C : info.machine == 0x8664
+    }
+
+    /// Drops a component from the cache so the next launch downloads it again.
+    static func invalidate(_ component: Component, reason: String) {
+        for machine: UInt16 in [0x014C, 0x8664] {
+            try? FileManager.default.removeItem(at: cacheFolder(component, machine: machine))
+        }
+        AppLog.record("[auto-dll] \(component.title): cache dropped (\(reason)); it is downloaded again")
+    }
+
     nonisolated(unsafe) static var downloading: Set<String> = []
 
     /// Downloads the component once and keeps both architectures' DLLs.
@@ -66,8 +81,20 @@ extension AutoDLLManager {
                 }
             }
         }
-        AppLog.record("[auto-dll] \(component.id) \(machine == 0x014C ? "x86" : "x64"): \(count) of \(names.count) DLLs (\(String(cString: message)))")
-        guard count > 0 else { throw NSError(domain: "iDeck.autodll", code: Int(count)) }
+        // Every extracted file must be a DLL of this architecture: a damaged cabinet or
+        // a file of the other architecture is removed instead of reaching a game folder.
+        var valid = 0, rejected: [String] = []
+        for name in names {
+            let file = folder.appendingPathComponent(name)
+            guard fm.fileExists(atPath: file.path) else { continue }
+            if isValidDLL(file, machine: machine) { valid += 1 } else {
+                try? fm.removeItem(at: file)
+                rejected.append(name)
+            }
+        }
+        AppLog.record("[auto-dll] \(component.id) \(machine == 0x014C ? "x86" : "x64"): \(count) of \(names.count) DLLs extracted, \(valid) valid"
+                      + (rejected.isEmpty ? "" : ", rejected " + rejected.joined(separator: ", ")) + " (\(String(cString: message)))")
+        guard count > 0, valid > 0 else { throw NSError(domain: "iDeck.autodll", code: Int(count)) }
         fm.createFile(atPath: folder.appendingPathComponent(marker).path, contents: Data())
     }
 

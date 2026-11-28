@@ -126,3 +126,25 @@ struct StoreClientCard: View {
         .clipShape(RoundedRectangle(cornerRadius: 10))
     }
 }
+
+/// One Resource Governor domain (FEX, JIT, GPU, sessions) and its level.
+struct ResourceLevelPicker: View {
+    let domain: ResourceDomain
+    @AppStorage private var level: String
+
+    init(domain: ResourceDomain) {
+        self.domain = domain
+        _level = AppStorage(wrappedValue: ResourceLevel.automatic.rawValue, ResourceDomains.key(domain))
+    }
+
+    var body: some View {
+        Picker(domain.title, selection: $level) {
+            ForEach(ResourceLevel.allCases, id: \.rawValue) { choice in
+                Text(choice.title).tag(choice.rawValue)
+            }
+        }
+        .onChange(of: level) { _, value in
+            AppLog.record("[resources] \(domain.rawValue): \(value)")
+        }
+    }
+}

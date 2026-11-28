@@ -31,11 +31,16 @@ struct SteamProgramDetailsView: View {
 
     var installed: Bool {
         guard let prefixPath else { return false }
-        return steamLibrary.isInstalled(appID: game.appID, prefixPath: prefixPath)
+        return StoreProviders.of(.steam).isInstalled(String(game.appID), prefix: prefixPath)
     }
 
+    /// The download state, through the StoreProvider (3.1).
+    var status: StoreDownloadStatus? { StoreProviders.of(.steam).downloadStatus(String(game.appID)) }
+
     var installing: Bool {
-        steamLibrary.installingApps.contains(game.appID)
+        guard let status else { return false }
+        if case .failed = status.state { return false }
+        return status.state != .paused
     }
 
     var body: some View {
@@ -58,18 +63,18 @@ struct SteamProgramDetailsView: View {
                         }
                     }
                     .onAppear { steamLibrary.loadOwnedDepots() }
-                    if steamLibrary.pausedInstalls.contains(game.appID) {
+                    if status?.isPaused == true {
                         VStack(spacing: 10) {
                             HStack(spacing: 10) {
                                 Button {
-                                    steamLibrary.resumeInstall(appID: game.appID)
+                                    StoreProviders.of(.steam).resume(String(game.appID), prefix: prefixPath)
                                 } label: {
                                     Label(tr("Resume"), systemImage: "play.fill")
                                         .downloadControlLabel()
                                 }
                                 .buttonStyle(.borderedProminent)
                                 Button(role: .destructive) {
-                                    steamLibrary.cancelInstall(appID: game.appID)
+                                    StoreProviders.of(.steam).cancel(String(game.appID))
                                 } label: {
                                     Label(tr("Stop"), systemImage: "stop.fill")
                                         .downloadControlLabel()
@@ -109,7 +114,7 @@ struct SteamProgramDetailsView: View {
                                 presentError(tr("Windows environment is not ready."))
                                 return
                             }
-                            if steamLibrary.uninstall(appID: game.appID, prefixPath: prefixPath) {
+                            if StoreProviders.of(.steam).uninstall(String(game.appID), prefix: prefixPath) {
                                 library.removeProfile(for: "steam:\(game.appID)")
                                 dismiss()
                             } else {
@@ -125,7 +130,7 @@ struct SteamProgramDetailsView: View {
                                 presentError(tr("Windows environment is not ready."))
                                 return
                             }
-                            steamLibrary.startInstall(appID: game.appID, prefixPath: prefixPath)
+                            StoreProviders.of(.steam).install(String(game.appID), prefix: prefixPath)
                         } label: {
                             Label(tr("Install"), systemImage: "arrow.down.circle.fill")
                                 .font(.subheadline.weight(.semibold))
@@ -150,7 +155,7 @@ struct SteamProgramDetailsView: View {
                         }
                     }
 
-                    if let error = steamLibrary.downloadErrors[game.appID] {
+                    if let error = status?.failure {
                         Text(error)
                             .foregroundColor(.red)
                             .font(.caption)
@@ -162,9 +167,9 @@ struct SteamProgramDetailsView: View {
                                      onChosen: { _ in
                                          // An installed game fetches the chosen language's depots
                                          // (dubbing and subtitles) through the update path.
-                                         guard let prefixPath, steamLibrary.installedApps.contains(game.appID) else { return }
+                                         guard let prefixPath, StoreProviders.of(.steam).installedIDs.contains(String(game.appID)) else { return }
                                          AppLog.record("[game-language] steam:\(game.appID): fetching the language files")
-                                         steamLibrary.startInstall(appID: game.appID, prefixPath: prefixPath)
+                                         StoreProviders.of(.steam).install(String(game.appID), prefix: prefixPath)
                                      })
                     WindowsGameProfileForm(profile: $profile)
                     DetailCard(title: tr("Steam Cloud saves"), footer: steamLibrary.cloudMessages[game.appID]) {
@@ -182,15 +187,16 @@ struct SteamProgramDetailsView: View {
             .background(Color.black.ignoresSafeArea())
             .navigationTitle(tr("Game details"))
             .navigationBarTitleDisplayMode(.inline)
-            .onChange(of: steamLibrary.installingDLC[game.appID]) { _, now in
-                if now == nil, let prefixPath { steamLibrary.refreshInstalledDLC(appID: game.appID, prefixPath: prefixPath) }
+            .onChange(of: StoreProviders.of(.steam).installingDLC(of: String(game.appID))) { _, now in
+                if now == nil, let prefixPath {
+                    StoreProviders.of(.steam).refreshInstalledDLC(of: String(game.appID), prefix: prefixPath)
+                }
             }
             .task(id: game.appID) {
-                await steamLibrary.loadDLC(appID: game.appID)
+                // The DLC list and which are installed, through the StoreProvider (3.1).
+                await StoreProviders.of(.steam).loadDLC(of: String(game.appID), prefix: prefixPath)
                 guard !Task.isCancelled else { return }
                 if let prefixPath {
-                    steamLibrary.refreshInstalledDLC(appID: game.appID, prefixPath: prefixPath)
-                    guard !Task.isCancelled else { return }
                     if autoSaveEnabled {
                         await steamLibrary.syncCloud(appID: game.appID, prefixPath: prefixPath)
                     }

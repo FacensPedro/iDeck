@@ -1,22 +1,65 @@
 ## What's Changed
-### iDeck 3
-- The first iDeck 3 release. It starts the new architecture: a central session lifecycle (preparing, launching, running, closing, failed, recovering) that every launcher reports to; its last transitions are in the bug report. The full plan is in docs/ARCHITECTURE-3.0.md.
-- iDeck System Libraries: a catalog of the public iOS frameworks iDeck uses or may use, with a coverage report (docs/ios-system-libraries.md) that GitHub updates are checked against.
-- The IPA is named after the version: iDeck-3.0.ipa.
-- The five largest files are split by layer: SystemCoordinator into Application/ (diagnostics, JIT, store clients, launch, Madeira Dock, session end), MainView into Presentation/ (library artwork, game pages per store, profile form, first-run setup, home shelves), WindowsEnvironment into Runtime/ (runtime, graphics, game profile, bundle identity, compatibility switches), EALibrary into Stores/EA/ (account, downloads, launch, licence check) and the Ubisoft downloader into Stores/Ubisoft/ (content service, manifest, installer). The Auto DLL Manager is split into catalog, cache and installer (Runtime/AutoDLL/), and the resource governor into memory and background parts (Runtime/Resources/). Screens and the objects behind them are in separate files: the bug report, Epic Cloud saves, external drives and GOG (sign-in and library). Settings is split by page (stores, system, general), with the shared rows and the Ubisoft account in their own files, each game page (Steam, GOG, Epic, EA, Ubisoft, Windows programs) has its own file, the game library is split by store (header, Steam, GOG, Epic, EA, Ubisoft, home shelves), and the Swift side of the Madeira native runtime (runtime, configuration, JIT helpers, input, renderer view, Wine Mono, Wine Gecko, crash diagnostics) is in its own NativeRuntime folder, with the C, Objective-C and C++ bridges in NativeRuntime/Bridges. Behaviour is unchanged.
-
 ### Games
-- Fixed Fallout: New Vegas from Epic Games closing when Play is tapped in its launcher. After the game's message hook ran, the address of its result was lost, the write faulted and the error handling ran until the stack ran out. The address is now kept safely across the call, as was already done for window messages.
+- Bethesda games start the game itself: Fallout: New Vegas, Fallout 3, Fallout 4, Skyrim (original, Special Edition and VR), Oblivion and Morrowind skip their launcher, which under Wine stopped at "Detecting Video Hardware" or closed when Play was tapped. The games write their default settings themselves on the first start.
+- Fixed Fallout: New Vegas from Epic Games closing about 25 seconds into the game (error 0xC000001D). A read of the game's own memory, made while it reported a message, hit memory that had already been freed; on iOS that fault landed in the middle of a system call and broke its return. The read now goes through the kernel, which reports unreadable memory instead of faulting, and copies whatever is readable, as Windows does.
+- DOOM (2016): the game asks for OpenGL 4.5 core, which the OpenGL runtime on iOS does not reach, and stopped with "wglCreateContextAttribsARB failed". iDeck now starts the game's own Vulkan build (DOOMx64vk.exe), which runs on MoltenVK, when it is in the game folder and Vulkan is not turned off for the game.
+- Mafia: Definitive Edition (GOG): GOG's play task opened 2K's launcher, which stops with exit code 1 under Wine before the game starts. iDeck now starts the game's own executable. Other GOG games whose play task is only a publisher launcher use another play task of the game, never a setup, settings or uninstall tool.
 
-### Game language
-- The language chosen on a game's page is now Windows' own language for that game: games that pick their dubbing and subtitles from the system language (most of them) follow it. Before, Windows always had the device's language.
-- Steam games: the choice is written to the game's install record at once, so subtitles the game already has switch at the next start; dubbing in another language is downloaded by the update the page starts.
+### Dragon Age: Inquisition
+- The game hands its licence check to EA's activation program (ActivationUI.exe, 32-bit). In the earlier Wine logs it crashed when it opened its window, at the same point already fixed for other 32-bit games' windows. The crash in 3.0 happens later, and its Wine log was gone: the log is cut once it passes 8 MB, and four more sessions ran before the report.
+- The Wine log of the last launch that failed is now kept on its own (madeira-log.failed.txt), whatever runs after it. Bugs & logs has "Copy Wine log of the last failed launch", with personal data removed as in the other logs.
+- The iDeck log keeps every row EA's activation program writes, not only the first two.
 
-### Setup
-- The Wine Mono step shows only the component, without a label next to it.
+### Ubisoft Connect
+- Installer integrity: every slice is checked against the SHA-1 it is named by and downloaded again (up to four times) when it does not match. A file whose slices do not add up to its size stops the install instead of being padded with zeros. When a download resumes, a file in the journal counts as installed only while it is on disk at its full size, so a file cut short or deleted since is downloaded again.
 
-### Build
-- The build workflow reads the version from the project only; the stale version in its description is gone.
+### Auto DLL Manager
+- Every DLL taken from Microsoft's package is checked to be a Windows DLL of the right architecture, after extraction and after the copy into the game folder. A damaged cache is dropped and downloaded again.
+- Better detection: delay-loaded imports are read too (games often load D3DX and the HLSL compiler that way). D3DX 9/10/11, the HLSL compiler and D3DCSX are looked up in Wine's folders instead of being assumed present. A start that fails now also names its missing DLLs through Wine's own "not found" lines.
+
+### Session lifecycle
+- Each state change records how long the previous state lasted, in the log and the bug report. A session stuck in preparing (3 min), launching (2 min), closing (45 s) or recovering (1 min) is noted once in the log. "Freeing memory" before a launch (iDeck reopening through StikDebug) is now a state change instead of being ignored.
+
+### Resource Governor
+- The governor now controls four domains on their own, each Auto, Economy or Performance (Settings › Graphics & Performance › Resource Governor). A game's own page always wins.
+  - FEX: Economy shows the game at most 4 cores and uses the faster x87 maths; Performance uses the faster x87 maths with every core.
+  - JIT: Economy asks for a 384 MB pool, Performance for 560 MB, for games whose page leaves the size to iDeck.
+  - GPU: Economy runs one frame in flight and turns frame generation off; Performance keeps two frames in flight unless less than 2 GB is free.
+  - Sessions: Economy hands memory back before the launch, pauses every store's downloads while the game runs (they go on when it ends) and pauses the game in the background; Performance keeps the game running in the background.
+- Auto acts as Economy in Low Power Mode or when the device is hot, and for JIT and GPU when less than 3 GB is free. Each launch logs its plan, and the bug report shows it.
+
+### Stores
+- A shared StoreProvider for Steam, GOG, Epic Games, the EA app and Ubisoft Connect: one interface for sign-in, owned games, install state, downloads (queued, running, paused, failed), install, pause, resume, stop, uninstall and refresh. The Resource Governor, the memory log and Bugs & logs use it. "Clear logs" now also waits for the EA app's and Ubisoft's downloads, which it did not count before. The bug report lists each store's sign-in, games and downloads (counts only).
+- The store screens use it too: install, update, pause, resume, stop and uninstall on the Steam, GOG, Epic Games, EA app and Ubisoft Connect pages and in the library go through each store's provider instead of calling each store in its own way. Behaviour is the same.
+- DLC too: the DLC lists of Steam and Epic Games game pages (titles, sizes, progress, install, cancel, uninstall, and loading the list and what is installed) go through the provider. GOG, the EA app and Ubisoft Connect answer with no DLC, as iDeck installs none for them yet. Epic's optional content (voice languages, textures and other packs inside the game's build) goes through the provider as well.
+- The screens also read what they show through it: installed or not, queued, downloading, paused, stopping, failed and why, progress, bytes downloaded and written, the phase (preparing, checking files, downloading, finishing) and the time left, on the game pages, the library cards, the Installed list and the EA shelf. The main screen also refreshes Steam's library and looks for Steam's and GOG's installed games through the provider. Each store's own data (versions, sizes, cloud saves) stays with the store.
+
+### Madeira, FEX, ARM64EC and WoW64
+- A fault inside a system call that is guarded on the Unix side (`__TRY`, as in the buffer checks and NtReadVirtualMemory) now resumes at the guard on iOS, as it does on Linux. Such faults arrive as Mach exceptions and were delivered on the game's own stack instead, so the system call never returned properly and the game ended with 0xC000001D. This is the general fix behind the Fallout: New Vegas one above.
+
+### iOS System Libraries
+- Full audit in docs/ios-system-libraries.md:
+  - every framework iDeck does not import has a decision and a reason (used through Madeira, worth adopting, or not applicable);
+  - CoreLocation, StoreKit and JavaScriptCore were evaluated by name and are not needed;
+  - Madeira's link line is audited: its frameworks, system libraries and the static archives it is built from;
+  - real use is measured: how many identifiers of each framework iDeck's code names, with the most used;
+  - frameworks that could be removed (imported but unused) are listed: none today;
+  - coverage is given both for iDeck's own code and with Madeira's frameworks.
+- IOKit is marked as not public: only the existing uses remain.
+
+### Sign-in and Bugs & logs (AuthenticationServices and QuickLook)
+- EA app and Epic Games sign-ins open in Safari's sign-in sheet over iDeck (AuthenticationServices) instead of switching to the Safari app. It shares Safari's cookies, so an account already signed in on the web goes straight through.
+  - EA app: the sheet receives EA's end-of-login address itself and closes; iDeck signs in.
+  - Epic Games: iDeck sees the approval and closes the sheet by itself.
+  - If the sheet cannot open, Safari is used as before; pasting a code or address still works.
+  - GOG keeps Safari: its login ends on an address of its own site that no other app can receive.
+- Bugs & logs › Preview before sharing (QuickLook): the bug report, the last Wine log, the failed launch's Wine log and the iDeck log, shown exactly as Copy shares them, compacted and with personal data removed.
+- The library audit now counts both frameworks as in use: 29 of 58 public frameworks (50%).
+
+### Graphics
+- MetalFX: the upscale factor now fits both sides of the screen. A 4:3 game on an iPhone was enlarged by its long side only, beyond the screen's height, so MetalFX drew pixels that were then thrown away.
+- Direct3D: a game able to use Direct3D 11 and 12 (Unity and Unreal engines) whose Direct3D 12 session crashed or caused GPU errors starts on Direct3D 11 (DXMT) from the next launch. The session's message says so.
+- Shaders: the shader cache is capped at 64 MB instead of 128 MB when less than 4 GB of storage is free or the GPU domain is on Economy.
 
 ### Version
-- Updated the application version to 3.0 (build 129).
+- Updated the application version to 3.1 (build 130).

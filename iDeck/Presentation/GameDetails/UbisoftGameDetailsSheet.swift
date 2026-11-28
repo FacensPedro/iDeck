@@ -15,12 +15,13 @@ struct UbisoftGameDetailsSheet: View {
 
     var body: some View {
         let game = ubisoft.game(gameID) ?? fallback
-        let download = ubisoft.downloads[gameID]
-        let failed: String? = { if case .failed(let message)? = download?.state { return message }; return nil }()
-        let paused: Bool = { if case .paused? = download?.state { return true }; return false }()
+        // Download state through the StoreProvider (3.1).
+        let download = StoreProviders.of(.ubisoft).downloadStatus(gameID)
+        let failed = download?.failure
+        let paused = download?.isPaused ?? false
         let installed = game.executable != nil
         let sizeText: String = {
-            guard let total = download?.total, total > 0 else { return tr(installed ? "Installed" : "Size unavailable") }
+            guard let total = download?.totalBytes, total > 0 else { return tr(installed ? "Installed" : "Size unavailable") }
             return tr("Download: %@", ByteCountFormatter.string(fromByteCount: Int64(clamping: total), countStyle: .file))
         }()
         StoreGameDetailsView(
@@ -28,8 +29,8 @@ struct UbisoftGameDetailsSheet: View {
             covers: game.coverURLs.filter { $0.lastPathComponent != "header.jpg" },
             banners: game.coverURLs.filter { $0.lastPathComponent == "header.jpg" },
             installed: installed && download == nil,
-            progress: (download != nil && failed == nil) ? download?.fraction : nil,
-            installedText: download.flatMap { installedBytesText(done: $0.done, total: $0.total) },
+            progress: download?.progress,
+            installedText: download.flatMap { installedBytesText(done: $0.doneBytes, total: $0.totalBytes) },
             paused: paused, sizeText: sizeText, errorText: failed,
             canInstall: !installed && !AntiCheatPolicy.isBlocked(title: game.title),
             onLaunch: {
@@ -37,14 +38,14 @@ struct UbisoftGameDetailsSheet: View {
                 let profile = library.profile(for: "ubisoft:\(gameID)", title: game.title)
                 coordinator.launchWindowsProgram(at: executable, profile: profile, detectInstaller: false)
             },
-            onInstall: { ubisoft.install(game) },
-            onPause: { ubisoft.pause(game) },
-            onStop: { ubisoft.cancel(game) },
+            onInstall: { StoreProviders.of(.ubisoft).install(game.id, prefix: nil) },
+            onPause: { StoreProviders.of(.ubisoft).pause(game.id) },
+            onStop: { StoreProviders.of(.ubisoft).cancel(game.id) },
             onUninstall: nil,
             library: library, coordinator: coordinator
         ) {
-            if let download, case .active = download.state, download.total == 0 {
-                Text(download.step).font(.caption).foregroundColor(.gray)
+            if let download, case .active = download.state, download.totalBytes == 0, let step = download.step {
+                Text(step).font(.caption).foregroundColor(.gray)
             }
         }
     }

@@ -20,9 +20,22 @@ struct EASignInView: View {
     @State private var pasted = ""
     @State private var opened = false
 
-    /// EA's login page in Safari (outside iDeck). EA ends on qrc:///…?code=, an address
-    /// iDeck is registered for, so Safari hands it back to iDeck (iDeckApp.onOpenURL).
-    private func openSafari() { UIApplication.shared.open(EALibrary.shared.loginURL()) }
+    /// EA's login page in Safari's sign-in sheet over iDeck (AuthenticationServices).
+    /// EA ends on qrc:///…?code=; the sheet hands that address straight back and closes.
+    /// If the sheet cannot open, Safari itself is used: iDeck is registered for qrc, so
+    /// Safari hands the address back too (iDeckApp.onOpenURL).
+    private func openSafari() {
+        let url = EALibrary.shared.loginURL()
+        Task { @MainActor in
+            do {
+                if let back = try await WebSignIn.shared.start(url: url, scheme: "qrc") { submit(back.absoluteString) }
+            } catch WebSignIn.Failure.cancelled {
+                // Closed by the user: the button opens it again.
+            } catch {
+                _ = await UIApplication.shared.open(url)
+            }
+        }
+    }
 
     var body: some View {
         NavigationStack {
@@ -38,7 +51,7 @@ struct EASignInView: View {
                             Button { openSafari() } label: { Label(tr("Sign in with Safari"), systemImage: "safari") }
                                 .disabled(busy)
                         } footer: {
-                            Text(tr("EA's login page opens in Safari and returns to iDeck by itself when you finish."))
+                            Text(tr("EA's login page opens in Safari over iDeck and closes by itself when you finish."))
                         }
                         if busy { Section { HStack(spacing: 12) { ProgressView(); Text("Signing in…") } } }
                     }

@@ -64,7 +64,7 @@ struct MainView: View {
         .task(id: steamLibrary != nil && coordinator.isSteamConnected) {
             guard let steamLibrary else { return }
             if coordinator.isSteamConnected {
-                await steamLibrary.refresh()
+                await StoreProviders.of(.steam).refresh()
             } else {
                 steamLibrary.disconnect()
             }
@@ -171,9 +171,12 @@ struct WindowsWorkspaceView: View {
     }
 
     var installedSteamGames: [SteamAppInfo] {
-        steamLibrary.games.filter { game in
-            steamLibrary.installingApps.contains(game.appID) ||
-            steamLibrary.installedApps.contains(game.appID)
+        // Through the StoreProvider (3.1): installed, or downloading now.
+        let steamStore = StoreProviders.of(.steam)
+        let installed = steamStore.installedIDs
+        return steamLibrary.games.filter { game in
+            let id = String(game.appID)
+            return installed.contains(id) || steamStore.downloadState(id)?.isRunning == true
         }
     }
 
@@ -200,11 +203,15 @@ struct WindowsWorkspaceView: View {
     /// GOG and Epic games being installed: listed under Installed games with
     /// their progress, as Steam games are while they download.
     var installingGOGGames: [GOGGame] {
-        gogLibrary.games.filter { gogLibrary.downloadProgress[$0.id] != nil && gogLibrary.installed[$0.id] == nil }
+        let gogStore = StoreProviders.of(.gog)
+        let installed = gogStore.installedIDs
+        return gogLibrary.games.filter { gogStore.hasDownload(String($0.id)) && !installed.contains(String($0.id)) }
     }
 
     var installingEpicGames: [EpicOwnedGame] {
-        epicLibrary.owned.filter { epicLibrary.downloads[$0.appName] != nil && epicLibrary.installed[$0.appName] == nil }
+        let epicStore = StoreProviders.of(.epic)
+        let installed = epicStore.installedIDs
+        return epicLibrary.owned.filter { epicStore.downloadStatus($0.appName) != nil && !installed.contains($0.appName) }
     }
 
     var isCompact: Bool { horizontalSizeClass == .compact }
@@ -403,7 +410,7 @@ struct WindowsWorkspaceView: View {
                     waited += 1
                 }
                 guard !ideck_wineprocess_running() else { return }
-                gogLibrary.refreshInstalled(prefixPath: prefixPath)
+                StoreProviders.of(.gog).refreshInstalled(prefix: prefixPath)
                 windowsLibrary.refresh(prefixPath: prefixPath)
             }
         }
@@ -444,8 +451,8 @@ struct WindowsWorkspaceView: View {
                         await windowsLibrary.importEmbeddedIcon(for: executable)
                     }
                 }
-                steamLibrary.refreshInstalledApps(prefixPath: root)
-                gogLibrary.refreshInstalled(prefixPath: root)
+                StoreProviders.of(.steam).refreshInstalled(prefix: root)
+                StoreProviders.of(.gog).refreshInstalled(prefix: root)
                 // Keep the first Wine prefix initialization architecture-only.
                 // Steam client components are installed from the explicit Madeira Dock step.
                 }
@@ -456,8 +463,8 @@ struct WindowsWorkspaceView: View {
     func reloadInstalledGames() {
         resolvePrefixPath()
         guard let prefixPath else { return }
-        steamLibrary.refreshInstalledApps(prefixPath: prefixPath)
-        gogLibrary.refreshInstalled(prefixPath: prefixPath)
+        StoreProviders.of(.steam).refreshInstalled(prefix: prefixPath)
+        StoreProviders.of(.gog).refreshInstalled(prefix: prefixPath)
         epicLibrary.reloadInstalled()
         windowsLibrary.refresh(prefixPath: prefixPath)
     }
