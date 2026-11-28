@@ -26,13 +26,13 @@ struct EASignInView: View {
     /// Safari hands the address back too (iDeckApp.onOpenURL).
     private func openSafari() {
         let url = EALibrary.shared.loginURL()
-        Task {
+        Task { @MainActor in
             do {
                 if let back = try await WebSignIn.shared.start(url: url, scheme: "qrc") { submit(back.absoluteString) }
             } catch WebSignIn.Failure.cancelled {
                 // Closed by the user: the button opens it again.
             } catch {
-                UIApplication.shared.open(url)
+                _ = await UIApplication.shared.open(url)
             }
         }
     }

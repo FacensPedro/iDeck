@@ -86,10 +86,10 @@ struct EpicSignInView: View {
     /// The page never redirects: iDeck polls for the approval and closes the sheet
     /// itself. Safari is used when the sheet cannot open.
     private func openSheet(_ url: URL) {
-        Task {
+        Task { @MainActor in
             do { _ = try await WebSignIn.shared.start(url: url, scheme: "ideck-epic-signin") }
             catch WebSignIn.Failure.cancelled {}
-            catch { UIApplication.shared.open(url) }
+            catch { _ = await UIApplication.shared.open(url) }
         }
     }
 
